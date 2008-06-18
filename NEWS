@@ -3,6 +3,19 @@ Changes in @NEW@:
     * The addRoleMember() and getRoleMembers() calls are now exposed
       via XMLRPC. (CNY-2862)
 
+  o Build Changes:
+    * When the configure script run by r.Configure() or r.ManualConfigure()
+      fails, "command not found" messages are highlighted, and possible
+      missing buildRequires based on those messages are sought in the
+      repository. (CNY-2708)
+    * All missing buildRequires found by noticing programs used in source
+      actions, build actions, and policies are reported immediately as well
+      as summarized at the end of the build, to make it clearer why each
+      requirement has been suggested. (CNY-2858)
+    * The r.addPatch() method now takes an optional patchName keyword
+      argument, which is the name of the patch program to use to apply
+      the patch. (CNY-2858)
+
 Changes in 2.0.17:
   o Build Changes:
     * Recipes loaded based on the autoLoadRecipe configuration directive

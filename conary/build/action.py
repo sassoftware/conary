@@ -194,22 +194,33 @@ class RecipeAction(Action):
 	if self.debug:
 	    debugger.set_trace()
 	if self.use:
-	    if self.linenum is None:
-		self.do()
-	    else:
-		oldexcepthook = sys.excepthook
-		sys.excepthook = genExcepthook(self)
-                if self.recipe.buildinfo:
-                    self.recipe.buildinfo.lastline = self.linenum
-		self.do()
-		sys.excepthook = oldexcepthook
+            try:
+                if self.linenum is None:
+                    self.do()
+                else:
+                    oldexcepthook = sys.excepthook
+                    sys.excepthook = genExcepthook(self)
+                    if self.recipe.buildinfo:
+                        self.recipe.buildinfo.lastline = self.linenum
+                    self.do()
+                    sys.excepthook = oldexcepthook
 
-        self.doSuggestAutoBuildReqs()
+            finally:
+                # we need to provide suggestions even in the failure case
+                self.doSuggestAutoBuildReqs()
+	else:
+            # any invariant suggestions should be provided even if not self.use
+            self.doSuggestAutoBuildReqs()
 
     def doSuggestAutoBuildReqs(self):
         if not hasattr(self.recipe, "buildRequires"):
             # Most likely group recipe
             return
+        if hasattr(self.recipe, "getRepos"):
+            repos = self.recipe.getRepos()
+        else:
+            repos = None
+
         paths = []
         buildRequires = self.recipe._getTransitiveBuildRequiresNames()
         for cmd in self._actionPathBuildRequires:
@@ -226,9 +237,24 @@ class RecipeAction(Action):
             # command, use the original one
             c = c % self.recipe.macros
             fullPath = util.checkPath(c)
-            if not fullPath:
-                log.warning('Unable to find path for command "%s", '
-                            'will not suggest a build requirement for it' % c)
+            if (not fullPath) and repos:
+                if not c.startswith('/'):
+                    candidatePaths = [os.path.join(x, c)
+                        for x in os.getenv('PATH', '').split(os.path.pathsep)]
+                else:
+                    candidatePaths = [c]
+                foundProvider = False
+                for label in self.recipe.cfg.installLabelPath:
+                    trvDict = repos.getTroveVersionsByPath(candidatePaths,
+                                                           label)
+                    trvs = [x for x in trvDict.values() if x]
+                    if trvs:
+                        foundProvider = True
+                        self._addActionTroveBuildRequires([trvs[0][0][0]])
+                        break
+                if not foundProvider:
+                    log.warning('Failed to find possible build requirement'
+                        ' for path "%s"' % c)
                 continue
             paths.append(fullPath)
         if not hasattr(self.recipe, '_pathLookupCache'):
@@ -246,6 +272,7 @@ class RecipeAction(Action):
         # Remove build requires that were already added
         suggests = suggests - set(buildRequires)
         if suggests:
+            log.warning('Some missing buildRequires %s' %(sorted(suggests)))
             self.recipe.reportMissingBuildRequires(sorted(suggests))
 
     def doPrep(self):

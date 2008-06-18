@@ -104,22 +104,27 @@ class BuildAction(action.RecipeAction):
 	    debugger.set_trace()
 
 	if self.use:
-            if self.manifest:
-                self.manifest.walk()
+            try:
+                if self.manifest:
+                    self.manifest.walk()
 
-	    if self.linenum is None:
-		self.do(self.recipe.macros)
-	    else:
-                self.recipe.buildinfo.lastline = self.linenum
-		oldexcepthook = sys.excepthook
-		sys.excepthook = action.genExcepthook(self)
-		self.do(self.recipe.macros)
-		sys.excepthook = oldexcepthook
+                if self.linenum is None:
+                    self.do(self.recipe.macros)
+                else:
+                    self.recipe.buildinfo.lastline = self.linenum
+                    oldexcepthook = sys.excepthook
+                    sys.excepthook = action.genExcepthook(self)
+                    self.do(self.recipe.macros)
+                    sys.excepthook = oldexcepthook
 
-            if self.manifest:
-                self.manifest.create()
-
-        self.doSuggestAutoBuildReqs()
+                if self.manifest:
+                    self.manifest.create()
+            finally:
+                # we need to provide suggestions even in the failure case
+                self.doSuggestAutoBuildReqs()
+	else:
+            # any invariant suggestions should be provided even if not self.use
+            self.doSuggestAutoBuildReqs()
 
     def do(self, macros):
         """
@@ -520,6 +525,9 @@ class Configure(BuildCommand):
             macros.bootstrapFlags = self.bootstrapFlags
         else:
             macros.bootstrapFlags = ''
+
+        missingCommandRe = ".* ([^ ]+): command not found"
+        self.recipe.subscribeLogs(missingCommandRe)
         try:
             try:
                 util.execute(self.command %macros)
@@ -540,6 +548,20 @@ class Configure(BuildCommand):
             if self.local:
                 os.environ['PATH'] = oldPath
                 os.environ['CONFIG_SITE'] = oldSite
+
+            self.recipe.synchronizeLogs()
+            subLogPath = self.recipe.getSubscribeLogPath()
+            matchRe = re.compile(missingCommandRe)
+            if subLogPath:
+                # get lines and match groups only for matching lines
+                lines = [(line, match)
+                         for line, match in ((l, matchRe.match(l))
+                                             for l in file(subLogPath))
+                         if match]
+                for line, match in lines:
+                    cmd = match.group(1)
+                    self._addActionPathBuildRequires([cmd])
+                    log.warning(line.strip())
 
 class CMake(Configure):
     """

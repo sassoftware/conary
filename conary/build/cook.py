@@ -332,8 +332,9 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param loaderList: list of RecipeLoader objects containing recipes to build
-    @type loaderList: list of classes descended from recipe.Recipe
+    @param loaderList: list of classes descended from C{recipe.Recipe}
+    containing recipes to build
+    @type loaderList: [L{RecipeLoader<conary.build.loadrecipe.RecipeLoader>}]
     @type sourceVersion: the full conary verison of the recipeClass we are 
     cooking.  This source trove version should exist.  If you know what you
     are doing, you can create troves with non-existant source versions 
@@ -1060,6 +1061,7 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
     for k, v in cfg.environment.items():
         os.environ[k] = v % recipeObj.macros
 
+    recipeObj.setRepos(repos)
     recipeObj.populateLcache()
     recipeObj.isatty(sys.stdout.isatty() and sys.stdin.isatty())
     recipeObj.sourceVersion = sourceVersion

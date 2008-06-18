@@ -499,6 +499,11 @@ class AbstractPackageRecipe(Recipe):
     def disableParallelMake(self):
         self.macros._override('parallelmflags', '')
 
+    def setRepos(self, repos):
+        self._repos = repos
+    def getRepos(self):
+        return self._repos
+
     def isatty(self, value=None):
         if value is not None:
             self._tty = value
@@ -846,6 +851,7 @@ class AbstractPackageRecipe(Recipe):
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
+        self._repos = None
 	self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
 	self.macros.update(baseMacros)

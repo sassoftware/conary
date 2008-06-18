@@ -631,7 +631,7 @@ class addPatch(_Source):
     SYNOPSIS
     ========
 
-    C{r.addPatch(I{patchname}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=,] [I{sourceDir}=])}
+    C{r.addPatch(I{patchfilename}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=,] [I{sourceDir}=,] [I{patchName}=])}
 
     DESCRIPTION
     ===========
@@ -662,7 +662,7 @@ class addPatch(_Source):
     Privacy Guard (GPG) key ID, without leading C{0x} for the source code
     archive signature should be sought, and checked. If you provide the
     C{keyid} keyword, {r.addPatch} will search for a file named
-    I{patchname}C{.{sig,sign,asc}}, and ensure it is signed with the
+    I{patchfilename}C{.{sig,sign,asc}}, and ensure it is signed with the
     appropriate GPG key. A missing signature results in a warning; a failed
     signature check is fatal.
 
@@ -681,7 +681,7 @@ class addPatch(_Source):
 
     B{rpm} : If the C{rpm} keyword is used, C{Archive}
     looks in the file, or URL specified by C{rpm} for an RPM
-    containing I{patchname}.
+    containing I{patchfilename}.
 
     B{use} : A Use flag, or boolean, or a tuple of Use flags, and/or
     boolean values which determine whether the source code archive is
@@ -707,6 +707,8 @@ class addPatch(_Source):
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
     considered relative to C{%(builddir)s}.
 
+    B{patchName} : Name of patch program to run (Default: C{patch))
+
     EXAMPLES
     ========
 
@@ -724,11 +726,11 @@ class addPatch(_Source):
     stripped, and a C{dir} keyword, instructing C{r.addPatch} to change to the
     C{lib/Xaw3d} directory prior to applying the patch.
     """
-    _actionPathBuildRequires = set(['patch'])
     keywords = {'level': None,
 		'backup': '',
 		'macros': False,
-		'extraArgs': ''}
+                'extraArgs': '',
+                'patchName': 'patch'}
 
 
     def __init__(self, recipe, *args, **keywords):
@@ -780,7 +782,9 @@ class addPatch(_Source):
 	self.applymacros = self.macros
 
     def _applyPatch(self, patchlevel, patch, destDir, dryRun=True):
-        patchArgs = [ 'patch', '-d', destDir, '-p%s'%patchlevel, ]
+        patchProgram = self.patchName %self.recipe.macros
+        self._addActionPathBuildRequires([patchProgram])
+        patchArgs = [ patchProgram, '-d', destDir, '-p%s'%patchlevel, ]
         if self.backup:
             patchArgs.extend(['-b', '-z', self.backup])
         if self.extraArgs:
@@ -795,10 +799,13 @@ class addPatch(_Source):
         if dryRun:
             patchArgs.append('--dry-run')
 
-        p2 = subprocess.Popen(patchArgs,
-                              stdin=subprocess.PIPE,
-                              stderr=logFile, shell=False, stdout=logFile,
-                              close_fds=True)
+        try:
+            p2 = subprocess.Popen(patchArgs,
+                                  stdin=subprocess.PIPE,
+                                  stderr=logFile, shell=False, stdout=logFile,
+                                  close_fds=True)
+        except OSError, e:
+            raise SourceError('Could not run %s: %s' % (patchProgram, e))
 
         p2.stdin.write(patch)
         p2.stdin.close() # since stdin is closed, we can't
