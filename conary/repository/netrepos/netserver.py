@@ -351,7 +351,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def listRoles(self, authToken, clientVersion):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], 'listRoles')
+        self.log(2, authToken[0])
         return self.auth.getRoleList()
 
     @accessReadWrite
@@ -363,7 +363,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addRoleMember(self, authToken, clientVersion, role, username):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], 'addRoleMember')
+        self.log(2, authToken[0], role, username)
         self.auth.addRoleMember(role, username)
         return True
 
@@ -371,14 +371,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getRoleMembers(self, authToken, clientVersion, role):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], 'getRoleMembers')
+        self.log(2, authToken[0], role)
         return self.auth.getRoleMembers(role)
 
     @accessReadWrite
     def updateRoleMembers(self, authToken, clientVersion, role, members):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-        self.log(2, authToken[0], 'updateRoleMembers')
+        self.log(2, authToken[0], role, members)
         self.auth.updateRoleMembers(role, members)
         return True
 
@@ -967,9 +967,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ORDER BY I.item, N.finalTimestamp
         """ % mainQdict
 
-        self.log(3, "execute query", fullQuery, argDict)
+        self.log(4, "execute query", fullQuery, argDict)
         cu.execute(fullQuery, argDict)
-        self.log(3, "executed query")
+        self.log(4, "executed query")
 
         # this prevents dups that could otherwise arise from multiple
         # acl's allowing access to the same information
