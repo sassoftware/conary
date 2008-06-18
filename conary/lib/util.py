@@ -228,7 +228,7 @@ def genExcepthook(debug=True,
             sys.stderr.write(error % dict(command=' '.join(sys.argv),
                                                  filename=filename,
                                                  lineno=lineno,
-                                                 errtype=type.__name__,
+                                                 errtype=typ.__name__,
                                                  errmsg=value,
                                                  stackfile=stackfile))
 
