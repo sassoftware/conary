@@ -75,8 +75,8 @@ def requireClientProtocol(protocol):
 
     return dec
 
-def deprecatedPermissionCall(*args):
-    def f(*args, **kw):
+def deprecatedPermissionCall(*args, **kw):
+    def f(self, *args, **kw):
         raise errors.InvalidClientVersion(
             'Conary 2.0 is required to manipulate permissions in this '
             'repository.')
@@ -3005,7 +3005,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """
         # infoType should be valid
         if infoType not in trove.TroveInfo.streamDict.keys():
-            raise RepositoryError("Unknown trove infoType requested", infoType)
+            raise errors.RepositoryError("Unknown trove infoType requested", infoType)
         self.log(2, infoType, troveList)
 
         # by default we should mark all troves with insuficient permission
