@@ -627,7 +627,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
         # a more recent major is not compatible
         if dbVersion.major > schema.VERSION.major:
             print "ERROR: code base too old for this repository database"
-            print "ERROR: repo=", dbVersion, "code=", self.VERSION
+            print "ERROR: repo=", dbVersion, "code=", schema.VERSION
             sys.exit(-1)
         # determine is we need to call the schema migration
         loadSchema = False
