@@ -386,24 +386,24 @@ class RoleInstances(RoleTable):
         delete from tmpInstances
         where exists (
             select 1 from UserGroupAllPermissions as ugap
-            where ugap.userGroupId = ?
+            where ugap.userGroupId = :roleId
               and ugap.instanceId = tmpInstances.instanceId )
         or exists (
             select 1 from UserGroupAllTroves as ugat
-            where ugat.userGroupId = ?
+            where ugat.userGroupId = :roleId
               and ugat.instanceId = tmpInstances.instanceId )
-        """, (roleId, roleId), start_transaction=False)
+        """, roleId=roleId, start_transaction=False)
         self.db.analyze("tmpInstances")
         # remove trove access from troves that are left
         cu.execute("""
         delete from UserGroupInstancesCache
-        where userGroupId = ?
+        where userGroupId = :roleId
           and instanceId in (select instanceId from tmpInstances)
           and not exists (
               select 1 from UserGroupAllTroves as ugat
-              where ugat.userGroupId = UserGroupInstancesCache.userGroupId
+              where ugat.userGroupId = :roleId
                 and ugat.instanceId = UserGroupInstancesCache.instanceId )
-        """, roleId)
+        """, roleId=roleId)
         # add the new troves now
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
@@ -495,7 +495,7 @@ class RoleInstances(RoleTable):
     def deleteInstanceId(self, instanceId):
         cu = self.db.cursor()
         for t in [ "UserGroupInstancesCache", "UserGroupAllTroves",
-                   "UserGroupAllPermissions"]:
+                   "UserGroupAllPermissions", "UserGroupTroves"]:
             cu.execute("delete from %s where instanceId = ?" % (t,),
                        instanceId)
         self.latest.updateInstanceId(cu, instanceId)
@@ -503,7 +503,7 @@ class RoleInstances(RoleTable):
     def deleteInstanceIds(self, idTableName):
         cu = self.db.cursor()
         for t in [ "UserGroupInstancesCache", "UserGroupAllTroves",
-                   "UserGroupAllPermissions"]:
+                   "UserGroupAllPermissions", "UserGroupTroves" ]:
             cu.execute("delete from %s where instanceId in (select instanceId from %s)"%(
                 t, idTableName))
         # this case usually does not require recomputing the
