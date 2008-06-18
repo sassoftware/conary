@@ -743,6 +743,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             return
         self.c[label].deleteRole(role)
 
+    def addRoleMember(self, label, role, username):
+        if self.c[label].getProtocolVersion() < 61:
+            raise errors.InvalidServerVersion(
+                'addRoleMember requires Conary 2.0.18 or later')
+        self.c[label].addRoleMember(role, username)
+
+    def getRoleMembers(self, label, role):
+        if self.c[label].getProtocolVersion() < 61:
+            raise errors.InvalidServerVersion(
+                'getRoleMembers requires Conary 2.0.18 or later')
+        return self.c[label].getRoleMembers(role)
+
     def updateRoleMembers(self, label, role, members):
         if self.c[label].getProtocolVersion() < 61:
             self.c[label].updateAccessGroupMembers(role, members)

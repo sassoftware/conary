@@ -360,6 +360,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         pass
 
     @accessReadWrite
+    def addRoleMember(self, authToken, clientVersion, role, username):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], 'addRoleMember')
+        self.auth.addRoleMember(role, username)
+        return True
+
+    @accessReadOnly
+    def getRoleMembers(self, authToken, clientVersion, role):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], 'getRoleMembers')
+        return self.auth.getRoleMembers(role)
+
+    @accessReadWrite
     def updateRoleMembers(self, authToken, clientVersion, role, members):
         if not self.auth.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
