@@ -3,6 +3,11 @@ Changes in @NEW@:
     * The addRoleMember() and getRoleMembers() calls are now exposed
       via XMLRPC. (CNY-2862)
 
+  o Bug Fixes:
+    * A rare error that occurred when an updating containing several groups
+      that contained different versions of the same package has been 
+      fixed. (CNY-2860)
+
   o Build Changes:
     * When the configure script run by r.Configure() or r.ManualConfigure()
       fails, "command not found" messages are highlighted, and possible
