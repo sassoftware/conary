@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Protocol Changes:
+    * The addRoleMember() and getRoleMembers() calls are now exposed
+      via XMLRPC. (CNY-2862)
+
 Changes in 2.0.17:
   o Build Changes:
     * Recipes loaded based on the autoLoadRecipe configuration directive

@@ -1,5 +1,8 @@
 # this file documents the wire protocol changes for conary.
-Varsion 62:
+Version 63:
+  - added calls addRoleMember and getRoleMembers
+
+Version 62:
   - added xmlrpc api call commitCheck()
   - getPackageBranchPathIds now passes on a list of dirnames instead of filePrefixes
 

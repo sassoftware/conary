@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 62 + 1)
+CLIENT_VERSIONS = range(36, 63 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -744,15 +744,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[label].deleteRole(role)
 
     def addRoleMember(self, label, role, username):
-        if self.c[label].getProtocolVersion() < 61:
-            raise errors.InvalidServerVersion(
-                'addRoleMember requires Conary 2.0.18 or later')
+        if self.c[label].getProtocolVersion() < 63:
+            raise errors.InvalidServerVersion('addRoleMember requires '
+                'a server running Conary 2.0.18 or later')
         self.c[label].addRoleMember(role, username)
 
     def getRoleMembers(self, label, role):
-        if self.c[label].getProtocolVersion() < 61:
-            raise errors.InvalidServerVersion(
-                'getRoleMembers requires Conary 2.0.18 or later')
+        if self.c[label].getProtocolVersion() < 63:
+            raise errors.InvalidServerVersion('getRoleMembers requires '
+                'a server running Conary 2.0.18 or later')
         return self.c[label].getRoleMembers(role)
 
     def updateRoleMembers(self, label, role, members):
