@@ -120,20 +120,31 @@ class MainHandler(object):
 
     def getParser(self, command):
         thisCommand = self._supportedCommands[command]
-        params, cfgMap = thisCommand.prepare()
-        usage = self._getUsage(command)
-        kwargs = self._getParserFlags(thisCommand)
+        return self.getParserByClass(commandClass)
+
+    def getParserByClass(self, commandClass, commandName=None):
+        params, cfgMap = commandClass.prepare()
+        usage = self._getUsageByClass(commandClass, commandName=commandName)
+        kwargs = self._getParserFlags(commandClass)
         return options._getParser(params, {}, usage=usage, **kwargs)
 
     def _getUsage(self, commandName):
+        commandClass = self._supportedCommands[commandName]
+        return self._getUsageByClass(commandClass, commandName)
+
+    def _getUsageByClass(self, commandClass, commandName=None):
         if self.name:
             progName = self.name
         else:
             progName = argv[0]
+        if not commandName:
+            if hasattr(commandClass, 'name'):
+                commandName = commandClass.name
+            else:
+                commandName = commandClass.commands[0]
 
-        thisCommand = self._supportedCommands[commandName]
         commandUsage = '%s %s %s' % (progName, commandName,
-                                     thisCommand.paramHelp)
+                                     commandClass.paramHelp)
         return commandUsage
 
     def _getParserFlags(self, thisCommand):
