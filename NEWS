@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Protocol Changes:
     * The addRoleMember() and getRoleMembers() calls are now exposed
       via XMLRPC. (CNY-2862)
+    * Added support for package creator specific data to trove info and
+      the getPackageCreatorTroves() repository all (CNY-2855)
 
   o Bug Fixes:
     * A rare error that occurred when an updating containing several groups
