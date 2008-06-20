@@ -2366,7 +2366,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """ % (trove._TROVEINFO_TAG_PKGCREATORDATA,
                ",".join("%d" % x for x in roleIds),
                trove._TROVEINFO_TAG_PKGCREATORDATA)
-        import epdb;epdb.st()
         cu.execute(query)
         return sorted([ tuple(x) for x in cu ])
 

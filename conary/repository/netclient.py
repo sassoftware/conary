@@ -2103,9 +2103,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             args = (leavesOnly,)
 
-        print "--- get deps %s" % label
         d = self.c[label].getDepSuggestions(self.fromLabel(label), l, *args)
-        print "--- got deps"
         r = {}
         for (key, val) in d.iteritems():
             l = []

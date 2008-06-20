@@ -1368,15 +1368,12 @@ class Database(SqlDbRepository):
         """
 
         checker = self.dependencyChecker(troveSource)
-        print "--- adding jobs"
         checker.addJobs(jobSet)
-        print "--- checking deps"
         unsatisfiedList, unresolveableList, changeSetList, criticalUpdates = \
                 checker.check(findOrdering = findOrdering,
                               linkedJobs = linkedJobs,
                               criticalJobs = criticalJobs,
                               finalJobs = finalJobs)
-        print "--- done"
 
         if criticalOnly and criticalUpdates:
             changeSetList = changeSetList[:criticalUpdates[0] + 1]
