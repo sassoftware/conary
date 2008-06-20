@@ -11,6 +11,8 @@ Changes in @NEW@:
       fixed. (CNY-2860)
     * Some .car format files previously caused builds to fail; this
       has been corrected. (CNY-2871)
+    * Tracebacks no longer print each filename twice (bug introduced
+      in Conary 2.0.16). (CNY-2872)
 
   o Build Changes:
     * When the configure script run by r.Configure() or r.ManualConfigure()
