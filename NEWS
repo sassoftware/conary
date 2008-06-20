@@ -9,6 +9,8 @@ Changes in @NEW@:
     * A rare error that occurred when an updating containing several groups
       that contained different versions of the same package has been 
       fixed. (CNY-2860)
+    * Some .car format files previously caused builds to fail; this
+      has been corrected. (CNY-2871)
 
   o Build Changes:
     * When the configure script run by r.Configure() or r.ManualConfigure()
