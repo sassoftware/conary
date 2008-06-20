@@ -583,7 +583,7 @@ def createTroves(db, createIndex = True):
     if createTrigger(db, "FileStreams"):
         commit = True
 
-    if idtable.createIdTable(db, "Dirnames", "dirnameId", "dirname"):
+    if idtable.createIdTable(db, "Dirnames", "dirnameId", "dirname", colType = 'PATHTYPE'):
         commit = True
     if 'Prefixes' not in db.tables:
         cu.execute("""
@@ -602,7 +602,7 @@ def createTroves(db, createIndex = True):
     if createIndex:
         db.createIndex("Prefixes", "PrefixesDirnameIdPrefixId_uq", "dirnameId, prefixId", unique = True)
         db.createIndex("Prefixes", "PrefixesPrefixId_fk", "prefixId")
-    if idtable.createIdTable(db, "Basenames", "basenameId", "basename"):
+    if idtable.createIdTable(db, "Basenames", "basenameId", "basename", colType = 'PATHTYPE'):
         commit = True
 
     if "FilePaths" not in db.tables:

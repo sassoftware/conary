@@ -14,7 +14,7 @@
 
 # FIXME: convert to use the dbstore modules
 
-def createIdTable(db, tableName, keyName, strName):
+def createIdTable(db, tableName, keyName, strName, colType = 'STRING'):
     commit = False
     idxName = "%s_uq" % tableName
     cu = db.cursor()
@@ -22,8 +22,8 @@ def createIdTable(db, tableName, keyName, strName):
         cu.execute("""
         CREATE TABLE %s (
             %s %%(PRIMARYKEY)s,
-            %s %%(STRING)s
-        )  %%(TABLEOPTS)s""" %(tableName, keyName, strName) % db.keywords)
+            %s %%(%s)s
+        )  %%(TABLEOPTS)s""" %(tableName, keyName, strName, colType) % db.keywords)
         db.tables[tableName] = []
         commit = True
     db.createIndex(tableName, idxName, strName, unique = True)
