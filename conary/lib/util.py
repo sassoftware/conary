@@ -1564,8 +1564,6 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
             stream.write('  File "%s", line %d, in %s\n' % 
                 (fileName, lineNo, funcName))
-            stream.write('  File "%s", line %d, in %s\n' % 
-                (fileName, lineNo, funcName))
             if text is not None:
                 # If the source file is not available, we may not be able to get 
                 # the line

@@ -778,7 +778,8 @@ _TROVEINFO_TAG_IMAGE_GROUP    = 22
 _TROVEINFO_TAG_FACTORY        = 23
 _TROVEINFO_TAG_SEARCH_PATH    = 24
 _TROVEINFO_TAG_DERIVEDFROM    = 25
-_TROVEINFO_TAG_LAST           = 25
+_TROVEINFO_TAG_PKGCREATORDATA = 26
+_TROVEINFO_TAG_LAST           = 26
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -871,6 +872,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_IMAGE_GROUP   : (DYNAMIC, streams.ByteStream, 'imageGroup' ),
         _TROVEINFO_TAG_FACTORY       : (DYNAMIC, streams.StringStream, 'factory' ),
         _TROVEINFO_TAG_SEARCH_PATH   : (DYNAMIC, SearchPath,          'searchPath'),
+        _TROVEINFO_TAG_PKGCREATORDATA: (DYNAMIC, streams.StringStream,'pkgCreatorData'),
         _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
     }
 

@@ -2436,7 +2436,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             self.fromVersion(sourceVersion))
         return [ (x[0], self.toVersion(x[1]), self.toFlavor(x[2]))
                             for x in l ]
-                    
+
+    def getPackageCreatorTroves(self, reposName):
+        """
+        Returns ((name, version, flavor), pkgData) tuples for all troves
+        in the repository which have packageCreatorData troveinfo
+        available.
+        """
+        l = self.c[reposName].getPackageCreatorTroves(reposName)
+        return [ ((x[0], self.toVersion(x[1]), self.toFlavor(x[2])), x[3])
+                            for x in l ]
+
     def commitChangeSetFile(self, fName, mirror = False, callback = None,
                             hidden = False):
         cs = changeset.ChangeSetFromFile(fName)

@@ -2335,8 +2335,39 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         args = [sourceName, versionMatch]
         cu.execute(query, args)
         self.log(4, "execute query", query, args)
-        matches = [ tuple(x) for x in cu ]
-        return matches
+        return [ x for x in cu ]
+
+    @accessReadOnly
+    def getPackageCreatorTroves(self, authToken, clientVersion, serverName):
+        cu = self.db.cursor()
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        query = """
+        SELECT Items.item, Versions.version, Flavors.flavor,
+               TroveInfo.data
+        FROM (
+            SELECT DISTINCT TroveInfo.instanceId AS instanceId FROM TroveInfo
+                JOIN UserGroupInstancesCache as ugi ON
+                    TroveInfo.instanceId = ugi.instanceId AND
+                    TroveInfo.infoType = %d
+                WHERE
+                    ugi.userGroupId in (%s)
+        ) AS Pkg_Created
+        JOIN Instances ON
+            Pkg_Created.instanceId = Instances.instanceId
+        JOIN Items ON
+            Instances.itemId = Items.itemId
+        JOIN Versions ON
+            Instances.versionId = Versions.versionId
+        JOIN Flavors ON
+            Instances.flavorId = Flavors.flavorId
+        JOIN TroveInfo ON
+            Instances.instanceId = TroveInfo.instanceId AND
+            TroveInfo.infoType = %d
+        """ % (trove._TROVEINFO_TAG_PKGCREATORDATA,
+               ",".join("%d" % x for x in roleIds),
+               trove._TROVEINFO_TAG_PKGCREATORDATA)
+        cu.execute(query)
+        return sorted([ tuple(x) for x in cu ])
 
     @accessReadWrite
     def addMetadataItems(self, authToken, clientVersion, itemList):

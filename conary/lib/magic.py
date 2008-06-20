@@ -301,16 +301,20 @@ def magic(path, basedir=''):
             if path.endswith('.jar'):
                 return jar(path, basedir)
             return ZIP(path, basedir)
-        if 'META-INF/application.xml' in namelist:
-            return EAR(path, basedir, zipFileObj = zf, fileList = namelist)
-        elif 'WEB-INF/web.xml' in namelist:
-            return WAR(path, basedir, zipFileObj = zf, fileList = namelist)
-        elif 'META-INF/MANIFEST.MF' in namelist:
-            return jar(path, basedir, zipFileObj = zf, fileList = namelist)
-        #elif path.endswith('.par'):
-        #    perl archive
-        else:
-            return ZIP(path, basedir, zipFileObj = zf, fileList = namelist)
+        except RuntimeError:
+            # not a proper zip archive -- likely a .car archive CNY-2871
+            namelist = None
+        if namelist is not None:
+            if 'META-INF/application.xml' in namelist:
+                return EAR(path, basedir, zipFileObj = zf, fileList = namelist)
+            elif 'WEB-INF/web.xml' in namelist:
+                return WAR(path, basedir, zipFileObj = zf, fileList = namelist)
+            elif 'META-INF/MANIFEST.MF' in namelist:
+                return jar(path, basedir, zipFileObj = zf, fileList = namelist)
+            #elif path.endswith('.par'):
+            #    perl archive
+            else:
+                return ZIP(path, basedir, zipFileObj = zf, fileList = namelist)
     elif _javaMagic(b):
         return java(path, basedir, b)
     elif len(b) > 4 and b[0:2] == "#!":

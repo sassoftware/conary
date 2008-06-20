@@ -28,7 +28,7 @@ class AbstractCommand(object):
 
     def usage(self, errNo=1):
         if not self.parser:
-            self.setParser(self.mainHandler.getParser(self.commands[0]))
+            self.setParser(self.mainHandler.getParserByClass(self))
         self.parser.print_help()
         if log.getVerbosity() > log.INFO:
             print

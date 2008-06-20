@@ -2482,8 +2482,14 @@ conary erase '%s=%s[%s]'
                     erases.add(oldInfo)
                 else:
                     erases.discard(oldInfo)
-                    allJobs.append(newJob)
+                    if newJob not in allJobs:
+                        allJobs.append(newJob)
                 if not oldTrove:
+                    # we some times will mark a trove as an install
+                    # at one level but it will turn out to be more properly
+                    # categorized as an update due to some intermediate level 
+                    # package that was modified.  Thus we don't count packages
+                    # out of consideration when they are marked as installs
                     continue
 
                 # no trove should be part of more than one update.
