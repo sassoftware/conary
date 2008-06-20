@@ -2335,7 +2335,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         args = [sourceName, versionMatch]
         cu.execute(query, args)
         self.log(4, "execute query", query, args)
-        return [ x for x in cu ]
+        return [ tuple(x) for x in cu ]
 
     @accessReadOnly
     def getPackageCreatorTroves(self, authToken, clientVersion, serverName):
