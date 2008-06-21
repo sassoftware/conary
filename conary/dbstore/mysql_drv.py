@@ -251,7 +251,7 @@ class Database(BaseDatabase):
     def _getMaxPacketSize(self, cu):
         cu.execute("show variables like 'max_allowed_packet'")
         name, size = cu.fetchall()[0]
-        self.MaxPacket = size
+        self.MaxPacket = int(size)
 
     # need to propagate the MaxPacket value to the cursors
     def cursor(self):
