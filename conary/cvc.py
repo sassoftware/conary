@@ -857,9 +857,9 @@ class NewPkgCommand(CvcCommand):
         args = args[1:]
         dir = argSet.pop('dir', None)
         template = argSet.pop('template', None)
-        # check to see if the user specified --factory (without an
+        # check to see if the user specified --factory= (with an empty
         # argument).  This is a shortcut for "--factory=factory"
-        # so as not to quite so cumbersome
+        # that is not quite so cumbersome
         factory = argSet.pop('factory', None)
         if factory is True:
             factory = 'factory'
