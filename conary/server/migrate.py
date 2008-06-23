@@ -728,7 +728,8 @@ class MigrateTo_17(SchemaMigration):
         # fix the autoincrement primary key value on the new FilePaths
         cu.execute("select max(filePathId) from FilePaths")
         maxId = cu.fetchone()[0]
-        self.db.setAutoIncrement("FilePaths", "filePathId", maxId)
+        if maxId:
+            self.db.setAutoIncrement("FilePaths", "filePathId", maxId)
         self.db.analyze("FilePaths")
 
         # re-enable the FK constraint and create indexes
