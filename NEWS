@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.18:
   o Protocol Changes:
     * The addRoleMember() and getRoleMembers() calls are now exposed
       via XMLRPC. (CNY-2862)
