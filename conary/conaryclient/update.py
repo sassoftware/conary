@@ -2394,14 +2394,34 @@ conary erase '%s=%s[%s]'
         oldTroveTups = [ (x[0], x[1][0], x[1][1]) for x in localUpdates]
         newTroveTups = [ (x[0], x[2][0], x[2][1]) for x in localUpdates]
 
-        toGet = [ x for x in oldTroveTups if x[1]]
+        toGet = [ x for x in oldTroveTups if x[1] and trove.troveIsGroup(x[0])]
 
         oldTroveSource = trovesource.stack(searchSource, self.repos)
         oldTroves = oldTroveSource.getTroves(toGet, withFiles=False)
+
         troveDict = dict(zip(toGet, oldTroves))
-        toGet = [ x for x in newTroveTups if x[1]]
+        toGet = [ x for x in newTroveTups if x[1] ]
         newTroves = self.db.getTroves(toGet, withFiles=False)
         troveDict.update(zip(toGet, newTroves))
+
+        isComponent = trove.troveIsComponent
+        for trv in newTroves:
+            if not trove.troveIsGroup(trv.getName()):
+                continue
+            for troveTup in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                if isComponent(troveTup[0]):
+                    packageName = troveTup[0].split(':', 1)[0]
+                    packageTup = packageName, troveTup[1], troveTup[2]
+                    l = troveDict.setdefault(packageTup, [])
+                    if isinstance(l, list):
+                        l.append(troveTup)
+                    troveDict.setdefault(troveTup, [])
+        toGet = [ x for x in oldTroveTups if x[1] and x not in troveDict ]
+        if toGet:
+            moreOldTroves = oldTroveSource.getTroves(toGet, withFiles=False)
+            troveDict.update(zip(toGet, moreOldTroves))
+            oldTroves += moreOldTroves
+
 
         if installedTroves is None:
             assert(missingTroves is None)
@@ -2413,6 +2433,8 @@ conary erase '%s=%s[%s]'
             childOld = list(set(chain(*(x.iterTroveList(strongRefs=True,
                                                         weakRefs=True)
                                                         for x in oldTroves))))
+            childOld += [ x[0] for x in troveDict.items()
+                          if isinstance(x[1], list) ]
             hasTroves = self.db.hasTroves(childNew + childOld)
             installedTroves = set(x[0] for x in izip(childNew, hasTroves) 
                                                 if x[1])
@@ -2450,14 +2472,20 @@ conary erase '%s=%s[%s]'
 
             # only create local updates between old troves that
             # don't exist and new troves that do.
-            if oldTrove:
-                for tup, byDefault, isStrong in oldTrove.iterTroveListInfo():
+            if oldTrove is not None:
+                if isinstance(oldTrove, list):
+                    oldTroveChildren = oldTrove
+                else:
+                    oldTroveChildren = [ x for x in oldTrove.iterTroveList(
+                                                            strongRefs=True,
+                                                            weakRefs=True) ]
+                for tup in oldTroveChildren:
                     if (tup in missingTroves and tup not in oldTroveTups
                         and not newTrove.hasTrove(*tup)):
                         notExistsOldTrove.addTrove(*tup)
                 for tup, byDefault, isStrong in newTrove.iterTroveListInfo():
                     if (tup in installedTroves and tup not in newTroveTups
-                        and not oldTrove.hasTrove(*tup)):
+                        and tup not in oldTroveChildren):
                         existsNewTrove.addTrove( *tup)
                     elif not byDefault and tup in installedTroves:
                         existsNewTrove.addTrove(*tup)
@@ -2484,7 +2512,7 @@ conary erase '%s=%s[%s]'
                     erases.discard(oldInfo)
                     if newJob not in allJobs:
                         allJobs.append(newJob)
-                if not oldTrove:
+                if oldTrove is None:
                     # we some times will mark a trove as an install
                     # at one level but it will turn out to be more properly
                     # categorized as an update due to some intermediate level 
