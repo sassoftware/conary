@@ -33,6 +33,7 @@ from conary.lib.cfg import CfgBool, CfgInt, CfgPath
 from conary.lib import log
 from conary.repository.netrepos import netserver, instances
 from conary import dbstore
+from conary.dbstore import sqlerrors
 
 class Checker:
     """ base class for checking/fixing an issue """
@@ -207,6 +208,40 @@ class CheckTroveInfo(Checker):
         self.commit()
         return self.check()
 
+class CheckSchema(Checker):
+    """ checks for schema version """
+    def _postinit(self):
+        self._alwaysfix = self._fix
+    def check(self):
+        db = self.getDB()
+        dbVersion = db.getVersion()
+        if dbVersion.major == schema.VERSION.major:
+            log.info("schema is compatible with this codebase")
+            return True
+        log.error("codebase requires schema %s, repository has %s",
+                  schema.VERSION, dbVersion)
+        return False
+    def fix(self):
+        db = self.getDB()
+        dbVersion = db.getVersion()
+        try:
+            log.info("performing a schema migration...")
+            newVersion = schema.loadSchema(db, doMigrate=True)
+        except sqlerrors.SchemaVersionError, e:
+            log.error(e.msg)
+            return False
+        if newVersion < dbVersion():
+            log.error("schema migration failed from %s to %s" % (
+                dbVersion, schema.VERSION))
+            return False
+        if newVersion == dbVersion: # did a big whoop noop
+            log.info("schema check complete")
+        else:
+            log.info("schema migration from %s to %s completed" %(
+                dbVersion, newVersion))
+        self.commit()
+        return True
+
 # main program
 class ServerConfig(netserver.ServerConfig):
     port                    = (CfgInt,  8000)
@@ -245,11 +280,12 @@ def startLogging():
     log.setVerbosity(log.DEBUG)
     log.info("Logging system started")
     
-def usage(name = ''):
+def usage(name = sys.argv[0]):
     print """checks repository for data consistency
     Usage:
     %s [--fix] [--config-file repo.cnr] [--config 'name param'] checkname [checkname...]
-    Valid check names are: ALL acls latest troveinfo
+    Valid check names are: ALL
+        acls latest troveinfo schema
     """ % (name,)
 
 def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
@@ -281,7 +317,6 @@ def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
 
     (driver, database) = cfg.repositoryDB
     db = dbstore.connect(database, driver)
-    log.info("checking schema version on %s://%s", driver, database)
     # if there is no schema or we're asked to migrate, loadSchema
     dbVersion = db.getVersion()
     # a more recent major is not compatible
@@ -299,19 +334,23 @@ def main():
     
     doFix = opts.has_key("fix")
     if not args:
-        args = ["troveinfo"]
+        usage()
+        sys.exit(-1)
     log.info("Starting tests\n")
 
     ret = {}
     all = False
-    if "ALL" in acls:
+    if "ALL" in args:
         all = True
+    # XXX: fixme - we should probably do something smarter and more automatic here...
     if all or "acls" in args:
         ret["acls"] = CheckAcls(cfg, doFix).run()
     if all or "latest" in args:
         ret["latest"] = CheckLatest(cfg, doFix).run()
     if all or "troveinfo" in args:
         ret["troveinfo"] = CheckTroveInfo(cfg, doFix).run()
+    if all or "schema" in args:
+        ret["schema"] = CheckSchema(cfg, doFix).run()
         
     return ret
 
