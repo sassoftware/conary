@@ -143,18 +143,39 @@ class CheckAcls(Checker):
 
 class CheckLatest(Checker):
     """ LatestCache table rebuilding """
-    def _postinit(self):
-        self._alwaysfix = self._fix
     def check(self):
-        log.debug("LatestCache table will be rebuilt is --fix is passed in")
-        self._status = 1
+        db = self.getDB()
+        cu = db.cursor()
+        # determine what entries (if any) are visible from LatestView
+        # but aren't cached into LatestCache
+        log.info("Checking if the LatestCache table is current...")
+        cu.execute("""
+        select userGroupId, itemId, branchId, flavorId, versionId, latestType, count(*) as c
+        from ( select userGroupId, itemId, branchId, flavorId, versionId, latestType from latestview
+               union all
+               select userGroupId, itemId, branchId, flavorId, versionId, latestType from latestcache
+        ) as duplicates
+        group by userGroupId, itemId, branchId, flavorId, versionId, latestType
+        having count(*) != 2 """)
+        # any entry that does not appear twice is cached wrong
+        self._status = set()
+        for userGroupId, itemId, branchId, flavorId, versionId, latestType, c in cu:
+            # record what needs rebuilding
+            self._status.add((itemId, branchId, flavorId))
+        if self._status:
+            log.info("detected %d LatestCache entries that need correction" % (
+                len(self._status),))
+            return False
         return True
     def fix(self):
         from conary.repository.netrepos import versionops
         db = self.getDB()
+        cu = db.cursor()
         latest = versionops.LatestTable(db)
-        log.info("rebuilding the LatestCache table...")
-        latest.rebuild()
+        log.info("updating LatestCache table")
+        for itemId, branchId, flavorId in self._status:
+            latest.update(cu, itemId, branchId, flavorId)
+        log.info("update completed for LatestCache")
         self.commit()
         return True
 
@@ -224,12 +245,12 @@ def startLogging():
     log.setVerbosity(log.DEBUG)
     log.info("Logging system started")
     
-def usage():
-    print """ checks repository for data consistency
+def usage(name = ''):
+    print """checks repository for data consistency
     Usage:
     %s [--fix] [--config-file repo.cnr] [--config 'name param'] checkname [checkname...]
     Valid check names are: ALL acls latest troveinfo
-    """
+    """ % (name,)
 
 def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
     cfg = ServerConfig()
@@ -248,6 +269,12 @@ def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
     except options.OptionError, msg:
         print >> sys.stderr, msg
         sys.exit(1)
+
+    if "help" in argSet:
+        usage(argv[0])
+        sys.exit(0)
+        
+    startLogging()
 
     if not cfg.check():
         raise RuntimeError("configuration file is invalid")
@@ -268,7 +295,6 @@ def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
 def main():
     opts =  {}
     opts["fix"] = options.NO_PARAM
-    startLogging()
     cfg, opts, args = getServer(opts)
     
     doFix = opts.has_key("fix")
