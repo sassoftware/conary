@@ -343,17 +343,19 @@ def main():
     if "ALL" in args:
         all = True
     # XXX: fixme - we should probably do something smarter and more automatic here...
+    if all or "schema" in args: # schema (migration) happens first
+        ret["schema"] = CheckSchema(cfg, doFix).run()
     if all or "acls" in args:
         ret["acls"] = CheckAcls(cfg, doFix).run()
     if all or "latest" in args:
         ret["latest"] = CheckLatest(cfg, doFix).run()
     if all or "troveinfo" in args:
         ret["troveinfo"] = CheckTroveInfo(cfg, doFix).run()
-    if all or "schema" in args:
-        ret["schema"] = CheckSchema(cfg, doFix).run()
-        
-    return ret
+    if False in ret.values():
+        return False
+    return True
 
 if __name__ == '__main__':
-    main()
-    
+    ret = main()
+    if not ret:
+        sys.exit(1)
