@@ -36,6 +36,7 @@ class BaseKeywordDict(dict):
              'TABLEOPTS'     : '',
              'PATHTYPE'      : 'STRING',
              'STRING'        : 'STRING',
+             'CREATEVIEW'    : 'CREATE VIEW',
              }
     def __init__(self):
         dict.__init__(self, self.keys)

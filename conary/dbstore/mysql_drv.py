@@ -37,6 +37,7 @@ class KeywordDict(BaseKeywordDict):
         'PATHTYPE'     : 'VARBINARY(767)',
         'STRING'       : 'VARCHAR(767)',
         'TABLEOPTS'    : 'DEFAULT CHARACTER SET latin1 COLLATE latin1_bin',
+        'CREATEVIEW'   : "CREATE DEFINER='root'@'localhost' SQL SECURITY INVOKER VIEW",
         })
     def binaryVal(self, len):
         return "VARBINARY(%d)" % len
