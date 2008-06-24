@@ -87,7 +87,7 @@ class PrintDatabase:
         return False
     def __skip_Tables(self, sql, skipAll = False):
         tbl = re.compile(
-            "^(?i)(CREATE|ALTER)\s+(TABLE\s+(?P<table>[^(]+)|VIEW\s+(?P<view>[^( ]+))\s*([(]|ADD|AS).*"
+            "^(?i)(CREATE|ALTER)\s+(TABLE\s+(?P<table>[^(]+)|(\s?DEFINER.*)?(\s?SQL SECURITY.*)?VIEW\s+(?P<view>[^( ]+))\s*([(]|ADD|AS).*"
             )
         m = tbl.match(sql)
         if m is not None:

@@ -183,7 +183,7 @@ def createLatest(db, withIndexes = True):
     # LATEST_TYPE_ANY: redirects, removed, and normal
     if "LatestViewAny_sub" not in db.views:
         cu.execute("""
-        CREATE VIEW LatestViewAny_sub AS
+        %(CREATEVIEW)s LatestViewAny_sub AS
         SELECT
             ugi.userGroupId AS userGroupId,
             n.itemId AS itemId,
@@ -193,14 +193,14 @@ def createLatest(db, withIndexes = True):
         FROM UserGroupInstancesCache AS ugi
         JOIN Instances AS i USING(instanceId)
         JOIN Nodes AS n USING(itemId, versionId)
-        WHERE i.isPresent = %(present)d
+        WHERE i.isPresent = %%(present)d
         GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
-        """ % {"present" : INSTANCE_PRESENT_NORMAL, })
+        """ % db.keywords % {"present" : INSTANCE_PRESENT_NORMAL, })
         db.views["LatestViewAny_sub"] = True
         commit = True
     if "LatestViewAny"  not in db.views:
         cu.execute("""
-        CREATE VIEW LatestViewAny AS
+        %(CREATEVIEW)s LatestViewAny AS
         SELECT
             sub.userGroupId AS userGroupId,
             sub.itemId AS itemId,
@@ -211,15 +211,15 @@ def createLatest(db, withIndexes = True):
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
         JOIN Instances USING(itemId, versionId)
         WHERE Instances.flavorId = sub.flavorId
-          AND Instances.isPresent = %(present)d
-        """ % {"present" : INSTANCE_PRESENT_NORMAL})
+          AND Instances.isPresent = %%(present)d
+        """ % db.keywords % {"present" : INSTANCE_PRESENT_NORMAL})
         db.views["LatestViewAny"] = True
         commit = True
 
     # LATEST_TYPE_PRESENT: redirects and normal
     if "LatestViewPresent_sub" not in db.views:
         cu.execute("""
-        CREATE VIEW LatestViewPresent_sub AS
+        %(CREATEVIEW)s LatestViewPresent_sub AS
         SELECT
             ugi.userGroupId AS userGroupId,
             n.itemId AS itemId,
@@ -229,16 +229,16 @@ def createLatest(db, withIndexes = True):
         FROM UserGroupInstancesCache AS ugi
         JOIN Instances AS i USING(instanceId)
         JOIN Nodes AS n USING(itemId, versionId)
-        WHERE i.isPresent = %(present)d
-          AND i.troveType != %(removed)d
+        WHERE i.isPresent = %%(present)d
+          AND i.troveType != %%(removed)d
         GROUP BY ugi.userGroupId, n.itemId, n.branchId, i.flavorId
-        """ % { "present": INSTANCE_PRESENT_NORMAL,
-                "removed"  : TROVE_TYPE_REMOVED, })
+        """ % db.keywords % { "present": INSTANCE_PRESENT_NORMAL,
+                              "removed"  : TROVE_TYPE_REMOVED, })
         db.views["LatestViewPresent_sub"] = True
         commit = True
     if "LatestViewPresent"  not in db.views:
         cu.execute("""
-        CREATE VIEW LatestViewPresent AS
+        %(CREATEVIEW)s LatestViewPresent AS
         SELECT
             sub.userGroupId AS userGroupId,
             sub.itemId AS itemId,
@@ -249,10 +249,10 @@ def createLatest(db, withIndexes = True):
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
         JOIN Instances USING(itemId, versionId)
         WHERE Instances.flavorId = sub.flavorId
-          AND Instances.isPresent = %(present)d
-          AND Instances.troveType != %(trove)d
-        """ % {"present" : INSTANCE_PRESENT_NORMAL,
-               "trove" : TROVE_TYPE_REMOVED, })
+          AND Instances.isPresent = %%(present)d
+          AND Instances.troveType != %%(trove)d
+        """ % db.keywords % {"present" : INSTANCE_PRESENT_NORMAL,
+                             "trove" : TROVE_TYPE_REMOVED, })
         db.views["LatestViewPresent"] = True
         commit = True
 
@@ -260,7 +260,7 @@ def createLatest(db, withIndexes = True):
     if "LatestViewNormal" not in db.views:
         assert("LatestViewPresent_sub" in db.views)
         cu.execute("""
-        CREATE VIEW LatestViewNormal AS
+        %(CREATEVIEW)s LatestViewNormal AS
         SELECT
             sub.userGroupId AS userGroupId,
             sub.itemId AS itemId,
@@ -271,18 +271,18 @@ def createLatest(db, withIndexes = True):
         JOIN Nodes USING(itemId, branchId, finalTimestamp)
         JOIN Instances USING(itemId, versionId)
         WHERE Instances.flavorId = sub.flavorId
-          AND Instances.isPresent = %(present)d
-          AND Instances.troveType = %(trove)d
-        """ % {"present" : INSTANCE_PRESENT_NORMAL,
-               "trove" : TROVE_TYPE_NORMAL,
-               "removed" : TROVE_TYPE_REMOVED, })
+          AND Instances.isPresent = %%(present)d
+          AND Instances.troveType = %%(trove)d
+        """ % db.keywords % {"present" : INSTANCE_PRESENT_NORMAL,
+                             "trove" : TROVE_TYPE_NORMAL,
+                             "removed" : TROVE_TYPE_REMOVED, })
         db.views["LatestViewNormal"] = True
         commit = True
 
     # LatestView is a union of the 3 smaller latest views
     if "LatestView" not in db.views:
         cu.execute("""
-        CREATE VIEW LatestView AS
+        %%(CREATEVIEW)s LatestView AS
         SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
         FROM LatestViewAny
         UNION ALL
@@ -291,7 +291,7 @@ def createLatest(db, withIndexes = True):
         UNION ALL
         SELECT %d as latestType, userGroupId, itemId, branchId, flavorId, versionId
         FROM LatestViewNormal
-        """ % (LATEST_TYPE_ANY,LATEST_TYPE_PRESENT,LATEST_TYPE_NORMAL))
+        """ % (LATEST_TYPE_ANY,LATEST_TYPE_PRESENT,LATEST_TYPE_NORMAL) % db.keywords)
         db.views["LatestView"] = True
         commit = True
 
