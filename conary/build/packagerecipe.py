@@ -77,8 +77,9 @@ def _clearReqs(attrName, reqs):
     # a __localImportModules dictionary in the global space
     # of the module that is created for the recipe.  PackageRecipe
     # should also be a global in the frame.
-    # First get the stack
-    stack = inspect.stack()
+    # First get the stack.  Specify 0 lines of context to avoid tripping
+    # up if source files are not available.
+    stack = inspect.stack(0)
     # now get the innermost frame, which is the first element of
     # the stack list.
     frame = stack.pop(0)[0]
