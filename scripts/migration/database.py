@@ -84,6 +84,7 @@ class Database:
         self.driver = driver
         self.db.loadSchema()
         self.verbose = verbose
+        self._hint = ''
     def createSchema(self):
         # create the tables, avoid the indexes
         cu = self.db.cursor()
@@ -134,7 +135,7 @@ class Database:
         return [x.lower() for x in self.db.tables]
     def iterRows(self, table, fields = "*"):
         cu = self.db.itercursor()
-        cu.execute("select %s from %s" % (fields, table))
+        cu.execute("select %s %s from %s" % (self._hint, fields, table))
         return cu
     # functions for when the instance is a target
     def prepareInsert(self, table, fields):
@@ -195,19 +196,22 @@ class PgSQLDatabase(Database):
         return PgSQLLoader(self.db, table, fields)
     def finalize(self, version):
         Database.finalize(self, version)
-        print "VACUUM ANALYZE"
         cu = self.db.cursor()
+        if self.verbose:
+            print "VACUUM ANALYZE"
         cu.execute("VACUUM ANALYZE")
 
 class MySQLDatabase(Database):
     def __init__(self, db, verbose=True):
         Database.__init__(self, "mysql", db, verbose)
+        self._hint = "/*!40001 SQL_NO_CACHE */"
     # functions for when the instance is a target
     def finalize(self, version):
         Database.finalize(self, version)
         cu = self.db.cursor()
+        if self.verbose:
+            print "ANALYZE"
         for t in TableList:
-            print "ANALYZE", t
             cu.execute("ANALYZE LOCAL TABLE %s" %(t,))
 
 def getdb(driver, db, verbose=True):
