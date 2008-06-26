@@ -29,7 +29,7 @@ import optparse
 
 from conary.server.schema import VERSION
 
-from tablelist import TableList
+import tablelist
 from database import getdb
 
 class Callback:
@@ -135,14 +135,19 @@ if __name__ == '__main__':
                       default = 5000, help = "batch size in (row count) for each copy operation")
     parser.add_option("--verbose", "-v", action = "store_true", dest = "verbose",
                       default = False, help = "verbose output")
+    parser.add_option("--add-table", "-t", action = "append", type = "string", metavar = "T",
+                      dest = "tables", help = "add table T to the list of tables to transfer")
     (options, args) = parser.parse_args()
     if options.db is None or len(options.db) != 2:
         parser.print_help()
         sys.exit(-1)
+    if options.tables:
+        for t in options.tables:
+            tablelist.TableList.append(t)
     src = getdb(*options.db[0])
     dst = getdb(*options.db[1])
     dst.verbose = options.verbose
-    
+
     # Sanity checks
     src.checkTablesList()
     dst.createSchema()
@@ -155,7 +160,7 @@ if __name__ == '__main__':
     if diff:
         print "WARNING: Only in Target (%s): %s" % (dst.driver, diff)
     # compare each table's schema between the source and target
-    for table in TableList:
+    for table in tablelist.TableList:
         srcFields = src.getFields(table)
         dstFields = dst.getFields(table)
         if set(srcFields) != set(dstFields):
@@ -166,7 +171,7 @@ if __name__ == '__main__':
             %s: %s""" % (table, src.driver, srcFields, dst.driver, dstFields))
 
     # now migrate all tables
-    for table in TableList:
+    for table in tablelist.TableList:
         migrate_table(src, dst, table, options.batch)
         if options.verify:
             verify_table(src, dst, table)
