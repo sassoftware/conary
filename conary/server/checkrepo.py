@@ -60,9 +60,8 @@ class Checker:
         if db is None:
             db = self._db
         assert(db)
-        #db.commit()
-        db.rollback()
-        
+        db.commit()
+
     def check(self):
         return True
     def repair(self):
