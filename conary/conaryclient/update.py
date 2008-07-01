@@ -3069,7 +3069,6 @@ conary erase '%s=%s[%s]'
         # changes), split has lost meaning, keepExisting is also practically 
         # meaningless at this level.
         # CNY-492
-        assert(split)
         if keepRequired is None:
             keepRequired = self.cfg.keepRequired
 
@@ -3199,14 +3198,21 @@ conary erase '%s=%s[%s]'
 
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
-        (depList, suggMap, cannotResolve, splitJob, keepList, 
-         criticalUpdates) = \
-        info = self._resolveDependencies(uJob, jobSet, split = split,
+        if resolveDeps or split:
+            (depList, suggMap, cannotResolve, splitJob, keepList, 
+             criticalUpdates) = \
+            info = self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps,
                                       useRepos = resolveRepos,
                                       resolveSource = resolveSource,
                                       keepRequired = keepRequired,
                                       criticalUpdateInfo = criticalUpdateInfo)
+            if not split:
+                splitJob = [ list(jobSet) ]
+        else:
+            (depList, suggMap, cannotResolve, splitJob, keepList,
+             criticalUpdates) = ( [], {}, [], [ list(jobSet) ], [], [] )
+
         if keepList:
             self.updateCallback.done()
             for job, depSet, reqInfo in sorted(keepList):
@@ -3255,7 +3261,12 @@ conary erase '%s=%s[%s]'
         else:
             criticalJobs = []
 
-        self._combineJobs(uJob, splitJob, criticalJobs)
+        if split:
+            self._combineJobs(uJob, splitJob, criticalJobs)
+        else:
+            # order must not matter since split was False
+            uJob.addJob(list(jobSet))
+
         uJob.reorderPreScripts(criticalUpdateInfo)
 
         uJob.setTransactionCounter(self.db.getTransactionCounter())
