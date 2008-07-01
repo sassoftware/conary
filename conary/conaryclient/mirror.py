@@ -130,7 +130,7 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
             lock = open(cfg.lockFile, 'w')
             fcntl.lockf(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
         except IOError:
-            log.warn('lock held by another process, exiting')
+            log.warning('lock held by another process, exiting')
             return
 
     # need to make sure we have a 'source' section
