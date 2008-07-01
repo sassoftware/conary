@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.19:
   o Bug Fixes:
     * Removed unnecessary repository accesses that were occuring while
       determining local system changes during an update. (CNY-2876)
