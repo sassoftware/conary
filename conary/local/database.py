@@ -986,6 +986,111 @@ class UpdateJob:
 
         self._commitFlags = None
 
+class DepCheckState:
+
+    def __init__(self, db, troveSource):
+        """
+        @param troveSource: Trove source troves in the job are
+                            available from
+        @type troveSource: AbstractTroveSource:
+        """
+
+        self.setTroveSource(troveSource)
+        self.db = db
+        self.jobSet = set()
+        self.checker = None
+
+    def setTroveSource(self, troveSource):
+        self.troveSource = troveSource
+
+    def done(self):
+        if self.checker is not None:
+            self.checker.done()
+            self.checker = None
+            self.jobSet = set()
+
+    def __del__(self):
+        self.done()
+
+    def setup(self):
+        if self.checker is None:
+            self.checker = self.db.dependencyChecker(self.troveSource)
+
+    def setJobs(self, newJobSet):
+        newJobSet = set(newJobSet)
+        removedJobs = self.jobSet - newJobSet
+        if removedJobs or True:
+            self.done()
+            addedJobs = newJobSet
+        else:
+            addedJobs = newJobSet - self.jobSet
+
+        self.setup()
+
+        self.checker.addJobs(addedJobs)
+        self.jobSet = newJobSet
+
+    def depCheck(self, jobSet, findOrdering = False,
+                 linkedJobs = None, criticalJobs = None,
+                 finalJobs = None, criticalOnly = False,
+                 checker = None):
+        """
+        Check the database for closure against the operations in
+        the passed changeSet.
+
+        @param jobSet: The jobs which define the dependency check
+        @type jobSet: set
+        @param findOrdering: If true, a reordering of the job is
+                             returned which preserves dependency
+                             closure at each step.
+        @type findOrdering: boolean
+        @param criticalJobs: list of jobs that should be applied as early
+        as possible.
+        @type criticalJobs: list of job tuples
+        @param finalJobs: list of jobs that should be applied as a part of the
+        last job.
+        @type finalJobs: list of job tuples
+        @rtype: tuple of dependency failures for new packages and
+                dependency failures caused by removal of existing
+                packages
+        """
+
+        self.setup()
+        #print "--- adding jobs"
+        self.setJobs(jobSet)
+        #print "--- checking deps"
+        unsatisfiedList, unresolveableList, changeSetList, criticalUpdates = \
+                self.checker.check(findOrdering = findOrdering,
+                                   linkedJobs = linkedJobs,
+                                   criticalJobs = criticalJobs,
+                                   finalJobs = finalJobs)
+        #print "--- done"
+
+        if criticalOnly and criticalUpdates:
+            changeSetList = changeSetList[:criticalUpdates[0] + 1]
+            jobSet.clear()
+            jobSet.update(itertools.chain(*changeSetList))
+            if criticalUpdates and (unresolveableList or unsatisfiedList):
+                # we're trying to apply only critical updates, but
+                # there's a dep failure somewhere in the entire job.
+                # Try again to resolve dependencies, using only
+                # the critical changes
+                self.setJobs(jobSet)
+                (unsatisfiedList, unresolveableList, changeSetList,
+                 criticalUpdates) = self.checker.check(
+                                    findOrdering = findOrdering,
+                                    linkedJobs = linkedJobs)
+                criticalUpdates = []
+
+        if criticalJobs is None and finalJobs is None:
+            # backwards compatibility.  For future code, pass in 
+            # criticalJobs = [] to make sure you get a consistant
+            # return value.  FIXME when we can break bw compatibility,
+            # we should remove this inconsistent
+            return (unsatisfiedList, unresolveableList, changeSetList)
+
+        return (unsatisfiedList, unresolveableList, changeSetList, 
+                criticalUpdates)
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
@@ -1343,69 +1448,8 @@ class Database(SqlDbRepository):
 
         return resultDict
 
-    def depCheck(self, jobSet, troveSource, findOrdering = False,
-                 linkedJobs = None, criticalJobs = None,
-                 finalJobs = None, criticalOnly = False):
-        """
-        Check the database for closure against the operations in
-        the passed changeSet.
-
-        @param jobSet: The jobs which define the dependency check
-        @type jobSet: set
-        @param troveSource: Trove source troves in the job are
-                            available from
-        @type troveSource: AbstractTroveSource:
-        @param findOrdering: If true, a reordering of the job is
-                             returned which preserves dependency
-                             closure at each step.
-        @type findOrdering: boolean
-        @param criticalJobs: list of jobs that should be applied as early
-        as possible.
-        @type criticalJobs: list of job tuples
-        @param finalJobs: list of jobs that should be applied as a part of the
-        last job.
-        @type finalJobs: list of job tuples
-        @rtype: tuple of dependency failures for new packages and
-                dependency failures caused by removal of existing
-                packages
-        """
-
-        checker = self.dependencyChecker(troveSource)
-        checker.addJobs(jobSet)
-        unsatisfiedList, unresolveableList, changeSetList, criticalUpdates = \
-                checker.check(findOrdering = findOrdering,
-                              linkedJobs = linkedJobs,
-                              criticalJobs = criticalJobs,
-                              finalJobs = finalJobs)
-
-        if criticalOnly and criticalUpdates:
-            changeSetList = changeSetList[:criticalUpdates[0] + 1]
-            jobSet.clear()
-            jobSet.update(itertools.chain(*changeSetList))
-            if criticalUpdates and (unresolveableList or unsatisfiedList):
-                # we're trying to apply only critical updates, but
-                # there's a dep failure somewhere in the entire job.
-                # Try again to resolve dependencies, using only
-                # the critical changes
-                checker.done()
-                checker = self.dependencyChecker(troveSource)
-                checker.addJobs(jobSet)
-                (unsatisfiedList, unresolveableList, changeSetList,
-                 criticalUpdates) = checker.check(findOrdering = findOrdering,
-                                                  linkedJobs = linkedJobs)
-                criticalUpdates = []
-        checker.done()
-        if criticalJobs is None and finalJobs is None:
-            # backwards compatibility.  For future code, pass in 
-            # criticalJobs = [] to make sure you get a consistant
-            # return value.  FIXME when we can break bw compatibility,
-            # we should remove this inconsistent
-            return (unsatisfiedList, unresolveableList, changeSetList)
-        return (unsatisfiedList, unresolveableList, changeSetList, 
-                criticalUpdates)
-
-    def dependencyChecker(self, troveSource):
-        return self.db.dependencyChecker(troveSource)
+    def getDepStateClass(self, troveSource):
+        return DepCheckState(self.db, troveSource)
 
     def getFileContents(self, l):
         # look for config files in the datastore first, then look for other
