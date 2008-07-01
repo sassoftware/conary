@@ -392,13 +392,14 @@ class UpdateJob:
         # close those, but since most of the time we're the only users of the
         # update job, it's not a huge issue -- misa 20070807
         self.lzCache.release()
-        # Close db too
-        if self.troveSource.db:
-            self.troveSource.db.close()
-            self.troveSource.db = None
-        if hasattr(self.searchSource, 'db') and self.troveSource.db:
-            self.searchSource.db.close()
-            self.searchSource.db = None
+        if self.closeDatabase:
+            # Close db too
+            if self.troveSource.db:
+                self.troveSource.db.close()
+                self.troveSource.db = None
+            if hasattr(self.searchSource, 'db') and self.troveSource.db:
+                self.searchSource.db.close()
+                self.searchSource.db = None
 
     def addPinMapping(self, name, pinnedVersion, neededVersion):
         self.pinMapping.add((name, pinnedVersion, neededVersion))
@@ -940,7 +941,8 @@ class UpdateJob:
     def getFeatures(self):
         return self._features
 
-    def __init__(self, db, searchSource = None, lazyCache = None):
+    def __init__(self, db, searchSource = None, lazyCache = None,
+                 closeDatabase = True):
         # 20070714: lazyCache can be None for the users of the old API (when
         # an update job was instantiated directly, instead of using the
         # client's newUpdateJob(). At some point we should deprecate that.
@@ -950,6 +952,7 @@ class UpdateJob:
         self.jobs = []
         self.pinMapping = set()
         self.rollback = None
+        self.closeDatabase = closeDatabase
         self.troveSource = trovesource.ChangesetFilesTroveSource(db)
         self.primaries = set()
         self.criticalJobs = []

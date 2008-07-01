@@ -320,7 +320,8 @@ class DependencySolver(object):
                         for x in potentialUpdateList ]
 
         try:
-            newJob, suggMap = self.client.updateChangeSet(updateJobs,
+            newJob = self.client.newUpdateJob(closeDatabase = False)
+            suggMap = self.client.prepareUpdateJob(newJob, updateJobs,
                                                      keepExisting=False,
                                                      resolveDeps=False,
                                                      split=True)

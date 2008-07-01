@@ -2571,15 +2571,19 @@ conary erase '%s=%s[%s]'
         util.rmtree(restartInfo, ignore_errors=True)
 
     @api.publicApi
-    def newUpdateJob(self):
+    def newUpdateJob(self, closeDatabase = True):
         """Create a new update job.
 
         The job can be initialized either by using prepareUpdateJob or by
         thawing it from a frozen representation.
+        @param closeDatabase: If True, the database used by this client
+        job is closed when the updateJob is destroyed or closed. See
+        CNY-1834.
         @rtype: L{database.UpdateJob}
         @return: the new update job
         """
-        updJob = database.UpdateJob(self.db, lazyCache = self.lzCache)
+        updJob = database.UpdateJob(self.db, lazyCache = self.lzCache,
+                                    closeDatabase = closeDatabase)
         return updJob
 
     @api.publicApi
