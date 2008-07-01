@@ -85,15 +85,30 @@ class CheckAcls(Checker):
     def check(self):
         db = self.getDB()
         cu = db.cursor()
-        log.info("checking Permissions acls")
+        log.info("checking existing Permissions cache")
         cu.execute("""
-        select p.permissionId, p.userGroupId, ug.userGroup, i.item, l.label, ugap.c, checker.c
+        select p.permissionId, p.userGroupId, ug.userGroup, i.item, l.label, coalesce(ugap.c,0)
         from Permissions as p
-        join (
+        join UserGroups as ug using (userGroupId)
+        join Items as i on p.itemId = i.itemId
+        join Labels as l on p.labelId = l.labelId
+        left join (
             select permissionId, count(*) as c
             from UserGroupAllPermissions
+            join Instances using(instanceId)
+            where Instances.isPresent != ?
             group by permissionId ) as ugap using(permissionId)
-        join (
+        """, instances.INSTANCE_PRESENT_MISSING)
+        info = {}
+        existing = {}
+        for permissionId, roleId, role, item, label, count in cu:
+            info[permissionId] = (roleId, role, item, label)
+            existing[permissionId] = count
+        log.info("checking for missing Permissions caches...")
+        cu.execute("""
+        select p.permissionId, coalesce(checker.c,0)
+        from Permissions as p
+        left join (
             select permissionId, count(*) as c from (
                 select Permissions.permissionId as permissionId,
                        Instances.instanceId as instanceId
@@ -105,20 +120,19 @@ class CheckAcls(Checker):
                 join CheckTroveCache on
                     Permissions.itemId = CheckTroveCache.patternId and
                     Instances.itemId = CheckTroveCache.itemId
-                 ) as perms
+                where Instances.isPresent != ?
+                ) as perms
              group by permissionId ) as checker using (permissionId)
-        join UserGroups as ug using (userGroupId)
-        join Items as i on p.itemId = i.itemId
-        join Labels as l on p.labelId = l.labelId
-        order by permissionId
-        """)
+        """, instances.INSTANCE_PRESENT_MISSING)
         self._status = set()
         ret = True
-        for (permissionId, roleId, role, trovePattern, label, crtCounter, newCounter) in cu:
+        for permissionId, newCounter in cu:
+            crtCounter = existing.get(permissionId, 0)
             if crtCounter == newCounter:
                 continue
+            roleId, role, item, label = info[permissionId]
             log.warning("acl(%d) (%s %s %s) caches %d entries instead of %d entries",
-                        permissionId, role, label, trovePattern, crtCounter, newCounter)
+                        permissionId, role, label, item, crtCounter, newCounter)
             self._status.add((permissionId, roleId, role))
             ret = False
         if not ret:
@@ -148,7 +162,7 @@ class CheckLatest(Checker):
         cu = db.cursor()
         # determine what entries (if any) are visible from LatestView
         # but aren't cached into LatestCache
-        log.info("Checking if the LatestCache table is current...")
+        log.info("checking if the LatestCache table is current...")
         cu.execute("""
         select userGroupId, itemId, branchId, flavorId, versionId, latestType, count(*) as c
         from ( select userGroupId, itemId, branchId, flavorId, versionId, latestType from latestview
