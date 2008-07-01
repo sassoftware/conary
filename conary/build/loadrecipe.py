@@ -18,6 +18,7 @@ import inspect
 import itertools
 import new
 import os
+import random
 import string
 import sys
 import types
@@ -83,7 +84,10 @@ class Importer(object):
                  subloadData = None):
         self.fileName = fileName
         self.baseName = os.path.basename(self.fileName)
-        self.module = imp.new_module(self.fileName)
+        moduleName = ''.join([ random.choice(string.ascii_lowercase) 
+                               for x in range(8) ])
+        moduleName += '_' + baseName.split('.')[0]
+        self.module = imp.new_module(moduleName)
         self.subloadData = subloadData
         self.loadedTroves = []
         self.loadedSpecs = {}
