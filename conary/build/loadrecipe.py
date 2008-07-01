@@ -83,7 +83,8 @@ class Importer(object):
                  subloadData = None):
         self.fileName = fileName
         self.baseName = os.path.basename(self.fileName)
-        self.module = imp.new_module(self.fileName)
+        # can't have a '.' in a module name or import code gets confused
+        self.module = imp.new_module(self.baseName.replace('.', '-'))
         self.subloadData = subloadData
         self.loadedTroves = []
         self.loadedSpecs = {}
