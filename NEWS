@@ -5,6 +5,9 @@ Changes in @NEW@:
     * Added closeDatabase parameter when creating an updateJob to prevent
       that updateJob from closing the database when it's destroyed. This
       is a workaround to support CNY-1834
+    * Build dependency temporary tables incrementally instead of rebuilding
+      them each time. This results in speedup for group building approaching
+      50%.
 
   o Bug Fixes:
     * Removed unnecessary repository accesses that were occuring while

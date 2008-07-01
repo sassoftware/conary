@@ -1019,7 +1019,7 @@ class DepCheckState:
     def setJobs(self, newJobSet):
         newJobSet = set(newJobSet)
         removedJobs = self.jobSet - newJobSet
-        if removedJobs or True:
+        if removedJobs:
             self.done()
             addedJobs = newJobSet
         else:
