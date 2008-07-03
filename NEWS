@@ -1,3 +1,6 @@
+Changes in @NEW@:
+  o Client Changes:
+    * Added separate s390x architecture. (CNY-2852)
 Changes in 2.0.20:
   o Code Changes:
     * Dependency checking can now be run without computing the dependency
