@@ -8,6 +8,8 @@ Changes in @NEW@:
     * Build dependency temporary tables incrementally instead of rebuilding
       them each time. This results in speedup for group building approaching
       50%.
+    * Added support for RPM payloads which have been compressed with lzma
+      (CNY-2834). /usr/bin/unlzma much be available for this feature.
 
   o Bug Fixes:
     * Removed unnecessary repository accesses that were occuring while

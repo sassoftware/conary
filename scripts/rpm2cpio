@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.4
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,6 +17,16 @@
 import gzip
 import os
 import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
 
 from conary import rpmhelper
 from conary.lib import util
@@ -49,6 +59,8 @@ def main(argv):
             decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
         elif compression == 'bzip2':
             decompressor = lambda fobj: util.BZ2File(fobj)
+        elif compression == 'lzma':
+            decompressor = lambda fobj: util.LZMAFile(fobj)
         else:
             print >> sys.stderr, 'compression type', compression, 'unknown'
             sys.exit(1)
