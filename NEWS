@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.20:
   o Code Changes:
     * Dependency checking can now be run without computing the dependency
       order
