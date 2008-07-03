@@ -1,7 +1,8 @@
 Changes in @NEW@:
-  o Code Changes:
-    * Added support for RPM payloads which have been compressed with lzma
-      (CNY-2834). /usr/bin/unlzma much be available for this feature.
+  o Build Changes:
+    * Added support for RPM payloads which have been compressed with
+      lzma.  The /usr/bin/unlzma program must be available to use this
+      feature.  (CNY-2834)
 
   o Client Changes:
     * Added separate s390x architecture. (CNY-2852)

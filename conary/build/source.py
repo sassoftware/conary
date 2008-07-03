@@ -1935,7 +1935,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
         elif compression == 'lzma':
             decompressor = lambda fobj: util.LZMAFile(fobj)
             if action is not None:
-                action._addActionPathBuildRequires(['lzma'])
+                action._addActionPathBuildRequires(['unlzma'])
 
     # assemble the path/owner/group list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
