@@ -2474,7 +2474,7 @@ conary erase '%s=%s[%s]'
             # don't exist and new troves that do.
             if oldTrove is not None:
                 if isinstance(oldTrove, list):
-                    oldTroveChildren = oldTrove
+                    oldTroveChildren = set(oldTrove)
                 else:
                     oldTroveChildren = [ x for x in oldTrove.iterTroveList(
                                                             strongRefs=True,
