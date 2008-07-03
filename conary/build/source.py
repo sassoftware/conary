@@ -232,7 +232,7 @@ class _Source(_AnySource):
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
         util.mkdirChain(os.path.dirname(c))
-	_extractFilesFromRPM(r, targetfile=c)
+	_extractFilesFromRPM(r, targetfile=c, action=self)
 
 
     def _guessName(self):
@@ -499,7 +499,7 @@ class addArchive(_Source):
 	elif f.endswith(".rpm"):
             self._addActionPathBuildRequires(['/bin/cpio'])
             log.info("extracting %s into %s" % (f, destDir))
-            ownerList = _extractFilesFromRPM(f, directory=destDir)
+            ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
                 for (path, user, group) in ownerList:
                     self.recipe.Ownership(user, group, re.escape(path))
@@ -1909,7 +1909,7 @@ class addPreUpdateScript(TroveScript):
 
     _scriptName = 'preUpdateScripts'
 
-def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
+def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     assert targetfile or directory
     if not directory:
 	directory = os.path.dirname(targetfile)
@@ -1934,6 +1934,8 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
             decompressor = lambda fobj: util.BZ2File(fobj)
         elif compression == 'lzma':
             decompressor = lambda fobj: util.LZMAFile(fobj)
+            if action is not None:
+                action._addActionPathBuildRequires(['lzma'])
 
     # assemble the path/owner/group list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
