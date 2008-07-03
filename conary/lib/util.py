@@ -1909,3 +1909,36 @@ def countOpenFileDescriptors():
 
 def convertPackageNameToClassName(pkgname):
     return ''.join([ x.capitalize() for x in pkgname.split('-') ])
+
+class LZMAFile:
+
+    def read(self, limit = 4096):
+        return os.read(self.infd, limit)
+
+    def close(self):
+        if self.childpid:
+            os.close(self.infd)
+            os.waitpid(self.childpid, 0)
+        self.childpid = None
+
+    def __del__(self):
+        self.close()
+
+    def __init__(self, fileobj = None):
+        [ self.infd, outfd ] = os.pipe()
+        self.childpid = os.fork()
+        if self.childpid == 0:
+            os.close(self.infd)
+            os.close(0)
+            os.close(1)
+            fd = fileobj.fileno()
+            # this undoes any buffering
+            os.lseek(fd, fileobj.tell(), 0)
+            os.dup2(fd, 0)
+            os.close(fd)
+            os.dup2(outfd, 1)
+            os.close(outfd)
+            os.execv('/usr/bin/unlzma', [ '/usr/bin/unlzma' ])
+            os._exit(1)
+
+        os.close(outfd)

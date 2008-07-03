@@ -1926,12 +1926,14 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
 
     r = file(rpm, 'r')
     h = rpmhelper.readHeader(r)
-    # assume compression is gzip unless specifically tagged as bzip2
+    # assume compression is gzip unless specifically tagged as bzip2 or lzma
     decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
     if h.has_key(rpmhelper.PAYLOADCOMPRESSOR):
         compression = h[rpmhelper.PAYLOADCOMPRESSOR]
         if compression == 'bzip2':
             decompressor = lambda fobj: util.BZ2File(fobj)
+        elif compression == 'lzma':
+            decompressor = lambda fobj: util.LZMAFile(fobj)
 
     # assemble the path/owner/group list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],

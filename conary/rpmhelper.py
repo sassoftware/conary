@@ -177,7 +177,7 @@ class RpmHeader(object):
 
         return items
 
-    def __init__(self, f, sha1 = None, isSource = False):
+    def __init__(self, f, sha1 = None, isSource = False, sigBlock = False):
         intro = f.read(16)
         (mag1, mag2, mag3, ver, reserved, entries, size) = \
             struct.unpack("!BBBBiii", intro)
@@ -203,9 +203,10 @@ class RpmHeader(object):
 
             self.entries[tag] = (dataType, offset, count)
 
-        place = f.tell()
-        if place % 8:
-            f.seek(8 - (place % 8), 1)
+        if sigBlock:
+            place = f.tell()
+            if place % 8:
+                f.seek(8 - (place % 8), 1)
 
 def readHeader(f):
     lead = f.read(96)
@@ -216,7 +217,7 @@ def readHeader(f):
 
     isSource = (struct.unpack('!H', lead[6:8])[0] == 1)
 
-    sigs = RpmHeader(f, isSource = isSource)
+    sigs = RpmHeader(f, isSource = isSource, sigBlock = True)
     sha1 = sigs.get(SIG_SHA1, None)
 
     if SIG_SIZE in sigs:

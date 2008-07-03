@@ -1,6 +1,11 @@
 Changes in @NEW@:
+  o Code Changes:
+    * Added support for RPM payloads which have been compressed with lzma
+      (CNY-2834). /usr/bin/unlzma much be available for this feature.
+
   o Client Changes:
     * Added separate s390x architecture. (CNY-2852)
+
 Changes in 2.0.20:
   o Code Changes:
     * Dependency checking can now be run without computing the dependency
@@ -11,6 +16,7 @@ Changes in 2.0.20:
     * Build dependency temporary tables incrementally instead of rebuilding
       them each time. This results in speedup for group building approaching
       50%.
+
   o Bug Fixes:
     * updates after a local update of a package that is referenced in
       multiple groups now function again. (CNY-2882)
