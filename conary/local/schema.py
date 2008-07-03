@@ -311,7 +311,8 @@ def createDepWorkTable(db, cu, name):
         isProvides      INTEGER,
         class           INTEGER,
         name            VARCHAR(254),
-        flag            VARCHAR(254)
+        flag            VARCHAR(254),
+        merged          BOOLEAN
     ) %%(TABLEOPTS)s""" % name % db.keywords, start_transaction = False)
 
     cu.execute("""

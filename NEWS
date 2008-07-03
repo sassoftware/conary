@@ -1,3 +1,17 @@
+Changes in @NEW@:
+  o Code Changes:
+    * Dependency checking can now be run without computing the dependency
+      order
+    * Added closeDatabase parameter when creating an updateJob to prevent
+      that updateJob from closing the database when it's destroyed. This
+      is a workaround to support CNY-1834
+    * Build dependency temporary tables incrementally instead of rebuilding
+      them each time. This results in speedup for group building approaching
+      50%.
+  o Bug Fixes:
+    * updates after a local update of a package that is referenced in
+      multiple groups now function again. (CNY-2882)
+
 Changes in 2.0.19:
   o Bug Fixes:
     * Removed unnecessary repository accesses that were occuring while

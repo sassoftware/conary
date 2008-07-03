@@ -2474,7 +2474,7 @@ conary erase '%s=%s[%s]'
             # don't exist and new troves that do.
             if oldTrove is not None:
                 if isinstance(oldTrove, list):
-                    oldTroveChildren = oldTrove
+                    oldTroveChildren = set(oldTrove)
                 else:
                     oldTroveChildren = [ x for x in oldTrove.iterTroveList(
                                                             strongRefs=True,
@@ -2571,15 +2571,19 @@ conary erase '%s=%s[%s]'
         util.rmtree(restartInfo, ignore_errors=True)
 
     @api.publicApi
-    def newUpdateJob(self):
+    def newUpdateJob(self, closeDatabase = True):
         """Create a new update job.
 
         The job can be initialized either by using prepareUpdateJob or by
         thawing it from a frozen representation.
+        @param closeDatabase: If True, the database used by this client
+        job is closed when the updateJob is destroyed or closed. See
+        CNY-1834.
         @rtype: L{database.UpdateJob}
         @return: the new update job
         """
-        updJob = database.UpdateJob(self.db, lazyCache = self.lzCache)
+        updJob = database.UpdateJob(self.db, lazyCache = self.lzCache,
+                                    closeDatabase = closeDatabase)
         return updJob
 
     @api.publicApi
@@ -3069,7 +3073,6 @@ conary erase '%s=%s[%s]'
         # changes), split has lost meaning, keepExisting is also practically 
         # meaningless at this level.
         # CNY-492
-        assert(split)
         if keepRequired is None:
             keepRequired = self.cfg.keepRequired
 
@@ -3199,14 +3202,21 @@ conary erase '%s=%s[%s]'
 
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
-        (depList, suggMap, cannotResolve, splitJob, keepList, 
-         criticalUpdates) = \
-        info = self._resolveDependencies(uJob, jobSet, split = split,
+        if resolveDeps or split:
+            (depList, suggMap, cannotResolve, splitJob, keepList, 
+             criticalUpdates) = \
+            info = self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps,
                                       useRepos = resolveRepos,
                                       resolveSource = resolveSource,
                                       keepRequired = keepRequired,
                                       criticalUpdateInfo = criticalUpdateInfo)
+            if not split:
+                splitJob = [ list(jobSet) ]
+        else:
+            (depList, suggMap, cannotResolve, splitJob, keepList,
+             criticalUpdates) = ( [], {}, [], [ list(jobSet) ], [], [] )
+
         if keepList:
             self.updateCallback.done()
             for job, depSet, reqInfo in sorted(keepList):
@@ -3255,7 +3265,12 @@ conary erase '%s=%s[%s]'
         else:
             criticalJobs = []
 
-        self._combineJobs(uJob, splitJob, criticalJobs)
+        if split:
+            self._combineJobs(uJob, splitJob, criticalJobs)
+        else:
+            # order must not matter since split was False
+            uJob.addJob(list(jobSet))
+
         uJob.reorderPreScripts(criticalUpdateInfo)
 
         uJob.setTransactionCounter(self.db.getTransactionCounter())

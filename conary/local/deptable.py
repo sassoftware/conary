@@ -49,19 +49,49 @@ class DependencyWorkTables:
                       'reqTable'  : reqTable,
                       'provTable' : provTable }
 
-        self.cu.execute("""
+        joinClause = ""
+        whereClause = []
+        for name in dependencyTables:
+            d = { 'depProvider' : name, 'tmpName' : tmpName }
+            joinClause += \
+                "        LEFT OUTER JOIN %(depProvider)s ON\n"\
+                "        %(depProvider)s.class = %(tmpName)s.class AND\n"\
+                "        %(depProvider)s.name = %(tmpName)s.name AND\n"\
+                "        %(depProvider)s.flag = %(tmpName)s.flag\n" % d
+            whereClause.append("%(depProvider)s.depId is NULL" %d)
+
+        sql = """\
         INSERT INTO %(depTable)s
             (class, name, flag)
         SELECT DISTINCT
             %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
-        FROM %(tmpName)s
-        LEFT OUTER JOIN Dependencies USING (class, name, flag)
-        WHERE Dependencies.depId is NULL
-        """ % substDict, start_transaction = False)
+        FROM %(tmpName)s\n""" % substDict
+        sql += joinClause
+        sql += """\
+        WHERE
+        %(tmpName)s.merged = 0 AND
+        %%s
+        """ % substDict % " AND ".join(whereClause)
+        self.cu.execute(sql, start_transaction = False)
+
+        if len(dependencyTables) > 1:
+            self.cu.execute("""
+            select count(*) from 
+                TmpDependencies join dependencies using (class, name, flag)
+            """)
+            count = self.cu.next()[0]
+            assert(not count)
 
         if multiplier != 1:
-            self.cu.execute("UPDATE %s SET depId=depId * %d"
+            self.cu.execute("UPDATE %s SET depId=depId * %d WHERE depId > 0"
                            % (depTable, multiplier), start_transaction = False)
+            if len(dependencyTables) > 1:
+                self.cu.execute("""
+                select count(*) from 
+                    TmpDependencies where depId > 0
+                """)
+                count = self.cu.next()[0]
+                assert(not count)
 
         self.cu.execute("SELECT MAX(depNum) FROM %(reqTable)s" % substDict)
         base = self.cu.next()[0]
@@ -95,7 +125,8 @@ class DependencyWorkTables:
         FROM %(tmpName)s """ % substDict
         repQuery += selectClause
         repQuery += """
-        WHERE %(tmpName)s.isProvides = 0 """ % substDict
+        WHERE %(tmpName)s.isProvides = 0 AND 
+              %(tmpName)s.merged = 0""" % substDict
         self.cu.execute(repQuery, start_transaction = False)
 
         if provTable is None:
@@ -108,8 +139,10 @@ class DependencyWorkTables:
         FROM %(tmpName)s """ % substDict
         repQuery += selectClause
         repQuery += """
-        WHERE %(tmpName)s.isProvides = 1 """ % substDict
+        WHERE %(tmpName)s.isProvides = 1 AND
+              %(tmpName)s.merged = 0""" % substDict
         self.cu.execute(repQuery, start_transaction = False)
+        self.cu.execute("UPDATE %(tmpName)s SET merged = 1" % substDict)
 
     def _populateTmpTable(self, depList, troveNum, requires,
                           provides, multiplier = 1):
@@ -135,7 +168,7 @@ class DependencyWorkTables:
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     toInsert.append((troveNum, multiplier * len(depList),
                                      1 + len(flags), isProvides, classId,
-                                     depName, NO_FLAG_MAGIC))
+                                     depName, NO_FLAG_MAGIC, False))
                     if flags:
                         for (flag, sense) in flags:
                             # conary 0.12.0 had mangled flags; this check
@@ -145,14 +178,14 @@ class DependencyWorkTables:
                             toInsert.append((troveNum,
                                              multiplier * len(depList),
                                              1 + len(flags), isProvides,
-                                             classId, depName, flag))
+                                             classId, depName, flag, False))
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
 
         self.db.bulkload("DepCheck", toInsert,
                          [ "troveId", "depNum", "flagCount", "isProvides",
-                           "class", "name", "flag" ],
+                           "class", "name", "flag", "merged" ],
                          start_transaction = False)
 
     def merge(self, intoDatabase = False, skipProvides = False):
@@ -207,7 +240,7 @@ class DependencyWorkTables:
         SELECT DISTINCT
             Requires.instanceId, Requires.depNum,
             Requires.DepCount, 0, Dependencies.class,
-            Dependencies.name, Dependencies.flag
+            Dependencies.name, Dependencies.flag, 1
         FROM RemovedTroveIds
         JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
         JOIN Requires ON Provides.depId = Requires.depId

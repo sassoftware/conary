@@ -1614,7 +1614,8 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             if hasattr(v, '__class__'):
                 if v.__class__.__name__ == 'ModuleProxy':
                     continue
-            if hasattr(v, '__safe_str__'):
+            if not isinstance(v, xmlrpclib.ServerProxy) \
+              and hasattr(v, '__safe_str__'):
                 vstr = v.__safe_str__()
             else:
                 vstr = r.repr(v)

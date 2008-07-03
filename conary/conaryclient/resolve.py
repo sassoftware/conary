@@ -71,14 +71,16 @@ class DependencySolver(object):
 
         ineligible = set()
 
+        check = self.db.getDepStateClass(uJob.getTroveSource())
+
         (depList, cannotResolve, changeSetList, keepList, ineligible,
          criticalUpdates) = self.checkDeps(uJob, jobSet, troveSource,
                                        findOrdering = split,
                                        resolveDeps = resolveDeps,
                                        ineligible=ineligible,
                                        keepRequired = keepRequired,
-                                       criticalUpdateInfo = criticalUpdateInfo)
-
+                                       criticalUpdateInfo = criticalUpdateInfo,
+                                       check = check)
 
         if not resolveDeps:
             # we're not supposed to resolve deps here; just skip the
@@ -118,9 +120,12 @@ class DependencySolver(object):
                                        resolveDeps = True,
                                        ineligible = ineligible,
                                        keepRequired = keepRequired,
-                                       criticalUpdateInfo = criticalUpdateInfo)
+                                       criticalUpdateInfo = criticalUpdateInfo,
+                                       check = check)
             keepList.extend(newKeepList)
             depList = resolveSource.filterDependencies(depList)
+
+        check.done()
 
         if criticalUpdateInfo is None:
             # backwards compatibility with conary v. 1.0.30/1.1.3 and earlier
@@ -169,13 +174,14 @@ class DependencySolver(object):
 
     def checkDeps(self, uJob, jobSet, trvSrc, findOrdering,
                   resolveDeps, ineligible, keepRequired = True,
-                  criticalUpdateInfo = None):
+                  criticalUpdateInfo = None, check = None):
         """
             Given a jobSet, use its dependencies to determine an
             ordering, resolve problems with jobs that have difficult
             dependency problems immediately,
             and determine any missing dependencies.
         """
+        assert(check)
 
         keepList = []
 
@@ -186,12 +192,12 @@ class DependencySolver(object):
                                                          jobSet,
                                                          criticalUpdateInfo)
             (depList, cannotResolve, changeSetList, criticalUpdates) = \
-                            self.db.depCheck(jobSet, uJob.getTroveSource(),
-                                             findOrdering = findOrdering,
-                                             linkedJobs = linkedJobs,
-                                             criticalJobs = criticalJobs,
-                                             finalJobs = finalJobs,
-                                             criticalOnly = criticalOnly)
+                            check.depCheck(jobSet,
+                                           findOrdering = findOrdering,
+                                           linkedJobs = linkedJobs,
+                                           criticalJobs = criticalJobs,
+                                           finalJobs = finalJobs,
+                                           criticalOnly = criticalOnly)
 
             if not resolveDeps or not cannotResolve:
                 break
@@ -225,7 +231,8 @@ class DependencySolver(object):
                                                                 trvSrc,
                                                                 cannotResolve,
                                                                 uJob, jobSet,
-                                                                ineligible)
+                                                                ineligible,
+                                                                check)
                 if newJobSet:
                     jobSet |= newJobSet
                     changeMade = True
@@ -247,7 +254,7 @@ class DependencySolver(object):
                 criticalUpdates)
 
     def resolveEraseByUpdating(self, trvSrc, cannotResolve, uJob, jobSet, 
-                               ineligible):
+                               ineligible, check):
         """
             Attempt to resolve broken erase dependencies by updating the 
             package that has the dependency on the trove that is being 
@@ -320,10 +327,11 @@ class DependencySolver(object):
                         for x in potentialUpdateList ]
 
         try:
-            newJob, suggMap = self.client.updateChangeSet(updateJobs,
+            newJob = self.client.newUpdateJob(closeDatabase = False)
+            suggMap = self.client.prepareUpdateJob(newJob, updateJobs,
                                                      keepExisting=False,
                                                      resolveDeps=False,
-                                                     split=True)
+                                                     split=False)
             newJobSet = newJob.getJobs()
 
             # ignore updates where updating this trove would update
@@ -339,12 +347,13 @@ class DependencySolver(object):
             # there is actually a change
 
             uJob.getTroveSource().merge(newJob.getTroveSource())
+            check.setTroveSource(uJob.getTroveSource())
 
             (depList, newCannotResolve, changeSetList, criticalUpdates) = \
-                    self.db.depCheck(jobSet | newJobSet,
-                                     uJob.getTroveSource(),
-                                     findOrdering = False,
-                                     criticalJobs=[])
+                    check.depCheck(jobSet | newJobSet, findOrdering = False,
+                                   criticalJobs=[])
+            check.done()
+
             if cannotResolve != newCannotResolve:
                 cannotResolve = newCannotResolve
             else:

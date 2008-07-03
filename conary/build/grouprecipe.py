@@ -3102,7 +3102,8 @@ def checkGroupDependencies(group, cfg, cache, callback):
 
     client = conaryclient.ConaryClient(cfg)
 
-    failedDeps = client.db.depCheck(jobSet, TroveCacheWrapper(cache))[0]
+    checker = client.db.getDepStateClass(TroveCacheWrapper(cache))
+    failedDeps = checker.depCheck(jobSet)[0]
     callback.done()
     return failedDeps
 
