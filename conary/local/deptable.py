@@ -223,7 +223,7 @@ class DependencyWorkTables:
         # we've removed. We insert those dependencies into our temporary
         # tables (which define everything which needs to be checked) with
         # a positive depNum which matches the depNum from the Requires table.
-        self.cu.execute("DELETE FROM TmpRequires WHERE depNum > 0")
+        self.cu.execute("DELETE FROM TmpRequires WHERE instanceId > 0")
         self.cu.execute("""
         INSERT INTO TmpRequires
         SELECT DISTINCT

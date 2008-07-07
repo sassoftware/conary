@@ -6,6 +6,8 @@ Changes in @NEW@:
 
   o Client Changes:
     * Added separate s390x architecture. (CNY-2852)
+    * An error introduced in 2.0.20 which caused an assertion failure during
+      dependency checking has been fixed (CNY-2883)
 
 Changes in 2.0.20:
   o Code Changes:
