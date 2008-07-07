@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.21:
   o Build Changes:
     * Added support for RPM payloads which have been compressed with
       lzma.  The /usr/bin/unlzma program must be available to use this
