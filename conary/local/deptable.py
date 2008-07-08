@@ -69,7 +69,7 @@ class DependencyWorkTables:
         sql += joinClause
         sql += """\
         WHERE
-        %(tmpName)s.merged = 0 AND
+        NOT %(tmpName)s.merged AND
         %%s
         """ % substDict % " AND ".join(whereClause)
         self.cu.execute(sql, start_transaction = False)
