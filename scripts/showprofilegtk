@@ -20,6 +20,7 @@ import gtk
 import hotshot.stats
 import sys
 import pango
+import os
 
 SHOW_CALLERS = 'Parent function'
 SHOW_CALLEES = 'Child function'
@@ -146,9 +147,11 @@ class StatWindow(gtk.Window):
         self.disable_callbacks = False
         self.current_display = SHOW_CALLERS
         self.set_title('Profile viewer: %s' %filename)
+        basedir = os.path.realpath(
+            os.path.dirname(os.path.join(os.getcwd(), filename)))
         self.connect('destroy', lambda *x: gtk.main_quit())
         self.set_default_size(800, 400)
-        self.source_window = SourceWindow()
+        self.source_window = SourceWindow(basedir)
         mainpane = gtk.VPaned()
         mainpane.pack1(self.source_window)
         pane = gtk.VPaned()
@@ -156,10 +159,12 @@ class StatWindow(gtk.Window):
 
         self.funcstore = gtk.ListStore(ProfileStat)
         self.funcview = gtk.TreeView(self.funcstore)
+        self.funcview.connect('cursor-changed',
+                              self._display_callers_or_callees)
 
         self.funcselection = self.funcview.get_selection()
-        self.funcselection.connect("changed", self._display_callers_or_callees)
         self.funcview.connect("key_press_event", self.button_press)
+        self.funcselection.set_mode(gtk.SELECTION_SINGLE)
 
         cols = (('Num calls', set_num_calls, sort_num_calls),
                 ('Total Time', set_t_time, sort_t_time),
@@ -179,9 +184,12 @@ class StatWindow(gtk.Window):
 
         self.callerstore = gtk.ListStore(Caller)
         self.callerview = gtk.TreeView(self.callerstore)
+        self.callerview.connect('cursor-changed', self.on_caller_cursor_change)
 
         selection = self.callerview.get_selection()
-        selection.connect("changed", self.display_function)
+        selection.set_mode(gtk.SELECTION_SINGLE)
+        # when the user selects a different caller/callee
+        # change the current function to the selected function
 
         cols = (('Num calls', set_num_calls, sort_num_calls),
                 ('Total time', set_t_time, sort_t_time),
@@ -218,15 +226,18 @@ class StatWindow(gtk.Window):
     def enable_callbacks(self):
         self.disable_callbacks = False
 
-    def _display_callers_or_callees(self, selection, what=None):
+    def _display_callers_or_callees(self, view, what=None):
         if self.disable_callbacks:
             return
         self.disable_callbacks = True
         gobject.idle_add(self.enable_callbacks)
 
-        model, iter = selection.get_selected()
-        if not iter:
+        path, col = view.get_cursor()
+        if not path:
             return
+
+        model = view.get_model()
+        iter = model.get_iter(path)
 
         # show the relevant source
         info = model.get_value(iter, 0)
@@ -261,8 +272,10 @@ class StatWindow(gtk.Window):
                 caller.ct = stats[func][3]
             iter = self.callerstore.append()
             self.callerstore.set(iter, 0, caller)
-            self.callerview.get_column(2).set_title(what)
-            self.callerview.get_column(3).set_title(what)
+        selection = self.callerview.get_selection()
+        selection.unselect_all()
+        self.callerview.get_column(2).set_title(what)
+        self.callerview.get_column(3).set_title(what)
 
     def display_callers(self, selection):
         self._display_callers_or_callees(selection, SHOW_CALLERS)
@@ -270,16 +283,25 @@ class StatWindow(gtk.Window):
     def display_children(self, selection):
         self._display_callers_or_callees(selection, SHOW_CALLEES)
 
-    def display_function(self, selection):
-        model, iter = selection.get_selected()
-        if not iter:
+    def on_caller_cursor_change(self, view):
+        path, col = view.get_cursor()
+        if not path:
             return
-        selection.unselect_all()
+
+        # first look up the caller/callee clicked on
+        model = view.get_model()
+        iter = model.get_iter(path)
         caller = model.get_value(iter, 0)
+
+        # now look up that function in the function list so we
+        # can change to it
         iter = self.funcstore.get_iter_first()
         while iter:
             stat = self.funcstore.get_value(iter, 0)
             if stat.func == caller.func:
+                # this is the function we want to switch to
+                # select it.
+                self.funcselection.unselect_all()
                 self.funcselection.select_iter(iter)
                 path = self.funcstore.get_path(iter)
                 col = self.funcview.get_column(0)
@@ -309,7 +331,7 @@ class StatWindow(gtk.Window):
             self.funcstore.set(iter, 0, stat)
 
 class SourceWindow(gtk.ScrolledWindow):
-    def __init__(self):
+    def __init__(self, basedir):
         self.last_file = None
         self.source_buffer = None
         self.start = None
@@ -319,6 +341,7 @@ class SourceWindow(gtk.ScrolledWindow):
         view = self.view = gtk.TextView()
         view.set_property('editable', False)
         self.add(view)
+        self.basedir = basedir
 
     def idle_load_source(self, args):
         path, lineno = args
@@ -328,7 +351,8 @@ class SourceWindow(gtk.ScrolledWindow):
             source_buffer = SourceBuffer()
             self.source_buffer = source_buffer
             try:
-                f = open(path, 'r')
+                fn = os.path.normpath(os.path.join(self.basedir, path))
+                f = open(fn, 'r')
             except IOError:
                 return
 
@@ -362,12 +386,12 @@ class SourceWindow(gtk.ScrolledWindow):
 class SourceBuffer:
     def __init__(self):
         buffer = self.buffer = gtk.TextBuffer(None)
-        tag = buffer.create_tag('source')
-        tag.set_property('font', 'monospace')
-        tag.set_property('pixels_above_lines', 0)
-        tag.set_property('pixels_below_lines', 0)
-        buffer.create_tag('current', background='#aaaaff')
-        buffer.create_tag('lineno', foreground='#00b000')
+        tag = buffer.create_tag('source', font='monospace',
+                                pixels_above_lines=0,
+                                pixels_below_lines=0)
+        buffer.create_tag('current', paragraph_background='#aaaaff')
+        buffer.create_tag('lineno', foreground='#00b000',
+                          font='monospace')
 
     def get_buffer(self):
         return self.buffer
