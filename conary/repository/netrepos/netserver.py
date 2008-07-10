@@ -207,7 +207,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         Returns a tuple of (Exception, result).  Exception is a Boolean
         stating whether an error occurred.
         """
-	# reopens the sqlite db if it's changed
+	# reopens the database as needed (if changed on disk or lost connection)
 	self.reopen()
         self._port = port
         self._protocol = protocol
