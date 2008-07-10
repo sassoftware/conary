@@ -142,7 +142,8 @@ class DependencyWorkTables:
         WHERE %(tmpName)s.isProvides = 1 AND
               %(tmpName)s.merged = 0""" % substDict
         self.cu.execute(repQuery, start_transaction = False)
-        self.cu.execute("UPDATE %(tmpName)s SET merged = 1" % substDict)
+        self.cu.execute("UPDATE %(tmpName)s SET merged = 1" % substDict, 
+                        start_transaction=False)
 
     def _populateTmpTable(self, depList, troveNum, requires,
                           provides, multiplier = 1):

@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Starting in 2.0.20, dependency resolution started locking the database 
+      unnecessarily.  This affected rmake dependency resolution.
+
 Changes in 2.0.21:
   o Build Changes:
     * Added support for RPM payloads which have been compressed with
