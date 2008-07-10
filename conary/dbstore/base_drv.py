@@ -273,7 +273,7 @@ class BaseDatabase:
     def reopen(self):
         """Returns True if the database backend was reopened or a reconnection
         was required"""
-        if self.alive():
+        if self.dbh and self.alive():
             return False
         return self.connect()
 
@@ -298,9 +298,6 @@ class BaseDatabase:
         else:
             del c
         return True
-
-    def closed(self):
-        return self.dbh is None
 
     # creating cursors
     def cursor(self):

@@ -161,14 +161,19 @@ class Database(BaseDatabase):
         self.closed = False
         return True
 
+    def close(self):
+        self.inode = (None, None)
+        return BaseDatabase.close(self)
+
     def reopen(self):
         if self.database in self.VIRTUALS:
             return False
         sb = os.stat(self.database)
-        inode= (sb.st_dev, sb.st_ino)
-	if self.inode != inode:
+        inode = (sb.st_dev, sb.st_ino)
+	if self.inode != inode and self.dbh:
             self.dbh.close()
-            del self.dbh
+            self.dbh = None
+        if not self.dbh:
             return self.connect()
         return False
 
