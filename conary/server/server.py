@@ -357,41 +357,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
-    publicCalls = set(tuple(NetworkRepositoryServer.publicCalls) + ('reset',))
-    def reset(self, authToken, clientVersion):
-        import shutil
-        logMe(1, "resetting NetworkRepositoryServer", self.repDB)
-        try:
-            shutil.rmtree(self.contentsDir[0])
-        except OSError, e:
-            if e.errno != errno.ENOENT:
-                raise
-        os.mkdir(self.contentsDir[0])
-
-        # cheap trick. sqlite3 doesn't mind zero byte files; just replace
-        # the file with a zero byte one (to change the inode) and reopen
-        open(self.repDB[1] + '.new', "w")
-        os.rename(self.repDB[1] + '.new', self.repDB[1])
-        db = dbstore.connect(self.repDB[1], 'sqlite')
-        schema.loadSchema(db)
-        db.commit()
-        self.reopen()
-        self.createUsers()
-        return 0
-
-    def createUser(self, name, password, write = False, admin = False,
-                   remove = False):
-        self.auth.addUser(name, password)
-        self.auth.addRole(name)
-        self.auth.addRoleMember(name, name)
-        self.auth.addAcl(name, None, None, write, False, admin, remove = remove)
-
-    def createUsers(self):
-        self.createUser('test', 'foo', admin = True, write = True,
-                        remove = True)
-        self.createUser('anonymous', 'anonymous', admin = False, write = False)
-
 class HTTPServer(BaseHTTPServer.HTTPServer):
     isSecure = False
 
@@ -646,8 +611,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
             logMe(1, "Schema migration complete", dbVersion)
             sys.exit(0)
 
-        #netRepos = NetworkRepositoryServer(cfg, baseUrl)
-        netRepos = ResetableNetworkRepositoryServer(cfg, baseUrl)
+        netRepos = NetworkRepositoryServer(cfg, baseUrl)
         reqClass.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
 
         if 'add-user' in argSet:
