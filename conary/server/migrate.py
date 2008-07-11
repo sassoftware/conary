@@ -653,7 +653,7 @@ class MigrateTo_16(SchemaMigration):
 
 
 class MigrateTo_17(SchemaMigration):
-    Version = (17,1)
+    Version = (17,2)
 
     # given a FilePaths table that only has a path column, split that into
     # a (dirnameid, basenameId) tuple and create/update the corresponding
@@ -668,11 +668,11 @@ class MigrateTo_17(SchemaMigration):
             basename %(PATHTYPE)s
         ) """ % self.db.keywords)
         # save a copy of FilePaths before updating the table definition
-        cu.execute("""create table tmpFilePaths as
+        cu.execute("""create table oldFilePaths as
         select filePathId, pathId, path from FilePaths""")
-        self.db.createIndex("tmpFilePaths", "tmpFilePathsIdx", "filePathId",
+        self.db.createIndex("oldFilePaths", "oldFilePathsIdx", "filePathId",
                             check=False, unique=True)
-        self.db.analyze("tmpFilePaths")
+        self.db.analyze("oldFilePaths")
 
         # drop the FK constraint from TroveFiles into FilePaths
         self.db.loadSchema()
@@ -687,7 +687,7 @@ class MigrateTo_17(SchemaMigration):
         analyze = 1
         while True:
             cu.execute("""
-            select fp.filePathId, fp.path from tmpFilePaths as fp
+            select fp.filePathId, fp.path from oldFilePaths as fp
             left join tmpDirnames as d using(filePathId)
             where d.filePathId is null limit ?""", sliceSize)
             tmpl = [ (_fpid, os.path.split(_path)) for _fpid,_path in cu.fetchall() ]
@@ -719,11 +719,11 @@ class MigrateTo_17(SchemaMigration):
         logMe(2, "generating the new FilePaths table...")
         cu.execute("""insert into FilePaths(filePathId, dirnameId, basenameId, pathId)
         select fp.filePathId, d.dirnameId, b.basenameId, fp.pathId
-        from tmpFilePaths as fp
+        from oldFilePaths as fp
         join tmpDirnames as td using(filePathId)
         join Dirnames as d on td.dirname = d.dirname
         join Basenames as b on td.basename =  b.basename """)
-        cu.execute("drop table tmpFilePaths")
+        cu.execute("drop table oldFilePaths")
         cu.execute("drop table tmpDirnames")
         # fix the autoincrement primary key value on the new FilePaths
         cu.execute("select max(filePathId) from FilePaths")
@@ -767,7 +767,17 @@ class MigrateTo_17(SchemaMigration):
             trovestore.addPrefixesFromList(self.db, ret)
             self.db.analyze("Prefixes")
         return True
-        
+    # migrate to 17.2
+    def migrate2(self):
+        # fix the dirnames and basenames column types for postgresql
+        if self.db.driver != 'postgresql':
+            return True
+        cu = self.db.cursor()
+        logMe(2, "fixing column types for pathfields")
+        cu.execute("alter table Dirnames alter column dirname type %(PATHTYPE)s" % self.db.keywords)
+        cu.execute("alter table Basenames alter column basename type %(PATHTYPE)s" % self.db.keywords)
+        return True
+
 def _getMigration(major):
     try:
         ret = sys.modules[__name__].__dict__['MigrateTo_' + str(major)]

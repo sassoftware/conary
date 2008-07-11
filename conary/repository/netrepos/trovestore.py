@@ -75,26 +75,26 @@ def addPrefixesFromList(db, dirnameList):
         ret = _getPrefixes(d)
         ret.append(dirname)
         return ret
-    def _iterPrefixes(dl):
+    def _iterPrefixes(cu, dl):
         for dirnameId, dirname in dl:
             for x in _getPrefixes(dirname):
-                yield (dirnameId, x)
+                yield (dirnameId, cu.binary(x))
         raise StopIteration
     if not dirnameList:
         return 0
     cu = db.cursor()
-    schema.resetTable(cu, "tmpItems")
-    db.bulkload("tmpItems", _iterPrefixes(dirnameList), ["itemId", "item"])
-    db.analyze("tmpItems")
+    schema.resetTable(cu, "tmpPaths")
+    db.bulkload("tmpPaths", _iterPrefixes(cu, dirnameList), ["id", "path"])
+    db.analyze("tmpPaths")
     # insert any new prefix strings into Dirnames
     cu.execute("""insert into Dirnames(dirname)
-    select distinct t.item from tmpItems as t
-    left join Dirnames as d on t.item = d.dirname
+    select distinct t.path from tmpPaths as t
+    left join Dirnames as d on t.path = d.dirname
     where d.dirnameId is null """)
     # now populate Prefixes
     cu.execute(""" insert into Prefixes (dirnameId, prefixId)
-    select tmpItems.itemId, d.dirnameId from tmpItems
-    join Dirnames as d on tmpItems.item = d.dirname """)
+    select tmpPaths.id, d.dirnameId from tmpPaths
+    join Dirnames as d on tmpPaths.path = d.dirname """)
     return len(dirnameList)
 
 class TroveStore:
@@ -375,10 +375,10 @@ class TroveStore:
         ) """)
         newDirnames = cu.fetchall()        
 
-        schema.resetTable(cu, "tmpItems")
-        self.db.bulkload("tmpItems", newDirnames, ["item"])
+        schema.resetTable(cu, "tmpPaths")
+        self.db.bulkload("tmpPaths", newDirnames, ["path"])
         cu.execute("select dirnameId, dirname from Dirnames "
-                   "join tmpItems on dirname = item ")
+                   "join tmpPaths on dirname = path ")
         addPrefixesFromList(self.db, cu.fetchall())
 
         # done with processing the Prefixes for new Dirnames

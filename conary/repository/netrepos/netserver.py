@@ -2067,10 +2067,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         roleIds = self.auth.getAuthRoles(cu, authToken)
 
         def _lookupIds(cu, itemList, selectQlist):
-            schema.resetTable(cu, "tmpItems")
-            cu.executemany("insert into tmpItems (item) values (?)",
-                           itemList, start_transaction=False)
-            self.db.analyze("tmpItems")
+            schema.resetTable(cu, "tmpPaths")
+            cu.executemany("insert into tmpPaths (path) values (?)",
+                           (cu.binary(x) for x in itemList), start_transaction=False)
+            self.db.analyze("tmpPaths")
             schema.resetTable(cu, "tmpId")
             if cu.driver == "mysql" and len(selectQlist) > 1:
                 # MySQL stupidity: a temporaray table can not be used twice in
@@ -2093,15 +2093,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 # "optimizing" since no records will be filtered out
                 if not ('/' in dirnames):
                     prefixQuery = _lookupIds(cu, dirnames, [
-                        """ select p.dirnameId from tmpItems
-                            join Dirnames as d on tmpItems.item = d.dirname
+                        """ select p.dirnameId from tmpPaths
+                            join Dirnames as d on tmpPaths.path = d.dirname
                             join Prefixes as p on d.dirnameId = p.prefixId """,
-                        """ select d.dirnameId from tmpItems
-                            join Dirnames as d on tmpItems.item = d.dirname """ ])
+                        """ select d.dirnameId from tmpPaths
+                            join Dirnames as d on tmpPaths.path = d.dirname """ ])
             else: # dirnames are just dirnames
                 prefixQuery = _lookupIds(cu, dirnames, [
-                    """ select d.dirnameId from tmpItems
-                        join Dirnames as d on tmpItems.item = d.dirname """ ])
+                    """ select d.dirnameId from tmpPaths
+                        join Dirnames as d on tmpPaths.path = d.dirname """ ])
 
         schema.resetTable(cu, "tmpPathIdLookup")
         query = """
@@ -2217,23 +2217,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not roleIds:
             return {}
 
-        schema.resetTable(cu, 'tmpPath')
+        schema.resetTable(cu, 'tmpFilePaths')
         for row, path in enumerate(pathList):
             dirname, basename = os.path.split(path)
-            cu.execute("INSERT INTO tmpPath (row, dirname, basename) VALUES (?, ?, ?)",
+            cu.execute("INSERT INTO tmpFilePaths (row, dirname, basename) VALUES (?, ?, ?)",
                        (row, dirname, basename), start_transaction=False)
-        self.db.analyze("tmpPath")
+        self.db.analyze("tmpFilePaths")
 
         query = """
         SELECT userQ.row, Items.item, Versions.version, Flavors.flavor,
             Nodes.timeStamps
-        FROM ( select tmpPath.row as row, filePathId as filePathId
-               from FilePaths
-               join Dirnames on FilePaths.dirnameId = Dirnames.dirnameId
-               join Basenames on FilePaths.basenameId = Basenames.basenameId
-               join tmpPath on
-                   tmpPath.dirname = Dirnames.dirname and
-                   tmpPath.basename = Basenames.basename ) as userQ
+        FROM ( select tfp.row as row, fp.filePathId as filePathId
+               from FilePaths as fp
+               join Dirnames as d on fp.dirnameId = d.dirnameId
+               join Basenames as b on fp.basenameId = b.basenameId
+               join tmpFilePaths as tfp on
+                   tfp.dirname = d.dirname and
+                   tfp.basename = b.basename ) as userQ
         JOIN TroveFiles using(filePathId)
         JOIN Instances using(instanceId)
         JOIN Nodes on

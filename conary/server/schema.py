@@ -1137,15 +1137,15 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpGTVL"] = True
         db.createIndex("tmpGTVL", "tmpGTVLitemIdx", "item", check = False)
-    if "tmpPath" not in db.tempTables:
+    if "tmpFilePaths" not in db.tempTables:
         cu.execute("""
-        CREATE TEMPORARY TABLE tmpPath(
+        CREATE TEMPORARY TABLE tmpFilePaths(
             row         INTEGER,
             dirname     %(PATHTYPE)s,
             basename    %(PATHTYPE)s
         )""" % db.keywords)
-        db.tempTables["tmpPath"] = True
-        db.createIndex("tmpPath", "tmpPathDirnameIdx", "dirname", check=False)
+        db.tempTables["tmpFilePaths"] = True
+        db.createIndex("tmpFilePaths", "tmpFilePathsDirnameIdx", "dirname", check=False)
     # used primarily for dependency resolution
     if "tmpInstances" not in db.tempTables:
         cu.execute("""
@@ -1172,6 +1172,16 @@ def setupTempTables(db):
         db.tempTables["tmpItems"] = True
         db.createIndex("tmpItems", "tmpItemsItemIdIdx", "itemId", check=False)
         db.createIndex("tmpItems", "tmpItemsItemIdx", "item", check=False)
+    # general purpose list of paths
+    if "tmpPaths" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpPaths(
+            id    INTEGER,
+            path  %(PATHTYPE)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpPaths"] = True
+        db.createIndex("tmpPaths", "tmpPathsIdIdx", "id", check=False)
+        db.createIndex("tmpPaths", "tmpPathsPathIdx", "path", check=False)
     # for processing UserGroupInstancesCache entries
     if "tmpUGI" not in db.tempTables:
         cu.execute("""
