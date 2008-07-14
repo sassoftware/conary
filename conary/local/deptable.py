@@ -163,26 +163,31 @@ class DependencyWorkTables:
         #""")
 
         toInsert = []
+        _len = len
+        depListLen = _len(depList)
+        insertFn = toInsert.append
         for (isProvides, (classId, depClass)) in allDeps:
             # getDeps() returns sorted deps
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
-                    toInsert.append((troveNum, multiplier * len(depList),
-                                     1 + len(flags), isProvides, classId,
-                                     depName, NO_FLAG_MAGIC, 0))
-                    if flags:
+                    flagLen = _len(flags)
+                    insertFn((troveNum, multiplier * depListLen,
+                              1 + flagLen, isProvides, classId,
+                              depName, NO_FLAG_MAGIC, 0))
+                    if flagLen:
                         for (flag, sense) in flags:
                             # conary 0.12.0 had mangled flags; this check
                             # prevents them from making it into any repository
                             assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
-                            toInsert.append((troveNum,
-                                             multiplier * len(depList),
-                                             1 + len(flags), isProvides,
+                            insertFn((troveNum,
+                                             multiplier * depListLen,
+                                             1 + flagLen, isProvides,
                                              classId, depName, flag, 0))
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
+                    depListLen += 1
 
         self.db.bulkload("DepCheck", toInsert,
                          [ "troveId", "depNum", "flagCount", "isProvides",
@@ -284,14 +289,14 @@ class DependencyChecker:
 
     def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges,
                     linkedIds, finalIds, criticalUpdates):
+        edges = []
+        addEdge = edges.append
         for (reqNodeId, provNodeId, depId) in oldOldEdges:
             # remove the provider after removing the requirer
-            self.g.addEdge(reqNodeId, provNodeId, (DEP_REASON_OLD_NEEDS_OLD,
-                                                   depId))
+            addEdge((reqNodeId, provNodeId, (DEP_REASON_OLD_NEEDS_OLD, depId)))
 
         for (reqNodeId, provNodeId, depId) in newNewEdges:
-            self.g.addEdge(provNodeId, reqNodeId, (DEP_REASON_NEW_NEEDS_NEW,
-                                                   depId))
+            addEdge((provNodeId, reqNodeId, (DEP_REASON_NEW_NEEDS_NEW, depId)))
 
         for nodeIdList in linkedIds:
             # create a circular link here, to make sure
@@ -299,8 +304,8 @@ class DependencyChecker:
             #  a -> b -> c -> a.
             l = len(nodeIdList)
             for i in range(l):
-                self.g.addEdge(nodeIdList[i], nodeIdList[(i + 1) % l],
-                               (DEP_REASON_LINKED, None))
+                addEdge((nodeIdList[i], nodeIdList[(i + 1) % l],
+                               (DEP_REASON_LINKED, None)))
 
         for finalId in finalIds:
             # these jobs are required to be last.  To force that, we simply
@@ -309,7 +314,7 @@ class DependencyChecker:
             for leafId in self.g.getLeaves():
                 if leafId in finalIds:
                     continue
-                self.g.addEdge(leafId, finalId, (DEP_REASON_FORCED_LAST, None))
+                addEdge((leafId, finalId, (DEP_REASON_FORCED_LAST, None)))
 
         for leafId in self.g.getDisconnected():
             # if nothing depends on a node and the node
@@ -332,11 +337,12 @@ class DependencyChecker:
                 if not parentId:
                     continue
 
-            self.g.addEdge(parentId, leafId, (DEP_REASON_ORDER, None))
+            addEdge((parentId, leafId, (DEP_REASON_ORDER, None)))
 
 
         for (reqNodeId, provNodeId, depId) in collectionEdges:
-            self.g.addEdge(provNodeId, reqNodeId, (DEP_REASON_COLLECTION, None))
+            addEdge((provNodeId, reqNodeId, (DEP_REASON_COLLECTION, None)))
+        self.g.addEdges(edges)
 
     def _collapseEdges(self, oldOldEdges, oldNewEdges, newOldEdges,
                        newNewEdges):
@@ -347,10 +353,13 @@ class DependencyChecker:
         newNewEdges.difference_update(newOldEdges)
 
     def _createCollectionEdges(self):
-        edges = set()
+        edges = []
 
         nodes = iter(self.nodes)
         nodes.next()
+        addEdge = edges.append
+        getOld = self.oldInfoToNodeId.get
+        getNew = self.newInfoToNodeId.get
 
         for i, (job, _, _) in enumerate(nodes):
             if not trove.troveIsCollection(job[0]): continue
@@ -359,20 +368,20 @@ class DependencyChecker:
                 trv = self.troveSource.db.getTrove(job[0], job[1][0], job[1][1],
                                                    withFiles = False)
                 for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
-                    targetTrove = self.oldInfoToNodeId.get(info, -1)
+                    targetTrove = getOld(info, -1)
                     if targetTrove >= 0:
-                        edges.add((i + 1, targetTrove, None))
+                        addEdge((i + 1, targetTrove, None))
 
             if job[2][0]:
                 trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
                                                 withFiles = False)
 
                 for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
-                    targetTrove = self.newInfoToNodeId.get(info, -1)
+                    targetTrove = getNew(info, -1)
                     if targetTrove >= 0:
-                        edges.add((i + 1, targetTrove, None))
+                        addEdge((i + 1, targetTrove, None))
 
-        return edges
+        return set(edges)
 
     def _createDependencyEdges(self, result, depList):
         oldNewEdges = set()
@@ -792,12 +801,15 @@ class DependencyChecker:
                 jobSetsByJob[nodeIdx] = jobSetIdx
 
         sccGraph = graph.DirectedGraph()
+        edges = []
+        addEdge = edges.append
         for jobSetIdx, jobSet in enumerate(jobSets):
             sccGraph.addNode(jobSetIdx)
             for job, nodeIdx in jobSet:
                 for childNodeIdx in self.g.iterChildren(nodeIdx):
                     childJobSetIdx = jobSetsByJob[childNodeIdx]
-                    sccGraph.addEdge(jobSetIdx, childJobSetIdx)
+                    addEdge((jobSetIdx, childJobSetIdx, 1))
+        sccGraph.addEdges(edges)
 
         # create an ordering based on dependencies, and then, when forced
         # to choose between several choices, use the index order for jobSets
