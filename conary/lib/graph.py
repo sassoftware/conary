@@ -127,10 +127,26 @@ class DirectedGraph:
         return self.data.get(idx)
 
     def addEdge(self, fromItem, toItem, value=1):
+        import epdb
+        epdb.st()
         fromIdx, toIdx = (self.data.getIndex(fromItem), 
                           self.data.getIndex(toItem))
         self.edges.setdefault(fromIdx, {})[toIdx] = value
         self.edges.setdefault(toIdx, {})
+
+    def addEdges(self, edgeList):
+        getIndex = self.data.getIndex
+        edges = self.edges
+
+        for fromItem, toItem, value in edgeList:
+            fromIdx = getIndex(fromItem)
+            toIdx = getIndex(toItem)
+            if fromIdx not in edges:
+                edges[fromIdx] = {toIdx:value}
+            else:
+                edges[fromIdx][toIdx] = value
+            if toIdx not in edges:
+                edges[toIdx] = {}
 
     def delete(self, item):
         idx = self.data.getIndex(item)
@@ -152,9 +168,13 @@ class DirectedGraph:
     def getReversedEdges(self):
         newEdges = {}
         for fromId, toIdList in self.edges.iteritems():
-            newEdges.setdefault(fromId, [])
+            if fromId not in newEdges:
+                newEdges[fromId] = []
             for toId, value in toIdList.iteritems():
-                newEdges.setdefault(toId, []).append((fromId, value))
+                if toId not in newEdges:
+                    newEdges[toId] = [(fromId, value)]
+                else:
+                    newEdges[toId].append((fromId, value))
         return dict((x[0], dict(x[1])) for x in newEdges.iteritems())
 
     def iterChildren(self, node, withEdges=False):
@@ -375,6 +395,8 @@ class DirectedGraph:
 
     def getStronglyConnectedGraph(self):
         compSets = self.getStronglyConnectedComponents()
+        edges = []
+        addEdge = edges.append
 
         sccGraph = self.__class__()
 
@@ -391,7 +413,8 @@ class DirectedGraph:
                 for childNode in self.iterChildren(node):
                     childComp = setsByNode[childNode]
                     if childComp != compSet:
-                        sccGraph.addEdge(compSet, setsByNode[childNode])
+                        addEdge((compSet, setsByNode[childNode], 1))
+        sccGraph.addEdges(edges)
         return sccGraph
 
     def flatten(self):
