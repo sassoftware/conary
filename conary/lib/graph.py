@@ -14,6 +14,7 @@
 """General graph algorithms"""
 import copy
 import itertools
+from collections import deque
 
 class BackEdgeError(Exception):
     def __init__(self, src, dst, *args, **kwargs):
@@ -229,6 +230,7 @@ class DirectedGraph:
 
         nodeIds = [ x[0] for x in nodeData.sort(nodeSort) ]
 
+ 
         trees = {}
         starts = {}
         finishes = {}
@@ -236,10 +238,12 @@ class DirectedGraph:
         depth = {}
         timeCount = 0
         parent = None
+        nodeStruct = deque()
         if dfs:
-            nodeStruct = Stack()
+            popFn = nodeStruct.pop
         else:
-            nodeStruct = Queue()
+            popFn = nodeStruct.popleft
+        pushFn = nodeStruct.append
 
         if start is not None:
             if not isinstance(start, list):
@@ -266,13 +270,14 @@ class DirectedGraph:
                 nodeId = nodeIds.pop(0)
                 if nodeId in starts:
                     continue
-                nodeStruct.clear().push((nodeId, None, False))
+                nodeStruct.clear()
+                pushFn((nodeId, None, False))
                 parent = nodeId
                 trees[nodeId] = []
                 depth[nodeId] = 0
 
             while nodeStruct:
-                nodeId, predNode, finish = nodeStruct.pop()
+                nodeId, predNode, finish = popFn()
                 if finish:
                     finishes[nodeId] = timeCount
                     if finishCallback:
@@ -299,17 +304,17 @@ class DirectedGraph:
                 # after all its children. Because in DFS we put the items in a
                 # queue, we have to do it after we add the children.
                 if dfs:
-                    nodeStruct.push((nodeId, None, True))
+                    pushFn((nodeId, None, True))
 
                 childNodes = [x[0] for x in nodeData.sortSubset(
                                             getChildrenCallback(nodeId),
                                             nodeSort, reverse=reverse)]
                 for childNodeId in childNodes:
                     if childNodeId not in starts:
-                        nodeStruct.push((childNodeId, nodeId, False))
+                        pushFn((childNodeId, nodeId, False))
 
                 if not dfs:
-                    nodeStruct.push((nodeId, None, True))
+                    pushFn((nodeId, None, True))
 
         return starts, finishes, trees, pred, depth
 
@@ -438,36 +443,3 @@ class DirectedGraph:
                     out.write(' [label="%s"]' % (labelStr,))
                 out.write('\n')
         out.write('}\n')
-
-class Stack(object):
-    """A representation of a stack"""
-    __slots__ = [ 'data' ]
-
-    def __init__(self):
-        self.data = []
-
-    def push(self, obj):
-        self.data.append(obj)
-
-    def pop(self):
-        return self.data.pop()
-
-    def clear(self):
-        del self.data[:]
-        return self
-
-    def __nonzero__(self):
-        return bool(self.data)
-
-    def __repr__(self):
-        return "<%s object at %0x: %s>" % (self.__class__.__name__,
-                id(self), self.data)
-
-class Queue(Stack):
-    """A representation of a queue"""
-    __slots__ = [ 'data' ]
-
-    def pop(self):
-        obj = self.data[0]
-        del self.data[0]
-        return obj
