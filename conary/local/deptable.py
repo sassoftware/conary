@@ -290,9 +290,7 @@ class DependencyChecker:
     def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges,
                     linkedIds, finalIds, criticalUpdates):
         edges = []
-        def addEdge(edge):
-            edges.append(edge)
-            #self.g.addEdge(*edge)
+        addEdge = edges.append
         for (reqNodeId, provNodeId, depId) in oldOldEdges:
             # remove the provider after removing the requirer
             addEdge((reqNodeId, provNodeId, (DEP_REASON_OLD_NEEDS_OLD, depId)))
