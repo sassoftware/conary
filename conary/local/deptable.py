@@ -290,7 +290,9 @@ class DependencyChecker:
     def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges,
                     linkedIds, finalIds, criticalUpdates):
         edges = []
-        addEdge = edges.append
+        def addEdge(edge):
+            edges.append(edge)
+            #self.g.addEdge(*edge)
         for (reqNodeId, provNodeId, depId) in oldOldEdges:
             # remove the provider after removing the requirer
             addEdge((reqNodeId, provNodeId, (DEP_REASON_OLD_NEEDS_OLD, depId)))
@@ -307,6 +309,8 @@ class DependencyChecker:
                 addEdge((nodeIdList[i], nodeIdList[(i + 1) % l],
                                (DEP_REASON_LINKED, None)))
 
+        self.g.addEdges(edges)
+        edges[:] = []
         for finalId in finalIds:
             # these jobs are required to be last.  To force that, we simply
             # make them after all the leaves - those with no edges requiring
@@ -315,6 +319,9 @@ class DependencyChecker:
                 if leafId in finalIds:
                     continue
                 addEdge((leafId, finalId, (DEP_REASON_FORCED_LAST, None)))
+
+        self.g.addEdges(edges)
+        edges[:] = []
 
         for leafId in self.g.getDisconnected():
             # if nothing depends on a node and the node
