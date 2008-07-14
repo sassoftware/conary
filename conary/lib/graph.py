@@ -127,8 +127,6 @@ class DirectedGraph:
         return self.data.get(idx)
 
     def addEdge(self, fromItem, toItem, value=1):
-        import epdb
-        epdb.st()
         fromIdx, toIdx = (self.data.getIndex(fromItem), 
                           self.data.getIndex(toItem))
         self.edges.setdefault(fromIdx, {})[toIdx] = value
