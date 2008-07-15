@@ -95,10 +95,13 @@ class NodeDataByHash(NodeData):
         return node in self.hashedData
 
     def getIndex(self, item):
-        idx = self.hashedData.setdefault(item, self.index)
-        if idx == self.index:
+        if item not in self.hashedData:
+            idx = self.index
+            self.hashedData[item] = idx
             self.data.append(item)
             self.index += 1
+        else:
+            idx = self.hashedData[item]
         return idx
 
     def isEmpty(self):
