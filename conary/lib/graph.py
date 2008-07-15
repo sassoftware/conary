@@ -403,18 +403,15 @@ class DirectedGraph:
         sccGraph = self.__class__()
 
         setsByNode = {}
+        for compSet in compSets:
+            setsByNode.update(dict.fromkeys(compSet, compSet))
 
         for compSet in compSets:
-            for node in compSet:
-                setsByNode[node] = frozenset(compSet)
-
-        for compSet in compSets:
-            compSet = frozenset(compSet)
             sccGraph.addNode(compSet)
             for node in compSet:
                 for childNode in self.iterChildren(node):
                     childComp = setsByNode[childNode]
-                    if childComp != compSet:
+                    if childComp is not compSet:
                         addEdge((compSet, setsByNode[childNode], 1))
         sccGraph.addEdges(edges)
         return sccGraph
