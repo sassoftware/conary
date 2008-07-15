@@ -120,7 +120,8 @@ class DirectedGraph:
 
     def addNode(self, item):
         nodeId = self.data.getIndex(item)
-        self.edges.setdefault(nodeId, {})
+        if nodeId not in self.edges:
+            self.edges[nodeId] = {}
         return nodeId
 
     def isEmpty(self):
