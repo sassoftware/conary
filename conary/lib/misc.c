@@ -20,11 +20,13 @@
 #include <errno.h>
 #include <malloc.h>
 #include <netinet/in.h>
+#include <openssl/sha.h>
 #include <resolv.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <unistd.h>
+#include <zlib.h>
 
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)
@@ -39,6 +41,7 @@ static PyObject * removeIfExists(PyObject *self, PyObject *args);
 static PyObject * mkdirIfMissing(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
+static PyObject * sha1Uncompress(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
 static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
 static PyObject * py_sendmsg(PyObject *self, PyObject *args);
@@ -60,6 +63,9 @@ static PyMethodDef MiscMethods[] = {
     { "mkdirIfMissing", mkdirIfMissing, METH_VARARGS,
         "Creates a directory if the file does not already exist. EEXIST "
         "is ignored." },
+    { "sha1Uncompress", sha1Uncompress, METH_VARARGS,
+        "Uncompresses a gzipped file descriptor into another gzipped "
+        "file descriptor and returns the sha1 of the uncompressed content. " },
     { "unpack", unpack, METH_VARARGS },
     { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
@@ -765,6 +771,69 @@ static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
             vfd++;
 
     return PyInt_FromLong(vfd);
+}
+
+static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
+    int inFd, outFd;
+    int inSize, inStart, inStop, inAt, i;
+    z_stream zs;
+    char inBuf[1024 * 256];
+    char outBuf[1024 * 256];
+    int rc;
+    SHA_CTX sha1state;
+    char sha1[20];
+
+    if (!PyArg_ParseTuple(args, "(iii)i", &inFd, &inStart, &inSize, &outFd))
+        return NULL;
+
+    memset(&zs, 0, sizeof(zs));
+    if ((rc = inflateInit2(&zs, 31)) != Z_OK) {
+        PyErr_SetString(PyExc_RuntimeError, zError(rc));
+        return NULL;
+    }
+
+    SHA1_Init(&sha1state);
+
+    inStop = inSize + inStart;
+    inAt = inStart;
+
+    rc = 0;
+    while (rc != Z_STREAM_END) {
+        if (!zs.avail_in) {
+            zs.avail_in = MIN(sizeof(inBuf), inStop - inAt);
+            zs.next_in = inBuf;
+            rc = pread(inFd, inBuf, zs.avail_in, inAt);
+            inAt += zs.avail_in;
+            if (rc != zs.avail_in) {
+                PyErr_SetFromErrno(PyExc_OSError);
+                return NULL;
+            }
+        }
+
+        zs.avail_out = sizeof(outBuf);
+        zs.next_out = outBuf;
+        rc = inflate(&zs, 0);
+        if (rc < 0) {
+            PyErr_SetString(PyExc_RuntimeError, zError(rc));
+            return NULL;
+        }
+
+        i = sizeof(outBuf) - zs.avail_out;
+        SHA1_Update(&sha1state, outBuf, i);
+        if (write(outFd, outBuf, i) != i) {
+            PyErr_SetFromErrno(PyExc_OSError);
+            return NULL;
+        }
+    }
+
+    if ((rc = inflateEnd(&zs)) != Z_OK) {
+        PyErr_SetString(PyExc_RuntimeError, zError(rc));
+        return NULL;
+    }
+
+    SHA1_Final(sha1, &sha1state);
+
+    return PyString_FromStringAndSize(sha1, sizeof(sha1));
 }
 
 static PyObject * py_res_init(PyObject *self, PyObject *args) {
