@@ -355,9 +355,12 @@ class Database(BaseDatabase):
         return self.dbh.bulkload(tableName, rows, columnNames)
 
     # resetting the auto increment values of primary keys
-    def setAutoIncrement(self, table, column, value):
+    def setAutoIncrement(self, table, column, value = None):
         cu = self.cursor()
         seqName = "%s_%s_seq" % (table, column)
+        if value is None:
+            cu.execute("select max(%s) from %s" % (column, table))
+            value = int(cu.fetchall()[0][0])
         cu.execute("select setval(?, ?)", (seqName, value))
         ret = cu.fetchall()
         assert (ret[0][0] == value)

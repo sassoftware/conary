@@ -393,8 +393,11 @@ class Database(BaseDatabase):
         return True
 
     # resetting the auto increment values of primary keys
-    def setAutoIncrement(self, table, column, value):
+    def setAutoIncrement(self, table, column, value = None):
         cu = self.cursor()
+        if value is None:
+            cu.execute("select max(%s) from %s" % (column, table))
+            value = int(cu,fetchall()[0][0])
         cu.execute("update sqlite_sequence set seq = ? where lower(name) = lower(?)",
                    (value, table))
         return True

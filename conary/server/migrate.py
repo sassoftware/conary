@@ -750,32 +750,57 @@ class MigrateTo_17(SchemaMigration):
 
     # migrate to 17.1
     def migrate1(self):
+        return True
+
+    # migrate to 17.2
+    def migrate2(self):
+        # fix the dirnames and basenames column types for postgresql
+        cu = self.db.cursor()
+        if self.db.driver == 'postgresql':
+            logMe(2, "fixing column types for pathfields")
+            cu.execute("create table saveDirnames as select dirnameId, dirname from Dirnames")
+            cu.execute("create table saveBasenames as select basenameId, basename from Basenames")
+            cu.execute("create table savePrefixes as select dirnameId, prefixId from Prefixes")
+            self.db.dropForeignKey("FilePaths", "dirnameId")
+            self.db.dropForeignKey("FilePaths", "basenameId")
+            cu.execute("drop table Prefixes")
+            cu.execute("drop table Dirnames")
+            cu.execute("drop table Basenames")
+            self.db.loadSchema()
+            schema.createTroves(self.db, createIndex = False)
+            cu.execute("select dirnameId, dirname from saveDirnames")
+            self.db.bulkload("Dirnames", ( (x[0], cu.binary(x[1])) for x in cu.fetchall() ),
+                             ["dirnameId", "dirname"])
+            cu.execute("select basenameId, basename from saveBasenames")
+            self.db.bulkload("Basenames", ( (x[0], cu.binary(x[1])) for x in cu.fetchall() ),
+                             ["basenameId", "basename"])
+            cu.execute("insert into Prefixes(dirnameId, prefixId) "
+                       "select dirnameId, prefixId from savePrefixes")
+            schema.createTroves(self.db, createIndex = True)
+            self.db.addForeignKey("FilePaths", "dirnameId", "Dirnames", "dirnameId")
+            self.db.addForeignKey("FilePaths", "basenameId", "Basenames", "basenameId")
+            cu.execute("drop table saveDirnames")
+            cu.execute("drop table saveBasenames")
+            cu.execute("drop table savePrefixes")
+            self.db.analyze("Dirnames")
+            self.db.analyze("Basenames")
+            self.db.setAutoIncrement("Dirnames", "dirnameId")
+            self.db.setAutoIncrement("Basenames", "basenameId")
         # fix the missing dirnames/prefixes links
         schema.setupTempTables(self.db)       
         logMe(2, "looking for missing dirnames/prefixes links")
         cu = self.db.cursor()
         cu.execute("""select d.dirnameId, d.dirname
-        from ( select distinct fp.dirnameId as dirnameId
+        from Dirnames as d
+        join ( select distinct fp.dirnameId as dirnameId
                from FilePaths as fp
                left join Prefixes as p using(dirnameId)
-               where p.dirnameId is null ) as dq
-        join Dirnames as d using(dirnameId)
-        """)
+               where p.dirnameId is null ) as dq using(dirnameId) """)
         ret = cu.fetchall()
         if ret:
             logMe(2, "fixing missing dirnames/prefixes links in %d dirnames" % (len(ret),))
             trovestore.addPrefixesFromList(self.db, ret)
             self.db.analyze("Prefixes")
-        return True
-    # migrate to 17.2
-    def migrate2(self):
-        # fix the dirnames and basenames column types for postgresql
-        if self.db.driver != 'postgresql':
-            return True
-        cu = self.db.cursor()
-        logMe(2, "fixing column types for pathfields")
-        cu.execute("alter table Dirnames alter column dirname type %(PATHTYPE)s" % self.db.keywords)
-        cu.execute("alter table Basenames alter column basename type %(PATHTYPE)s" % self.db.keywords)
         return True
 
 def _getMigration(major):
