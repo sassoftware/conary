@@ -208,13 +208,12 @@ class StatWindow(gtk.Window):
         self.add(mainpane)
 
     def button_press(self, obj, event):
-        selection = obj.get_selection()
         if event.keyval == ord('c'):
-            self.display_children(selection)
+            self.display_children(obj)
         elif event.keyval == ord('p'):
-            self.display_callers(selection)
+            self.display_callers(obj)
         elif event.keyval == ord('s'):
-            self.display_source(selection)
+            self.display_source(obj)
 
     def display_source(self, selection):
         model, iter = selection.get_selected()
