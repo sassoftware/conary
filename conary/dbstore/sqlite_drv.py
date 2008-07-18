@@ -397,7 +397,7 @@ class Database(BaseDatabase):
         cu = self.cursor()
         if value is None:
             cu.execute("select max(%s) from %s" % (column, table))
-            value = int(cu,fetchall()[0][0])
+            value = int(cu.fetchall()[0][0])
         cu.execute("update sqlite_sequence set seq = ? where lower(name) = lower(?)",
                    (value, table))
         return True
