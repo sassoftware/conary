@@ -283,6 +283,8 @@ class StatWindow(gtk.Window):
         self._display_callers_or_callees(selection, SHOW_CALLEES)
 
     def on_caller_cursor_change(self, view):
+        if self.disable_callbacks:
+            return
         path, col = view.get_cursor()
         if not path:
             return
