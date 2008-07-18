@@ -22,9 +22,6 @@ import sys
 import pango
 import os
 
-SHOW_CALLERS = 'Parent function'
-SHOW_CALLEES = 'Child function'
-
 class ProfileStat(gobject.GObject):
     func = None
     cc = 0
@@ -51,7 +48,7 @@ def compare(a, b):
     return 0
 
 def format_float(x):
-    return "%.3f" % x
+    return '%.4f' % x
 
 def set_func(tree, cell, model, iter):
     info = model.get_value(iter, 0)
@@ -65,10 +62,7 @@ def sort_func(model, iter1, iter2):
 def set_num_calls(tree, cell, model, iter):
     info = model.get_value(iter, 0)
     if info.nc != info.cc:
-        try:
-            c = '%d/%d' %(info.nc, info.cc)
-        except:
-            import epdb;epdb.st()
+        c = '%d/%d' %(info.nc, info.cc)
     else:
         c = str(info.nc)
     cell.set_property('text', c)
@@ -141,18 +135,78 @@ def setup_tree_view(treeview, model, cols):
         model.set_sort_func(col, sort)
         column.set_sort_column_id(col)
 
+    treeview.set_search_column(len(cols) - 1)
+    treeview.set_search_equal_func(search_equal_func)
+
+def search_equal_func(model, column, key, iter):
+    info = model.get_value(iter, 0)
+    key = key.lower()
+    if key in info.func[0].lower():
+        return False
+    if key in info.func[2].lower():
+        return False
+    return True
+
 class StatWindow(gtk.Window):
+    ui_info = """
+<ui>
+  <menubar name='MenuBar'>
+    <menu action='FileMenu'>
+      <menuitem action='Refresh'/>
+      <menuitem action='Quit'/>
+    </menu>
+    <menu action='View'>
+      <menuitem action='Parent'/>
+      <menuitem action='Child'/>
+    </menu>
+  </menubar>
+</ui>
+"""
+
+    def build_action_group(self):
+        entries = (
+          ( 'FileMenu', None, '_File' ),
+          ( 'Refresh', gtk.STOCK_REFRESH, '_Refresh', '<control>R', 'Refresh',
+            self.activate_action ),
+          ( 'Quit', gtk.STOCK_QUIT, '_Quit', '<control>Q', 'Quit',
+            self.activate_action ),
+          ( 'View', None, '_View' ),
+          ( 'Parent', None, '_Parent Functions', 'P', None,
+            self.activate_action ),
+          ( 'Child', None, '_Child Functions', 'C', None,
+            self.activate_action ),
+        )
+
+        action_group = gtk.ActionGroup('AppWindowActions')
+        action_group.add_actions(entries)
+
+        return action_group
+
     def __init__(self, filename):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.filename = filename
+
+        ui = gtk.UIManager()
+        self.set_data('ui-manager', ui)
+        ui.insert_action_group(self.build_action_group(), 0)
+        self.add_accel_group(ui.get_accel_group())
+
+        uiid = ui.add_ui_from_string(self.ui_info)
+        bar = ui.get_widget('/MenuBar')
+        bar.show()
+
         self.disable_callbacks = False
-        self.current_display = SHOW_CALLERS
         self.set_title('Profile viewer: %s' %filename)
         basedir = os.path.realpath(
             os.path.dirname(os.path.join(os.getcwd(), filename)))
         self.connect('destroy', lambda *x: gtk.main_quit())
         self.set_default_size(800, 400)
         self.source_window = SourceWindow(basedir)
+        vbox = gtk.VBox()
+        vbox.pack_start(bar, False, False)
+
         mainpane = gtk.VPaned()
+        vbox.pack_start(mainpane)
         mainpane.pack1(self.source_window)
         pane = gtk.VPaned()
         mainpane.pack2(pane)
@@ -160,10 +214,9 @@ class StatWindow(gtk.Window):
         self.funcstore = gtk.ListStore(ProfileStat)
         self.funcview = gtk.TreeView(self.funcstore)
         self.funcview.connect('cursor-changed',
-                              self._display_callers_or_callees)
+                              self.on_funcview_cursor_changed)
 
         self.funcselection = self.funcview.get_selection()
-        self.funcview.connect("key_press_event", self.button_press)
         self.funcselection.set_mode(gtk.SELECTION_SINGLE)
 
         cols = (('Num calls', set_num_calls, sort_num_calls),
@@ -182,11 +235,26 @@ class StatWindow(gtk.Window):
         sw.add(self.funcview)
         pane.pack1(sw, True, False)
 
-        self.callerstore = gtk.ListStore(Caller)
-        self.callerview = gtk.TreeView(self.callerstore)
-        self.callerview.connect('cursor-changed', self.on_caller_cursor_change)
+        nb = gtk.Notebook()
+        self.nb = nb
+        sw, self.callerstore = self.setup_callinfo_list('Calling')
+        nb.append_page(sw, tab_label=gtk.Label('Parent Functions'))
 
-        selection = self.callerview.get_selection()
+        sw, self.calleestore = self.setup_callinfo_list('Called')
+        nb.append_page(sw, tab_label=gtk.Label('Called Functions'))
+
+        pane.pack2(nb, False, True)
+
+        self.add(vbox)
+
+        self.load_stats()
+
+    def setup_callinfo_list(self, what):
+        store = gtk.ListStore(Caller)
+        view = gtk.TreeView(store)
+        view.connect('cursor-changed', self.on_caller_cursor_change)
+
+        selection = view.get_selection()
         selection.set_mode(gtk.SELECTION_SINGLE)
         # when the user selects a different caller/callee
         # change the current function to the selected function
@@ -194,38 +262,33 @@ class StatWindow(gtk.Window):
         cols = (('Num calls', set_num_calls, sort_num_calls),
                 ('Total time', set_t_time, sort_t_time),
                 ('Cumulative time', set_c_time, sort_c_time),
-                ('Parent function', set_func, sort_func))
-        setup_tree_view(self.callerview, self.callerstore, cols)
+                ('%s function' %what, set_func, sort_func))
+        setup_tree_view(view, store, cols)
         # set to number of calls, decending
-        self.callerstore.set_sort_column_id(0, gtk.SORT_DESCENDING)
+        store.set_sort_column_id(0, gtk.SORT_DESCENDING)
 
         sw = gtk.ScrolledWindow()
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_size_request(-1, 150)
-        sw.add(self.callerview)
-        pane.pack2(sw, False, True)
+        sw.add(view)
 
-        self.add(mainpane)
+        return sw, store
 
-    def button_press(self, obj, event):
-        if event.keyval == ord('c'):
-            self.display_children(obj)
-        elif event.keyval == ord('p'):
-            self.display_callers(obj)
-        elif event.keyval == ord('s'):
-            self.display_source(obj)
-
-    def display_source(self, selection):
-        model, iter = selection.get_selected()
-        if not iter:
-            return
-        info = model.get_value(iter, 0)
-        self.source_window.show()
+    def activate_action(self, action):
+        name = action.get_name()
+        if name == 'Quit':
+            gtk.main_quit()
+        elif name == 'Parent':
+            self.nb.set_current_page(0)
+        elif name == 'Child':
+            self.nb.set_current_page(1)
+        elif name == 'Refresh':
+            self.load_stats()
 
     def enable_callbacks(self):
         self.disable_callbacks = False
 
-    def _display_callers_or_callees(self, view, what=None):
+    def on_funcview_cursor_changed(self, view):
         if self.disable_callbacks:
             return
         self.disable_callbacks = True
@@ -243,44 +306,24 @@ class StatWindow(gtk.Window):
         path, lineno, func = info.func
         self.source_window.load_source(path, lineno)
 
-        self.callerstore.clear()
-
-        if not what:
-            what = self.current_display
-
-        if what == SHOW_CALLERS:
-            callinfo = info.callers
-        elif what == SHOW_CALLEES:
-            callinfo = info.callees
-        else:
-            raise RuntimeError('"what" must be SHOW_CALLERS or SHOW_CALLEES')
-        self.current_display = what
-
-        for func, nc in callinfo.iteritems():
-            caller = Caller()
-            caller.func = func
-            if type(nc) == tuple:
-                caller.nc = nc[0]
-                caller.cc = nc[1]
-                caller.tt = nc[2]
-                caller.ct = nc[3]
-            else:
-                caller.nc = nc
-                caller.cc = nc
-                caller.tt = stats[func][2]
-                caller.ct = stats[func][3]
-            iter = self.callerstore.append()
-            self.callerstore.set(iter, 0, caller)
-        selection = self.callerview.get_selection()
-        selection.unselect_all()
-        self.callerview.get_column(2).set_title(what)
-        self.callerview.get_column(3).set_title(what)
-
-    def display_callers(self, selection):
-        self._display_callers_or_callees(selection, SHOW_CALLERS)
-
-    def display_children(self, selection):
-        self._display_callers_or_callees(selection, SHOW_CALLEES)
+        for store, callinfo in ((self.callerstore, info.callers),
+                                (self.calleestore, info.callees)):
+            store.clear()
+            for func, nc in callinfo.iteritems():
+                caller = Caller()
+                caller.func = func
+                if type(nc) == tuple:
+                    caller.nc = nc[0]
+                    caller.cc = nc[1]
+                    caller.tt = nc[2]
+                    caller.ct = nc[3]
+                else:
+                    caller.nc = nc
+                    caller.cc = nc
+                    caller.tt = stats[func][2]
+                    caller.ct = stats[func][3]
+                iter = store.append()
+                store.set(iter, 0, caller)
 
     def on_caller_cursor_change(self, view):
         if self.disable_callbacks:
@@ -310,6 +353,23 @@ class StatWindow(gtk.Window):
                 self.funcview.set_cursor(path, col, False)
                 break
             iter = self.funcstore.iter_next(iter)
+
+    def load_stats(self):
+        self.funcstore.clear()
+        self.callerstore.clear()
+        self.calleestore.clear()
+
+        filename = self.filename
+        if '.pickle' in filename:
+            f = open(filename)
+            stats = cPickle.load(f).stats
+        elif filename.endswith('.lsprof'):
+            import marshal
+            f = open(filename)
+            stats = marshal.load(f)
+        else:
+            stats = hotshot.stats.load(filename).stats
+        self.populate(stats)
 
     def populate(self, stats):
         callees = {}
@@ -346,15 +406,18 @@ class SourceWindow(gtk.ScrolledWindow):
 
     def idle_load_source(self, args):
         path, lineno = args
-
         if path != self.last_file:
             self.last_file = path
             source_buffer = SourceBuffer()
             self.source_buffer = source_buffer
+            self.start = None
+            self.end = None
             try:
                 fn = os.path.normpath(os.path.join(self.basedir, path))
                 f = open(fn, 'r')
             except IOError:
+                buffer = source_buffer.get_buffer()
+                self.view.set_buffer(buffer)
                 return
 
             source_buffer.insert_source(f.read())
@@ -411,21 +474,11 @@ class SourceBuffer:
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print "usage: %s profile-file" %sys.argv[0]
+        print 'usage: %s profile-file' %sys.argv[0]
         sys.exit(1)
 
     filename = sys.argv[1]
-    if ".pickle" in filename:
-        f = open(filename)
-        stats = cPickle.load(f).stats
-    elif filename.endswith('.lsprof'):
-        import marshal
-        f = open(filename)
-        stats = marshal.load(f)
-    else:
-        stats = hotshot.stats.load(filename).stats
 
     app = StatWindow(filename)
-    app.populate(stats)
     app.show_all()
     gtk.main()
