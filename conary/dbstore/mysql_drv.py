@@ -495,8 +495,11 @@ class Database(BaseDatabase):
         return True
 
     # resetting the auto increment values of primary keys
-    def setAutoIncrement(self, table, column, value):
+    def setAutoIncrement(self, table, column, value = None):
         cu = self.cursor()
+        if value is None:
+            cu.execute("select max(%s) from %s" % (column, table))
+            value = int(cu.fetchall()[0][0])
         # mysql doesn't start from the "next" value, so we do it for it
         cu.execute("ALTER TABLE %s AUTO_INCREMENT = ?" % (table,), value+1)
         return True
