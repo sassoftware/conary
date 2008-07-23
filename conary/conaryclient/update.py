@@ -3565,14 +3565,26 @@ conary erase '%s=%s[%s]'
             removeHints.update([ ((x[0], x[1][0], x[1][1]), None)
                                     for x in job if x[1][0] is not None ])
 
-        if uJob.getChangesetsDownloaded() or not self.cfg.threaded:
-            for i, job in enumerate(allJobs):
-                self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
-                newCs = self._createCs(self.repos, self.db, job, uJob)
-                self.updateCallback.setUpdateHunk(i + 1, len(allJobs))
+        if uJob.getChangesetsDownloaded() or \
+           self.cfg.downloadFirst or not self.cfg.threaded:
+            def _applyCs(job, newCs, i, maxlen):
+                self.updateCallback.setUpdateHunk(i, maxlen)
                 self.updateCallback.setUpdateJob(job)
                 self._applyCs(newCs, uJob, removeHints = removeHints, **kwargs)
                 self.updateCallback.updateDone()
+            if self.cfg.downloadFirst:
+                csList = []
+                for i, job in enumerate(allJobs):
+                    self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
+                    newCs = self._createCs(self.repos, self.db, job, uJob)
+                    csList.append((job, newCs))
+                for i, (job, newCs) in enumerate(csList):
+                    _applyCs(job, newCs, i+1, len(csList))
+            else:
+                for i, job in enumerate(allJobs):
+                    self.updateCallback.setChangesetHunk(i + 1, len(allJobs))
+                    newCs = self._createCs(self.repos, self.db, job, uJob)
+                    _applyCs(job, newCs, i+1, len(allJobs))
             if self.getRepos():
                 self.getRepos()._clearHostCache()
             return

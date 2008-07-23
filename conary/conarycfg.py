@@ -570,6 +570,7 @@ class ConaryContext(ConfigSection):
                                             '~/.conary/site'))
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
+    downloadFirst         =  (CfgBool, False)
     tmpDir                =  (CfgPath, '/var/tmp')
     trustThreshold        =  (CfgInt, 0)
     trustedKeys           =  (CfgList(CfgString), [])
