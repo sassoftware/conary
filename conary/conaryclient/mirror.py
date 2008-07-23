@@ -211,7 +211,19 @@ def groupTroves(troveList):
         crtGrp.append(info)
     grouping = grouping.values()
     # make sure the groups are sorted in ascending order of their mark
-    grouping.sort(lambda a,b: cmp(a[0][0], b[0][0]))
+    def _groupsort(a, b):
+        ret = cmp(a[0][0], b[0][0])
+        if ret:
+            return ret
+        # if they have the same mark, sort the groups at the end
+        ahasgrp = [x[1][1] for x in a if x[1][0].startswith("group-")]
+        bhasgrp = [x[1][1] for x in b if x[1][0].startswith("group-")]
+        if len(ahasgrp) > len(bhasgrp):
+            return 1
+        if len(bhasgrp) > len(ahasgrp):
+            return -1
+        return cmp(ahasgrp, bhasgrp)
+    grouping.sort(_groupsort)
     return grouping
 
 def buildJobList(src, target, groupList, absolute = False):
