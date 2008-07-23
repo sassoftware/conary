@@ -214,23 +214,35 @@ def groupTroves(troveList):
     grouping.sort(lambda a,b: cmp(a[0][0], b[0][0]))
     return grouping
 
-def buildJobList(repos, groupList, absolute = False):
+def buildJobList(src, target, groupList, absolute = False):
     # Match each trove with something we already have; this is to mirror
     # using relative changesets, which is a lot more efficient than using
     # absolute ones.
     q = {}
+    srcAvailable = {}
     for group in groupList:
         for mark, (name, version, flavor) in group:
             # force groups to always be transferred using absolute changesets
             if name.startswith("group-"):
                 continue
+            srcAvailable[(name,version,flavor)] = True
             d = q.setdefault(name, {})
             l = d.setdefault(version.branch(), [])
             l.append(flavor)
 
+    # check that the latestavailable versions from the target are
+    # present on the source to be able to use relative changesets
     latestAvailable = {}
     if len(q):
-        latestAvailable = repos.getTroveLeavesByBranch(q)
+        latestAvailable = target.getTroveLeavesByBranch(q)
+    if len(latestAvailable):
+        def _tol(d):
+            for n, vd in d.iteritems():
+                for v, fl in vd.iteritems():
+                    for f in fl:
+                        yield (n,v,f)
+        ret = src.hasTroves(list(_tol(latestAvailable)), hidden=True)
+        srcAvailable.update(ret)
 
     # we'll keep latestAvailable in sync with what the target will look like
     # as the mirror progresses
@@ -252,6 +264,8 @@ def buildJobList(repos, groupList, absolute = False):
                     if version.getHost() != repVersion.getHost():
                         continue
                     for repFlavor in flavorList:
+                        if not srcAvailable.get((name, repVersion, repFlavor), False):
+                            continue
                         score = flavor.score(repFlavor)
                         if score is False:
                             continue
@@ -274,7 +288,7 @@ def buildJobList(repos, groupList, absolute = False):
                               (version, flavor), currentMatch[0] is None)
 
             groupJobList.append((mark, job))
-
+        
         # now iterate through groupJobList and update latestAvailable to
         # reflect the state of the mirror after this job completes
         for mark, job in groupJobList:
@@ -284,6 +298,7 @@ def buildJobList(repos, groupList, absolute = False):
             oldVersion, oldFlavor = job[1]
             newVersion, newFlavor = job[2]
 
+            srcAvailable[(name, newVersion, newFlavor)] = True
             d = latestAvailable.setdefault(name, {})
 
             if oldVersion in d and oldVersion.branch() == newVersion.branch():
@@ -607,12 +622,12 @@ class TargetRepository:
         self.repo.presentHiddenTroves(self.cfg.host)
                                       
 # split a troveList in changeset jobs
-def buildBundles(target, troveList, absolute=False):
+def buildBundles(sourceRepos, target, troveList, absolute=False):
     bundles = []
     log.debug("grouping %d troves based on version and flavor", len(troveList))
     groupList = groupTroves(troveList)
     log.debug("building grouped job list")
-    bundles = buildJobList(target.repo, groupList, absolute)
+    bundles = buildJobList(sourceRepos, target.repo, groupList, absolute)
     return bundles
 
 # return the new list of troves to process after filtering and sanity checks
@@ -814,7 +829,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # since these troves are required for all targets, we can use
         # the "first" one to build the relative changeset requests
         target = list(targetSet)[0]
-        bundles = buildBundles(target, troveList, cfg.absoluteChangesets)
+        bundles = buildBundles(sourceRepos, target, troveList, cfg.absoluteChangesets)
         for i, bundle in enumerate(bundles):
             jobList = [ x[1] for x in bundle ]
             # XXX it's a shame we can't give a hint as to what server to use
