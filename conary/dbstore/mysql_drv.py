@@ -291,6 +291,8 @@ class Database(BaseDatabase):
         return True
 
     def alive(self):
+        if not self.dbh:
+            return False
         # MySQL can use its own ping() method to check if the backend is still alive
         try:
             self.dbh.ping()

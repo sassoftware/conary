@@ -288,7 +288,8 @@ class BaseDatabase:
         self.closed = True
 
     def alive(self):
-        assert(self.dbh)
+        if not self.dbh:
+            return False
         try:
             c = self.cursor()
             c.execute(self.alive_check)
