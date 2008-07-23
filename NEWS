@@ -5,6 +5,11 @@ Changes in @NEW@:
     * Starting in 2.0.20, dependency resolution started locking the database 
       unnecessarily.  This affected rmake dependency resolution.
 
+  o Client Changes:
+    * Boolean conaryrc option downloadFirst has been added to allow
+      for downloading all required changesets from the repository before
+      proceeding with the update steps. (CNY-2808)
+
 Changes in 2.0.21:
   o Build Changes:
     * Added support for RPM payloads which have been compressed with
