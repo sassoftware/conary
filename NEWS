@@ -4,7 +4,10 @@ Changes in @NEW@:
       repositories has been resolved
     * Starting in 2.0.20, dependency resolution started locking the database 
       unnecessarily.  This affected rmake dependency resolution.
-
+    * mirroring code now correctly detects when access control changes
+      in the source repository require the generation of absolute changesets
+      for mirroring. (CNY-2888)
+    
   o Client Changes:
     * Boolean conaryrc option downloadFirst has been added to allow
       for downloading all required changesets from the repository before
