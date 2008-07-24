@@ -194,7 +194,7 @@ class Importer(object):
         l.append(m)
 
     def _loadRecipe(self, troveSpec, label, findInstalled):
-        """ See docs for loadInstalledPackage and loadSuperClass.  """
+        """ See docs for loadInstalled and loadSuperClass.  """
         loader = ChainedRecipeLoader(troveSpec, label, findInstalled,
                                      self.subloadData.cfg,
                                      self.subloadData.repos,
@@ -253,6 +253,8 @@ class Importer(object):
         C{/conary.rpath.com@rpl:devel//shadow/1.0-1-1},
         the default C{labelPath} that would be constructed would be:
         C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
+
+        @return: RecipeLoader object used to load the recipe
         """
         return self._loadRecipe(troveSpec, label, False)
 
@@ -282,8 +284,10 @@ class Importer(object):
         C{/conary.rpath.com@rpl:devel//shadow/1.0-1-1},
         the default C{labelPath} that would be constructed would be:
         C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
+
+        @return: RecipeLoader object used to load the recipe
         """
-        self._loadRecipe(troveSpec, label, True)
+        return self._loadRecipe(troveSpec, label, True)
 
     def execString(self, codeString):
         try:
