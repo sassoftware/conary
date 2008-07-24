@@ -254,7 +254,7 @@ class Importer(object):
         the default C{labelPath} that would be constructed would be:
         C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
 
-        @return: RecipeLoader object used to load the recipe
+        @return: recipe class loaded
         """
         return self._loadRecipe(troveSpec, label, False)
 
@@ -285,7 +285,7 @@ class Importer(object):
         the default C{labelPath} that would be constructed would be:
         C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
 
-        @return: RecipeLoader object used to load the recipe
+        @return: recipe class loaded
         """
         return self._loadRecipe(troveSpec, label, True)
 
