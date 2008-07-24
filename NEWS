@@ -9,6 +9,9 @@ Changes in @NEW@:
       for mirroring. (CNY-2888)
 
   o Build Changes:
+    * The loadSuperClass method now returns the loader object so that the
+      loaded objects can be referenced anonymously.  This makes factories more
+      flexible.
     * The addPatch source action now takes a "filter" keyword argument
       that provides a command line that can modify the patch; for
       example, by calling the filterdiff program. (CNY-2874)
