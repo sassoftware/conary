@@ -23,6 +23,7 @@ import os
 import re
 import shutil, subprocess
 import sha
+import shlex
 import sys
 import tempfile
 
@@ -679,6 +680,12 @@ class addPatch(_Source):
     C{CFLAGS = %(cflags)s} will update the C{CFLAGS} parameter based upon the
     current setting of C{recipe.macros.cflags}.
 
+    B{filter} : The C{filter} keyword provides a shell command that
+    takes the patch with macros applied (if applicable) on standard
+    input and provides on standard output a modified patch.  Put
+    spaces around any C{|} characters in the filter pipeline that
+    implement shell pipes.
+
     B{rpm} : If the C{rpm} keyword is used, C{Archive}
     looks in the file, or URL specified by C{rpm} for an RPM
     containing I{patchfilename}.
@@ -729,6 +736,7 @@ class addPatch(_Source):
     keywords = {'level': None,
 		'backup': '',
 		'macros': False,
+                'filter': None,
                 'extraArgs': '',
                 'patchName': 'patch'}
 
@@ -768,6 +776,11 @@ class addPatch(_Source):
         the patch. For example, a patch which modifies the value
         C{CFLAGS = -02} using C{CFLAGS = %(cflags)s} will update the C{CFLAGS}
         parameter based upon the current setting of C{recipe.macros.cflags}.
+        @keyword filter: The C{filter} keyword provides a shell command that
+        takes the patch with macros applied (if applicable) on standard
+        input and provides on standard output a modified patch.  Put
+        spaces around any C{|} characters in the filter pipeline that
+        implement shell pipes.
         @keyword rpm: If the C{rpm} keyword is used, C{addArchive} looks in the file,
         or URL specified by C{rpm} for an RPM containing I{patchname}.
         @keyword use: A Use flag, or boolean, or a tuple of Use flags, and/or
@@ -909,13 +922,12 @@ class addPatch(_Source):
             self.doFile(patchPath)
 
     def doFile(self, patchPath):
-        # FIXME: we should probably read in the patch directly now
-        # that we aren't just applying in a pipeline
 	provides = "cat"
 	if self.sourcename.endswith(".gz"):
 	    provides = "zcat"
 	elif self.sourcename.endswith(".bz2"):
 	    provides = "bzcat"
+        self._addActionPathBuildRequires([provides])
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir=defaultDir)
@@ -925,7 +937,21 @@ class addPatch(_Source):
             leveltuple = (1, 0, 2, 3,)
         util.mkdirChain(destDir)
 
-        pin = util.popen("%s '%s'" %(provides, patchPath))
+        filterString = ''
+        if self.filter:
+            filterString = '| %s' %self.filter
+            # enforce appropriate buildRequires
+            commandReported = False
+            for shellToken in shlex.split(self.filter):
+                if shellToken.startswith('|'):
+                    shellToken = shellToken[1:]
+                    commandReported = False
+                if not commandReported:
+                    if shellToken:
+                        self._addActionPathBuildRequires([shellToken])
+                        commandReported = True
+
+        pin = util.popen("%s '%s' %s" %(provides, patchPath, filterString))
 	if self.applymacros:
             patch = pin.read() % self.recipe.macros
 	else:

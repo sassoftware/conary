@@ -7,6 +7,11 @@ Changes in @NEW@:
     * mirroring code now correctly detects when access control changes
       in the source repository require the generation of absolute changesets
       for mirroring. (CNY-2888)
+
+  o Build Changes:
+    * The addPatch source action now takes a "filter" keyword argument
+      that provides a command line that can modify the patch; for
+      example, by calling the filterdiff program. (CNY-2874)
     
   o Client Changes:
     * Boolean conaryrc option downloadFirst has been added to allow
