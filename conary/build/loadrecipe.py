@@ -232,7 +232,7 @@ class Importer(object):
         # stash a reference to the module in the namespace
         # of the recipe that loaded it, or else it will be destroyed
         self.module.__dict__[loader.recipe.__module__] = loader
-        return loader
+        return loader.getRecipe()
 
     def loadSuperClass(self, troveSpec, label=None):
         """
