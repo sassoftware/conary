@@ -17,6 +17,7 @@ arch_files =	alpha	\
 		ppc	\
 		ppc64	\
 		s390	\
+		s390x	\
 		sparc	\
 		sparc64	\
 		x86	\
