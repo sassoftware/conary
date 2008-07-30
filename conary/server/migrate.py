@@ -800,7 +800,7 @@ class MigrateTo_17(SchemaMigration):
         if ret:
             logMe(2, "fixing missing dirnames/prefixes links in %d dirnames" % (len(ret),))
             trovestore.addPrefixesFromList(self.db, ret)
-            self.db.analyze("Prefixes")
+        self.db.analyze("Prefixes")
         return True
 
 def _getMigration(major):
