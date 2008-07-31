@@ -363,12 +363,12 @@ class StatWindow(gtk.Window):
         if '.pickle' in filename:
             f = open(filename)
             stats = cPickle.load(f).stats
-        elif filename.endswith('.lsprof'):
+        elif filename.endswith('.prof'):
+            stats = hotshot.stats.load(filename).stats
+        else:
             import marshal
             f = open(filename)
             stats = marshal.load(f)
-        else:
-            stats = hotshot.stats.load(filename).stats
         self.populate(stats)
 
     def populate(self, stats):
