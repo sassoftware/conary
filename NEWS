@@ -7,6 +7,8 @@ Changes in @NEW@:
     * mirroring code now correctly detects when access control changes
       in the source repository require the generation of absolute changesets
       for mirroring. (CNY-2888)
+    * parseTroveSpec now checks for the colon character if an @ symbol is also
+      present in the versionSpec. (CNY-2907)
 
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
