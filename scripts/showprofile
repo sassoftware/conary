@@ -40,7 +40,11 @@ if filename.endswith('.pickle'):
         usage()
     f = open(filename)
     stats = cPickle.load(f)
-else:    
+elif filename.endswith('.lsprof'):
+    import pstats
+    progress('loading %s' %filename)
+    stats = pstats.Stats(filename)
+else:
     progress('loading %s' %filename)
     stats = hotshot.stats.load(filename)
 
