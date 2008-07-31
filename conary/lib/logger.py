@@ -249,7 +249,19 @@ class LogWriter(object):
         # silently ignore nonsensical calls because the logger loops over each
         # writer and passes the command separately to all of them
         if func and func.__dict__.get('_callable', False):
-            return func(self, *args)
+            try:
+                return func(self, *args)
+            except TypeError:
+                # Probably the wrong number of arguments; make it
+                # possible to debug the problem
+                self.freetext('\nERROR: failed attempt to call'
+                    ' function %s with arguments %s\n' %(cmd, repr(args)))
+            except Exception, e:
+                # Unknown problem; provide information so that we can
+                # debug it and fix it later
+                self.freetext('\nERROR: unhandled exception %s: %s'
+                    ' calling function %s with arguments %s\n' %(
+                    str(e.__class__), str(e), cmd, repr(args)))
 
     def close(self):
         pass
@@ -311,7 +323,7 @@ class XmlLogWriter(LogWriter):
         descriptorStack = self._getDescriptorStack()
         return '.'.join(descriptorStack)
 
-    def log(self, message = None, levelname = 'INFO'):
+    def log(self, message, levelname = 'INFO'):
         # escape xml delimiters and newline characters
         message = saxutils.escape(message)
         message = message.replace('\n', '\\n')
@@ -347,6 +359,9 @@ class XmlLogWriter(LogWriter):
 
     @callable
     def addRecordData(self, *args):
+        if not args:
+            # handle bad input
+            return
         if len(args) < 2:
             # called via lexer
             key, val = args[0].split(None, 1)
@@ -454,6 +469,8 @@ class StreamLogWriter(LogWriter):
 
     @callable
     def popDescriptor(self, descriptor = None):
+        if descriptor is None:
+            return
         if descriptor == 'environment':
             self.data.hideLog = False
 
