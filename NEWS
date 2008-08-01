@@ -9,6 +9,8 @@ Changes in @NEW@:
       for mirroring. (CNY-2888)
     * parseTroveSpec now checks for the colon character if an @ symbol is also
       present in the versionSpec. (CNY-2907)
+    * A problem with the autoLoadRecipes config option has been fixed.
+      (CNY-2909)
 
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
