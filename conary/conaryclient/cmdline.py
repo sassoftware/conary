@@ -63,10 +63,6 @@ def parseTroveSpec(specStr, allowEmptyName = True):
     if not name and not allowEmptyName:
         raise TroveSpecError(origSpecStr, 'Trove name is required')
 
-    if versionSpec is not None:
-        if '@' in versionSpec and ':' not in versionSpec:
-            raise TroveSpecError(origSpecStr,
-                    "@ sign can only be used with a colon")
     return (name, versionSpec, flavor)
 
 def _getChangeSet(path):
