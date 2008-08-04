@@ -323,7 +323,7 @@ class ChangeSet(streams.StreamSet):
 
 	if cfgFile:
             if compressed:
-                s = util.decompressString(contents.get().read())
+                s = gzip.GzipFile(None, "r", fileobj = contents.get()).read()
                 contents = filecontents.FromString(s)
                 compressed = False
 
@@ -409,8 +409,7 @@ class ChangeSet(streams.StreamSet):
                         # add 4 bytes to store a 64-bit size
                         sizeCorrection += 4
                     csf.addFile(hash, 
-                                filecontents.FromString(path,
-                                                        compressed = True),
+                                filecontents.FromString(path),
                                 tag + ChangedFileTypes.refr[4:],
                                 precompressed = True)
                 else:
@@ -1012,7 +1011,7 @@ class ReadOnlyChangeSet(ChangeSet):
                 util.copyfileobj(cont.get(), compressor)
                 compressor.close()
                 f.seek(0)
-                cont = filecontents.FromFile(f, compressed = True)
+                cont = filecontents.FromFile(f)
 	else:
             self.filesRead = True
 
@@ -1030,7 +1029,7 @@ class ReadOnlyChangeSet(ChangeSet):
                 # compatibility reading old change set formats
                 if name == key or name == pathId or tagInfo[0] == '1':
                     tag = 'cft-' + tagInfo.split()[1]
-                    cont = filecontents.FromFile(f, compressed = compressed)
+                    cont = filecontents.FromFile(f)
 
                     # we found the one we're looking for, break out
                     if name == key or name == pathId:
@@ -1663,7 +1662,7 @@ def _convertChangeSetV2V1(inPath, outPath):
             newCompressedF = StringIO()
             gzip.GzipFile(None, "w", fileobj = newCompressedF).write(new)
             newCompressed = newCompressedF.getvalue()
-            fc = filecontents.FromString(newCompressed, compressed = True)
+            fc = filecontents.FromString(newCompressed)
             size -= len(oldCompressed) - len(newCompressed)
         else:
             fc = filecontents.FromFile(f)
@@ -1735,11 +1734,9 @@ class AbstractChangesetExploder:
 
         delayedRestores = {}
         for pathId, fileId, fileObj, destDir, destPath, trv in restoreList:
-            (contentType, contents) = cs.getFileContents(pathId, fileId,
-                                                         compressed = True)
+            (contentType, contents) = cs.getFileContents(pathId, fileId)
             if contentType == ChangedFileTypes.ptr:
                 targetPtrId = contents.get().read()
-                targetPtrId = util.decompressString(targetPtrId)
                 l = delayedRestores.setdefault(targetPtrId, [])
                 l.append((fileObj, destDir, destPath))
                 continue

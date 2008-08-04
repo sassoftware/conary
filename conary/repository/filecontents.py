@@ -25,7 +25,7 @@ SEEK_END=2
 
 class FileContents(object):
 
-    __slots__ = ( "compressed" )
+    __slots__ = ()
 
     def copy(self):
         raise NotImplementedError
@@ -33,11 +33,7 @@ class FileContents(object):
     def get(self):
         raise NotImplementedError
 
-    def isCompressed(self):
-        return self.compressed
-
     def __init__(self):
-        self.compressed = False
 	if self.__class__ == FileContents:
 	    raise NotImplementedError
 
@@ -55,7 +51,6 @@ class FromDataStore(FileContents):
         return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
 
     def __init__(self, store, sha1):
-        self.compressed = False
 	self.store = store
 	self.sha1 = sha1
 
@@ -78,7 +73,6 @@ class CompressedFromDataStore(FileContents):
     def __init__(self, store, sha1):
 	self.store = store
 	self.sha1 = sha1
-        self.compressed = True
 
 class FromFilesystem(FileContents):
 
@@ -89,7 +83,6 @@ class FromFilesystem(FileContents):
 
     def __init__(self, path):
 	self.path = path
-        self.compressed = False
 
 class FromChangeSet(FileContents):
 
@@ -99,14 +92,12 @@ class FromChangeSet(FileContents):
         return self.__class__(self.cs, self.pathId)
 
     def get(self):
-	return self.cs.getFileContents(self.pathId, self.fileId,
-                                       compressed = self.compressed)[1].get()
+	return self.cs.getFileContents(self.pathId, self.fileId)[1].get()
 
-    def __init__(self, cs, pathId, fileId, compressed = False):
+    def __init__(self, cs, pathId, fileId):
 	self.cs = cs
 	self.pathId = pathId
 	self.fileId = fileId
-        self.compressed = compressed
 
 class FromString(FileContents):
 
@@ -133,9 +124,8 @@ class FromString(FileContents):
             return self.str == other.str
         return False
 
-    def __init__(self, str, compressed = False):
+    def __init__(self, str):
 	self.str = str
-        self.compressed = compressed
 util.SendableFileSet._register(FromString)
 
 class FromFile(FileContents):
@@ -150,9 +140,22 @@ class FromFile(FileContents):
         self.f.seek(0)
 	return self.f
 
-    def __init__(self, f, compressed = False):
+    def __init__(self, f):
 	self.f = f
-        self.compressed = compressed
+
+class FromGzFile(FileContents):
+
+    __slots__ = "f"
+
+    def copy(self):
+        return self.__class__(self.f)
+
+    def get(self):
+        self.f.seek(0)
+	return self.f
+
+    def __init__(self, f):
+	self.f = f
 
 class WithFailedHunks(FileContents):
 
@@ -170,4 +173,3 @@ class WithFailedHunks(FileContents):
     def __init__(self, fc, hunks):
 	self.fc = fc
 	self.hunks = hunks
-        self.compressed = False
