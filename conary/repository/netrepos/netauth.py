@@ -18,11 +18,12 @@ import time
 import urllib, urllib2
 import xml
 
-from conary import conarycfg
+from conary import conarycfg, versions
 from conary.repository import errors
 from conary.lib import sha1helper, tracelog
 from conary.dbstore import sqlerrors
 from conary.repository.netrepos import items, versionops, accessmap
+from conary.server.schema import resetTable
 
 # FIXME: remove these compatibilty error classes later
 UserAlreadyExists = errors.UserAlreadyExists
@@ -334,18 +335,63 @@ class NetworkAuthorization:
 
         return roleSet
 
-    # a faster way for batch checking access to a list of troves
-    def batchCheck(self, authToken, troveTupList, write = False, remove = False):
+    def batchCheck(self, authToken, troveList, write = False, cu = None):
+        """ checks access permissions for a set of *existing* troves in the repository """
         # troveTupList is a list of (name, VFS) tuples
-        self.log(3, authToken[0], "entitlements=%s write=%s remove=%s" %(
-            authToken[2], int(bool(write)), int(bool(remove))),
-                 troveTupList)
+        self.log(3, authToken[0], "entitlements=%s write=%s" %(authToken[2], int(bool(write))), troveList)
+        # process/check the troveList, which can be an iterator
+        checkList = []
+        for i, (n,v,f) in enumerate(troveList):
+            h = versions.VersionFromString(v).getHost()
+            if h not in self.serverNameList:
+                raise errors.RepositoryMismatch(self.serverNameList, h)
+            checkList.append((i,n,v,f))
+        # default to all failing
+        retlist = [ False ] * len(checkList)
+        if not authToken[0]:
+            return retlist
+        # check groupIds
+        if cu is None:
+            cu = self.db.cursor()
+        try:
+            groupIds = self.getAuthRoles(cu, authToken)
+        except errors.InsufficientPermission:
+            return retlist
+        if not len(groupIds):
+            return retlist
+        resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF", checkList, ["idx","name","version", "flavor"],
+                         start_transaction=False)
+        self.db.analyze("tmpNVF")
+        writeCheck = ''
+        if write:
+            writeCheck = "and ugi.canWrite = 1"
+        cu.execute("""
+        select t.idx, i.instanceId
+        from tmpNVF as t
+        join Items on t.name = Items.item
+        join Versions on t.version = Versions.version
+        join Flavors on t.flavor = Flavors.flavor
+        join Instances as i on
+            i.itemId = Items.itemId and
+            i.versionId = Versions.versionId and
+            i.flavorId = Flavors.flavorId
+        join UserGroupInstancesCache as ugi on i.instanceId = ugi.instanceId
+        where ugi.userGroupId in (%s)
+        %s""" % (",".join("%d" % x for x in groupIds), writeCheck) )
+        for i, instanceId in cu:
+            retlist[i] = True
+        return retlist
+
+    def commitCheck(self, authToken, nameVersionList):
+        """ checks that we can commit to a list of (name, version) tuples """
+        self.log(3, authToken[0], "entitlements=%s" % (authToken[2],), nameVersionList)
         checkDict = {}
-        # troveTupList can actually be an iterator, so we need to keep
+        # nameVersionList can actually be an iterator, so we need to keep
         # a list of the trove names we're dealing with
         troveList = []
         # first check that we handle all the labels we're asked about
-        for i, (n, v) in enumerate(troveTupList):
+        for i, (n, v) in enumerate(nameVersionList):
             label = v.branch().label()
             if label.getHost() not in self.serverNameList:
                 raise errors.RepositoryMismatch(self.serverNameList, label.getHost())
@@ -369,20 +415,15 @@ class NetworkAuthorization:
         select Items.item
         from Permissions join Items using (itemId)
         """
-        where = []
+        where = ["Permissions.canWrite=1"]
         where.append("Permissions.userGroupId IN (%s)" %
                      ",".join("%d" % x for x in groupIds))
-        if write:
-            where.append("Permissions.canWrite=1")
-        if remove:
-            where.append("Permissions.canRemove=1")
         if len(checkDict):
             where.append("""(
             Permissions.labelId = 0 OR
             Permissions.labelId in (select labelId from Labels where label=?)
             )""")
         stmt += "WHERE " + " AND ".join(where)
-        self.log(4, stmt)
         # we need to test for each label separately in case we have
         # mutiple troves living of multiple lables with different
         # permission settings
@@ -899,7 +940,7 @@ class NetworkAuthorization:
         # admins can do everything
         cu.execute("select userGroupId from UserGroups "
                    "where userGroupId in (%s) "
-                   "and admin = 1" % ",".join(str(x) for x in roleIds))
+                   "and admin = 1" % ",".join([str(x) for x in roleIds]))
         if not len(cu.fetchall()):
             raise errors.InsufficientPermission
 

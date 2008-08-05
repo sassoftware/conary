@@ -7,6 +7,8 @@ Changes in @NEW@:
     * mirroring code now correctly detects when access control changes
       in the source repository require the generation of absolute changesets
       for mirroring. (CNY-2888)
+    * a permission check error for users that only have trove access
+      entitlements has been fixed (CNY-2761)
     * A problem with the autoLoadRecipes config option has been fixed.
       (CNY-2909)
 
