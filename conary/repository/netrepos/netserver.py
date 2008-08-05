@@ -1771,16 +1771,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def commitCheck(self, authToken, clientVersion, troveVersionList):
         # troveVersionList is a list of (name, version) tuples
-        # batchCheck does it own authToken checking and validation
-        return self.auth.batchCheck(
-            authToken, ((n, self.toVersion(v)) for n,v in troveVersionList),
-            write = True)
+        # commitCheck does it own authToken checking and validation
+        return self.auth.commitCheck(
+            authToken, ((n, self.toVersion(v)) for n,v in troveVersionList))
 
     def _checkCommitPermissions(self, authToken, verList, mirror, hidden):
         if (mirror or hidden) and \
                not self.auth.authCheck(authToken, mirror=(mirror or hidden)):
             raise errors.InsufficientPermission
-        # verList items are (name, oldVer, newVer). e check both
+        # verList items are (name, oldVer, newVer). we check both
         # combinations in one step
         def _fullVerList(verList):
             for name, oldVer, newVer in verList:
@@ -1789,8 +1788,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 if oldVer:
                     yield (name, oldVer)
         # check newVer
-        if False in self.auth.batchCheck(authToken, _fullVerList(verList),
-                                    write=True):
+        if False in self.auth.commitCheck(authToken, _fullVerList(verList) ):
             raise errors.InsufficientPermission
 
     @accessReadOnly
@@ -2765,20 +2763,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if requireMirror and not self.auth.authCheck(authToken, mirror=True):
             raise errors.InsufficientPermission
         # batch permission check for writing
-        if False in self.auth.batchCheck(authToken, [
-            (n,self.toVersion(v)) for (n,v,f), s in infoList], write=True):
-            raise errors.InsufficientPermission
         cu = self.db.cursor()
+        if False in self.auth.batchCheck(authToken, [t for t,s in infoList],
+                                         write=True, cu = cu):
+            raise errors.InsufficientPermission
         updateCount = 0
 
         # look up if we have all the troves we're asked
-        schema.resetTable(cu, "tmpNVF")
         schema.resetTable(cu, "tmpInstanceId")
         schema.resetTable(cu, "tmpTroveInfo")
         for (n,v,f), info in infoList:
             cu.execute("insert into tmpNVF(name,version,flavor) values (?,?,?)",
                        (n,v,f), start_transaction=False)
-        self.db.analyze("tmpNVF")
         # we'll need the min idx to account for differences in SQL backends
         cu.execute("SELECT MIN(idx) from tmpNVF")
         minIdx = cu.fetchone()[0]
@@ -3046,22 +3042,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ##ret = [ (-2, '') ] * len(troveList)
         ret = [ (-1, '') ] * len(troveList)
         # check permissions using the batch interface
-        permList = self.auth.batchCheck(authToken, ((x[0],self.toVersion(x[1])) for x in troveList))
-        if True in permList:
-            cu = self.db.cursor()
-            schema.resetTable(cu, "tmpNVF")
-        else: # we got no permissions, shortcircuit all of them as missing
+        cu = self.db.cursor()
+        permList = self.auth.batchCheck(authToken, troveList, cu = cu)
+        if True not in permList:
+            # we got no permissions, shortcircuit all of them as missing
             return ret
-        def _iterTroveList(troveList, permList):
-            for (n, v, f), (i, perm) in itertools.izip(troveList, enumerate(permList)):
-                # if we don't have permissions for this one, don't bother looking it up
-                if not perm:
-                    continue
-                yield (i, n, v, f)
-        self.db.bulkload("tmpNVF", _iterTroveList(troveList, permList),
-                         ["idx", "name", "version", "flavor"],
-                         start_transaction = False)
-        self.db.analyze("tmpNVF")
+        if False in permList:
+            # drop troves for which we have no permissions to avoid busy work
+            cu.execute("delete from tmpNVF where idx in (%s)" % (",".join(
+                "%d" % i for i,perm in enumerate(permList) if not perm)))
+            self.db.analyze("tmpNVF")
         # get the data doing a full scan of tmpNVF
         cu.execute("""
         SELECT tmpNVF.idx, TroveInfo.data

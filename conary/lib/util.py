@@ -951,18 +951,6 @@ class SeekableNestedFile:
     def _sendInfo(self):
         return ([ self.file ], struct.pack("!II", self.size, self.start))
 
-    def _fdInfo(self):
-        if hasattr(self.file, '_fdInfo'):
-            fd, start, size = self.file._fdInfo()
-            start += self.start
-            size = self.size
-        elif hasattr(self.file, 'fileno'):
-            fd, start, size = self.file.fileno(), self.start, self.size
-        else:
-            return (None, None, None)
-
-        return (fd, start, size)
-
     def close(self):
         pass
 
@@ -1125,7 +1113,6 @@ exists = misc.exists
 removeIfExists = misc.removeIfExists
 pread = misc.pread
 res_init = misc.res_init
-sha1Uncompress = misc.sha1Uncompress
 
 class _LazyFile(object):
     __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
@@ -1562,16 +1549,16 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     def formatOneFrame(tb, stream):
         import linecache
         _updatecache = linecache.updatecache
-        def updatecache(filename):
+        def updatecache(*args):
             # linecache.updatecache brokenlt looks in the module
             # search path for files that match the module name
             # (problem if you have a file without source with the same
             # name as a python standard library module. We'll just check
             # to see if the file exists first and require exact path
             # matches
-            if not os.access(filename, os.R_OK):
+            if not os.access(args[0], os.R_OK):
                 return []
-            return _updatecache(filename)
+            return _updatecache(*args)
         linecache.updatecache = updatecache
         try:
             fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
@@ -1844,9 +1831,6 @@ def compressStream(src, level = 5, bufferSize = 16384):
         sio.write(z.compress(buf))
     sio.write(z.flush())
     return sio
-
-def decompressString(s):
-    return zlib.decompress(s, 31)
 
 def massCloseFileDescriptors(start, unusedCount):
     """Close all file descriptors starting with start, until we hit

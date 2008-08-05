@@ -17,7 +17,7 @@ import pickle
 
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
-from conary.conaryclient import clone, resolve, update
+from conary.conaryclient import clone, resolve, update, filetypes, callbacks, mirror
 from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
@@ -141,6 +141,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
 
     @api.publicApi
     def getDatabase(self):
+        """
+        Return the L{conary.local.database.Database} instance
+        contained within this ConaryClient instance
+
+        @rtype: L{conary.local.database.Database}
+        """
         return self.db
 
     def disconnectRepos(self):
@@ -364,8 +370,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         @param troveList: a list of troves to pin
         @type troveList: list of troves
 
-        @note:
-            As this call makes database updates, any of the errors
+        @note: As this call makes database updates, any of the errors
         documented in L{conary.dbstore.sqlerrors} may be raised.
 
         @rtype: None

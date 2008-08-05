@@ -2363,11 +2363,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 start += size
 
                 if compressed:
-                    contents[i] = filecontents.FromFile(nestedF,
-                                                        compressed = True)
+                    contents[i] = filecontents.FromFile(nestedF)
                 else:
                     gzfile = gzip.GzipFile(fileobj = nestedF)
-                    contents[i] = filecontents.FromFile(gzfile)
+                    contents[i] = filecontents.FromGzFile(gzfile)
 
             assert(totalSize == 0)
 

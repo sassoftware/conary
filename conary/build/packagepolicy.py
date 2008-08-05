@@ -4185,14 +4185,20 @@ class reportExcessBuildRequires(policy.Policy):
             if excessSuperReqs:
                 # note that as this is for debugging only, we do not
                 # remove runtime requirements
-                self._reportExcessSuperclassBuildRequires(sorted(list(
-                    removeDupComponents(removeCore(excessSuperReqs)))))
+                deDupedSuperReqs = sorted(list(
+                    removeDupComponents(removeCore(excessSuperReqs))))
+                if deDupedSuperReqs:
+                    self._reportExcessSuperclassBuildRequires(deDupedSuperReqs)
 
             excessReqs = recipeReqs - self.found
             redundantReqs = recipeReqs.intersection(superClosure)
             if excessReqs or redundantReqs:
-                self._reportExcessBuildRequires(sorted(list(
-                    removeSome(excessReqs.union(redundantReqs)))))
+                excessBuildRequires = sorted(list(
+                    removeSome(excessReqs.union(redundantReqs))))
+                # all potential excess build requires might have
+                # been removed by removeSome
+                if excessBuildRequires:
+                    self._reportExcessBuildRequires(excessBuildRequires)
 
     def _reportExcessBuildRequires(self, reqList):
         self.recipe._logFile.reportExcessBuildRequires(

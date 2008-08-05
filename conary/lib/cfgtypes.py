@@ -422,7 +422,7 @@ class CfgDict(CfgType):
         # that the dict value is a list, so we call updateFromString
         strs = str.split(None, 1)
         if len(strs) == 1:
-            dkey, dvalue = str, ''
+            dkey, dvalue = strs[0], ''
         else:
             (dkey, dvalue) = strs
 
@@ -449,7 +449,9 @@ class CfgDict(CfgType):
         for key in sorted(value.iterkeys()):
             val = value[key]
             for item in self.valueType.toStrings(val, displayOptions):
-                yield ' '.join(('%-25s' % key, item))
+                if displayOptions and displayOptions.get('prettyPrint', False):
+                    key = '%-25s' % key
+                yield ' '.join((key, item))
 
     def copy(self, val):
         return dict((k, self.valueType.copy(v)) for k,v in val.iteritems())
