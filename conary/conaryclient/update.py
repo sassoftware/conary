@@ -11,6 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+"""
+Implements various update functionality for the Conary Client
+"""
+
 import itertools
 import re
 import os
@@ -31,8 +35,10 @@ from conary import trove, versions
 
 class CriticalUpdateInfo(object):
     """
-        Defines update settings regarding critical jobs - those required
-        to go first and those required to go last.
+    Defines update settings regarding critical jobs - those required
+    to go first and those required to go last.
+
+    PUBLIC API
     """
 
     criticalTroveRegexps = []
@@ -2572,7 +2578,8 @@ conary erase '%s=%s[%s]'
 
     @api.publicApi
     def newUpdateJob(self, closeDatabase = True):
-        """Create a new update job.
+        """
+        Create a new update job.
 
         The job can be initialized either by using prepareUpdateJob or by
         thawing it from a frozen representation.
@@ -2934,22 +2941,22 @@ conary erase '%s=%s[%s]'
         Coming the dependency-ordered list of individual jobs into large jobs
         for update efficiency. The following rules apply:
 
-        1. Info packages/components must be in there own jobs because of
-        limitations with our user handling (bah). We actually allow them
-        to combine if multiple versions/flavors of a single info package
-        are installed, which doesn't seem quite right but hasn't hurt
-        anything.
-        2. We don't combine groups with other types of troves. Groups may
-        be combined with other groups.
-        3. self.cfg.updateThreshold is the maximum number of troves
-        which may be installed within a single job. The only reason this
-        will be exceeded is if a single dependency job is larger than this.
-        4. We generally break jobs on packages and groups, not on components.
-        The rule for updateThreshold overrides this.
-        5. Jobs are made as large as possible given the other constraints.
-        6. jobs split for critical updates to prevent including non-critical
-        updates in a critical job unnecessarily.
-        7. Try hard to keep packages and components in a single job.
+         1. Info packages/components must be in there own jobs because of
+            limitations with our user handling (bah). We actually allow them
+            to combine if multiple versions/flavors of a single info package
+            are installed, which doesn't seem quite right but hasn't hurt
+            anything.
+         2. We don't combine groups with other types of troves. Groups may
+            be combined with other groups.
+         3. self.cfg.updateThreshold is the maximum number of troves
+            which may be installed within a single job. The only reason this
+            will be exceeded is if a single dependency job is larger than this.
+         4. We generally break jobs on packages and groups, not on components.
+            The rule for updateThreshold overrides this.
+         5. Jobs are made as large as possible given the other constraints.
+         6. jobs split for critical updates to prevent including non-critical
+            updates in a critical job unnecessarily.
+         7. Try hard to keep packages and components in a single job.
         """
 
         combinedJobs = []

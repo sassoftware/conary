@@ -22,7 +22,7 @@ import traceback
 import pwd
 
 from conary.deps import deps, arch
-from conary.lib import util
+from conary.lib import util, api
 from conary.lib.cfg import *
 from conary import errors
 from conary import versions
@@ -594,12 +594,12 @@ class ConaryContext(ConfigSection):
         ConfigSection._writeKey(self, out, cfgItem, value, options)
 
 class ConaryConfiguration(SectionedConfigFile):
-
     # this allows a new section to be created on the fly with the type 
     # ConaryContext
     _allowNewSections     = True
     _defaultSectionType   =  ConaryContext
 
+    @api.publicApi
     def __init__(self, readConfigFiles = False, ignoreErrors = False,
                  readProxyValuesFirst=True):
         """

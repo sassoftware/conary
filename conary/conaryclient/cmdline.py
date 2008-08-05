@@ -127,8 +127,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     and turns it into C{(name, (oldVersionSpec, oldFlavorSpec),
     (newVersionSpec, newFlavorSpec), isAbsolute)} tuples.
 
-    @note:
-        If a filename is passed as a changeSpec, and the file does not contain
+    @note: If a filename is passed as a changeSpec, and the file does not contain
     a valid conary changeset, a sys.exit() will be called.
     
     @param changeSpecList: a changeSpec, such as C{foo=1.1--1.2}

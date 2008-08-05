@@ -15,12 +15,14 @@
 """
 The Conary Repository System
 
-@group Package Building: build, buildpackage, recipe, cook, policy,
-                         destdirpolicy, packagepolicy
-@group Command Line: cscmd, srccmd, updatecmd
-@group Database/Repository: database, local, repository, versioned
-@group Package/Changeset objects: package, changeset, versions
-@group Package installation/rollback: update, rollbacks
-@group Utility: util, lookaside, rpmhelper, sha1helper, fixedglob, log, enum, magic
-@group Files: files, filecontainer
+@group Public Interfaces: conaryclient, conarycfg, versions, deps, dbstore.sqlerrors, updatecmd, repository.changeset, repository.errors, query, errors
+@group Package Building: build
+@group Command Line: cscmd
+@group Database/Repository: database, local, repository, dbstore
+@group Networked Repository: repository.netserver, server
+@group Package/Changeset objects: package, changeset
+@group Package installation/rollback: local.update, local.rollbacks
+@group Utility: lib
+@group Files: files, repository.filecontainer
+@group Misc: *
 """
