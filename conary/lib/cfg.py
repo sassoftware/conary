@@ -24,7 +24,7 @@ import sys
 import textwrap
 import urllib2
 
-from conary.lib import cfgtypes,util
+from conary.lib import cfgtypes, util, api
 from conary import constants, errors
 from conary.repository import transport
 
@@ -186,6 +186,7 @@ class _Config:
     def getDefaultValue(self, name):
         return self._options[name].getDefault()
 
+    @api.publicApi
     def isDefault(self, key):
         return self._options[key].isDefault()
 
@@ -233,6 +234,7 @@ class _Config:
             out = sys.stdout
         self._writeKey(out, self._options[key], self[key], self._displayOptions)
 
+    @api.publicApi
     def storeKey(self, key, out):
         self._writeKey(out, self._options[key], self[key], dict(prettyPrint=False))
         
@@ -324,7 +326,7 @@ class ConfigFile(_Config):
                           "No such file or directory: '%s'" % path, 
                           path)
 
-
+    @api.publicApi
     def read(self, path, exception=True):
         """
         read a config file or config file section
@@ -341,7 +343,16 @@ class ConfigFile(_Config):
         f = self._openPath(path, exception=exception)
         if f: self.readObject(path, f)
 
+    @api.publicApi
     def readUrl(self, url):
+        """
+        read a config file from a URL
+
+        @param url: the URL to read
+        @type url: string
+
+        @raises CfgEnvironmentError: raised if file read fails
+        """
         if self._ignoreUrlIncludes:
             return
         try:
@@ -350,8 +361,6 @@ class ConfigFile(_Config):
         except CfgEnvironmentError, err:
             if not self._ignoreErrors:
                 raise
-
-
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
         origLine = line
@@ -537,6 +546,7 @@ class SectionedConfigFile(ConfigFile):
         self._sections[sectionName] = sectionObject
         sectionObject._ignoreErrors = self._ignoreErrors
 
+    @api.publicApi
     def configLine(self, line, file = "override", lineno = '<No line>'):
 	line = line.strip()
         if line and line[0] == '[' and line[-1] == ']':
@@ -567,6 +577,7 @@ class SectionedConfigFile(ConfigFile):
             for cfgfile in sorted(util.braceGlob(val)):
                 self.read(cfgfile, resetSection = False)
 
+    @api.publicApi
     def read(self, *args, **kw):
         # when reading a new config file, reset the section.
         oldSection = self._sectionName
@@ -576,6 +587,7 @@ class SectionedConfigFile(ConfigFile):
         self._sectionName = oldSection
         return rv
 
+    @api.publicApi
     def readUrl(self, *args, **kw):
         oldSection = self._sectionName
         if kw.pop('resetSection', True):
@@ -654,6 +666,7 @@ class ConfigOption:
     def getDefault(self):
         return self.default
 
+    @api.publicApi
     def isDefault(self):
         return self._isDefault
 

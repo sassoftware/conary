@@ -14,12 +14,23 @@
 # implement decorators for tagging api calls in conary code
 
 def publicApi(func):
-    msg = ""
-    if func.__doc__:
-        msg = "\n\n" + func.__doc__
-    if func.func_name == '__init__':
-        # XXX: should decorating a class' init() method mean anything?
-        pass
-    func.__doc__ = 'PUBLIC API' + msg
+    lines = ['']
+    marked = False
+    if not func.__doc__:
+        func.__doc__ = func.__name__
+    lines = func.__doc__.split('\n')
+    for idx, line in enumerate(lines):
+        if '@' in line:
+            l = line.replace('\t', '        ')
+            l2 = line.lstrip()
+            indent = len(l) - len(l2)
+            lines.insert(idx, (' ' * indent) + '(PUBLIC API)')
+            marked = True
+            break
+
+    if not marked:
+        lines[0] = lines[0] + ' (PUBLIC API)'
+
+    func.__doc__ = '\n'.join(lines)
     return func
 
