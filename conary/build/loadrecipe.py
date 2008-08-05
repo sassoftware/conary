@@ -464,7 +464,7 @@ class RecipeLoaderFromString(object):
         except graph.BackEdgeError, e:
             raise builderrors.RecipeFileError(
                 "Cannot autoload recipes due to a loadedRecipes loop involving"
-                "%s=%s[%s] and %s=%s[%s]" %
+                " %s=%s[%s] and %s=%s[%s]" %
                         tuple(itertools.chain(e.src.getNameVersionFlavor(),
                                         e.dst.getNameVersionFlavor())))
 
