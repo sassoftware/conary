@@ -455,7 +455,7 @@ class RecipeLoaderFromString(object):
 
             for (name, version, flavor) in trv.getLoadedTroves():
                 if name in trovesByName:
-                    g.addEdge(trovesByName[name + ':recipe'], recipeTrv)
+                    g.addEdge(trovesByName[name], recipeTrv)
 
         try:
             orderedTroveList = g.getTotalOrdering(
@@ -476,6 +476,7 @@ class RecipeLoaderFromString(object):
 
         recipes = ts.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
 
+        objDict = {}
         for (fileContents, fileInfo, trv) in \
                                itertools.izip(recipes, filesNeeded,
                                               orderedTroveList):
@@ -483,13 +484,14 @@ class RecipeLoaderFromString(object):
                                   fileInfo[1], cfg, repos = repos,
                                   ignoreInstalled = True,
                                   buildFlavor = buildFlavor, db = db,
-                                  loadAutoRecipes = False)
+                                  loadAutoRecipes = False, objDict = objDict)
 
             recipe = loader.getRecipe()
             recipe.internalAbstractBaseClass = True
             recipe._loadedFromSource = (trv.getNameVersionFlavor())
 
             importer.updateModuleDict(loader.recipes)
+            objDict.update(loader.recipes)
 
         RecipeLoaderFromString._loadingDefaults = False
 
