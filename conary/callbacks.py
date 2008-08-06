@@ -449,7 +449,6 @@ class KeyCacheCallback(Callback):
     def getPublicKey(self, keyId, serverName, warn=False):
         return False
 
-    @api.publicApi
     def __init__(self, repos = None, cfg = None):
         Callback.__init__(self)
         self.repos = repos

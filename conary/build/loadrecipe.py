@@ -335,7 +335,6 @@ class RecipeLoaderFromString(object):
 
     loadedTroves = None
     loadedSpecs = None
-    _loadingDefaults = False
 
     def __init__(self, codeString, filename, cfg=None, repos=None,
                  component=None, branch=None, ignoreInstalled=False,
@@ -382,7 +381,7 @@ class RecipeLoaderFromString(object):
 
         # def _loadDefaultPackages begins here
 
-        if not cfg.autoLoadRecipes or RecipeLoaderFromString._loadingDefaults:
+        if not cfg.autoLoadRecipes:
             return
 
         RecipeLoaderFromString._loadingDefaults = True

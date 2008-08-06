@@ -36,6 +36,8 @@ class InvalidBackend(DatabaseError):
 class DatabaseLocked(DatabaseError):
     """
     Database is locked and cannot be accessed by the current process.
+
+    PUBLIC API
     """
     pass
 

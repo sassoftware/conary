@@ -14,6 +14,8 @@
 """
 The lib module provides code utility functions which are not
 conary-specific.
+
+@group Public Interfaces: util, openpgpkey
 """
 # BW compatibility - old code will expect to see MainHandler in
 # options.py.
