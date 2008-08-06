@@ -2772,13 +2772,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # look up if we have all the troves we're asked
         schema.resetTable(cu, "tmpInstanceId")
         schema.resetTable(cu, "tmpTroveInfo")
-        for (n,v,f), info in infoList:
-            cu.execute("insert into tmpNVF(name,version,flavor) values (?,?,?)",
-                       (n,v,f), start_transaction=False)
-        # we'll need the min idx to account for differences in SQL backends
-        cu.execute("SELECT MIN(idx) from tmpNVF")
-        minIdx = cu.fetchone()[0]
-
+        # tmpNVF is already seeded from the batchCheck() call earlier
         cu.execute("""
         insert into tmpInstanceId(idx, instanceId)
         select idx, Instances.instanceId
@@ -2799,15 +2793,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.db.analyze("tmpInstanceId")
         # see what troves are missing, if any
         cu.execute("""
-        select tmpNVF.idx
-        from tmpNVF
+        select tmpNVF.idx from tmpNVF
         left join tmpInstanceId on tmpNVF.idx = tmpInstanceId.idx
         where tmpInstanceId.instanceId is NULL
         """)
         ret = cu.fetchall()
-        if len(ret):
-            # we'll report the first one
-            i = ret[0][0] - minIdx
+        if len(ret): # we'll report the first one
+            i = ret[0][0]
             raise errors.TroveMissing(infoList[i][0][0], infoList[i][0][1])
 
         cu.execute('select instanceId from tmpInstanceId order by idx')
