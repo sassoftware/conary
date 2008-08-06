@@ -338,7 +338,8 @@ class NetworkAuthorization:
     def batchCheck(self, authToken, troveList, write = False, cu = None):
         """ checks access permissions for a set of *existing* troves in the repository """
         # troveTupList is a list of (name, VFS) tuples
-        self.log(3, authToken[0], "entitlements=%s write=%s" %(authToken[2], int(bool(write))), troveList)
+        self.log(3, authToken[0], "entitlements=%s write=%s" %(authToken[2], int(bool(write))),
+                 troveList)
         # process/check the troveList, which can be an iterator
         checkList = []
         for i, (n,v,f) in enumerate(troveList):

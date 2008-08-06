@@ -478,24 +478,24 @@ def createCheckTroveCache(db):
     assert("CheckTroveCache" in db.tables)
     cu = db.cursor()
     cu.execute("delete from CheckTroveCache")
-    cu.execute("""
-    select distinct
-        P.itemId as patternId, Items.itemId as itemId,
-        PI.item as pattern, Items.item as trove
-    from Permissions as P
-    join Items as PI using(itemId)
-    cross join Items
-    """)
-    cu2 = db.cursor()
-    auth = netauth.NetworkAuthorization(db, None)
-    for (patternId, itemId, pattern, troveName) in cu:
-        if not auth.checkTrove(pattern, troveName):
-            continue
-        cu2.execute("insert into CheckTroveCache (patternId, itemId) values (?,?)",
+    # grab all possible patterns
+    cu.execute("select distinct i.itemId, i.item "
+               "from Permissions join Items as i using(itemId)")
+    patterns = set([(x[0],x[1]) for x in cu.fetchall()])
+    patterns.add((0, "ALL"))
+    # grab all items
+    cu.execute("select itemId, item from Items")
+    items = cu.fetchall()
+    from conary.repository.netrepos.items import checkTrove
+    for (patternId, pattern) in patterns:
+        for (itemId, troveName) in items:
+            if not checkTrove(pattern, troveName):
+                continue
+            cu.execute("insert into CheckTroveCache (patternId, itemId) values (?,?)",
                     (patternId, itemId))
     db.analyze("CheckTroveCache")
     return True
-        
+
 # return a list of all prefixes for a given dirname, including self
 # note: we deliberately do not insert '/' as a prefix for all directories, since
 #       not walking through the Prefixes is faster than looping through the entire
@@ -790,9 +790,9 @@ class MigrateTo_17(SchemaMigration):
         schema.setupTempTables(self.db)       
         logMe(2, "looking for missing dirnames/prefixes links")
         cu = self.db.cursor()
-        cu.execute("""select d.dirnameId, d.dirname
+        cu.execute("""select distinct d.dirnameId, d.dirname
         from Dirnames as d
-        join ( select distinct fp.dirnameId as dirnameId
+        join ( select fp.dirnameId as dirnameId
                from FilePaths as fp
                left join Prefixes as p using(dirnameId)
                where p.dirnameId is null ) as dq using(dirnameId) """)

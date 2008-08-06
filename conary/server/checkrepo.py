@@ -31,7 +31,7 @@ from conary.server import schema
 from conary.local import schema as depSchema
 from conary.lib.cfg import CfgBool, CfgInt, CfgPath
 from conary.lib import log
-from conary.repository.netrepos import netserver, instances
+from conary.repository.netrepos import netserver, instances, items
 from conary import dbstore
 from conary.dbstore import sqlerrors
 
@@ -255,6 +255,39 @@ class CheckSchema(Checker):
         self.commit()
         return True
 
+class CheckCTC(Checker):
+    """ checks if the CheckTroveCache table is correctly built """
+    def check(self):
+        db = self.getDB()
+        log.info("checking the state of the CheckTroveCache table")
+        cu = db.cursor()
+        cu.execute("select patternId, itemId from CheckTroveCache")
+        existing = set([(x[0],x[1]) for x in cu.fetchall()])
+        required = []
+        cu.execute("select distinct i.itemId, i.item from Permissions as p "
+                   "join Items as i using(itemId)")
+        patterns = set([(x[0], x[1]) for x in cu.fetchall()])
+        cu.execute("select itemId, item from Items")
+        troveNames = set([(x[0], x[1]) for x in cu.fetchall()])
+        for patternId, pattern in patterns:
+            for itemId, item in troveNames:
+                if items.checkTrove(pattern, item):
+                    required.append((patternId, itemId))
+        required = set(required)
+        self._status = required.difference(existing)
+        if len(self._status):
+            log.warning("found %d entries that are missing from CheckTroveCache", len(self._status))
+            return False
+        return True
+    def fix(self):
+        db = self.getDB()
+        cu = db.cursor()
+        log.info("adding missing entries to CheckTroveCache")
+        cu.executemany("insert into CheckTroveCache(patternId, itemId) values (?,?)",
+                       ((p,i) for (p,i) in self._status))
+        self.commit()
+        return self.check()
+    
 # main program
 class ServerConfig(netserver.ServerConfig):
     port                    = (CfgInt,  8000)
@@ -298,7 +331,7 @@ def usage(name = sys.argv[0]):
     Usage:
     %s [--fix] [--config-file repo.cnr] [--config 'name param'] checkname [checkname...]
     Valid check names are: ALL
-        acls latest troveinfo schema
+        acls latest troveinfo schema ctc
     """ % (name,)
 
 def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
@@ -364,6 +397,8 @@ def main():
         ret["latest"] = CheckLatest(cfg, doFix).run()
     if all or "troveinfo" in args:
         ret["troveinfo"] = CheckTroveInfo(cfg, doFix).run()
+    if all or "ctc" in args:
+        ret["ctc"] = CheckCTC(cfg, doFix).run()
     if False in ret.values():
         return False
     return True

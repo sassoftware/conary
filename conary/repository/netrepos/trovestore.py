@@ -138,7 +138,10 @@ class TroveStore:
         itemId = self.itemIdCache.get(item, None)
         if itemId is not None:
             return itemId
-        itemId = self.items.getOrAddId(item)
+        itemId = self.items.get(item, None)
+        if itemId is None:
+            itemId = self.items.addId(item)
+        self.items.updateCheckTrove(itemId, item)
         self.itemIdCache[item] = itemId
         return itemId
 

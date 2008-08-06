@@ -57,18 +57,30 @@ class Items(idtable.IdTable):
 		 WHERE instances.itemId is NULL)
 	""")
 
-    # need to keep the CheckTroveCache in sync when adding or removing ids
-    def addId(self, item):
-        itemId = idtable.IdTable.addId(self, item)
+    def updateCheckTrove(self, itemId, item):
         cu = self.db.cursor()
-        cu.execute("select distinct Items.item, Items.itemId "
-                   "from Permissions join Items using(itemId) ")
-        for (pattern, patternId) in cu.fetchall():
+        # having a CheckTroveCace entry for (item, ALL) is a marker
+        # we've already processed this
+        cu.execute("select 1 from CheckTroveCache "
+                   "where itemId = ? and patternId = 0", itemId)
+        if len(cu.fetchall()) > 0:
+            return
+        # need to process a new itemId
+        cu.execute("""
+        select distinct i.item, i.itemId from Permissions as p
+        join Items as i on p.itemId = i.itemId
+        where not exists (
+            select 1 from CheckTroveCache as ctc 
+            where i.itemId = ctc.patternId and ctc.itemId = ? ) """, itemId)
+        pattSet = set([(x[0],x[1]) for x in cu.fetchall()])
+        # add the marker - this should not exist since we checked it earlier
+        pattSet.add(("ALL", 0))
+        for (pattern, patternId) in pattSet:
             if checkTrove(pattern, item):
                 cu.execute("""
                 insert into CheckTroveCache(itemId, patternId)
                 values (?,?) """, (itemId, patternId))
-        return itemId
+                
     def delId(self, theId):
         cu = self.db.cursor()
         cu.execute("delete from CheckTroveCache where itemId = ?", theId)
@@ -81,12 +93,14 @@ class Items(idtable.IdTable):
         itemId = self.get(pattern, None)
         if itemId is None:
             itemId = idtable.IdTable.addId(self, pattern)
-        # need to update CheckTroveCache for this pattern
-        cu.execute("select count(*) from CheckTroveCache where patternId = ?",
-                   itemId)
-        pCount = cu.fetchall()[0][0]
-        if pCount > 0: # this pattern is already being tracked
-            return itemId
+        else:
+            # check if we're already tracking the permissions for this pattern
+            cu.execute("select count(*) from CheckTroveCache where patternId = ?",
+                       itemId)
+            pCount = cu.fetchall()[0][0]
+            if pCount > 0:
+                return itemId
+            # need to update CheckTroveCache for this pattern
         cu.execute("select Troves.itemId, Troves.item from Items as Troves")
         for (tid, t) in cu.fetchall():
             if checkTrove(pattern, t):

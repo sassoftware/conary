@@ -11,6 +11,8 @@ Changes in @NEW@:
       entitlements has been fixed (CNY-2761)
     * A problem with the autoLoadRecipes config option has been fixed.
       (CNY-2909)
+    * A permission check problem when trove names are used as trove patterns in ACLs 
+      has been fixed (CNY-2913)
 
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
