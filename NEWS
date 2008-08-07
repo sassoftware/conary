@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.22:
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
       recipe class so that the loaded class can be referenced anonymously.
@@ -10,7 +10,7 @@ Changes in @NEW@:
       discovered no need only for :runtime components listed in
       buildRequires.  This has been fixed, and error reporting
       improved for similar classes of bugs in the future. (CNY-2904)
-    
+
   o Client Changes:
     * The new boolean conaryrc option downloadFirst has been added to
       instruct Conary to download all required changesets from the
