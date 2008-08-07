@@ -1,19 +1,4 @@
 Changes in @NEW@:
-  o Bug Fixes:
-    * Problem added in 2.0.20 with adding dependencies to postgres
-      repositories has been resolved
-    * Starting in 2.0.20, dependency resolution started locking the database 
-      unnecessarily.  This affected rmake dependency resolution.
-    * mirroring code now correctly detects when access control changes
-      in the source repository require the generation of absolute changesets
-      for mirroring. (CNY-2888)
-    * a permission check error for users that only have trove access
-      entitlements has been fixed (CNY-2761)
-    * A problem with the autoLoadRecipes config option has been fixed.
-      (CNY-2909)
-    * A permission check problem when trove names are used as trove patterns in ACLs 
-      has been fixed (CNY-2913)
-
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
       recipe class so that the loaded class can be referenced anonymously.
@@ -27,9 +12,25 @@ Changes in @NEW@:
       improved for similar classes of bugs in the future. (CNY-2904)
     
   o Client Changes:
-    * Boolean conaryrc option downloadFirst has been added to allow
-      for downloading all required changesets from the repository before
-      proceeding with the update steps. (CNY-2808)
+    * The new boolean conaryrc option downloadFirst has been added to
+      instruct Conary to download all required changesets from the
+      repository before proceeding to update steps. (CNY-2808)
+
+  o Bug Fixes:
+    * Conary 2.0.20 introduced a bug adding dependencies to postgres-based
+      repositories; this has been resolved.
+    * Starting in 2.0.20, dependency resolution started locking the
+      database unnecessarily.  This affected rmake dependency resolution,
+      and is now resolved.
+    * Mirroring code now correctly detects when access control changes
+      in the source repository require the generation of absolute
+      changesets for mirroring. (CNY-2888)
+    * A permission check error for users that only have trove access
+      entitlements has been fixed. (CNY-2761)
+    * A problem with the autoLoadRecipes config option has been fixed.
+      (CNY-2909)
+    * A permission check problem when trove names are used as trove
+      patterns in ACLs has been fixed. (CNY-2913)
 
 Changes in 2.0.21:
   o Build Changes:
