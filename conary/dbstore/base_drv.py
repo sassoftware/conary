@@ -37,6 +37,7 @@ class BaseKeywordDict(dict):
              'PATHTYPE'      : 'STRING',
              'STRING'        : 'STRING',
              'CREATEVIEW'    : 'CREATE VIEW',
+             'CHANGED'       : 'NUMERIC(14,0) NOT NULL DEFAULT 0',
              }
     def __init__(self):
         dict.__init__(self, self.keys)

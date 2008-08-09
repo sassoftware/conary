@@ -14,7 +14,9 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile changemail.py commitaction perlreqs.pl findmissingbuildreqs
+extra_dist = Makefile \
+             logaction.py changemail.py commitaction \
+	     perlreqs.pl findmissingbuildreqs
 
 bin_scripts = rpm2cpio dbsh conary-debug ccs2tar
 util_scripts = dumpcontainer localupdateinfo mirror md5pw showchangeset logcat listcachedir
@@ -34,6 +36,7 @@ install: install-subdirs
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
+	install -m 755 logaction.py $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
 	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 
