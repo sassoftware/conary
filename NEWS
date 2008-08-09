@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o New Features:
+    * a new commitaction module that logs to a database the results of
+      all commits in to a repository has been added as logaction.py 
+      (CNY-2814, CNY-2849)
+
+
 Changes in 2.0.22:
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
