@@ -1,0 +1,64 @@
+#!/usr/bin/python
+# -*- mode: python -*-
+#
+# Copyright (c) 2008 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+"""
+This is a script that works identically to epydoc, but implements a
+Conary-specific semantic for determining if an interface is public or
+private.
+"""
+
+from epydoc.cli import cli
+from epydoc import docintrospecter, apidoc
+from epydoc.apidoc import UNKNOWN
+import inspect
+
+def _mark_public(doc, recurse=True):
+    any_public = False
+    for name, var in doc.variables.iteritems():
+        has_public_child = False
+        if isinstance(var.value, (apidoc.ClassDoc, apidoc.VariableDoc)):
+            has_public_child |= _mark_public(var.value)
+        elif isinstance(var.value, apidoc.ModuleDoc):
+            has_public_child = False
+        s = str(var.value.docstring)
+        if 'PUBLIC API' in s or has_public_child:
+            any_public = True
+            var.is_public = True
+        else:
+            var.is_public = False
+    return any_public
+
+def introspect_class(cls, class_doc, module_name=None):
+    doc = docintrospecter.introspect_class(cls, class_doc,
+                                           module_name=module_name)
+    _mark_public(doc)
+    return doc
+
+docintrospecter.register_introspecter(docintrospecter.isclass,
+                                      introspect_class, priority=10)
+
+def introspect_module(module, module_doc, module_name=None, preliminary=False):
+    doc = docintrospecter.introspect_module(module, module_doc,
+                                            module_name=module_name,
+                                            preliminary=preliminary)
+    _mark_public(doc)
+    return doc
+
+docintrospecter.register_introspecter(inspect.ismodule,
+                                      introspect_module, priority=10)
+
+cli()
