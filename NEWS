@@ -3,7 +3,8 @@ Changes in @NEW@:
     * a new commitaction module that logs to a database the results of
       all commits in to a repository has been added as logaction.py 
       (CNY-2814, CNY-2849)
-
+    * Some trove sources now deal better with being passed a trove name
+      of None when using findTroves. (CNY-2923)
 
 Changes in 2.0.22:
   o Build Changes:

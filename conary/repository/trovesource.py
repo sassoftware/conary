@@ -437,31 +437,32 @@ class SearchableTroveSource(AbstractTroveSource):
             if not troves:
                 continue
             if not versionQuery:
-                allTroves[name] = troves[name]
+                allTroves.update(troves)
                 continue
-            versionResults = self._filterByVersionQuery(versionType,
-                                                        troves[name].keys(),
-                                                        versionQuery)
+            for resultName in troves:
+                versionResults = self._filterByVersionQuery(versionType,
+                                                            troves[resultName].keys(),
+                                                            versionQuery)
 
-            for queryKey, versionList in versionResults.iteritems():
+                for queryKey, versionList in versionResults.iteritems():
 
-                flavorQueryList = versionQuery[queryKey]
-                versionFlavorDict = dict((x, troves[name][x])
-                                          for x in versionList)
-                for flavorQuery, idxList in flavorQueryList.iteritems():
-                    results, altFlavors = self._filterResultsByFlavor(
-                                                versionFlavorDict,
-                                                flavorQuery, filterOptions,
-                                                scoreCache)
-                    for idx in idxList:
-                        if results:
-                            finalAltFlavors[idx] = []
-                        else:
-                            finalAltFlavors[idx] = altFlavors
-                        for idx in troveSpecDict[name][queryKey][flavorQuery]:
-                            for version, flavorList in results.iteritems():
-                                finalResults[idx].extend((name, version, x)
-                                                         for x in flavorList)
+                    flavorQueryList = versionQuery[queryKey]
+                    versionFlavorDict = dict((x, troves[resultName][x])
+                                              for x in versionList)
+                    for flavorQuery, idxList in flavorQueryList.iteritems():
+                        results, altFlavors = self._filterResultsByFlavor(
+                                                    versionFlavorDict,
+                                                    flavorQuery, filterOptions,
+                                                    scoreCache)
+                        for idx in idxList:
+                            if results:
+                                finalAltFlavors[idx] = []
+                            else:
+                                finalAltFlavors[idx] = altFlavors
+                            for idx in troveSpecDict[name][queryKey][flavorQuery]:
+                                for version, flavorList in results.iteritems():
+                                    finalResults[idx].extend((resultName, version, x)
+                                                             for x in flavorList)
 
         return finalResults, finalAltFlavors
 
@@ -877,6 +878,8 @@ class SimpleTroveSource(SearchableTroveSource):
         self._trovesByName = _trovesByName
 
     def trovesByName(self, name):
+        if name is None:
+            return list(self)
         return self._trovesByName.get(name, [])
 
     def iterAllTroveNames(self):
@@ -887,7 +890,7 @@ class SimpleTroveSource(SearchableTroveSource):
 
     def __len__(self):
         return len([x for x in self ])
-        
+
     def __iter__(self):
         return itertools.chain(*self._trovesByName.itervalues())
 
