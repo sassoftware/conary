@@ -1480,6 +1480,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
     import inspect
     import itertools
     import repr as reprmod
+    UNSAFE_TYPES = (xmlrpclib.ServerProxy, xmlrpclib._Method)
     class Repr(reprmod.Repr):
         def __init__(self, subsequentIndent = ""):
             reprmod.Repr.__init__(self)
@@ -1497,7 +1498,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             self._pretty = True
 
         def repr_str(self, x, level):
-            if hasattr(x, '__safe_str__'):
+            if not isinstance(v, UNSAFE_TYPES) and hasattr(x, '__safe_str__'):
                 return reprmod.Repr.repr_str(x.__safe_str__())
             return reprmod.Repr.repr_str(self, x, level)
 
@@ -1614,8 +1615,7 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             if hasattr(v, '__class__'):
                 if v.__class__.__name__ == 'ModuleProxy':
                     continue
-            if not isinstance(v, xmlrpclib.ServerProxy) \
-              and hasattr(v, '__safe_str__'):
+            if not isinstance(v, UNSAFE_TYPES) and hasattr(v, '__safe_str__'):
                 vstr = v.__safe_str__()
             else:
                 vstr = r.repr(v)
