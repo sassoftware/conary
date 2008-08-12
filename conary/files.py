@@ -525,6 +525,9 @@ class RegularFile(File):
                                                      tmpfd)
                     os.close(tmpfd)
                 else:
+                    if fileContents.isCompressed():
+                        src = gzip.GzipFile(mode = "r", fileobj = src)
+
                     d = sha.new()
                     f = os.fdopen(tmpfd, 'w')
                     util.copyfileobj(src, f, digest = d)

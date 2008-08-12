@@ -1190,6 +1190,10 @@ class _LazyFile(object):
     def trucate(self):
         pass
 
+    @reopen
+    def fileno(self):
+        pass
+
     def _close(self):
         # Close only the file descriptor
         if self._realFd is not None:
