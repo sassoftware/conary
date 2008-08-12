@@ -13,6 +13,7 @@
 #
 
 import grp
+import gzip
 import os
 import pwd
 import socket
@@ -478,6 +479,7 @@ class CharacterDevice(DeviceFile):
     lsTag = "c"
     __slots__ = []
 
+import gzip
 class RegularFile(File):
 
     streamDict = { 
@@ -500,6 +502,15 @@ class RegularFile(File):
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
 	    src = fileContents.get()
+            inFd = None
+
+            if fileContents.isCompressed():
+                if hasattr(src, '_fdInfo'):
+                    # inFd is None if we can't figure this information out
+                    # (for _LazyFile for instance)
+                    (inFd, inStart, inSize) = src._fdInfo()
+                else:
+                    src = gzip.GzipFile(mode = "r", fileobj = src)
 
 	    path = os.path.dirname(target)
 	    name = os.path.basename(target)
@@ -508,9 +519,13 @@ class RegularFile(File):
 
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
 	    try:
-		f = os.fdopen(tmpfd, 'w')
-		util.copyfileobj(src, f, digest = digest)
-		f.close()
+                if inFd is not None:
+                    sha1 = util.sha1Uncompress((inFd, inStart, inSize), tmpfd)
+                    os.close(tmpfd)
+                else:
+                    f = os.fdopen(tmpfd, 'w')
+                    util.copyfileobj(src, f, digest = digest)
+                    f.close()
 
                 if os.path.isdir(target):
                     os.rmdir(target)
