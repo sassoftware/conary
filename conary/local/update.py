@@ -353,8 +353,7 @@ class FilesystemJob:
 		# into the config file cache
 		d = sha.new()
 		fileObj.restore(contents, root, target, journal=journal,
-				digest = d)
-		#assert(d.digest() == fileObj.contents.sha1())
+				sha1 = fileObj.contents.sha1())
 	    else:
 		fileObj.restore(contents, root, target, journal=journal,
                                 nameLookup = (not self.isSourceTrove))

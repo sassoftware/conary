@@ -16,6 +16,7 @@ import grp
 import gzip
 import os
 import pwd
+import sha
 import socket
 import stat
 import string
@@ -497,7 +498,7 @@ class RegularFile(File):
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def restore(self, fileContents, root, target, journal=None, digest = None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, sha1 = None, nameLookup=True):
 	if fileContents != None:
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
@@ -520,12 +521,15 @@ class RegularFile(File):
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
 	    try:
                 if inFd is not None:
-                    sha1 = util.sha1Uncompress((inFd, inStart, inSize), tmpfd)
+                    actualSha1 = util.sha1Uncompress((inFd, inStart, inSize),
+                                                     tmpfd)
                     os.close(tmpfd)
                 else:
+                    d = sha.new()
                     f = os.fdopen(tmpfd, 'w')
-                    util.copyfileobj(src, f, digest = digest)
+                    util.copyfileobj(src, f, digest = d)
                     f.close()
+                    actualSha1 = d.digest()
 
                 if os.path.isdir(target):
                     os.rmdir(target)
@@ -535,6 +539,9 @@ class RegularFile(File):
                 # clean up instead of leaving temp files around
                 os.unlink(tmpname)
                 raise
+
+            if (sha1 is not None and sha1 != actualSha1):
+                raise Sha1Exception(target)
 
             File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
 	else:
@@ -812,6 +819,14 @@ class UserGroupIdCache:
         # (if any) so that the correct configuration and libraries are
         # loaded. (CNY-1515)
         nameLookupFn('root')
-	
+
+class Sha1Exception(Exception):
+
+    def __str__(self):
+        return self.path
+
+    def __init__(self, path):
+        self.path = path
+
 userCache = UserGroupIdCache('user', pwd.getpwnam, pwd.getpwuid)
 groupCache = UserGroupIdCache('group', grp.getgrnam, grp.getgrgid)
