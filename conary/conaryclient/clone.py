@@ -441,6 +441,7 @@ class ClientClone:
         toClone = chooser.getPrimaryTroveList()
         total = 0
         current = 0
+        sourceByPackage = {}
         while toClone:
             total += len(toClone)
             needed = []
@@ -462,25 +463,47 @@ class ClientClone:
                     needed.append(info)
                     seen.add(info)
 
-            troves = troveCache.getTroves(needed, withFiles = False)
+            nonComponents = [ x for x in needed
+                                if not trove.troveIsComponent(x[0]) ]
+            got = troveCache.getTroves(nonComponents, withFiles = False)
+            troves = []
+            for info in needed:
+                if trove.troveIsComponent(info[0]):
+                    troves.append(None)
+                else:
+                    troves.append(got.pop(0))
+
             newToClone = []
             for troveTup, trv in itertools.izip(needed, troves):
                 current += 1
                 callback.determiningCloneTroves(current, total)
+
                 if troveTup[0].endswith(':source'):
                     sourceName = None
+                elif trove.troveIsComponent(troveTup[0]):
+                    try:
+                        sourceName = sourceByPackage[troveTup[0].split(":")[0]]
+                    except KeyError:
+                        # XXX This can't happen because groups have to include
+                        # packages, not components. However, the test suite
+                        # hand builds groups which don't obey this rule. Just
+                        # guess because it's good enough for the tests.
+                        sourceName = troveTup[0].split(":")[0] + ":source"
                 else:
                     sourceName = _getSourceName(trv)
+                    sourceByPackage[troveTup[0]] = sourceName
+
                 if chooser.shouldClone(troveTup, sourceName):
                     if not chooser.isExcluded(troveTup):
                         targetBranch = chooser.getTargetBranch(troveTup[1])
                         cloneMap.addTrove(troveTup, targetBranch, sourceName)
                         chooser.addSource(troveTup, sourceName)
                         cloneJob.add(troveTup)
-                        for childTup in trv.iterTroveList(strongRefs=True,
-                                                          weakRefs=True):
-                            chooser.addReferenceByCloned(childTup)
-                    else:
+                        if trv:
+                            for childTup in trv.iterTroveList(strongRefs=True,
+                                                              weakRefs=True):
+                                chooser.addReferenceByCloned(childTup)
+                    elif trv:
                         # don't include this collection, instead
                         # only include child troves that aren't
                         # components of this collection.
@@ -498,11 +521,14 @@ class ClientClone:
                         for childTup in trv.iterTroveList(strongRefs=True,
                                                           weakRefs=True):
                             chooser.addReferenceByUncloned(childTup)
+
                     if trove.troveIsPackage(troveTup[0]):
-                        # don't bother downloading components for something
+                        # don't bother analyzing components for something
                         # we're not cloning
                         continue
-                newToClone.extend(trv.iterTroveList(strongRefs=True))
+
+                if trv:
+                    newToClone.extend(trv.iterTroveList(strongRefs=True))
 
             toClone = newToClone
 

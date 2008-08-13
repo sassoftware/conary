@@ -6,6 +6,11 @@ Changes in @NEW@:
     * Some trove sources now deal better with being passed a trove name
       of None when using findTroves. (CNY-2923)
 
+  o Build Changes:
+    * Promote now uses the source trove for packages to determine the
+      source trove for components instead of downloading the components
+      themselves.
+
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
     * Cleaned up graph code during dependency checks to remove redundant
