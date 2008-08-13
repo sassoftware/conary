@@ -756,16 +756,21 @@ class ClientClone:
         toReclone = []
         # match up as many needed targets for these clone as possible.
         _logMe("Rechecking %s preclones" % len(troveTups))
+        needed = []
         for troveTup in troveTups:
             _logMe("Rechecking %s" % (troveTup,))
-            if troveTup[0].endswith(':source'):
-                # we don't need to worry about recloning sources.
-                # sources don't have troveInfo that we want to rewrite.
+            if not trove.troveIsCollection(troveTup[0]):
+                # this is only interested in missing references for included
+                # troves. only collections have those
                 continue
             newVersion = cloneMap.getTargetVersion(troveTup)
             clonedTup = (troveTup[0], newVersion, troveTup[2])
-            trv, clonedTrv = troveCache.getTroves([troveTup, clonedTup],
-                                                  withFiles=False)
+            needed += [ troveTup, clonedTup ]
+
+        troves = troveCache.getTroves(needed, withFiles = False)
+        while troves:
+            trv = troves.pop(0)
+            clonedTrv = troves.pop(0)
             if self._shouldReclone(trv, clonedTrv, chooser, cloneMap):
                 toReclone.append(troveTup)
 

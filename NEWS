@@ -13,6 +13,8 @@ Changes in @NEW@:
     * Promote no longer uses getTroves() to look up clone history; it uses
       getTroveInfo() instead. This provides a significant performance
       improvement as well as a significant RAM savings.
+    * Checking for recloning (due to changes in referenced trove sets) now
+      skips components, improving promote performance.
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
