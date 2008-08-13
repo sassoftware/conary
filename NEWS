@@ -11,6 +11,10 @@ Changes in @NEW@:
     * Cleaned up graph code during dependency checks to remove redundant
       calls in some (relatively obscure) cases
     * Reworked MPI to long conversion to work on four bytes at a time
+    * TroveChangeSet objects in changesets are now sorted by the
+      name/version/flavor of the new trove
+    * Thawing ReferencedTroveSet objects now looks up values with a single
+      slice instead of one index at a time for a performance improvement
 
 Changes in 2.0.22:
   o Build Changes:

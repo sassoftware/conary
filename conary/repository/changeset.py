@@ -75,8 +75,8 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
 	l = []
-	for trv in sorted(self.itervalues()):
-	    s = trv.freeze()
+	for info in sorted(self.iterkeys()):
+	    s = self[info].freeze()
 	    l.append(struct.pack("!I", len(s)))
 	    l.append(s)
 

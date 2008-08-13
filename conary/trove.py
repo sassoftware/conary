@@ -2723,9 +2723,8 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 
 	    i += 1
 	    while l[i]:
-		change = l[i]
-		version = versions.ThawVersion(l[i + 1])
-		flavor = l[i + 2]
+                change, version, flavor, byDefFlag = l[i:i+4]
+                version = versions.ThawVersion(version)
 
 		if flavor == "-":
 		    flavor = deps.Flavor()
@@ -2734,7 +2733,7 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 
                 if change == '-':
                     byDefault = None
-                elif l[i + 3] == '0':
+                elif byDefFlag == '0':
                     byDefault = False
                 else:
                     byDefault = True
