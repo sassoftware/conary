@@ -1073,6 +1073,9 @@ class TroveCache(object):
     def getTrove(self, troveTup, withFiles=True):
         return self.getTroves([troveTup], withFiles=withFiles)[0]
 
+    def getTroveInfo(self, *args):
+        return self.repos.getTroveInfo(*args)
+
 class CloneChooser(object):
     def __init__(self, targetMap, primaryTroveList, cloneOptions):
         # make sure there are no zeroed timeStamps - branches may be
@@ -1501,27 +1504,32 @@ class LeafMap(object):
         while toGet:
             newToGet = {}
             hasTroves = {}
-            hasTrovesByHost = {}
+            trovesByHost = {}
             # sort by host so that if a particular repository is down
             # we can continue to look at the rest of the clonedFrom info.
             for troveTup in toGet:
+                if troveTup[1].isInLocalNamespace():
+                    continue
                 host = troveTup[1].trailingLabel().getHost()
-                hasTrovesByHost.setdefault(host, []).append(troveTup)
+                trovesByHost.setdefault(host, []).append(troveTup)
 
-            for host, troveTups in hasTrovesByHost.items():
+            results = []
+            for host, troveTups in trovesByHost.items():
                 try:
-                    results = troveCache.hasTroves(troveTups)
+                    infoList = troveCache.getTroveInfo(
+                                    trove._TROVEINFO_TAG_CLONEDFROM, troveTups)
+                    results += zip(troveTups, infoList)
                 except errors.ConaryError, msg:
-                    log.debug('warning: Could not access host %s: %s' % (host, msg))
-                    results = dict((x, False) for x in troveTups)
-                hasTroves.update(results)
-            troves = troveCache.getTroves([ x for x in toGet if hasTroves[x]], 
-                                           withFiles=False)
-            for trove in troves:
-                troveTup = trove.getNameVersionFlavor()
+                    log.debug('warning: Could not access host %s: %s' %
+                                    (host, msg))
+
+            for troveTup, clonedFrom in results:
                 origTups = toGet[troveTup]
-                clonedFrom = trove.troveInfo.clonedFrom()
+
                 if clonedFrom:
+                    # Looks weird, but switches from a version stream to
+                    # a version object
+                    clonedFrom = clonedFrom()
                     for origTup in origTups:
                         clonedFromInfo[origTup].add(clonedFrom)
 
@@ -1529,6 +1537,7 @@ class LeafMap(object):
                                 (troveTup[0], clonedFrom, troveTup[2]), [])
                     l.extend(origTups)
             toGet = newToGet
+
         for troveTup, clonedFrom in clonedFromInfo.iteritems():
             self._addTrove(troveTup, clonedFrom)
 

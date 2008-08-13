@@ -10,6 +10,9 @@ Changes in @NEW@:
     * Promote now uses the source trove for packages to determine the
       source trove for components instead of downloading the components
       themselves.
+    * Promote no longer uses getTroves() to look up clone history; it uses
+      getTroveInfo() instead. This provides a significant performance
+      improvement as well as a significant RAM savings.
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
