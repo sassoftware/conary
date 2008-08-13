@@ -14,6 +14,7 @@
 
 import itertools
 import re
+import weakref
 from conary.lib import misc, util, api
 from conary.errors import ParseError
 
@@ -546,6 +547,10 @@ class DependencyClass(object):
             yield dep
 
     def thawDependency(frozen):
+        cached = dependencyCache.get(frozen, None)
+        if cached:
+            return cached
+
         name, flags = misc.depSplit(frozen)
 
         for i, flag in enumerate(flags):
@@ -561,9 +566,9 @@ class DependencyClass(object):
                 flags[i] = (flag, FLAG_SENSE_REQUIRED)
 
         d = Dependency(name, flags)
-        cached = dependencyCache.setdefault(d, d)
+        dependencyCache[frozen] = d
 
-        return cached
+        return d
     thawDependency = staticmethod(thawDependency)
 
     def __hash__(self):
@@ -1577,7 +1582,7 @@ def getShortFlavorDescriptors(flavors):
     raise NotImplementedError
 
 
-dependencyCache = util.ObjectCache()
+dependencyCache = weakref.WeakValueDictionary()
 
 ident = '(?:[0-9A-Za-z_-]+)'
 flag = '(?:~?!?IDENT)'
