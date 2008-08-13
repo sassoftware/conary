@@ -61,6 +61,7 @@ def realpath(path):
 def isregular(path):
     return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
 
+@api.developerApi
 def mkdirChain(*paths):
     _ignoredErrors = set((errno.ENOENT, errno.ENOTDIR, errno.EACCES))
     for path in paths:

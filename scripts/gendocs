@@ -2,4 +2,5 @@
 thisdir=$(dirname $0)
 topdir=$(cd $thisdir/.. 2> /dev/null && pwd -P;)
 export PYTHONPATH=$topdir
-$thisdir/epydoc --html conary -o /tmp/conary-docs
+$thisdir/epydoc --public --html conary -o ../doc/public_api/
+$thisdir/epydoc --developer --html conary -o ../doc/developer_api/

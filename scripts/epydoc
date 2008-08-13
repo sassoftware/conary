@@ -25,17 +25,38 @@ from epydoc.cli import cli
 from epydoc import docintrospecter, apidoc
 from epydoc.apidoc import UNKNOWN
 import inspect
+import sys
+
+def _is_developer(var):
+    s = str(var.value.docstring)
+    return 'PUBLIC API' in s or 'DEVELOPER API' in s
+
+def _is_public(var):
+    s = str(var.value.docstring)
+    return 'PUBLIC API' in s
 
 def _mark_public(doc, recurse=True):
     any_public = False
     for name, var in doc.variables.iteritems():
         has_public_child = False
+        if isinstance(var.value, apidoc.ClassDoc):
+            if isinstance(doc, apidoc.ModuleDoc):
+                if var.value.defining_module != doc:
+                    continue
+                has_public_child |= _mark_public(var.value)
+            else:
+                # classes containing subclasses - the subclass can't
+                # be public
+                var.is_public = False
+                continue
         if isinstance(var.value, (apidoc.ClassDoc, apidoc.VariableDoc)):
             has_public_child |= _mark_public(var.value)
         elif isinstance(var.value, apidoc.ModuleDoc):
+            # importing a public module doesn't make you public!
             has_public_child = False
-        s = str(var.value.docstring)
-        if 'PUBLIC API' in s or has_public_child:
+        if is_public(var) or has_public_child:
+            if var.value.defining_module != doc.defining_module:
+                continue
             any_public = True
             var.is_public = True
         else:
@@ -55,10 +76,94 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
     doc = docintrospecter.introspect_module(module, module_doc,
                                             module_name=module_name,
                                             preliminary=preliminary)
-    _mark_public(doc)
+    is_public = _mark_public(doc)
+    doc.is_public = is_public
+    package = doc.package
+    if is_public:
+        while package and not package.is_public:
+            package.is_public = True
+            package = package.package
     return doc
 
+
+def _doc_or_ancestor_is_private(self, api_doc):
+    name = api_doc.canonical_name
+    for i in range(len(name), 0, -1):
+        # Is it (or an ancestor) a private var?
+        var_doc = self.docindex.get_vardoc(name[:i])
+        if var_doc is not None and var_doc.is_public == False:
+            return True
+        # Is it (or an ancestor) a private module?
+        val_doc = self.docindex.get_valdoc(name[:i])
+        if (val_doc is not None and isinstance(val_doc, apidoc.ModuleDoc) and
+            (val_doc.canonical_name[-1].startswith('_') or not val_doc.is_public)):
+            return True
+    return False
+
+def write_module_tree_item(self, out, doc, package=None):
+    # If it's a private variable, then mark its <li>.
+    var = package and package.variables.get(doc.canonical_name[-1])
+    priv = ((var is not None and var.is_public is False) or
+            (var is None and doc.canonical_name[-1].startswith('_')))
+    out('    <li%s> <strong class="uidlink">%s</strong>'
+        % (priv and ' class="private"' or '', self.href(doc)))
+    if doc.summary not in (None, UNKNOWN):
+        out(': <em class="summary">'+
+            self.description(doc.summary, doc, 8)+'</em>')
+    if doc.submodules != UNKNOWN and doc.submodules:
+        if priv: out('\n    <ul class="private">\n')
+        else: out('\n    <ul>\n')
+        for submodule in doc.submodules:
+            if submodule.is_public:
+                self.write_module_tree_item(out, submodule, package=doc)
+        out('    </ul>\n')
+    out('    </li>\n')
+
+def write_module_list(self, out, doc):
+    submodules = [ x for x in doc.submodules if x.is_public ]
+    if len(submodules) == 0: return
+    self.write_table_header(out, "summary", "Submodules")
+
+    for group_name in doc.group_names():
+        submodules = doc.submodule_groups[group_name]
+        submodules = [ x for x in submodules if x.is_public ]
+        if not submodules:
+            continue
+        if group_name:
+            self.write_group_header(out, group_name)
+        out('  <tr><td class="summary">\n'
+            '  <ul class="nomargin">\n')
+        for submodule in submodules:
+            self.write_module_tree_item(out, submodule, package=doc)
+        out('  </ul></td></tr>\n')
+    out(self.TABLE_FOOTER+'\n<br />\n')
+
+
+# monkey patch ModuleDoc
+from epydoc.docwriter.html import HTMLWriter
+HTMLWriter._doc_or_ancestor_is_private = _doc_or_ancestor_is_private
+HTMLWriter.write_module_tree_item = write_module_tree_item
+HTMLWriter.write_module_list = write_module_list
+
+apidoc.ModuleDoc.is_public = False
 docintrospecter.register_introspecter(inspect.ismodule,
                                       introspect_module, priority=10)
 
-cli()
+def main(argv):
+    global is_public
+    if '--public' in argv:
+        argv.append('--no-private')
+        argv.remove('--public')
+        is_public = _is_public
+    elif '--developer' in argv:
+        argv.append('--no-private')
+        argv.remove('--developer')
+        is_public = _is_developer
+    else:
+        # we simply don't hide private
+        is_public = _is_public
+    cli()
+
+
+if __name__ == '__main__':
+    main(sys.argv)

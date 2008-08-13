@@ -13,24 +13,29 @@
 
 # implement decorators for tagging api calls in conary code
 
-def publicApi(func):
-    lines = ['']
-    marked = False
-    if not func.__doc__:
-        func.__doc__ = func.__name__
-    lines = func.__doc__.split('\n')
-    for idx, line in enumerate(lines):
-        if '@' in line:
-            l = line.replace('\t', '        ')
-            l2 = line.lstrip()
-            indent = len(l) - len(l2)
-            lines.insert(idx, (' ' * indent) + '(PUBLIC API)')
-            marked = True
-            break
 
-    if not marked:
-        lines[0] = lines[0] + ' (PUBLIC API)'
+def apiDecorator(api_type):
+    def _apiDecorator(func):
+        lines = ['']
+        marked = False
+        if not func.__doc__:
+            func.__doc__ = func.__name__
+        lines = func.__doc__.split('\n')
+        for idx, line in enumerate(lines):
+            if '@' in line:
+                l = line.replace('\t', '        ')
+                l2 = line.lstrip()
+                indent = len(l) - len(l2)
+                lines.insert(idx, (' ' * indent) + '(%s)' % api_type)
+                marked = True
+                break
 
-    func.__doc__ = '\n'.join(lines)
-    return func
+        if not marked:
+            lines[0] = lines[0] + ' (%s)' % api_type
 
+        func.__doc__ = '\n'.join(lines)
+        return func
+    return _apiDecorator
+
+publicApi = apiDecorator('PUBLIC API')
+developerApi = apiDecorator('DEVELOPER API')
