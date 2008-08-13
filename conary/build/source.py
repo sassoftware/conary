@@ -304,8 +304,9 @@ class addArchive(_Source):
     ===========
 
     The C{r.addArchive()} class adds a source code archive consisting
-    of an optionally compressed ar, tar, cpio, xpi or zip archive, or
-    binary/source RPM, and unpacks it to the proper directory.
+    of an optionally compressed tar, cpio, xpi or zip archive,
+    binary/source RPM, or binary dpkg .deb, and unpacks it to the
+    proper directory.
 
     If the specified I{archivename} is only a URL in the form of
     C{http://www.site.org/}, C{r.addArchive} will automatically attempt
