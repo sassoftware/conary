@@ -6,6 +6,9 @@ Changes in @NEW@:
     * Some trove sources now deal better with being passed a trove name
       of None when using findTroves. (CNY-2923)
 
+  o Internal Changes:
+    * Moved findOrdering boolean into DependencyCheck object
+
 Changes in 2.0.22:
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded

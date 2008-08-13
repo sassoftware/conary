@@ -990,7 +990,7 @@ class DependencyChecker:
         self.workTables.merge()
         self.workTables.mergeRemoves()
 
-    def _check(self, findOrdering = False, linkedJobs = None,
+    def _check(self, linkedJobs = None,
               criticalJobs = None, finalJobs = None, createGraph = False):
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
@@ -1028,7 +1028,7 @@ class DependencyChecker:
 
         if linkedJobs is None:
             linkedJobs = set()
-        if findOrdering:
+        if self.findOrdering:
             changeSetList, criticalUpdates = self._findOrdering(result,
                                                brokenByErase, satisfied,
                                                linkedJobSets = linkedJobs,
@@ -1056,19 +1056,18 @@ class DependencyChecker:
         return (unsatisfiedList, unresolveableList, changeSetList, depGraph,
                 criticalUpdates)
 
-    def check(self, findOrdering = False, linkedJobs = None,
+    def check(self, linkedJobs = None,
               criticalJobs = None, finalJobs = None):
         (unsatisfiedList, unresolveableList, changeSetList, depGraph,
          criticalUpdates) = \
-                self._check(findOrdering=findOrdering, linkedJobs=linkedJobs,
+                self._check(linkedJobs=linkedJobs,
                             createGraph=False, criticalJobs=criticalJobs,
                             finalJobs=finalJobs)
         return unsatisfiedList, unresolveableList, changeSetList, criticalUpdates
 
     def createDepGraph(self, linkedJobs=None):
         unsatisfiedList, unresolveableList, changeSetList, depGraph, criticalUpdates = \
-                self._check(findOrdering=False, linkedJobs=linkedJobs,
-                            createGraph=True)
+                self._check(linkedJobs=linkedJobs, createGraph=True)
 
         externalDepGraph = graph.DirectedGraph()
         for nodeId in depGraph.iterNodes():
@@ -1089,7 +1088,7 @@ class DependencyChecker:
     def __del__(self):
         self.done()
 
-    def __init__(self, db, troveSource):
+    def __init__(self, db, troveSource, findOrdering = True):
         self.g = graph.DirectedGraph()
         # adding None to the front prevents us from using nodeId's of 0, which
         # would be a problem since we use negative nodeIds in the SQL
@@ -1103,6 +1102,7 @@ class DependencyChecker:
         self.db = db
         self.cu = self.db.cursor()
         self.troveSource = troveSource
+        self.findOrdering = findOrdering
         self.workTables = DependencyWorkTables(self.db, self.cu,
                                                removeTables = True)
 

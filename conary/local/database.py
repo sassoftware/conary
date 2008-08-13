@@ -988,17 +988,22 @@ class UpdateJob:
 
 class DepCheckState:
 
-    def __init__(self, db, troveSource):
+    def __init__(self, db, troveSource, findOrdering = True):
         """
         @param troveSource: Trove source troves in the job are
                             available from
         @type troveSource: AbstractTroveSource:
+        @param findOrdering: If true, a reordering of the job is
+                             returned which preserves dependency
+                             closure at each step.
+        @type findOrdering: boolean
         """
 
         self.setTroveSource(troveSource)
         self.db = db
         self.jobSet = set()
         self.checker = None
+        self.findOrdering = findOrdering
 
     def setTroveSource(self, troveSource):
         self.troveSource = troveSource
@@ -1014,7 +1019,8 @@ class DepCheckState:
 
     def setup(self):
         if self.checker is None:
-            self.checker = self.db.dependencyChecker(self.troveSource)
+            self.checker = self.db.dependencyChecker(self.troveSource,
+                                        findOrdering = self.findOrdering)
 
     def setJobs(self, newJobSet):
         newJobSet = set(newJobSet)
@@ -1030,7 +1036,7 @@ class DepCheckState:
         self.checker.addJobs(addedJobs)
         self.jobSet = newJobSet
 
-    def depCheck(self, jobSet, findOrdering = False,
+    def depCheck(self, jobSet,
                  linkedJobs = None, criticalJobs = None,
                  finalJobs = None, criticalOnly = False,
                  checker = None):
@@ -1040,10 +1046,6 @@ class DepCheckState:
 
         @param jobSet: The jobs which define the dependency check
         @type jobSet: set
-        @param findOrdering: If true, a reordering of the job is
-                             returned which preserves dependency
-                             closure at each step.
-        @type findOrdering: boolean
         @param criticalJobs: list of jobs that should be applied as early
         as possible.
         @type criticalJobs: list of job tuples
@@ -1060,8 +1062,7 @@ class DepCheckState:
         self.setJobs(jobSet)
         #print "--- checking deps"
         unsatisfiedList, unresolveableList, changeSetList, criticalUpdates = \
-                self.checker.check(findOrdering = findOrdering,
-                                   linkedJobs = linkedJobs,
+                self.checker.check(linkedJobs = linkedJobs,
                                    criticalJobs = criticalJobs,
                                    finalJobs = finalJobs)
         #print "--- done"
@@ -1078,7 +1079,6 @@ class DepCheckState:
                 self.setJobs(jobSet)
                 (unsatisfiedList, unresolveableList, changeSetList,
                  criticalUpdates) = self.checker.check(
-                                    findOrdering = findOrdering,
                                     linkedJobs = linkedJobs)
                 criticalUpdates = []
 
@@ -1448,8 +1448,9 @@ class Database(SqlDbRepository):
 
         return resultDict
 
-    def getDepStateClass(self, troveSource):
-        return DepCheckState(self.db, troveSource)
+    def getDepStateClass(self, troveSource, findOrdering = True):
+        return DepCheckState(self.db, troveSource,
+                             findOrdering = findOrdering)
 
     def getFileContents(self, l):
         # look for config files in the datastore first, then look for other
