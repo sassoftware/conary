@@ -24,6 +24,7 @@ import sha
 import stat
 import sys
 import tempfile
+import zlib
 
 from conary import errors, files, trove, versions
 from conary.build import tags
@@ -352,8 +353,7 @@ class FilesystemJob:
 		# into the config file cache
 		d = sha.new()
 		fileObj.restore(contents, root, target, journal=journal,
-				digest = d)
-		assert(d.digest() == fileObj.contents.sha1())
+				sha1 = fileObj.contents.sha1())
 	    else:
 		fileObj.restore(contents, root, target, journal=journal,
                                 nameLookup = (not self.isSourceTrove))
@@ -446,7 +446,8 @@ class FilesystemJob:
                 (otherId, fileObj, target, msg, ptrId, otherFileId) = match[1]
 
                 contType, contents = self.changeSet.getFileContents(
-                                            pathId, fileId)
+                                            pathId, fileId,
+                                            compressed = True)
                 assert(contType == changeset.ChangedFileTypes.file)
 		restoreFile(fileObj, contents, self.root, target, journal,
                             opJournal)
@@ -474,6 +475,7 @@ class FilesystemJob:
                     # take the config file from the local database
                     contents = self.db.getFileContents(
                                     [ (None, None, fileObj) ])[0]
+                    contents = filecontents.FromString(contents.get().read())
                 elif fileObj.linkGroup() and \
                         self.linkGroups.has_key(fileObj.linkGroup()):
                     # this creates links whose target we already know
@@ -495,7 +497,8 @@ class FilesystemJob:
                                                 lastRestored.target)
                     else:
                         contType, contents = self.changeSet.getFileContents(
-                                                                pathId, fileId)
+                                                            pathId, fileId,
+                                                            compressed = True)
 
                     assert(contType != changeset.ChangedFileTypes.diff)
                     # PTR types are restored later. We need to cache
@@ -504,6 +507,8 @@ class FilesystemJob:
                     # same target
                     if contType == changeset.ChangedFileTypes.ptr:
                         targetPtrId = contents.get().read()
+                        if contents.isCompressed():
+                            targetPtrId = util.decompressString(targetPtrId)
 
                         lastRestored.pathId = pathId
                         lastRestored.fileId = fileId

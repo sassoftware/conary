@@ -952,6 +952,18 @@ class SeekableNestedFile:
     def _sendInfo(self):
         return ([ self.file ], struct.pack("!II", self.size, self.start))
 
+    def _fdInfo(self):
+        if hasattr(self.file, '_fdInfo'):
+            fd, start, size = self.file._fdInfo()
+            start += self.start
+            size = self.size
+        elif hasattr(self.file, 'fileno'):
+            fd, start, size = self.file.fileno(), self.start, self.size
+        else:
+            return (None, None, None)
+
+        return (fd, start, size)
+
     def close(self):
         pass
 
@@ -1114,6 +1126,7 @@ exists = misc.exists
 removeIfExists = misc.removeIfExists
 pread = misc.pread
 res_init = misc.res_init
+sha1Uncompress = misc.sha1Uncompress
 
 class _LazyFile(object):
     __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
@@ -1176,6 +1189,10 @@ class _LazyFile(object):
 
     @reopen
     def trucate(self):
+        pass
+
+    @reopen
+    def fileno(self):
         pass
 
     def _close(self):
@@ -1832,6 +1849,9 @@ def compressStream(src, level = 5, bufferSize = 16384):
         sio.write(z.compress(buf))
     sio.write(z.flush())
     return sio
+
+def decompressString(s):
+    return zlib.decompress(s, 31)
 
 def massCloseFileDescriptors(start, unusedCount):
     """Close all file descriptors starting with start, until we hit

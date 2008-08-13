@@ -43,7 +43,7 @@ elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< $(libelf)
 
 miscmodule.so: $(miscmodule_objs)
-	$(CC) -shared -lresolv -o $@ $<
+	$(CC) -shared -lcrypto -lz -lresolv -o $@ $<
 
 $(cstreamsmodule_objs): cstreams.h
 
