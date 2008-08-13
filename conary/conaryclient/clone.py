@@ -1270,12 +1270,18 @@ class CloneMap(object):
                 troveSpec = '%s[%s]' % (name, flavor)
             else:
                 troveSpec = name
+
+            if otherVersion < version:
+                a, b = otherVersion, version
+            else:
+                a, b = version, otherVersion
+
             raise CloneError("Cannot clone multiple versions of %s"
                              " to branch %s at the same time.  Attempted to"
                              " clone versions %s and %s" % (troveSpec,
                                                             targetBranch,
-                                                            otherVersion,
-                                                            version))
+                                                            a,  b))
+
         self.trovesByTargetBranch[name, targetBranch, flavor] = version
         if name.endswith(':source'):
             self.trovesBySource.setdefault((name, version, flavor), [])
