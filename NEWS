@@ -10,6 +10,7 @@ Changes in @NEW@:
     * Moved findOrdering boolean into DependencyCheck object
     * Cleaned up graph code during dependency checks to remove redundant
       calls in some (relatively obscure) cases
+    * Reworked MPI to long conversion to work on four bytes at a time
 
 Changes in 2.0.22:
   o Build Changes:

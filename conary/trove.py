@@ -299,10 +299,21 @@ class DigitalSignature(streams.StreamSet):
 
     def _mpiToLong(self, data):
         length = ((ord(data[0]) << 8) + ord(data[1]) + 7) / 8
+        if len(data) != length + 2:
+            raise IndexError
+
+        frontSize = length & ~3
+
         r = 0L
-        for i in range(length):
+        ints = struct.unpack("!" + "I" * (frontSize / 4), data[2:2 + frontSize])
+        for i in ints:
+            r <<= 32;
+            r += i
+
+        for i in range(2 + frontSize, 2 + length):
             r <<= 8
-            r += ord(data[i + 2])
+            r += ord(data[i])
+
         return r
 
     def _longToMpi(self, data):
