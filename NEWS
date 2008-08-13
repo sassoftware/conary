@@ -15,6 +15,8 @@ Changes in @NEW@:
       improvement as well as a significant RAM savings.
     * Checking for recloning (due to changes in referenced trove sets) now
       skips components, improving promote performance.
+    * The file contents of dpkg .deb files can now be extracted by
+      r.addArchive() (CNY-2926)
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
