@@ -8,6 +8,8 @@ Changes in @NEW@:
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
+    * Cleaned up graph code during dependency checks to remove redundant
+      calls in some (relatively obscure) cases
 
 Changes in 2.0.22:
   o Build Changes:

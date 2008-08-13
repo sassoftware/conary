@@ -992,6 +992,9 @@ class DependencyChecker:
 
     def _check(self, linkedJobs = None,
               criticalJobs = None, finalJobs = None, createGraph = False):
+        # we can't create the graph if we're not finding the ordering
+        assert(not createGraph or self.findOrdering)
+
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
         # "unresolvable" dependencies. (they could be resolved by something
@@ -1028,7 +1031,8 @@ class DependencyChecker:
 
         if linkedJobs is None:
             linkedJobs = set()
-        if self.findOrdering:
+
+        if createGraph or self.findOrdering:
             changeSetList, criticalUpdates = self._findOrdering(result,
                                                brokenByErase, satisfied,
                                                linkedJobSets = linkedJobs,
@@ -1037,11 +1041,9 @@ class DependencyChecker:
         else:
             changeSetList = []
             criticalUpdates = []
+
         if createGraph:
-            depGraph = self._createDepGraph(result, brokenByErase, satisfied,
-                                            linkedJobSets=linkedJobs,
-                                            criticalJobs=criticalJobs,
-                                            finalJobs=finalJobs)
+            depGraph = self.g
         else:
             depGraph = None
 

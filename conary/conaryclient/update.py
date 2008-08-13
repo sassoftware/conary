@@ -2645,10 +2645,13 @@ conary erase '%s=%s[%s]'
 	'-' or '+' prefix will be updated. If False, troves without a prefix 
 	will be erased.
         @type updateByDefault: bool
-        @param split: Split large update operations into separate jobs. As
-                      of 1.0.10, this must be true (False broke how we
+        @param split: Split large update operations into separate jobs.
+                      This must be true (False broke how we
                       handle users and groups, which requires info- packages
-                      to be installed first and in separate jobs)
+                      to be installed first and in separate jobs) if you
+                      intend to install the job. We allow False here because
+                      we don't need to do these calculations when the jobs
+                      are being constructed for other reasons.
         @type split: bool
         @param sync: Limit acceptabe trove updates only to versions 
         referenced in the local database.
@@ -3077,8 +3080,7 @@ conary erase '%s=%s[%s]'
         # non backwards compatible API changes are acceptable. 
         # In particular. installMissing and updateOnly have similar meanings,
         # (but expanding updateOnly meaning would require making incompatible
-        # changes), split has lost meaning, keepExisting is also practically 
-        # meaningless at this level.
+        # changes), keepExisting is also practically meaningless at this level.
         # CNY-492
         if keepRequired is None:
             keepRequired = self.cfg.keepRequired

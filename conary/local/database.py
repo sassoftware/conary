@@ -1038,8 +1038,7 @@ class DepCheckState:
 
     def depCheck(self, jobSet,
                  linkedJobs = None, criticalJobs = None,
-                 finalJobs = None, criticalOnly = False,
-                 checker = None):
+                 finalJobs = None, criticalOnly = False):
         """
         Check the database for closure against the operations in
         the passed changeSet.

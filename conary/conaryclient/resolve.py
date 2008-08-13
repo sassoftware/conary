@@ -45,8 +45,8 @@ class DependencySolver(object):
             @type uJob: local.database.UpdateJob
             @param jobSet: jobs that are to be applied
             @type jobSet: list of job tuples
-            @param split: if True, find an ordering for the jobs in 
-            jobSet plus any resolved jobs. 
+            @param split: if True, find an ordering for the jobs in
+            jobSet plus any resolved jobs.
             @type split: bool
             @param resolveDeps: If True, try to resolve any dependency problems
             by modifying the given job.

@@ -3035,10 +3035,12 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     oldRepos = client.getRepos()
     client.setRepos(TroveCacheWrapper(cache))
     try:
-        updJob, suggMap = client.updateChangeSet(troves, recurse = False,
-                                                 resolveDeps = True,
-                                                 test = True,
-                                                 checkPathConflicts=False,
+        updJob = client.newUpdateJob()
+        suggMap = client.prepareUpdateJob(updJob, troves, recurse = False,
+                                          resolveDeps = True,
+                                          test = True,
+                                          checkPathConflicts=False,
+                                          split = False,
                                  resolveSource=resolveSource.getResolveMethod())
     finally:
         client.setRepos(oldRepos)
