@@ -531,7 +531,7 @@ class addArchive(_Source):
                 # ownership
                 _uncompress = ''
                 # binutils is needed for ar
-                actionPathBuildRequires.append('binutils')
+                actionPathBuildRequires.extend(['ar', 'gzip'])
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
                 _uncompress = "bzip2 -d -c"
                 actionPathBuildRequires.append('bzip2')
@@ -572,7 +572,7 @@ class addArchive(_Source):
             if f.endswith('.deb'):
                 # special handling for .deb files - need to put
                 # the .deb file on the command line
-                cmd = "ar p '%s' data.tar.gz | zcat | %s" %(f, _unpack)
+                cmd = "ar p '%s' data.tar.gz | gzip -d -c | %s" %(f, _unpack)
             else:
                 cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
             fObj = os.popen(cmd)
