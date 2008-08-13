@@ -231,7 +231,7 @@ class DependencyWorkTables:
         # a positive depNum which matches the depNum from the Requires table.
         self.cu.execute("DELETE FROM TmpRequires WHERE instanceId > 0")
         self.cu.execute("""
-        INSERT INTO TmpRequires
+        INSERT INTO TmpRequires (instanceId, depId, depNum, depCount)
         SELECT DISTINCT
             Requires.instanceId, Requires.depId,
             Requires.depNum, Requires.depCount
@@ -657,7 +657,8 @@ class DependencyChecker:
                 %(flag)s AS flag
             FROM %(requires)s
             JOIN %(provides)s ON
-                %(requires)s.depId = %(provides)s.depId
+                %(requires)s.depId = %(provides)s.depId AND
+                %(requires)s.satisfied = 0
             """ % substTable
 
             if restrictor:
@@ -1048,12 +1049,26 @@ class DependencyChecker:
             depGraph = None
 
         brokenByErase = set(brokenByErase)
-        satisfied = set(satisfied)
+        self.satisfied.update(set(satisfied))
 
         unsatisfiedList, unresolveableList = \
-                self._gatherDependencyErrors(satisfied, brokenByErase,
+                self._gatherDependencyErrors(self.satisfied, brokenByErase,
                                                 unresolveable,
                                                 wasIn)
+
+        # We store the edges in self.g for the next try; don't resolve the
+        # same things over and over. It's a shame we do this even if all the
+        if not unsatisfiedList and not unresolveableList:
+            # Everything was satisfied. No reason to be careful about updating
+            # the satisfied list.
+            self.cu.execute("update tmprequires set satisfied=1")
+        else:
+            for (depId, depNum, reqInstanceId,
+                 reqNodeIdx, provInstId, provNodeIdx) in result:
+                if not provInstId: continue
+                self.cu.execute("update tmprequires set satisfied=1 where "
+                        "depId = ? and instanceId = ?",
+                        depId, reqInstanceId)
 
         return (unsatisfiedList, unresolveableList, changeSetList, depGraph,
                 criticalUpdates)
@@ -1105,6 +1120,7 @@ class DependencyChecker:
         self.cu = self.db.cursor()
         self.troveSource = troveSource
         self.findOrdering = findOrdering
+        self.satisfied = set()
         self.workTables = DependencyWorkTables(self.db, self.cu,
                                                removeTables = True)
 

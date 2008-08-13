@@ -228,7 +228,8 @@ def createDepTable(db, cu, name, isTemp):
 def createRequiresTable(db, cu, name, isTemp):
     d = { "tmp" : "",
           "name" : name,
-          "constraint" : "" }
+          "constraint" : "",
+          "tmpCol" : ""}
     startTrans = not isTemp
 
     if isTemp:
@@ -236,6 +237,7 @@ def createRequiresTable(db, cu, name, isTemp):
             resetTable(cu, name)
             return False
         d['tmp'] = 'TEMPORARY'
+        d['tmpCol'] = ',satisfied INTEGER DEFAULT 0'
     else:
         d['constraint'] = """,
         CONSTRAINT %(name)s_instanceId_fk
@@ -252,6 +254,7 @@ def createRequiresTable(db, cu, name, isTemp):
         depId           INTEGER NOT NULL,
         depNum          INTEGER,
         depCount        INTEGER %(constraint)s
+        %(tmpCol)s
     ) %%(TABLEOPTS)s""" % d % db.keywords, start_transaction = startTrans)
     cu.execute("CREATE INDEX %(name)sIdx ON %(name)s(instanceId)" % d,
                start_transaction = startTrans)
