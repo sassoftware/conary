@@ -13,7 +13,6 @@
 
 # implement decorators for tagging api calls in conary code
 
-
 def apiDecorator(api_type):
     def _apiDecorator(func):
         lines = ['']
@@ -33,7 +32,11 @@ def apiDecorator(api_type):
         if not marked:
             lines[0] = lines[0] + ' (%s)' % api_type
 
-        func.__doc__ = '\n'.join(lines)
+        try:
+            func.__doc__ = '\n'.join(lines)
+        except TypeError:
+            # maybe a C function.
+            pass
         return func
     return _apiDecorator
 

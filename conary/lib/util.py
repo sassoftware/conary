@@ -175,6 +175,7 @@ The complete related traceback has been saved as %(stackfile)s
 '''
 _debugAll = False
 
+@api.developerApi
 def genExcepthook(debug=True,
                   debugCtrlC=False, prefix='conary-error-',
                   catchSIGUSR1=True, error=errorMessage):
@@ -341,6 +342,7 @@ def braceGlob(paths):
 	pathlist.extend(fixedglob.glob(path))
     return pathlist
 
+@api.developerApi
 def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
 	log.debug('deleting [tree] %s', path)

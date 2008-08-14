@@ -18,6 +18,8 @@ import optparse
 from conary import errors
 from conary.lib import log
 
+__developer_api__ = True
+
 class AbstractCommand(object):
     """
         Abstract command object to be subclassed used to represent commands
@@ -36,6 +38,7 @@ class AbstractCommand(object):
               # or 'long-option' : ('description', 'KEYWORD').
     hidden = False # hide from the default usage message?
     hobbleShortOpts = None
+
     def __init__(self):
         self.parser = None
         self.mainHandler = None

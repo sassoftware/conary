@@ -31,7 +31,7 @@ from conary.build.errors import RecipeFileError
 from conary.build.factory import Factory as FactoryRecipe
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary.lib import graph, log, util
+from conary.lib import api, graph, log, util
 from conary.local import database
 from conary import versions
 
@@ -657,6 +657,7 @@ class RecipeLoaderFromString(object):
     def allRecipes(self):
         return self.recipes
 
+    @api.developerApi
     def getRecipe(self):
         return self.recipe
 
@@ -687,6 +688,7 @@ class RecipeLoaderFromString(object):
 
 class RecipeLoader(RecipeLoaderFromString):
 
+    @api.developerApi
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False, directory=None,
                  buildFlavor=None, db=None, overrides = None,

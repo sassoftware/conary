@@ -21,6 +21,7 @@ import os
 
 from conary import errors, trove
 from conary.deps import deps
+from conary.lib import api
 from conary.lib import sha1helper
 from conary import versions
 
@@ -69,6 +70,7 @@ class FileInfo(object):
 class ConaryState:
 
     stateVersion = 2
+    __developer_api__ = True
 
     def __init__(self, context=None, source=None):
         self.context = context
@@ -115,6 +117,7 @@ class ConaryState:
 class SourceState(trove.Trove):
 
     __slots__ = [ "branch", "pathMap", "lastMerged", "fileInfo" ]
+    __developer_api__ = True
 
     def setPathMap(self, map):
         self.pathMap = map
@@ -264,6 +267,8 @@ class SourceState(trove.Trove):
         self.fileInfo = {}
 
 class ConaryStateFromFile(ConaryState):
+
+    __developer_api__ = True
 
     def parseFile(self, filename, repos=None, parseSource=True):
 	f = open(filename)

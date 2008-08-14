@@ -19,6 +19,8 @@ import shlex
 import sre_constants
 import os
 
+__developer_api__ = True
+
 class CfgType(object):
 
     """ A config value type wrapper -- gives a config value a conversion

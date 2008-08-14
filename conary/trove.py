@@ -39,22 +39,28 @@ TROVE_VERSION=10
 # and we allow group redirects; 11 is used *only* for those situations
 TROVE_VERSION_1_1=11
 
+@api.developerApi
 def troveIsCollection(troveName):
     return not(":" in troveName or troveName.startswith("fileset-"))
 
+@api.developerApi
 def troveIsPackage(troveName):
     return troveIsCollection(troveName) and not troveName.startswith('group-')
 
+@api.developerApi
 def troveIsGroup(troveName):
     return troveIsCollection(troveName) and troveName.startswith('group-')
 
+@api.developerApi
 def troveIsComponent(troveName):
     return ":" in troveName
 
+@api.developerApi
 def troveIsFileSet(troveName):
     return (troveName.startswith('fileset-')
             and not troveName.endswith(':source'))
 
+@api.developerApi
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
@@ -1050,6 +1056,7 @@ class Trove(streams.StreamSet):
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "strongTroves", "weakTroves",
                   "idMap", "type", "redirects" ]
+    __developer_api__ = True
 
     def __repr__(self):
         return "trove.Trove(%r, %r, %r)" % (self.name(), self.version(),
@@ -1386,6 +1393,7 @@ class Trove(streams.StreamSet):
 	    
 	self.idMap[pathId] = (path, fileId, version)
 
+    @api.developerApi
     def removeFile(self, pathId):   
 	del self.idMap[pathId]
 

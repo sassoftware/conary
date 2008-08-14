@@ -1010,12 +1010,14 @@ class Flavor(DependencySet):
         raise SyntaxError, \
               "Flavor objects can't be evaluated in a boolean context"
 
+    @api.developerApi
     def toStrongFlavor(self):
         newDep = self.__class__()
         for tag, depClass in self.members.iteritems():
             newDep.members[tag] = depClass.toStrongFlavor()
         return newDep
 
+    @api.developerApi
     def stronglySatisfies(self, other):
         return self.toStrongFlavor().score(
                     other.toStrongFlavor()) is not False
@@ -1050,6 +1052,7 @@ def ThawFlavor(frz):
     """
     return _Thaw(Flavor(), frz)
 
+@api.developerApi
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """ 
     Performs overrides of flavors as expected when the new flavor is 
@@ -1294,6 +1297,7 @@ def formatFlavor(flavor):
         flavors.append('target: %s' % targetSet)
     return ' '.join(flavors)
 
+@api.developerApi
 def parseFlavor(s, mergeBase = None, raiseError = False):
     # return a Flavor dep set for the string passed. format is
     # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
@@ -1548,6 +1552,7 @@ def getUseFlags(flavor):
         return {}
     return deps[0].getFlags()[0]
 
+@api.developerApi
 def getMajorArch(flavor):
     from conary.deps import arch
     majorArch = arch.getMajorArch(
@@ -1555,6 +1560,7 @@ def getMajorArch(flavor):
     if majorArch:
         return majorArch.name
 
+@api.developerApi
 def getShortFlavorDescriptors(flavors):
     differences = flavorDifferences(flavors, strict=False)
     contextStr = {}

@@ -49,7 +49,7 @@ from conary import versions
 from conary.build.nextversion import nextVersions
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import api, log
 from conary.repository import changeset, filecontents
 from conary.repository import trovesource
 from conary.repository import errors as neterrors
@@ -95,6 +95,7 @@ MAX_CLONE_FILES  = 5000
 CHANGESET_MULTIPLE = 3
 
 class ClientClone:
+    __developer_api__ = True
 
     def createCloneChangeSet(self, targetBranch, troveList,
                              updateBuildInfo=True, message=DEFAULT_MESSAGE,
@@ -113,6 +114,7 @@ class ClientClone:
                                                infoOnly=infoOnly,
                                                excludeGroups=excludeGroups)
 
+    @api.developerApi
     def createTargetedCloneChangeSet(self, targetMap, troveList,
                                      updateBuildInfo=True, infoOnly=False,
                                      callback=None, message=DEFAULT_MESSAGE,
