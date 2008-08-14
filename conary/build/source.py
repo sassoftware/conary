@@ -263,9 +263,11 @@ class _Source(_AnySource):
 
         toFetch = self.getPath()
 
+        multiurlMap = self.recipe.multiurlMap
         f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             toFetch, self.recipe.name, self.recipe.srcdirs,
-            guessName=self.guessname, refreshFilter=refreshFilter)
+            guessName=self.guessname, refreshFilter=refreshFilter,
+            multiurlMap=multiurlMap)
 	self._checkSignature(f)
 	return f
 

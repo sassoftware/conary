@@ -35,6 +35,10 @@ Changes in @NEW@:
     * Use a WeakValueDictionary for the dependencyCache instead of an
       ObjectCache
 
+  o Bug Fixes:
+    * Recipes containing a mirror:// style source can be properly committed
+      to the repository. (CNY-2848)
+
 Changes in 2.0.22:
   o Build Changes:
     * The loadSuperClass and loadInstalled methods now returns the loaded
