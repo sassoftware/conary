@@ -60,6 +60,7 @@ class Option(optparse.Option):
 class OptionParser(optparse.OptionParser):
     forbiddenOpts = set(str(x) for x in range(0,9))
     matchPartialOptions = False
+    __developer_api__ = True
 
     def __init__(self, *args, **kw):
         self.hobbleShortOpts = kw.pop('hobbleShortOpts', False)

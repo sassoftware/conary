@@ -22,6 +22,8 @@ defined in places closer to where they are used.
 The cvc error hierarchy is defined in the cvc build dir.
 """
 
+__developer_api__ = True
+
 class InternalConaryError(Exception):
     """Base class for conary errors that should never make it to
        the user.  If this error is raised anywhere it means neither bad

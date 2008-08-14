@@ -4,6 +4,8 @@ import sys
 from conary import errors
 from conary.lib import options
 
+__developer_api__ = True
+
 class MainHandler(object):
     """
         Class to handle parsing and executing commands set up to use

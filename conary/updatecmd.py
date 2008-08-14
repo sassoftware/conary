@@ -23,6 +23,7 @@ from conary import display
 from conary import errors
 from conary import versions
 from conary.deps import deps
+from conary.lib import api
 from conary.lib import log
 from conary.lib import util
 from conary.local import database
@@ -417,6 +418,7 @@ def displayUpdateInfo(updJob, cfg):
         print '** The update will restart itself after job%s %s and continue updating' % (jobPlural, jobList)
     return
 
+@api.developerApi
 def doUpdate(cfg, changeSpecs, **kwargs):
     callback = kwargs.get('callback', None)
     if not callback:

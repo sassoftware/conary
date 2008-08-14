@@ -12,6 +12,7 @@
 # full details.
 
 from conary.deps import deps
+from conary.lib import api
 from conary.repository import changeset
 from conary import errors
 from conary import versions
@@ -23,6 +24,8 @@ class ClientBranch:
     BRANCH_SOURCE = 1 << 0
     BRANCH_BINARY = 1 << 1
     BRANCH_ALL = BRANCH_SOURCE | BRANCH_BINARY
+
+    __developer_api__ = True
 
     def createBranchChangeSet(self, newLabel, 
                               troveList = [], branchType=BRANCH_ALL,

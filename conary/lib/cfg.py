@@ -35,6 +35,8 @@ configVersion = 1
 # separation between the two modules real.
 from conary.lib.cfgtypes import *
 
+__developer_api__ = True
+
 class _Config:
     """ Base configuration class.  Supports defining a configuration object, 
         and displaying that object, but has no knowledge of how the input.

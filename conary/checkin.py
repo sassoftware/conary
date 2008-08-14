@@ -44,6 +44,7 @@ from conary.build.cook import signAbsoluteChangeset
 from conary.build import cook, use
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
+from conary.lib import api
 from conary.lib import fixeddifflib
 from conary.lib import log
 from conary.lib import magic
@@ -77,6 +78,7 @@ cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
 
 # mix UpdateCallback and CookCallback, since we use both.
 class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
+    __developer_api__ = True
     def __init__(self, trustThreshold=0, keyCache=None):
         callbacks.UpdateCallback.__init__(self, trustThreshold=trustThreshold,
                                                 keyCache=keyCache)
@@ -156,6 +158,7 @@ def verifyAbsoluteChangesetSignatures(cs, callback):
         r = min(verTuple[0], r)
     return r
 
+@api.developerApi
 def checkout(repos, cfg, workDir, nameList, callback=None):
     if not callback:
         callback = CheckinCallback(trustThreshold=cfg.trustThreshold)
@@ -1132,6 +1135,7 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
 	path = oldTrove.getFile(pathId)[0]
 	print "%s: removed" % path
 	
+@api.developerApi
 def updateSrc(repos, versionList = None, callback = None):
     if not versionList:
         updateSpecs = [ (os.getcwd(), None) ]
@@ -1691,6 +1695,7 @@ def removeFile(filename, repos=None):
 
     conaryState.write("CONARY")
 
+@api.developerApi
 def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
              factory = None):
     parts = name.split('=', 1)
@@ -1815,6 +1820,7 @@ def showLog(repos, branch = None, newer = False):
     for message in iterLog(repos, branch = branch, newer = newer):
         print message
 
+@api.developerApi
 def iterLog(repos, branch = None, newer = False, dirName = '.'):
     '''
     Iterator that yeilds log message lines relative to the
@@ -2094,6 +2100,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     conaryState.write('CONARY')
 
 
+@api.developerApi
 def generateStatus(repos, dirName='.'):
     '''
     Create summary of changes regarding all files in a directory
