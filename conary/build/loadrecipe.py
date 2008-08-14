@@ -823,8 +823,8 @@ class RecipeLoaderFromSourceTrove(RecipeLoader):
         def openSourceFile(path):
             if path not in pathDict:
                 raise builderrors.LoadRecipeError(
-                        'Path %s not found in %s=%s', path,
-                        sourceTrv.getName(), sourceTrv.getVersion())
+                        'Path %s not found in %s=%s' %(path,
+                        sourceTrv.getName(), sourceTrv.getVersion()))
 
             fileId, fileVersion = pathDict[path]
 
