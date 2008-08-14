@@ -2,5 +2,9 @@
 thisdir=$(dirname $0)
 topdir=$(cd $thisdir/.. 2> /dev/null && pwd -P;)
 export PYTHONPATH=$topdir
+echo "Creating public documetation in doc/public_api"
 $thisdir/epydoc --public --html conary -o ../doc/public_api/
+echo
+echo
+echo "Creating developer documetation in doc/developer_api"
 $thisdir/epydoc --developer --html conary -o ../doc/developer_api/

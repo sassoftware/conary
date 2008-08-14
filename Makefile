@@ -85,6 +85,9 @@ forcedist: $(dist_files) smoketest
 tag:
 	hg tag -f conary-$(VERSION)
 
+docs:
+	cd scripts; ./gendocs
+
 clean: clean-subdirs default-clean
 
 check: check-subdirs
