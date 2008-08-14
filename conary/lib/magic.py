@@ -104,6 +104,9 @@ class changeset(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 
+class deb(Magic):
+    def __init__(self, path, basedir=''):
+	Magic.__init__(self, path, basedir)
 
 class jar(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
@@ -267,6 +270,8 @@ def magic(path, basedir=''):
 
     if len(b) > 4 and b[0] == '\x7f' and b[1:4] == "ELF":
 	return ELF(path, basedir, b)
+    elif len(b) > 14 and b[0:14] == '!<arch>\ndebian':
+	return deb(path, basedir)
     elif len(b) > 7 and b[0:7] == "!<arch>":
 	return ar(path, basedir, b)
     elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
