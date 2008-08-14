@@ -807,9 +807,21 @@ class ClientClone:
     def _buildTroves(self, chooser, cloneMap, cloneJob, leafMap, troveCache,
                      callback):
         # fill the trove cache with a single repository call
-        allTroveList = [x[0] for x in cloneJob.iterTargetList()]
-        troveCache.getTroves(allTroveList, withFiles=True)
-        del allTroveList
+        allTroveList = []
+        for troveTup, newVersion in cloneJob.iterTargetList():
+            allTroveList.append(troveTup)
+            targetBranch = newVersion.branch()
+            leafVersion = leafMap.getLeafVersion(troveTup[0], targetBranch,
+                                                 troveTup[2])
+            if leafVersion:
+                allTroveList.append((troveTup[0], leafVersion, troveTup[2]))
+
+        # this getTroves populates troveCache.hasTroves simultaneously
+        has = troveCache.hasTroves(allTroveList)
+        toFetch = [ x for x, y in itertools.izip(allTroveList, has)
+                            if y ]
+        troveCache.getTroves(toFetch, withFiles=True)
+        #del allTroveList, has
 
         current = 0
         finalTroves = []
@@ -1066,6 +1078,7 @@ class TroveCache(object):
         theDict = self.troves[withFiles]
         needed = [ x for x in troveTups if x not in theDict ]
         if needed:
+            theOtherDict = self.troves[not withFiles]
             msg = getattr(self.callback, 'lastMessage', None)
             _logMe('getting %s troves from repos' % len(needed))
             troves = self.repos.getTroves(needed, withFiles=withFiles,
@@ -1073,6 +1086,15 @@ class TroveCache(object):
             if msg:
                 self.callback._message(msg)
             theDict.update(itertools.izip(needed, troves))
+
+            # Collections don't have files, so are the same for withFiles
+            # True and withFiles False
+            theOtherDict.update(x for x in itertools.izip(needed, troves)
+                                    if trove.troveIsCollection(x[0][0]))
+
+        # this prevents future hasTroves calls from calling the server
+        self._hasTroves.update((x, True) for x in troveTups)
+
         return [ theDict[x] for x in troveTups]
 
     def getTrove(self, troveTup, withFiles=True):
