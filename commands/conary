@@ -1017,6 +1017,10 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["no-resolve"] = NO_PARAM
         argDef["no-restart"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
+        argDef["replace-config-files"] = NO_PARAM
+        argDef["replace-managed-files"] = NO_PARAM
+        argDef["replace-modified-files"] = NO_PARAM
+        argDef["replace-unmanaged-files"] = NO_PARAM
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
         argDef["restart-info"] = ONE_PARAM
@@ -1042,9 +1046,19 @@ class UpdateAllCommand(_UpdateCommand):
             kwargs['depCheck'] = False
             del argSet['no-deps']
 
+        kwargs["replaceConfigFiles"] = argSet.pop('replace-config-files', False)
+        kwargs["replaceManagedFiles"] = argSet.pop('replace-managed-files', False)
+        kwargs["replaceModifiedFiles"] = argSet.pop('replace-modified-files', False)
+        kwargs["replaceUnmanagedFiles"] = argSet.pop('replace-unmanaged-files', False)
+
         if argSet.has_key('replace-files'):
-            kwargs['replaceFiles'] = True
             del argSet['replace-files']
+            kwargs["replaceFiles"] = \
+            kwargs["replaceConfigFiles"] = \
+            kwargs["replaceManagedFiles"] = \
+            kwargs["replaceModifiedFiles"] = \
+            kwargs["replaceUnmanagedFiles"] = True
+
         if argSet.pop('keep-required', False):
             cfg.keepRequired = True
 
