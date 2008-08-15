@@ -11,12 +11,12 @@ Changes in @NEW@:
   o Build Changes:
     * Promote now uses the source trove for packages to determine the
       source trove for components instead of downloading the components
-      themselves.
+      themselves. (CNY-1867)
     * Promote no longer uses getTroves() to look up clone history; it uses
       getTroveInfo() instead. This provides a significant performance
-      improvement as well as a significant RAM savings.
+      improvement as well as a significant RAM savings. (CNY-1867)
     * Checking for recloning (due to changes in referenced trove sets) now
-      skips components, improving promote performance.
+      skips components, improving promote performance. (CNY-1867)
     * The file contents of dpkg .deb files can now be extracted by
       r.addArchive() (CNY-2926)
 
