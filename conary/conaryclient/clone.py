@@ -465,6 +465,9 @@ class ClientClone:
                     needed.append(info)
                     seen.add(info)
 
+            # make sure we see the packages before the components; we rely
+            # on that to get the source's right
+            needed.sort()
             nonComponents = [ x for x in needed
                                 if not trove.troveIsComponent(x[0]) ]
             got = troveCache.getTroves(nonComponents, withFiles = False)
