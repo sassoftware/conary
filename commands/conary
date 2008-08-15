@@ -1046,7 +1046,7 @@ class UpdateAllCommand(_UpdateCommand):
             kwargs['depCheck'] = False
             del argSet['no-deps']
 
-        kwargs["replaceConfigFiles"] = argSet.pop('replace-config-files', False)
+        kwargs["replaceModifiedConfigFiles"] = argSet.pop('replace-config-files', False)
         kwargs["replaceManagedFiles"] = argSet.pop('replace-managed-files', False)
         kwargs["replaceModifiedFiles"] = argSet.pop('replace-modified-files', False)
         kwargs["replaceUnmanagedFiles"] = argSet.pop('replace-unmanaged-files', False)
@@ -1054,7 +1054,7 @@ class UpdateAllCommand(_UpdateCommand):
         if argSet.has_key('replace-files'):
             del argSet['replace-files']
             kwargs["replaceFiles"] = \
-            kwargs["replaceConfigFiles"] = \
+            kwargs["replaceModifiedConfigFiles"] = \
             kwargs["replaceManagedFiles"] = \
             kwargs["replaceModifiedFiles"] = \
             kwargs["replaceUnmanagedFiles"] = True
