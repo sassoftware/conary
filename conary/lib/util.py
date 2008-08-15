@@ -1967,3 +1967,48 @@ class LZMAFile:
                 os._exit(1)
 
         os.close(outfd)
+
+
+def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
+    '''
+    Re-throw an exception, either from C{sys.exc_info()} (the default)
+    or from C{oldTup} (when set). If C{newClassOrInstance} is a class,
+    the original traceback will be stringified and used as the parameter
+    to the new exception, otherwise it should be an instance which will
+    be thrown as-is. In either case, the original traceback will be
+    preserved. Additionally, if it is a class and C{prependClassName} is
+    C{True} (the default), the resulting exception will after
+    stringification be prepended with the name of the original class.
+
+    Note that C{prependClassName} should typically be set to C{False}
+    when re-throwing a re-thrown exception so that the intermediate
+    class is not prepended to a value that already has the original
+    class name in it.
+    
+    @param newClassOrInstance: Class of the new exception to be thrown,
+        or the exact exception instance to be thrown.
+    @type  newClass: subclass or instance of Exception
+    @param prependClassName: If C{True}, prepend the original class
+        name to the new exception
+    @type  prependClassName: bool
+    @param oldTup: Exception triple to use instead of the current
+        exception
+    @type  oldTup: (exc_class, exc_value, exc_traceback)
+    '''
+
+    if oldTup is None:
+        oldTup = sys.exc_info()
+    exc_class, exc_value, exc_traceback = oldTup
+
+    if isinstance(newClassOrInstance, Exception):
+        newClass = newClassOrInstance.__class__
+        newValue = newClassOrInstance
+    else:
+        newClass = newClassOrInstance
+        newStr = str(exc_value)
+        if prependClassName:
+            exc_name = getattr(exc_class, '__name__', 'Unknown Error')
+            newStr = '%s: %s' % (exc_name, newStr)
+        newValue = newClass(newStr)
+
+    raise newClass, newValue, exc_traceback
