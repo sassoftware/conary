@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.23:
   o New Features:
     * A new commitaction module that logs to a database the results of
       all commits in to a repository has been added as logaction.py 
