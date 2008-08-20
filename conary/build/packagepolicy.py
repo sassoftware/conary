@@ -711,6 +711,7 @@ class Transient(policy.Policy):
     having transient contents.
     """
     bucket = policy.PACKAGE_CREATION
+    filetree = policy.PACKAGE
     processUnmodified = True
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),

@@ -21,6 +21,9 @@ Changes in @NEW@:
       r.addArchive() (CNY-2926)
     * Conary now provides python: dependencies during incompatible
       cross-builds. (CNY-2914)
+    * The Transient policy now follows packaging instead of walking
+      the filesystem, avoiding inconsistencies caused by side effects
+      of other policies. (CNY-2939)
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
