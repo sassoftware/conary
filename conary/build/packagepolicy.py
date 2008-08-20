@@ -1754,6 +1754,11 @@ class _dependency(policy.Policy):
     Internal class for shared code between Provides and Requires
     """
 
+    def __init__(self, *args, **kwargs):
+        # bootstrap keeping only one copy of these around
+        self.bootstrapPythonFlags = None
+        self.bootstrapSysPath = []
+        
     def preProcess(self):
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
@@ -1794,18 +1799,54 @@ class _dependency(policy.Policy):
     def _getPythonVersion(self, pythonPath, destdir, libdir):
         ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         if pythonPath not in self.pythonVersionCache:
-            self.pythonVersionCache[pythonPath] = util.popen(
+            pyVerCmd = util.popen(
                 r"""%s %s -Ec 'import sys;"""
                  """ print "%%d.%%d" %%sys.version_info[0:2]'"""
-                %(ldLibraryPath, pythonPath)).read().strip()
+                 %(ldLibraryPath, pythonPath))
+            self.pythonVersionCache[pythonPath] = pyVerCmd.read().strip()
+            try:
+                pyVerCmd.close()
+            except RuntimeError:
+                self.pythonVersionCache[pythonPath] = self._getPythonVersionFromPath(pythonPath, destdir)
         return self.pythonVersionCache[pythonPath]
 
     def _getPythonSysPath(self, pythonPath, destdir, libdir):
         ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
-        return [x.strip() for x in util.popen(
+        pySysPathCmd = util.popen(
                 r"""%s %s -Ec 'import sys; print "\0".join(sys.path)'"""
-                %(ldLibraryPath, pythonPath)).read().split('\0')
-                if x]
+                %(ldLibraryPath, pythonPath))
+        sysPath = [x.strip() for x in pySysPathCmd.read().split('\0') if x]
+        try:
+            pySysPathCmd.close()
+        except RuntimeError:
+            # something went wrong, don't trust any output
+            self.info('Could not run system python "%s", guessing sys.path...',
+                      pythonPath)
+            sysPath = []
+
+        if sysPath == []:
+            # probably a cross-build -- let's try a decent assumption
+            # for the syspath.
+            pyVer = self._getPythonVersionFromPath(pythonPath, destdir)
+            if not pyVer and self.bootstrapPythonFlags is not None:
+                pyVer = self._getPythonVersionFromFlags(
+                    self.bootstrapPythonFlags)
+            if pyVer and self.bootstrapSysPath is not None:
+                lib = self.recipe.macros.lib
+                # this list needs to include all sys.path elements that
+                # might be needed for python per se -- note that
+                # bootstrapPythonFlags and bootstrapSysPath go
+                # together
+                sysPath = self.bootstrapSysPath + [
+                    '/usr/%s/%s' %(lib, pyVer),
+                    '/usr/%s/%s/plat-linux2' %(lib, pyVer),
+                    '/usr/%s/%s/lib-tk' %(lib, pyVer),
+                    '/usr/%s/%s/lib-dynload' %(lib, pyVer),
+                    '/usr/%s/%s/site-packages' %(lib, pyVer),
+                    # for purelib python on x86_64
+                    '/usr/lib/%s/site-packages' %pyVer,
+                ]
+        return sysPath
 
     def _warnPythonPathNotInDB(self, pathName):
         self.warn('%s found on system but not provided by'
@@ -1886,10 +1927,22 @@ class _dependency(policy.Policy):
                 break
         return flags
 
-    def _getPythonVersionFromPath(self, pathName):
+    def _stringIsPythonVersion(self, s):
+        return not set(s).difference(set('.0123456789'))
+
+    def _getPythonVersionFromFlags(self, flags):
+        for flag in flags:
+            if self._stringIsPythonVersion(flag):
+                return 'python'+flag
+
+    def _getPythonVersionFromPath(self, pathName, destdir):
+        if destdir and pathName.startswith(destdir):
+            pathName = pathName[len(destdir):]
+
         pathList = pathName.split('/')
         for dirName in pathList:
-            if dirName.startswith('python') and not set(dirName[6:]).difference(set('.0123456789')):
+            if dirName.startswith('python') and self._stringIsPythonVersion(
+                    dirName[6:]):
                 # python2.4 or python2.5 or python3.9 but not python.so
                 return dirName
         return ''
@@ -2196,7 +2249,7 @@ class _dependency(policy.Policy):
         if m and m.name == 'script' and 'python' in m.contents['interpreter']:
             pythonPath = [m.contents['interpreter']]
         else:
-            pythonVersion = self._getPythonVersionFromPath(path)
+            pythonVersion = self._getPythonVersionFromPath(path, None)
             if pythonVersion:
                 # After %(bindir)s, fall back to /usr/bin so that package
                 # modifications do not break the search for system python
@@ -2324,6 +2377,7 @@ class Provides(_dependency):
     dbDepCacheClass = _DatabaseDepCache
 
     def __init__(self, *args, **keywords):
+        _dependency.__init__(self, *args, **keywords)
 	self.provisions = []
         self.sonameSubtrees = set()
         self.sysPath = None
@@ -2357,31 +2411,47 @@ class Provides(_dependency):
                 self.exceptDeps.extend(exceptDeps)
             else:
                 self.exceptDeps.append(exceptDeps)
+        # The next two are called only from Requires and should override
+        # completely to make sure the policies are in sync
+        bootstrapPythonFlags = keywords.pop('_bootstrapPythonFlags', None)
+        if bootstrapPythonFlags is not None:
+            self.bootstrapPythonFlags = bootstrapPythonFlags
+        bootstrapSysPath = keywords.pop('_bootstrapSysPath', None)
+        if bootstrapSysPath is not None:
+            self.bootstrapSysPath = bootstrapSysPath
+
         policy.Policy.updateArgs(self, **keywords)
 
     def preProcess(self):
-	self.rootdir = self.rootdir % self.macros
+        macros = self.macros
+        if self.bootstrapPythonFlags is not None:
+            self.bootstrapPythonFlags = set(x % macros
+                                            for x in self.bootstrapPythonFlags)
+        if self.bootstrapSysPath:
+            self.bootstrapSysPath = [x % macros for x in self.bootstrapSysPath]
+        self.rootdir = self.rootdir % macros
 	self.fileFilters = []
         self.binDirs = frozenset(
-            x % self.macros for x in [
+            x % macros for x in [
             '%(bindir)s', '%(sbindir)s', 
             '%(essentialbindir)s', '%(essentialsbindir)s',
             '%(libexecdir)s', ])
         self.noProvDirs = frozenset(
-            x % self.macros for x in [
+            x % macros for x in [
             '%(testdir)s',
             '%(debuglibdir)s',
             ]).union(self.binDirs)
         exceptDeps = []
         for fE, rE in self.exceptDeps:
             try:
-                exceptDeps.append((filter.Filter(fE, self.macros), re.compile(rE % self.macros)))
+                exceptDeps.append((filter.Filter(fE, macros),
+                                   re.compile(rE % self.macros)))
             except sre_constants.error, e:
                 self.error('Bad regular expression %s for file spec %s: %s', rE, fE, e)
         self.exceptDeps= exceptDeps
 	for filespec, provision in self.provisions:
-	    self.fileFilters.append(
-		(filter.Filter(filespec, self.macros), provision % self.macros))
+            self.fileFilters.append(
+                (filter.Filter(filespec, macros), provision % macros))
 	del self.provisions
         _dependency.preProcess(self)
 
@@ -2965,8 +3035,10 @@ class Requires(_addInfo, _dependency):
     dbDepCacheClass = _DatabaseDepCache
 
     def __init__(self, *args, **keywords):
-        self.sonameSubtrees = set()
+        _dependency.__init__(self, *args, **keywords)
         self.bootstrapPythonFlags = set()
+        self.bootstrapSysPath = []
+        self.sonameSubtrees = set()
         self._privateDepMap = {}
         self.rpathFixup = []
         self.exceptDeps = []
@@ -3008,6 +3080,18 @@ class Requires(_addInfo, _dependency):
                 self.bootstrapPythonFlags.update(set(bootstrapPythonFlags))
             else:
                 self.bootstrapPythonFlags.add(bootstrapPythonFlags)
+            # pass full set to Provides to share the exact same data
+            self.recipe.Provides(
+                _bootstrapPythonFlags=self.bootstrapPythonFlags)
+        bootstrapSysPath = keywords.pop('bootstrapSysPath', None)
+        if bootstrapSysPath:
+            if type(bootstrapSysPath) in (list, tuple):
+                self.bootstrapSysPath.extend(bootstrapSysPath)
+            else:
+                self.error('bootstrapSysPath must be list or tuple')
+            # pass full set to Provides to share the exact same data
+            self.recipe.Provides(
+                _bootstrapSysPath=self.bootstrapSysPath)
         _CILPolicyProvides = keywords.pop('_CILPolicyProvides', None)
         if _CILPolicyProvides:
             self._CILPolicyProvides.update(_CILPolicyProvides)
@@ -3032,8 +3116,10 @@ class Requires(_addInfo, _dependency):
         macros = self.macros
         self.systemLibPaths = set(os.path.normpath(x % macros)
                                   for x in self.sonameSubtrees)
-        self.bootstrapPythonFlags= set(x%macros
-                                       for x in self.bootstrapPythonFlags)
+        self.bootstrapPythonFlags = set(x % macros
+                                        for x in self.bootstrapPythonFlags)
+        self.bootstrapSysPath = [x % macros for x in self.bootstrapSysPath]
+
         # anything that any buildreqs have caused to go into ld.so.conf
         # or ld.so.conf.d/*.conf is a system library by definition,
         # but only look at paths, not (for example) "include" lines

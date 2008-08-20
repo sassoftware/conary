@@ -19,6 +19,8 @@ Changes in @NEW@:
       skips components, improving promote performance.
     * The file contents of dpkg .deb files can now be extracted by
       r.addArchive() (CNY-2926)
+    * Conary now provides python: dependencies during incompatible
+      cross-builds. (CNY-2914)
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
