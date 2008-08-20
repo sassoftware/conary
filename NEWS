@@ -1,6 +1,6 @@
 Changes in @NEW@:
   o New Features:
-    * a new commitaction module that logs to a database the results of
+    * A new commitaction module that logs to a database the results of
       all commits in to a repository has been added as logaction.py 
       (CNY-2814, CNY-2849)
     * Some trove sources now deal better with being passed a trove name
@@ -28,24 +28,24 @@ Changes in @NEW@:
       module for python dependency discovery, fall back to the
       cross-compiling case. (CNY-2940)
 
-  o Internal Changes:
-    * Moved findOrdering boolean into DependencyCheck object
-    * Cleaned up graph code during dependency checks to remove redundant
-      calls in some (relatively obscure) cases
-    * Reworked MPI to long conversion to work on four bytes at a time
-    * TroveChangeSet objects in changesets are now sorted by the
-      name/version/flavor of the new trove
-    * Thawing ReferencedTroveSet objects now looks up values with a single
-      slice instead of one index at a time for a performance improvement
-    * Check the dependencyCache when thawing Dependency objects before
-      thawing them instead of after (helping performance as well as memory
-      usage)
-    * Use a WeakValueDictionary for the dependencyCache instead of an
-      ObjectCache
-
   o Bug Fixes:
     * Recipes containing a mirror:// style source can be properly committed
       to the repository. (CNY-2848)
+
+  o Internal Changes:
+    * Moved findOrdering boolean into DependencyCheck object.
+    * Cleaned up graph code during dependency checks to remove redundant
+      calls in some (relatively obscure) cases.
+    * Reworked MPI-to-long conversion to work on four bytes at a time.
+    * TroveChangeSet objects in changesets are now sorted by the
+      name/version/flavor of the new trove.
+    * Thawing ReferencedTroveSet objects now looks up values with a single
+      slice instead of one index at a time for a performance improvement.
+    * Check the dependencyCache when thawing Dependency objects before
+      thawing them instead of after (helping performance as well as memory
+      usage).
+    * Use a WeakValueDictionary for the dependencyCache instead of an
+      ObjectCache.
 
 Changes in 2.0.22:
   o Build Changes:
