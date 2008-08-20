@@ -61,8 +61,6 @@ class DependencyWorkTables:
             whereClause.append("%(depProvider)s.depId is NULL" %d)
 
         sql = """\
-        INSERT INTO %(depTable)s
-            (class, name, flag)
         SELECT DISTINCT
             %(tmpName)s.class, %(tmpName)s.name, %(tmpName)s.flag
         FROM %(tmpName)s\n""" % substDict
@@ -72,7 +70,19 @@ class DependencyWorkTables:
         %(tmpName)s.merged = 0 AND
         %%s
         """ % substDict % " AND ".join(whereClause)
-        self.cu.execute(sql, start_transaction = False)
+
+        if self.cu.driver != 'mysql':
+            self.cu.execute("""\
+            INSERT INTO %(depTable)s
+                (class, name, flag)\n""" % substDict + sql,
+            start_transaction = False)
+        else:
+            # MySQL won't let use insert into depTable the results of a
+            # query involving depTable. Argh.
+            self.cu.execute(sql)
+            results = list(self.cu)
+            self.db.bulkload(substDict['depTable'], results,
+                             [ "class", "name", "flag" ])
 
         if len(dependencyTables) > 1:
             self.cu.execute("""

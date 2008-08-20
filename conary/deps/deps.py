@@ -1457,6 +1457,9 @@ def flavorDifferences(flavors, strict=True):
                        direction, e.g. ignore ~foo vs. foo, but not ~foo
                        vs. ~!foo.
     """
+    if not flavors:
+        return {}
+
     diffs = {}
     flavors = list(flavors)
     base = flavors[0].copy()
