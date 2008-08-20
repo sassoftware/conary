@@ -31,8 +31,16 @@ if __name__ != "__main__":
     # conary.errors.InternalConaryError
     class ModuleFinderProtocolError(errors.InternalConaryError):
         pass
+    class ModuleFinderProtocolErrorNoData(errors.InternalConaryError):
+        pass
+    class ModuleFinderInitializationError(errors.InternalConaryError):
+        pass
 else:
     class ModuleFinderProtocolError(IOError):
+        pass
+    class ModuleFinderProtocolErrorNoData(IOError):
+        pass
+    class ModuleFinderInitializationError(IOError):
         pass
 
 
@@ -98,7 +106,7 @@ def getData(inFile):
         while remaining > 0:
             partial = inFile.read(remaining)
             if not partial:
-                raise ModuleFinderProtocolError('No data available to read')
+                raise ModuleFinderProtocolErrorNoData('No data available to read')
             remaining -= len(partial)
             data += partial
         return data
@@ -139,7 +147,19 @@ class moduleFinderProxy:
             bufsize=0, close_fds=True)
         sysPath = '\0'.join(sysPath)
         data = '\0'.join(('init', destdir, sysPath))
-        putData(self.proxyProcess.stdin, data)
+        try:
+            putData(self.proxyProcess.stdin, data)
+        except IOError, e:
+            # failure to write to pipe means child did not initialize
+            raise ModuleFinderInitializationError(e)
+        try:
+            ack = getData(self.proxyProcess.stdout)
+            if ack != 'READY':
+                raise ModuleFinderProtocolError('Wrong initial response from'
+                    ' dependency discovery process')
+        except ModuleFinderProtocolErrorNoData, e:
+            # no data available now means child did not initialize
+            raise ModuleFinderInitializationError(e)
         self.poll()
 
     def poll(self):
@@ -184,6 +204,7 @@ def main():
             # set sys.path in order to find modules outside the bootstrap
             sys.path = sysPath
             finder = DirBasedModuleFinder(destdir, sysPath)
+            putData(sys.stdout, 'READY')
             continue
         elif type == 'exit':
             os._exit(0)

@@ -777,7 +777,7 @@ class ClientClone:
             trv = troves.pop(0)
             clonedTrv = troves.pop(0)
             if self._shouldReclone(trv, clonedTrv, chooser, cloneMap):
-                toReclone.append(troveTup)
+                toReclone.append(trv.getNameVersionFlavor())
 
         trovesBySource = cloneMap.getTrovesWithSameSource(toReclone)
         _logMe("Recloning %s troves" % len(trovesBySource))

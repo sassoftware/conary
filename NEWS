@@ -19,6 +19,14 @@ Changes in @NEW@:
       skips components, improving promote performance. (CNY-1867)
     * The file contents of dpkg .deb files can now be extracted by
       r.addArchive() (CNY-2926)
+    * Conary now provides python: dependencies during incompatible
+      cross-builds. (CNY-2914)
+    * The Transient policy now follows packaging instead of walking
+      the filesystem, avoiding inconsistencies caused by side effects
+      of other policies. (CNY-2939)
+    * When bootstrapping a python that is unable to load the pydeps
+      module for python dependency discovery, fall back to the
+      cross-compiling case. (CNY-2940)
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
