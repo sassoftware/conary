@@ -3421,12 +3421,23 @@ class Requires(_addInfo, _dependency):
             if not bootstrapPython and pythonPath == sys.executable:
                 self.pythonModuleFinderMap[pythonPath] = pydeps.DirBasedModuleFinder(destdir, sysPath)
             else:
-                self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, libdir, sysPath, self.error)
+                try:
+                    self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, libdir, sysPath, self.error)
+                except pydeps.ModuleFinderInitializationError, e:
+                    if bootstrapPython:
+                        # another case, like isCrossCompiling, where we cannot
+                        # run pythonPath -- ModuleFinderInitializationError
+                        # is raised before looking at any path, so should
+                        # be consistent for any pythonPath
+                        self.pythonModuleFinderMap[pythonPath] = None
+                    else:
+                        raise
         return self.pythonModuleFinderMap[pythonPath]
 
     def _delPythonRequiresModuleFinder(self):
         for finder in self.pythonModuleFinderMap.values():
-            finder.close()
+            if finder is not None:
+                finder.close()
 
 
     def _addPythonRequirements(self, path, fullpath, pkg, script=False):

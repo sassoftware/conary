@@ -24,6 +24,9 @@ Changes in @NEW@:
     * The Transient policy now follows packaging instead of walking
       the filesystem, avoiding inconsistencies caused by side effects
       of other policies. (CNY-2939)
+    * When bootstrapping a python that is unable to load the pydeps
+      module for python dependency discovery, fall back to the
+      cross-compiling case. (CNY-2940)
 
   o Internal Changes:
     * Moved findOrdering boolean into DependencyCheck object
