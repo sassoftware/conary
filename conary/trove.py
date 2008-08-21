@@ -977,14 +977,12 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
         l = []
         for (pathId, (path, fileId, version)) in self.iteritems():
             v = version.asString()
-            s = (pathId + fileId +
-                     struct.pack("!H", len(path)) + path +
-                     struct.pack("!H", len(v)) + v)
-            l.append(struct.pack("!H", len(s)) + s)
+            s = misc.pack("!S16S20SHSH", pathId, fileId, path, v);
+            l.append((len(s), s))
 
         l.sort()
 
-        return ''.join(l)
+        return misc.pack("!" + "SH" * len(l), *( x[1] for x in l))
 
     def copy(self):
         new = TroveRefsFilesStream()

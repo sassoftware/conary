@@ -40,6 +40,7 @@ static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
 static PyObject * mkdirIfMissing(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
+static PyObject * pack(PyObject * self, PyObject * args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * sha1Uncompress(PyObject *self, PyObject *args);
 static PyObject * py_pread(PyObject *self, PyObject *args);
@@ -67,6 +68,7 @@ static PyMethodDef MiscMethods[] = {
         "Uncompresses a gzipped file descriptor into another gzipped "
         "file descriptor and returns the sha1 of the uncompressed content. " },
     { "unpack", unpack, METH_VARARGS },
+    { "pack", pack, METH_VARARGS },
     { "dynamicSize", dynamicSize, METH_VARARGS },
     { "pread", py_pread, METH_VARARGS },
     { "massCloseFileDescriptors", py_massCloseFDs, METH_VARARGS },
@@ -261,6 +263,168 @@ static PyObject * mkdirIfMissing(PyObject *self, PyObject *args) {
 
     Py_INCREF(Py_True);
     return Py_True;
+}
+
+int getSize(char ** s, int * val) {
+    char lenStr[10];
+    char * lenPtr = lenStr;
+    char * ptr = *s;
+
+    /* '\0' isn't a digit, so this check stops at the end */
+    while (isdigit(*ptr) &&
+           (lenPtr - lenStr) < sizeof(lenStr))
+        *lenPtr++ = *ptr++;
+
+    if ((lenPtr - lenStr) == sizeof(lenStr)) {
+        PyErr_SetString(PyExc_ValueError, 
+                        "length too long for S format");
+        return -1;
+    }
+
+    *lenPtr = '\0';
+    *s = ptr;
+    *val = atoi(lenStr);
+
+    return 0;
+}
+
+static PyObject * pack(PyObject * self, PyObject * args) {
+    PyObject * formatArg, * arg, * resultObj;
+    char * format, * formatPtr, * s, * result;
+    int argCount;
+    int strLen;
+    int argNum;
+    int len, i;
+    unsigned char oneByte;
+    unsigned short twoBytes;
+    unsigned int fourBytes;
+
+    formatArg = PyTuple_GET_ITEM(args, 0);
+    if (!PyString_CheckExact(formatArg)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be a string");
+        return NULL;
+    }
+
+    formatPtr = format = PyString_AS_STRING(formatArg);
+
+    /* walk the format twice, first to figure out the length and the second
+       to build the string */
+    argCount = PyTuple_GET_SIZE(args);
+
+    if (*formatPtr != '!') {
+        PyErr_SetString(PyExc_ValueError, "format must begin with !");
+        return NULL;
+    }
+    formatPtr++;
+
+    strLen = 0, argNum = 1;
+    while (*formatPtr) {
+        switch (*formatPtr++) {
+            case 'B':
+                arg = PyTuple_GET_ITEM(args, argNum++);
+                if (!PyInt_CheckExact(arg)) {
+                    PyErr_SetString(PyExc_TypeError,
+                                    "argument for B format must be an int");
+                    return NULL;
+                }
+                strLen += 1;
+                break;
+
+            case 'S':
+                arg = PyTuple_GET_ITEM(args, argNum++);
+                len = PyString_GET_SIZE(arg);
+                if (!PyString_CheckExact(arg)) {
+                    PyErr_SetString(PyExc_TypeError,
+                                    "argument for S format must be a str");
+                    return NULL;
+                }
+                s = PyString_AS_STRING(arg);
+
+                if (*formatPtr == 'H') {
+                    strLen += 2 + len;
+                    formatPtr++;
+                } else if (*formatPtr == 'I') {
+                    strLen += 4 + len;
+                    formatPtr++;
+                } else if (isdigit(*formatPtr)) {
+                    if (getSize(&formatPtr, &i)) {
+                        return NULL;
+                    }
+
+                    if (len != i) {
+                        breakpoint;
+                        PyErr_SetString(PyExc_RuntimeError, "bad string size");
+                        return NULL;
+                    }
+
+                    strLen += len;
+                } else {
+                    PyErr_SetString(PyExc_ValueError, 
+                                "# must be followed by H or I in format");
+                    return NULL;
+                }
+
+                break;
+
+            default:
+                breakpoint;
+                PyErr_SetString(PyExc_ValueError,
+                                "unknown character in pack format");
+                return NULL;
+        }
+    }
+
+    result = malloc(strLen);
+    argNum = 1;
+    strLen = 0;
+    formatPtr = format + 1;
+    while (*formatPtr) {
+        switch (*formatPtr++) {
+            case 'B':
+                arg = PyTuple_GET_ITEM(args, argNum++);
+                oneByte = PyInt_AS_LONG(arg);
+                result[strLen++] = oneByte;
+                break;
+
+            case 'S':
+                arg = PyTuple_GET_ITEM(args, argNum++);
+                s = PyString_AS_STRING(arg);
+                len = PyString_GET_SIZE(arg);
+
+                if (*formatPtr == 'H') {
+                    twoBytes = htons(len);
+                    memcpy(result + strLen, &twoBytes, sizeof(twoBytes));
+                    strLen += 2;
+                    formatPtr++;
+                } else if (*formatPtr == 'I') {
+                    fourBytes = htonl(len);
+                    memcpy(result + strLen, &fourBytes, sizeof(twoBytes));
+                    strLen += 4;
+                    formatPtr++;
+                } else if (isdigit(*formatPtr)) {
+                    if (getSize(&formatPtr, &i)) {
+                        return NULL;
+                    }
+                } else {
+                    PyErr_SetString(PyExc_RuntimeError,
+                                    "internal pack error 1");
+                    return NULL;
+                }
+
+
+                memcpy(result + strLen, s, len);
+                strLen += len;
+                break;
+
+            default:
+                PyErr_SetString(PyExc_RuntimeError,
+                                "internal pack error 2");
+                return NULL;
+        }
+    }
+
+    resultObj = PyString_FromStringAndSize(result, strLen);
+    return resultObj;
 }
 
 static PyObject * unpack(PyObject *self, PyObject *args) {

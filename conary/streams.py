@@ -427,8 +427,7 @@ class StreamCollection(InfoStream):
                 s = item.freeze()
                 if len(s) >= (1 << 16):
                     raise OverflowError
-                l.append(struct.pack("!BH", typeId, len(s)))
-                l.append(s)
+                l.append(misc.pack("!BSH", typeId, s))
 
         return "".join(l)
 

@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Internal Changes:
     * More of the file installation path was moved into C for improved
       performance
+    * Added misc.pack() and use it to freeze TroveRefsFilesStream and
+      StreamCollection objects
 
 Changes in 2.0.23:
   o New Features:
