@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Internal Changes:
+    * More of the file installation path was moved into C for improved
+      performance
+
 Changes in 2.0.23:
   o New Features:
     * A new commitaction module that logs to a database the results of

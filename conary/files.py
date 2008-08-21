@@ -518,27 +518,26 @@ class RegularFile(File):
 	    if not os.path.isdir(path):
 		util.mkdirChain(path)
 
-	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
-	    try:
-                if inFd is not None:
-                    actualSha1 = util.sha1Uncompress((inFd, inStart, inSize),
-                                                     tmpfd)
-                    os.close(tmpfd)
-                else:
+            if inFd is not None:
+                actualSha1 = util.sha1Uncompress((inFd, inStart, inSize),
+                                                 path, name, target)
+            else:
+                tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
+                try:
                     d = sha.new()
                     f = os.fdopen(tmpfd, 'w')
                     util.copyfileobj(src, f, digest = d)
                     f.close()
                     actualSha1 = d.digest()
 
-                if os.path.isdir(target):
-                    os.rmdir(target)
-                os.rename(tmpname, target)
-	    except:
-                # we've not renamed tmpname to target yet, we should
-                # clean up instead of leaving temp files around
-                os.unlink(tmpname)
-                raise
+                    if os.path.isdir(target):
+                        os.rmdir(target)
+                    os.rename(tmpname, target)
+                except:
+                    # we've not renamed tmpname to target yet, we should
+                    # clean up instead of leaving temp files around
+                    os.unlink(tmpname)
+                    raise
 
             if (sha1 is not None and sha1 != actualSha1):
                 raise Sha1Exception(target)

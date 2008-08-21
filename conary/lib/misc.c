@@ -782,13 +782,26 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     int rc;
     SHA_CTX sha1state;
     char sha1[20];
+    char * path, * baseName;
+    struct stat sb;
+    char * tmpPath, * targetPath;
 
-    if (!PyArg_ParseTuple(args, "(iii)i", &inFd, &inStart, &inSize, &outFd))
+    if (!PyArg_ParseTuple(args, "(iii)sss", &inFd, &inStart, &inSize,
+                                           &path, &baseName, &targetPath))
         return NULL;
+
+    tmpPath = alloca(strlen(path) + strlen(baseName) + 10);
+    sprintf(tmpPath, "%s/.ct%sXXXXXX", path, baseName);
+    outFd = mkstemp(tmpPath);
+    if (outFd == -1) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
 
     memset(&zs, 0, sizeof(zs));
     if ((rc = inflateInit2(&zs, 31)) != Z_OK) {
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
+        unlink(tmpPath);
         return NULL;
     }
 
@@ -806,6 +819,7 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
             inAt += zs.avail_in;
             if (rc != zs.avail_in) {
                 PyErr_SetFromErrno(PyExc_OSError);
+                unlink(tmpPath);
                 return NULL;
             }
         }
@@ -815,6 +829,7 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
         rc = inflate(&zs, 0);
         if (rc < 0) {
             PyErr_SetString(PyExc_RuntimeError, zError(rc));
+            unlink(tmpPath);
             return NULL;
         }
 
@@ -822,6 +837,7 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
         SHA1_Update(&sha1state, outBuf, i);
         if (write(outFd, outBuf, i) != i) {
             PyErr_SetFromErrno(PyExc_OSError);
+            unlink(tmpPath);
             return NULL;
         }
     }
@@ -832,6 +848,33 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     }
 
     SHA1_Final(sha1, &sha1state);
+
+    if (close(outFd)) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        unlink(tmpPath);
+        return NULL;
+    }
+
+    rc = stat(targetPath, &sb);
+    if (rc && errno != ENOENT) {
+        fprintf(stderr, "ACK %d", errno);
+        fflush(stderr);
+        PyErr_SetFromErrno(PyExc_OSError);
+        unlink(tmpPath);
+        return NULL;
+    } else if (!rc && S_ISDIR(sb.st_mode)) {
+        if (rmdir(targetPath)) {
+            PyErr_SetFromErrno(PyExc_OSError);
+            unlink(tmpPath);
+            return NULL;
+        }
+    }
+
+    if (rename(tmpPath, targetPath)) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        unlink(tmpPath);
+        return NULL;
+    }
 
     return PyString_FromStringAndSize(sha1, sizeof(sha1));
 }
