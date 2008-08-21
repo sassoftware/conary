@@ -4,6 +4,8 @@ Changes in @NEW@:
       performance
     * Added misc.pack() and use it to freeze TroveRefsFilesStream and
       StreamCollection objects
+    * Initial step of promote takes advantage of weak references to avoid
+      downloading so many packages (CNY-1867)
 
 Changes in 2.0.23:
   o New Features:

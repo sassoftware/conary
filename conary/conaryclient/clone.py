@@ -439,6 +439,13 @@ class ClientClone:
 
     def _determineTrovesToClone(self, chooser, cloneMap, cloneJob, troveCache,
                                 callback):
+        trvs = troveCache.getTroves(chooser.getPrimaryTroveList())
+        toClone = []
+
+        for trv in trvs:
+            toClone.append(trv.getNameVersionFlavor())
+            cloneMap.updateChildMap(trv)
+
         seen = set()
         toClone = chooser.getPrimaryTroveList()
         total = 0
@@ -465,21 +472,15 @@ class ClientClone:
                     needed.append(info)
                     seen.add(info)
 
-            # make sure we see the packages before the components; we rely
-            # on that to get the source's right
-            needed.sort()
-            nonComponents = [ x for x in needed
-                                if not trove.troveIsComponent(x[0]) ]
-            got = troveCache.getTroves(nonComponents, withFiles = False)
-            troves = []
-            for info in needed:
-                if trove.troveIsComponent(info[0]):
-                    troves.append(None)
-                else:
-                    troves.append(got.pop(0))
+            srcsNeeded = [ (n,v,f) for n,v,f in needed if not
+                    trove.troveIsComponent(n) and n not in sourceByPackage ]
+            srcList = troveCache.getTroveInfo(
+                            trove._TROVEINFO_TAG_SOURCENAME, srcsNeeded)
+            sourceByPackage.update( (x[0],y()) for x, y in
+                                        itertools.izip(srcsNeeded, srcList) )
 
             newToClone = []
-            for troveTup, trv in itertools.izip(needed, troves):
+            for troveTup in needed:
                 current += 1
                 callback.determiningCloneTroves(current, total)
 
@@ -495,8 +496,7 @@ class ClientClone:
                         # guess because it's good enough for the tests.
                         sourceName = troveTup[0].split(":")[0] + ":source"
                 else:
-                    sourceName = _getSourceName(trv)
-                    sourceByPackage[troveTup[0]] = sourceName
+                    sourceName = sourceByPackage[troveTup[0]]
 
                 if chooser.shouldClone(troveTup, sourceName):
                     if not chooser.isExcluded(troveTup):
@@ -504,16 +504,13 @@ class ClientClone:
                         cloneMap.addTrove(troveTup, targetBranch, sourceName)
                         chooser.addSource(troveTup, sourceName)
                         cloneJob.add(troveTup)
-                        if trv:
-                            for childTup in trv.iterTroveList(strongRefs=True,
-                                                              weakRefs=True):
-                                chooser.addReferenceByCloned(childTup)
-                    elif trv:
+                        for childTup in cloneMap.getChildren(troveTup):
+                            chooser.addReferenceByCloned(childTup)
+                    else:
                         # don't include this collection, instead
                         # only include child troves that aren't
                         # components of this collection.
-                        for childTup in trv.iterTroveList(strongRefs=True,
-                                                          weakRefs=True):
+                        for childTup in cloneMap.getChildren(troveTup):
                             if (childTup[0].split(':')[0],
                                 childTup[1], childTup[2]) == troveTup:
                                 chooser.addReferenceByUncloned(childTup)
@@ -523,8 +520,7 @@ class ClientClone:
                     if (chooser.options.cloneOnlyByDefaultTroves
                         and chooser.isByDefault(troveTup)
                         and chooser.isReferencedByCloned(troveTup)):
-                        for childTup in trv.iterTroveList(strongRefs=True,
-                                                          weakRefs=True):
+                        for childTup in cloneMap.getChildren(troveTup):
                             chooser.addReferenceByUncloned(childTup)
 
                     if trove.troveIsPackage(troveTup[0]):
@@ -532,8 +528,7 @@ class ClientClone:
                         # we're not cloning
                         continue
 
-                if trv:
-                    newToClone.extend(trv.iterTroveList(strongRefs=True))
+                newToClone.extend(cloneMap.getChildren(troveTup))
 
             toClone = newToClone
 
@@ -1035,13 +1030,6 @@ def _computeLabelPath(name, labelPathMap):
         newLabelPath.append(newLabel)
     return newLabelPath
 
-def _getSourceName(trove):
-    sourceName = trove.getSourceName()
-    if sourceName is None:
-        sourceName = trove.getName().split(':')[0] + ':source'
-    return sourceName
-
-
 class CloneOptions(object):
     def __init__(self, fullRecurse=True, cloneSources=True,
                  trackClone=True, callback=None,
@@ -1078,6 +1066,16 @@ class TroveCache(object):
             self._hasTroves.update(self.repos.hasTroves(needed))
         return dict((x, self._hasTroves[x]) for x in troveTups)
 
+    def _get(self, troveTups, withFiles):
+        cs = self.repos.createChangeSet(
+                [ (x[0], (None, None), (x[1], x[2]), True) for x in troveTups],
+                withFiles = withFiles, withFileContents = False,
+                recurse = False)
+
+        for x in troveTups:
+            self.troves[withFiles][x] = cs.getNewTroveVersion(*x)
+            if trove.troveIsCollection(x[0]):
+                self.troves[not withFiles][x] = cs.getNewTroveVersion(*x)
 
     def getTroves(self, troveTups, withFiles=True):
         theDict = self.troves[withFiles]
@@ -1086,21 +1084,14 @@ class TroveCache(object):
             theOtherDict = self.troves[not withFiles]
             msg = getattr(self.callback, 'lastMessage', None)
             _logMe('getting %s troves from repos' % len(needed))
-            troves = self.repos.getTroves(needed, withFiles=withFiles,
-                                          callback=self.callback)
-            if msg:
-                self.callback._message(msg)
-            theDict.update(itertools.izip(needed, troves))
 
-            # Collections don't have files, so are the same for withFiles
-            # True and withFiles False
-            theOtherDict.update(x for x in itertools.izip(needed, troves)
-                                    if trove.troveIsCollection(x[0][0]))
+            self._get(troveTups, withFiles)
 
         # this prevents future hasTroves calls from calling the server
         self._hasTroves.update((x, True) for x in troveTups)
 
-        return [ theDict[x] for x in troveTups]
+        return [ trove.Trove(theDict[x],
+                 skipIntegrityChecks = (not withFiles)) for x in troveTups ]
 
     def getTrove(self, troveTup, withFiles=True):
         return self.getTroves([troveTup], withFiles=withFiles)[0]
@@ -1286,6 +1277,7 @@ class CloneMap(object):
         self.trovesByTargetBranch = {}
         self.trovesBySource = {}
         self.sourcesByTrove = {}
+        self.childMap = {}
 
     def addTrove(self, troveTup, targetBranch, sourceName=None):
         name, version, flavor = troveTup
@@ -1376,6 +1368,20 @@ class CloneMap(object):
                 matches.add(newVersion.trailingLabel())
         return matches
 
+    def updateChildMap(self, trv):
+        l = list(trv.iterTroveList(strongRefs=True, weakRefs=True))
+        l.sort()
+        self.childMap[trv.getNameVersionFlavor()] = set(l)
+        for child in l:
+            if trove.troveIsPackage(child[0]):
+                if child not in self.childMap:
+                    self.childMap[child] = set()
+            elif trove.troveIsComponent(child[0]):
+                pkg = child[0].split(":")[0]
+                self.childMap[(pkg, child[1], child[2])].add(child)
+
+    def getChildren(self, trvTuple):
+        return self.childMap.get(trvTuple, [])
 
 class LeafMap(object):
     def __init__(self, options):
