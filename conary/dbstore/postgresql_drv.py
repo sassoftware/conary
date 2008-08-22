@@ -84,7 +84,7 @@ class Cursor(BaseCursor):
                 raise sqlerrors.ConstraintViolation(msg)
             if re.search('relation \S+ does not exist', msg, re.I):
                 raise sqlerrors.InvalidTable(msg)
-            if msg.find("duplicate key violates unique constraint") > 0:
+            if re.search("duplicate key (value )?violates unique constraint", msg):
                 raise sqlerrors.ColumnNotUnique(msg)
             raise sqlerrors.CursorError(msg, e)
         return ret
