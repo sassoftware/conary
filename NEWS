@@ -6,6 +6,8 @@ Changes in @NEW@:
       StreamCollection objects
     * Initial step of promote takes advantage of weak references to avoid
       downloading so many packages (CNY-1867)
+    * The shim network client now supports CONARY_CLIENT_LOG environment
+      variable
 
 Changes in 2.0.23:
   o New Features:

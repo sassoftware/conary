@@ -11,11 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.repository import netclient
+from conary.repository import calllog, netclient
 from conary.repository.netrepos import netserver
 
 import os
 import tempfile
+import time
 
 # this returns the same server for any server name or label
 # requested; because a shim can only refer to one server.
@@ -123,21 +124,30 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
 
 
 class _ShimMethod(netclient._Method):
-    def __init__(self, server, protocol, port, authToken, name):
+    def __init__(self, server, protocol, port, authToken, name, callLog = None):
         self._server = server
         self._authToken = authToken
         self._name = name
         self._protocol = protocol
         self._port = port
+        self._callLog = callLog
 
     def __repr__(self):
         return "<server._ShimMethod(%r)>" % (self._name)
 
     def __call__(self, *args, **kwargs):
         args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
-        return self._server.callWrapper(self._protocol, self._port,
+        start = time.time()
+        result = self._server.callWrapper(self._protocol, self._port,
                                           self._name, self._authToken, args,
                                           kwargs)
+
+        if self._callLog:
+            self._callLog.log("shim-" + self._server.repos.serverNameList[0],
+                               [], self._name, result, args,
+                               latency = time.time() - start)
+
+        return result
 
 class ShimServerProxy(netclient.ServerProxy):
     def __init__(self, server, protocol, port, authToken):
@@ -145,6 +155,13 @@ class ShimServerProxy(netclient.ServerProxy):
         self._server = server
         self._protocol = protocol
         self._port = port
+
+        if 'CONARY_CLIENT_LOG' in os.environ:
+            self._callLog = calllog.ClientCallLogger(
+                                os.environ['CONARY_CLIENT_LOG'])
+        else:
+            self._callLog = None
+
 
     def setAbortCheck(self, *args):
         pass
@@ -158,4 +175,4 @@ class ShimServerProxy(netclient.ServerProxy):
     def __getattr__(self, name):
         return _ShimMethod(self._server,
             self._protocol, self._port,
-            self._authToken, name)
+            self._authToken, name, self._callLog)
