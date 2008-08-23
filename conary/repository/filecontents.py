@@ -87,9 +87,9 @@ class FromFilesystem(FileContents):
     def get(self):
 	return open(self.path, "r")
 
-    def __init__(self, path):
+    def __init__(self, path, compressed = False):
 	self.path = path
-        self.compressed = False
+        self.compressed = compressed
 
 class FromChangeSet(FileContents):
 

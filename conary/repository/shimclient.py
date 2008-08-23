@@ -11,9 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.repository import calllog, netclient
+from conary.repository import calllog, filecontents, netclient
 from conary.repository.netrepos import netserver
 
+import gzip
 import os
 import tempfile
 import time
@@ -36,6 +37,15 @@ class FakeServerCache(netclient.ServerCache):
         return netclient.ServerCache.__getitem__(self, item)
 
 class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
+    @netserver.accessReadOnly
+    def getFileContents(self, *args, **kwargs):
+        location = netserver.NetworkRepositoryServer.getFileContents(self,
+                                                        *args, **kwargs)[0]
+        path = os.path.join(self.tmpPath,location.split('?')[1] + '-out')
+        paths = open(path).readlines()
+        os.unlink(path)
+        return [ x.split(" ")[0] for x in paths ]
+
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
         paths = []
@@ -108,6 +118,24 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     NOTE: Conary proxies are only used for "real" netclients
     outside this repository's serverNameList.
     """
+
+    def getFileContentsObjects(self, server, fileList, callback, outF,
+                               compressed):
+        if not isinstance(self.c[server], ShimServerProxy):
+            return netclient.NetworkRepositoryClient.getFileContentsObjects(
+                server, fileList, callback, outF, compressed)
+        filePaths = self.c[server].getFileContents(fileList)
+        fileObjList = []
+        for path in filePaths:
+            if compressed:
+                fileObjList.append(
+                    filecontents.FromFilesystem(path, compressed = True))
+            else:
+                f = gzip.GzipFile(path, "r")
+                fileObjList.append(filecontents.FromFile(f))
+
+        return fileObjList
+
     def __init__(self, server, protocol, port, authToken, repMap, userMap,
             conaryProxies=None):
         if type(authToken[2]) is not list:

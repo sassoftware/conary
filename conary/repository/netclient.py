@@ -2271,6 +2271,59 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromPathId(pathId), 
 				   self.fromFileId(fileId)))
 
+    def getFileContentsObjects(self, server, fileList, callback, outF,
+                               compressed):
+        (url, sizes) = self.c[server].getFileContents(fileList)
+        # protocol version 44 and later return sizes as strings rather
+        # than ints to avoid 2 GiB limits
+        sizes = [ int(x) for x in sizes ]
+        assert(len(sizes) == len(fileList))
+
+        # FIXME: This check is for broken conary proxies that
+        # return a URL with "localhost" in it.  The proxy will know
+        # how to handle that.  So, we force the url to be reinterpreted
+        # by the proxy no matter what.
+        forceProxy = self.c[server].usedProxy()
+        inF = transport.ConaryURLOpener(proxies = self.proxies,
+                                        forceProxy=forceProxy).open(url)
+
+        if callback:
+            wrapper = callbacks.CallbackRateWrapper(
+                callback, callback.downloadingFileContents, sum(sizes))
+            copyCallback = wrapper.callback
+        else:
+            copyCallback = None
+
+        # make sure we append to the end (creating the gzip file
+        # object does a certain amount of seeking through the
+        # nested file object which we need to undo
+        outF.seek(0, 2)
+        start = outF.tell()
+
+        totalSize = util.copyfileobj(inF, outF,
+                                     rateLimit = self.downloadRateLimit,
+                                     callback = copyCallback)
+
+        fileObjList= []
+        for size in sizes:
+            nestedF = util.SeekableNestedFile(outF, size, start)
+
+            totalSize -= size
+            start += size
+
+            if compressed:
+                fc = filecontents.FromFile(nestedF,
+                                                    compressed = True)
+            else:
+                gzfile = gzip.GzipFile(fileobj = nestedF)
+                fc = filecontents.FromFile(gzfile)
+
+            fileObjList.append(fc)
+
+        assert(totalSize == 0)
+
+        return fileObjList
+
     def getFileContents(self, fileList, tmpFile = None, lookInLocal = False,
                         callback = None, compressed = False):
         contents = [ None ] * len(fileList)
@@ -2308,6 +2361,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             l = byServer.setdefault(server, [])
             l.append((i, (fileId, fileVersion)))
 
+        if tmpFile:
+            outF = tmpFile
+        else:
+            (fd, path) = util.mkstemp(suffix = 'filecontents')
+            outF = util.ExtendedFile(path, "r+", buffering = False)
+            os.close(fd)
+            os.unlink(path)
+
         for server, itemList in byServer.iteritems():
             fileList = [ (self.fromFileId(x[1][0]), 
                           self.fromVersion(x[1][1])) for x in itemList ]
@@ -2316,60 +2377,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     callback.requestingFileContentsWithCount(len(fileList))
                 else:
                     callback.requestingFileContents()
-            (url, sizes) = self.c[server].getFileContents(fileList)
-            # protocol version 44 and later return sizes as strings rather
-            # than ints to avoid 2 GiB limits
-            sizes = [ int(x) for x in sizes ]
-            assert(len(sizes) == len(fileList))
 
-            # FIXME: This check is for broken conary proxies that
-            # return a URL with "localhost" in it.  The proxy will know
-            # how to handle that.  So, we force the url to be reinterpreted
-            # by the proxy no matter what.
-            forceProxy = self.c[server].usedProxy()
-            inF = transport.ConaryURLOpener(proxies = self.proxies,
-                                            forceProxy=forceProxy).open(url)
+            fileObjList = self.getFileContentsObjects(server, fileList,
+                                                      callback, outF,
+                                                      compressed)
 
-            if callback:
-                wrapper = callbacks.CallbackRateWrapper(
-                    callback, callback.downloadingFileContents, sum(sizes))
-                copyCallback = wrapper.callback
-            else:
-                copyCallback = None
-
-            if tmpFile:
-		# make sure we append to the end (creating the gzip file
-		# object does a certain amount of seeking through the
-		# nested file object which we need to undo
-		tmpFile.seek(0, 2)
-                start = tmpFile.tell()
-                outF = tmpFile
-            else:
-                (fd, path) = util.mkstemp(suffix = 'filecontents')
-                outF = util.ExtendedFile(path, "r+", buffering = False)
-                os.close(fd)
-                os.unlink(path)
-                start = 0
-
-            totalSize = util.copyfileobj(inF, outF,
-                                         rateLimit = self.downloadRateLimit,
-                                         callback = copyCallback)
-            del inF
-
-            for (i, item), size in itertools.izip(itemList, sizes):
-                nestedF = util.SeekableNestedFile(outF, size, start)
-
-                totalSize -= size
-                start += size
-
-                if compressed:
-                    contents[i] = filecontents.FromFile(nestedF,
-                                                        compressed = True)
-                else:
-                    gzfile = gzip.GzipFile(fileobj = nestedF)
-                    contents[i] = filecontents.FromFile(gzfile)
-
-            assert(totalSize == 0)
+            for (i, item), fObj in itertools.izip(itemList, fileObjList):
+                contents[i] = fObj
 
         return contents
 
