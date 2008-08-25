@@ -1,6 +1,8 @@
 Changes in @NEW@:
   o Client Changes:
     * Added support for getFileContents call to ShimNetClient (CNY-1669)
+    * Added support for commitChangeSet and commitChangeSetFile to
+      ShimNetClient (CNY-2545)
 
   o Internal Changes:
     * More of the file installation path was moved into C for improved

@@ -11,7 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.repository import calllog, filecontents, netclient
+from conary.lib import util
+from conary.repository import calllog, changeset, filecontents, netclient
 from conary.repository.netrepos import netserver
 
 import gzip
@@ -135,6 +136,33 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
                 fileObjList.append(filecontents.FromFile(f))
 
         return fileObjList
+
+    def commitChangeSet(self, chgSet, callback = None, mirror = False,
+                        hidden = False):
+        trvCs = chgSet.iterNewTroveList().next()
+        newLabel = trvCs.getNewVersion().trailingLabel()
+
+        if not isinstance(self.c[newLabel], ShimServerProxy):
+            return netclient.NetworkRepositoryClient._commit(chgSet,
+                fName, callback = callback, mirror = False, hidden = False)
+
+        (fd, path) = tempfile.mkstemp(dir = self.c[newLabel]._server.tmpPath,
+                                      suffix = '.ccs-in')
+        os.close(fd)
+        chgSet.writeToFile(path)
+        base = os.path.basename(path)[:-3]
+        url = util.normurl(self.c[newLabel]._server.basicUrl) + "?" + base
+
+        self.c[newLabel].commitChangeSet(url, mirror = mirror,
+                                         hidden = hidden)
+
+    def commitChangeSetFile(self, fName, mirror = False, callback = None,
+                            hidden = False):
+        # this could be more efficient. it rewrites the trove every time,
+        # but it doesn't seem to be heavily used
+        cs = changeset.ChangeSetFromFile(fName)
+        self.commitChangeSet(cs, callback = callback, mirror = mirror,
+                             hidden = hidden)
 
     def __init__(self, server, protocol, port, authToken, repMap, userMap,
             conaryProxies=None):
