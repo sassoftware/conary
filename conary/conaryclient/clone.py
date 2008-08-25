@@ -698,7 +698,7 @@ class ClientClone:
             callback.checkNeedsFulfilled(current, total)
             trv = troveCache.getTrove(troveTup, withFiles=False)
             for mark, src in _iterAllVersions(trv):
-                if (chooser.troveInfoNeedsRewrite(mark, src)
+                if (chooser.troveInfoNeedsRewrite(mark[0], src)
                     and not cloneMap.hasRewrite(src)):
                     if mark[0] == V_LOADED:
                         # Loaded troves are recorded with the flavor which
@@ -761,10 +761,10 @@ class ClientClone:
         # reclones.  Otherwise you could have to reclone when minor details
         # about the entironment have changed.
         troveTups = cloneJob.getPreclonedTroves()
-        toReclone = []
         # match up as many needed targets for these clone as possible.
         _logMe("Rechecking %s preclones" % len(troveTups))
         needed = []
+        fetch = []
         for troveTup in troveTups:
             _logMe("Rechecking %s" % (troveTup,))
             if not trove.troveIsCollection(troveTup[0]):
@@ -773,14 +773,20 @@ class ClientClone:
                 continue
             newVersion = cloneMap.getTargetVersion(troveTup)
             clonedTup = (troveTup[0], newVersion, troveTup[2])
-            needed += [ troveTup, clonedTup ]
+            needed += [ (troveTup, clonedTup) ]
+            fetch += [ clonedTup ]
 
-        troves = troveCache.getTroves(needed, withFiles = False)
-        while troves:
-            trv = troves.pop(0)
+        troves = troveCache.getTroves(fetch, withFiles = False)
+        toReclone = []
+        for (troveTup, clonedTup) in needed:
             clonedTrv = troves.pop(0)
-            if self._shouldReclone(trv, clonedTrv, chooser, cloneMap):
-                toReclone.append(trv.getNameVersionFlavor())
+            trvChildren = cloneMap.getChildren(troveTup)
+            assert(trvChildren)
+            if self._shouldReclone(trvChildren,
+                        list(clonedTrv.iterTroveList(strongRefs = True,
+                                                     weakRefs = True)),
+                        chooser, cloneMap):
+                toReclone.append(troveTup)
 
         trovesBySource = cloneMap.getTrovesWithSameSource(toReclone)
         _logMe("Recloning %s troves" % len(trovesBySource))
@@ -794,19 +800,20 @@ class ClientClone:
                 cloneMap.target(binaryTup, newVersion)
                 cloneJob.target(binaryTup, newVersion)
 
-    def _shouldReclone(self, origTrove, clonedTrove, chooser, cloneMap):
+    def _shouldReclone(self, origTroveChildren, clonedTroveChildren, chooser,
+                       cloneMap):
         childTroves = {}
         clonedChildTroves = {}
-        for mark, src in _iterAllVersions(origTrove, rewriteTroveInfo=False):
-            if chooser.troveInfoNeedsRewrite(mark, src):
+        for src in origTroveChildren:
+            if chooser.troveInfoNeedsRewrite(V_REFTRV, src):
                 targetBranch = chooser.getTargetBranch(src[1])
                 childTroves[src[0], targetBranch, src[2]] = True
-            elif chooser.troveInfoNeedsErase(mark, src):
+            elif chooser.troveInfoNeedsErase(V_REFTRV, src):
                 continue
             else:
                 childTroves[src[0], src[1].branch(), src[2]] = True
 
-        for mark, src in _iterAllVersions(clonedTrove, rewriteTroveInfo=False):
+        for src in clonedTroveChildren:
             clonedChildTroves[src[0], src[1].branch(), src[2]] = True
         if childTroves == clonedChildTroves:
             return False
@@ -895,12 +902,12 @@ class ClientClone:
         trv.copyMetadata(trv) # flatten metadata
 
         for mark, src in _iterAllVersions(trv):
-            if chooser.troveInfoNeedsRewrite(mark, src):
+            if chooser.troveInfoNeedsRewrite(mark[0], src):
                 newVersion = cloneMap.getTargetVersion(src)
                 if newVersion is None:
                     continue
                 _updateVersion(trv, mark, newVersion)
-            elif chooser.troveInfoNeedsErase(mark, src):
+            elif chooser.troveInfoNeedsErase(mark[0], src):
                 _updateVersion(trv, mark, None)
         if trove.troveIsFileSet(trv.getName()):
             needsRewriteFn = chooser.filesetFileNeedsRewrite
@@ -1227,9 +1234,8 @@ class CloneChooser(object):
             return target
         assert(0)
 
-    def troveInfoNeedsRewrite(self, mark, troveTup):
+    def troveInfoNeedsRewrite(self, kind, troveTup):
         targetBranch = self.getTargetBranch(troveTup[1])
-        kind = mark[0]
         if not targetBranch:
             return False
         if self.byDefaultMap is not None and troveTup not in self.byDefaultMap:
@@ -1264,8 +1270,7 @@ class CloneChooser(object):
         # /A//B, then the file is ok.
         return fileVersion.depth() > targetBranch.depth()
 
-    def troveInfoNeedsErase(self, mark, troveTup):
-        kind = mark[0]
+    def troveInfoNeedsErase(self, kind, troveTup):
         if kind != V_REFTRV:
             # we only erase trove references - all other types 
             # just let remain with their old, uncloned values.
@@ -1391,7 +1396,7 @@ class CloneMap(object):
                 self.childMap[(pkg, child[1], child[2])].add(child)
 
     def getChildren(self, trvTuple):
-        return self.childMap.get(trvTuple, [])
+        return self.childMap.get(trvTuple, set())
 
 class LeafMap(object):
     def __init__(self, options):
