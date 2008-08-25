@@ -119,13 +119,14 @@ def getIPAddress(hostAndPort):
         return hostAndPort
     try:
         ret = socket.gethostbyname(host)
-    except IOError, err:
+    except (IOError, socket.error), err:
         util.res_init()
         # error looking up the host.  If this fails,
         # the we fall back to the cache
         if host in _ipCache:
             ret = _ipCache[host]
-        raise
+        else:
+            raise
     else:
         _ipCache[host] = ret
     if port:

@@ -13,6 +13,9 @@ Changes in @NEW@:
       downloading so many packages (CNY-1867)
     * The shim network client now supports CONARY_CLIENT_LOG environment
       variable
+    * Conary update no longer caches all hostnames immediately on
+      update - instead hostnames are cached as they are accessed.  This
+      avoids unnecessary caches when installing from changesets. (CNY-2832)
 
 Changes in 2.0.23:
   o New Features:
