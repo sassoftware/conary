@@ -1552,20 +1552,22 @@ class LeafMap(object):
         # field, we could be doing lots of extra work.  However, this way
         # is very generic.
         clonedFromInfo = dict((x, set([x[1]])) for x in tupList)
-        toGet = dict((x, [x]) for x in tupList)
 
         newToGet = {}
         hasTroves = {}
         trovesByHost = {}
         # sort by host so that if a particular repository is down
         # we can continue to look at the rest of the clonedFrom info.
-        for troveTup in toGet:
+        for troveTup in sorted(tupList):
             if troveTup[1].isInLocalNamespace():
                 continue
-            host = troveTup[1].trailingLabel().getHost()
-            trovesByHost.setdefault(host, []).append(troveTup)
 
-        results = []
+            host = troveTup[1].trailingLabel().getHost()
+            l = trovesByHost.setdefault(host, [])
+            if (troveTup[0].split(":")[0], troveTup[1], troveTup[2]) not in l:
+                l.append(troveTup)
+
+        results = dict()
         for host, troveTups in trovesByHost.items():
             try:
                 infoList = troveCache.getTroveInfo(
@@ -1593,17 +1595,24 @@ class LeafMap(object):
                 else:
                     infoList[i] = None
 
-            results += zip(troveTups, infoList)
+            results.update(itertools.izip(troveTups, infoList))
 
-        for troveTup, clonedFromList in results:
-            origTups = toGet[troveTup]
+        for troveTup in tupList:
+            if troveTup[1].isInLocalNamespace():
+                continue
+
+            if troveTup not in results and trove.troveIsComponent(troveTup[0]):
+                name = troveTup[0].split(":")[0]
+            else:
+                name = troveTup[0]
+
+            clonedFromList = results[(name, troveTup[1], troveTup[2])]
 
             if clonedFromList:
                 # Looks weird, but switches from a version stream to
                 # a version object
                 for clonedFrom in clonedFromList:
-                    for origTup in origTups:
-                        clonedFromInfo[origTup].add(clonedFrom)
+                    clonedFromInfo[troveTup].add(clonedFrom)
 
         for troveTup, clonedFrom in clonedFromInfo.iteritems():
             self._addTrove(troveTup, clonedFrom)

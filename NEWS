@@ -3,6 +3,8 @@ Changes in @NEW@:
     * Added support for getFileContents call to ShimNetClient (CNY-1669)
     * Added support for commitChangeSet and commitChangeSetFile to
       ShimNetClient (CNY-2545)
+    * During promote operations use the cloned history for packages for
+      the components of those packages as well. (CNY-1867)
 
   o Internal Changes:
     * More of the file installation path was moved into C for improved
