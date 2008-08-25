@@ -66,7 +66,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     """
     @api.publicApi
     def __init__(self, cfg = None, passwordPrompter = None,
-                 resolverClass=resolve.DependencySolver, updateCallback=None):
+                 resolverClass=resolve.DependencySolver, updateCallback=None,
+                 repos=None):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration} object.
                     If None, the standard Conary configuration is loaded
@@ -83,8 +84,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
 
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
-        self.repos = self.createRepos(self.db, cfg,
-                                      passwordPrompter = passwordPrompter)
+        if repos:
+            self.repos = repos
+        else:
+            self.repos = self.createRepos(self.db, cfg,
+                                          passwordPrompter = passwordPrompter)
+
         log.openSysLog(self.cfg.root, self.cfg.logFile)
 
         if not resolverClass:
