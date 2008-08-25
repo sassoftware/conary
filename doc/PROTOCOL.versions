@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Version 64:
+  - getTroveInfo call understands CLONEDFROMLIST troveInfo
+
 Version 63:
   - added calls addRoleMember and getRoleMembers
 

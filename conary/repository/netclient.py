@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 63 + 1)
+CLIENT_VERSIONS = range(36, 64 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2612,6 +2612,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # first, we need to know about this infoType
         if infoType not in trove.TroveInfo.streamDict.keys():
             raise Exception("Invalid infoType requested")
+
         byServer = {}
         results = [ None ] * len(troveList)
         for i, info in enumerate(troveList):
@@ -2628,6 +2629,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         attrname = trove.TroveInfo.streamDict[infoType][2]
                         results[i] = getattr(trv.troveInfo, attrname, None)
                 continue
+            elif (infoType >= trove._TROVEINFO_TAG_CLONEDFROMLIST and
+                  self.c[host].getProtocolVersion() < 64):
+                # server doesn't support this troveInfo type
+                continue
+
             tl = [ (x[0], self.fromVersion(x[1]), self.fromFlavor(x[2]))
                    for x in tl ]
             infoList = self.c[host].getTroveInfo(infoType, tl)

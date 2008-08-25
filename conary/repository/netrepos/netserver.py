@@ -45,7 +45,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 63 + 1)
+SERVER_VERSIONS = range(36, 64 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -3026,6 +3026,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # infoType should be valid
         if infoType not in trove.TroveInfo.streamDict.keys():
             raise errors.RepositoryError("Unknown trove infoType requested", infoType)
+
         self.log(2, infoType, troveList)
 
         # by default we should mark all troves with insuficient permission

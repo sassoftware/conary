@@ -11,14 +11,17 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import conary.errors
 from conary.errors import ConaryError, FilesystemError, InternalConaryError
-from conary.errors import RepositoryError, TroveNotFound, InvalidRegex
+from conary.errors import TroveNotFound, InvalidRegex
 from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
 from conary.trove import TroveError
 from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature
 from conary.lib.openpgpfile import IncompatibleKey
 from conary import versions
+
+RepositoryError = conary.errors.RepositoryError
 
 class RepositoryMismatch(RepositoryError):
 

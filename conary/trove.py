@@ -105,6 +105,17 @@ class TroveTupleList(streams.StreamCollection):
     def iter(self):
         return ( x[1] for x in self.iterAll() )
 
+class VersionListStream(streams.OrderedStreamCollection):
+    streamDict = { 1 : StringVersionStream }
+
+    def append(self, ver):
+        v = streams.StringVersionStream()
+        v.set(ver)
+        self.addStream(1, v)
+
+    def __iter__(self):
+        return ( x[1]() for x in self.iterAll() )
+
 class SearchPathItem(TroveTuple):
     _SEARCH_PATH_LABEL  = 10
     streamDict = TroveTuple.streamDict.copy()
@@ -796,7 +807,8 @@ _TROVEINFO_TAG_FACTORY        = 23
 _TROVEINFO_TAG_SEARCH_PATH    = 24
 _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
-_TROVEINFO_TAG_LAST           = 26
+_TROVEINFO_TAG_CLONEDFROMLIST = 27
+_TROVEINFO_TAG_LAST           = 27
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -891,6 +903,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SEARCH_PATH   : (DYNAMIC, SearchPath,          'searchPath'),
         _TROVEINFO_TAG_PKGCREATORDATA: (DYNAMIC, streams.StringStream,'pkgCreatorData'),
         _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
+        _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,    'clonedFromList' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)

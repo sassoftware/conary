@@ -700,7 +700,15 @@ class ClientClone:
             for mark, src in _iterAllVersions(trv):
                 if (chooser.troveInfoNeedsRewrite(mark, src)
                     and not cloneMap.hasRewrite(src)):
-                    neededInfoTroveTups.setdefault(src, []).append(mark)
+                    if mark[0] == V_LOADED:
+                        # Loaded troves are recorded with the flavor which
+                        # was used to load the recipe, the flavor to use
+                        # to get the trove from the repo is empty
+                        neededInfoTroveTups.setdefault(
+                                    (src[0], src[1], deps.ThawFlavor('')),
+                                    []).append(mark)
+                    else:
+                        neededInfoTroveTups.setdefault(src, []).append(mark)
 
         _logMe("Checking clonedFrom info for %s needed troves" % (len(neededInfoTroveTups)))
         leafMap.addClonedFromInfo(troveCache, neededInfoTroveTups)
@@ -868,10 +876,12 @@ class ClientClone:
         targetBranch = newVersion.branch()
 
         needsNewVersions = []
-        # if this is a clone of a clone, use the original clonedFrom value
-        # so that all clones refer back to the source-of-all-clones trove
         if cloneJob.options.trackClone:
+            # cloned from tracks exactly where we cloned from
             trv.troveInfo.clonedFrom.set(troveVersion)
+            # cloned from list lists all places we've cloned from,
+            # with the most recent clone at the end
+            trv.troveInfo.clonedFromList.append(troveVersion)
 
         # clone the labelPath
         labelPath = list(trv.getLabelPath())
@@ -1544,42 +1554,56 @@ class LeafMap(object):
         clonedFromInfo = dict((x, set([x[1]])) for x in tupList)
         toGet = dict((x, [x]) for x in tupList)
 
-        while toGet:
-            newToGet = {}
-            hasTroves = {}
-            trovesByHost = {}
-            # sort by host so that if a particular repository is down
-            # we can continue to look at the rest of the clonedFrom info.
-            for troveTup in toGet:
-                if troveTup[1].isInLocalNamespace():
-                    continue
-                host = troveTup[1].trailingLabel().getHost()
-                trovesByHost.setdefault(host, []).append(troveTup)
+        newToGet = {}
+        hasTroves = {}
+        trovesByHost = {}
+        # sort by host so that if a particular repository is down
+        # we can continue to look at the rest of the clonedFrom info.
+        for troveTup in toGet:
+            if troveTup[1].isInLocalNamespace():
+                continue
+            host = troveTup[1].trailingLabel().getHost()
+            trovesByHost.setdefault(host, []).append(troveTup)
 
-            results = []
-            for host, troveTups in trovesByHost.items():
-                try:
-                    infoList = troveCache.getTroveInfo(
-                                    trove._TROVEINFO_TAG_CLONEDFROM, troveTups)
-                    results += zip(troveTups, infoList)
-                except errors.ConaryError, msg:
-                    log.debug('warning: Could not access host %s: %s' %
-                                    (host, msg))
+        results = []
+        for host, troveTups in trovesByHost.items():
+            try:
+                infoList = troveCache.getTroveInfo(
+                                trove._TROVEINFO_TAG_CLONEDFROMLIST, troveTups)
+            except errors.ConaryError, msg:
+                log.debug('warning: Could not access host %s: %s' %
+                                (host, msg))
 
-            for troveTup, clonedFrom in results:
-                origTups = toGet[troveTup]
+            # handle old CLONEDFROM adequately if CLONEDFROMLIST doesn't
+            # exist
+            missingList = [ i for i, x in enumerate(infoList)
+                                    if x is None ]
 
+            try:
+                cfList = troveCache.getTroveInfo(
+                                trove._TROVEINFO_TAG_CLONEDFROM,
+                                [ troveTups[x] for x in missingList ])
+            except errors.ConaryError, msg:
+                log.debug('warning: Could not access host %s: %s' %
+                                (host, msg))
+
+            for i, clonedFrom in itertools.izip(missingList, cfList):
                 if clonedFrom:
-                    # Looks weird, but switches from a version stream to
-                    # a version object
-                    clonedFrom = clonedFrom()
+                    infoList[i] = [ clonedFrom() ]
+                else:
+                    infoList[i] = None
+
+            results += zip(troveTups, infoList)
+
+        for troveTup, clonedFromList in results:
+            origTups = toGet[troveTup]
+
+            if clonedFromList:
+                # Looks weird, but switches from a version stream to
+                # a version object
+                for clonedFrom in clonedFromList:
                     for origTup in origTups:
                         clonedFromInfo[origTup].add(clonedFrom)
-
-                    l = newToGet.setdefault(
-                                (troveTup[0], clonedFrom, troveTup[2]), [])
-                    l.extend(origTups)
-            toGet = newToGet
 
         for troveTup, clonedFrom in clonedFromInfo.iteritems():
             self._addTrove(troveTup, clonedFrom)

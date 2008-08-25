@@ -16,6 +16,11 @@ Changes in @NEW@:
     * Conary update no longer caches all hostnames immediately on
       update - instead hostnames are cached as they are accessed.  This
       avoids unnecessary caches when installing from changesets. (CNY-2832)
+    * Track CLONEDFROMLIST in troveInfo now as well as CLONEDFROM. This
+      keeps track of the full clone history of a trove, with the most
+      recent parent at the end of the list.
+    * Use CLONEDFROMLIST instead of CLONEDFROM where available to remove
+      the need to follow the cloned from history in time. (CNY-1867)
 
 Changes in 2.0.23:
   o New Features:
