@@ -761,20 +761,44 @@ def UnknownDependencyFactory(intTag):
         justOne = False
     return _UnknownDependency
 
+#ld = {}
+
 class DependencySet(object):
 
-    __slots__ = ( 'members', 'hash' )
+    __slots__ = ( '_members', '_hash' )
+
+    def _getMembers(self):
+        m = self._members
+        if type(m) == str:
+            #if False:
+            #    import sys, os
+            #    f = sys._getframe(2)
+            #    fn = f.f_code.co_filename
+            #    ln = f.f_lineno
+            #    global ld
+            #    if (fn, ln) not in ld:
+            #        l = open(fn).readlines()[ln - 1]
+            #        ld[(fn, ln)] = "%s:%s %s" % (os.path.basename(fn), ln, l)
+            #        if not l.strip():
+            #            import epdb;epdb.st()
+            #    print ld[(fn, ln)],
+            self._thaw()
+            m = self._members
+
+        return m
+
+    members = property(_getMembers)
 
     def addDep(self, depClass, dep):
 	assert(isinstance(dep, Dependency))
-        self.hash = None
+        self._hash = None
 
 	tag = depClass.tag
         c = self.members.setdefault(tag, depClass())
         c.addDep(dep)
 
     def addDeps(self, depClass, deps):
-        self.hash = None
+        self._hash = None
         tag = depClass.tag
         c = self.members.setdefault(tag, depClass())
 
@@ -803,32 +827,65 @@ class DependencySet(object):
         return depClass.tag in self.members
 
     def removeDeps(self, depClass, deps):
-        self.hash = None
+        self._hash = None
         c = self.members[depClass.tag]
         for dep in deps:
             del c.members[dep.name]
 
     def removeDepsByClass(self, depClass):
-        self.hash = None
+        self._hash = None
         self.members.pop(depClass.tag, None)
 
     def addEmptyDepClass(self, depClass):
         """ adds an empty dependency class, which for flavors has 
             different semantics when merging than not having a dependency 
             class.  See mergeFlavors """
-        self.hash = None
+        self._hash = None
 	tag = depClass.tag
         assert(tag not in self.members)
         self.members[tag] = depClass()
 
+    def thaw(self, frz):
+        if frz is None:
+            self._members = ''
+        else:
+            self._members = frz
+
+        self._hash = None
+
+    def _thaw(self):
+        frz = self._members
+        self._members = dict()
+
+        if not frz:
+            return
+
+        i = 0
+        a = self.addDep
+        depSetSplit = misc.depSetSplit
+        while i < len(frz):
+            (i, tag, frozen) = depSetSplit(i, frz)
+            if tag in dependencyClasses:
+                depClass = dependencyClasses[tag]
+            else:
+                depClass = UnknownDependencyFactory(tag)
+            a(depClass, depClass.thawDependency(frozen))
+
     def copy(self):
         new = self.__class__()
-        add = new.addDep
-        for depClass in self.members.itervalues():
-            cls = depClass.__class__
-            for dep in depClass.members.itervalues():
-                add(cls, dep)
+        if type(self._members) == str:
+            new.thaw(self._members)
+        else:
+            add = new.addDep
+            for depClass in self.members.itervalues():
+                cls = depClass.__class__
+                for dep in depClass.members.itervalues():
+                    add(cls, dep)
+
         return new
+
+    __copy__ = lambda s, x: s.copy()
+    __deepcopy__ = lambda s, x: s.copy()
 
     def getDepClasses(self):
         return self.members
@@ -837,7 +894,7 @@ class DependencySet(object):
         if other is None:
             return
         assert(isinstance(other, self.__class__))
-        self.hash = None
+        self._hash = None
         a = self.addDep
 	for tag, members in other.members.iteritems():
             c = members.__class__
@@ -915,16 +972,27 @@ class DependencySet(object):
         if other is None:
             return False
         # No much sense in comparing stuff that is not the same class as ours;
-        # it also breaks epydoc (CNY-1772)
-        if not hasattr(other, 'members'):
+        # it also breaks epydoc (CNY-1772). We don't compare the classes
+        # here (even though it would be far more sensible) because conary
+        # compares DependencySet objects to Flavors sometimes. Which is,
+        # of course, awful.
+        if not hasattr(other, '_members'):
             return False
-        if set(other.members.iterkeys()) != set(self.members.iterkeys()):
-            return False
-	for tag in other.members:
-	    if not self.members[tag] == other.members[tag]:
-		return False
 
-	return True
+        if type(self._members) == dict and type(other._members) == dict:
+            if set(other.members.iterkeys()) != set(self.members.iterkeys()):
+                return False
+            for tag in other.members:
+                if not self.members[tag] == other.members[tag]:
+                    return False
+            return True
+
+        if type(self._members) == dict:
+            self._members = self.freeze()
+        elif type(other._members) == dict:
+            other._members = other.freeze()
+
+        return self._members == other._members
 
     def __cmp__(self, other):
         if other is None:
@@ -961,15 +1029,13 @@ class DependencySet(object):
         return not self == other
 
     def __hash__(self):
-        if self.hash is None:
-            h = 0
-            for member in self.members.itervalues():
-                h ^= hash(member)
-            self.hash = h
-	return self.hash
+        if self._hash is None:
+            self._hash = hash(self.freeze())
+
+        return self._hash
 
     def __nonzero__(self):
-	return not(not(self.members))
+        return not(not(self._members))
 
     def __str__(self):
         memberList = self.members.items()
@@ -977,18 +1043,24 @@ class DependencySet(object):
         return "\n".join([ str(x[1]) for x in memberList])
 
     def freeze(self):
-        return misc.depSetFreeze(self.members);
+        if type(self._members) == str:
+            return self._members
+        else:
+            return misc.depSetFreeze(self.members);
 
     def isEmpty(self):
-        return not(self.members)
+        return not(self._members)
 
     def __repr__(self):
         return "ThawDep('%s')" % self.freeze()
 
-    def __init__(self):
-	self.members = {}
-        self.hash = None
+    def __init__(self, frz = None):
+        if frz is not None:
+            self._members = frz
+        else:
+            self._members = ''
 
+        self._hash = None
 
 # A special class for representing Flavors
 class Flavor(DependencySet):
@@ -1013,24 +1085,8 @@ class Flavor(DependencySet):
         return self.toStrongFlavor().score(
                     other.toStrongFlavor()) is not False
 
-
-def _Thaw(depSet, frz):
-    if not frz:
-        return depSet
-    i = 0
-    a = depSet.addDep
-    depSetSplit = misc.depSetSplit
-    while i < len(frz):
-        (i, tag, frozen) = depSetSplit(i, frz)
-        if tag in dependencyClasses:
-            depClass = dependencyClasses[tag]
-        else:
-            depClass = UnknownDependencyFactory(tag)
-        a(depClass, depClass.thawDependency(frozen))
-    return depSet
-
 def ThawDependencySet(frz):
-    return _Thaw(DependencySet(), frz)
+    return DependencySet(frz)
 
 @api.publicApi
 def ThawFlavor(frz):
@@ -1041,7 +1097,9 @@ def ThawFlavor(frz):
     @raises TypeError: could be raised if frozen object is malformed
     @raises ValueError: could be raised if frozen object is malformed
     """
-    return _Thaw(Flavor(), frz)
+    f = Flavor()
+    f.thaw(frz)
+    return f
 
 @api.developerApi
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):

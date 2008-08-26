@@ -33,6 +33,8 @@ Changes in @NEW@:
     * Use CLONEDFROMLIST instead of CLONEDFROM where available to remove
       the need to follow the cloned from history in time. (CNY-1867)
     * Reimplemented dependency freezing in C
+    * DependencySet objects now store the frozen depenedency by default
+      and thaw it only when the thawed objects are needed
 
 Changes in 2.0.23:
   o New Features:
