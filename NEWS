@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.24:
   o New Features:
     * includeConfigFile now interprets paths relative to the file
       currently being processed, for files and URIs. (CNY-2950)
