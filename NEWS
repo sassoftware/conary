@@ -2,7 +2,17 @@ Changes in @NEW@:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
 
-Changes in @NEW@:
+  o Internal Changes:
+    * Reimplemented dependency freezing in C
+    * DependencySet objects now store the frozen depenedency by default
+      and thaw it only when the thawed objects are needed (CNY-2410)
+    * Intern frozen dependency and frozen StringCollection strings (CNY-2410)
+    * DependenciesStream and FlavorStream objects now subclass from
+      DependenciesSet instead of having a DependenciesSet object as an
+      attribute. This saves one object per instance. (CNY-2410)
+
+
+Changes in 2.0.24:
   o New Features:
     * includeConfigFile now interprets paths relative to the file
       currently being processed, for files and URIs. (CNY-2950)
@@ -36,13 +46,6 @@ Changes in @NEW@:
       recent parent at the end of the list.
     * Use CLONEDFROMLIST instead of CLONEDFROM where available to remove
       the need to follow the cloned from history in time. (CNY-1867)
-    * Reimplemented dependency freezing in C
-    * DependencySet objects now store the frozen depenedency by default
-      and thaw it only when the thawed objects are needed (CNY-2410)
-    * Intern frozen dependency and frozen StringCollection strings (CNY-2410)
-    * DependenciesStream and FlavorStream objects now subclass from
-      DependenciesSet instead of having a DependenciesSet object as an
-      attribute. This saves one object per instance. (CNY-2410)
 
 Changes in 2.0.23:
   o New Features:
