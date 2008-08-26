@@ -433,6 +433,7 @@ class StreamCollection(InfoStream):
         return "".join(l)
 
     def thaw(self, data):
+        data = intern(data)
         self._data = data
 
     def _thaw(self):

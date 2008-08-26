@@ -21,7 +21,7 @@ Changes in @NEW@:
     * Added misc.pack() and use it to freeze TroveRefsFilesStream and
       StreamCollection objects
     * Initial step of promote takes advantage of weak references to avoid
-      downloading so many packages (CNY-1867)
+      downloading so many packages (CNY-1867,CNY-2410)
     * The shim network client now supports CONARY_CLIENT_LOG environment
       variable
     * Conary update no longer caches all hostnames immediately on
@@ -34,7 +34,8 @@ Changes in @NEW@:
       the need to follow the cloned from history in time. (CNY-1867)
     * Reimplemented dependency freezing in C
     * DependencySet objects now store the frozen depenedency by default
-      and thaw it only when the thawed objects are needed
+      and thaw it only when the thawed objects are needed (CNY-2410)
+    * Intern frozen dependency and frozen StringCollection strings (CNY-2410)
 
 Changes in 2.0.23:
   o New Features:

@@ -845,14 +845,6 @@ class DependencySet(object):
         assert(tag not in self.members)
         self.members[tag] = depClass()
 
-    def thaw(self, frz):
-        if frz is None:
-            self._members = ''
-        else:
-            self._members = frz
-
-        self._hash = None
-
     def _thaw(self):
         frz = self._members
         self._members = dict()
@@ -1056,11 +1048,14 @@ class DependencySet(object):
 
     def __init__(self, frz = None):
         if frz is not None:
+            frz = intern(frz)
             self._members = frz
         else:
             self._members = ''
 
         self._hash = None
+
+    thaw = __init__
 
 # A special class for representing Flavors
 class Flavor(DependencySet):
