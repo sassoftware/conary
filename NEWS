@@ -36,6 +36,9 @@ Changes in @NEW@:
     * DependencySet objects now store the frozen depenedency by default
       and thaw it only when the thawed objects are needed (CNY-2410)
     * Intern frozen dependency and frozen StringCollection strings (CNY-2410)
+    * DependenciesStream and FlavorStream objects now subclass from
+      DependenciesSet instead of having a DependenciesSet object as an
+      attribute. This saves one object per instance. (CNY-2410)
 
 Changes in 2.0.23:
   o New Features:

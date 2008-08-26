@@ -245,50 +245,42 @@ class StringVersionStream(FrozenVersionStream):
 	else:
 	    return self.v.asString()
 
+class DepsAttr(object):
 
-class DependenciesStream(InfoStream):
+    def __get__(self, inst, cl):
+        return inst
+
+class BaseDependenciesStream(InfoStream):
     """
+    Abstract Class. Doesn't work without a mixin.
+
     Stores list of strings; used for requires/provides lists
     """
-
-    __slots__ = 'deps'
-    klass = deps.DependencySet
+    deps = DepsAttr()
 
     def __call__(self):
-	return self.deps
+        return self
 
     def set(self, val):
         assert(val is not None)
-	self.deps = val
-
-    def freeze(self, skipSet = None):
-        if self.deps is None:
-            return ''
-        return self.deps.freeze()
+        self._members = val._members
+        self.hash = None
 
     def diff(self, them):
-	if self.deps != them.deps:
+        if self != them:
 	    return self.freeze()
 
 	return None
-
-    def thaw(self, frz):
-        self.deps = self.klass(frz)
 
     def twm(self, diff, base):
         self.thaw(diff)
         return False
 
-    def __eq__(self, other, skipSet = None):
-	return other.__class__ == self.__class__ and self.deps == other.deps
+class DependenciesStream(deps.DependencySet, BaseDependenciesStream):
+    pass
 
-    def __init__(self, dep = ''):
-        assert(type(dep) is str)
-        self.deps = self.klass(dep)
-
-class FlavorsStream(DependenciesStream):
-
-    klass = deps.Flavor
+class FlavorsStream(deps.Flavor, BaseDependenciesStream):
+    pass
 
 class StringsStream(list, InfoStream):
     """

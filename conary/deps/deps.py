@@ -904,7 +904,7 @@ class DependencySet(object):
                     a(c, dep)
 
     def intersection(self, other, strict=True):
-        assert(isinstance(other, self.__class__))
+        assert(hasattr(other, '_members'))
         newDep = self.__class__()
         for tag, depClass in self.members.iteritems():
             if tag in other.members:
@@ -960,7 +960,7 @@ class DependencySet(object):
     def satisfies(self, other):
         return self.score(other) is not False
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
         if other is None:
             return False
         # No much sense in comparing stuff that is not the same class as ours;
@@ -1034,7 +1034,7 @@ class DependencySet(object):
         memberList.sort()
         return "\n".join([ str(x[1]) for x in memberList])
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
         if type(self._members) == str:
             return self._members
         else:
