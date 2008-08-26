@@ -155,15 +155,6 @@ class Dependency(BaseDependency):
         else:
             return "Dependency('%s')" % (self.name)
 
-    def freeze(self):
-	if self.flags:
-	    flags = [ (x.replace(':', '::'), y) for x, y in self.flags.items() ]
-	    flags.sort()
-	    return "%s:%s" % (self.name.replace(':', '::'), 
-                ":".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
-	else:
-	    return self.name.replace(':', '::')
-
     def score(self, required):
         """
         Returns a flavor matching score. This dependency is considered
@@ -423,7 +414,6 @@ class DependencyClass(object):
             assert(class_.flags == DEP_CLASS_OPT_FLAGS)
 
         return Dependency(depName, flags)
-
 
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__.__name__ == self.depClass.__name__)
@@ -987,11 +977,7 @@ class DependencySet(object):
         return "\n".join([ str(x[1]) for x in memberList])
 
     def freeze(self):
-        rc = []
-        for tag, depclass in sorted(self.getDepClasses().items()):
-            for dep in depclass.getDeps():
-                rc.append('%d#%s' %(tag, dep.freeze()))
-        return '|'.join(rc)
+        return misc.depSetFreeze(self.members);
 
     def isEmpty(self):
         return not(self.members)

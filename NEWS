@@ -4,6 +4,7 @@ Changes in @NEW@:
       currently being processed, for files and URIs. (CNY-2950)
     * includeConfigFile now supports a ~/path syntax to substitute the
       current user's home directory. (CNY-1650)
+
   o Client Changes:
     * Added support for getFileContents call to ShimNetClient (CNY-1669)
     * Added support for commitChangeSet and commitChangeSetFile to
@@ -31,6 +32,7 @@ Changes in @NEW@:
       recent parent at the end of the list.
     * Use CLONEDFROMLIST instead of CLONEDFROM where available to remove
       the need to follow the cloned from history in time. (CNY-1867)
+    * Reimplemented dependency freezing in C
 
 Changes in 2.0.23:
   o New Features:

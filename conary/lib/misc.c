@@ -35,6 +35,7 @@
 
 static PyObject * depSetSplit(PyObject *self, PyObject *args);
 static PyObject * depSplit(PyObject *self, PyObject *args);
+static PyObject * depSetFreeze(PyObject *self, PyObject *args);
 static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * removeIfExists(PyObject *self, PyObject *args);
@@ -53,6 +54,7 @@ static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
     { "depSplit", depSplit, METH_VARARGS },
+    { "depSetFreeze", depSetFreeze, METH_VARARGS },
     { "exists", exists, METH_VARARGS,
         "returns a boolean reflecting whether a file (even a broken symlink) "
         "exists in the filesystem" },
@@ -201,6 +203,336 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
     Py_DECREF(flags);
     free(data);
     return ret;
+}
+
+static void copyColonStr(char ** sPtr, PyObject * strObj) {
+    int size;
+    char * s;
+    char * r = *sPtr;
+
+    s = PyString_AS_STRING(strObj);
+    size = PyString_GET_SIZE(strObj);
+
+    while (size--) {
+        if (*s == ':')
+            *r++ = ':';
+        *r++ = *s++;
+    }
+
+    *sPtr = r;
+}
+
+struct depFlag {
+    PyObject * flag;
+    int sense;
+};
+
+static int flagSort(const void * a, const void * b) {
+    return strcmp(PyString_AS_STRING( ((struct depFlag *) a)->flag),
+                  PyString_AS_STRING( ((struct depFlag *) b)->flag) );
+}
+
+static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
+                        char ** resultPtr, int * size) {
+    PyObject * itemList;
+    PyObject * itemTuple;
+    PyObject * senseObj;
+    int itemCount;
+    int itemSize;
+    int i;
+    char * next, * result;
+    struct depFlag * flags;
+
+    if (!PyString_CheckExact(nameObj)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be a string");
+        return -1;
+    }
+
+    if (!PyDict_CheckExact(dict)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be a dict");
+        return -1;
+    }
+
+    itemList = PyDict_Items(dict);
+    itemCount = PyList_GET_SIZE(itemList);
+    flags = malloc(itemCount * sizeof(*flags));
+    itemSize = 0;
+    for (i = 0; i < itemCount; i++) {
+        itemTuple = PyList_GET_ITEM(itemList, i);
+
+        flags[i].flag = PyTuple_GET_ITEM(itemTuple, 0);
+        senseObj = PyTuple_GET_ITEM(itemTuple, 1);
+
+        if (!PyString_CheckExact(flags[i].flag)) {
+            PyErr_SetString(PyExc_TypeError, "dict keys must be strings");
+            Py_DECREF(itemList);
+            return -1;
+        }
+
+        if (!PyInt_CheckExact(senseObj)) {
+            PyErr_SetString(PyExc_TypeError, "dict values must be ints");
+            Py_DECREF(itemList);
+            return -1;
+        }
+
+        flags[i].sense = PyInt_AS_LONG(senseObj);
+        itemSize += PyString_GET_SIZE(flags[i].flag);
+    }
+
+    qsort(flags, itemCount, sizeof(*flags), flagSort);
+
+    /* Frozen form is name:SENSEflag:SENSEflag. Worst case size for name/flag
+       is * 2 due to : expansion */
+    result = malloc((PyString_GET_SIZE(nameObj) * 2) + 1 +
+                    (itemSize * 2) + itemCount * 3);
+    next = result;
+    copyColonStr(&next, nameObj);
+
+    for (i = 0; i < itemCount; i++) {
+        *next++ = ':';
+        switch (flags[i].sense) {
+            case 1:                   /* PY_SENSE_REQUIRED */
+                break;
+            case 2:                   /* PY_SENSE_PREFERRED */
+                *next++ = '~';
+                break;
+            case 3:                   /* PY_SENSE_PREFERNOT */
+                *next++ = '~';
+                *next++ = '!';
+                break;
+            case 4:                   /* PY_SENSE_DISALLOWED */
+                *next++ = '!';
+                break;
+            default:
+                free(result);
+                free(flags);
+                Py_DECREF(itemList);
+                PyErr_SetString(PyExc_TypeError, "unknown sense");
+                return -1;
+        }
+
+        copyColonStr(&next, flags[i].flag);
+    }
+
+    *size = next - result;
+    *resultPtr = result;
+    free(flags);
+    Py_DECREF(itemList);
+
+    return 0;
+}
+
+struct depList {
+    char * className;
+    PyObject * dep;
+    char * frz;
+    int frzSize;
+};
+
+static int depListSort(const void * a, const void * b) {
+    return strcmp( ((struct depList *) a)->className,
+                   ((struct depList *) b)->className);
+}
+
+/* This leaks memory on error. Oh well. */
+static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
+                          char ** resultPtr, int * resultSizePtr) {
+    PyObject * depObjList, * tuple;
+    PyObject * nameObj, * flagsObj;
+    int depCount, i;
+    struct depList * depList;
+    int totalSize, tagLen;
+    char * result, * next;
+    char tag[12];
+
+    if (!PyInt_CheckExact(tagObj)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
+        free(depList);
+        return -1;
+    }
+
+    if (!PyDict_CheckExact(dict)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be a dict");
+        return -1;
+    }
+
+    tagLen = sprintf(tag, "%d#", (int) PyInt_AS_LONG(tagObj));
+
+    depObjList = PyDict_Items(dict);
+    depCount = PyList_GET_SIZE(depObjList);
+    if (!depCount) {
+        Py_DECREF(depObjList);
+        *resultPtr = NULL;
+        *resultSizePtr = 0;
+        return 0;
+    }
+
+    depList = malloc(depCount * sizeof(*depList));
+    for (i = 0; i < depCount; i++) {
+        tuple = PyList_GET_ITEM(depObjList, i);
+        if (!PyString_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
+            PyErr_SetString(PyExc_TypeError, "dict keys must be ints");
+            Py_DECREF(depObjList);
+            free(depList);
+            return -1;
+        }
+        depList[i].className = PyString_AS_STRING(PyTuple_GET_ITEM(tuple, 0));
+        depList[i].dep = PyTuple_GET_ITEM(tuple, 1);
+    }
+
+    Py_DECREF(depObjList);
+
+    qsort(depList, depCount, sizeof(*depList), depListSort);
+
+    totalSize = 0;
+    for (i = 0; i < depCount; i++) {
+        if (!(nameObj = PyObject_GetAttrString(depList[i].dep, "name"))) {
+            free(depList);
+            return -1;
+        }
+
+        if (!(flagsObj = PyObject_GetAttrString(depList[i].dep, "flags"))) {
+            free(depList);
+            return -1;
+        }
+
+        depFreezeRaw(nameObj, flagsObj, &depList[i].frz, &depList[i].frzSize);
+
+        Py_DECREF(nameObj);
+        Py_DECREF(flagsObj);
+
+        totalSize += depList[i].frzSize;
+    }
+
+    /* 15 leaves plenty of room for the tag integer and the # */
+    result = malloc((depCount * 15) + totalSize);
+    next = result;
+    for (i = 0; i < depCount; i++) {
+        /* is sprintf really the best we can do? */
+        strcpy(next, tag);
+        next += tagLen;
+        memcpy(next, depList[i].frz, depList[i].frzSize);
+        free(depList[i].frz);
+        next += depList[i].frzSize;
+        *next++ = '|';
+    }
+
+    /* chop off the trailing | */
+    next--;
+
+    *resultPtr = result;
+    *resultSizePtr = next - result;
+
+    return 0;
+}
+
+struct depClassList {
+    int tag;
+    char * frz;
+    int frzSize;
+};
+
+static int depClassSort(const void * a, const void * b) {
+    int one = ((struct depClassList *) a)->tag;
+    int two = ((struct depClassList *) b)->tag;
+
+    if (one < two)
+        return -1;
+    else if (one == two)
+        return 0;
+
+    return 1;
+}
+
+/* leaks memory on error */
+static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
+    PyObject * memberObjs, * memberList;
+    PyObject * depClass, * tuple, * rc;
+    PyObject * tagObj, * classMembers;
+    struct depClassList * members;
+    int memberCount;
+    char * result, * next;
+    int i, totalSize;
+
+    if (PyTuple_GET_SIZE(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "exactly one argument expected");
+        return NULL;
+    }
+
+    memberObjs = PyTuple_GET_ITEM(args, 0);
+    if (!PyDict_CheckExact(memberObjs)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be a dict");
+        return NULL;
+    }
+
+    memberList = PyDict_Items(memberObjs);
+    memberCount = PyList_GET_SIZE(memberList);
+    if (!memberCount) {
+        Py_DECREF(memberList);
+        return PyString_FromString("");
+    }
+
+    members = malloc(sizeof(*members) * memberCount);
+
+    totalSize = 0;
+    for (i = 0; i < memberCount; i++) {
+        tuple = PyList_GET_ITEM(memberList, i);
+
+        if (!PyInt_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
+            PyErr_SetString(PyExc_TypeError, "dict keys must be ints");
+            Py_DECREF(memberList);
+            free(members);
+            return NULL;
+        }
+
+        members[i].tag = PyInt_AS_LONG(PyTuple_GET_ITEM(tuple, 0));
+        depClass = PyTuple_GET_ITEM(tuple, 1);
+
+        if (!(tagObj = PyObject_GetAttrString(depClass, "tag"))) {
+            free(members);
+            Py_DECREF(memberList);
+            return NULL;
+        }
+
+        if (!(classMembers =
+                    PyObject_GetAttrString(depClass, "members"))) {
+            free(members);
+            Py_DECREF(memberList);
+            Py_DECREF(tagObj);
+            return NULL;
+        }
+
+        if (depClassFreezeRaw(tagObj, classMembers, &members[i].frz,
+                              &members[i].frzSize)) {
+            Py_DECREF(memberList);
+            Py_DECREF(tagObj);
+            Py_DECREF(classMembers);
+            free(members);
+            return NULL;
+        }
+
+        totalSize += members[i].frzSize + 1;
+    }
+
+    Py_DECREF(memberList);
+
+    next = result = malloc(totalSize);
+    qsort(members, memberCount, sizeof(*members), depClassSort);
+
+    for (i = 0; i < memberCount; i++) {
+        memcpy(next, members[i].frz, members[i].frzSize);
+        next += members[i].frzSize;
+        *next++ = '|';
+        free(members[i].frz);
+    }
+
+    /* chop off the trailing | */
+    next--;
+
+    free(members);
+    rc = PyString_FromStringAndSize(result, next - result);
+    free(result);
+    return rc;
 }
 
 static PyObject * exists(PyObject *self, PyObject *args) {
@@ -352,7 +684,6 @@ static PyObject * pack(PyObject * self, PyObject * args) {
                     }
 
                     if (len != i) {
-                        breakpoint;
                         PyErr_SetString(PyExc_RuntimeError, "bad string size");
                         return NULL;
                     }
@@ -367,7 +698,6 @@ static PyObject * pack(PyObject * self, PyObject * args) {
                 break;
 
             default:
-                breakpoint;
                 PyErr_SetString(PyExc_ValueError,
                                 "unknown character in pack format");
                 return NULL;
