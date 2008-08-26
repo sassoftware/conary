@@ -261,7 +261,7 @@ class ConfigFile(_Config):
         self._ignoreErrors = False
         self._ignoreUrlIncludes = False
         self._keyLimiters = set()
-        self._configFileStack = set()
+        self._configFileStack = []
         _Config.__init__(self)
         self.addDirective('includeConfigFile', 'includeConfigFile')
 
@@ -282,7 +282,7 @@ class ConfigFile(_Config):
             # File was already processed, most likely an include loop
             # This should also handle loops in URLs
             return
-        self._configFileStack.add(path)
+        self._configFileStack.append(path)
         # path is used for generating error messages
         try:
             lineno = 1
@@ -312,7 +312,7 @@ class ConfigFile(_Config):
             raise CfgEnvironmentError(err.filename, err.strerror)
 
         # We're done with this config file, remove it from the include stack
-        self._configFileStack.remove(path)
+        self._configFileStack.pop()
 
     def _openPath(self, path, exception=True):
         if os.path.exists(path):
@@ -341,7 +341,6 @@ class ConfigFile(_Config):
 
         @raises CfgEnvironmentError: raised if file read fails
         """
-
         f = self._openPath(path, exception=exception)
         if f: self.readObject(path, f)
 
@@ -387,8 +386,8 @@ class ConfigFile(_Config):
             except Exception, err:
                 if errors.exceptionIsUncatchable(err):
                     raise
-                raise ParseError, "%s:%s: when processing %s: %s" \
-                                                % (fileName, lineno, key, err)
+                util.rethrow(ParseError("%s:%s: when processing %s: %s"
+                    % (fileName, lineno, key, err)))
         else:
             self.configKey(key, val, fileName, lineno)
 
@@ -461,12 +460,38 @@ class ConfigFile(_Config):
     def isUrl(self, val):
         return val.startswith("http://") or val.startswith("https://")
 
+    def _absPath(self, relpath):
+        """
+        Interpret C{relpath} relative to the last included config file
+        (or the current working directory if no config file is being
+        processed) and return the full path.
+
+        Additionally, paths like ~/foo where the current user's home
+        directory is substituted for the ~ are supported.
+        """
+
+        # Pass through URIs and absolute paths.
+        if self.isUrl(relpath) or relpath[0] == '/':
+            return relpath
+
+        # This won't deal with ~user/ syntax, but it's much less
+        # common anyway.
+        if relpath.startswith('~/') and 'HOME' in os.environ:
+            return os.path.join(os.environ['HOME'], relpath[2:])
+
+        if self._configFileStack:
+            relativeTo = os.path.dirname(self._configFileStack[-1])
+        else:
+            relativeTo = os.getcwd()
+        return os.path.join(relativeTo, relpath)
+
     def includeConfigFile(self, val, fileName = "override",
                           lineno = '<No line>'):
-        if self.isUrl(val):
-            self.readUrl(val)
+        abspath = self._absPath(val)
+        if self.isUrl(abspath):
+            self.readUrl(abspath)
         else:
-            for cfgfile in sorted(util.braceGlob(val)):
+            for cfgfile in sorted(util.braceGlob(abspath)):
                 self.read(cfgfile)
 
 class ConfigSection(ConfigFile):
@@ -573,10 +598,11 @@ class SectionedConfigFile(ConfigFile):
 
     def includeConfigFile(self, val, fileName = "override",
                           lineno = '<No line>'):
-        if self.isUrl(val):
-            self.readUrl(val, resetSection = False)
+        abspath = self._absPath(val)
+        if self.isUrl(abspath):
+            self.readUrl(abspath, resetSection = False)
         else:
-            for cfgfile in sorted(util.braceGlob(val)):
+            for cfgfile in sorted(util.braceGlob(abspath)):
                 self.read(cfgfile, resetSection = False)
 
     @api.publicApi

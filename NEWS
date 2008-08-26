@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o New Features:
+    * includeConfigFile now interprets paths relative to the file
+      currently being processed, for files and URIs. (CNY-2950)
+    * includeConfigFile now supports a ~/path syntax to substitute the
+      current user's home directory. (CNY-1650)
   o Client Changes:
     * Added support for getFileContents call to ShimNetClient (CNY-1669)
     * Added support for commitChangeSet and commitChangeSetFile to
