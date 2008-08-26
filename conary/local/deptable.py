@@ -1066,8 +1066,6 @@ class DependencyChecker:
                                                 unresolveable,
                                                 wasIn)
 
-        # We store the edges in self.g for the next try; don't resolve the
-        # same things over and over. It's a shame we do this even if all the
         if not unsatisfiedList and not unresolveableList:
             # Everything was satisfied. No reason to be careful about updating
             # the satisfied list.
