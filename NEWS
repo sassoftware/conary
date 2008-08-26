@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * "conary emerge" no longer emits warnings. (CNY-2835)
+
+Changes in @NEW@:
   o New Features:
     * includeConfigFile now interprets paths relative to the file
       currently being processed, for files and URIs. (CNY-2950)

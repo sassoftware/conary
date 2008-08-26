@@ -379,6 +379,8 @@ class DisplayConfig:
         self.fullVersions = fullVersions
         self.showLabels = showLabels
         self.fullFlavors = fullFlavors
+        if not baseFlavors:
+            baseFlavors = []
         self.baseFlavors = baseFlavors
         # FIXME: showComponents should really be in setChildDisplay.
         self.showComponents = showComponents

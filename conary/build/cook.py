@@ -2036,6 +2036,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 groupOptions=None):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
+    if emerge:
+        client.checkWriteableRoot()
     repos = client.getRepos()
 
     if cookIds:
@@ -2196,14 +2198,31 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             client = conaryclient.ConaryClient(cfg)
             try:
                 cs = changeset.ChangeSetFromFile(csFile)
-                job = [ (x[0], (None, None), (x[1], x[2]), True) for
+                applyList = [ (x[0], (None, None), (x[1], x[2]), True) for
                         x in cs.getPrimaryTroveList() ]
                 callback = updatecmd.UpdateCallback()
-                rc = client.updateChangeSet(job, recurse = True,
-                                            resolveDeps = False,
-                                            callback = callback,
-                                            fromChangesets = [ cs ])
-                client.applyUpdate(rc[0])
+                client.setUpdateCallback(callback)
+                updJob = client.newUpdateJob()
+
+                try:
+                    suggMap = client.prepareUpdateJob(updJob, applyList,
+                                                        recurse = True, resolveDeps = False,
+                                                        fromChangesets = [ cs ]
+                    )
+                except:
+                    callback.done()
+                    client.close()
+                    raise
+
+                if suggMap:
+                    callback.done()
+
+                try:
+                    restartDir = client.applyUpdateJob(updJob)
+                finally:
+                    updJob.close()
+                    client.close()
+
             except (conaryclient.UpdateError, errors.CommitError), e:
                 log.error(e)
                 log.error("Not committing changeset: please apply %s by "
