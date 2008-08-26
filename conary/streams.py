@@ -282,6 +282,46 @@ class DependenciesStream(deps.DependencySet, BaseDependenciesStream):
 class FlavorsStream(deps.Flavor, BaseDependenciesStream):
     pass
 
+class OptionalFlavorStream(InfoStream):
+
+    __slots__ = ( 'deps' )
+
+    def __call__(self):
+        return self.deps
+
+    def freeze(self, skipSet = None):
+        if self.deps is None:
+            return '\0'
+
+        return self.deps.freeze()
+
+    def thaw(self, s):
+        if s == '\0':
+            self.deps = None
+        else:
+            self.deps = FlavorsStream(s)
+
+    def diff(self, other, skipSet = None):
+        if self.deps is None and other.deps is None:
+            return ''
+        elif self.deps is None:
+            return '\0';
+
+        return self.deps.diff(other)
+
+    def set(self, val):
+        # None is okay
+        if val is None:
+            self.deps = None
+        else:
+            self.deps = FlavorsStream(val.freeze())
+
+    def __init__(self, frz = None):
+        if frz == None:
+            self.deps = FlavorsStream('')
+        else:
+            self.deps = FlavorsStream(frz)
+
 class StringsStream(list, InfoStream):
     """
     Stores list of arbitrary strings

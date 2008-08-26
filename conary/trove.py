@@ -32,6 +32,7 @@ from conary.streams import ByteStream
 from conary.streams import DependenciesStream, FlavorsStream
 from conary.streams import FrozenVersionStream
 from conary.streams import SMALL, LARGE, DYNAMIC
+from conary.streams import OptionalFlavorStream
 from conary.streams import StringVersionStream
 
 TROVE_VERSION=10
@@ -158,32 +159,6 @@ class SearchPath(TroveTupleList):
 
     def iter(self):
         return ( x[1].get() for x in self.iterAll() )
-
-class OptionalFlavorStream(streams.FlavorsStream):
-
-    def freeze(self, skipSet = None):
-        if self.deps is None:
-            return '\0'
-
-        return streams.FlavorsStream.freeze(self)
-
-    def thaw(self, s):
-        if s == '\0':
-            self.deps = None
-        else:
-            streams.FlavorsStream.thaw(self, s)
-
-    def diff(self, other, skipSet = None):
-        if self.deps is None and other.deps is None:
-            return ''
-        elif self.deps is None:
-            return '\0';
-
-        return streams.FlavorsStream.diff(self, other)
-
-    def set(self, val):
-        # None is okay
-        self.deps = val
 
 class SingleTroveRedirect(streams.StreamSet):
     _SINGLE_REDIRECT_NAME   = 1
