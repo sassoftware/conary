@@ -2,6 +2,14 @@ Changes in @NEW@:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
 
+  o Build Changes:
+    * Cross-compiling packages that include perl modules can now
+      provide perl: dependencies; the perl @INC path needs to
+      be provided via the r.Requires(bootstrapPerlIncPath=...)
+      keyword argument. (CNY-2943)
+    * Packaging a version of perl that requires libraries in the
+      destdir to start but does not use RPATH now succeeds. (CNY-2955)
+
   o Internal Changes:
     * Reimplemented dependency freezing in C
     * DependencySet objects now store the frozen depenedency by default

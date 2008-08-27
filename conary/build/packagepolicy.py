@@ -1759,6 +1759,7 @@ class _dependency(policy.Policy):
         # bootstrap keeping only one copy of these around
         self.bootstrapPythonFlags = None
         self.bootstrapSysPath = []
+        self.bootstrapPerlIncPath = []
         
     def preProcess(self):
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
@@ -2190,16 +2191,19 @@ class _dependency(policy.Policy):
         p = util.popen(r"""%s -e 'print join("\n", @INC)'""" %perl)
         perlIncPath = p.readlines()
         # make sure that the command completed successfully
-        rc = p.close()
-        perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
-        return perlIncPath
+        try:
+            rc = p.close()
+            perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
+            return perlIncPath
+        except RuntimeError:
+            return self.bootstrapPerlIncPath
 
     def _getperl(self, macros, recipe):
         """
         Find the preferred instance of perl to use, including setting
         any environment variables necessary to use that perl.
-        Returns string for running it, and a separate string, if necessary,
-        for adding to @INC.
+        Returns string for running it, the C{@INC} path, and a separate
+        string, if necessary, for adding to @INC.
         """
         perlDestPath = '%(destdir)s%(bindir)s/perl' %macros
         # not %(bindir)s so that package modifications do not affect
@@ -2211,32 +2215,36 @@ class _dependency(policy.Policy):
 
         if os.access(perlDestPath, os.X_OK):
             # must use packaged perl if it exists
-            m = recipe.magic[perlPath]
+            m = recipe.magic[perlPath] # this actually looks up perlDestPath
             if m and 'RPATH' in m.contents and m.contents['RPATH']:
                 # we need to prepend the destdir to each element of the RPATH
                 # in order to run perl in the destdir
                 perl = ''.join((
                     'export LD_LIBRARY_PATH=',
+                    '%s%s:' %(macros.destdir, macros.libdir),
                     ':'.join([macros.destdir+x
                               for x in m.contents['RPATH'].split(':')]),
                     ';',
                     perlDestPath
                 ))
-                perlDestInc = self._getperlincpath(perl)
-                perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
-                return [perl, perlDestInc]
+                perlIncPath = self._getperlincpath(perl)
+                perlDestInc = _perlDestInc(macros.destdir, perlIncPath)
+                return [perl, perlIncPath, perlDestInc]
             else:
-                # perl that does not need rpath?
-                perlDestInc = self._getperlincpath(perlDestPath)
-                perlDestInc = _perlDestInc(macros.destdir, perlDestInc)
-                return [perlDestPath, perlDestInc]
+                # perl that does not use/need rpath
+                perl = 'LD_LIBRARY_PATH=%s%s %s' %(
+                    macros.destdir, macros.libdir, perlDestPath)
+                perlIncPath = self._getperlincpath(perl)
+                perlDestInc = _perlDestInc(macros.destdir, perlIncPath)
+                return [perlDestPath, perlIncPath, perlDestInc]
         elif os.access(perlPath, os.X_OK):
             # system perl if no packaged perl, needs no @INC mangling
             self._enforceProvidedPath(perlPath)
-            return [perlPath, '']
+            perlIncPath = self._getperlincpath(perlPath)
+            return [perlPath, perlIncPath, '']
 
         # must be no perl at all
-        return ['', '']
+        return ['', '', '']
 
 
     def _getPython(self, macros, path):
@@ -2412,7 +2420,7 @@ class Provides(_dependency):
                 self.exceptDeps.extend(exceptDeps)
             else:
                 self.exceptDeps.append(exceptDeps)
-        # The next two are called only from Requires and should override
+        # The next three are called only from Requires and should override
         # completely to make sure the policies are in sync
         bootstrapPythonFlags = keywords.pop('_bootstrapPythonFlags', None)
         if bootstrapPythonFlags is not None:
@@ -2420,6 +2428,9 @@ class Provides(_dependency):
         bootstrapSysPath = keywords.pop('_bootstrapSysPath', None)
         if bootstrapSysPath is not None:
             self.bootstrapSysPath = bootstrapSysPath
+        bootstrapPerlIncPath = keywords.pop('_bootstrapPerlIncPath', None)
+        if bootstrapPerlIncPath is not None:
+            self.bootstrapPerlIncPath = bootstrapPerlIncPath
 
         policy.Policy.updateArgs(self, **keywords)
 
@@ -2430,6 +2441,8 @@ class Provides(_dependency):
                                             for x in self.bootstrapPythonFlags)
         if self.bootstrapSysPath:
             self.bootstrapSysPath = [x % macros for x in self.bootstrapSysPath]
+        if self.bootstrapPerlIncPath:
+            self.bootstrapPerlIncPath = [x % macros for x in self.bootstrapPerlIncPath]
         self.rootdir = self.rootdir % macros
 	self.fileFilters = []
         self.binDirs = frozenset(
@@ -2649,8 +2662,8 @@ class Provides(_dependency):
         if self.perlIncPath is not None:
             return
 
-        perl = self._getperl(self.recipe.macros, self.recipe)[0]
-        self.perlIncPath = self._getperlincpath(perl)
+        perl, self.perlIncPath, _ = self._getperl(
+            self.recipe.macros, self.recipe)
         self.perlIncPath.sort(key=len, reverse=True)
 
     def _addPythonProvides(self, path, m, pkg, macros):
@@ -3039,6 +3052,7 @@ class Requires(_addInfo, _dependency):
         _dependency.__init__(self, *args, **keywords)
         self.bootstrapPythonFlags = set()
         self.bootstrapSysPath = []
+        self.bootstrapPerlIncPath = []
         self.sonameSubtrees = set()
         self._privateDepMap = {}
         self.rpathFixup = []
@@ -3093,6 +3107,15 @@ class Requires(_addInfo, _dependency):
             # pass full set to Provides to share the exact same data
             self.recipe.Provides(
                 _bootstrapSysPath=self.bootstrapSysPath)
+        bootstrapPerlIncPath = keywords.pop('bootstrapPerlIncPath', None)
+        if bootstrapPerlIncPath:
+            if type(bootstrapPerlIncPath) in (list, tuple):
+                self.bootstrapPerlIncPath.extend(bootstrapPerlIncPath)
+            else:
+                self.error('bootstrapPerlIncPath must be list or tuple')
+            # pass full set to Provides to share the exact same data
+            self.recipe.Provides(
+                _bootstrapPerlIncPath=self.bootstrapPerlIncPath)
         _CILPolicyProvides = keywords.pop('_CILPolicyProvides', None)
         if _CILPolicyProvides:
             self._CILPolicyProvides.update(_CILPolicyProvides)
@@ -3120,6 +3143,7 @@ class Requires(_addInfo, _dependency):
         self.bootstrapPythonFlags = set(x % macros
                                         for x in self.bootstrapPythonFlags)
         self.bootstrapSysPath = [x % macros for x in self.bootstrapSysPath]
+        self.bootstrapPerlIncPath = [x % macros for x in self.bootstrapPerlIncPath]
 
         # anything that any buildreqs have caused to go into ld.so.conf
         # or ld.so.conf.d/*.conf is a system library by definition,
@@ -3653,14 +3677,14 @@ class Requires(_addInfo, _dependency):
 
     def _fetchPerl(self):
         """
-        Cache the perl path and @INC path with %(destdir)s prepended to
+        Cache the perl path and @INC path with -I%(destdir)s prepended to
         each element if necessary
         """
         if self.perlPath is not None:
             return
 
         macros = self.recipe.macros
-        self.perlPath, self.perlIncPath = self._getperl(macros, self.recipe)
+        self.perlPath, _, self.perlIncPath = self._getperl(macros, self.recipe)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
