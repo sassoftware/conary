@@ -918,7 +918,8 @@ class DependencySet(object):
         return self.intersection(other)
 
     def difference(self, other, strict=True):
-        assert(isinstance(other, self.__class__))
+        assert(isinstance(other, self.__class__)
+               or isinstance(self, other.__class__))
         newDep = self.__class__()
         a = newDep.addDep
         for tag, depClass in self.members.iteritems():
