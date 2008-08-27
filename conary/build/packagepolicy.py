@@ -2064,19 +2064,29 @@ class _dependency(policy.Policy):
         else:
             depMap[path] = depSet
 
+    @staticmethod
+    def _recurseSymlink(path, destdir, fullpath=None):
+        """
+        Recurse through symlinks in destdir and get the final path and fullpath.
+        If initial fullpath (or destdir+path if fullpath not specified)
+        does not exist, return path.
+        """
+        if fullpath is None:
+            fullpath = destdir + path
+        while os.path.islink(fullpath):
+            contents = os.readlink(fullpath)
+            if contents.startswith('/'):
+                fullpath = os.path.normpath(contents)
+            else:
+                fullpath = os.path.normpath(
+                    os.path.dirname(fullpath)+'/'+contents)
+        return fullpath[len(destdir):], fullpath
+        
     def _symlinkMagic(self, path, fullpath, macros, m=None):
         "Recurse through symlinks and get the final path and magic"
-        contentsPath = fullpath
-        while os.path.islink(contentsPath):
-            contents = os.readlink(contentsPath)
-            if contents.startswith('/'):
-                contentsPath = os.path.normpath(contents)
-            else:
-                contentsPath = os.path.normpath(
-                    os.path.dirname(path)+'/'+contents)
-            m = self.recipe.magic[contentsPath]
-            contentsPath = macros.destdir + contentsPath
-        return m, contentsPath[len(macros.destdir):]
+        path, _ = self._recurseSymlink(path, macros.destdir, fullpath=fullpath)
+        m = self.recipe.magic[path]
+        return m, path
 
     def _enforceProvidedPath(self, path, fileType='interpreter',
                              unmanagedError=False):
@@ -2181,10 +2191,11 @@ class _dependency(policy.Policy):
         return None
 
 
-    def _getperlincpath(self, perl):
+    def _getperlincpath(self, perl, destdir):
         """
-        Fetch the perl @INC path, and sort longest first for removing
-        prefixes from perl files that are provided.
+        Fetch the perl @INC path, falling back to bootstrapPerlIncPath
+        only if perl cannot be run.  All elements of the search path
+        will be resolved against symlinks in destdir if they exist. (CNY-2949)
         """
         if not perl:
             return []
@@ -2194,9 +2205,10 @@ class _dependency(policy.Policy):
         try:
             rc = p.close()
             perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
-            return perlIncPath
+            return [self._recurseSymlink(x, destdir)[0] for x in perlIncPath]
         except RuntimeError:
-            return self.bootstrapPerlIncPath
+            return [self._recurseSymlink(x, destdir)[0]
+                    for x in self.bootstrapPerlIncPath]
 
     def _getperl(self, macros, recipe):
         """
@@ -2209,6 +2221,7 @@ class _dependency(policy.Policy):
         # not %(bindir)s so that package modifications do not affect
         # the search for system perl
         perlPath = '/usr/bin/perl'
+        destdir = macros.destdir
 
         def _perlDestInc(destdir, perlDestInc):
             return ' '.join(['-I' + destdir + x for x in perlDestInc])
@@ -2221,26 +2234,26 @@ class _dependency(policy.Policy):
                 # in order to run perl in the destdir
                 perl = ''.join((
                     'export LD_LIBRARY_PATH=',
-                    '%s%s:' %(macros.destdir, macros.libdir),
-                    ':'.join([macros.destdir+x
+                    '%s%s:' %(destdir, macros.libdir),
+                    ':'.join([destdir+x
                               for x in m.contents['RPATH'].split(':')]),
                     ';',
                     perlDestPath
                 ))
-                perlIncPath = self._getperlincpath(perl)
-                perlDestInc = _perlDestInc(macros.destdir, perlIncPath)
+                perlIncPath = self._getperlincpath(perl, destdir)
+                perlDestInc = _perlDestInc(destdir, perlIncPath)
                 return [perl, perlIncPath, perlDestInc]
             else:
                 # perl that does not use/need rpath
                 perl = 'LD_LIBRARY_PATH=%s%s %s' %(
-                    macros.destdir, macros.libdir, perlDestPath)
-                perlIncPath = self._getperlincpath(perl)
-                perlDestInc = _perlDestInc(macros.destdir, perlIncPath)
+                    destdir, macros.libdir, perlDestPath)
+                perlIncPath = self._getperlincpath(perl, destdir)
+                perlDestInc = _perlDestInc(destdir, perlIncPath)
                 return [perlDestPath, perlIncPath, perlDestInc]
         elif os.access(perlPath, os.X_OK):
             # system perl if no packaged perl, needs no @INC mangling
             self._enforceProvidedPath(perlPath)
-            perlIncPath = self._getperlincpath(perlPath)
+            perlIncPath = self._getperlincpath(perlPath, destdir)
             return [perlPath, perlIncPath, '']
 
         # must be no perl at all

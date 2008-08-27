@@ -9,6 +9,9 @@ Changes in @NEW@:
       keyword argument. (CNY-2943)
     * Packaging a version of perl that requires libraries in the
       destdir to start but does not use RPATH now succeeds. (CNY-2955)
+    * When the perl @INC path includes elements that are symlinks in
+      the destdir, the symlinks are now resolved for correct perl:
+      provides. (CNY-2949)
 
   o Internal Changes:
     * Reimplemented dependency freezing in C
