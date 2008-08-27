@@ -286,6 +286,9 @@ class OptionalFlavorStream(InfoStream):
 
     __slots__ = ( 'deps' )
 
+    def __eq__(self, other, skipSet = None):
+        return self.deps == other.deps
+
     def __call__(self):
         return self.deps
 
