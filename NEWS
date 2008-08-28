@@ -1,6 +1,8 @@
 Changes in @NEW@:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
+    * The ccs2tar script now correctly handles changeset files containing
+      directories, symlinks, and other non-regular files. (CNY-2954)
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now
