@@ -14,6 +14,8 @@ Changes in @NEW@:
     * When the perl @INC path includes elements that are symlinks in
       the destdir, the symlinks are now resolved for correct perl:
       provides. (CNY-2949)
+    * When discovering perl: dependencies using a bootstrap perl,
+      Conary now sets LD_LIBRARY_PATH. (CNY-2959)
 
   o Internal Changes:
     * Reimplemented dependency freezing in C

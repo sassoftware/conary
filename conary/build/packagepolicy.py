@@ -2228,7 +2228,7 @@ class _dependency(policy.Policy):
 
         if os.access(perlDestPath, os.X_OK):
             # must use packaged perl if it exists
-            m = recipe.magic[perlPath] # this actually looks up perlDestPath
+            m = recipe.magic[perlDestPath[len(destdir):]] # not perlPath
             if m and 'RPATH' in m.contents and m.contents['RPATH']:
                 # we need to prepend the destdir to each element of the RPATH
                 # in order to run perl in the destdir
@@ -2249,7 +2249,7 @@ class _dependency(policy.Policy):
                     destdir, macros.libdir, perlDestPath)
                 perlIncPath = self._getperlincpath(perl, destdir)
                 perlDestInc = _perlDestInc(destdir, perlIncPath)
-                return [perlDestPath, perlIncPath, perlDestInc]
+                return [perl, perlIncPath, perlDestInc]
         elif os.access(perlPath, os.X_OK):
             # system perl if no packaged perl, needs no @INC mangling
             self._enforceProvidedPath(perlPath)
