@@ -506,7 +506,10 @@ class addArchive(_Source):
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
                 for (path, user, group) in ownerList:
-                    self.recipe.Ownership(user, group, re.escape(path))
+                    while path.startswith('/'):
+                        path = path[1:]
+                    path = util.normpath(os.path.join(self.dir, path))
+                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path))
         elif f.endswith(".iso"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
@@ -599,9 +602,8 @@ class addArchive(_Source):
 
             if ownerParser and self.preserveOwnership:
                 for (path, user, group) in ownerParser(output):
-                    if path[-1] == '/': path = path[:-1]
-
-                    self.recipe.Ownership(user, group, re.escape(path))
+                    path = util.normpath(os.path.join(self.dir, path))
+                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path))
 
         if guessMainDir:
             bd = self.builddir

@@ -3,6 +3,12 @@ Changes in @NEW@:
     * "conary emerge" no longer emits warnings. (CNY-2835)
     * The ccs2tar script now correctly handles changeset files containing
       directories, symlinks, and other non-regular files. (CNY-2954)
+    * A bug that prevented proper ownership and permissions from being
+      recorded when using r.addArchive(..., perserveOwnership=True)
+      and the archive had a prefix of "./" has been fixed.
+      Additionally, a bug that could cause permissions to be assigned
+      to files with similar paths as those created by addArchive has
+      been fixed. (CNY-2953)
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now
