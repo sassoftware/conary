@@ -22,6 +22,8 @@ Changes in @NEW@:
       provides. (CNY-2949)
     * When discovering perl: dependencies using a bootstrap perl,
       Conary now sets LD_LIBRARY_PATH. (CNY-2959)
+    * ComponentRequires now handles :cil, :java, :perl, :python, and :ruby
+      components in the same manner it handles :lib. (CNY-2935)
 
   o Internal Changes:
     * Reimplemented dependency freezing in C

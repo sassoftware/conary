@@ -1609,7 +1609,8 @@ class ComponentRequires(policy.Policy):
     def __init__(self, *args, **keywords):
         self.depMap = {
             # component: components that require it if they both exist
-            'data': frozenset(('lib', 'runtime', 'devellib')),
+            'data': frozenset(('lib', 'runtime', 'devellib', 'cil', 'java',
+                'perl', 'python', 'ruby')),
             'devellib': frozenset(('devel',)),
             'lib': frozenset(('devel', 'devellib', 'runtime')),
             'config': frozenset(('runtime', 'lib', 'devellib', 'devel')),
