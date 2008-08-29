@@ -508,8 +508,7 @@ class addArchive(_Source):
                 for (path, user, group) in ownerList:
                     # trim off the leading / (or else path.joining it with
                     # self.dir will result in /dir//foo -> /foo.
-                    while path.startswith('/'):
-                        path = path[1:]
+                    path = path.lstrip('/')
                     # FIXME: this should be refactored to remove duplicate
                     # code below
                     path = util.normpath(os.path.join(self.dir, path))
