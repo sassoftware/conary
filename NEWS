@@ -4,6 +4,7 @@ Changes in 2.0.24:
       currently being processed, for files and URIs. (CNY-2950)
     * includeConfigFile now supports a ~/path syntax to substitute the
       current user's home directory. (CNY-1650)
+
   o Client Changes:
     * Added support for getFileContents call to ShimNetClient (CNY-1669)
     * Added support for commitChangeSet and commitChangeSetFile to
@@ -13,6 +14,10 @@ Changes in 2.0.24:
     * Promote now uses group weak references to learn about all of the
       components for a package instead of downloading all of the package
       troves for the source. (CNY-1867)
+
+  o Bug Fixes:
+    * The ccs2tar script now correctly handles changeset files containing
+      directories, symlinks, and other non-regular files. (CNY-2954)
 
   o Internal Changes:
     * More of the file installation path was moved into C for improved
