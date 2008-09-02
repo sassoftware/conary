@@ -885,7 +885,8 @@ class DependencySet(object):
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
         if other is None:
             return
-        assert(isinstance(other, self.__class__))
+        assert(isinstance(other, self.__class__) 
+                or isinstance(self, other.__class__))
         self._hash = None
         a = self.addDep
 	for tag, members in other.members.iteritems():
