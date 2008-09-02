@@ -88,10 +88,7 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 
 	i = 0
 	while i < len(data):
-	    size = struct.unpack("!I", data[i : i + 4])[0]
-	    i += 4
-	    s = data[i: i + size]
-	    i += size
+            i, (s,) = misc.unpack("!SI", i, data)
 	    trvCs = trove.ThawTroveChangeSet(s)
 
 	    self[(trvCs.getName(), trvCs.getNewVersion(),
