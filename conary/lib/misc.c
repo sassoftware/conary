@@ -371,7 +371,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
     for (i = 0; i < depCount; i++) {
         tuple = PyList_GET_ITEM(depObjList, i);
         if (!PyString_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
-            PyErr_SetString(PyExc_TypeError, "dict keys must be ints");
+            PyErr_SetString(PyExc_TypeError, "dict keys must be strings");
             Py_DECREF(depObjList);
             free(depList);
             return -1;
