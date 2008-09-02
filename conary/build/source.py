@@ -506,7 +506,19 @@ class addArchive(_Source):
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
                 for (path, user, group) in ownerList:
-                    self.recipe.Ownership(user, group, re.escape(path))
+                    # trim off the leading / (or else path.joining it with
+                    # self.dir will result in /dir//foo -> /foo.
+                    path = path.lstrip('/')
+                    # FIXME: this should be refactored to remove duplicate
+                    # code below
+                    path = util.normpath(os.path.join(self.dir, path))
+                    # we have to anchor the filter ourselves because
+                    # re.escape('/foo') -> '\\/foo'.  Since this doesn't
+                    # start with '/', the filter will not be anchored.
+                    # we can put the trailing $ in too, just to make sure
+                    # that we only apply this ownership to an exact match
+                    # (in case somehow a path has a trailing /)
+                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path))
         elif f.endswith(".iso"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
@@ -599,9 +611,10 @@ class addArchive(_Source):
 
             if ownerParser and self.preserveOwnership:
                 for (path, user, group) in ownerParser(output):
-                    if path[-1] == '/': path = path[:-1]
-
-                    self.recipe.Ownership(user, group, re.escape(path))
+                    # FIXME: this should be refactored to remove duplicate
+                    # code above
+                    path = util.normpath(os.path.join(self.dir, path))
+                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path))
 
         if guessMainDir:
             bd = self.builddir

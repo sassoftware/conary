@@ -319,9 +319,19 @@ class OptionalFlavorStream(InfoStream):
         else:
             self.deps = FlavorsStream(val.freeze())
 
+    def twm(self, diff, base):
+        if diff is '\0':
+            self.deps = None
+        else:
+            if self.deps is None:
+                self.deps = FlavorsStream()
+            self.deps.twm(diff, self.deps)
+
     def __init__(self, frz = None):
         if frz == None:
             self.deps = FlavorsStream('')
+        elif frz == '\0':
+            self.deps = None
         else:
             self.deps = FlavorsStream(frz)
 

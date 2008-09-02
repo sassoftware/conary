@@ -1,6 +1,14 @@
 Changes in @NEW@:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
+    * The ccs2tar script now correctly handles changeset files containing
+      directories, symlinks, and other non-regular files. (CNY-2954)
+    * A bug that prevented proper ownership and permissions from being
+      recorded when using r.addArchive(..., perserveOwnership=True)
+      and the archive had a prefix of "./" has been fixed.
+      Additionally, a bug that could cause permissions to be assigned
+      to files with similar paths as those created by addArchive has
+      been fixed. (CNY-2953)
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now
@@ -12,6 +20,10 @@ Changes in @NEW@:
     * When the perl @INC path includes elements that are symlinks in
       the destdir, the symlinks are now resolved for correct perl:
       provides. (CNY-2949)
+    * When discovering perl: dependencies using a bootstrap perl,
+      Conary now sets LD_LIBRARY_PATH. (CNY-2959)
+    * ComponentRequires now handles :cil, :java, :perl, :python, and :ruby
+      components in the same manner it handles :lib. (CNY-2935)
 
   o Internal Changes:
     * Reimplemented dependency freezing in C

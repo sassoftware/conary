@@ -84,6 +84,8 @@ for pathId, path, fileId in fileList:
     tarInfo.uname = f.inode.owner()
     tarInfo.gname = f.inode.group()
 
+    fObj = None
+
     if isinstance(f, files.RegularFile):
         tarInfo.size = f.contents.size()
         tarInfo.type = tarfile.REGTYPE

@@ -1558,7 +1558,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             allRemovedTroves.extend(removedTroves)
             sizes.append(size)
         except:
-            os.unlink(retpath)
+            util.removeIfExists(retpath)
             raise
 
         sizes = [ str(x) for x in sizes ]
