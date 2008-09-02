@@ -124,7 +124,7 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
                                compressed):
         if not isinstance(self.c[server], ShimServerProxy):
             return netclient.NetworkRepositoryClient.getFileContentsObjects(
-                server, fileList, callback, outF, compressed)
+                self, server, fileList, callback, outF, compressed)
         filePaths = self.c[server].getFileContents(fileList)
         fileObjList = []
         for path in filePaths:
@@ -143,8 +143,8 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
         newLabel = trvCs.getNewVersion().trailingLabel()
 
         if not isinstance(self.c[newLabel], ShimServerProxy):
-            return netclient.NetworkRepositoryClient._commit(chgSet,
-                fName, callback = callback, mirror = False, hidden = False)
+            return netclient.NetworkRepositoryClient.commitChangeSet(self,
+                chgSet, callback = callback, mirror = False, hidden = False)
 
         (fd, path) = tempfile.mkstemp(dir = self.c[newLabel]._server.tmpPath,
                                       suffix = '.ccs-in')
