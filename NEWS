@@ -31,6 +31,9 @@ Changes in @NEW@:
       dpkg .deb files when the data is bzip2-compressed. (CNY-2967)
     * Promote now uses hasTroves to check to check the completeness of a
       promote instead of fetching group troves for improved performance.
+    * Builtin recipes have been broken out so that there's no need to
+      commit conary internals to repository based recipes. BaseRequiresRecipe
+      has been introduced. (CNY-2898)
 
   o Client Changes:
     * Shim commitChangeSet() and getFileContents() calls now fall back to

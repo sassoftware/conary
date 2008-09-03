@@ -259,7 +259,8 @@ class GroupRecipe(_BaseGroupRecipe):
 
     def __init__(self, repos, cfg, label, flavor, laReposCache, srcdirs=None,
                  extraMacros={}, lightInstance = False):
-        _BaseGroupRecipe.__init__(self, laReposCache = laReposCache,
+        klass = self._getParentClass('_BaseGroupRecipe')
+        klass.__init__(self, laReposCache = laReposCache,
                                   srcdirs = srcdirs,
                                   lightInstance = lightInstance)
 

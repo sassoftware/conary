@@ -149,12 +149,24 @@ class Recipe(object):
                     if classItem.im_func == item.im_func:
                         className = class_.__name__
                 if className in ['Recipe', 'AbstractPackageRecipe',
-                                 'GroupRecipe', 'RedirectRecipe', 
+                                 'SourcePackageRecipe',
+                                 'BaseRequiresRecipe',
+                                 'GroupRecipe', 'RedirectRecipe',
+                                 'AbstractDerivedPackageRecipe',
                                  'DerivedPackageRecipe', 'FilesetRecipe',
                                  '_BaseGroupRecipe']:
                     continue
                 setattr(self, itemName, self._wrapMethod(className, item))
                 self.unusedMethods.add((className, item.__name__))
+
+    def _getParentClass(self, className):
+        klass = self.__class__
+        while klass.__name__ != className:
+            if klass is None:
+                # None's base class is object. object's base class is None
+                return None
+            klass = klass.__base__
+        return klass
 
     @classmethod
     def getType(class_):

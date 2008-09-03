@@ -10,13 +10,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-from conary import files, trove, versions
-from conary import errors as conaryerrors
-from conary.build import build, source
-from conary.build import errors as builderrors
-from conary.build.packagerecipe import AbstractPackageRecipe
-from conary.lib import log, util
-from conary.repository import changeset, filecontents
+from conary import files
+from conary.build import defaultrecipes
+from conary.build.packagerecipe import AbstractPackageRecipe, BaseRequiresRecipe
+from conary.repository import changeset
 
 class DerivedChangesetExploder(changeset.ChangesetExploder):
 
@@ -98,7 +95,13 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
 
         return changeset.ChangesetExploder.installFile(self, trv, path, fileObj)
 
-class DerivedPackageRecipe(AbstractPackageRecipe):
+from conary import versions
+from conary import errors as conaryerrors
+from conary.build import build, source
+from conary.build import errors as builderrors
+from conary.lib import log
+
+class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
 
     internalAbstractBaseClass = 1
     _isDerived = True
@@ -218,16 +221,19 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
         self._expandChangeset(cs)
         self.cs = cs
 
-        AbstractPackageRecipe.unpackSources(self, resume = resume,
+        klass = self._getParentClass('AbstractPackageRecipe')
+        klass.unpackSources(self, resume = resume,
                                              downloadOnly = downloadOnly)
 
     def loadPolicy(self):
-        return AbstractPackageRecipe.loadPolicy(self,
+        klass = self._getParentClass('AbstractPackageRecipe')
+        return klass.loadPolicy(self,
                                 internalPolicyModules = ( 'derivedpolicy', ) )
 
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        AbstractPackageRecipe.__init__(self, cfg, laReposCache, srcDirs,
+        klass = self._getParentClass('AbstractPackageRecipe')
+        klass.__init__(self, cfg, laReposCache, srcDirs,
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
                                         lightInstance = lightInstance)
@@ -268,3 +274,5 @@ class DerivedPackageRecipe(AbstractPackageRecipe):
         self._addSourceAction('addAction', source.addAction)
         self._addSourceAction('addPatch', source.addPatch)
         self._addSourceAction('addSource', source.addSource)
+
+exec defaultrecipes.DerivedPackageRecipe

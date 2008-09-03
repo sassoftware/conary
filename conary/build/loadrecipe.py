@@ -25,6 +25,7 @@ import tempfile
 import traceback
 
 from conary.repository import errors, trovesource
+from conary.build import defaultrecipes
 from conary.build import recipe, use
 from conary.build import errors as builderrors
 from conary.build.errors import RecipeFileError
@@ -33,6 +34,7 @@ from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import api, graph, log, util
 from conary.local import database
+from conary import trove
 from conary import versions
 
 class SubloadData(object):
@@ -59,25 +61,30 @@ class SubloadData(object):
 class Importer(object):
 
     baseModuleImports = [
-        ('conary.build', ('build', 'action')),
-        ('conary.build.grouprecipe', 'GroupRecipe'),
-        ('conary.build.filesetrecipe', 'FilesetRecipe'),
-        ('conary.build.redirectrecipe', 'RedirectRecipe'),
-        ('conary.build.derivedrecipe', 'DerivedPackageRecipe'),
-        ('conary.build.packagerecipe', 
+        ('conary.build', ('build', 'action', 'use')),
+        ('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
+                                            'PackageFlags')),
+        ('conary.build.packagerecipe',
                           ('clearBuildReqs', 'clearBuildRequires',
                            'clearCrossReqs', 'clearCrossRequires',
+                           'AbstractPackageRecipe',
+                           'SourcePackageRecipe',
+                           'BaseRequiresRecipe',
                            'PackageRecipe', 'BuildPackageRecipe',
                            'CPackageRecipe', 'AutoPackageRecipe')),
-        ('conary.build.inforecipe',  ('UserInfoRecipe', 'GroupInfoRecipe',
-                                      'UserGroupInfoRecipe' )),
+        ('conary.build.grouprecipe', ('_BaseGroupRecipe', 'GroupRecipe')),
+        ('conary.build.filesetrecipe', 'FilesetRecipe'),
+        ('conary.build.redirectrecipe', 'RedirectRecipe'),
+        ('conary.build.derivedrecipe', ('DerivedChangesetExploder',
+                            'AbstractDerivedPackageRecipe',
+                            'DerivedPackageRecipe')),
+        ('conary.build.inforecipe',  ('UserGroupInfoRecipe',
+                                      'UserInfoRecipe', 'GroupInfoRecipe')),
         ('conary.lib', ('util',)),
         ('os',),
         ('re',),
         ('sys',),
-        ('stat',),
-        ('conary.build.use', ('Arch', 'Use', ('LocalFlags', 'Flags'),
-                                            'PackageFlags')) ]
+        ('stat',)]
     def __init__(self, objDict = {}, fileName = 'unknownfile.py',
                  baseName = 'unknown', factory = False,
                  subloadData = None):
@@ -477,6 +484,7 @@ class RecipeLoaderFromString(object):
         recipes = ts.getFileContents([ (x[2], x[3]) for x in filesNeeded ])
 
         objDict = {}
+        objDict.update(importer.module.__dict__)
         for (fileContents, fileInfo, trv) in \
                                itertools.izip(recipes, filesNeeded,
                                               orderedTroveList):
@@ -564,7 +572,10 @@ class RecipeLoaderFromString(object):
                     recipe.RECIPE_TYPE_GROUP: 'group-',
                     recipe.RECIPE_TYPE_FILESET: 'fileset-'}
 
-        if packageType in prefixes:
+        # don't enforce the prefix convention if the class in question is
+        # actully a superclass. especially needed for repo based *InfoRecipe
+        if packageType in prefixes and \
+                'abstractBaseClass' not in recipeClass.__dict__:
             if not recipeClass.name.startswith(prefixes[packageType]):
                 raise builderrors.BadRecipeNameError(
                         'recipe name must start with "%s"' % prefixes[packageType])

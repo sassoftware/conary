@@ -17,6 +17,7 @@ import inspect
 import itertools
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
+from conary.build import defaultrecipes
 from conary.build.errors import RecipeFileError
 from conary import trove
 
@@ -98,8 +99,9 @@ def _clearReqs(attrName, reqs):
     # get a list of all classes that are derived from AbstractPackageRecipe
     classes = []
     for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, AbstractPackageRecipe):
-            classes.append(value)
+        if inspect.isclass(value) and issubclass(value, Recipe):
+            if 'AbstractPackageRecipe' in [x.__name__ for x in value.mro()]:
+                classes.append(value)
 
     # define a convenience function for removing buildReqs from a list
     # or clearing them.
@@ -118,8 +120,9 @@ def _clearReqs(attrName, reqs):
         _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
-            if issubclass(base, AbstractPackageRecipe) and base not in classes:
-                _removePackages(base, reqs)
+            if issubclass(base, Recipe) and base not in classes:
+                if 'AbstractPackageRecipe' in [x.__name__ for x in base.mro()]:
+                    _removePackages(base, reqs)
 
 crossFlavor = deps.parseFlavor('cross')
 def getCrossCompileSettings(flavor):
@@ -134,18 +137,6 @@ def getCrossCompileSettings(flavor):
     return None, targetFlavor, isCrossTool
 
 class AbstractPackageRecipe(Recipe):
-    buildRequires = [
-        'filesystem:runtime',
-        'setup:runtime',
-        'python:runtime',
-        'python:lib',
-        'conary:runtime',
-        'conary:python',
-        'conary-build:runtime',
-        'conary-build:lib',
-        'conary-build:python',
-        'sqlite:lib',
-    ]
     crossRequires = []
     buildRequirementsOverride = None
     crossRequirementsOverride = None
@@ -154,6 +145,7 @@ class AbstractPackageRecipe(Recipe):
     Flags = use.LocalFlags
     explicitMainDir = False
 
+    internalAbstractBaseClass = 1
     _recipeType = RECIPE_TYPE_PACKAGE
     internalPolicyModules = ( 'destdirpolicy', 'packagepolicy')
     basePolicyClass = policy.Policy
@@ -922,239 +914,18 @@ class AbstractPackageRecipe(Recipe):
 # starting with _, see CNY-1848
 _AbstractPackageRecipe = AbstractPackageRecipe
 
-class PackageRecipe(AbstractPackageRecipe):
-    """
-    NAME
-    ====
-    B{C{PackageRecipe}} - Base class which provides Conary functionality
-
-    SYNOPSIS
-    ========
-
-    C{PackageRecipe} is inherited by the other *PackageRecipe super classes
-
-    DESCRIPTION
-    ===========
-
-    The C{PackageRecipe} class provides Conary recipes with references to
-    the essential troves which offer Conary's packaging requirements. 
-    (python, sqlite, gzip, bzip2, tar, cpio, and patch)
-
-    Other PackageRecipe classes such as C{AutoPackageRecipe} inherit the
-    functionality offered by C{PackageRecipe}.
-
-    EXAMPLE
-    =======
-    A sample class that uses PackageRecipe to download source code from
-    a web site, unpack it, run "make", then run "make install"::
-
-        class ExamplePackage(PackageRecipe):
-            name = 'example'
-            version = '1.0'
-
-            def setup(r):
-                r.addArchive('http://code.example.com/example/')
-                r.Make()
-                r.MakeInstall()
-    """
+class SourcePackageRecipe(AbstractPackageRecipe):
     internalAbstractBaseClass = 1
-    name = "package-recipe"
-    # these initial buildRequires need to be cleared where they would
-    # otherwise create a requirement loop.  Also, note that each instance
-    # of :lib in here is only for runtime, not to link against.
-    # Any package that needs to link should still specify the :devel
-    # component
-    buildRequires = AbstractPackageRecipe.buildRequires + [
-        'bzip2:runtime',
-        'gzip:runtime',
-        'tar:runtime',
-        'cpio:runtime',
-        'patch:runtime',
-    ]
-
     def __init__(self, *args, **kwargs):
-        AbstractPackageRecipe.__init__(self, *args, **kwargs)
+        klass = self._getParentClass('AbstractPackageRecipe')
+        klass.__init__(self, *args, **kwargs)
         for name, item in build.__dict__.items():
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
+_SourcePackageRecipe = SourcePackageRecipe
 
-# FIXME the next three classes will probably migrate to the repository
-# somehow, but not until we have figured out how to do this without
-# requiring that every recipe have a loadSuperClass line in it.
-
-class BuildPackageRecipe(PackageRecipe):
-    """
-    NAME
-    ====
-
-    B{C{BuildPackageRecipe}} - Build packages requiring Make and shell
-    utilities
-
-    SYNOPSIS
-    ========
-
-    C{class I{className(BuildPackageRecipe):}}
-
-    DESCRIPTION
-    ===========
-
-    The C{BuildPackageRecipe} class provides recipes with capabilities for
-    building packages which require the C{make} utility, and additional,
-    standard shell tools, (coreutils) and the programs needed to run
-    C{configure}. (findutils, C{gawk}, C{grep}, C{sed}, and diffutils)
-    
-    C{BuildPackageRecipe} inherits from C{PackageRecipe}, and therefore
-    includes all the build requirements of  C{PackageRecipe}. 
-
-    EXAMPLE
-    =======
-
-    C{class DocbookDtds(BuildPackageRecipe):}
-
-    Uses C{BuildPackageRecipe} to define the class for a Docbook Document Type
-    Definition collection recipe.
-    """
-    # Again, no :devellib here
-    buildRequires = [
-        'coreutils:runtime',
-        'make:runtime',
-        'mktemp:runtime',
-        # all the rest of these are for configure
-        'file:runtime',
-        'findutils:runtime',
-        'gawk:runtime',
-        'grep:runtime',
-        'sed:runtime',
-        'diffutils:runtime',
-    ]
-    Flags = use.LocalFlags
-    internalAbstractBaseClass = 1
-
-class CPackageRecipe(BuildPackageRecipe):
-    """
-    NAME
-    ====
-
-    B{C{CPackageRecipe}} - Build packages consisting of binaries built from C
-    source code
-
-    SYNOPSIS
-    ========
-
-    C{class I{className(CPackageRecipe):}}
-
-    DESCRIPTION
-    ===========
-    The C{CPackageRecipe} class provides the essential build requirements
-    needed for packages consisting of binaries built from C source code, such
-    as the linker and C library. C{CPacakgeRecipe} inherits from
-    C{BuildPackageRecipe}, and therefore includes all the build requirements of
-    C{BuildPackageRecipe}.
-
-    Most package recipes which are too complex for C{AutoPackageRecipe}, and
-    consist of applications derived from C source code which do not require
-    additional shell utilities as build requirements use the
-    C{CPackageRecipe} class.
-
-    EXAMPLE
-    =======
-
-    C{class Bzip2(CPackageRecipe):}
-
-    Defines the class for a C{bzip2} recipe using C{AutoPackageRecipe}.
-    """
-    buildRequires = [
-        'binutils:runtime',
-        'binutils:lib',
-        'binutils:devellib',
-        'gcc:runtime',
-        'gcc:lib',
-        'gcc:devel',
-        'gcc:devellib',
-        'glibc:runtime',
-        'glibc:lib',
-        'glibc:devellib',
-        'glibc:devel',
-        'libgcc:lib',
-        'libgcc:devellib',
-        'debugedit:runtime',
-        'elfutils:runtime',
-    ]
-    Flags = use.LocalFlags
-    internalAbstractBaseClass = 1
-
-class AutoPackageRecipe(CPackageRecipe):
-    """
-    NAME
-    ====
-
-    B{C{AutoPackageRecipe}} - Build simple packages with auto* tools
-
-    SYNOPSIS
-    ========
-
-    C{class I{className(AutoPackageRecipe):}}
-
-    DESCRIPTION
-    ===========
-
-    The  C{AutoPackageRecipe} class provides a simple means for the
-    creation of packages from minimal recipes, which are built from source
-    code using the auto* tools, such as C{automake}, and C{autoconf}.
-
-    Processing in the C{AutoPackageRecipe} class is a simple workflow modeled
-    after building software from source code, and is essentially comprised of
-    these steps:
-
-        1. Unpack source archive
-        2. C{configure}
-        3. C{make}
-        4. C{make install}
-        5. Applying Conary policy (optional)
-
-    With C{AutoPackageRecipe} the recipe writer does not necessarily need to
-    define the C{Configure}, C{Make}, or C{MakeInstall} methods, which allows
-    for very compact, and simple recipes.
-
-    The recipe's child classes should define the C{unpack()} method in order
-    to populate the source list.
-
-    Invoke the C{policy} method, with necessary policy parameters, and
-    keywords in your recipe to enforce Conary policy in the package.
-
-    If the standard C{Configure()}, C{Make()}, and C{MakeInstall()} methods
-    are insufficient for your package requirements, you should define your own
-    methods to override them.
-
-    Of the three methods, C{Configure}, and C{Make} are least likely to be
-    insufficient, and require overriding for the majority of recipes using
-    C{AutoPackageRecipe}.
-
-    EXAMPLE
-    =======
-
-    C{class Gimp(AutoPackageRecipe):}
-
-    Defines the class for a GNU Image Manipulation Program (Gimp) recipe using
-    C{AutoPackageRecipe}.
-    """
-    Flags = use.LocalFlags
-    internalAbstractBaseClass = 1
-
-    def setup(r):
-        r.unpack()
-        r.configure()
-        r.make()
-        r.makeinstall()
-        r.policy()
-
-    def unpack(r):
-        pass
-    def configure(r):
-        r.Configure()
-    def make(r):
-        r.Make()
-    def makeinstall(r):
-        r.MakeInstall()
-    def policy(r):
-        pass
+exec defaultrecipes.BaseRequiresRecipe
+exec defaultrecipes.PackageRecipe
+exec defaultrecipes.BuildPackageRecipe
+exec defaultrecipes.CPackageRecipe
+exec defaultrecipes.AutoPackageRecipe
