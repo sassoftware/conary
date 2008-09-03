@@ -1,8 +1,6 @@
 Changes in @NEW@:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
-    * The ccs2tar script now correctly handles changeset files containing
-      directories, symlinks, and other non-regular files. (CNY-2954)
     * A bug that prevented proper ownership and permissions from being
       recorded when using r.addArchive(..., perserveOwnership=True)
       and the archive had a prefix of "./" has been fixed.
@@ -61,6 +59,10 @@ Changes in 2.0.24:
     * Promote now uses group weak references to learn about all of the
       components for a package instead of downloading all of the package
       troves for the source. (CNY-1867)
+
+  o Bug Fixes:
+    * The ccs2tar script now correctly handles changeset files containing
+      directories, symlinks, and other non-regular files. (CNY-2954)
 
   o Internal Changes:
     * More of the file installation path was moved into C for improved
