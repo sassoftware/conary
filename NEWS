@@ -9,6 +9,8 @@ Changes in @NEW@:
       Additionally, a bug that could cause permissions to be assigned
       to files with similar paths as those created by addArchive has
       been fixed. (CNY-2953)
+    * Promote in 2.0.24 could traceback instead of printing an error message
+      if no troves were present to clone.
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now

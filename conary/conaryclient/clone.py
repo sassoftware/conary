@@ -780,16 +780,21 @@ class ClientClone:
             hasList += [ (x[0], clonedTup[1], clonedTup[2]) for x in
                                     cloneMap.getChildren(troveTup) ]
 
-        groupsNeeded = [ x[1] for x in needed if x[0][0].startswith('group-') ]
+        groupsNeeded = [ x[0] for x in needed if x[0][0].startswith('group-') ]
+        groupsNeeded += [ x[1] for x in needed if x[0][0].startswith('group-') ]
         groupTroves = troveCache.getTroves(groupsNeeded)
         groupTroves = dict( itertools.izip(groupsNeeded, groupTroves) )
 
         hasTroves = troveCache.hasTroves(hasList)
         toReclone = []
         for (troveTup, clonedTup) in needed:
-            #clonedTrv = troves.pop(0)
-            trvChildren = cloneMap.getChildren(troveTup)
-            assert(trvChildren)
+            if troveTup[0].startswith('group-'):
+                trvChildren = list(
+                    groupTroves[troveTup].iterTroveList(strongRefs = True,
+                                                         weakRefs = True) )
+            else:
+                trvChildren = cloneMap.getChildren(troveTup)
+                assert(trvChildren)
 
             if troveTup[0].startswith('group-'):
                 clonedChildren = list(
