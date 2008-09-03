@@ -539,13 +539,34 @@ class addArchive(_Source):
             actionPathBuildRequires = []
             # Question: can magic() ever get these wrong?!
             if f.endswith('deb'):
-                # this isn't actually used, see below where the
-                # unpack command is formed for .deb files.  We want to
-                # use the normal tar processing so we can preserve
-                # ownership
-                _uncompress = ''
+                # We want to use the normal tar processing so we can
+                # preserve ownership
+
                 # binutils is needed for ar
-                actionPathBuildRequires.extend(['ar', 'gzip'])
+                actionPathBuildRequires.append('ar')
+
+                # Need to determine how data is compressed
+                cfile = util.popen('ar t %s' %f)
+                debData = [ x.strip() for x in cfile.readlines()
+                            if x.startswith('data.tar') ]
+                cfile.close()
+                if not debData:
+                    raise SourceError('no data.tar found in %s' % f)
+                debData = debData[0]
+
+                if debData.endswith('.gz'):
+                    _uncompress = "gzip -d -c"
+                    actionPathBuildRequires.append('gzip')
+                elif debData.endswith('.bz2'):
+                    _uncompress = "bzip2 -d -c"
+                    actionPathBuildRequires.append('bzip2')
+                else:
+                    # data.tar?  Alternatively, yet another
+                    # compressed format that we need to add
+                    # support for
+                    _uncompress = 'cat'
+                    actionPathBuildRequires.append('cat')
+
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
                 _uncompress = "bzip2 -d -c"
                 actionPathBuildRequires.append('bzip2')
@@ -576,6 +597,7 @@ class addArchive(_Source):
                 # assuming it's an archive of a tar for now
                 # TODO: do something smarter about the contents of the
                 # archive
+                # Note: .deb handling currently depends on this default
                 _unpack = "tar -C '%s' -xvvSpf -" % (destDir,)
                 ownerParser = self._tarOwners
                 actionPathBuildRequires.append('tar')
@@ -586,7 +608,8 @@ class addArchive(_Source):
             if f.endswith('.deb'):
                 # special handling for .deb files - need to put
                 # the .deb file on the command line
-                cmd = "ar p '%s' data.tar.gz | gzip -d -c | %s" %(f, _unpack)
+                cmd = "ar p '%s' %s | %s | %s" %(
+                             f, debData, _uncompress, _unpack)
             else:
                 cmd = "%s < '%s' | %s" % (_uncompress, f, _unpack)
             fObj = os.popen(cmd)
