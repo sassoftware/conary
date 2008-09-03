@@ -765,6 +765,7 @@ class ClientClone:
         _logMe("Rechecking %s preclones" % len(troveTups))
         needed = []
         fetch = []
+        hasList = []
         for troveTup in troveTups:
             _logMe("Rechecking %s" % (troveTup,))
             if not trove.troveIsCollection(troveTup[0]):
@@ -775,16 +776,33 @@ class ClientClone:
             clonedTup = (troveTup[0], newVersion, troveTup[2])
             needed += [ (troveTup, clonedTup) ]
             fetch += [ clonedTup ]
+            hasList.append(clonedTup)
+            hasList += [ (x[0], clonedTup[1], clonedTup[2]) for x in
+                                    cloneMap.getChildren(troveTup) ]
 
-        troves = troveCache.getTroves(fetch, withFiles = False)
+        groupsNeeded = [ x[1] for x in needed if x[0][0].startswith('group-') ]
+        groupTroves = troveCache.getTroves(groupsNeeded)
+        groupTroves = dict( itertools.izip(groupsNeeded, groupTroves) )
+
+        hasTroves = troveCache.hasTroves(hasList)
         toReclone = []
         for (troveTup, clonedTup) in needed:
-            clonedTrv = troves.pop(0)
+            #clonedTrv = troves.pop(0)
             trvChildren = cloneMap.getChildren(troveTup)
             assert(trvChildren)
-            if self._shouldReclone(trvChildren,
-                        list(clonedTrv.iterTroveList(strongRefs = True,
-                                                     weakRefs = True)),
+
+            if troveTup[0].startswith('group-'):
+                clonedChildren = list(
+                    groupTroves[clonedTup].iterTroveList(strongRefs = True,
+                                                         weakRefs = True) )
+            else:
+                clonedChildren = []
+                for x in cloneMap.getChildren(troveTup):
+                    childTup = (x[0], clonedTup[1], clonedTup[2])
+                    if hasTroves[childTup]:
+                        clonedChildren.append(childTup)
+
+            if self._shouldReclone(trvChildren, clonedChildren,
                         chooser, cloneMap):
                 toReclone.append(troveTup)
 
