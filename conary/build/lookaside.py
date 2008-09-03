@@ -270,7 +270,8 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
-            allowNone=False, refreshFilter=None, multiurlMap=None):
+            allowNone=False, refreshFilter=None, multiurlMap=None,
+            unifiedSourcePath = None):
 
     """
     searches all locations, including populating the cache if the
@@ -328,6 +329,24 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             return None
 
     for sourcename, origname in possibleNames:
+        # this specialPrefix (and possibly future patterns of this nature)
+        # must come before the _searchRepository call because this prefix
+        # is on a separate path (and also guaranteed to already be in the
+        # lookaside cache)
+        if unifiedSourcePath:
+            # CNY-2627 introduced a separate lookaside stack for rpm contents
+            # this dir tree is parallel to NEGATIVE and trovenames.
+            # the name =XXX_CONTENTS= pattern was chosen because = is an
+            # illegal character in a trovename and thus will never conflict
+            # with real troves.
+            contentsName, trailingPath = unifiedSourcePath.split('://', 1)
+            contentsName = "=%s_CONTENTS=" % contentsName.upper()
+
+            unifiedPath = os.path.sep.join((contentsName, trailingPath))
+            unifiedSource = util.searchFile(unifiedPath, [cfg.lookaside])
+            if not (unifiedSource or allowNone):
+                raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
+            return unifiedSource
 
         # this needs to come as soon as possible to preserve reproducability
         f = _searchRepository(cfg, repCache, sourcename, location)

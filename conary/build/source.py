@@ -51,6 +51,7 @@ class _Source(_AnySource):
                 'sourceDir': None}
 
     def __init__(self, recipe, *args, **keywords):
+        self.unifiedSourcePath = None
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
         if isinstance(sourcename, (list, tuple)):
@@ -230,11 +231,21 @@ class _Source(_AnySource):
 			      self.rpm, self.recipe.name,
 			      self.recipe.srcdirs)
 
-	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
-				      self.recipe.name)
+        # by using the rpm's name in the full path, we ensure that different
+        # rpms can contain files of the same name.
+        prefix = os.path.sep.join((self.recipe.name, self.rpm))
+        prefix = os.path.normpath(prefix)
+        # CNY-2627 introduced a separate lookaside stack for rpm contents
+        # this dir tree is parallel to NEGATIVE and trovenames.
+        # the name =RPM_CONTENTS= was chosen because = is an illegal character
+        # in a trovename and thus will never conflict with real troves.
+        loc = os.path.sep.join(('=RPM_CONTENTS=', prefix))
+        loc = os.path.normpath(loc)
+        c = lookaside.createCacheName(self.recipe.cfg, self.sourcename, loc)
         util.mkdirChain(os.path.dirname(c))
-	_extractFilesFromRPM(r, targetfile=c, action=self)
-
+        _extractFilesFromRPM(r, targetfile=c, action=self)
+        sourcename = os.path.sep.join((prefix, '', self.sourcename))
+        self.unifiedSourcePath = 'rpm://%s' % sourcename
 
     def _guessName(self):
 
@@ -253,7 +264,7 @@ class _Source(_AnySource):
         source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             self.sourcename, self.recipe.name, self.recipe.srcdirs,
             httpHeaders=httpHeaders, guessName=self.guessname,
-            multiurlMap=multiurlMap)
+            multiurlMap=multiurlMap, unifiedSourcePath = self.unifiedSourcePath)
 
         return source
 
@@ -267,7 +278,7 @@ class _Source(_AnySource):
         f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
             toFetch, self.recipe.name, self.recipe.srcdirs,
             guessName=self.guessname, refreshFilter=refreshFilter,
-            multiurlMap=multiurlMap)
+            multiurlMap=multiurlMap, unifiedSourcePath = self.unifiedSourcePath)
 	self._checkSignature(f)
 	return f
 

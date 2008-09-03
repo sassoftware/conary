@@ -9,6 +9,9 @@ Changes in @NEW@:
       been fixed. (CNY-2953)
     * Promote in 2.0.24 could traceback instead of printing an error message
       if no troves were present to clone.
+    * A bug causing addSource to use the wrong file if there was a name
+      collision between a filename in an rpm and the source directory
+      has been fixed. (CNY-2627)
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now
