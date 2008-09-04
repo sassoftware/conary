@@ -650,12 +650,20 @@ class InitialContents(policy.Policy):
 
     # change inclusions to default to none, instead of all files
     keywords = policy.Policy.keywords.copy()
-    keywords['inclusions'] = []
 
     invariantexceptions = [ '%(userinfodir)s/', '%(groupinfodir)s' ]
+    invariantinclusions = ['%(localstatedir)s/run/',
+                           '%(localstatedir)s/log/',
+                           '%(cachedir)s/']
+
+    keywords['inclusions'] = invariantinclusions[:]
+
+    def postInit(self, *args, **kwargs):
+        self.recipe.Config(exceptions = self.invariantinclusions,
+                allowUnusedFilters = True)
 
     def updateArgs(self, *args, **keywords):
-	policy.Policy.updateArgs(self, *args, **keywords)
+        policy.Policy.updateArgs(self, *args, **keywords)
         self.recipe.Config(exceptions=args, allowUnusedFilters = True)
 
     def doFile(self, filename):
