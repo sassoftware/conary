@@ -137,6 +137,7 @@ def getCrossCompileSettings(flavor):
     return None, targetFlavor, isCrossTool
 
 class AbstractPackageRecipe(Recipe):
+    buildRequires = []
     crossRequires = []
     buildRequirementsOverride = None
     crossRequirementsOverride = None
