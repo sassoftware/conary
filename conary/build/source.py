@@ -311,7 +311,7 @@ class addArchive(_Source):
     SYNOPSIS
     ========
 
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{sourceDir}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{sourceDir}=,] [I{debArchive}=])}
 
     DESCRIPTION
     ===========
@@ -391,6 +391,12 @@ class addArchive(_Source):
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
     considered relative to C{%(builddir)s}.
 
+    B{debArchive} : When unpacking a dpkg .deb archive, provides the
+    prefix used to select the internal archive to unpack.  Defaults to 
+    C{"data.tar"} (will choose C{"data.tar.gz"} or C{"data.tar.bz2"}
+    but can reasonably be set to C{"control.tar"} to instead choose the
+    archive containing the scripts.
+
     EXAMPLES
     ========
 
@@ -428,6 +434,7 @@ class addArchive(_Source):
     """
     keywords = dict(_Source.keywords)
     keywords['preserveOwnership'] = None
+    keywords['debArchive'] = None
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -455,6 +462,11 @@ class addArchive(_Source):
         when downloading the source code archive.
         @keyword package: A string that specifies the package, component, or package and
         component in which to place the files added while executing this command
+        @keyword debArchive: When unpacking a dpkg .deb archive, provides the
+        prefix used to select the internal archive to unpack.  Defaults to 
+        C{"data.tar"} (will choose C{"data.tar.gz"} or C{"data.tar.bz2"}
+        but can reasonably be set to C{"control.tar"} to instead choose the
+        archive containing the scripts.
         """
 	_Source.__init__(self, recipe, *args, **keywords)
 
@@ -552,6 +564,8 @@ class addArchive(_Source):
             if f.endswith('deb'):
                 # We want to use the normal tar processing so we can
                 # preserve ownership
+                if self.debArchive is None:
+                    self.debArchive = 'data.tar'
 
                 # binutils is needed for ar
                 actionPathBuildRequires.append('ar')
@@ -559,10 +573,10 @@ class addArchive(_Source):
                 # Need to determine how data is compressed
                 cfile = util.popen('ar t %s' %f)
                 debData = [ x.strip() for x in cfile.readlines()
-                            if x.startswith('data.tar') ]
+                            if x.startswith(self.debArchive) ]
                 cfile.close()
                 if not debData:
-                    raise SourceError('no data.tar found in %s' % f)
+                    raise SourceError('no %s found in %s' %(self.debArchive, f))
                 debData = debData[0]
 
                 if debData.endswith('.gz'):
