@@ -34,6 +34,10 @@ Changes in @NEW@:
     * Builtin recipes have been broken out so that there's no need to
       commit conary internals to repository based recipes. BaseRequiresRecipe
       has been introduced. (CNY-2898)
+    * Files in /var/log, /var/run, and /var/cache are now automatically marked
+      InitialContents. (CNY-2578)
+    * Explicit calls to r.Requires are now honored in derived recipes.
+      (CNY-1760)
 
   o Client Changes:
     * Shim commitChangeSet() and getFileContents() calls now fall back to
