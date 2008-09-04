@@ -243,11 +243,17 @@ class StatWindow(gtk.Window):
         sw, self.calleestore = self.setup_callinfo_list('Called')
         nb.append_page(sw, tab_label=gtk.Label('Called Functions'))
 
+        nb.connect('switch-page', self.on_switch_page)
+
         pane.pack2(nb, False, True)
 
         self.add(vbox)
 
         self.load_stats()
+
+    def on_switch_page(self, nb, page, page_num):
+        self.disable_callbacks = True
+        gobject.idle_add(self.enable_callbacks)
 
     def setup_callinfo_list(self, what):
         store = gtk.ListStore(Caller)
