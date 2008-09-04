@@ -147,6 +147,14 @@ class Requires(packagepolicy.Requires):
     def doFile(self, path):
         pkg = self.recipe.autopkg.componentMap[path]
         f = pkg.getFile(path)
+
+        m = self.recipe.magic[path]
+        # now go through explicit requirements
+        for info in self.included:
+            for filt in self.included[info]:
+                if filt.match(path):
+                    self._markManualRequirement(info, path, pkg, m)
+
         self.whiteOut(path, pkg)
         self.unionDeps(path, pkg, f)
 
