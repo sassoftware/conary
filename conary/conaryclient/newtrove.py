@@ -75,6 +75,8 @@ class ClientNewTrove:
 
 
     def _targetNewTroves(self, troveList):
+        # construct a map of the troveSpecs about to be created
+        # to pre-existing troves
         repos = self.getRepos()
         previousVersionMap = {}
         versionDict = {}
@@ -84,24 +86,28 @@ class ClientNewTrove:
             name, version, flavor = troveObj.getNameVersionFlavor()
             if not name.endswith(':source'):
                 raise RuntimeError('Only source components allowed')
-            versionSpec = '%s/%s' % (version.trailingLabel(), 
+            versionSpec = '%s/%s' % (version.trailingLabel(),
                                      version.trailingRevision().getVersion())
             if (name, versionSpec) in trovesSeen:
                 raise RuntimeError('Cannot create multiple versions of %s with same version' % name)
 
             trovesSeen.add((name, versionSpec))
-            troveSpecs[name, versionSpec, None] = troveObj
+            troveSpecs[name, str(version.trailingLabel()), None] = troveObj
 
         results = repos.findTroves(None, troveSpecs, None, allowMissing=True)
         for troveSpec, troveObj in troveSpecs.iteritems():
             tupList = results.get(troveSpec, [])
+            assert (len(tupList) in (0, 1))
             if tupList:
-                assert(len(tupList) == 1)
+                previousUpstreamVersion = tupList[0][1].trailingRevision().getVersion()
+            else:
+                previousUpstreamVersion = None
+            currentUpstreamVersion = troveObj.getVersion().trailingRevision().getVersion()
+            if previousUpstreamVersion == currentUpstreamVersion:
                 latestVersion = tupList[0][1]
                 newVersion = latestVersion.copy()
                 newVersion.incrementSourceCount()
                 troveObj.changeVersion(newVersion)
-                previousVersionMap[troveObj.getNameVersionFlavor()] = tupList[0]
             else:
                 version = troveObj.getVersion()
                 branch = version.branch()
@@ -109,6 +115,8 @@ class ClientNewTrove:
                 revision = versions.Revision('%s-1' % upstreamVer)
                 newVersion = branch.createVersion(revision)
                 troveObj.changeVersion(newVersion)
+            if tupList:
+                previousVersionMap[troveObj.getNameVersionFlavor()] = tupList[0]
         return previousVersionMap
 
     def _addAllNewFiles(self, cs, troveAndPathList, previousVersionMap):

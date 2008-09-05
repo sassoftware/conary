@@ -12,6 +12,8 @@ Changes in @NEW@:
     * A bug causing addSource to use the wrong file if there was a name
       collision between a filename in an rpm and the source directory
       has been fixed. (CNY-2627)
+    * A bug causing createNewSourceTrove to erroneously change pathIds
+      has been fixed. (CNY-2971)
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now
