@@ -652,15 +652,7 @@ class InitialContents(policy.Policy):
     keywords = policy.Policy.keywords.copy()
 
     invariantexceptions = [ '%(userinfodir)s/', '%(groupinfodir)s' ]
-    invariantinclusions = ['%(localstatedir)s/run/',
-                           '%(localstatedir)s/log/',
-                           '%(cachedir)s/']
-
-    keywords['inclusions'] = invariantinclusions[:]
-
-    def postInit(self, *args, **kwargs):
-        self.recipe.Config(exceptions = self.invariantinclusions,
-                allowUnusedFilters = True)
+    keywords['inclusions'] = []
 
     def updateArgs(self, *args, **keywords):
         policy.Policy.updateArgs(self, *args, **keywords)
