@@ -648,11 +648,14 @@ class InitialContents(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     processUnmodified = True
 
-    # change inclusions to default to none, instead of all files
-    keywords = policy.Policy.keywords.copy()
-
     invariantexceptions = [ '%(userinfodir)s/', '%(groupinfodir)s' ]
-    keywords['inclusions'] = []
+    invariantinclusions = ['%(localstatedir)s/run/',
+                           '%(localstatedir)s/log/',
+                           '%(cachedir)s/']
+
+    def postInit(self, *args, **kwargs):
+        self.recipe.Config(exceptions = self.invariantinclusions,
+                allowUnusedFilters = True)
 
     def updateArgs(self, *args, **keywords):
         policy.Policy.updateArgs(self, *args, **keywords)
