@@ -499,6 +499,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
     argDef['admin'] = options.NO_PARAM
     argDef['analyze'] = options.NO_PARAM
     argDef['help'] = options.NO_PARAM
+    argDef['lsprof'] = options.NO_PARAM
     argDef['migrate'] = options.NO_PARAM
     argDef['mirror'] = options.NO_PARAM
 
@@ -524,7 +525,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
     reqClass.tmpDir = cfg.tmpDir
     reqClass.cfg = cfg
 
-    profile = False
+    profile = argSet.pop('lsprof', False)
     if profile:
         import cProfile
         profiler = cProfile.Profile()
@@ -657,10 +658,8 @@ def serve(httpServer, profiler=None):
             pass
         except:
             if profiler:
-                print 'HERE'
                 profiler.disable()
-                profiler.dump_stats('conary.lsprof')
-                profiler.print_stats()
+                profiler.dump_stats('server.lsprof')
                 print "exception happened, exiting"
                 sys.exit(1)
             else:

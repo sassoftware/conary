@@ -47,6 +47,9 @@ Changes in @NEW@:
     * Shim commitChangeSet() and getFileContents() calls now fall back to
       network access properly
 
+  o Server Changes:
+    * Added --lsprof argument to standalone server
+
   o Internal Changes:
     * Reimplemented dependency freezing in C
     * DependencySet objects now store the frozen depenedency by default
@@ -55,7 +58,6 @@ Changes in @NEW@:
     * DependenciesStream and FlavorStream objects now subclass from
       DependenciesSet instead of having a DependenciesSet object as an
       attribute. This saves one object per instance. (CNY-2410)
-
 
 Changes in 2.0.24:
   o New Features:
