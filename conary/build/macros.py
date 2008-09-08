@@ -134,6 +134,9 @@ class Macros(dict):
         if not shadow:
             return Macros([(x, self._get(x)) for x in dict.__iter__(self)])
 	return Macros(self, shadow)
+
+    def __deepcopy__(self, memo):
+        return self.copy(self, shadow=False)
     
     # occasionally it may be desirable to switch from shadowing
     # to a flattened representation
