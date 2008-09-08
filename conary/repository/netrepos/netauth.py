@@ -137,13 +137,15 @@ class UserAuthorization:
         if not result:
             return set()
 
+        canMirror = (sum(x[4] for x in result) > 0)
+
         # each user can only appear once (by constraint), so we only
         # need to validate the password once. we don't validate the
         # password for 'anonymous'. Using a bad password still allows
         # anonymous access
         userPasswords = [ x for x in result if x[3] != 'anonymous' ]
         # mirror users do not have an anonymous fallback
-        if userPasswords and userPasswords[0][4] == 1:
+        if userPasswords and canMirror:
             allowAnonymous = False
         if not allowAnonymous:
             result = userPasswords

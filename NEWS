@@ -49,6 +49,9 @@ Changes in @NEW@:
 
   o Server Changes:
     * Added --lsprof argument to standalone server
+    * If a user's mirror permission was granted by the second or subsequent
+      role, the anonymous permissions were inappropriately granted to the user
+      (CNY-2964)
 
   o Internal Changes:
     * Reimplemented dependency freezing in C
