@@ -627,7 +627,8 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
     """
     Inserts newItem into haystack, maintaining the sorted order. The
     cmpIdx is the item number in the list of tuples to base comparisons on.
-    Duplicates items aren't added.
+    Duplicates items aren't added. Returns True if the item was added,
+    False if it was already present.
 
     @param haystack: list of tuples.
     @type haystack: list
@@ -635,6 +636,7 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
     @type newItem: tuple
     @param cmpFn: Comparison function
     @type cmpFn: function
+    @rtype: bool
     """
     start = 0
     finish = len(haystack) - 1
@@ -659,6 +661,10 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
             haystack.insert(start + 1, newItem)
         elif rc > 0:
             haystack.insert(start, newItem)
+        else:
+            return False
+
+    return True
 
 _tempdir = tempfile.gettempdir()
 def settempdir(tempdir):

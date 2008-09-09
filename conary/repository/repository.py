@@ -16,7 +16,7 @@
 
 from conary.repository import changeset, errors, filecontents
 from conary import files, trove
-from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper
+from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper, util
 
 class AbstractTroveDatabase:
 
@@ -646,6 +646,21 @@ class ChangeSetJob:
 
         return troveNo, configRestoreList, normalRestoreList
 
+    @staticmethod
+    def ptrCmp(a, b):
+        if a[0] < b[0]:
+            return -1
+        elif a[0] > b[0]:
+            return 1
+        elif not a[1] or not b[1]:
+            # just ptrId's are being used
+            return 0
+        elif a[1] < b[1]:
+            return -1
+        elif a[1] > b[1]:
+            return 1
+
+        return 0
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False, allowIncomplete = False,
@@ -725,9 +740,11 @@ class ChangeSetJob:
                                  restoreContents, 1)
 
         ptrRestores = []
+        ptrRefsAdded = {}
         lastRestore = None         # restore each pathId,fileId combo once
-        for (pathId, fileId, sha1, version, restoreContents) in \
-                                                    normalRestoreList:
+        while normalRestoreList:
+            (pathId, fileId, sha1, version, restoreContents) = \
+                                                    normalRestoreList.pop(0)
             if (pathId, fileId) == lastRestore:
                 continue
 
@@ -743,6 +760,16 @@ class ChangeSetJob:
                                         sha1helper.sha1ToString(fileId)))
             if contType == changeset.ChangedFileTypes.ptr:
                 ptrRestores.append(sha1)
+                target = util.decompressString(fileContents.get().read())
+
+                if util.tupleListBsearchInsert(normalRestoreList,
+                                (target[:16], target[16:], sha1, None, True),
+                                self.ptrCmp):
+                    # Item was inserted. This creates a reference in the
+                    # datastore; keep track of it to prevent a duplicate
+                    # reference count.
+                    ptrRefsAdded[sha1] = True
+
                 continue
 
 	    assert(contType == changeset.ChangedFileTypes.file)
@@ -750,7 +777,12 @@ class ChangeSetJob:
 				 0, precompressed = True)
 
         for sha1 in ptrRestores:
-	    self.addFileContents(sha1, None, None, False, 0)
+            # Increment the reference count for items which were ptr's
+            # to a different file.
+            if sha1 in ptrRefsAdded:
+                del ptrRefsAdded[sha1]
+            else:
+                self.addFileContents(sha1, None, None, False, 0)
 
 	#del configRestoreList
 	#del normalRestoreList
