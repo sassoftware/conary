@@ -2087,7 +2087,8 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
             ldsoDlines.update(file(fileName).readlines())
 
     newlines = []
-    rootlen = len(root)
+    # Remove trailing / to avoid like "usr/lib" instead of "/usr/lib" CNY-2982
+    rootlen = len(root.rstrip('/'))
 
     for path in shlibList:
 	dirname = os.path.dirname(path)[rootlen:]

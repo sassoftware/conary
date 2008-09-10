@@ -14,6 +14,10 @@ Changes in @NEW@:
       has been fixed. (CNY-2627)
     * A bug causing createNewSourceTrove to erroneously change pathIds
       has been fixed. (CNY-2971)
+    * When installing with the --root option and a trailing '/'
+      character provided, Conary previously wrote new entries
+      in the ld.so.conf without a leading '/' character.  This
+      has been fixed. (CNY-2982)
 
   o Build Changes:
     * Cross-compiling packages that include perl modules can now
