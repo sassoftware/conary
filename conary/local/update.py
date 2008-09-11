@@ -2088,7 +2088,7 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
 
     newlines = []
     # Remove trailing / to avoid like "usr/lib" instead of "/usr/lib" CNY-2982
-    rootlen = len(root.rstrip('/'))
+    rootlen = max(len(root.rstrip('/')), 1)
 
     for path in shlibList:
 	dirname = os.path.dirname(path)[rootlen:]
