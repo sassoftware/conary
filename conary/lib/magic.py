@@ -105,8 +105,7 @@ class changeset(Magic):
 	Magic.__init__(self, path, basedir)
 
 class deb(Magic):
-    def __init__(self, path, basedir=''):
-	Magic.__init__(self, path, basedir)
+    "Debian package"
 
 class jar(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
