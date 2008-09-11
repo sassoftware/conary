@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.25:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
     * A bug that prevented proper ownership and permissions from being
