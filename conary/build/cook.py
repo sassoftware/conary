@@ -1839,6 +1839,39 @@ def newPackageSourceCount(cfg, recipeClass):
 
     return sourceVersion
 
+def loadFactoryRecipe(factoryClass, cfg, repos, buildFlavor):
+    '''
+    Loads a FactoryRecipe using the Factory as basis for the template.  This
+    method works in a way that is compatible with having superclasses in the
+    repository since it is loaded fresh every time this method is called.
+
+    @param repos: Repository to use for building
+    @type repos: repository.Repository
+    @param cfg: conary configuration
+    @type cfg: conarycfg.ConaryConfiguration
+    @param buildFlavor: Flavor to use while loading
+    @type buildFlavor: conary flavor object
+    '''
+    recipedir = tempfile.mkdtemp(prefix='factoryrecipe-%s-' % factoryClass.name, dir = cfg.tmpDir)
+    try:
+        recipefile = util.joinPaths(recipedir, factoryClass.name) + '.recipe'
+        open(recipefile, 'w').close()
+
+        factRec = factory.generateFactoryRecipe(factoryClass)
+        loader = loadrecipe.RecipeLoaderFromString(
+                    factRec, recipefile, cfg=cfg,
+                    repos=repos, buildFlavor = buildFlavor)
+        loaded = loader.getRecipe()
+        # The lookaside cache requires that these items be set in the
+        # class object before the recipe is instantiated, so we have to
+        # set them here rather than in __init__
+        loaded.originalFactoryClass = factoryClass
+        loaded._sourcePath = factoryClass._sourcePath
+        loaded._trove = factoryClass._trove
+        return loader
+    finally:
+        util.rmtree(recipedir)
+
 def cookItem(repos, cfg, item, prep=0, macros={},
 	     emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
@@ -1954,24 +1987,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         # This is the fake recipe used instead of cooking the Factory (which is
         # not a recipe)
         if recipeClass.getType() == recipe.RECIPE_TYPE_FACTORY:
-            recipedir = tempfile.mkdtemp(prefix='factoryrecipe-%s-' % name)
-            try:
-                recipefile = util.joinPaths(recipedir, recipeClass.name) + '.recipe'
-                open(recipefile, 'w').close()
-
-                factRec = factory.generateFactoryRecipe(recipeClass)
-                loader = loadrecipe.RecipeLoaderFromString(
-                            factRec, recipefile, cfg=cfg,
-                            repos=repos, buildFlavor = buildFlavor)
-                loaded = loader.getRecipe()
-                # The lookaside cache requires that these items be set in the
-                # class object before the recipe is instantiated, so we have to
-                # set them here rather than in __init__
-                loaded.originalFactoryClass = recipeClass
-                loaded._sourcePath = recipeClass._sourcePath
-                loaded._trove = recipeClass._trove
-            finally:
-                util.rmtree(recipedir)
+            loader = loadFactoryRecipe(recipeClass, cfg, repos, buildFlavor)
         loaderDict.setdefault(sourceVersion, []).append(loader)
 
         if showBuildReqs:
