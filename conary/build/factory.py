@@ -12,6 +12,9 @@
 # full details.
 #
 
+from conary.build.packagerecipe import AbstractPackageRecipe
+from conary.build import defaultrecipes
+
 from conary.build.recipe import RECIPE_TYPE_FACTORY
 from conary.build.errors import RecipeFileError
 
@@ -41,3 +44,37 @@ class Factory:
 
     def openSourceFile(self, path):
         return self._openSourceFileFn(path)
+
+FactoryRecipe = '''class FactoryRecipe(BaseRequiresRecipe):
+    name = '%(name)s'
+    version = '%(version)s'
+    abstractBaseClass = True
+
+    originalFactoryClass = None
+    _sourcePath = None
+    _trove = None
+
+    def __init__(r, *arg, **kw):
+        assert(r.originalFactoryClass is not None, 'You must set the originalFactoryClass before creating the FactoryRecipe object')
+        BaseRequiresRecipe.__init__(r, *arg, **kw)
+
+    def setup(r):
+        pass
+
+    def setupAbstractBaseClass(r):
+        BaseRequiresRecipe.setupAbstractBaseClass(r)
+        ofc = r.originalFactoryClass
+        # getAdditionalSourceFiles has to be a static or class
+        # method
+        if  hasattr(ofc, "getAdditionalSourceFiles"):
+            additionalFiles = ofc.getAdditionalSourceFiles()
+            for ent in additionalFiles:
+                srcFile, destLoc = ent[:2]
+                r.addSource(srcFile, dest = destLoc,
+                            package = ':recipe')
+'''
+
+
+def generateFactoryRecipe(class_):
+    return FactoryRecipe % dict(name=class_.name, version=class_.version)
+
