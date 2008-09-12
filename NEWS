@@ -46,6 +46,9 @@ Changes in @NEW@:
       (CNY-1760)
     * The r.addArchive() method can now extract control contents from
       dpkg .deb archive files. (CNY-2967)
+    * The way that factories are cooked has been changed so that buildRequires
+      are set (for building in rMake) and so that platforms may override the
+      default build requirements. (CNY-2986)
 
   o Client Changes:
     * Shim commitChangeSet() and getFileContents() calls now fall back to
