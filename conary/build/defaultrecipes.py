@@ -373,7 +373,8 @@ recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'autopackage': 'AutoPackageRecipe',
                'userinfo': 'UserInfoRecipe',
                'groupinfo': 'GroupInfoRecipe',
-               'derivedpackage': 'DerivedPackageRecipe'}
+               'derivedpackage': 'DerivedPackageRecipe',
+               }
 
 packageNames = dict([(x[1], x[0]) for x in recipeNames.iteritems()])
 

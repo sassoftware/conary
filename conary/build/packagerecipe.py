@@ -925,8 +925,10 @@ class SourcePackageRecipe(AbstractPackageRecipe):
                 self._addBuildAction(name, item)
 _SourcePackageRecipe = SourcePackageRecipe
 
+
 exec defaultrecipes.BaseRequiresRecipe
 exec defaultrecipes.PackageRecipe
 exec defaultrecipes.BuildPackageRecipe
 exec defaultrecipes.CPackageRecipe
 exec defaultrecipes.AutoPackageRecipe
+

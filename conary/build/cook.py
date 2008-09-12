@@ -32,7 +32,7 @@ import traceback
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe
+from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
@@ -472,35 +472,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
             sys.exit(1)
 
         if type == recipe.RECIPE_TYPE_FACTORY:
-
-            class FactoryRecipe(packagerecipe.AbstractPackageRecipe):
-
-                name = recipeClass.name
-                version = recipeClass.version
-                _sourcePath = recipeClass._sourcePath
-                abstractBaseClass = True
-                _originalFactoryClass = recipeClass
-                _trove = recipeClass._trove
-
-                def setup(r):
-                    pass
-
-                def setupAbstractBaseClass(r):
-                    packagerecipe.AbstractPackageRecipe.setupAbstractBaseClass(r)
-                    ofc = r._originalFactoryClass
-                    # getAdditionalSourceFiles has to be a static or class
-                    # method
-                    if  hasattr(ofc, "getAdditionalSourceFiles"):
-                        additionalFiles = ofc.getAdditionalSourceFiles()
-                        for ent in additionalFiles:
-                            srcFile, destLoc = ent[:2]
-                            r.addSource(srcFile, dest = destLoc,
-                                        package = ':recipe')
-
-            recipeClass = FactoryRecipe
-            # XXX Ouch. Gross.
-            loader.recipe = recipeClass
-            type = recipeClass.getType()
+            assert(False, 'Factory recipe types should not get this far')
 
         if type in (recipe.RECIPE_TYPE_INFO,
                       recipe.RECIPE_TYPE_PACKAGE):
@@ -1979,6 +1951,27 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
             recipeClass = loader.getRecipe()
 
+        # This is the fake recipe used instead of cooking the Factory (which is
+        # not a recipe)
+        if recipeClass.getType() == recipe.RECIPE_TYPE_FACTORY:
+            recipedir = tempfile.mkdtemp(prefix='factoryrecipe-%s-' % name)
+            try:
+                recipefile = util.joinPaths(recipedir, recipeClass.name) + '.recipe'
+                open(recipefile, 'w').close()
+
+                factRec = factory.generateFactoryRecipe(recipeClass)
+                loader = loadrecipe.RecipeLoaderFromString(
+                            factRec, recipefile, cfg=cfg,
+                            repos=repos, buildFlavor = buildFlavor)
+                loaded = loader.getRecipe()
+                # The lookaside cache requires that these items be set in the
+                # class object before the recipe is instantiated, so we have to
+                # set them here rather than in __init__
+                loaded.originalFactoryClass = recipeClass
+                loaded._sourcePath = recipeClass._sourcePath
+                loaded._trove = recipeClass._trove
+            finally:
+                util.rmtree(recipedir)
         loaderDict.setdefault(sourceVersion, []).append(loader)
 
         if showBuildReqs:

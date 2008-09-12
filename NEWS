@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Build Changes:
+    * The way that factories are cooked has been changed so that buildRequires
+      are set (for building in rMake) and so that platforms may override the
+      default build requirements. (CNY-2986)
+
 Changes in 2.0.25:
   o Bug Fixes:
     * "conary emerge" no longer emits warnings. (CNY-2835)
