@@ -4,7 +4,6 @@ Changes in @NEW@:
       are set (for building in rMake) and so that platforms may override the
       default build requirements. (CNY-2986)
 
-Changes in @NEW@:
   o Bug Fixes:
     * A bug causing cooks to fail when Perl was not installed on the
       build system has been fixed. (CNY-2989)
