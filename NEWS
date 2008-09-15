@@ -7,6 +7,11 @@ Changes in @NEW@:
   o Bug Fixes:
     * A bug causing cooks to fail when Perl was not installed on the
       build system has been fixed. (CNY-2989)
+    * A bug that prevented Java dependencies from being parsed
+      correctly in some cases, for example when given on a "conary rq
+      --what-provides" command line, has been fixed.  Previously a
+      "bad java dependency: flags required" error message was
+      generated. (CNY-2990)
 
 Changes in 2.0.25:
   o Bug Fixes:

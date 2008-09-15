@@ -680,7 +680,7 @@ class JavaDependencies(DependencyClass):
     tagName = "java"
     justOne = False
     depClass = Dependency
-    flags = DEP_CLASS_HAS_FLAGS
+    flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(JavaDependencies)
 
 class PythonDependencies(DependencyClass):
