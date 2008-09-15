@@ -2261,7 +2261,7 @@ class _dependency(policy.Policy):
             return [perlPath, perlIncPath, '']
 
         # must be no perl at all
-        return ['', '', '']
+        return ['', [], '']
 
 
     def _getPython(self, macros, path):
@@ -2679,7 +2679,7 @@ class Provides(_dependency):
         if self.perlIncPath is not None:
             return
 
-        perl, self.perlIncPath, _ = self._getperl(
+        _, self.perlIncPath, _ = self._getperl(
             self.recipe.macros, self.recipe)
         self.perlIncPath.sort(key=len, reverse=True)
 
@@ -3701,7 +3701,7 @@ class Requires(_addInfo, _dependency):
             return
 
         macros = self.recipe.macros
-        self.perlPath, _, self.perlIncPath = self._getperl(macros, self.recipe)
+        self.perlPath, self.perlIncPath, _ = self._getperl(macros, self.recipe)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
@@ -3875,7 +3875,7 @@ class _basePluggableRequires(Requires):
     def info(self, *args, **kwargs):
         return self.recipe._policyMap['Requires'].info(*args, **kwargs)
 
-    def _addClassName(self, *args, **kawrgs):
+    def _addClassName(self, *args, **kwargs):
         return self.recipe._policyMap['Requires']._addClassName(*args, **kwargs)
 
     def doFile(self, path):
