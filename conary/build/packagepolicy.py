@@ -3268,9 +3268,9 @@ class Requires(_addInfo, _dependency):
             perlReqs = self._getPerlReqs(path, fullpath)
             for req in perlReqs:
                 thisReq = deps.parseDep('perl: ' + req)
-                if db.getTrovesWithProvides([thisReq]) or \
-                        [x for x in self.recipe.autopkg.components.values() \
-                            if x.provides.satisfies(thisReq)]:
+                if db.getTrovesWithProvides([thisReq]) or [
+                        x for x in self.recipe.autopkg.components.values()
+                        if x.provides.satisfies(thisReq)]:
                     self._addRequirement(path, req, [], pkg,
                                          deps.PerlDependencies)
 
@@ -3701,7 +3701,8 @@ class Requires(_addInfo, _dependency):
             return
 
         macros = self.recipe.macros
-        self.perlPath, self.perlIncPath, _ = self._getperl(macros, self.recipe)
+        self.perlPath, perlIncPath, _ = self._getperl(macros, self.recipe)
+        self.perlIncPath = ' '.join('-I'+x for x in perlIncPath)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
