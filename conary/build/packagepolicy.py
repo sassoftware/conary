@@ -3082,7 +3082,7 @@ class Requires(_addInfo, _dependency):
         self.rubyLoadPath = None
         self.perlReqs = None
         self.perlPath = None
-        self.perlIncPath = None
+        self.perlIncArgs = None
         self._CILPolicyProvides = {}
         self.pythonSysPathMap = {}
         self.pythonModuleFinderMap = {}
@@ -3702,7 +3702,7 @@ class Requires(_addInfo, _dependency):
 
         macros = self.recipe.macros
         self.perlPath, perlIncPath, _ = self._getperl(macros, self.recipe)
-        self.perlIncPath = ' '.join('-I'+x for x in perlIncPath)
+        self.perlIncArgs = ' '.join('-I'+x for x in perlIncPath)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
@@ -3742,7 +3742,7 @@ class Requires(_addInfo, _dependency):
                     scandeps = '%s/lib64/conary/ScanDeps' %prefix
                 perlreqs = '%s/libexec/conary/perlreqs.pl' %prefix
             self.perlReqs = '%s -I%s %s %s' %(
-                self.perlPath, scandeps, self.perlIncPath, perlreqs)
+                self.perlPath, scandeps, self.perlIncArgs, perlreqs)
         if self.perlReqs is False:
             return []
 
