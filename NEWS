@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.26:
   o Build Changes:
     * The way that factories are cooked has been changed so that buildRequires
       are set (for building in rMake) and so that platforms may override the
