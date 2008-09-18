@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Client Changes:
+     * The "conary rollback" command now handles --info and --interactive
+       flags, which behave similarly to the "conary update" flags. (CNY-820)
+
 Changes in 2.0.26:
   o Build Changes:
     * The way that factories are cooked has been changed so that buildRequires

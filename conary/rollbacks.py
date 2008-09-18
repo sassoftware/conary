@@ -19,6 +19,7 @@ from conary import deps, versions
 
 from conary.lib import log, util
 from conary.local import database
+from conaryclient import cmdline
 
 def listRollbacks(db, cfg):
     return formatRollbacks(cfg, db.getRollbackStack().iter(), stream=sys.stdout)
@@ -147,6 +148,100 @@ def formatRollbacks(cfg, rollbacks, stream=None):
 
         w_('\n')
 
+def formatRollbacksAsUpdate(cfg, rollbackList):
+    updateTempl = "    %-7s %s %s"
+    templ = "    %-7s %s=%s"
+    print 'The following actions will be performed:'
+
+    for idx, rb in enumerate(rollbackList):
+        print 'Job %s of %s' % (idx + 1, len(rollbackList))
+        
+        newList = []
+        oldList = []
+        for cs in rb.iterChangeSets():
+            for pkg in cs.iterNewTroveList():
+                newList.append((pkg.getName(),
+                                pkg.getOldVersion(), pkg.getOldFlavor(),
+                                pkg.getNewVersion(), pkg.getNewFlavor()))
+            oldList += [ x[0:3] for x in cs.getOldTroveList() ]
+        newList.sort()
+
+        # looks for components-of-packages and collapse those into the
+        # package itself (just like update does)
+        compByPkg = {}
+
+        for info in newList:
+            name = info[0]
+            if ':' in name:
+                pkg, component = name.split(':')
+                pkgInfo = (pkg,) + info[1:]
+            else:
+                pkgInfo = info
+                component = None
+            l = compByPkg.setdefault(pkgInfo, [])
+            l.append(component)                
+        
+        oldList.sort()
+        for info in newList:
+            (name, oldVersion, oldFlavor, newVersion, newFlavor) = info
+            if ':' in name:
+                pkgInfo = (name.split(':')[0],) + info[1:]
+                if None in compByPkg[pkgInfo]:
+                    # this component was displayed with its package
+                    continue
+
+            if info in compByPkg:
+                comps = [":" + x for x in compByPkg[info] if x is not None]
+                if comps:
+                    name += '(%s)' % " ".join(comps)
+                    
+            if newVersion.onLocalLabel():
+                # Don't display changes to local branch
+                continue
+                
+            if not oldVersion:
+                print(templ % ('Install', name, 
+                            verStr(cfg, newVersion, newFlavor)))
+            else:
+                ov = oldVersion.trailingRevision()
+                nv = newVersion.trailingRevision()
+                if newVersion.onRollbackLabel() and ov == nv:
+                    # Avoid displaying changes to rollback branch
+                    continue
+                pn = "(%s -> %s)" % (verStr(cfg, oldVersion, newFlavor),
+                                   verStr(cfg, newVersion, oldFlavor,
+                                          defaultLabel =
+                                            newVersion.branch().label()))
+                print(updateTempl % ('Update', name, pn))
+
+        compByPkg = {}
+
+        for name, version, flavor in oldList:
+            if ':' in name:
+                pkg, component = name.split(':')
+            else:
+                pkg = name
+                component = None
+            l = compByPkg.setdefault((pkg, version, flavor), [])
+            l.append(component)
+
+        for (name, version, flavor) in oldList:
+            if ':' in name:
+                pkgInfo = (name.split(':')[0], version, flavor)
+                if None in compByPkg[pkgInfo]:
+                    # this component was displayed with its package
+                    continue
+
+            if (name, version, flavor) in compByPkg:
+                comps = [ ":" + x 
+                            for x in compByPkg[(name, version, flavor)]
+                            if x is not None ]
+                if comps:
+                    name += '(%s)' % " ".join(comps)
+            print(templ % ('Erase', name, verStr(cfg, version, flavor)))
+
+    return 0
+
 def apply(db, cfg, rollbackSpec, **kwargs):
     import warnings
     warnings.warn("rollbacks.apply is deprecated, use the client's "
@@ -168,6 +263,7 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
     transactionCounter = client.db.getTransactionCounter()
 
     log.syslog.command()
+    showInfoOnly = kwargs.pop('showInfoOnly', False)
 
     defaults = dict(replaceFiles = False,
                     transactionCounter = transactionCounter,
@@ -212,6 +308,20 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
 
         rollbacks = rollbackList[-rollbackCount:]
         rollbacks.reverse()
+
+    #-- Show only information and return
+    if showInfoOnly or client.cfg.interactive:
+        rollbackList = [ rollbackStack.getRollback(x) for x in rollbacks if rollbackStack.hasRollback(x) ]
+        formatRollbacksAsUpdate(client.cfg, rollbackList)
+        
+    if showInfoOnly:
+        return 0
+
+    #-- Interactive input (default behaviour)
+    if client.cfg.interactive:
+        okay = cmdline.askYn('continue with rollback? [y/N]', default=False)
+        if not okay:
+            return 1
 
     try:
         client.db.applyRollbackList(client.getRepos(), rollbacks, **defaults)
@@ -393,7 +503,6 @@ class _RollbackScripts(object):
         if cls._KEYS.difference(ret.keys()):
             # Missing key
             return None
-        from conaryclient import cmdline
         job = cmdline.parseChangeList([ret[cls._KEY_JOB]])[0]
         oldCompatClass = cls._toInt(ret[cls._KEY_OLD_COMPAT_CLASS])
         newCompatClass = cls._toInt(ret[cls._KEY_NEW_COMPAT_CLASS])

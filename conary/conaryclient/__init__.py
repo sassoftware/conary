@@ -437,7 +437,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     @api.publicApi
     def applyRollback(self, rollbackSpec, replaceFiles = None,
             callback = None, tagScript = None, justDatabase = None,
-            transactionCounter = None):
+            transactionCounter = None, showInfoOnly = False):
         """
         Apply a rollback.
 
@@ -493,6 +493,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
             transactionCounter = transactionCounter,
             callback = callback,
             replaceFiles = replaceFiles,
+            showInfoOnly = showInfoOnly,
         )
         # If any of these arguments are None, don't even pass them, the
         # defaults are going to apply
