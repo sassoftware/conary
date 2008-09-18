@@ -1,11 +1,16 @@
 Changes in @NEW@:
   o Client Changes:
-     * The "conary rollback" command now handles --info and --interactive
-       flags, which behave similarly to the "conary update" flags. (CNY-820)
-  o Bug Fixes: 
-     * Conary no longer checks for the existence of a db journal on startup,
-       making it possible to perform cvc operations while updating your
-       system. (CNY-2958)
+    * The "conary rollback" command now handles --info and --interactive
+      flags, which behave similarly to the "conary update" flags. (CNY-820)
+
+  o Bug Fixes:
+    * Conary no longer checks for the existence of a db journal on startup,
+      making it possible to perform cvc operations while updating your
+      system. (CNY-2958)
+
+  o Build Changes:
+    * A new type of metadata information, storing key-value pairs,
+      is now available. (CNY-2983)
 
 Changes in 2.0.26:
   o Build Changes:

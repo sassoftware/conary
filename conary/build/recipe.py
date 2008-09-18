@@ -128,6 +128,7 @@ class Recipe(object):
         # Old metadata, keyed on trove name, with ((n, v, f), metadata, log)
         # as value
         self._oldMetadataMap = {}
+        self._filteredKeyValueMetadata = set()
         # Multi-URL map, used for multiple URL support in addArchive et al
         self.multiurlMap = {}
 

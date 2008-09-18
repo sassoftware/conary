@@ -2408,7 +2408,8 @@ def _doCopyForwardMetadata(troveList, recipeObj):
             continue
         items = newTrove.getAllMetadataItems()
         newTrove.copyMetadataFromMetadata(oldMetadata,
-                              skipSet=recipeObj.metadataSkipSet)
+                              skipSet=recipeObj.metadataSkipSet,
+                              filteredKeyValues=recipeObj._filteredKeyValueMetadata)
         if logCopy and newTrove.getAllMetadataItems():
             # if getAllMetadataItems is empty, we didn't copy anything
             # forward, so don't log. This is because copyMetadataFromMetadata

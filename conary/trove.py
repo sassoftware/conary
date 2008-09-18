@@ -592,8 +592,71 @@ _METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
 _METADATA_ITEM_TAG_SIGNATURES = 8
 _METADATA_ITEM_TAG_NOTES = 9
 _METADATA_ITEM_TAG_LANGUAGE = 10
+_METADATA_ITEM_TAG_KEY_VALUE = 11
 
 _METADATA_ITEM_SIG_VER_ALL = [ 0 ]
+
+class KeyValueItemsStream(streams.OrderedStreamCollection):
+    __slots__ = [ '_map' ]
+
+    streamDict = {
+        1 : streams.StringStream,
+        2 : streams.StringStream,
+    }
+
+    def __init__(self, data = None):
+        self._map = {}
+        streams.OrderedStreamCollection.__init__(self, data = data)
+
+    # Dictionary interface
+    def __setitem__(self, key, value):
+        assert(isinstance(key, str))
+        assert(isinstance(value, str))
+        self._map[key] = value
+
+    def __getitem__(self, key):
+        if self._data is not None:
+            self._thaw()
+        return self._map[key]
+
+    def keys(self):
+        if self._data is not None:
+            self._thaw()
+        return self._map.keys()
+
+    def items(self):
+        if self._data is not None:
+            self._thaw()
+        return self._map.items()
+
+    def update(self, ddata):
+        self._map.update(ddata)
+
+    def iteritems(self):
+        if self._data is not None:
+            self._thaw()
+        return self._map.iteritems()
+
+    def freeze(self, skipSet = None):
+        self._reset()
+
+        for key, val in sorted(self._map.iteritems()):
+            self.addStream(1, streams.StringStream(key))
+            self.addStream(2, streams.StringStream(val))
+
+        self._data = None
+        return streams.OrderedStreamCollection.freeze(self, skipSet = skipSet)
+
+    def _thaw(self):
+        streams.OrderedStreamCollection._thaw(self)
+        keys = self.getStreams(1)
+        vals = self.getStreams(2)
+        self._map = dict((x(), y()) for (x, y) in zip(keys, vals))
+        self._reset()
+
+    def _reset(self):
+        for k, v in self.getItems().iteritems():
+            del v[:]
 
 OBSS = streams.OrderedBinaryStringsStream
 class MetadataItem(streams.StreamSet):
@@ -620,6 +683,8 @@ class MetadataItem(streams.StreamSet):
                 (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
         _METADATA_ITEM_TAG_NOTES:
                 (DYNAMIC, OBSS,                   'notes'        ),
+        _METADATA_ITEM_TAG_KEY_VALUE:
+                (DYNAMIC, KeyValueItemsStream,    'keyValue'     ),
         }
 
     _skipSet = { 'id' : True, 'signatures': True }
@@ -682,10 +747,21 @@ class MetadataItem(streams.StreamSet):
         return streams.StreamSet.freeze(self, *args, **kw)
 
     def keys(self):
-        return [ x for x in self._keys if getattr(self, x)() ]
+        ret = []
+        for x in self._keys:
+            attr = getattr(self, x)
+            if hasattr(attr, 'keys'):
+                if attr.keys():
+                    ret.append(x)
+            elif hasattr(attr, '__call__') and attr():
+                ret.append(x)
+        return ret
 
     def __getitem__(self, key):
-        return getattr(self, key)()
+        attr = getattr(self, key)
+        if hasattr(attr, '__call__'):
+            return attr()
+        return attr
 
 class Metadata(streams.OrderedStreamCollection):
     streamDict = { 1: MetadataItem }
@@ -712,9 +788,11 @@ class Metadata(streams.OrderedStreamCollection):
                     d.update(item)
         return d
 
-    def flatten(self, skipSet=None):
+    def flatten(self, skipSet=None, filteredKeyValues=None):
         if skipSet is None:
             skipSet = []
+        if filteredKeyValues is None:
+            filteredKeyValues = []
         items = {}
         keys = MetadataItem._keys
         for item in self.getStreams(1):
@@ -723,8 +801,14 @@ class Metadata(streams.OrderedStreamCollection):
             for key in item.keys():
                 if key in skipSet:
                     continue
-                values = getattr(item, key)()
                 newItemStream = getattr(newItem, key)
+                if key == 'keyValue':
+                    # Key-value metadata
+                    for k, v in item.keyValue.items():
+                        if k not in filteredKeyValues:
+                            newItemStream[k] = v
+                    continue
+                values = getattr(item, key)()
                 if isinstance(newItemStream, list):
                     # We have to clear the old list before adding new elements
                     # to it, otherwise we end up with a union of the lists,
@@ -1310,18 +1394,22 @@ class Trove(streams.StreamSet):
     def getAllMetadataItems(self):
         return self.troveInfo.metadata.flatten()
 
-    def copyMetadata(self, trv, skipSet=None):
+    def copyMetadata(self, trv, skipSet=None, filteredKeyValues=None):
         """
         Copy metadata from a different trove
         @param trv: Trove object from which metadata items will be copied
         @type trv: Trove
         @param skipSet: Items that will not be copied
         @type skipSet: iterable
+        @param filteredKeyValues: Keys in the key-value metadata that will
+        not be copied.
+        @type filteredKeyValues: iterable
         """
         return self.copyMetadataFromMetadata(trv.troveInfo.metadata,
-                                             skipSet=skipSet)
+                                             skipSet=skipSet,
+                                             filteredKeyValues=filteredKeyValues)
 
-    def copyMetadataFromMetadata(self, metadata, skipSet=None):
+    def copyMetadataFromMetadata(self, metadata, skipSet=None, filteredKeyValues=None):
         """
         Copy metadata from a different metadata object
         @param metadata: Metadata object from which metadata items will be
@@ -1329,8 +1417,12 @@ class Trove(streams.StreamSet):
         @type metadata: Metadata
         @param skipSet: Items that will not be copied
         @type skipSet: iterable
+        @param filteredKeyValues: Keys in the key-value metadata that will
+        not be copied.
+        @type filteredKeyValues: iterable
         """
-        items = metadata.flatten(skipSet=skipSet)
+        items = metadata.flatten(skipSet=skipSet,
+                                 filteredKeyValues=filteredKeyValues)
         self.troveInfo.metadata = Metadata()
         self.troveInfo.metadata.addItems(items)
 
