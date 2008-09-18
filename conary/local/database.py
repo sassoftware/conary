@@ -1358,6 +1358,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         datastore.DataStoreRepository.__init__(self,
                            dataStore = localrep.SqlDataStore(self.db.db))
 
+
     def _getDb(self):
         if not self._db:
             try:
@@ -2374,6 +2375,13 @@ class Database(SqlDbRepository):
         j.revert()
         os.unlink(opJournalPath)
 
+    def _initDb(self):
+        SqlDbRepository._initDb(self)
+        if self.opJournalPath and os.path.exists(self.opJournalPath):
+            raise ExistingJournalError(top,
+                    'journal file exists. use revert command to '
+                    'undo the previous (failed) operation')
+
     def __init__(self, root, path, timeout = None):
         """
         Instantiate a database object
@@ -2397,15 +2405,11 @@ class Database(SqlDbRepository):
             SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
             # use :memory: as a marker not to bother with locking
             self.lockFile = path 
+            self.opJournalPath = None
         else:
             SqlDbRepository.__init__(self, root + path, timeout = timeout)
             self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
-
-            if os.path.exists(self.opJournalPath):
-                raise ExistingJournalError(top,
-                        'journal file exists. use revert command to '
-                        'undo the previous (failed) operation')
 
             self.lockFile = top + "/syslock"
             self.lockFileObj = None
