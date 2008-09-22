@@ -120,7 +120,7 @@ class deb(Magic):
         f = file(fullPath)
         try:
             h = debhelper.DebianPackageHeader(f)
-        except debhelper.Error:
+        except (debhelper.Error, debhelper.ar.ArchiveError):
             # Probably the control file was missing; ignore the error, we
             # don't know how to extract metadata
             return
