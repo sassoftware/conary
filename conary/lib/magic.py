@@ -118,7 +118,13 @@ class deb(Magic):
         Magic.__init__(self, path, basedir)
         fullPath = basedir + path
         f = file(fullPath)
-        h = debhelper.DebianPackageHeader(f)
+        try:
+            h = debhelper.DebianPackageHeader(f)
+        except debhelper.Error:
+            # Probably the control file was missing; ignore the error, we
+            # don't know how to extract metadata
+            return
+
         for dtag, cstr in self._tagMap.items():
             self.contents[cstr] = h[dtag]
 
