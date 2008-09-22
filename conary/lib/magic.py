@@ -22,6 +22,7 @@ import gzip as gzip_module
 import bz2
 
 from conary import rpmhelper
+from conary.lib import debhelper
 from conary.lib import elf
 from conary.lib import javadeps
 from conary.lib import util
@@ -106,6 +107,20 @@ class changeset(Magic):
 
 class deb(Magic):
     "Debian package"
+    _tagMap = dict([
+        (debhelper.NAME, 'name'),
+        (debhelper.VERSION, 'version'),
+        (debhelper.RELEASE, 'release'),
+        (debhelper.SUMMARY, 'summary'),
+        (debhelper.DESCRIPTION, 'description'),
+    ])
+    def __init__(self, path, basedir):
+        Magic.__init__(self, path, basedir)
+        fullPath = basedir + path
+        f = file(fullPath)
+        h = debhelper.DebianPackageHeader(f)
+        for dtag, cstr in self._tagMap.items():
+            self.contents[cstr] = h[dtag]
 
 class jar(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):

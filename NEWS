@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o New Features:
+    * Metadata information can now be extracted from debian packages.
+      (CNY-2995)
+
   o Client Changes:
     * The "conary rollback" command now handles --info and --interactive
       flags, which behave similarly to the "conary update" flags. (CNY-820)
