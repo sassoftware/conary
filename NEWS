@@ -11,6 +11,9 @@ Changes in @NEW@:
     * Conary no longer checks for the existence of a db journal on startup,
       making it possible to perform cvc operations while updating your
       system. (CNY-2958)
+    * Files with (only) unsatisfied Java requirements that are filtered
+      out using r.Requires(exceptDeps) no longer have their provides
+      removed. (CNY-3001)
 
   o Build Changes:
     * A new type of metadata information, storing key-value pairs,

@@ -2817,6 +2817,22 @@ class Provides(_dependency):
     def _addJavaProvides(self, path, m, pkg):
         if 'provides' not in m.contents or not m.contents['provides']:
             return
+        if not hasattr(self.recipe, '_reqExceptDeps'):
+            self.recipe._reqExceptDeps = []
+        # Compile requires exceptDeps (and persist them)
+        if not hasattr(self.recipe, '_compiledReqExceptDeps'):
+            self.recipe._compiledReqExceptDeps = exceptDeps = []
+            macros = self.recipe.macros
+            for fE, rE in self.recipe._reqExceptDeps:
+                try:
+                    exceptDeps.append((filter.Filter(fE, macros),
+                                       re.compile(rE % macros)))
+                except sre_constants.error, e:
+                    self.error('Bad regular expression %s for file spec %s: %s',
+                        rE, fE, e)
+            # We will no longer need this, we have the compiled version now
+            self.recipe._reqExceptDeps = []
+
         if self.recipe._internalJavaDepMap is None:
             # Instantiate the dictionary of provides from this package
             self.recipe._internalJavaDepMap = internalJavaDepMap = {}
@@ -2864,6 +2880,28 @@ class Provides(_dependency):
             troves = self.depCache.getProvides(depSetList)
             missingDepSets = set(depSetList) - set(troves)
             missingReqs = set(depSetMap[x] for x in missingDepSets)
+
+            # White out the missing requires if exceptDeps for them are found
+            rExceptDeps = self.recipe._compiledReqExceptDeps
+            if missingReqs and rExceptDeps:
+                depClass = deps.JavaDependencies
+                filteredMissingDeps = set()
+                for dep in list(missingReqs):
+                    for filt, exceptRe in rExceptDeps:
+                        if not filt.match(path):
+                            continue
+                        matchName = '%s: %s' %(depClass.tagName, str(dep))
+                        if exceptRe.match(matchName):
+                            # found one to not copy
+                            missingReqs.remove(dep)
+                            filteredMissingDeps.add(dep)
+                if filteredMissingDeps:
+                    # We need to take them out of the per-file requires
+                    ofiles = internalJavaDepMap[path]
+                    for _, (oclassProv, oclassReqSet) in ofiles.items():
+                        if oclassProv is not None:
+                            oclassReqSet.difference_update(filteredMissingDeps)
+
             if missingReqs:
                 fileDeps = internalJavaDepMap[path]
                 # This file has unsatisfied dependencies.
@@ -3151,6 +3189,10 @@ class Requires(_addInfo, _dependency):
                 self.exceptDeps.extend(exceptDeps)
             else:
                 self.exceptDeps.append(exceptDeps)
+        if not hasattr(self.recipe, '_reqExceptDeps'):
+            self.recipe._reqExceptDeps = []
+        self.recipe._reqExceptDeps.extend(self.exceptDeps)
+
         _addInfo.updateArgs(self, *args, **keywords)
 
     def preProcess(self):
