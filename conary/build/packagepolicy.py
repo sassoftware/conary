@@ -2895,6 +2895,7 @@ class Provides(_dependency):
                             # found one to not copy
                             missingReqs.remove(dep)
                             filteredMissingDeps.add(dep)
+                            break
                 if filteredMissingDeps:
                     # We need to take them out of the per-file requires
                     ofiles = internalJavaDepMap[path]
