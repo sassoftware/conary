@@ -14,6 +14,14 @@ Changes in @NEW@:
     * Files with (only) unsatisfied Java requirements that are filtered
       out using r.Requires(exceptDeps) no longer have their provides
       removed. (CNY-3001)
+    * A bug that caused the frozen list of trove script compatibility
+      information (created if using the "toClass=" keyword argument
+      when adding a trove script) to be recorded in a random order has
+      been fixed.  Because sorting the list causes a different Trove
+      signature digest to be generated, this version of Conary
+      introduces version 2 trove signatures.  Conary will ignore
+      version 1 trove signatures on old troves that have multiple
+      trove script compatibility entries.  (CNY-2997)
 
   o Build Changes:
     * A new type of metadata information, storing key-value pairs,
