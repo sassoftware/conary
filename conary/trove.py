@@ -289,6 +289,10 @@ class DigitalSignature(streams.StreamSet):
         _DIGSIG_TIMESTAMP    : (SMALL, streams.IntStream,      'timestamp'   ),
     }
 
+    def __cmp__(self, other):
+        return cmp((self.fingerprint, self.signature, self.timestamp),
+                   (other.fingerprint, other.signature, other.timestamp))
+
     def _mpiToLong(self, data):
         length = ((ord(data[0]) << 8) + ord(data[1]) + 7) / 8
         if len(data) != length + 2:
@@ -393,6 +397,10 @@ class VersionedDigitalSignatures(streams.StreamSet):
         _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS:
                 (SMALL, DigitalSignatures,     'signatures'),
     }
+
+    def __cmp__(self, other):
+        return cmp((self.version, self.digest, self.signatures),
+                   (other.version, other.digest, other.signatures))
 
     def addPrecomputed(self, sig):
         self.signatures.add(sig)

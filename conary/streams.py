@@ -469,6 +469,13 @@ class StreamCollection(InfoStream):
 
         l = []
         for typeId, itemDict in sorted(self._items.iteritems()):
+            itemList = sorted(itemDict)
+            if itemList and not hasattr(itemList[0], '__cmp__'):
+                raise AssertionError('Programming Error: %s type object '
+                                     'does not have a __cmp__ method - '
+                                     'sorting will be unstable'
+                                     % itemList[0].__class__.__name__)
+
             for item in sorted(itemDict):
                 s = item.freeze()
                 if len(s) >= (1 << 16):

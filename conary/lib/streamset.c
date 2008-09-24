@@ -180,11 +180,25 @@ static StreamSetDefObject * StreamSet_GetSSD(PyTypeObject *o) {
     return (StreamSetDefObject *) ssd;
 }
 
-static int _StreamSet_doCmp(PyObject * self, PyObject * other,
-			    PyObject * skipSet) {
-    StreamSetDefObject * ssd;
+static int _StreamSet_doEq(PyObject * self,
+			   PyObject * args,
+			   PyObject * kwargs) {
+    /* returns -1 on error, 0 if the objects are the same, 1
+       if they are different */
+    StreamSetDefObject *ssd;
     int i;
-    PyObject * attr, * otherAttr, * rc;
+    PyObject *attr, *otherAttr, *rc;
+    PyObject *skipSet=Py_None, *other;
+    static char * kwlist[] = { "other", "skipSet", NULL };
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist,
+				     &other, &skipSet))
+        return -1;
+
+    if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
+        PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
+	return -1;
+    }
 
     if (self->ob_type != other->ob_type) return 1;
 
@@ -215,10 +229,6 @@ static int _StreamSet_doCmp(PyObject * self, PyObject * other,
     }
 
     return 0;
-}
-
-static int StreamSet_Cmp(PyObject * self, PyObject * other) {
-    return _StreamSet_doCmp(self, other, Py_None);
 }
 
 #define SIZE_SMALL sizeof(char) + sizeof(short)
@@ -536,34 +546,40 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args,
     return rc;
 }
 
-static PyObject * StreamSet_Eq(PyObject * self, 
+static PyObject * StreamSet_Eq(PyObject * self,
                                PyObject * args,
                                PyObject * kwargs) {
-    static char * kwlist[] = { "other", "skipSet", NULL };
-    PyObject * other;
-    PyObject * skipSet = Py_None;
     int rc;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O", kwlist,
-				     self->ob_type, &other, &skipSet))
-        return NULL;
-
-    if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
-        PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
-	return NULL;
-    }
-
-    rc = _StreamSet_doCmp(self, other, skipSet);
-    if (rc < 0 && PyErr_Occurred())
+    rc = _StreamSet_doEq(self, args, kwargs);
+    if (rc == -1)
 	return NULL;
 
-    if (!rc) {
+    if (rc == 0) {
         Py_INCREF(Py_True);
         return Py_True;
     }
 
     Py_INCREF(Py_False);
     return Py_False;
+}
+
+static PyObject * StreamSet_Ne(PyObject * self,
+                               PyObject * args,
+                               PyObject * kwargs) {
+    int rc;
+
+    rc = _StreamSet_doEq(self, args, kwargs);
+    if (rc == -1)
+	return NULL;
+
+    if (rc == 0) {
+        Py_INCREF(Py_False);
+        return Py_False;
+    }
+
+    Py_INCREF(Py_True);
+    return Py_True;
 }
 
 /* this is a python class method */
@@ -1128,6 +1144,7 @@ static PyMethodDef StreamSetMethods[] = {
     { "__deepcopy__", (PyCFunction) StreamSet_DeepCopy, METH_VARARGS         },
     { "diff",   (PyCFunction) StreamSet_Diff,   METH_VARARGS | METH_KEYWORDS },
     { "__eq__", (PyCFunction) StreamSet_Eq,     METH_VARARGS | METH_KEYWORDS },
+    { "__ne__", (PyCFunction) StreamSet_Ne,     METH_VARARGS | METH_KEYWORDS },
     { "find",   (PyCFunction) StreamSet_Find,   METH_VARARGS | METH_CLASS    },
     { "freeze", (PyCFunction) StreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
     { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
@@ -1145,7 +1162,7 @@ PyTypeObject StreamSetType = {
     0,                              /*tp_print*/
     0,                              /*tp_getattr*/
     0,                              /*tp_setattr*/
-    StreamSet_Cmp,		    /*tp_compare*/
+    0,				    /*tp_compare*/
     0,                              /*tp_repr*/
     0,                              /*tp_as_number*/
     0,                              /*tp_as_sequence*/
