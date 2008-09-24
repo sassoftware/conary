@@ -445,7 +445,11 @@ _TROVESIG_VSIG   = 2
 
 _TROVESIG_VER_CLASSIC = 0
 _TROVESIG_VER_NEW     = 1
-_TROVESIG_VER_ALL = [ 0, 1 ]
+# NEW2 is exactly the same as NEW -- it is only used if more than one
+# trove script compatibility class is in this trove.  The sort order
+# was broken in older versions of conary. CNY-2997
+_TROVESIG_VER_NEW2    = 2
+_TROVESIG_VER_ALL = [ 0, 1, 2 ]
 
 class TroveSignatures(streams.StreamSet):
     """
@@ -482,7 +486,7 @@ class TroveSignatures(streams.StreamSet):
             self.sha1.compute(message)
             return
 
-        if sigVersion == _TROVESIG_VER_NEW:
+        if sigVersion in (_TROVESIG_VER_NEW, _TROVESIG_VER_NEW2):
             digest = streams.Sha256Stream()
             digest.compute(message)
         else:
@@ -539,7 +543,7 @@ class TroveSignatures(streams.StreamSet):
 
         for versionedBlock in self.vSigs:
             ver = versionedBlock.version()
-            if ver == _TROVESIG_VER_NEW:
+            if ver in (_TROVESIG_VER_NEW, _TROVESIG_VER_NEW2):
                 digest = streams.Sha256Stream()
             else:
                 # Ignore digest types we don't know about.
@@ -886,6 +890,9 @@ class TroveScriptCompatibility(streams.StreamSet):
     def __str__(self):
         return "%s->%s" % (self.old(), self.new())
 
+    def __cmp__(self, other):
+        return cmp((self.old, self.new), (other.old, other.new))
+
 class TroveScriptCompatibilityCollection(streams.StreamCollection):
 
     streamDict = { 1 : TroveScriptCompatibility }
@@ -1129,6 +1136,13 @@ class Trove(streams.StreamSet):
 
     v0SkipSet = { 'sigs' : True, 'versionStrings' : True, 'incomplete' : True,
                   'pathHashes' : True }
+    v1SkipSet = { 'sigs' : True,
+                  'versionStrings' : True,
+                  'incomplete' : True,
+                  'metadata': True,
+                  'completeFixup' : True,
+                  }
+
     _mergeTroveInfoSigExclusions(v0SkipSet, streamDict)
 
     # the memory savings from slots isn't all that interesting here, but it
@@ -1147,16 +1161,9 @@ class Trove(streams.StreamSet):
         if version == _TROVESIG_VER_CLASSIC:
             return streams.StreamSet.freeze(self, self.v0SkipSet,
                                             freezeUnknown = False)
-        elif version == _TROVESIG_VER_NEW:
-            return streams.StreamSet.freeze(self,
-                                            skipSet = { 'sigs' : True,
-                                                        'versionStrings' : True,
-                                                        'incomplete' : True,
-                                                        'metadata': True,
-                                                        'completeFixup' : True,
-                                                        },
+        elif version in (_TROVESIG_VER_NEW, _TROVESIG_VER_NEW2):
+            return streams.StreamSet.freeze(self, self.v1SkipSet,
                                             freezeUnknown = True)
-
         raise NotImplementedError
 
     def addDigitalSignature(self, keyId, skipIntegrityChecks = False):
@@ -1321,6 +1328,16 @@ class Trove(streams.StreamSet):
     def invalidateDigests(self):
         self.troveInfo.sigs.reset()
 
+    def _use_TROVESIG_VER_NEW2(self):
+        # go through all the trove scripts for this trove.  If any
+        # of them have more than one conversion, we need to use
+        # the TROVESIG_VER_NEW2
+        for script in [ x[2] for x in TroveScripts.streamDict.values() ]:
+            conversions = getattr(self.troveInfo.scripts, script).conversions
+            if len(conversions.getStreams(1)) > 1:
+                return True
+        return False
+
     def computeDigests(self, store = True):
         """
         Recomputes the sha1 signature of this trove.
@@ -1330,7 +1347,12 @@ class Trove(streams.StreamSet):
         @type store: boolean
         @rtype: string
         """
-        for sigVersion in _TROVESIG_VER_ALL:
+        if self._use_TROVESIG_VER_NEW2():
+            sigVersions = [ _TROVESIG_VER_CLASSIC, _TROVESIG_VER_NEW2 ]
+        else:
+            sigVersions = [ _TROVESIG_VER_CLASSIC, _TROVESIG_VER_NEW ]
+
+        for sigVersion in sigVersions:
             s = self._sigString(version = sigVersion)
             self.troveInfo.sigs.computeDigest(sigVersion, s)
 
@@ -1340,10 +1362,17 @@ class Trove(streams.StreamSet):
 
         @rtype: boolean
         """
-
         lastSigVersion = None
         lastDigest = None
         for (sigVersion, sigDigest, signature) in self.troveInfo.sigs:
+            if sigVersion == _TROVESIG_VER_NEW and self._use_TROVESIG_VER_NEW2():
+                from conary.lib import log
+                log.warning('Ignoring version 1 signature on %s=%s[%s] - '
+                            'it has multiple conversion entries for '
+                            'a trove script' %(self.getName(),
+                                               self.getVersion(),
+                                               self.getFlavor()))
+                continue
             if lastSigVersion == sigVersion:
                 if sigDigest() != lastDigest:
                     return False
