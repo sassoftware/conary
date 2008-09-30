@@ -2,7 +2,7 @@ Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.
       (CNY-2995)
-    * Groups now support pre-rollback scripts. (CNY-2844)
+    * Groups now support pre-rollback scripts. (CNY-2908)
 
   o Client Changes:
     * The "conary rollback" command now handles --info and --interactive
