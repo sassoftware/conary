@@ -200,6 +200,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    self.troveStore = self.repos = self.auth = self.deptable = None
             self.open(connect=False)
 
+
+    # does the actual method calling and the retry when hitting deadlocks
+    def _callWrapper(self, method, authToken, orderedArgs, kwArgs):
+        methodname = method.im_func.__name__
+        attempt = 1
+        while True:
+            try:
+                return method(authToken, *orderedArgs, **kwArgs)
+            except sqlerrors.DatabaseLocked, e:
+                # deadlock occurred; we rollback and try again
+                log.error("Deadlock id %d while calling %s: %s",
+                          attempt, methodname, str(e.args))
+                self.log(1, "Deadlock id %d while calling %s: %s" %(
+                    attempt, methodname, str(e.args)))
+                if attempt < self.deadlockRetry:
+                    self.db.rollback()
+                    attempt += 1
+                    continue
+                # max number of deadlocks reached, bail out
+                raise
+            # not reached
+            assert(0)
+
     def callWrapper(self, protocol, port, methodname, authToken, 
                     orderedArgs, kwArgs,
                     remoteIp = None, rawUrl = None, isSecure = False):
@@ -207,8 +230,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         Returns a tuple of (Exception, result).  Exception is a Boolean
         stating whether an error occurred.
         """
-	# reopens the database as needed (if changed on disk or lost connection)
-	self.reopen()
         self._port = port
         self._protocol = protocol
         self._baseUrlOverride = rawUrl
@@ -228,46 +249,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     '%s call only supports protocol versions %s '
                     'and later' % (methodname, method._minimumClientProtocol))
 
-        attempt = 1
-        # nested try:...except statements.... Yeeee-haaa!
-        while True:
-            exceptionOverride = None
-            start = time.time()
+	# reopens the database as needed (if changed on disk or lost connection)
+	self.reopen()
 
+        exceptionOverride = None
+        start = time.time()
+        try:
             try:
-                # the first argument is a version number
-                try:
-                    r = method(authToken, *orderedArgs, **kwArgs)
-                except sqlerrors.DatabaseLocked:
-                    raise
-                else:
-                    self.db.commit()
-
-                    if self.callLog:
-                        self.callLog.log(remoteIp, authToken, methodname,
-                                         orderedArgs, kwArgs,
-                                         latency = time.time() - start)
-
-                    return r
-            except sqlerrors.DatabaseLocked, e:
-                # deadlock occurred; we rollback and try again
-                log.error("Deadlock id %d while calling %s: %s",
-                          attempt, methodname, str(e.args))
-                self.log(1, "Deadlock id %d while calling %s: %s" %(
-                    attempt, methodname, str(e.args)))
-                if attempt < self.deadlockRetry:
-                    self.db.rollback()
-                    attempt += 1
-                    continue
-                # else fall through
+                r = self._callWrapper(method, authToken, orderedArgs, kwArgs)
+                self.db.commit()
             except Exception, e:
-                pass
-            # fall through for processing below
-            break
-
-        # if there wasn't an exception, we would've returned before now.
-        # This means if we reach here, we have an exception in e
-        self.db.rollback()
+                # on exceptions we rollback the database
+                self.db.rollback()
+            else:
+                if self.callLog:
+                    self.callLog.log(remoteIp, authToken, methodname,
+                                     orderedArgs, kwArgs,
+                                     latency = time.time() - start)
+                return r
+        finally:
+            # when we're done with database work we need to close the
+            # connection to free it for others if we're running in
+            # pool mode
+            if self.db.poolmode:
+                self.db.close()
 
         if self.callLog:
             if isinstance(e, HiddenException):

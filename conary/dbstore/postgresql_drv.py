@@ -185,17 +185,6 @@ class IterCursor(Cursor):
         assert(self.dbh)
         return self.dbh.itercursor()
 
-# PostgreSQL lowercase everything automatically, so we need a special
-# "lowercase match" list type for matches like
-# idxname in db.tables[x]
-class Llist(list):
-    def __contains__(self, item):
-        return item.lower() in [x.lower() for x in list.__iter__(self)]
-    def remove(self, item):
-        return list.pop(self, self.index(item))
-    def index(self, item):
-        return [x.lower() for x in list.__iter__(self)].index(item.lower())
-                           
 class Database(BaseDatabase):
     driver = "postgresql"
     avail_check = "select version() as version"
@@ -234,9 +223,9 @@ class Database(BaseDatabase):
         """)
         for table, schema in c.fetchall():
             if schema.startswith("pg_temp"):
-                self.tempTables[table] = Llist()
+                self.tempTables[table] = sqllib.Llist()
             else:
-                self.tables[table] = Llist()
+                self.tables[table] = sqllib.Llist()
         if not len(self.tables):
             return self.version
         # views
@@ -256,9 +245,9 @@ class Database(BaseDatabase):
         """)
         for (name, table, schema) in c.fetchall():
             if schema.startswith("pg_temp"):
-                self.tempTables.setdefault(table, Llist()).append(name)
+                self.tempTables.setdefault(table, sqllib.Llist()).append(name)
             else:
-                self.tables.setdefault(table, Llist()).append(name)
+                self.tables.setdefault(table, sqllib.Llist()).append(name)
         # sequences. I wish there was a better way...
         c.execute("""
         SELECT c.relname as name
