@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.
       (CNY-2995)

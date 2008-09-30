@@ -12,6 +12,8 @@
 # full details.
 #
 
+import os
+
 from conary.lib import cfg, cfgtypes
 
 from base_drv import BaseDatabase as Database
@@ -35,10 +37,24 @@ def __get_driver(driver = __DRIVER):
                 e.args + (driver,))
         else:
             return Database
+    # requesting a postgresql driver that is pooling aware switches to
+    # the pgpool driver
+    if driver == "postgresql" and os.environ.has_key("POSTGRESQL_POOL"):
+        driver = "pgpool"
     # postgresl support
     if driver == "postgresql":
         try:
             from postgresql_drv import Database
+        except ImportError, e:
+            raise InvalidBackend(
+                "Could not locate driver for backend '%s'" % (driver,),
+                e.args + (driver,))
+        else:
+            return Database
+    # PostgreSQL pgpool/pgbouncer support
+    if driver == "pgpool":
+        try:
+            from pgpool_drv import Database
         except ImportError, e:
             raise InvalidBackend(
                 "Could not locate driver for backend '%s'" % (driver,),

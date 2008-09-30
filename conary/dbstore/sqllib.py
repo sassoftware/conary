@@ -107,6 +107,17 @@ class CaselessDict(dict):
     def itervalues(self):
         return (v[1] for v in dict.itervalues(self))
 
+# PostgreSQL lowercase everything automatically, so we need a special
+# "lowercase match" list type for matches like
+# idxname in db.tables[x]
+class Llist(list):
+    def __contains__(self, item):
+        return item.lower() in [x.lower() for x in list.__iter__(self)]
+    def remove(self, item):
+        return list.pop(self, self.index(item))
+    def index(self, item):
+        return [x.lower() for x in list.__iter__(self)].index(item.lower())
+
 # convert time.time() to timestamp with optional offset
 def toDatabaseTimestamp(secsSinceEpoch=None, offset=0):
     """

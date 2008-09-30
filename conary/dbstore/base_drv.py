@@ -217,7 +217,8 @@ class BaseDatabase:
     sequenceClass = BaseSequence
     driver = "base"
     keywords = BaseKeywordDict()
-
+    poolmode = False    # indicates if connections are pooled and can be open/closed cheaply
+    
     # schema caching
     tables = None
     views = None
