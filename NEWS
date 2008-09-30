@@ -2,6 +2,7 @@ Changes in @NEW@:
   o New Features:
     * Metadata information can now be extracted from debian packages.
       (CNY-2995)
+    * Groups now support pre-rollback scripts. (CNY-2844)
 
   o Client Changes:
     * The "conary rollback" command now handles --info and --interactive

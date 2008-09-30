@@ -935,6 +935,7 @@ _TROVESCRIPTS_POSTROLLBACK = 3
 _TROVESCRIPTS_PREINSTALL   = 4
 _TROVESCRIPTS_PREERASE     = 5
 _TROVESCRIPTS_POSTERASE    = 6
+_TROVESCRIPTS_PREROLLBACK  = 7
 
 class TroveScripts(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -942,6 +943,7 @@ class TroveScripts(streams.StreamSet):
         _TROVESCRIPTS_PREUPDATE     : (DYNAMIC, TroveScript, 'preUpdate'  ),
         _TROVESCRIPTS_POSTINSTALL   : (DYNAMIC, TroveScript, 'postInstall' ),
         _TROVESCRIPTS_POSTUPDATE    : (DYNAMIC, TroveScript, 'postUpdate' ),
+        _TROVESCRIPTS_PREROLLBACK   : (DYNAMIC, TroveScript, 'preRollback' ),
         _TROVESCRIPTS_POSTROLLBACK  : (DYNAMIC, TroveScript, 'postRollback' ),
         _TROVESCRIPTS_PREINSTALL    : (DYNAMIC, TroveScript, 'preInstall' ),
         _TROVESCRIPTS_PREERASE      : (DYNAMIC, TroveScript, 'preErase' ),
@@ -3080,6 +3082,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getPreUpdateScript(self):
         return self._getScript(_TROVESCRIPTS_PREUPDATE)
+
+    def getPreRollbackScript(self):
+        return self._getScript(_TROVESCRIPTS_PREROLLBACK)
 
     def getPostRollbackScript(self):
         return self._getScript(_TROVESCRIPTS_POSTROLLBACK)

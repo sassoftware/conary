@@ -924,7 +924,7 @@ class UpdateJob:
             jobPreScripts = [ x for x in jobPreScripts
                               if x[0] in jobOrderHash ]
         self._jobPreScripts = self.orderScriptListByBucket(jobPreScripts,
-                                [ 'preinstall', 'preupdate', 'preerase' ])
+            [ 'prerollback', 'preinstall', 'preupdate', 'preerase' ])
 
     def setPreviousVersion(self, version):
         self._previousVersion = version
@@ -2265,6 +2265,11 @@ class Database(SqlDbRepository):
                 withFiles=False, withDeps=False)[0]
             oldCompatClass = oldTrv.getCompatibilityClass()
 
+            script = oldTrv.troveInfo.scripts.preRollback.script()
+            if script:
+                preScripts.append((job, script, oldCompatClass, newCompatClass,
+                    "prerollback"))
+
             script = trvCs.getPreUpdateScript()
             if script:
                 preScripts.append((job, script, oldCompatClass, newCompatClass,
@@ -2285,10 +2290,14 @@ class Database(SqlDbRepository):
                 j = (j[0], j[2], j[1], False)
                 jobs.append(j)
                 script = trvCs._getPreEraseScript()
+                oldCompatClass = trv.getCompatibilityClass()
                 if script:
-                    preScripts.append((j, script,
-                                      trv.getCompatibilityClass(), None,
+                    preScripts.append((j, script, oldCompatClass, None,
                                       "preerase"))
+
+                # This is the rollback of an install, we shall not run the
+                # prerollback script (CNY-2844)
+
         jobs.sort()
         updJob.addJob(jobs)
         return preScripts

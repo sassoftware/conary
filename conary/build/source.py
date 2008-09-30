@@ -1905,6 +1905,38 @@ class addPostInstallScript(TroveScript):
 
     _scriptName = 'postInstallScripts'
 
+class addPreRollbackScript(TroveScript):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addPreRollbackScript()}} - Specify the pre rollback script for a trove.
+
+    SYNOPSIS
+    ========
+
+    C{r.addPreRollbackScript(I{sourcename}, [I{contents},] [I{groupName}]}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addPreRollbackScript} command specifies the pre rollback script
+    for a group. This script is run before the group defining the script
+    has been rolled back to a previously-installed version of the group.
+
+    PARAMETERS
+    ==========
+
+    The C{r.addPreRollbackScript()} command accepts the following parameters,
+    with default values shown in parentheses:
+
+    B{contents} : (None) The contents of the script
+    B{groupName} : (None) The name of the group to add the script to
+    """
+
+    _scriptName = 'preRollbackScripts'
+
 
 class addPostRollbackScript(TroveScript):
 

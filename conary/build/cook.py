@@ -753,6 +753,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (group.postInstallScripts, False,
                             grpTrv.troveInfo.scripts.postInstall),
+                      (group.preRollbackScripts, True,
+                            grpTrv.troveInfo.scripts.preRollback),
                       (group.postRollbackScripts, True,
                             grpTrv.troveInfo.scripts.postRollback),
                       (group.postUpdateScripts, False,

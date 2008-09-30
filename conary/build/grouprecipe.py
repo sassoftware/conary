@@ -281,6 +281,7 @@ class GroupRecipe(_BaseGroupRecipe):
 
         self.postEraseScripts = {}
         self.postInstallScripts = {}
+        self.preRollbackScripts = {}
         self.postRollbackScripts = {}
         self.postUpdateScripts = {}
         self.preEraseScripts = {}
@@ -1631,6 +1632,7 @@ class SingleGroup(object):
         self.postUpdateScripts = None
         self.preEraseScripts = None
         self.postEraseScripts = None
+        self.preRollbackScripts = None
         self.postRollbackScripts = None
 
     def __repr__(self):
