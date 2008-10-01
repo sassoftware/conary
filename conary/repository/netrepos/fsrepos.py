@@ -72,8 +72,9 @@ class FilesystemChangeSetJob(ChangeSetJob):
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def __init__(self, serverNameList, troveStore, contentsDir, repositoryMap,
-                 requireSigs = False):
+                 requireSigs = False, paranoidCommits = False):
 	self.serverNameList = serverNameList
+        self.paranoidCommits = paranoidCommits
 	map = dict(repositoryMap)
         for serverName in serverNameList:
             map[serverName] = self
@@ -222,6 +223,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             self.troveStore.rollback()
             raise
         else:
+            if self.paranoidCommits:
+                for trvCs in cs.iterNewTroveList():
+                    newTuple = trvCs.getNewNameVersionFlavor()
+                    if newTuple[1] is None:
+                        continue
+
+                    trv = self.getTrove(withFiles = True, *newTuple)
+                    assert(trv.verifyDigests())
+
             self.troveStore.commit()
 
     def markTroveRemoved(self, name, version, flavor):

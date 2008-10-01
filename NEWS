@@ -2,6 +2,10 @@ Changes in @NEW@:
   o New Features:
     * Groups now support pre-rollback scripts. (CNY-2908)
 
+  o Server Changes:
+    * Added paranoidCommits option which checks trove data has been stored
+      properly in the SQL database before allowing the commit to complete.
+
 Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.
