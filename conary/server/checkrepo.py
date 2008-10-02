@@ -97,7 +97,7 @@ class CheckAcls(Checker):
             from UserGroupAllPermissions
             join Instances using(instanceId)
             where Instances.isPresent != ?
-            group by permissionId ) as ugap using(permissionId)
+            group by permissionId ) as ugap on p.permissionId = ugap.permissionId
         """, instances.INSTANCE_PRESENT_MISSING)
         info = {}
         existing = {}
