@@ -14,16 +14,7 @@
 
 TOPDIR	= ../..
 
-python_files	= __init__.py \
-		  idtable.py \
-		  base_drv.py \
-		  shell.py \
-		  mysql_drv.py \
-		  postgresql_drv.py \
-		  sqlite_drv.py	\
-		  migration.py \
-		  sqllib.py \
-		  sqlerrors.py
+python_files	= *.py
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)

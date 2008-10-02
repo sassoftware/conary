@@ -1022,6 +1022,7 @@ class DependencyChecker:
         """ % self._resolveStmt("TmpRequires",
                                 ("Provides", "TmpProvides"),
                                 ("Dependencies", "TmpDependencies"))
+
         self.cu.execute(stmt)
 
         # it's a shame we instantiate this, but merging _gatherResoltion
@@ -1074,6 +1075,10 @@ class DependencyChecker:
             for (depId, depNum, reqInstanceId,
                  reqNodeIdx, provInstId, provNodeIdx) in result:
                 if not provInstId: continue
+                if provNodeIdx is not None:
+                    # it's provided by something we're erasing,
+                    # so don't count that.
+                    continue
                 self.cu.execute("update tmprequires set satisfied=1 where "
                         "depId = ? and instanceId = ?",
                         depId, reqInstanceId)

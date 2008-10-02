@@ -753,6 +753,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             for (recipeScripts, isRollback, troveScripts) in \
                     [ (group.postInstallScripts, False,
                             grpTrv.troveInfo.scripts.postInstall),
+                      (group.preRollbackScripts, True,
+                            grpTrv.troveInfo.scripts.preRollback),
                       (group.postRollbackScripts, True,
                             grpTrv.troveInfo.scripts.postRollback),
                       (group.postUpdateScripts, False,
@@ -2004,8 +2006,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
         os.close(fd)
         targetLabel = versions.EmergeLabel()
-
-    built = None
 
     built = []
     if len(loaderDict) > 1 and changeSetFile:

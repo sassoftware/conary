@@ -139,7 +139,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.entitlementCheckURL = cfg.entitlementCheckURL
         self.readOnlyRepository = cfg.readOnlyRepository
         self.serializeCommits = cfg.serializeCommits
-        
+        self.paranoidCommits = cfg.paranoidCommits
+
         self.__delDB = False
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -181,7 +182,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.troveStore = trovestore.TroveStore(self.db, self.log)
         self.repos = fsrepos.FilesystemRepository(
             self.serverNameList, self.troveStore, self.contentsDir,
-            self.map, requireSigs = self.requireSigs)
+            self.map, requireSigs = self.requireSigs,
+            paranoidCommits = self.paranoidCommits)
 	self.auth = NetworkAuthorization(
             self.db, self.serverNameList, log = self.log,
             cacheTimeout = self.authCacheTimeout,
@@ -3292,6 +3294,7 @@ class ServerConfig(ConfigFile):
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)
+    paranoidCommits         = (CfgBool, False)
     proxyContentsDir        = CfgPath
     readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver

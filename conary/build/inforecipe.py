@@ -34,11 +34,19 @@ class UserGroupInfoRecipe(AbstractPackageRecipe):
         return klass.__getattr__(self, name)
 
     def _loadSourceActions(self, *args, **kwargs):
-        pass
+        klass = self._getParentClass('AbstractPackageRecipe')
+        if self.abstractBaseClass:
+            return klass._loadSourceActions(self, *args, **kwargs)
 
     def loadPolicy(self):
         klass = self._getParentClass('AbstractPackageRecipe')
-        return klass.loadPolicy(self, internalPolicyModules = ('infopolicy',))
+        if self.abstractBaseClass:
+            self.basePolicyClass = policy.BasePolicy
+            internalPolicyModules = None
+        else:
+            internalPolicyModules = ('infopolicy',)
+        return klass.loadPolicy(self,
+                                internalPolicyModules = internalPolicyModules)
 
 exec defaultrecipes.BaseRequiresRecipe
 exec defaultrecipes.UserInfoRecipe

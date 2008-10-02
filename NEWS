@@ -1,3 +1,16 @@
+Changes in @NEW@:
+  o New Features:
+    * Groups now support pre-rollback scripts. (CNY-2908)
+
+  o Server Changes:
+    * Added paranoidCommits option which checks trove data has been stored
+      properly in the SQL database before allowing the commit to complete.
+
+  o Bug Fixes:
+    * Fixed handling of troves erased by an update job which satisfy
+      dependencies of packages being installed, so that an error
+      message is given instead of an assertion being raised (CNY-2996).
+
 Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.
@@ -22,6 +35,10 @@ Changes in 2.0.27:
       introduces version 2 trove signatures.  Conary will ignore
       version 1 trove signatures on old troves that have multiple
       trove script compatibility entries.  (CNY-2997)
+    * Conary ignores journal if the database is currently being locked
+      by an update.  Its existence does not signify a failed update,
+      but rather a currently running one. (CNY-3008)
+
 
   o Build Changes:
     * A new type of metadata information, storing key-value pairs,

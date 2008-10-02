@@ -4497,5 +4497,8 @@ class ScriptPreErase(_TroveScript):
 class ScriptPostErase(_TroveScript):
     _troveScriptName = 'postErase'
 
+class ScriptPreRollback(_TroveScript):
+    _troveScriptName = 'preRollback'
+
 class ScriptPostRollback(_TroveScript):
     _troveScriptName = 'postRollback'
