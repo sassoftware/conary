@@ -6,6 +6,11 @@ Changes in @NEW@:
     * Added paranoidCommits option which checks trove data has been stored
       properly in the SQL database before allowing the commit to complete.
 
+  o Bug Fixes:
+    * Fixed handling of troves erased by an update job which satisfy
+      dependencies of packages being installed, so that an error
+      message is given instead of an assertion being raised (CNY-2996).
+
 Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.

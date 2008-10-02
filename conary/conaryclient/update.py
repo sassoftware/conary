@@ -3813,6 +3813,7 @@ class EraseDepFailure(DepResolutionFailure):
         res = []
         packagesByErase = {}
         packagesByInstall = {}
+        resolved = set(itertools.chain(*self.suggMap.values()))
         for jobSet in self.jobSets:
             for job in jobSet:
                 newInfo = job[0], job[2][0], job[2][1]
@@ -3822,7 +3823,7 @@ class EraseDepFailure(DepResolutionFailure):
                 if job[2][0]:
                     packagesByInstall[newInfo] = oldInfo
 
-        res.append('The following dependencies would no longer be met after this update:\n')
+        res.append('The following dependencies would not be met after this update:\n')
         for (reqBy, depSet, providedBy) in self.getFailures():
             requiredPackages = []
             providers = []
@@ -3840,6 +3841,8 @@ class EraseDepFailure(DepResolutionFailure):
                     reqByInfo = '%s (Updated from %s)' % (
                                             self.formatNVF(reqBy),
                                                 self.formatVF(oldInfo))
+                elif reqBy in resolved:
+                    reqByInfo = '%s (Added due to resolution)' % self.formatNVF(reqBy)
                 else:
                     reqByInfo = '%s (Newly Installed)' % self.formatNVF(reqBy)
             else:
