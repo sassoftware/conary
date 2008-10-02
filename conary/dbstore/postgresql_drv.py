@@ -187,7 +187,7 @@ class IterCursor(Cursor):
 
 class Database(BaseDatabase):
     driver = "postgresql"
-    avail_check = "select version() as version"
+    alive_check = "select version() as version"
     cursorClass = Cursor
     iterCursorClass = IterCursor
     keywords = KeywordDict()
