@@ -35,6 +35,10 @@ Changes in 2.0.27:
       introduces version 2 trove signatures.  Conary will ignore
       version 1 trove signatures on old troves that have multiple
       trove script compatibility entries.  (CNY-2997)
+    * Conary ignores journal if the database is currently being locked
+      by an update.  Its existence does not signify a failed update,
+      but rather a currently running one. (CNY-3008)
+
 
   o Build Changes:
     * A new type of metadata information, storing key-value pairs,
