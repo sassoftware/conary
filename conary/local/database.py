@@ -2387,7 +2387,7 @@ class Database(SqlDbRepository):
     def _initDb(self):
         SqlDbRepository._initDb(self)
         if (self.opJournalPath and os.path.exists(self.opJournalPath) 
-            and not os.path.exists(self.lockPath)):
+            and self.lockFile and not os.path.exists(self.lockFile)):
             raise ExistingJournalError(os.path.dirname(self.opJournalPath),
                     'journal file exists. use revert command to '
                     'undo the previous (failed) operation')
