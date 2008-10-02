@@ -2007,8 +2007,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         os.close(fd)
         targetLabel = versions.EmergeLabel()
 
-    built = None
-
     built = []
     if len(loaderDict) > 1 and changeSetFile:
         # this would involve reading the changeset from disk and merging 
