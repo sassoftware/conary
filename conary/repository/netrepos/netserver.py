@@ -197,9 +197,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if self.db.reopen():
             # help the garbage collector with the magic from __del__
             self.repos.troveStore = self.repos.reposSet = None
-	    self.troveStore = self.repos = self.auth = self.deptable = None
+            self.troveStore = self.repos = self.auth = self.deptable = None
             self.open(connect=False)
-
 
     # does the actual method calling and the retry when hitting deadlocks
     def _callWrapper(self, method, authToken, orderedArgs, kwArgs):

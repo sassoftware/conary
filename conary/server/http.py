@@ -75,12 +75,14 @@ class HttpHandler(WebHandler):
 
         # see the comment about remote repositories in the checkAuth decorator
         self.isRemoteRepository = False
+        self._poolmode = False
         if isinstance(repServer, netserver.ClosedRepositoryServer):
             self.repServer = self.troveStore = None
         else:
             self.repServer = repServer.callFactory.repos
             self.troveStore = self.repServer.troveStore
-
+            self._poolmode = self.repServer.db.poolmode
+            
         self._protocol = protocol
         self._port = port
 
@@ -101,6 +103,30 @@ class HttpHandler(WebHandler):
     def _getAuth(self):
         return getAuth(self.req)
 
+    def _methodCall(self, method, auth):
+        d = dict(self.fields)
+        d['auth'] = auth
+        try:
+            output = method(**d)
+            self.req.write(output)
+            return apache.OK
+        except errors.InsufficientPermission:
+            if auth[0] == "anonymous":
+                # if an anonymous user raises errors.InsufficientPermission,
+                # ask for a real login.
+                return self._requestAuth()
+            else:
+                # if a real user raises errors.InsufficientPermission, forbid access.
+                return apache.HTTP_FORBIDDEN
+        except InvalidPassword:
+            # if password is invalid, request a new one
+            return self._requestAuth()
+        except apache.SERVER_RETURN:
+            raise
+        except:
+            self.req.write(self._write("error", shortError = "Error", error = traceback.format_exc()))
+            return apache.OK
+        
     def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
 
@@ -123,6 +149,9 @@ class HttpHandler(WebHandler):
             self.repServer, self._protocol, self._port, auth,
             cfg.repositoryMap, cfg.user)
 
+        if self._poolmode:
+            self.repServer.reopen()
+            
         if not self.cmd:
             self.cmd = "main"
 
@@ -130,9 +159,6 @@ class HttpHandler(WebHandler):
             method = self._getHandler(self.cmd)
         except AttributeError:
             raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
-
-        d = dict(self.fields)
-        d['auth'] = auth
 
         if self.authToken[0] != 'anonymous':
             self.loggedIn = self.repServer.auth.checkPassword(self.authToken)
@@ -150,26 +176,11 @@ class HttpHandler(WebHandler):
             self.authToken)
 
         try:
-            output = method(**d)
-            self.req.write(output)
-            return apache.OK
-        except errors.InsufficientPermission:
-            if auth[0] == "anonymous":
-                # if an anonymous user raises errors.InsufficientPermission,
-                # ask for a real login.
-                return self._requestAuth()
-            else:
-                # if a real user raises errors.InsufficientPermission, forbid access.
-                return apache.HTTP_FORBIDDEN
-        except InvalidPassword:
-            # if password is invalid, request a new one
-            return self._requestAuth()
-        except apache.SERVER_RETURN:
-            raise
-        except:
-            self.req.write(self._write("error", shortError = "Error", error = traceback.format_exc()))
-            return apache.OK
-
+            return self._methodCall(method, auth)
+        finally:
+            if self._poolmode:
+                self.repServer.db.close()
+                
     def _requestAuth(self):
         self.req.err_headers_out['WWW-Authenticate'] = \
             'Basic realm="Conary Repository"'
