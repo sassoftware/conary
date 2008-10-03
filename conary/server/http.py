@@ -81,8 +81,11 @@ class HttpHandler(WebHandler):
         else:
             self.repServer = repServer.callFactory.repos
             self.troveStore = self.repServer.troveStore
-            self._poolmode = self.repServer.db.poolmode
-            
+            if not isinstance(self.repServer, netserver.ClosedRepositoryServer):
+                self._poolmode = self.repServer.db.poolmode
+            else:
+                self._poolmode = False
+
         self._protocol = protocol
         self._port = port
 
