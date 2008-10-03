@@ -22,6 +22,7 @@ class UserGroupInfoRecipe(AbstractPackageRecipe):
     _recipeType = RECIPE_TYPE_INFO
     internalAbstractBaseClass = 1
     basePolicyClass = policy.UserGroupBasePolicy
+    abstractBaseClass = False
 
     def __getattr__(self, name):
         if not name.startswith('_'):
