@@ -16,6 +16,9 @@ Changes in @NEW@:
       BaseRequiresPackage base class to allow rMake to build against non-rPath
       Linux platforms (CNY-3005).
 
+  o Other Changes:
+    * New PGP signing keys have been added.
+
 Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.
