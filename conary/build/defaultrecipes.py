@@ -25,15 +25,22 @@ BaseRequiresRecipe = '''class BaseRequiresRecipe(AbstractPackageRecipe):
     name = "baserequires"
     internalAbstractBaseClass = 1
     buildRequires = [
-        'filesystem:runtime',
-        'setup:runtime',
-        'python:runtime',
-        'python:lib',
-        'conary:runtime',
-        'conary:python',
-        'conary-build:runtime',
+        'bash:runtime',
         'conary-build:lib',
         'conary-build:python',
+        'conary-build:runtime',
+        'conary:python',
+        'conary:runtime',
+        'coreutils:runtime',
+        'dev:runtime',
+        'filesystem:runtime',
+        'findutils:runtime',
+        'gawk:runtime',
+        'grep:runtime',
+        'python:lib',
+        'python:runtime',
+        'sed:runtime',
+        'setup:runtime',
         'sqlite:lib',
     ]'''
 

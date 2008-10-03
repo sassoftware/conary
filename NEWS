@@ -11,6 +11,11 @@ Changes in @NEW@:
       dependencies of packages being installed, so that an error
       message is given instead of an assertion being raised (CNY-2996).
 
+  o Build Changes:
+    * The default build requirements for rmake have been added to the
+      BaseRequiresPackage base class to allow rMake to build against non-rPath
+      Linux platforms (CNY-3005).
+
 Changes in 2.0.27:
   o New Features:
     * Metadata information can now be extracted from debian packages.
