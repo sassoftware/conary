@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.28:
   o New Features:
     * Groups now support pre-rollback scripts. (CNY-2908)
 
