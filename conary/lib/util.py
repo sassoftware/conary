@@ -2005,3 +2005,11 @@ def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
         newValue = newClass(newStr)
 
     raise newClass, newValue, exc_traceback
+
+class Tick:
+    def __init__(self):
+        self.last = self.start = time.time()
+    def log(self, m = ''):
+        now = time.time()
+        print "tick: +%.2f %s total=%.3f" % (now-self.last, m, now-self.start)
+        self.last = now
