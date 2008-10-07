@@ -160,6 +160,12 @@ have been made in the current source directory since the last
 error occurs, diff returns a value of 2. If there are differences
 in the local directory, 1 is returned. If no differences are found, 0
 is returned (this convention is consistent with \fBdiff\fR(1).
+.RS 4
+.TP 4
+.B \-\-revision=REVISION
+Diff against revision REVISION rather than against the latest
+revision.
+.RE
 .TP 4
 .B explain
 Displays the Conary API Documentation associated with a recipe or action

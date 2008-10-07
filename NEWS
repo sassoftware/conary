@@ -1,6 +1,8 @@
 Changes in @NEW@:
   o New Features:
-    * cvc diff now optionally takes a set of files to diff. (CNY-2384)
+    * cvc diff now optionally takes a set of files to diff.  Note that
+      providing a revision now requires the --revision argument, to
+      differentiate revisions from files. (CNY-2384)
 
 Changes in 2.0.28:
   o New Features:
