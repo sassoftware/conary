@@ -1,3 +1,7 @@
+Changes in @NEW@:
+  o New Features:
+    * cvc diff now optionally takes a set of files to diff. (CNY-2384)
+
 Changes in 2.0.28:
   o New Features:
     * Groups now support pre-rollback scripts. (CNY-2908)

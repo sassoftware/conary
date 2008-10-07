@@ -638,13 +638,21 @@ _register(DeriveCommand)
 class DiffCommand(CvcCommand):
     commands = ['diff']
     help = 'Show uncommitted changes'
+    
+    def addParameters(self, argDef):
+        CvcCommand.addParameters(self, argDef)
+        argDef['revision'] = ONE_PARAM
+
     def runCommand(self, cfg, argSet, args, profile = False, 
                    callback = None, repos = None):
-        args = args[1:]
-        if argSet or not args or len(args) > 2: return self.usage()
+        if not args or len(args) < 2: return self.usage()
 
-        args[0] = repos
-        return checkin.diff(*args)
+        diffArgs = [repos, ]
+        diffArgs.append(argSet.pop('revision', None));
+        if len(args) > 2:
+            diffArgs.append(args[2:]);
+        
+        return checkin.diff(*diffArgs)
 _register(DiffCommand)
 
 class LogCommand(CvcCommand):

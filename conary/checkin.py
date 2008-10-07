@@ -1019,13 +1019,19 @@ def revert(repos, fileList):
 
     conaryState.write("CONARY")
 
-def diff(repos, versionStr = None):
+def diff(repos, versionStr = None, pathList = None):
     # return 0 if no differences, 1 if differences, 2 on error
     state = ConaryStateFromFile("CONARY", repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
-	log.error("no versions have been committed")
-	return 2
+        log.error("no versions have been committed")
+        return 2
+
+    if pathList:
+        for path in pathList:
+            if not os.path.exists(path):
+                log.error("File %s can not be found" % path)
+                return 2
 
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
@@ -1056,11 +1062,11 @@ def diff(repos, versionStr = None):
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return 0
     _showChangeSet(repos, changeSet, oldTrove, state,
-                   displayAutoSourceFiles = False)
+                   displayAutoSourceFiles = False, pathList = pathList)
     return 1
 
 def _showChangeSet(repos, changeSet, oldTrove, newTrove,
-                   displayAutoSourceFiles = True):
+                   displayAutoSourceFiles = True, pathList = None):
     troveChanges = changeSet.iterNewTroveList()
     troveCs = troveChanges.next()
     assert(util.assertIteratorAtEnd(troveChanges))
@@ -1078,6 +1084,9 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
 	    print "%s: new" % path
 	    chg = changeSet.getFileChange(None, fileId)
 	    f = files.ThawFile(chg, pathId)
+	    if pathList:
+	        continue;
+
 
             if (displayAutoSourceFiles or not f.flags.isAutoSource()) \
                     and f.hasContents and f.flags.isConfig():
@@ -1093,27 +1102,31 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
                 print
 	    continue
 
-	# changed file
-	if path:
-	    dispStr = path
-	    if oldTrove:
-		oldPath = oldTrove.getFile(pathId)[0]
-		dispStr += " (aka %s)" % oldPath
-	else:
-	    path = oldTrove.getFile(pathId)[0]
-	    dispStr = path
+        # changed file
+        if path:
+            dispStr = path
+            if oldTrove:
+                oldPath = oldTrove.getFile(pathId)[0]
+                dispStr += " (aka %s)" % oldPath
+        else:
+            path = oldTrove.getFile(pathId)[0]
+            dispStr = path
+
+        #if files to show diff passed - check if current is in
+        if pathList and os.path.basename(dispStr) not in pathList:
+            continue;
 
         oldFileId = oldTrove.getFile(pathId)[1]
-	
-	if not newVersion:
-	    sys.stdout.write(dispStr + '\n')
-	    continue
-	    
-	sys.stdout.write(dispStr + ": changed\n")
-        
-	sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
 
-	csInfo = changeSet.getFileChange(oldFileId, fileId)
+        if not newVersion:
+            sys.stdout.write(dispStr + '\n')
+            continue
+
+        sys.stdout.write(dispStr + ": changed\n")
+
+        sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
+
+        csInfo = changeSet.getFileChange(oldFileId, fileId)
         if csInfo:
             print '\n'.join(files.fieldsChanged(csInfo))
         else:
