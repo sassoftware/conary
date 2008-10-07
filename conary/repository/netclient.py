@@ -693,6 +693,41 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             self.fromFlavor(flavor),
                                             encSig)
 
+    def getChangeSetFingerprints(self, csList, recurse, withFiles,
+                                 withFileContents, excludeAutoSource,
+                                 mirrorMode):
+        byServer = {}
+        for cs in csList:
+            name, (oldV, oldF), (newV, newF), abs = cs
+            host = newV.getHost()
+            if oldV and oldV.getHost() != host:
+                raise RuntimeError('requested fingerprint for a changeset '
+                                   'between two different repositories')
+            l = byServer.setdefault(host, [])
+            l.append(cs)
+        fingerprints = {}
+        for host, subCsList in byServer.iteritems():
+            req = [ (x[0],
+                     (x[1][0] and self.fromVersion(x[1][0]) or '',
+                      x[1][1] and self.fromFlavor(x[1][1]) or ''),
+                     (self.fromVersion(x[2][0]), self.fromFlavor(x[2][1])),
+                     x[3]) for x in subCsList ]
+            l = self.c[host].getChangeSetFingerprints(
+                req,
+                recurse=(recurse and 1 or 0),
+                withFiles=(withFiles and 1 or 0),
+                withFileContents=(withFileContents and 1 or 0),
+                excludeAutoSource=(excludeAutoSource and 1 or 0),
+                mirrorMode=(mirrorMode and 1 or 0))
+            for cs, fp in itertools.izip(subCsList, l):
+                fingerprints[cs] = fp
+
+        l = []
+        for cs in csList:
+            l.append(fingerprints[cs])
+
+        return l
+
     def addMetadataItems(self, itemList):
         byServer = {}
         for (name, version, flavor), item in itemList:

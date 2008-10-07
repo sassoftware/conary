@@ -4,6 +4,10 @@ Changes in @NEW@:
       providing a revision now requires the --revision argument, to
       differentiate revisions from files. (CNY-2384)
 
+  o Client Changes:
+    * Support for obtaining changeset fingerprints has been added to
+      the network repository client.
+
 Changes in 2.0.28:
   o New Features:
     * Groups now support pre-rollback scripts. (CNY-2908)
