@@ -261,7 +261,8 @@ class DependencyWorkTables:
         JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
         JOIN Requires ON Provides.depId = Requires.depId
         JOIN Dependencies ON Dependencies.depId = Requires.depId
-        """)
+        WHERE Dependencies.class != ?
+        """, deps.AbiDependency.tag)
 
     def removeTrove(self, (name, version, flavor), nodeId):
         if flavor is None or flavor.isEmpty():
