@@ -71,6 +71,12 @@ class UserAuthorization:
                    cu.binary(password), cu.binary(salt), user)
 
     def _checkPassword(self, user, salt, password, challenge, remoteIp = None):
+        if challenge is ValidPasswordToken:
+            # Short-circuit for shim-using code that does its own
+            # authentication, e.g. through one-time tokens or session
+            # data.
+            return True
+
         if self.cacheTimeout:
             cacheEntry = sha1helper.sha1String("%s%s" % (user, challenge))
             timeout = self.pwCache.get(cacheEntry, None)
@@ -1243,3 +1249,25 @@ class PasswordCheckParser(dict):
         self.valid = False
         dict.__init__(self)
 
+
+class ValidPasswordTokenType:
+    """
+    Type of L{ValidPasswordToken}, a token used in lieu of a password in
+    authToken to represent a user that has been authorized by other
+    means (e.g. a one-time token).
+
+    For example, a script that needs to perform some operation from a
+    particular user's viewpoint, but has direct access to the database
+    via a shim client, may use L{ValidPasswordToken} instead of a
+    password in authToken to bypass password checks while still adhering
+    to the user's own capabilities and limitations.
+
+    This type should be instantiated exactly once (as
+    L{ValidPasswordToken}).
+    """
+    def __str__(self):
+        return '<Valid Password>'
+
+    def __repr__(self):
+        return 'ValidPasswordToken'
+ValidPasswordToken = ValidPasswordTokenType()

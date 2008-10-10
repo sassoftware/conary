@@ -8,6 +8,11 @@ Changes in @NEW@:
     * Support for obtaining changeset fingerprints has been added to
       the network repository client.
 
+  o Server Changes:
+    * Code using a shim client can now more securely "imitate" a user by
+      passing in a ValidPasswordToken object in lieu of the actual
+      password. (CNY-2968)
+
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)
 
