@@ -165,7 +165,7 @@ class ClientNewTrove:
                 contents = hasattr(fileObj, 'contents') and fileObj.contents
                 if contents:
                     cs.addFileContents(pathId, newFileId, contentType,
-                            contents, cfgFile=False)
+                            contents, cfgFile = f.flags.isConfig())
 
             trove.addFile(pathId, path, newFileVer, newFileId)
 

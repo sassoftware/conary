@@ -15,6 +15,7 @@ Changes in @NEW@:
 
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)
+    * createSourceTrove now honors filestreams marked as config. (CNY-3011)
 
 Changes in 2.0.28:
   o New Features:
