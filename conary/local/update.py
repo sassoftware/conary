@@ -1156,21 +1156,17 @@ class FilesystemJob:
             # for removal in the local changeset and considered only "changed"
             # from the repository's point of view.
 
-            if not headChanges:
+            if headChanges is None:
                 fileOnSystem = fsTrove.hasFile(pathId)
 
-	    if not fileOnSystem:
-		# the file was removed from the local system; we're not
-		# putting it back
-                self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
-		continue
-
-            if headChanges:
+            if (not headChanges) and fileOnSystem:
+                (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
+            else:
                 fsPath = headPath
                 fsFileId = headFileId
                 fsVersion = headFileVersion
-            else:
-                (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
+                if fsPath is None:
+                    fsPath = baseTrove.getFile(pathId)[0]
 
 	    contentsOkay = True         # do we have valid contents
 
@@ -1178,10 +1174,6 @@ class FilesystemJob:
             pathOkay, finalPath = self._pathMerge(pathId, headPath, fsTrove,
                                                   fsPath, baseTrove,
                                                   rootFixup, flags)
-
-            # final path is the path to use w/o the root
-            # real path is the path to use w/ the root
-	    realPath = os.path.normpath(rootFixup + finalPath)
 
 	    # headFileVersion is None for renames, but in that case there
             # is nothing left to do for this file
@@ -1211,6 +1203,10 @@ class FilesystemJob:
 
             headFile = self._mergeFile(baseFile, headFileId, headChanges,
                                        pathId)
+
+            # final path is the path to use w/o the root
+            # real path is the path to use w/ the root
+	    realPath = os.path.normpath(rootFixup + finalPath)
 
             # XXX is this correct?  all the other addFiles use
             # the headFileId, not the fsFileId
@@ -1249,7 +1245,23 @@ class FilesystemJob:
             # to see if we need to go into the if statement which follows
             # this rather then having to look up the file from the old
             # trove for every file which has changed
-            fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
+            if not fileOnSystem:
+                if (headFile.flags.isTransient() and
+                        headFile.contents.sha1() != baseFile.contents.sha1()):
+                    # a transient file has been removed locally, but contents
+                    # changed upstream. restore the new version of the file to
+                    # the filesystem. using baseFile here tricks the code below
+                    # into thinking the file was never removed. since it needs
+                    # updating anyway, it works out.
+                    fsFile = baseFile
+                else:
+                    # the file was removed from the local system; we're not
+                    # putting it back
+                    self.userRemoval(replaced = False,
+                                     *(newTroveInfo + (pathId,)))
+                    continue
+            else:
+                fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
 
             # link groups come from the database; they aren't inferred from
             # the filesystem
