@@ -347,10 +347,16 @@ class Database(BaseDatabase):
     def setAutoIncrement(self, table, column, value = None):
         cu = self.cursor()
         seqName = "%s_%s_seq" % (table, column)
+        usedVal = True
         if value is None:
             cu.execute("select max(%s) from %s" % (column, table))
-            value = int(cu.fetchall()[0][0])
-        cu.execute("select setval(?, ?)", (seqName, value))
+            value = cu.fetchall()[0][0]
+            if value is None:
+                usedVal = False
+                value = 1
+            else:
+                values = int(value)
+        cu.execute("select setval(?, ?, ?)", (seqName, value, usedVal))
         ret = cu.fetchall()
         assert (ret[0][0] == value)
         return True
