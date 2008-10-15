@@ -1227,8 +1227,6 @@ class FilesystemJob:
                     self.userRemoval(replaced = False,
                                      *(newTroveInfo + (pathId,)))
                     continue
-            else:
-                fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
 
             # XXX is this correct?  all the other addFiles use
             # the headFileId, not the fsFileId
@@ -1262,6 +1260,9 @@ class FilesystemJob:
                             isAutoSource = headFile.flags.isAutoSource())
             else:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
+
+            if fileOnSystem:
+                fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
 
             # link groups come from the database; they aren't inferred from
             # the filesystem
