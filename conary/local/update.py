@@ -1208,6 +1208,28 @@ class FilesystemJob:
             # real path is the path to use w/ the root
 	    realPath = os.path.normpath(rootFixup + finalPath)
 
+            # FIXME we should be able to inspect headChanges directly
+            # to see if we need to go into the if statement which follows
+            # this rather then having to look up the file from the old
+            # trove for every file which has changed
+            if not fileOnSystem:
+                if (headFile.flags.isTransient() and
+                        headFile.contents.sha1() != baseFile.contents.sha1()):
+                    # a transient file has been removed locally, but contents
+                    # changed upstream. restore the new version of the file to
+                    # the filesystem. using baseFile here tricks the code below
+                    # into thinking the file was never removed. since it needs
+                    # updating anyway, it works out.
+                    fsFile = baseFile
+                else:
+                    # the file was removed from the local system; we're not
+                    # putting it back
+                    self.userRemoval(replaced = False,
+                                     *(newTroveInfo + (pathId,)))
+                    continue
+            else:
+                fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
+
             # XXX is this correct?  all the other addFiles use
             # the headFileId, not the fsFileId
 
@@ -1240,28 +1262,6 @@ class FilesystemJob:
                             isAutoSource = headFile.flags.isAutoSource())
             else:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
-
-            # FIXME we should be able to inspect headChanges directly
-            # to see if we need to go into the if statement which follows
-            # this rather then having to look up the file from the old
-            # trove for every file which has changed
-            if not fileOnSystem:
-                if (headFile.flags.isTransient() and
-                        headFile.contents.sha1() != baseFile.contents.sha1()):
-                    # a transient file has been removed locally, but contents
-                    # changed upstream. restore the new version of the file to
-                    # the filesystem. using baseFile here tricks the code below
-                    # into thinking the file was never removed. since it needs
-                    # updating anyway, it works out.
-                    fsFile = baseFile
-                else:
-                    # the file was removed from the local system; we're not
-                    # putting it back
-                    self.userRemoval(replaced = False,
-                                     *(newTroveInfo + (pathId,)))
-                    continue
-            else:
-                fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
 
             # link groups come from the database; they aren't inferred from
             # the filesystem
