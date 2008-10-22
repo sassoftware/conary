@@ -1511,9 +1511,15 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             self._pretty = True
 
         def repr_str(self, x, level):
-            if not isinstance(v, UNSAFE_TYPES) and hasattr(x, '__safe_str__'):
-                return reprmod.Repr.repr_str(x.__safe_str__())
-            return reprmod.Repr.repr_str(self, x, level)
+            try:
+                if not isinstance(v, UNSAFE_TYPES) and hasattr(x, '__safe_str__') and isinstance(getattr(x, '__safe_str__'), types.MethodType):
+                    return reprmod.Repr.repr_str(x.__safe_str__())
+                return reprmod.Repr.repr_str(self, x, level)
+            except Exception:
+                # here we swallow the exception in the display code.
+                # but, hopefully, we will instead get the mostly-full stack
+                # of the original problem, which should be more helpful.
+                return '** could not represent **'
 
         def _pretty_repr(self, pieces, iterLen, level):
             ret = ', '.join(pieces)
@@ -1628,11 +1634,18 @@ def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
             if hasattr(v, '__class__'):
                 if v.__class__.__name__ == 'ModuleProxy':
                     continue
-            if not isinstance(v, UNSAFE_TYPES) and hasattr(v, '__safe_str__'):
-                vstr = v.__safe_str__()
-            else:
-                vstr = r.repr(v)
+            try:
+                if (not isinstance(v, UNSAFE_TYPES) and hasattr(x, '__safe_str__') and isinstance(getattr(x, '__safe_str__'), types.MethodType)):
+                    vstr = v.__safe_str__()
+                else:
+                    vstr = r.repr(v)
+            except Exception, e:
+                # here we swallow the exception in the display code.
+                # but, hopefully, we will instead get the mostly-full stack 
+                # of the original problem, which should be more helpful.
+                vstr = '** could not represent **'
             stream.write("        %15s : %s\n" % (k, vstr))
+                
         stream.write("  %s\n\n" % ("*" * 70))
 
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
