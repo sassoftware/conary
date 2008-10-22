@@ -548,6 +548,8 @@ class RepQueryCommand(_AbstractQueryCommand):
             'leaves'         : 'Return latest version for each unique flavor',
             'show-removed'   : 'Display troves that have been removed from the repos',
             'show-normal'    : 'Do not display branches that end in a redirect',
+            'show-file'      : 'Display contents of a file',
+            'build-log'      : 'Display log of the build for this package',
             #'show-redirects' : 'Display redirect troves'
             # turned off for now.
             }
@@ -560,12 +562,14 @@ class RepQueryCommand(_AbstractQueryCommand):
         d["all-versions"] = NO_PARAM
         d["available-flavors"] = NO_PARAM
         d["best-flavors"] = NO_PARAM
+        d["build-log"] = NO_PARAM
         d["latest-versions"] = NO_PARAM
         d["leaves"] = NO_PARAM
         d["path"] = MULT_PARAM
         d["what-provides"] = MULT_PARAM
         d["show-removed"] = NO_PARAM
         d["show-normal"] = NO_PARAM
+        d["show-file"] = ONE_PARAM
         #d["show-redirects"] = NO_PARAM
         argDef['Trove Selection'].update(d)
 
@@ -605,8 +609,10 @@ class RepQueryCommand(_AbstractQueryCommand):
             flavorFilter = queryrep.FLAVOR_FILTER_BEST
 
         kw = {}
+        kw['filesToShow'] = []
         for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
+                ('build-log', 'showBuildLog'),
                 ('file-deps', 'fileDeps'), 
                 ('file-flavors', 'fileFlavors'), 
                 ('file-versions', 'fileVersions'),
@@ -629,6 +635,14 @@ class RepQueryCommand(_AbstractQueryCommand):
         whatProvidesList = argSet.pop('what-provides', [])
 
         pathList = argSet.pop('path', [])
+        
+        files = argSet.pop('show-file', None);
+        if files:
+            kw['filesToShow'].append(files)
+
+        if kw['filesToShow'] and kw['showBuildLog']:
+            print 'error: can\'t use --build-log and --show-file together'
+            return 1
 
         if argSet.pop('show-removed', False):
             argSet.pop('show-redirects', False)

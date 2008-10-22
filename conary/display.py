@@ -16,6 +16,7 @@ Provides output methods for displaying troves
 """
 
 import itertools
+import sys
 import textwrap
 import time
 
@@ -25,8 +26,13 @@ from conary import trove
 from conary.deps import deps
 from conary.lib import log
 from conary.lib.sha1helper import sha1ToString, md5ToString
+from conary.lib import util
 from conary import metadata
 from conary.repository import errors
+
+from conary import conaryclient
+from conaryclient import newtrove
+
 
 def jobKey(x):
     return (x[0], (str(x[1][0]), str(x[1][1])),
@@ -57,9 +63,12 @@ def displayTroves(dcfg, formatter, troveTups):
                          checkExists = dcfg.checkExists,
                          showNotExists = dcfg.showNotExists,
                          showFlags = dcfg.showTroveFlags,
+                         showBuildLog = dcfg.showBuildLog,
+                         filesToShow = dcfg.filesToShow,
                          primaryTroves = dcfg.getPrimaryTroves())
 
     allTups = list(iter)
+
     # let the formatter know what troves are going to be displayed
     # in order to determine what parts of the version/flavor to display
     troveTups = formatter.prepareTuples([x[0] for x in allTups])
@@ -77,8 +86,24 @@ def displayTroves(dcfg, formatter, troveTups):
             continue
 
         if dcfg.printFiles():
+            #import epdb; epdb.st()
             for ln in formatter.formatTroveFiles(trv, n, v, f, indent):
-                print ln
+                if not isinstance(ln, str):
+                    write = sys.stdout.write
+                    chunk = ln.read(1024)
+                    while chunk:
+                        write(chunk)
+                        chunk = ln.read(1024)
+                else:
+                    print ln
+
+def getBuildLog(troveSource, n, v, f):
+    iter = troveSource.iterFilesInTrove(n, v, f,
+                                        sortByPath = True, 
+                                        withFiles = True)
+    for (pathId, path, fileId, version, file_) in iter:
+        if 'buildlog' in file_.tags:
+            return (pathId, path, fileId, version, file)
 
 def filterComponents(tupList, primaryTroves=[]):
     tups = set()
@@ -108,7 +133,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                   needTroves=False, getPristine=True,
                   showNotByDefault=False, showWeakRefs=False,
                   checkExists=False, showNotExists=False,
-                  showFlags=False, primaryTroves=[]):
+                  showFlags=False, showBuildLog=False, 
+                  filesToShow = [], primaryTroves=[]):
     """
     Given a troveTup list, iterate over those troves and their child troves
     as specified by parameters
@@ -191,7 +217,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
     indent = 0
     seen = set()  # cached info about what troves we've called hasTrove on.
-
+    #import epdb; epdb.st()
     for troveTup, trv in itertools.izip(troveTups, troves):
         if recurseAll:
             # recurse all troves, depth first.
@@ -319,11 +345,12 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
                 if not showWeakRefs:
                     newTroveTups = (x for x in newTroveTups if x[2])
+
                 if not showNotByDefault:
                     newTroveTups = (x for x in newTroveTups if x[1])
 
                 newTroveTups = sorted(newTroveTups)
-
+                
                 if needTroves or trv.isRedirect():
                     newTroves = troveSource.getTroves(
                                                 [x[0] for x in newTroveTups],
@@ -368,7 +395,8 @@ class DisplayConfig:
         self.setChildDisplay()
         self.setPrimaryTroves(set())
 
-    def setTroveDisplay(self, deps=False, info=False, showBuildReqs=False,
+    def setTroveDisplay(self, deps=False, info=False, showBuildReqs=False, 
+                        showBuildLog=False, filesToShow = [],
                         digSigs=False, showLabels=False, fullVersions=False,
                         fullFlavors=False, baseFlavors=[],
                         showComponents=False):
@@ -376,6 +404,8 @@ class DisplayConfig:
         self.info = info
         self.digSigs = digSigs
         self.showBuildReqs = showBuildReqs
+        self.showBuildLog = showBuildLog
+        self.filesToShow = filesToShow
         self.fullVersions = fullVersions
         self.showLabels = showLabels
         self.fullFlavors = fullFlavors
@@ -420,6 +450,9 @@ class DisplayConfig:
     #### Accessors 
     #### Methods to grab information passed into the DisplayConfig
 
+    def needFileContents(self):
+        return self.showBuildLog or self.filesToShow
+
     def getTroveSource(self):
         return self.troveSource
 
@@ -427,7 +460,7 @@ class DisplayConfig:
         return self.showBuildReqs
 
     def printTroveHeader(self):
-        return self.info or self.showBuildReqs or self.deps or not self.printFiles() or self.displayHeaders
+        return (self.info or self.showBuildReqs or self.deps or not self.printFiles() or self.displayHeaders) and not self.showBuildLog
 
     def printSimpleHeader(self):
         return not self.info and (not self.showBuildReqs or self.displayHeaders)
@@ -448,7 +481,7 @@ class DisplayConfig:
         return self.info
 
     def printFiles(self):
-        return self.ls or self.ids or self.sha1s or self.tags or self.fileDeps or self.fileVersions or self.fileFlavors
+        return self.ls or self.ids or self.sha1s or self.tags or self.fileDeps or self.fileVersions or self.fileFlavors or self.needFileContents()
 
     def isVerbose(self):
         return self.lsl
@@ -469,17 +502,23 @@ class DisplayConfig:
 
     def needTroves(self):
         # we need the trove 
-        return self.info or self.showBuildReqs or self.digSigs or self.deps or self.printFiles()
+        return self.info or self.showBuildReqs or self.showBuildLog or self.digSigs or self.deps or self.printFiles()
 
     def needFiles(self):
-        return self.printFiles()
+        return self.printFiles() or self.needFileContents()
 
     def needFileObjects(self):
-        return self.needFiles()
+        return self.needFiles() or self.showBuildLog
 
     def getPristine(self):
         return True
 
+    def shouldGetFileContents(self, pathId, path, fileId, version, file):
+        if (self.showBuildLog and 'buildlog' in file.tags):
+            return True, util.BZ2File
+        if path in self.filesToShow:
+            return True, None
+        return False, None
 
 class TroveTupFormatter:
     """ Formats (n,v,f) troveTuples taking into account the other
@@ -790,16 +829,33 @@ class TroveFormatter(TroveTupFormatter):
         """ Print information about the files associated with this trove """
         dcfg = self.dcfg
         needFiles = dcfg.needFileObjects()
-
         troveSource = dcfg.getTroveSource()
 
-        iter = troveSource.iterFilesInTrove(n, v, f, 
-                                            sortByPath = True, 
+        iter = troveSource.iterFilesInTrove(n, v, f,
+                                            sortByPath = True,
                                             withFiles = needFiles)
-        if needFiles:
+        
+        if dcfg.needFileContents():
+            if not needFiles:
+                iter = [ x + (None,) for x in iter ]
+            for (pathId, path, fileId, version, file) in iter:
+                shouldDisplay, modifier =  dcfg.shouldGetFileContents(pathId,
+                                                                path,
+                                                                fileId, version,
+                                                                file)
+                                                                
+                if not shouldDisplay:
+                    continue
+                file = troveSource.getFileContents([(fileId, version)])[0]
+                if modifier:
+                    file = modifier(file.get())
+                else:
+                    file = file.get()
+                yield file
+        elif needFiles:
             for (pathId, path, fileId, version, file) in iter:
                 for ln in self.formatFile(pathId, path, fileId, version, file,
-                                          indent=indent):
+                                      indent=indent):
                     yield ln
         else:
             for (pathId, path, fileId, version) in iter:

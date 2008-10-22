@@ -22,6 +22,7 @@ from conary import display
 from conary.deps import deps
 from conary.repository import trovesource, errors
 from conary.lib import log
+from conary.errors import ConaryError
 
 VERSION_FILTER_ALL    = 0
 VERSION_FILTER_LATEST = 1
@@ -40,7 +41,7 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
                   useAffinity = False,
                   # trove options
                   info = False, digSigs = False, showDeps = False,
-                  showBuildReqs = False, 
+                  showBuildReqs = False, showBuildLog = False, filesToShow = [], 
                   # file options
                   ls = False, lsl = False, ids = False, sha1s = False, 
                   tags = False, fileDeps = False, fileVersions = False,
@@ -108,6 +109,11 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @rtype: None
     """
 
+    if showBuildLog and len(troveSpecs)>1:
+        raise ConaryError('Error: can not show build log for several packages. Please specify one')
+    if filesToShow and len(troveSpecs)>1:
+        raise ConaryError('Error: can not show files log for several packages. Please specify one')
+
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
 
@@ -125,10 +131,15 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
                                    affinityDb,
                                    troveTypes=troveTypes)
 
+    if (filesToShow or showBuildLog) and len(troveTups)>1:
+        raise ConaryError('Error: %s is ambigious. Please specify one of: \n%s' % \
+                    (troveSpecs[0], 
+                    "\n".join([x[0]+"="+str(x[1].trailingLabel()) for x in troveTups]) ))
+
     dcfg = display.DisplayConfig(repos, affinityDb)
 
     dcfg.setTroveDisplay(deps=showDeps, info=info,
-                         showBuildReqs=showBuildReqs,
+                         showBuildReqs=showBuildReqs, showBuildLog=showBuildLog, filesToShow = filesToShow, 
                          digSigs=digSigs, fullVersions=cfg.fullVersions,
                          showLabels=cfg.showLabels, fullFlavors=cfg.fullFlavors,
                          showComponents = cfg.showComponents,
@@ -148,7 +159,7 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
     displayHeaders = alwaysDisplayHeaders or showTroveFlags 
 
     dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
-                         showNotByDefault = showAllTroves,
+                         showNotByDefault = showAllTroves or showBuildLog,
                          showWeakRefs = weakRefs,
                          showTroveFlags = showTroveFlags,
                          displayHeaders = displayHeaders,

@@ -3,6 +3,7 @@ Changes in @NEW@:
     * cvc diff now optionally takes a set of files to diff.  Note that
       providing a revision now requires the --revision argument, to
       differentiate revisions from files. (CNY-2384)
+    * Added --build-log and --show-file parameters to conary rq. (CNY-2584)
 
   o Client Changes:
     * Support for obtaining changeset fingerprints has been added to
