@@ -19,6 +19,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)
     * createSourceTrove now honors filestreams marked as config. (CNY-3011)
+    * Subscribing to log messages now works with a system time
+      that requires more than 10 characters to represent the seconds
+      (after Saturday November 20 2286 17:46:39 UTC). (CNY-3019)
 
 Changes in 2.0.28:
   o New Features:
