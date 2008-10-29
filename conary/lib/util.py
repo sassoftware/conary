@@ -41,6 +41,10 @@ import zlib
 
 from conary.lib import fixedglob, graph, log, api
 
+# Imported for the benefit of older code,
+from conary.lib.formattrace import formatTrace
+
+
 # Simple ease-of-use extensions to python libraries
 
 def normpath(path):
@@ -1488,165 +1492,6 @@ class ProtectedTemplate(str):
             nargs[k] = v
         return self._templ.safe_substitute(nargs)
 
-def formatTrace(excType, excValue, tb, stream = sys.stderr, withLocals = True):
-    import types
-    import inspect
-    import itertools
-    import repr as reprmod
-    UNSAFE_TYPES = (xmlrpclib.ServerProxy, xmlrpclib._Method)
-    class Repr(reprmod.Repr):
-        def __init__(self, subsequentIndent = ""):
-            reprmod.Repr.__init__(self)
-            self.maxtuple = 20
-            self.maxset = 160
-            self.maxlist = 20
-            self.maxdict = 20
-            self.maxstring = 160
-            self.maxother = 160
-
-            self.maxLineLen = 160
-
-            self.subsequentIndent = subsequentIndent
-            # Pretty-print?
-            self._pretty = True
-
-        def repr_str(self, x, level):
-            try:
-                if not isinstance(v, UNSAFE_TYPES) and hasattr(x, '__safe_str__') and isinstance(getattr(x, '__safe_str__'), types.MethodType):
-                    return reprmod.Repr.repr_str(x.__safe_str__())
-                return reprmod.Repr.repr_str(self, x, level)
-            except Exception:
-                # here we swallow the exception in the display code.
-                # but, hopefully, we will instead get the mostly-full stack
-                # of the original problem, which should be more helpful.
-                return '** could not represent **'
-
-        def _pretty_repr(self, pieces, iterLen, level):
-            ret = ', '.join(pieces)
-            if not self._pretty or len(ret) < self.maxLineLen:
-                return ret
-            padding = self.subsequentIndent + "  " * (self.maxlevel - level)
-            sep = ',\n' + padding
-            return '\n' + padding + sep.join(pieces)
-
-        def _repr_iterable(self, x, level, left, right, maxiter, trail=''):
-            n = len(x)
-            if level <= 0 and n:
-                s = '...len=%d...' % n
-            else:
-                newlevel = level - 1
-                repr1 = self.repr1
-                pieces = [repr1(elem, newlevel) for elem in itertools.islice(x, maxiter)]
-                if n > maxiter:  pieces.append('...len=%d...' % n)
-                s = self._pretty_repr(pieces, n, level)
-                if n == 1 and trail:  right = trail + right
-            return '%s%s%s' % (left, s, right)
-
-        def repr_dict(self, x, level):
-            n = len(x)
-            if n == 0: return '{}'
-            if level <= 0: return '{...len=%d...}' % n
-            newlevel = level - 1
-            repr1 = self.repr1
-            pieces = []
-            for key in itertools.islice(sorted(x), self.maxdict):
-                oldPretty = self._pretty
-                self._pretty = False
-                keyrepr = repr1(key, newlevel)
-                self._pretty = oldPretty
-
-                oldSubsequentIndent = self.subsequentIndent
-                self.subsequentIndent += ' ' * 4;
-                valrepr = repr1(x[key], newlevel)
-                self.subsequentIndent = oldSubsequentIndent
-
-                pieces.append('%s: %s' % (keyrepr, valrepr))
-            if n > self.maxdict: pieces.append('...len=%d...' % n)
-            s = self._pretty_repr(pieces, n, level)
-            return '{%s}' % (s,)
-
-
-    def formatOneFrame(tb, stream):
-        import linecache
-        _updatecache = linecache.updatecache
-        def updatecache(*args):
-            # linecache.updatecache brokenlt looks in the module
-            # search path for files that match the module name
-            # (problem if you have a file without source with the same
-            # name as a python standard library module. We'll just check
-            # to see if the file exists first and require exact path
-            # matches
-            if not os.access(args[0], os.R_OK):
-                return []
-            return _updatecache(*args)
-        linecache.updatecache = updatecache
-        try:
-            fileName, lineNo, funcName, text, idx = inspect.getframeinfo(tb)
-            stream.write('  File "%s", line %d, in %s\n' % 
-                (fileName, lineNo, funcName))
-            if text is not None and len(text) > idx:
-                # If the source file is not available, we may not be able to get 
-                # the line
-                stream.write('    %s\n' % text[idx].strip())
-        finally:
-            linecache.updatecache = _updatecache
-
-    stream.write(str(excType))
-    stream.write(": ")
-    stream.write(str(excValue))
-    stream.write("\n\n")
-
-    tbStack = []
-    while tb:
-        tbStack.append(tb)
-        if hasattr(tb, 'tb_next'):
-            tb = tb.tb_next
-        else:
-            tb = tb.f_back
-
-    if withLocals:
-        tbStack.reverse()
-        msg = "Traceback (most recent call first):\n"
-    else:
-        msg = "Traceback (most recent call last):\n"
-
-    r = Repr(subsequentIndent = " " * 27)
-    ignoredTypes = (types.ClassType, types.ModuleType, types.FunctionType,
-                    types.TypeType)
-
-    stream.write(msg)
-    for tb in tbStack:
-        formatOneFrame(tb, stream)
-
-        if not withLocals:
-            continue
-
-        if hasattr(tb, 'tb_frame'):
-            frame = tb.tb_frame
-        else:
-            frame = tb
-        for k, v in sorted(frame.f_locals.items()):
-            if k.startswith('__') and k.endswith('__'):
-                # Presumably internal data
-                continue
-            if isinstance(v, ignoredTypes):
-                continue
-            if hasattr(v, '__class__'):
-                if v.__class__.__name__ == 'ModuleProxy':
-                    continue
-            try:
-                if (not isinstance(v, UNSAFE_TYPES) and hasattr(x, '__safe_str__') and isinstance(getattr(x, '__safe_str__'), types.MethodType)):
-                    vstr = v.__safe_str__()
-                else:
-                    vstr = r.repr(v)
-            except Exception, e:
-                # here we swallow the exception in the display code.
-                # but, hopefully, we will instead get the mostly-full stack 
-                # of the original problem, which should be more helpful.
-                vstr = '** could not represent **'
-            stream.write("        %15s : %s\n" % (k, vstr))
-                
-        stream.write("  %s\n\n" % ("*" * 70))
 
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
     """Marshaller for XMLRPC data"""
