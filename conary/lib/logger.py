@@ -658,13 +658,14 @@ class Logger:
 
     def synchronize(self):
         timestamp = '%10.8f' %time.time()
+        timestampLen = len(timestamp)
         self.command('synchronizeMark %s' %timestamp)
         self.flush()
         syncFile = file(self.syncPath)
 
         def _fileLongEnough():
             syncFile.seek(0, 2)
-            return syncFile.tell() > 19
+            return syncFile.tell() > timestampLen
 
         def _waitedTooLong(i, stage):
             if i > 10000:
@@ -682,11 +683,11 @@ class Logger:
             time.sleep(0.01)
 
         def _seekTimestamp():
-            syncFile.seek(-20, 2)
+            syncFile.seek(-(timestampLen + 1), 2)
 
         i = 0
         _seekTimestamp()
-        while syncFile.read(19) != timestamp:
+        while syncFile.read(timestampLen) != timestamp:
             _waitedTooLong(i, 'search')
             i += 1
             time.sleep(0.01)
