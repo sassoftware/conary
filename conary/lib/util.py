@@ -894,6 +894,9 @@ class ExtendedFile(ExtendedFdopen):
         self.fd = None
         self.fObj = None
 
+    def __repr__(self):
+        return '<ExtendedFile %r>' % (path,)
+
     def __init__(self, path, mode = "r", buffering = True):
         self.fd = None
 
