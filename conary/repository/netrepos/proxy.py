@@ -149,9 +149,14 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
+        urlProtocol, urlRest = urllib.splittype(url)
+        urlHost, urlRest = urllib.splithost(urlRest)
         # If the proxy injected entitlements or user information, switch to
-        # SSL
-        withSSL = url.startswith('https') or bool(injEntList) or bool(userOverride)
+        # SSL -- IF they are using
+        # default ports (if they specify ports, we have no way of
+        # knowing what port to use)
+        addSSL = ':' not in urlHost and (bool(injEntList) or bool(userOverride))
+        withSSL = urlProtocol == 'https' or addSSL
         transporter = transport.Transport(https = withSSL,
                                           proxies = proxies,
                                           serverName = targetServerName)
