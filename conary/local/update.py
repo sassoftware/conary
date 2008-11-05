@@ -1737,8 +1737,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     @type srcTrove: trove.Trove
     @param newVersion: version to use for the newly created trove
     @type newVersion: versions.NewVersion
-    @param root: root directory the files are in (ignored for sources, which
-    are assumed to be in the current directory)
+    @param root: root directory the files are in. may be empty "." or a
+    directory for source troves
     @type root: str
     @param flags: boolean flags for this operation
     @type flags: UpdateFlags
@@ -1754,6 +1754,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             file contents can be used even when the old and new versions
             of that file are on different repositories.
     """
+    assert(root)
 
     newTrove = curTrove.copy()
     newTrove.changeVersion(newVersion)
@@ -1819,8 +1820,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     realPath = info
                     isAutoSource = True
             else:
-                realPath = os.getcwd() + "/" + path
                 isAutoSource = False
+                realPath = root + "/" + path
         else:
 	    realPath = root + path
 
@@ -1923,7 +1924,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     realPath = curTrove.pathMap[path]
                     isAutoSource = True
             else:
-                realPath = os.getcwd() + "/" + path
+                realPath = root + "/" + path
                 isAutoSource = False
 
             if not isinstance(version, versions.NewVersion):
@@ -1986,7 +1987,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     return (foundDifference, newTrove)
 
-def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
+def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
                       ignoreAutoSource = False, updateContainers = False,
                       crossRepositoryDeltas = True, allowMissingFiles = False,
@@ -2003,8 +2004,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     @param pkgList: Specifies which pacakage to work on, and is a list
     of (curTrove, srcTrove, newVersion, flags) tuples as defined in the parameter
     list for _localChanges()
-    @param root: root directory the files are in (ignored for sources, which
-    are assumed to be in the current directory)
+    @param root: root directory the files are in. may be empty for sources,
+    in which case files are assumed to be in the current directory)
     @type root: str
     @param forceSha1: disallows the use of inode information to avoid
                       checking the sha1 of the file if the inode information 

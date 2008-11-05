@@ -10,6 +10,9 @@ Changes in @NEW@:
       the network repository client.
     * Transient files whose contents have changed will be restored if the
       file had been previously removed from the local system (CNY-2987)
+    * generateStatus() call didn't handle a root parameter properly. This
+      didn't cause cvc problems, but didn't work properly within rbuild
+      (CNY-3026).
 
   o Server Changes:
     * Code using a shim client can now more securely "imitate" a user by
