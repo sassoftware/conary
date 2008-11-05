@@ -27,11 +27,46 @@ import os
 import sha
 import tempfile
 
-from conary.lib import util
+from conary.lib import misc, util
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents
 
 class AbstractDataStore:
+
+    @staticmethod
+    def _writeFile(fileObj, outFds, precompressed, computeSha1):
+        if precompressed and hasattr(fileObj, '_fdInfo'):
+            (fd, start, size) = fileObj._fdInfo()
+            pid = os.getpid()
+            realHash = misc.sha1Copy((fd, start, size), outFds)
+            for x in outFds:
+                os.close(x)
+
+            return realHash
+        else:
+            for fd in outFds:
+                outFileObj = os.fdopen(fd, "w")
+                contentSha1 = sha.new()
+                if precompressed and computeSha1:
+                    tee = Tee(fileObj, outFileObj)
+                    uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
+                    s = uncompObj.read(128 * 1024)
+                    while s:
+                        contentSha1.update(s)
+                        s = uncompObj.read(128 * 1024)
+                    uncompObj.close()
+                elif precompressed:
+                    util.copyfileobj(fileObj, outFileObj)
+                else:
+                    dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
+                    util.copyfileobj(fileObj, dest, digest = contentSha1)
+                    dest.close()
+
+                # this closes tmpFd for us
+                outFileObj.close()
+                fileObj.seek(0)
+
+            return contentSha1.digest()
 
     def hasFile(self, hash):
         raise NotImplementedError
@@ -50,7 +85,6 @@ class AbstractDataStore:
 
     def removeFile(self, hash):
         raise NotImplementedError
-
 
 class Tee:
     """
@@ -112,27 +146,10 @@ class DataStore(AbstractDataStore):
         tmpFd, tmpName = tempfile.mkstemp(suffix = ".new", 
                                           dir = os.path.dirname(path))
 
-        outFileObj = os.fdopen(tmpFd, "w")
-        contentSha1 = sha.new()
-        if precompressed and integrityCheck:
-            tee = Tee(fileObj, outFileObj)
-            uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)
-            s = uncompObj.read(128 * 1024)
-            while s:
-                contentSha1.update(s)
-                s = uncompObj.read(128 * 1024)
-            uncompObj.close()
-        elif precompressed:
-            util.copyfileobj(fileObj, outFileObj)
-        else:
-            dest = gzip.GzipFile(mode = "w", fileobj = outFileObj)
-            util.copyfileobj(fileObj, dest, digest = contentSha1)
-            dest.close()
+        realHash = self._writeFile(fileObj, [ tmpFd ], precompressed,
+                                   computeSha1 = integrityCheck)
 
-        # this closes tmpFd for us
-        outFileObj.close()
-
-        if integrityCheck and contentSha1.hexdigest() != hash:
+        if integrityCheck and realHash != sha1helper.sha1FromString(hash):
             os.unlink(tmpName)
             raise errors.IntegrityError
 
@@ -210,7 +227,7 @@ class OverlayDataStoreSet:
         self.stores = storeList
         self.storeIter = itertools.cycle(self.stores)
 
-class DataStoreSet:
+class DataStoreSet(AbstractDataStore):
 
     """
     Duplicates data across multiple content stores.
@@ -225,9 +242,28 @@ class DataStoreSet:
         return store.hasFile(hash)
 
     def addFile(self, f, hash, precompressed = False):
+        tmpFileList = []
         for store in self.stores:
-            store.addFile(f, hash, precompressed = precompressed)
-            f.seek(0)
+            path = self.hashToPath(hash)
+            store.makeDir(path)
+            if os.path.exists(path): return
+
+            tmpFd, tmpPath = tempfile.mkstemp(suffix = ".new", 
+                                              dir = os.path.dirname(path))
+            tmpFileList.append((tmpFd, tmpPath, path))
+
+        # fd's close as a side effect. yikes.
+        realHash = self._writeFile(f, [ x[0] for x in tmpFileList ],
+                                   precompressed, computeSha1 = True)
+
+        if realHash != sha1helper.sha1FromString(hash):
+            for fd, tmpPath, path in tmpFileList:
+                os.unlink(tmpPath)
+
+            raise errors.IntegrityError
+
+        for fd, tmpPath, path in tmpFileList:
+            os.rename(tmpPath, path)
 
     def addFileReference(self, hash):
         for store in self.stores:
