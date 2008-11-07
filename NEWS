@@ -31,6 +31,8 @@ Changes in @NEW@:
     * Committing now works through restrictive proxies. (CNY-3032)
     * A bug that manifested itself as a TroveNotFound when accessing
       multiple repositories through the same url has been fixed. (CNY-3027)
+    * A bug that caused conary to segfault while creating changsets under
+      python 2.6 has been fixed. (CNY-3033)
 
 Changes in 2.0.28:
   o New Features:
