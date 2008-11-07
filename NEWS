@@ -22,6 +22,9 @@ Changes in @NEW@:
     * Subscribing to log messages now works with a system time
       that requires more than 10 characters to represent the seconds
       (after Saturday November 20 2286 17:46:39 UTC). (CNY-3019)
+    * Committing now works through restrictive proxies. (CNY-3032)
+    * A bug that manifested itself as a TroveNotFound when accessing
+      multiple repositories through the same url has been fixed. (CNY-3027)
 
 Changes in 2.0.28:
   o New Features:

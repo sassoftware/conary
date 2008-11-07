@@ -458,7 +458,7 @@ class ServerCache:
             url = '/'.join(s)
             usedMap = True
 
-        shareTuple = (url, userInfo, tuple(entList))
+        shareTuple = (url, userInfo, tuple(entList), serverName)
         server = self.shareCache.get(shareTuple, None)
         if server is not None:
             self.cache[serverName] = server
@@ -2928,7 +2928,6 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                                                 size)
         callbackFn = wrapper.callback
 
-    c.connect()
     c.putrequest("PUT", selector)
     for k, v in headers:
         c.putheader(k, v)
