@@ -21,6 +21,8 @@ Changes in @NEW@:
     * Writing files into the content store now decompresses and validates
       the sha1 once instead of once per content store. Additionaly, file
       creation and the sha1 computation are now done in C instead of python.
+    * Significantly reduced the number of SQL queries used to commit groups
+      to repositories for a noticeable improvment in commit performance.
 
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)

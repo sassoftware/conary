@@ -417,65 +417,102 @@ class TroveStore:
         # need to use self.items.addId to keep the CheckTroveCache in
         # sync for any new items we might add
         cu.execute("""
-        SELECT DISTINCT tmpTroves.item
-        FROM tmpTroves
+        INSERT INTO Items (item)
+        SELECT DISTINCT tmpTroves.item FROM tmpTroves
         LEFT JOIN Items USING (item)
-        WHERE Items.itemId is NULL
+        WHERE
+            Items.item is NULL
         """)
-        for (newItem,) in cu.fetchall():
-            self.items.addId(newItem)
 
-        # look for included troves with no instances yet; we make those
-        # entries manually here
         cu.execute("""
-        SELECT Items.itemId, tmpTroves.frozenVersion, Flavors.flavorId
+        INSERT INTO Versions (version)
+        SELECT DISTINCT tmpTroves.version FROM tmpTroves
+        LEFT JOIN Versions USING (version)
+        WHERE
+            Versions.version is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Branches (branch)
+        SELECT DISTINCT tmpTroves.branch FROM tmpTroves
+        LEFT JOIN Branches USING (branch)
+        WHERE
+            Branches.branch is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Labels (label)
+        SELECT DISTINCT tmpTroves.label FROM tmpTroves
+        LEFT JOIN Labels USING (label)
+        WHERE
+            Labels.label is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Nodes(itemId, branchId, versionId, timestamps,
+                          finalTimestamp)
+        SELECT DISTINCT Items.itemId, Branches.branchId, Versions.versionId,
+                        tmpTroves.timeStamps, tmpTroves.finalTimestamp
+        FROM tmpTroves
+        JOIN Items USING (item)
+        JOIN Versions ON Versions.version = tmpTroves.version
+        JOIN Branches ON Branches.branch = tmpTroves.branch
+        LEFT JOIN Nodes ON
+            Items.itemId = Nodes.itemId AND
+            Versions.versionId = Nodes.versionId
+        WHERE
+            Nodes.nodeId is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO LabelMap(itemId, branchId, labelId)
+        SELECT DISTINCT Items.itemId, Branches.branchId, Labels.labelId
+        FROM tmpTroves
+        JOIN Items USING (item)
+        JOIN Branches ON Branches.branch = tmpTroves.branch
+        JOIN Labels ON Labels.label = tmpTroves.label
+        LEFT JOIN LabelMap ON
+            Items.itemId = LabelMap.itemId AND
+            Branches.branchId = LabelMap.branchId AND
+            Labels.labelId = LabelMap.labelId
+        WHERE
+            LabelMap.itemId is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Instances (itemId, versionId, flavorId, isPresent,
+                               troveType)
+        SELECT Items.itemId, Versions.versionId, flavors.flavorId, ?, ?
         FROM tmpTroves
         JOIN Items USING (item)
         JOIN Flavors ON Flavors.flavor = tmpTroves.flavor
-        LEFT JOIN Versions ON Versions.version = tmpTroves.version
+        JOIN Versions ON Versions.version = tmpTroves.version
         LEFT JOIN Instances ON
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
-        WHERE Instances.instanceId is NULL
-        """)
+        WHERE
+            Instances.instanceId is NULL
+        """, instances.INSTANCE_PRESENT_MISSING, troveType)
 
-        for (itemId, version, flavorId) in cu.fetchall():
-	    # make sure the versionId and nodeId exists for this (we need
-	    # a nodeId, or the version doesn't get timestamps)
-            version = versions.ThawVersion(version)
-	    versionId = self.getVersionId(version)
-
-            # sourcename = None for now.
-            # will be fixed up when the real trove is comitted
-	    if versionId is not None:
-		nodeId = self.versionOps.nodes.getRow(itemId, versionId, None)
-		if nodeId is None:
-		    (nodeId, versionId) = self.versionOps.createVersion(
-                        itemId, version, flavorId, sourceName = None)
-		del nodeId
-            else:
-                (nodeId, versionId) = self.versionOps.createVersion(
-                    itemId, version, flavorId, sourceName = None)
-            # create the new instanceId entry.
-            # cloneFromId = None for now.
-            # will get fixed when the trove is comitted.
-            # We actually don't quite care about the exact instanceId value we get back...
-            self.getInstanceId(itemId, versionId, flavorId,
-                               clonedFromId = None, troveType =  troveType,
-                               isPresent = instances.INSTANCE_PRESENT_MISSING)
-
+        schema.resetTable(cu, 'tmpGroupInsertShim')
         cu.execute("""
-        INSERT INTO TroveTroves (instanceId, includedId, flags)
-        SELECT %d, Instances.instanceId, tmpTroves.flags
+        INSERT INTO tmpGroupInsertShim (itemId, versionId, flavorId, flags)
+        SELECT itemId, versionId, flavorId, flags
         FROM tmpTroves
         JOIN Items USING (item)
         JOIN Versions ON Versions.version = tmpTroves.version
         JOIN Flavors ON Flavors.flavor = tmpTroves.flavor
+        """)
+
+        cu.execute("""
+        INSERT INTO TroveTroves (instanceId, includedId, flags)
+        SELECT %d, Instances.instanceId, flags
+        FROM tmpGroupInsertShim
         JOIN Instances ON
-            Items.itemId = Instances.itemId AND
-            Versions.versionId = Instances.versionId AND
-            Flavors.flavorId = Instances.flavorId
+            tmpGroupInsertShim.itemId = Instances.itemId AND
+            tmpGroupInsertShim.versionId = Instances.versionId AND
+            tmpGroupInsertShim.flavorId = Instances.flavorId
         """ %(troveInstanceId,))
 
     def addTroveDone(self, troveInfo, mirror=False):
@@ -565,11 +602,18 @@ class TroveStore:
             assert(not isPackage or version == trv.getVersion())
             assert(not isPackage or flavor == trv.getFlavor())
             insertList.append((name, str(version), version.freeze(),
+                               ":".join(["%.3f" % x for x in
+                                            version.timeStamps()]),
+                               '%.3f' %version.timeStamps()[-1],
+                               str(version.branch()),
+                               str(version.trailingLabel()),
                                flavor.freeze(), flags))
         if len(insertList):
             schema.resetTable(cu, 'tmpTroves')
             self.db.bulkload("tmpTroves", insertList, [
-                "item", "version", "frozenVersion", "flavor", "flags" ])
+                "item", "version", "frozenVersion", "timestamps",
+                "finalTimestamp",
+                "branch", "label", "flavor", "flags" ])
             self.db.analyze("tmpTroves")
             self._addTroveNewTroves(cu, troveInstanceId, trv.getType())
 
