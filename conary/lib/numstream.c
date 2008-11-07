@@ -18,7 +18,7 @@
 #include <netinet/in.h>
 
 #if PY_MINOR_VERSION < 5
-typedef int Py_ssize_t
+typedef int Py_ssize_t;
 #endif
 
 #include "cstreams.h"
