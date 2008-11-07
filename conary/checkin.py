@@ -2161,7 +2161,7 @@ def generateStatus(repos, dirName='.'):
     result = update.buildLocalChanges(repos, 
 	    [(state, oldTrove, versions.NewVersion(),
               update.UpdateFlags(ignoreUGids = True) )],
-            forceSha1=True, ignoreAutoSource = True)
+            forceSha1=True, ignoreAutoSource = True, root = dirName)
     result = localAutoSourceChanges(oldTrove, result)
 
     (changeSet, ((isDifferent, newState),)) = result

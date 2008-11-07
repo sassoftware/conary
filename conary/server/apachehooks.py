@@ -23,6 +23,7 @@ import traceback
 from conary.lib import coveragehook
 from conary.lib import log
 from conary.lib import util
+from conary.lib.formattrace import formatTrace
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
 from conary.server.apachemethods import get, post, putFile
@@ -113,9 +114,9 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
 
     # Nicely format the exception
     out = util.BoundedStringIO()
-    util.formatTrace(exception, e, bt, stream = out, withLocals = False)
+    formatTrace(exception, e, bt, stream = out, withLocals = False)
     out.write("\nFull stack:\n")
-    util.formatTrace(exception, e, bt, stream = out, withLocals = True)
+    formatTrace(exception, e, bt, stream = out, withLocals = True)
     out.seek(0)
     msg = out.read()
 

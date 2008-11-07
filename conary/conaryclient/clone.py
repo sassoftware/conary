@@ -340,7 +340,7 @@ class ClientClone:
                                    contType, contents,
                                    files.frozenFileFlags(filecs).isConfig(),
                                    compressed = True)
-		    #lastContents = (pathId, newFileId)
+		    lastContents = (pathId, newFileId)
 
             # now collect up the random files and handle those
             allFileObjects = self.repos.getFileVersions(

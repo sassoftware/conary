@@ -12,7 +12,7 @@
 # full details.
 #
 
-python_files=	    *.py
+python_files=$(wildcard *.py)
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
