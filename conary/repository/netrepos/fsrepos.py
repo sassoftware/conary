@@ -27,11 +27,15 @@ from conary.repository.datastore import DataStoreSet
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository import netclient
+from conary.server import schema
 
 class FilesystemChangeSetJob(ChangeSetJob):
-    def __init__(self, *args, **kw):
+    def __init__(self, repos, cs, *args, **kw):
         self.mirror = kw.get('mirror', False)
-        ChangeSetJob.__init__(self, *args, **kw)
+
+        repos.troveStore.addTroveSetStart()
+        ChangeSetJob.__init__(self, repos, cs, *args, **kw)
+        repos.troveStore.addTroveSetDone()
 
     def markTroveRemoved(self, name, version, flavor):
         self.repos.markTroveRemoved(name, version, flavor)

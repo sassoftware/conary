@@ -23,6 +23,9 @@ Changes in @NEW@:
       creation and the sha1 computation are now done in C instead of python.
     * Significantly reduced the number of SQL queries used to commit groups
       to repositories for a noticeable improvment in commit performance.
+    * Temporary tables for commits of collectiosn and files are merged into
+      the final tables at the end of the changeset commit instead of
+      incrementally following each trove.
 
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)
