@@ -317,8 +317,8 @@ class ChangeSetJob:
         else:
             return self.invalidateRollbacksFlag
 
-    def addFileContents(self, sha1, fileVersion, fileContents, 
-                        restoreContents, isConfig, precompressed = False):
+    def addFileContents(self, sha1, fileContents, restoreContents, isConfig, 
+                        precompressed = False):
 	# Note that the order doesn't matter, we're just copying
 	# files into the repository. Restore the file pointer to
 	# the beginning of the file as we may want to commit this
@@ -339,7 +339,7 @@ class ChangeSetJob:
         assert(hasattr(callback, 'verifyTroveSignatures'))
         return callback.verifyTroveSignatures(trv)
 
-    def _handleContents(self, pathId, fileId, fileStream, newVersion,
+    def _handleContents(self, pathId, fileId, fileStream,
                         configRestoreList, normalRestoreList,
                         oldFileId = None, oldVersion = None, oldfile = None,
                         restoreContents = True):
@@ -373,16 +373,16 @@ class ChangeSetJob:
                              repos.contentsStore, 
                              contentInfo.sha1())
             contType = changeset.ChangedFileTypes.file
-            self.addFileContents(contentInfo.sha1(), newVersion, 
+            self.addFileContents(contentInfo.sha1(),
                                  fileContents, restoreContents, 
                                  fileFlags.isConfig())
         elif fileFlags.isConfig():
             tup = (pathId, fileId, contentInfo.sha1(),
-                   oldfile, newVersion, fileId, oldVersion, oldFileId,
+                   oldfile, fileId, oldVersion, oldFileId,
                    restoreContents)
             configRestoreList.append(tup)
         else:
-            tup = (pathId, fileId, contentInfo.sha1(), newVersion,
+            tup = (pathId, fileId, contentInfo.sha1(),
                    restoreContents)
             normalRestoreList.append(tup)
 
@@ -421,8 +421,7 @@ class ChangeSetJob:
             self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
                                 newVersion, fileStream = fileStream)
 
-            self._handleContents(pathId, fileId, fileStream,
-                                 newVersion, configRestoreList,
+            self._handleContents(pathId, fileId, fileStream, configRestoreList, 
                                  normalRestoreList)
 
         return checkFilesList
@@ -581,7 +580,6 @@ class ChangeSetJob:
 
                 if fileStream is not None:
                     self._handleContents(pathId, fileId, fileStream,
-                                    newVersion,
                                     configRestoreList, normalRestoreList,
                                     oldFileId = oldFileId,
                                     oldVersion = oldVersion,
@@ -634,7 +632,6 @@ class ChangeSetJob:
                                     newVersion, fileStream = fileStream)
 
                 self._handleContents(pathId, fileId, fileStream,
-                                newVersion,
                                 configRestoreList, normalRestoreList,
                                 oldFileId = oldFileId,
                                 oldVersion = oldVersion,
@@ -702,7 +699,7 @@ class ChangeSetJob:
 
         # config files are cached, so we don't have to worry about not
         # restoring the same fileId/pathId twice
-        for (pathId, newFileId, sha1, oldfile, newVersion, newFileId,
+        for (pathId, newFileId, sha1, oldfile, newFileId,
              oldVersion, oldFileId, restoreContents) in configRestoreList:
             if cs.configFileIsDiff(pathId, newFileId):
                 (contType, fileContents) = cs.getFileContents(pathId, newFileId)
@@ -736,15 +733,13 @@ class ChangeSetJob:
                 # to the config file cache)
                 fileContents = filecontents.FromChangeSet(cs, pathId, newFileId)
 
-	    self.addFileContents(sha1, newVersion, fileContents, 
-                                 restoreContents, 1)
+            self.addFileContents(sha1, fileContents, restoreContents, 1)
 
         ptrRestores = []
         ptrRefsAdded = {}
         lastRestore = None         # restore each pathId,fileId combo once
         while normalRestoreList:
-            (pathId, fileId, sha1, version, restoreContents) = \
-                                                    normalRestoreList.pop(0)
+            (pathId, fileId, sha1, restoreContents) = normalRestoreList.pop(0)
             if (pathId, fileId) == lastRestore:
                 continue
 
@@ -763,7 +758,7 @@ class ChangeSetJob:
                 target = util.decompressString(fileContents.get().read())
 
                 if util.tupleListBsearchInsert(normalRestoreList,
-                                (target[:16], target[16:], sha1, None, True),
+                                (target[:16], target[16:], sha1, True),
                                 self.ptrCmp):
                     # Item was inserted. This creates a reference in the
                     # datastore; keep track of it to prevent a duplicate
@@ -773,8 +768,8 @@ class ChangeSetJob:
                 continue
 
 	    assert(contType == changeset.ChangedFileTypes.file)
-	    self.addFileContents(sha1, version, fileContents, restoreContents,
-				 0, precompressed = True)
+            self.addFileContents(sha1, fileContents, restoreContents, 0,
+                                 precompressed = True)
 
         for sha1 in ptrRestores:
             # Increment the reference count for items which were ptr's
@@ -782,7 +777,7 @@ class ChangeSetJob:
             if sha1 in ptrRefsAdded:
                 del ptrRefsAdded[sha1]
             else:
-                self.addFileContents(sha1, None, None, False, 0)
+                self.addFileContents(sha1, None, False, 0)
 
 	#del configRestoreList
 	#del normalRestoreList

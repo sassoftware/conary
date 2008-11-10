@@ -1059,7 +1059,8 @@ def setupTempTables(db):
             stream      %(MEDIUMBLOB)s,
             sha1        %(BINARY20)s,
             dirname     %(PATHTYPE)s,
-            basename    %(PATHTYPE)s
+            basename    %(PATHTYPE)s,
+            instanceId  INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpNewFiles"] = True
         # it sucks that we have to create this many indexes for this table;
@@ -1196,11 +1197,17 @@ def setupTempTables(db):
         cu.execute("""
         CREATE TEMPORARY TABLE tmpTroves(
             idx             %(PRIMARYKEY)s,
+            instanceId      INTEGER NOT NULL,
             item            VARCHAR(254),
             version         %(STRING)s,
+            branch          %(STRING)s,
+            label           %(STRING)s,
+            timestamps      %(STRING)s,
+            finalTimestamp  NUMERIC(13,3) NOT NULL,
             frozenVersion   %(STRING)s,
             flavor          %(STRING)s,
-            flags           INTEGER NOT NULL DEFAULT 0
+            flags           INTEGER NOT NULL DEFAULT 0,
+            troveType       INTEGER NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpTroves"] = True
         # XXX: this index helps postgresql and hurts mysql.
@@ -1256,7 +1263,18 @@ def setupTempTables(db):
             finalTimestamp      NUMERIC(13,3) NOT NULL      
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpPathIdLookup"] = True
-        
+
+    if "tmpGroupInsertShim" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpGroupInsertShim(
+            itemId        INTEGER NOT NULL,
+            versionId     INTEGER NOT NULL,
+            flavorId      INTEGER NOT NULL,
+            flags         INTEGER NOT NULL,
+            instanceId    INTEGER NOT NULL
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpGroupInsertShim"] = True
+
     db.commit()
 
 def resetTable(cu, name):

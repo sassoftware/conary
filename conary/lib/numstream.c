@@ -17,6 +17,10 @@
 #include <Python.h>
 #include <netinet/in.h>
 
+#if PY_MINOR_VERSION < 5
+typedef int Py_ssize_t;
+#endif
+
 #include "cstreams.h"
 
 /* debugging aid */
@@ -273,7 +277,7 @@ static inline PyObject * raw_ByteStream_Freeze(ByteStreamObject * o) {
     if (o->isNone)
         return PyString_FromString("");
 
-    return PyString_FromStringAndSize(&o->val, 1);
+    return (PyObject *) PyString_FromStringAndSize((const char *) &o->val, 1);
 }
 
 static inline PyObject * raw_LongLongStream_Freeze(LongLongStreamObject * o) {
@@ -330,7 +334,7 @@ static int NumericStream_Init(PyObject * self, PyObject * args,
 
     if (initObj && PyString_CheckExact(initObj)) {
         char * frozen;
-        int frozenLen;
+        Py_ssize_t frozenLen;
 
         PyString_AsStringAndSize(initObj, &frozen, &frozenLen);
         if (!raw_NumericStream_Thaw(o, frozen, frozenLen))

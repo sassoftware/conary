@@ -19,8 +19,13 @@ Changes in @NEW@:
       passing in a ValidPasswordToken object in lieu of the actual
       password. (CNY-2968)
     * Writing files into the content store now decompresses and validates
-      the sha1 once instead of once per content store. Additionaly, file
+      the sha1 once instead of once per content store. Additionally, file
       creation and the sha1 computation are now done in C instead of python.
+    * Significantly reduced the number of SQL queries used to commit groups
+      to repositories for a noticeable improvement in commit performance.
+    * Temporary tables for commits of collection and files are merged into
+      the final tables at the end of the changeset commit instead of
+      incrementally following each trove.
 
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)
@@ -28,6 +33,11 @@ Changes in @NEW@:
     * Subscribing to log messages now works with a system time
       that requires more than 10 characters to represent the seconds
       (after Saturday November 20 2286 17:46:39 UTC). (CNY-3019)
+    * Committing now works through restrictive proxies. (CNY-3032)
+    * A bug that manifested itself as a TroveNotFound when accessing
+      multiple repositories through the same url has been fixed. (CNY-3027)
+    * A bug that caused conary to segfault while creating changesets under
+      python 2.6 has been fixed. (CNY-3033)
 
 Changes in 2.0.28:
   o New Features:

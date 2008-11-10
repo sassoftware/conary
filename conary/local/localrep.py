@@ -93,10 +93,10 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	if oldFileId:
             self.removeFile(pathId, oldFileId)
 
-    def addFileContents(self, sha1, newVer, fileContents, restoreContents,
+    def addFileContents(self, sha1, fileContents, restoreContents,
 			isConfig, precompressed = False):
 	if isConfig:
-	    repository.ChangeSetJob.addFileContents(self, sha1, newVer, 
+	    repository.ChangeSetJob.addFileContents(self, sha1,
 			     fileContents, restoreContents, isConfig, 
                              precompressed = precompressed)
 

@@ -251,7 +251,6 @@ class TroveStore:
 
     def addTrove(self, trv, hidden = False):
 	cu = self.db.cursor()
-        schema.resetTable(cu, 'tmpNewFiles')
         schema.resetTable(cu, 'tmpNewRedirects')
 	return (cu, trv, hidden, [])
 
@@ -326,7 +325,7 @@ class TroveStore:
     # 1. Update existing fileIds
     # 2. Insert new fileIds with non-NULL streams
     # 3. Insert new fileIds that might have NULL streams.
-    def _addTroveNewFiles(self, cu, troveInstanceId):
+    def _mergeTroveNewFiles(self, cu):
         # We split these steps into separate queries because most DB
         # backends I have tried will get the optimization of a single
         # query wrong --gafton
@@ -402,7 +401,7 @@ class TroveStore:
 
         # create the TroveFiles links for this trove's files.
         cu.execute(""" insert into TroveFiles (instanceId, streamId, versionId, filePathId)
-        select %d, fs.streamId, tnf.versionId, fp.filePathId
+        select tnf.instanceId, fs.streamId, tnf.versionId, fp.filePathId
         from tmpNewFiles as tnf
         join Dirnames as d on tnf.dirname = d.dirname
         join Basenames as b on tnf.basename = b.basename
@@ -411,72 +410,110 @@ class TroveStore:
             fp.dirnameId = d.dirnameId and
             fp.basenameId = b.basenameId
         join FileStreams as fs on tnf.fileId = fs.fileId
-        """ % (troveInstanceId,))
+        """)
 
-    def _addTroveNewTroves(self, cu, troveInstanceId, troveType):
+    def _mergeIncludedTroves(self, cu):
         # need to use self.items.addId to keep the CheckTroveCache in
         # sync for any new items we might add
         cu.execute("""
-        SELECT DISTINCT tmpTroves.item
-        FROM tmpTroves
+        INSERT INTO Items (item)
+        SELECT DISTINCT tmpTroves.item FROM tmpTroves
         LEFT JOIN Items USING (item)
-        WHERE Items.itemId is NULL
+        WHERE
+            Items.item is NULL
         """)
-        for (newItem,) in cu.fetchall():
-            self.items.addId(newItem)
 
-        # look for included troves with no instances yet; we make those
-        # entries manually here
         cu.execute("""
-        SELECT Items.itemId, tmpTroves.frozenVersion, Flavors.flavorId
+        INSERT INTO Versions (version)
+        SELECT DISTINCT tmpTroves.version FROM tmpTroves
+        LEFT JOIN Versions USING (version)
+        WHERE
+            Versions.version is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Branches (branch)
+        SELECT DISTINCT tmpTroves.branch FROM tmpTroves
+        LEFT JOIN Branches USING (branch)
+        WHERE
+            Branches.branch is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Labels (label)
+        SELECT DISTINCT tmpTroves.label FROM tmpTroves
+        LEFT JOIN Labels USING (label)
+        WHERE
+            Labels.label is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Nodes(itemId, branchId, versionId, timestamps,
+                          finalTimestamp)
+        SELECT DISTINCT Items.itemId, Branches.branchId, Versions.versionId,
+                        tmpTroves.timeStamps, tmpTroves.finalTimestamp
+        FROM tmpTroves
+        JOIN Items USING (item)
+        JOIN Versions ON Versions.version = tmpTroves.version
+        JOIN Branches ON Branches.branch = tmpTroves.branch
+        LEFT JOIN Nodes ON
+            Items.itemId = Nodes.itemId AND
+            Versions.versionId = Nodes.versionId
+        WHERE
+            Nodes.nodeId is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO LabelMap(itemId, branchId, labelId)
+        SELECT DISTINCT Items.itemId, Branches.branchId, Labels.labelId
+        FROM tmpTroves
+        JOIN Items USING (item)
+        JOIN Branches ON Branches.branch = tmpTroves.branch
+        JOIN Labels ON Labels.label = tmpTroves.label
+        LEFT JOIN LabelMap ON
+            Items.itemId = LabelMap.itemId AND
+            Branches.branchId = LabelMap.branchId AND
+            Labels.labelId = LabelMap.labelId
+        WHERE
+            LabelMap.itemId is NULL
+        """)
+
+        cu.execute("""
+        INSERT INTO Instances (itemId, versionId, flavorId, isPresent,
+                               troveType)
+        SELECT DISTINCT Items.itemId, Versions.versionId, flavors.flavorId, ?,
+               tmpTroves.troveType
         FROM tmpTroves
         JOIN Items USING (item)
         JOIN Flavors ON Flavors.flavor = tmpTroves.flavor
-        LEFT JOIN Versions ON Versions.version = tmpTroves.version
+        JOIN Versions ON Versions.version = tmpTroves.version
         LEFT JOIN Instances ON
             Items.itemId = Instances.itemId AND
             Versions.versionId = Instances.versionId AND
             Flavors.flavorId = Instances.flavorId
-        WHERE Instances.instanceId is NULL
-        """)
+        WHERE
+            Instances.instanceId is NULL
+        """, instances.INSTANCE_PRESENT_MISSING)
 
-        for (itemId, version, flavorId) in cu.fetchall():
-	    # make sure the versionId and nodeId exists for this (we need
-	    # a nodeId, or the version doesn't get timestamps)
-            version = versions.ThawVersion(version)
-	    versionId = self.getVersionId(version)
-
-            # sourcename = None for now.
-            # will be fixed up when the real trove is comitted
-	    if versionId is not None:
-		nodeId = self.versionOps.nodes.getRow(itemId, versionId, None)
-		if nodeId is None:
-		    (nodeId, versionId) = self.versionOps.createVersion(
-                        itemId, version, flavorId, sourceName = None)
-		del nodeId
-            else:
-                (nodeId, versionId) = self.versionOps.createVersion(
-                    itemId, version, flavorId, sourceName = None)
-            # create the new instanceId entry.
-            # cloneFromId = None for now.
-            # will get fixed when the trove is comitted.
-            # We actually don't quite care about the exact instanceId value we get back...
-            self.getInstanceId(itemId, versionId, flavorId,
-                               clonedFromId = None, troveType =  troveType,
-                               isPresent = instances.INSTANCE_PRESENT_MISSING)
-
+        schema.resetTable(cu, 'tmpGroupInsertShim')
         cu.execute("""
-        INSERT INTO TroveTroves (instanceId, includedId, flags)
-        SELECT %d, Instances.instanceId, tmpTroves.flags
+        INSERT INTO tmpGroupInsertShim (itemId, versionId, flavorId, flags, instanceId)
+        SELECT itemId, versionId, flavorId, flags, instanceId
         FROM tmpTroves
         JOIN Items USING (item)
         JOIN Versions ON Versions.version = tmpTroves.version
         JOIN Flavors ON Flavors.flavor = tmpTroves.flavor
+        """)
+
+        cu.execute("""
+        INSERT INTO TroveTroves (instanceId, includedId, flags)
+        SELECT tmpGroupInsertShim.instanceId, Instances.instanceId, flags
+        FROM tmpGroupInsertShim
         JOIN Instances ON
-            Items.itemId = Instances.itemId AND
-            Versions.versionId = Instances.versionId AND
-            Flavors.flavorId = Instances.flavorId
-        """ %(troveInstanceId,))
+            tmpGroupInsertShim.itemId = Instances.itemId AND
+            tmpGroupInsertShim.versionId = Instances.versionId AND
+            tmpGroupInsertShim.flavorId = Instances.flavorId
+        """)
 
     def addTroveDone(self, troveInfo, mirror=False):
         (cu, trv, hidden, newFilesInsertList) = troveInfo
@@ -539,11 +576,12 @@ class TroveStore:
 
         # Fold tmpNewFiles into FileStreams
         if len(newFilesInsertList):
-            self.db.bulkload("tmpNewFiles", newFilesInsertList,
+            self.db.bulkload("tmpNewFiles",
+                             [ x + (troveInstanceId,) for x in
+                                    newFilesInsertList ],
                              [ "pathId", "versionId", "fileId", "stream",
-                               "dirname", "basename", "sha1" ])
-            self.db.analyze("tmpNewFiles")
-            self._addTroveNewFiles(cu, troveInstanceId)
+                               "dirname", "basename", "sha1", "instanceId" ])
+            #self.db.analyze("tmpNewFiles")
 
         # iterate over both strong and weak troves, and set weakFlag to
         # indicate which kind we're looking at when
@@ -565,13 +603,20 @@ class TroveStore:
             assert(not isPackage or version == trv.getVersion())
             assert(not isPackage or flavor == trv.getFlavor())
             insertList.append((name, str(version), version.freeze(),
-                               flavor.freeze(), flags))
+                               ":".join(["%.3f" % x for x in
+                                            version.timeStamps()]),
+                               '%.3f' %version.timeStamps()[-1],
+                               str(version.branch()),
+                               str(version.trailingLabel()),
+                               flavor.freeze(), flags, troveInstanceId,
+                               trv.getType()))
+
         if len(insertList):
-            schema.resetTable(cu, 'tmpTroves')
             self.db.bulkload("tmpTroves", insertList, [
-                "item", "version", "frozenVersion", "flavor", "flags" ])
-            self.db.analyze("tmpTroves")
-            self._addTroveNewTroves(cu, troveInstanceId, trv.getType())
+                "item", "version", "frozenVersion", "timestamps",
+                "finalTimestamp",
+                "branch", "label", "flavor", "flags", "instanceId",
+                "troveType"])
 
         # process troveInfo and metadata...
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
@@ -623,6 +668,16 @@ class TroveStore:
         JOIN Branches ON tmpNewRedirects.branch = Branches.branch
         LEFT JOIN Flavors ON tmpNewRedirects.flavor = Flavors.flavor
         """ % troveInstanceId)
+
+    def addTroveSetStart(self):
+        cu = self.db.cursor()
+        schema.resetTable(cu, 'tmpTroves')
+        schema.resetTable(cu, 'tmpNewFiles')
+
+    def addTroveSetDone(self):
+        cu = self.db.cursor()
+        self._mergeIncludedTroves(cu)
+        self._mergeTroveNewFiles(cu)
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
                     urls, licenses, categories, source, language):
