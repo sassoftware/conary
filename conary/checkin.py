@@ -1149,16 +1149,16 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
 	print "%s: removed" % path
 
 @api.developerApi
-def logUpdateSrc(repos, versionList = None, callback = None):
+def updateSrc(repos, versionList = None, callback = None):
     try:
-        return updateSrc(repos, versionList, callback)
+        return nologUpdateSrc(repos, versionList, callback)
     except builderrors.UpToDate, e:
         e.logInfo()
     except builderrors.CheckinError, e:
         e.logError()
 
 @api.developerApi
-def updateSrc(repos, versionList = None, callback = None):
+def nologUpdateSrc(repos, versionList = None, callback = None):
     if not versionList:
         updateSpecs = [ (os.getcwd(), None) ]
     else:
