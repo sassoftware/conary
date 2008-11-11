@@ -976,7 +976,7 @@ class UpdateCommand(CvcCommand):
         if argSet: return self.usage()
 
         kwargs = {'callback': callback}
-        checkin.updateSrc(repos, versionList = args, **kwargs)
+        checkin.logUpdateSrc(repos, versionList = args, **kwargs)
 _register(UpdateCommand)
 
 class FactoryCommand(CvcCommand):

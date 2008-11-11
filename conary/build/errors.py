@@ -12,6 +12,7 @@
 # full details.
 #
 from conary.errors import CvcError
+from conary.lib import log
 
 class RecipeFileError(CvcError):
     pass
@@ -131,3 +132,47 @@ class MacroKeyError(KeyError):
 class MirrorError(CvcError):
     pass
 
+class CheckinError(CvcError):
+    'Checkin Error'
+    def __init__(self, *a):
+        cls = self.__class__
+        self.msg = cls.__doc__ % a
+        CvcError.__init__(self, *a)
+
+    def __str__(self):
+        return self.msg
+
+    def _log(self, logger):
+        logger(str(self))
+
+    def logError(self): self._log(log.error)
+    def logInfo(self): self._log(log.info)
+    #def logWarning(self): self._log(log.warning) # Not currently used
+    #def logDebug(self): self._log(log.debug) # Not currently used
+
+class CheckinErrorList(CheckinError):
+    '''The followin errors occurred:\n'''
+    def __init__(self, errlist):
+        self.errlist = errlist
+        assert isinstance(errlist, (tuple, list)), 'Invalid arguments for %s' % self.__name__
+        assert len(errlist) > 0, 'This exception should not be raised with an empty list'
+        CheckinError.__init__(self)
+
+    def _log(self, logger):
+        for x in self.errlist:
+            logger(x)
+
+class UpToDate(CheckinError):
+    'working directory %s is already based on head of branch'
+
+class NotCheckedInError(CheckinError):
+    "cannot update source directory for package '%s' - it was created with newpkg and has never been checked in."
+
+class MultipleSourceVersions(CheckinError):
+    "%s specifies multiple versions"
+
+class NoSuchSourceVersion(CheckinError):
+    "unable to find source component %s with version %s"
+
+class NoSourceTroveFound(CheckinError):
+    "cannot find source trove: %s"
