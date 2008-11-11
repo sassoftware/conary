@@ -1147,7 +1147,16 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
     for pathId in troveCs.getOldFileList():
 	path = oldTrove.getFile(pathId)[0]
 	print "%s: removed" % path
-	
+
+@api.developerApi
+def logUpdateSrc(repos, versionList = None, callback = None):
+    try:
+        return updateSrc(repos, versionList, callback)
+    except builderrors.UpToDate, e:
+        e.logInfo()
+    except builderrors.CheckinError, e:
+        e.logError()
+
 @api.developerApi
 def updateSrc(repos, versionList = None, callback = None):
     if not versionList:
@@ -1176,8 +1185,7 @@ def updateSrc(repos, versionList = None, callback = None):
         conaryState = ConaryStateFromFile(targetDir + "/CONARY", repos)
         state = conaryState.getSourceState()
         if state.getVersion() == versions.NewVersion():
-            log.error("cannot update source directory for package '%s' - it was created with newpkg and has never been checked in." % state.getName())
-            return
+            raise builderrors.NotCheckedInError(state.getName())
 
         updateSpecs[i] = (targetDir, versionStr, state)
 
@@ -1197,11 +1205,10 @@ def updateSrc(repos, versionList = None, callback = None):
             headVersion = r[state.getName()].keys()[0]
             newBranch = None
             if headVersion == state.getVersion():
-                log.info("working directory %s is already based on head of "
-                         "branch", targetDir)
-                return
+                raise builderrors.UpToDate(targetDir)
 
             if headVersion.branch() != state.getBranch():
+                #TODO: Get rid of this API level logging
                 log.info("switching directory %s to branch %s", targetDir,
                          headVersion.branch())
                 newBranch = headVersion.branch()
@@ -1215,19 +1222,15 @@ def updateSrc(repos, versionList = None, callback = None):
         try:
             matches = repos.findTroves(None, q)
         except errors.TroveNotFound, e:
-            log.error('cannot find source trove: %s' % str(e))
-            return
+            raise builderrors.NoSourceTroveFound(str(e))
 
         for i, (targetDir, versionStr, state) in specificVersions:
             l = matches[(state.getName(), state.expandVersionStr(versionStr),
                          None)]
             if len(l) > 1:
-                log.error("%s specifies multiple versions" % versionStr)
-                return
+                raise builderrors.MultipleSourceVersions(versionStr)
             elif not len(l):
-                log.error("Unable to find source component %s with version %s"
-                          % (state.getName(), versionStr))
-                return
+                raise builderrors.NoSuchSourceVersion(state.getName(), versionStr)
 
             headVersion = l[0][1]
             newBranch = headVersion.branch()
@@ -1266,9 +1269,7 @@ def updateSrc(repos, versionList = None, callback = None):
                                                 merge = True))
         errList = fsJob.getErrorList()
         if errList:
-            for err in errList: log.error(err)
-            success = False
-            continue
+            raise builderrors.CheckinErrorList(errList)
 
         fsJob.apply()
         newPkgs = fsJob.iterNewTroveList()

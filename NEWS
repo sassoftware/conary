@@ -40,6 +40,8 @@ Changes in @NEW@:
       multiple repositories through the same url has been fixed. (CNY-3027)
     * A bug that caused conary to segfault while creating changesets under
       python 2.6 has been fixed. (CNY-3033)
+    * The API method updateSrc now raises exceptions instead of returning None
+      to indicate failure.  (CNY-3035)
 
 Changes in 2.0.28:
   o New Features:
