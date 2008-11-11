@@ -15,13 +15,15 @@
 from fnmatch import fnmatchcase
 import os
 
+from conary.build import defaultrecipes
 from conary.build.recipe import Recipe, RECIPE_TYPE_FILESET
+from conary.build.packagerecipe import BaseRequiresRecipe
 from conary import errors
 from conary.build import errors as builderrors
 from conary.build import macros
 from conary.lib import util
 
-class FilesetRecipe(Recipe):
+class _FilesetRecipe(Recipe):
     _recipeType = RECIPE_TYPE_FILESET
     internalAbstractBaseClass = 1
 
@@ -154,3 +156,4 @@ class FilesetRecipe(Recipe):
         self.requestedFiles = {}
 
 
+exec defaultrecipes.FilesetRecipe

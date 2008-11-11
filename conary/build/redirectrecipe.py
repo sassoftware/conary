@@ -14,9 +14,11 @@
 from conary import trove, versions
 from conary.deps import deps
 from conary.build import errors as builderrors
+from conary.build import defaultrecipes
 from conary.build import macros
 from conary.build import use
 from conary.build.recipe import Recipe, RECIPE_TYPE_REDIRECT
+from conary.build.packagerecipe import BaseRequiresRecipe
 from conary.lib import log
 
 class _Redirect(object):
@@ -99,7 +101,7 @@ class _RedirectRule(object):
         self.skipTargetMatching = skipTargetMatching
         self.allowMultipleTargets = allowMultipleTargets
 
-class RedirectRecipe(Recipe):
+class _RedirectRecipe(Recipe):
     Flags = use.LocalFlags
     _recipeType = RECIPE_TYPE_REDIRECT
     internalAbstractBaseClass = 1
@@ -403,4 +405,4 @@ class RedirectRecipe(Recipe):
             self.branch = None
         self.rules = {}
 
-
+exec defaultrecipes.RedirectRecipe

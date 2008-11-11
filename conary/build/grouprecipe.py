@@ -14,6 +14,7 @@
 import copy
 from itertools import chain, izip
 
+from conary.build import defaultrecipes
 from conary.build import policy
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP, loadMacros
 from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
@@ -22,6 +23,7 @@ from conary.build.errors import GroupAddAllError, GroupImplicitReplaceError
 from conary.build.errors import GroupUnmatchedReplaces, GroupUnmatchedRemoves
 from conary.build.errors import GroupUnmatchedGlobalReplaces
 from conary.build import macros
+from conary.build.packagerecipe import BaseRequiresRecipe
 from conary.build import trovefilter
 from conary.build import use
 from conary import conaryclient
@@ -58,6 +60,7 @@ class _BaseGroupRecipe(Recipe):
     internalAbstractBaseClass = 1
     internalPolicyModules = ('grouppolicy',)
     basePolicyClass = policy.GroupPolicy
+    _recipeType = RECIPE_TYPE_GROUP
 
     def __init__(self, laReposCache = None, srcdirs = None,
                  lightInstance = None):
@@ -124,131 +127,9 @@ class _BaseGroupRecipe(Recipe):
 
 
 
-class GroupRecipe(_BaseGroupRecipe):
-    """
-    NAME
-    ====
-
-    B{C{r.GroupRecipe()}} - Provides the recipe interface for creating a group.
-
-    SYNOPSIS
-    ========
-
-    See USER COMMANDS Section
-
-    DESCRIPTION
-    ===========
-    The C{r.GroupRecipe} class provides the interface for creation of groups
-    in a Conary recipe.  A group refers to a collection of troves; the troves
-    may be related in purpose to provide a useful functionality, such as a
-    group of media-related troves to provide encoding, decoding, and playback
-    facilities for various media, for example.  Groups are not required to
-    consist of troves with related functionality however, and may contain a
-    collection of any arbitrary troves.
-
-    Most C{r.GroupRecipe} user commands accept a B{groupName}
-    parameter. This parameter  specifies the group a particular command
-    applies to. For example, C{r.add('foo', groupName='group-bar')}
-    attempts to add the trove I{foo} to the group I{group-bar}.
-
-    The group specified by B{groupName} must exist, or be created before
-    troves may be added to it. The B{groupName} parameter may also be a list
-    of groups in which case the command will be applied to all groups.  If
-    B{groupName} is not specified, or is None, then the command will apply to
-    the current default group.
-
-    PARAMETERS
-    ==========
-    Several parameters may be set at the time of group creation.  Although
-    these parameters are typically passed to C{r.createGroup()} for the
-    base group, they should be set as variables in the recipe class.
-
-    Note: Setting these parameters affects not only the value for the base
-    group, but also the default value for all newly created groups. For
-    example, if B{autoResolve} is set to C{True} in the base group, all other
-    groups created will have autoResolve set to C{True} by default.
-    B{imageGroup} is an exception to this rule; it will not propogate to
-    sub groups.
-
-    The following parameters are accepted by C{r.GroupRecipe} with default
-    values indicated in parentheses when applicable:
-
-    B{depCheck} : (False) If set to C{True}, Conary will check for dependency
-    closure in this group, and raise an error if closure is not found.
-
-    B{autoResolve} : (False) If set to C{True}, Conary will include any extra
-    troves needed to make this group dependency complete.
-
-    B{checkOnlyByDefaultDeps} : (True) Conary only checks the
-    dependencies of troves that are installed by default, referenced in the
-    group.  If set to C{False}, Conary will also check the dependencies of
-    B{byDefault} C{False} troves.  Doing this, however, will prevent groups
-    with C{autoResolve}=C{True} from changing the C{byDefault} status of
-    required troves.
-
-    B{checkPathConflicts} : (True) Conary checks for path conflicts in each
-    group by default to ensure that the group can be installed without path
-    conflicts.  Setting this parameter to C{False} will disable the check.
-
-    B{imageGroup} | (True) Indicates that this group defines a complete,
-    functioning system, as opposed to a group representing a system
-    component or a collection of multiple groups that might or might not
-    collectively define a complete, functioning system.
-    Image group policies will be executed separately for each image group.
-    This setting is recorded in the troveInfo for the group. This setting
-    does not propogate to subgroups.
-
-    USER COMMANDS
-    =============
-    The following user commands are applicable in Conary group recipes:
-
-        - L{add} : Adds a trove to a group
-
-        - L{addAll} : Add all troves directly contained in a given reference
-        to groupName
-
-        - L{addNewGroup} : Adds one newly created group to another newly
-        created group
-
-        - L{addReference} : (Deprecated) Adds a reference to a trove
-
-        - L{createGroup} : Creates a new group
-
-        - L{copyComponents}: Add components to one group by copying them
-        from the components in another group
-
-        - L{moveComponents}: Add components to one group, removing them
-        from the other in the process.
-
-        - L{remove} : Removes a trove
-
-        - L{removeComponents} : Define components which should not be
-        installed
-
-        - L{removeItemsAlsoInGroup}: removes troves in the group specified
-        that are also in the current group
-
-        - L{removeItemsAlsoInNewGroup}: removes troves in the group specified
-        that are also in the current group
-
-        - L{Requires} : Defines a runtime requirement for group
-
-        - L{requireLatest} : Raise an error if add* commands resolve to older
-        trove than the latest on branch. This can occur when a flavor of
-        a trove exists that is not the latest version.
-
-        - L{replace} : Replace troves
-
-        - L{setByDefault} : Set troves to be added to group by default
-
-        - L{setDefaultGroup} : Defines default group
-
-        - L{setSearchPath} : Specify the searchPath to search for troves
-
-    """
+class _GroupRecipe(_BaseGroupRecipe):
     Flags = use.LocalFlags
     internalAbstractBaseClass = 1
-    _recipeType = RECIPE_TYPE_GROUP
 
     depCheck = False
     autoResolve = None
@@ -3348,3 +3229,4 @@ def _findTroves(repos, toFind, labelPath, searchFlavor, defaultSource):
             raise CookError, str(e)
     return results
 
+exec defaultrecipes.GroupRecipe

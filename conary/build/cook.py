@@ -456,6 +456,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
                                alwaysBumpCount = alwaysBumpCount,
                                requireCleanSources = requireCleanSources,
                                callback = callback,
+                               ignoreDeps = ignoreDeps,
                                groupOptions=groupOptions)
         needsSigning = True
     else:
@@ -494,14 +495,16 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
                                   sourceVersion,
                                   macros = macros, 
                                   targetLabel = targetLabel,
-                                  alwaysBumpCount = alwaysBumpCount)
+                                  alwaysBumpCount = alwaysBumpCount,
+                                  ignoreDeps = ignoreDeps)
             needsSigning = True
         elif type == recipe.RECIPE_TYPE_FILESET:
             ret = cookFilesetObject(repos, db, cfg, recipeClass, 
                                     sourceVersion, buildFlavor,
                                     macros = macros, 
                                     targetLabel = targetLabel,
-                                    alwaysBumpCount = alwaysBumpCount)
+                                    alwaysBumpCount = alwaysBumpCount,
+                                    ignoreDeps = ignoreDeps)
             needsSigning = True
         else:
             raise AssertionError
@@ -528,7 +531,8 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     return built
 
 def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
-		    targetLabel = None, alwaysBumpCount=False):
+		    targetLabel = None, alwaysBumpCount=False,
+                    ignoreDeps = False):
     """
     Turns a redirect recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -558,7 +562,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
     # needed to take care of branched troves
     binaryBranch = sourceVersion.getBinaryVersion().branch()
     recipeObj = recipeClass(repos, cfg, binaryBranch, cfg.flavor, macros)
-
+    recipeObj.checkBuildRequirements(cfg, sourceVersion,
+                                     raiseError=not ignoreDeps)
     use.track(True)
     _callSetup(cfg, recipeObj)
     recipeObj.findTroves()
@@ -581,6 +586,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
                                 flavors, targetLabel, 
                                 alwaysBumpCount=alwaysBumpCount)
 
+    buildReqs = recipeObj.getRecursiveBuildRequirements(db, cfg)
+
     redirList = []
     childList = []
     troveList = []
@@ -589,6 +596,7 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
                             None, type = trove.TROVE_TYPE_REDIRECT)
 
         redirList.append(redir.getNameVersionFlavor())
+        redir.setBuildRequirements(buildReqs)
 
         for redirSpec in redirSpecList:
             for subName in redirSpec.components:
@@ -619,7 +627,8 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
 def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                      targetLabel = None, alwaysBumpCount=False, 
                      callback = callbacks.CookCallback(),
-                     requireCleanSources = False, groupOptions=None):
+                     requireCleanSources = False, groupOptions=None,
+                     ignoreDeps = False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -678,6 +687,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                                 buildFlavor, lcache, srcdirs, macros)
         recipeObj.populateLcache()
+        recipeObj.checkBuildRequirements(cfg, sourceVersion,
+                                         raiseError=not ignoreDeps)
 
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
@@ -722,14 +733,17 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
                             groupFlavors)
     buildTime = time.time()
 
+
     built = []
     for recipeObj, grpFlavor in builtGroups:
+        buildReqs = recipeObj.getRecursiveBuildRequirements(db, cfg)
+
         troveList = []
         for group in recipeObj.iterGroupList():
             groupName = group.name
             grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
             grpTrv.setRequires(group.getRequires())
-
+            grpTrv.setBuildRequirements(buildReqs)
             provides = deps.DependencySet()
             provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
             grpTrv.setProvides(provides)
@@ -812,7 +826,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
-                      macros={}, targetLabel = None, alwaysBumpCount=False):
+                      macros = {}, targetLabel = None, alwaysBumpCount = False,
+                      ignoreDeps = False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -841,6 +856,8 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
                             buildFlavor, macros)
+    recipeObj.checkBuildRequirements(cfg, sourceVersion,
+                                     raiseError=not ignoreDeps)
     _callSetup(cfg, recipeObj)
 
     log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -877,10 +894,12 @@ def cookFilesetObject(repos, db, cfg, recipeClass, sourceVersion, buildFlavor,
     targetVersion = nextVersion(repos, db, fullName, sourceVersion, flavor, 
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
 
+    buildReqs = recipeObj.getRecursiveBuildRequirements(db, cfg)
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
     provides = deps.DependencySet()
     provides.addDep(deps.TroveDependencies, deps.Dependency(fullName))
     fileset.setProvides(provides)
+    fileset.setBuildRequirements(buildReqs)
 
     for (pathId, path, version, fileId, isConfig) in l:
 	fileset.addFile(pathId, path, version, fileId)

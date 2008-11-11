@@ -4,6 +4,8 @@ Changes in @NEW@:
       providing a revision now requires the --revision argument, to
       differentiate revisions from files. (CNY-2384)
     * Added --build-log and --show-file parameters to conary rq. (CNY-2584)
+    * Group, Fileset, and Redirect recipes now check and record build 
+      requirements. (CNY-3016)
 
   o Client Changes:
     * Support for obtaining changeset fingerprints has been added to

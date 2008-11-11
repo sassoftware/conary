@@ -268,6 +268,8 @@ class RecipeAction(Action):
         # Add the trove requirements
         suggests.update(self._actionTroveBuildRequires)
         # Tell reportExcessBuildRequires that all these are necessary
+        if not hasattr(self.recipe, 'reportExcessBuildRequires'):
+            return
         self.recipe.reportExcessBuildRequires(suggests)
         # Remove build requires that were already added
         suggests = suggests - set(buildRequires)

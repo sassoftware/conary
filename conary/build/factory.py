@@ -45,7 +45,9 @@ class Factory:
     def openSourceFile(self, path):
         return self._openSourceFileFn(path)
 
-FactoryRecipe = '''class FactoryRecipe(BaseRequiresRecipe):
+FactoryRecipe = '''
+from conary.build import recipe
+class FactoryRecipe(AbstractPackageRecipe, BaseRequiresRecipe):
     name = '%(name)s'
     version = '%(version)s'
     abstractBaseClass = True
@@ -56,13 +58,13 @@ FactoryRecipe = '''class FactoryRecipe(BaseRequiresRecipe):
 
     def __init__(r, *arg, **kw):
         assert(r.originalFactoryClass is not None, 'You must set the originalFactoryClass before creating the FactoryRecipe object')
-        BaseRequiresRecipe.__init__(r, *arg, **kw)
+        AbstractPackageRecipe.__init__(r, *arg, **kw)
 
     def setup(r):
         pass
 
     def setupAbstractBaseClass(r):
-        BaseRequiresRecipe.setupAbstractBaseClass(r)
+        AbstractPackageRecipe.setupAbstractBaseClass(r)
         ofc = r.originalFactoryClass
         # getAdditionalSourceFiles has to be a static or class
         # method

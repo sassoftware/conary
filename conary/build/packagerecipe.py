@@ -27,10 +27,8 @@ from conary.build import errors
 from conary.build import macros
 from conary.build import policy
 from conary.build import use
-from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log, magic, util
-from conary.local import database
 
 from conary.repository import errors as repoerrors
 
@@ -99,9 +97,8 @@ def _clearReqs(attrName, reqs):
     # get a list of all classes that are derived from AbstractPackageRecipe
     classes = []
     for value in callerGlobals.itervalues():
-        if inspect.isclass(value) and issubclass(value, Recipe):
-            if 'AbstractPackageRecipe' in [x.__name__ for x in value.mro()]:
-                classes.append(value)
+        if inspect.isclass(value) and hasattr(value, attrName):
+            classes.append(value)
 
     # define a convenience function for removing buildReqs from a list
     # or clearing them.
@@ -120,9 +117,8 @@ def _clearReqs(attrName, reqs):
         _removePackages(class_, reqs)
 
         for base in inspect.getmro(class_):
-            if issubclass(base, Recipe) and base not in classes:
-                if 'AbstractPackageRecipe' in [x.__name__ for x in base.mro()]:
-                    _removePackages(base, reqs)
+            if hasattr(base, attrName):
+                _removePackages(base, reqs)
 
 crossFlavor = deps.parseFlavor('cross')
 def getCrossCompileSettings(flavor):
@@ -137,10 +133,6 @@ def getCrossCompileSettings(flavor):
     return None, targetFlavor, isCrossTool
 
 class AbstractPackageRecipe(Recipe):
-    buildRequires = []
-    crossRequires = []
-    buildRequirementsOverride = None
-    crossRequirementsOverride = None
     _derivedFrom = []
 
     Flags = use.LocalFlags
@@ -150,20 +142,6 @@ class AbstractPackageRecipe(Recipe):
     _recipeType = RECIPE_TYPE_PACKAGE
     internalPolicyModules = ( 'destdirpolicy', 'packagepolicy')
     basePolicyClass = policy.Policy
-
-    def validate(self):
-        # wait to check build requires until the object is instantiated
-        # so that we can include all of the parent classes' buildreqs
-        # in the check
-
-        for buildRequires in self.buildRequires:
-            (n, vS, f) = cmdline.parseTroveSpec(buildRequires)
-            if n.count(':') > 1:
-                raise RecipeFileError("Build requirement '%s' cannot have two colons in its name" % (buildRequires))
-
-            # we don't allow full version strings or just releases
-            if vS and vS[0] not in ':@':
-                raise RecipeFileError("Unsupported buildReq format %s" % buildRequires)
 
     def mainDir(self, new=None, explicit=True):
 	if new:
@@ -181,228 +159,6 @@ class AbstractPackageRecipe(Recipe):
     def cleanup(self, builddir, destdir):
 	if self.cfg.cleanAfterCook:
 	    util.rmtree(builddir)
-
-    def checkBuildRequirements(self, cfg, sourceVersion, raiseError=True):
-        """ Checks to see if the build requirements for the recipe
-            are installed
-        """
-        def _filterBuildReqsByVersionStr(versionStr, troves):
-            if not versionStr:
-                return troves
-
-            versionMatches = []
-            if versionStr.find('@') == -1:
-                if versionStr.find(':') == -1:
-                    log.warning('Deprecated buildreq format.  Use '
-                                ' foo=:tag, not foo=tag')
-                    versionStr = ':' + versionStr
-
-
-
-
-            for trove in troves:
-                labels = trove.getVersion().iterLabels()
-                if versionStr[0] == ':':
-                    branchTag = versionStr[1:]
-                    branchTags = [ x.getLabel() for x in labels ]
-                    if branchTag in branchTags:
-                        versionMatches.append(trove)
-                else:
-                    # versionStr must begin with an @
-                    branchNames = []
-                    for label in labels:
-                        branchNames.append('@%s:%s' % (label.getNamespace(),
-                                                       label.getLabel()))
-                    if versionStr in branchNames:
-                        versionMatches.append(trove)
-            return versionMatches
-
-        def _filterBuildReqsByFlavor(flavor, troves):
-            troves.sort(key = lambda x: x.getVersion())
-            if flavor is None:
-                # get latest
-                return troves[-1]
-            for trove in troves:
-                troveFlavor = trove.getFlavor()
-                if troveFlavor.stronglySatisfies(flavor):
-                    return trove
-
-        def _matchReqs(reqList, db):
-            reqMap = {}
-            missingReqs = []
-            for buildReq in reqList:
-                (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
-                # XXX move this to use more of db.findTrove's features, instead
-                # of hand parsing
-                troves = db.trovesByName(name)
-                troves = db.getTroves(troves)
-
-                versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
-
-                if not versionMatches:
-                    missingReqs.append(buildReq)
-                    continue
-                match = _filterBuildReqsByFlavor(flavor, versionMatches)
-                if match:
-                    reqMap[buildReq] = match
-                else:
-                    missingReqs.append(buildReq)
-            return reqMap, missingReqs
-
-
-	db = database.Database(cfg.root, cfg.dbPath)
-
-
-        if self.needsCrossFlags() and self.crossRequires:
-            if not self.macros.sysroot:
-                err = ("cross requirements needed but %(sysroot)s undefined")
-                if raiseError:
-                    log.error(err)
-                    raise errors.RecipeDependencyError(err)
-                else:
-                    log.warning(err)
-                    self.buildReqMap = {}
-                    self.ignoreDeps = True
-                    return
-
-            if self.cfg.root != '/':
-                sysroot = self.cfg.root + self.macros.sysroot
-            else:
-                sysroot = self.macros.sysroot
-            if not os.path.exists(sysroot):
-                err = ("cross requirements needed but sysroot (%s) does not exist" % (sysroot))
-                if raiseError:
-                    raise errors.RecipeDependencyError(err)
-                else:
-                    log.warning(err)
-                    self.buildReqMap = {}
-                    self.ignoreDeps = True
-                    return
-
-            else:
-                crossDb = database.Database(sysroot, cfg.dbPath)
-        time = sourceVersion.timeStamps()[-1]
-
-        reqMap, missingReqs = _matchReqs(self.buildRequires, db)
-        if self.needsCrossFlags() and self.crossRequires:
-            crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
-                                                       crossDb)
-        else:
-            missingCrossReqs = []
-            crossReqMap = {}
-
-        if missingReqs or missingCrossReqs:
-            if missingReqs:
-                err = ("Could not find the following troves "
-                       "needed to cook this recipe:\n"
-                       "%s" % '\n'.join(sorted(missingReqs)))
-                if missingCrossReqs:
-                    err += '\n'
-            else:
-                err = ''
-            if missingCrossReqs:
-                err += ("Could not find the following cross requirements"
-                        " (that must be installed in %s) needed to cook this"
-                        " recipe:\n"
-                        "%s" % (sysroot, '\n'.join(sorted(missingCrossReqs))))
-            if raiseError:
-                log.error(err)
-                raise errors.RecipeDependencyError(
-                                            'unresolved build dependencies')
-            else:
-                log.warning(err)
-        self.buildReqMap = reqMap
-        self.crossReqMap = crossReqMap
-        self.ignoreDeps = not raiseError
-
-    def _getTransitiveDepClosure(self, targets=None):
-        def isTroveTarget(trove):
-            if targets is None:
-                return True
-            return trove.getName() in targets
-
-	db = database.Database(self.cfg.root, self.cfg.dbPath)
-        
-        reqList =  [ req for req in self.getBuildRequirementTroves(db)
-                     if isTroveTarget(req) ]
-        reqNames = set(req.getName() for req in reqList)
-        depSetList = [ req.getRequires() for req in reqList ]
-        d = db.getTransitiveProvidesClosure(depSetList)
-        for depSet in d:
-            reqNames.update(
-                set(troveTup[0] for troveTup in d[depSet]))
-
-        return reqNames
-
-    def _getTransitiveBuildRequiresNames(self):
-        if self.transitiveBuildRequiresNames is not None:
-            return self.transitiveBuildRequiresNames
-
-        self.transitiveBuildRequiresNames = self._getTransitiveDepClosure()
-        return self.transitiveBuildRequiresNames
-
-    def getBuildRequirementTroves(self, db):
-        if self.buildRequirementsOverride is not None:
-            return db.getTroves(self.buildRequirementsOverride,
-                                withFiles=False)
-        return self.buildReqMap.values()
-
-    def getCrossRequirementTroves(self):
-        if self.crossRequirementsOverride:
-            db = database.Database(self.cfg.root, self.cfg.dbPath)
-            return db.getTroves(self.crossRequirementsOverride,
-                                     withFiles=False)
-        return self.crossRequires.values()
-
-    def getRecursiveBuildRequirements(self, db, cfg):
-        if self.buildRequirementsOverride is not None:
-            return self.buildRequirementsOverride
-        buildReqs = self.getBuildRequirementTroves(db)
-        buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
-                        for x in buildReqs)
-        packageReqs = [ x for x in self.buildReqMap.itervalues() 
-                        if trove.troveIsCollection(x.getName()) ]
-        for package in packageReqs:
-            childPackages = [ x for x in package.iterTroveList(strongRefs=True,
-                                                               weakRefs=True) ]
-            hasTroves = db.hasTroves(childPackages)
-            buildReqs.update(x[0] for x in itertools.izip(childPackages,
-                                                          hasTroves) if x[1])
-        buildReqs = self._getRecursiveRequirements(db, buildReqs, cfg.flavor)
-        return buildReqs
-
-    def _getRecursiveRequirements(self, db, troveList, flavorPath):
-        # gets the recursive requirements for the listed packages
-        seen = set()
-        while troveList:
-            depSetList = []
-            for trv in db.getTroves(list(troveList), withFiles=False):
-                required = deps.DependencySet()
-                oldRequired = trv.getRequires()
-                [ required.addDep(*x) for x in oldRequired.iterDeps() 
-                  if x[0] != deps.AbiDependency ]
-                depSetList.append(required)
-            seen.update(troveList)
-            sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
-            troveList = set()
-            for depSetSols in sols.itervalues():
-                for depSols in depSetSols:
-                    bestChoices = []
-                    # if any solution for a dep is satisfied by the installFlavor
-                    # path, then choose the solutions that are satisfied as 
-                    # early as possible on the flavor path.  Otherwise return
-                    # all solutions.
-                    for flavor in flavorPath:
-                        bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
-                        if bestChoices:
-                            break
-                    if bestChoices:
-                        depSols = set(bestChoices)
-                    else:
-                        depSols = set(depSols)
-                    depSols.difference_update(seen)
-                    troveList.update(depSols)
-        return seen
 
     def processResumeList(self, resume):
 	resumelist = []
@@ -493,38 +249,6 @@ class AbstractPackageRecipe(Recipe):
     def disableParallelMake(self):
         self.macros._override('parallelmflags', '')
 
-    def setRepos(self, repos):
-        self._repos = repos
-    def getRepos(self):
-        return self._repos
-
-    def isatty(self, value=None):
-        if value is not None:
-            self._tty = value
-        return self._tty
-
-    def _setSubscribeLogPath(self, path):
-        self._subscribeLogPath = path
-
-    def getSubscribeLogPath(self):
-        return self._subscribeLogPath
-
-    def _setLogFile(self, logFile):
-        self._logFile = logFile
-        for pattern in self._subscribedPatterns:
-            logFile.subscribe(pattern)
-        self._subscribedPatterns = None
-
-    def subscribeLogs(self, pattern):
-        if self._logFile:
-            self._logFile.subscribe(pattern)
-        else:
-            self._subscribedPatterns.append(pattern)
-
-    def synchronizeLogs(self):
-        if self._logFile:
-            self._logFile.synchronize()
-
     def __delattr__(self, name):
 	"""
 	Allows us to delete policy items from their respective lists
@@ -554,39 +278,6 @@ class AbstractPackageRecipe(Recipe):
             del self.externalMethods[name]
             return
 	del self.__dict__[name]
-
-    def _includeSuperClassBuildReqs(self):
-        self._includeSuperClassItemsForAttr('buildRequires')
-
-    def _includeSuperClassCrossReqs(self):
-        self._includeSuperClassItemsForAttr('crossRequires')
-
-    def _includeSuperClassItemsForAttr(self, attr):
-        """ Include build requirements from super classes by searching
-            up the class hierarchy for buildRequires.  You can
-            override this currently only by calling
-            <superclass>.buildRequires.remove()
-        """
-        buildReqs = set()
-        superBuildReqs = set()
-        immediateSuper = True
-        for base in inspect.getmro(self.__class__):
-            thisClassReqs = getattr(base, attr, [])
-            buildReqs.update(thisClassReqs)
-            if base != self.__class__:
-                if immediateSuper:
-                    if (set(self._recipeRequirements[attr]) ==
-                        set(getattr(base, attr, []))):
-                        # requirements in recipe were inherited,
-                        # not explicitly specified, so report
-                        # them as if recipe explicitly contained
-                        # an empty list
-                        self._recipeRequirements[attr] = []
-                    # We have now inspected the immediate superclass
-                    immediateSuper = False
-                superBuildReqs.update(thisClassReqs)
-        setattr(self, attr, list(buildReqs))
-        self._recipeRequirements['%sSuper' %attr] = superBuildReqs
 
     def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
@@ -783,9 +474,6 @@ class AbstractPackageRecipe(Recipe):
         _setSiteConfig(self.macros, self.macros.hostmajorarch,
                        self.macros.hostos, setEnviron=True)
 
-    def needsCrossFlags(self):
-        return self._isCrossCompileTool or self._isCrossCompiling
-
     def isCrossCompiling(self):
         return self._isCrossCompiling
 
@@ -833,15 +521,6 @@ class AbstractPackageRecipe(Recipe):
         self._componentReqs = {}
         self._componentProvs = {}
         self._derivedFiles = {} # used only for derived packages
-        # Inspected only when it is important to know for reporting
-        # purposes what was specified in the recipe per se, and not
-        # in superclasses or in defaultBuildRequires
-        self._recipeRequirements = {
-            'buildRequires': list(self.buildRequires),
-            'crossRequires': list(self.crossRequires)
-        }
-        self._includeSuperClassBuildReqs()
-        self._includeSuperClassCrossReqs()
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
@@ -851,12 +530,8 @@ class AbstractPackageRecipe(Recipe):
 	self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
-        self.transitiveBuildRequiresNames = None
         # Mapping from trove name to scripts
         self._scriptsMap = {}
-        self._subscribeLogPath = None
-        self._subscribedPatterns = []
-        self._logFile = None
 
         self._provideGroup = {} # used by User build action to indicate if
         # group should also be provided

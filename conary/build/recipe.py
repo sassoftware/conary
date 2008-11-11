@@ -12,12 +12,16 @@
 # full details.
 #
 import inspect
+import itertools
 
-from conary import files, versions
+from conary import files, trove, versions
+from conary.deps import deps
 from conary.errors import ParseError
 from conary.build import action, lookaside, source, policy
-from conary.build.errors import RecipeFileError
+from conary.build.errors import RecipeFileError, RecipeDependencyError
 from conary.lib import log, util
+from conary.local import database
+from conary.conaryclient import cmdline
 
 import glob
 import imp
@@ -102,6 +106,12 @@ class Recipe(object):
     _isDerived = False
     _sourceModule = None
 
+    buildRequires = []
+    crossRequires = []
+    buildRequirementsOverride = None
+    crossRequirementsOverride = None
+
+
     def __init__(self, lightInstance = False, laReposCache = None,
                  srcdirs = None):
         assert(self.__class__ is not Recipe)
@@ -122,6 +132,7 @@ class Recipe(object):
         self.unusedMethods = set()
         self.methodDepth = 0
         self._pathTranslations = []
+        self._repos = None
         # Metadata is a hash keyed on a trove name and with a list of
         # per-trove-name MetadataItem like objects (well, dictionaries)
         self._metadataItemsMap = {}
@@ -152,13 +163,30 @@ class Recipe(object):
                 if className in ['Recipe', 'AbstractPackageRecipe',
                                  'SourcePackageRecipe',
                                  'BaseRequiresRecipe',
-                                 'GroupRecipe', 'RedirectRecipe',
+                                 'GroupRecipe', '_GroupRecipe', 'RedirectRecipe',
                                  'AbstractDerivedPackageRecipe',
                                  'DerivedPackageRecipe', 'FilesetRecipe',
                                  '_BaseGroupRecipe']:
                     continue
                 setattr(self, itemName, self._wrapMethod(className, item))
                 self.unusedMethods.add((className, item.__name__))
+
+        # Inspected only when it is important to know for reporting
+        # purposes what was specified in the recipe per se, and not
+        # in superclasses or in defaultBuildRequires
+        self._recipeRequirements = {
+            'buildRequires': list(self.buildRequires),
+            'crossRequires': list(self.crossRequires)
+        }
+
+        self._includeSuperClassBuildReqs()
+        self._includeSuperClassCrossReqs()
+        self.transitiveBuildRequiresNames = None
+        self._subscribeLogPath = None
+        self._subscribedPatterns = []
+        self._logFile = None
+        self._isCrossCompileTool = False
+        self._isCrossCompiling = False
 
     def _getParentClass(self, className):
         klass = self.__class__
@@ -205,7 +233,19 @@ class Recipe(object):
             raise ParseError("empty release string")
 
     def validate(self):
-        pass
+        # wait to check build requires until the object is instantiated
+        # so that we can include all of the parent classes' buildreqs
+        # in the check
+
+        for buildRequires in self.buildRequires:
+            (n, vS, f) = cmdline.parseTroveSpec(buildRequires)
+            if n.count(':') > 1:
+                raise RecipeFileError("Build requirement '%s' cannot have two colons in its name" % (buildRequires))
+
+            # we don't allow full version strings or just releases
+            if vS and vS[0] not in ':@':
+                raise RecipeFileError("Unsupported buildReq format %s" % buildRequires)
+
 
     def __getattr__(self, name):
         """
@@ -504,3 +544,295 @@ class Recipe(object):
 
     def _getOldMetadata(self):
         return self._oldMetadataMap
+
+    def needsCrossFlags(self):
+        return self._isCrossCompileTool or self._isCrossCompiling
+
+    def checkBuildRequirements(self, cfg, sourceVersion, raiseError=True):
+        """ Checks to see if the build requirements for the recipe
+            are installed
+        """
+        def _filterBuildReqsByVersionStr(versionStr, troves):
+            if not versionStr:
+                return troves
+
+            versionMatches = []
+            if versionStr.find('@') == -1:
+                if versionStr.find(':') == -1:
+                    log.warning('Deprecated buildreq format.  Use '
+                                ' foo=:tag, not foo=tag')
+                    versionStr = ':' + versionStr
+
+
+
+
+            for trove in troves:
+                labels = trove.getVersion().iterLabels()
+                if versionStr[0] == ':':
+                    branchTag = versionStr[1:]
+                    branchTags = [ x.getLabel() for x in labels ]
+                    if branchTag in branchTags:
+                        versionMatches.append(trove)
+                else:
+                    # versionStr must begin with an @
+                    branchNames = []
+                    for label in labels:
+                        branchNames.append('@%s:%s' % (label.getNamespace(),
+                                                       label.getLabel()))
+                    if versionStr in branchNames:
+                        versionMatches.append(trove)
+            return versionMatches
+
+        def _filterBuildReqsByFlavor(flavor, troves):
+            troves.sort(key = lambda x: x.getVersion())
+            if flavor is None:
+                # get latest
+                return troves[-1]
+            for trove in troves:
+                troveFlavor = trove.getFlavor()
+                if troveFlavor.stronglySatisfies(flavor):
+                    return trove
+
+        def _matchReqs(reqList, db):
+            reqMap = {}
+            missingReqs = []
+            for buildReq in reqList:
+                (name, versionStr, flavor) = cmdline.parseTroveSpec(buildReq)
+                # XXX move this to use more of db.findTrove's features, instead
+                # of hand parsing
+                troves = db.trovesByName(name)
+                troves = db.getTroves(troves)
+
+                versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
+
+                if not versionMatches:
+                    missingReqs.append(buildReq)
+                    continue
+                match = _filterBuildReqsByFlavor(flavor, versionMatches)
+                if match:
+                    reqMap[buildReq] = match
+                else:
+                    missingReqs.append(buildReq)
+            return reqMap, missingReqs
+
+
+	db = database.Database(cfg.root, cfg.dbPath)
+
+
+        if self.needsCrossFlags() and self.crossRequires:
+            if not self.macros.sysroot:
+                err = ("cross requirements needed but %(sysroot)s undefined")
+                if raiseError:
+                    log.error(err)
+                    raise RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
+
+            if self.cfg.root != '/':
+                sysroot = self.cfg.root + self.macros.sysroot
+            else:
+                sysroot = self.macros.sysroot
+            if not os.path.exists(sysroot):
+                err = ("cross requirements needed but sysroot (%s) does not exist" % (sysroot))
+                if raiseError:
+                    raise RecipeDependencyError(err)
+                else:
+                    log.warning(err)
+                    self.buildReqMap = {}
+                    self.ignoreDeps = True
+                    return
+
+            else:
+                crossDb = database.Database(sysroot, cfg.dbPath)
+        time = sourceVersion.timeStamps()[-1]
+
+        reqMap, missingReqs = _matchReqs(self.buildRequires, db)
+        if self.needsCrossFlags() and self.crossRequires:
+            crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,
+                                                       crossDb)
+        else:
+            missingCrossReqs = []
+            crossReqMap = {}
+
+        if missingReqs or missingCrossReqs:
+            if missingReqs:
+                err = ("Could not find the following troves "
+                       "needed to cook this recipe:\n"
+                       "%s" % '\n'.join(sorted(missingReqs)))
+                if missingCrossReqs:
+                    err += '\n'
+            else:
+                err = ''
+            if missingCrossReqs:
+                err += ("Could not find the following cross requirements"
+                        " (that must be installed in %s) needed to cook this"
+                        " recipe:\n"
+                        "%s" % (sysroot, '\n'.join(sorted(missingCrossReqs))))
+            if raiseError:
+                log.error(err)
+                raise RecipeDependencyError(
+                                            'unresolved build dependencies')
+            else:
+                log.warning(err)
+        self.buildReqMap = reqMap
+        self.crossReqMap = crossReqMap
+        self.ignoreDeps = not raiseError
+
+    def _getTransitiveDepClosure(self, targets=None):
+        def isTroveTarget(trove):
+            if targets is None:
+                return True
+            return trove.getName() in targets
+
+	db = database.Database(self.cfg.root, self.cfg.dbPath)
+        
+        reqList =  [ req for req in self.getBuildRequirementTroves(db)
+                     if isTroveTarget(req) ]
+        reqNames = set(req.getName() for req in reqList)
+        depSetList = [ req.getRequires() for req in reqList ]
+        d = db.getTransitiveProvidesClosure(depSetList)
+        for depSet in d:
+            reqNames.update(
+                set(troveTup[0] for troveTup in d[depSet]))
+
+        return reqNames
+
+    def _getTransitiveBuildRequiresNames(self):
+        if self.transitiveBuildRequiresNames is not None:
+            return self.transitiveBuildRequiresNames
+
+        self.transitiveBuildRequiresNames = self._getTransitiveDepClosure()
+        return self.transitiveBuildRequiresNames
+
+    def getBuildRequirementTroves(self, db):
+        if self.buildRequirementsOverride is not None:
+            return db.getTroves(self.buildRequirementsOverride,
+                                withFiles=False)
+        return self.buildReqMap.values()
+
+    def getCrossRequirementTroves(self):
+        if self.crossRequirementsOverride:
+            db = database.Database(self.cfg.root, self.cfg.dbPath)
+            return db.getTroves(self.crossRequirementsOverride,
+                                     withFiles=False)
+        return self.crossRequires.values()
+
+    def getRecursiveBuildRequirements(self, db, cfg):
+        if self.buildRequirementsOverride is not None:
+            return self.buildRequirementsOverride
+        buildReqs = self.getBuildRequirementTroves(db)
+        buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
+                        for x in buildReqs)
+        packageReqs = [ x for x in self.buildReqMap.itervalues() 
+                        if trove.troveIsCollection(x.getName()) ]
+        for package in packageReqs:
+            childPackages = [ x for x in package.iterTroveList(strongRefs=True,
+                                                               weakRefs=True) ]
+            hasTroves = db.hasTroves(childPackages)
+            buildReqs.update(x[0] for x in itertools.izip(childPackages,
+                                                          hasTroves) if x[1])
+        buildReqs = self._getRecursiveRequirements(db, buildReqs, cfg.flavor)
+        return buildReqs
+
+    def _getRecursiveRequirements(self, db, troveList, flavorPath):
+        # gets the recursive requirements for the listed packages
+        seen = set()
+        while troveList:
+            depSetList = []
+            for trv in db.getTroves(list(troveList), withFiles=False):
+                required = deps.DependencySet()
+                oldRequired = trv.getRequires()
+                [ required.addDep(*x) for x in oldRequired.iterDeps() 
+                  if x[0] != deps.AbiDependency ]
+                depSetList.append(required)
+            seen.update(troveList)
+            sols = db.getTrovesWithProvides(depSetList, splitByDep=True)
+            troveList = set()
+            for depSetSols in sols.itervalues():
+                for depSols in depSetSols:
+                    bestChoices = []
+                    # if any solution for a dep is satisfied by the installFlavor
+                    # path, then choose the solutions that are satisfied as 
+                    # early as possible on the flavor path.  Otherwise return
+                    # all solutions.
+                    for flavor in flavorPath:
+                        bestChoices = [ x for x in depSols if flavor.satisfies(x[2])]
+                        if bestChoices:
+                            break
+                    if bestChoices:
+                        depSols = set(bestChoices)
+                    else:
+                        depSols = set(depSols)
+                    depSols.difference_update(seen)
+                    troveList.update(depSols)
+        return seen
+
+    def setRepos(self, repos):
+        self._repos = repos
+
+    def getRepos(self):
+        return self._repos
+
+    def isatty(self, value=None):
+        if value is not None:
+            self._tty = value
+        return self._tty
+
+    def _setSubscribeLogPath(self, path):
+        self._subscribeLogPath = path
+
+    def getSubscribeLogPath(self):
+        return self._subscribeLogPath
+
+    def _setLogFile(self, logFile):
+        self._logFile = logFile
+        for pattern in self._subscribedPatterns:
+            logFile.subscribe(pattern)
+        self._subscribedPatterns = None
+
+    def subscribeLogs(self, pattern):
+        if self._logFile:
+            self._logFile.subscribe(pattern)
+        else:
+            self._subscribedPatterns.append(pattern)
+
+    def synchronizeLogs(self):
+        if self._logFile:
+            self._logFile.synchronize()
+
+    def _includeSuperClassBuildReqs(self):
+        self._includeSuperClassItemsForAttr('buildRequires')
+
+    def _includeSuperClassCrossReqs(self):
+        self._includeSuperClassItemsForAttr('crossRequires')
+
+    def _includeSuperClassItemsForAttr(self, attr):
+        """ Include build requirements from super classes by searching
+            up the class hierarchy for buildRequires.  You can
+            override this currently only by calling
+            <superclass>.buildRequires.remove()
+        """
+        buildReqs = set()
+        superBuildReqs = set()
+        immediateSuper = True
+        for base in inspect.getmro(self.__class__):
+            thisClassReqs = getattr(base, attr, [])
+            buildReqs.update(thisClassReqs)
+            if base != self.__class__:
+                if immediateSuper:
+                    if (set(self._recipeRequirements[attr]) ==
+                        set(getattr(base, attr, []))):
+                        # requirements in recipe were inherited,
+                        # not explicitly specified, so report
+                        # them as if recipe explicitly contained
+                        # an empty list
+                        self._recipeRequirements[attr] = []
+                    # We have now inspected the immediate superclass
+                    immediateSuper = False
+                superBuildReqs.update(thisClassReqs)
+        setattr(self, attr, list(buildReqs))
+        self._recipeRequirements['%sSuper' %attr] = superBuildReqs
+
