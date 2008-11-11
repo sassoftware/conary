@@ -12,7 +12,6 @@
 
 """ Extended pdb """
 import bdb
-import stackutil
 import inspect
 import pdb
 import os
@@ -30,6 +29,7 @@ import sys
 import tempfile
 import traceback
 
+from conary.lib import stackutil
 from pdb import _saferepr
 
 class Epdb(pdb.Pdb):
