@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.29:
   o New Features:
     * cvc diff now optionally takes a set of files to diff.  Note that
       providing a revision now requires the --revision argument, to
