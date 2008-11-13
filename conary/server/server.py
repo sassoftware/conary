@@ -265,6 +265,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
             except errors.InsufficientPermission:
                 self.send_error(403)
                 return None
+            except:
+                # exceptions are handled (logged) in callWrapper - send
+                # 500 code back to the client to indicate an error happened
+                self.send_error(500)
+                return None
             logMe(3, "returned from", method)
 
         usedAnonymous = result[0]

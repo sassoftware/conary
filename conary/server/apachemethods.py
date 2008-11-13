@@ -80,10 +80,14 @@ def post(port, isSecure, repos, req):
             localAddr = "%s:%s" % (req.connection.local_ip,
                                    req.connection.local_addr[1])
 
+            # Use the IP address of the original request in the case
+            # of a proxy, otherwise use the connection's remote_ip
+            remoteIp = req.headers_in.get('X-Forwarded-For',
+                                      req.connection.remote_ip)
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
-                                           remoteIp = req.connection.remote_ip,
+                                           remoteIp = remoteIp,
                                            rawUrl = req.unparsed_uri,
                                            localAddr = localAddr,
                                            protocolString = req.protocol,

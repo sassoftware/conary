@@ -28,6 +28,9 @@ Changes in @NEW@:
     * Temporary tables for commits of collection and files are merged into
       the final tables at the end of the changeset commit instead of
       incrementally following each trove.
+    * The original client IP is now used for logging and
+      authentication when a request is received from a HTTP proxy.
+      (CNY-3006)
 
   o Bug Fixes:
     * ABI dependencies are no longer checked on erase. (CNY-2991)
