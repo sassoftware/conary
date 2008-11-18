@@ -446,7 +446,7 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         C{r.removeComponents(['devel', 'devellib'])}
 
-        Uses C{r.RemoveComponents} to specify that the C{:devel} and
+        Uses C{r.removeComponents} to specify that the C{:devel} and
         C{:devellib} components should not be installed by default.
         """
         if not isinstance(componentList, (list, tuple)):
