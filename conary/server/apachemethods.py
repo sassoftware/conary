@@ -80,10 +80,16 @@ def post(port, isSecure, repos, req):
             localAddr = "%s:%s" % (req.connection.local_ip,
                                    req.connection.local_addr[1])
 
-            # Use the IP address of the original request in the case
+            remoteIp = req.connection.remote_ip
+            # Get the IP address of the original request in the case
             # of a proxy, otherwise use the connection's remote_ip
-            remoteIp = req.headers_in.get('X-Forwarded-For',
-                                      req.connection.remote_ip)
+            if 'X-Forwarded-For' in req.headers_in:
+                # pick the right-most client, since that is
+                # the one closest to us.  For example, if
+                # we have "X-Forwarded-For: 1.2.3.4, 4.5.6.7"
+                # we want to use 4.5.6.7
+                clients = req.headers_in['X-Forwarded-For']
+                remoteIp = clients.split(',')[-1].strip()
             try:
                 result = repos.callWrapper(protocol, port, method, authToken,
                                            params,
