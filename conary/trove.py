@@ -601,13 +601,14 @@ _METADATA_ITEM_TAG_CRYPTO = 4
 _METADATA_ITEM_TAG_URL = 5
 _METADATA_ITEM_TAG_CATEGORIES = 6
 _METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
-_METADATA_ITEM_TAG_SIGNATURES = 8
+_METADATA_ITEM_TAG_OLD_SIGNATURES = 8
 _METADATA_ITEM_TAG_NOTES = 9
 _METADATA_ITEM_TAG_LANGUAGE = 10
 _METADATA_ORIG_ITEMS = 10
 _METADATA_ITEM_TAG_KEY_VALUE = 11
+_METADATA_ITEM_TAG_NEW_SIGNATURES = 12
 
-_METADATA_ITEM_SIG_VER_ALL = [ 0 ]
+_METADATA_ITEM_SIG_VER_ALL = [ 0, 1 ]
 
 class KeyValueItemsStream(streams.OrderedStreamCollection):
     __slots__ = [ '_map' ]
@@ -693,54 +694,79 @@ class MetadataItem(streams.StreamSet):
                 (DYNAMIC, OBSS,                   'categories'   ),
         _METADATA_ITEM_TAG_BIBLIOGRAPHY:
                 (DYNAMIC, OBSS,                   'bibliography' ),
-        _METADATA_ITEM_TAG_SIGNATURES:
-                (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
+        _METADATA_ITEM_TAG_OLD_SIGNATURES:
+                (DYNAMIC, VersionedSignaturesSet, 'oldSignatures'),
         _METADATA_ITEM_TAG_NOTES:
                 (DYNAMIC, OBSS,                   'notes'        ),
         _METADATA_ITEM_TAG_KEY_VALUE:
                 (DYNAMIC, KeyValueItemsStream,    'keyValue'     ),
+        _METADATA_ITEM_TAG_NEW_SIGNATURES:
+                (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
         }
 
-    _skipSet = { 'id' : True, 'signatures': True }
+    _skipSet = { 'id' : True, 'signatures': True, 'oldSignatures' : True }
     _keys = [ x[2] for x in streamDict.itervalues() if x[2] not in _skipSet ]
 
     def _digest(self, version=0):
+        # version 0 is stored in old signatures, and doesn't include any
+        # extended metadata
+        #
+        # version 1 is stored in new signatures, and includes extended
+        # metadata
+        if version > 1:
+            return None
+
         if version == 0:
             # version 0 of the digest
-            frz = streams.StreamSet.freeze(self, self._skipSet)
-            digest = streams.Sha256Stream()
-            digest.compute(frz)
-            return digest()
-        raise RuntimeError('unsupported version')
+            skip = self._skipSet.copy()
+            skip.update((x[1][2], True) for x in self.streamDict.items() if
+                            x[0] > _METADATA_ORIG_ITEMS)
+            frz = streams.StreamSet.freeze(self, skipSet = skip,
+                                           freezeUnknown = False)
+        else:
+            frz = streams.StreamSet.freeze(self, skipSet = self._skipSet)
+
+        digest = streams.Sha256Stream()
+        digest.compute(frz)
+        return digest()
 
     def _updateId(self):
         frz = streams.StreamSet.freeze(self, self._skipSet)
-        digest = streams.Sha1Stream()
-        digest.compute(frz)
-        self.id.set(digest())
+        self.id.set(sha1helper.sha1String(frz))
 
     def _updateDigests(self):
         self._updateId()
         for version in _METADATA_ITEM_SIG_VER_ALL:
-            if not self.signatures.getDigest(version):
-                self.signatures.addDigest(self._digest(version), version)
+            if version == 0:
+                if not self.oldSignatures.getDigest(version):
+                    self.oldSignatures.addDigest(self._digest(version), version)
+            else:
+                if not self.signatures.getDigest(version):
+                    self.signatures.addDigest(self._digest(version), version)
 
     def addDigitalSignature(self, keyId, version=0):
         self._updateDigests()
-        self.signatures.sign(keyId, version)
+        if version == 0:
+            self.oldSignatures.sign(keyId, version)
+        else:
+            self.signatures.sign(keyId, version)
 
     def verifyDigitalSignatures(self, label=None):
         keyCache = openpgpkey.getKeyCache()
         missingKeys = []
         badFingerprints = []
         untrustedKeys = set()
-        for signatures in self.signatures:
+        for signatures in itertools.chain(self.oldSignatures, self.signatures):
             # verify that recomputing the digest for this version
             # of the signature matches the stored version
-            if self._digest(signatures.version()) != signatures.digest():
+            digest = self._digest(signatures.version())
+            if digest is None:
+                # unknown signature version
+                continue
+            elif digest != signatures.digest():
                 raise DigitalSignatureVerificationError(
                     'metadata checksum does not match stored value')
-            digest = signatures.digest()
+
             for signature in signatures.signatures:
                 try:
                     key = keyCache.getPublicKey(signature[0],
@@ -757,10 +783,14 @@ class MetadataItem(streams.StreamSet):
         return missingKeys, badFingerprints, untrustedKeys
 
     def verifyDigests(self):
-        for signatures in self.signatures:
+        for signatures in itertools.chain(self.oldSignatures, self.signatures):
             # verify that recomputing the digest for this version
             # of the signature matches the stored version
-            if self._digest(signatures.version()) != signatures.digest():
+            digest = self._digest(signatures.version())
+            if digest is None:
+                # unknown signature version
+                continue
+            elif digest != signatures.digest():
                 raise DigitalSignatureVerificationError(
                     'metadata checksum does not match stored value')
 

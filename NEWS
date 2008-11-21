@@ -6,6 +6,8 @@ Changes in @VERSION@:
     * Metadata now allows new types to be added, and key/value metadata
       is a new type. Without this troves with key/data metadata attached
       were unuseable by older versions of conary (CNY-3040).
+    * Added a new signature type which includes new metadata types.
+    * Made Trove.verifyDigests() verify signatures of metadata.
 
 Changes in 2.0.29:
   o New Features:
