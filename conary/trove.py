@@ -604,6 +604,7 @@ _METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
 _METADATA_ITEM_TAG_SIGNATURES = 8
 _METADATA_ITEM_TAG_NOTES = 9
 _METADATA_ITEM_TAG_LANGUAGE = 10
+_METADATA_ORIG_ITEMS = 10
 _METADATA_ITEM_TAG_KEY_VALUE = 11
 
 _METADATA_ITEM_SIG_VER_ALL = [ 0 ]
@@ -672,6 +673,7 @@ class KeyValueItemsStream(streams.OrderedStreamCollection):
 
 OBSS = streams.OrderedBinaryStringsStream
 class MetadataItem(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _METADATA_ITEM_TAG_ID:
                 (DYNAMIC, streams.StringStream,   'id'           ),
@@ -754,6 +756,16 @@ class MetadataItem(streams.StreamSet):
                     untrustedKeys.add(key.getFingerprint())
         return missingKeys, badFingerprints, untrustedKeys
 
+    def verifyDigests(self):
+        for signatures in self.signatures:
+            # verify that recomputing the digest for this version
+            # of the signature matches the stored version
+            if self._digest(signatures.version()) != signatures.digest():
+                raise DigitalSignatureVerificationError(
+                    'metadata checksum does not match stored value')
+
+        return True
+
     def freeze(self, *args, **kw):
         self._updateDigests()
         return streams.StreamSet.freeze(self, *args, **kw)
@@ -788,6 +800,9 @@ class Metadata(streams.OrderedStreamCollection):
     def __iter__(self):
         for item in self.getStreams(1):
             yield item
+
+    def _replaceAll(self, new):
+        self._items[1] = new._items[1]
 
     def get(self, language=None):
         d = dict.fromkeys(MetadataItem._keys)
@@ -842,6 +857,12 @@ class Metadata(streams.OrderedStreamCollection):
             badFingerprints.extend(rc[1])
             untrustedKeys.update(rc[2])
         return missingKeys, badFingerprints, untrustedKeys
+
+    def verifyDigests(self):
+        for item in self:
+            item.verifyDigests()
+
+        return True
 
 _TROVEINFO_TAG_SIZE           =  0
 _TROVEINFO_TAG_SOURCENAME     =  1
@@ -983,6 +1004,12 @@ class TroveInfo(streams.StreamSet):
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
+    _oldMetadataItems = dict([ (x[1][2], True) for x in
+                               MetadataItem.streamDict.items() if
+                               x[0] <= _METADATA_ORIG_ITEMS ])
+    _newMetadataItems = dict([ (x[1][2], True) for x in
+                               MetadataItem.streamDict.items() if
+                               x[0] > _METADATA_ORIG_ITEMS ])
 
     def diff(self, other):
         return streams.StreamSet.diff(self, other, ignoreUnknown=True)
@@ -1368,7 +1395,7 @@ class Trove(streams.StreamSet):
 
     def verifyDigests(self):
         """
-        Verifies the digests trove.
+        Verifies the trove's digests
 
         @rtype: boolean
         """
@@ -1392,6 +1419,8 @@ class Trove(streams.StreamSet):
                 s = self._sigString(sigVersion)
                 if not sigDigest.verify(s):
                     return False
+
+        self.troveInfo.metadata.verifyDigests()
 
         return True
 
@@ -1728,7 +1757,7 @@ class Trove(streams.StreamSet):
             # even if it wasn't originally). Use the relative data (which may
             # set it or not).
             troveInfoClass = self.streamDict[_STREAM_TRV_TROVEINFO][1]
-            self.troveInfo = troveInfoClass(trvCs.getFrozenTroveInfo())
+            self.troveInfo = trvCs.getTroveInfo(klass = troveInfoClass)
             if not self.troveInfo.incomplete():
                 self.troveInfo.incomplete.set(incomplete)
         elif not trvCs.getOldVersion():
@@ -2975,6 +3004,7 @@ _STREAM_TCS_NEW_SIGS                = 16
 _STREAM_TCS_WEAK_TROVE_CHANGES      = 17
 _STREAM_TCS_REDIRECTS               = 18
 _STREAM_TCS_ABSOLUTE_TROVEINFO      = 19
+_STREAM_TCS_EXTENDED_METADATA       = 20
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -3006,6 +3036,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_ABSOLUTE_TROVEINFO
                                 : (LARGE, streams.StringStream,
                                                         "absoluteTroveInfo"  ),
+        _STREAM_TCS_EXTENDED_METADATA
+                                : (LARGE, streams.StringStream,
+                                                        "extendedMetadata"   ),
     }
 
     ignoreUnknown = True
@@ -3045,6 +3078,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getFrozenTroveInfo(self):
         return self.absoluteTroveInfo()
+
+    def getFrozenExtendedMetadata(self):
+        return self.extendedMetadata()
 
     def _getScriptObj(self, kind):
         troveInfo = self.absoluteTroveInfo()
@@ -3178,7 +3214,23 @@ class AbstractTroveChangeSet(streams.StreamSet):
         return True
 
     def setTroveInfo(self, ti):
-        self.absoluteTroveInfo.set((ti.freeze()))
+        self.absoluteTroveInfo.set((ti.freeze(skipSet = ti._newMetadataItems)))
+        self.extendedMetadata.set((ti.metadata.freeze(skipSet =
+                                                        ti._oldMetadataItems)))
+
+    def getTroveInfo(self, klass = TroveInfo):
+        if self.absoluteTroveInfo():
+            trvInfo = klass(self.absoluteTroveInfo())
+            if self.extendedMetadata():
+                extMetadata = Metadata(self.extendedMetadata())
+                for old, ext in itertools.izip(trvInfo.metadata, extMetadata):
+                    for attrName in trvInfo._oldMetadataItems:
+                        setattr(ext, attrName, getattr(old, attrName))
+                trvInfo.metadata._replaceAll(extMetadata)
+
+            return trvInfo
+        else:
+            return None
 
     def getChangeLog(self):
 	return self.changeLog

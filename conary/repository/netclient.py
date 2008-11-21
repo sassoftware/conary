@@ -2807,7 +2807,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	for trvCs in chgSet.iterNewTroveList():
             # See if there is anything which needs new trove info handling
             # to commit
-            troveInfo = trove.TroveInfo(trvCs.getFrozenTroveInfo())
+            troveInfo = trvCs.getTroveInfo()
             if troveInfo.freeze(skipSet = newOnlySkipSet):
                 minProtocolRequired = max(minProtocolRequired, 45)
 

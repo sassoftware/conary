@@ -479,10 +479,8 @@ class ChangeSet(streams.StreamSet):
 
 	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
                                 troveCs.getOldFlavor())
-
-            if troveCs.getFrozenTroveInfo():
-                newTroveInfo = trove.TroveInfo(troveCs.getFrozenTroveInfo())
-            else:
+            newTroveInfo = troveCs.getTroveInfo()
+            if newTroveInfo is None:
                 newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
                 newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
             newTroveInfoDiff = trv.getTroveInfo().diff(newTroveInfo)

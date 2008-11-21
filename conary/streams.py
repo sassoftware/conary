@@ -575,7 +575,7 @@ class OrderedStreamCollection(StreamCollection):
         l = []
         for typeId, itemList in (self._items.iteritems()):
             for item in itemList:
-                s = item.freeze()
+                s = item.freeze(skipSet = skipSet)
                 l.append(struct.pack('!B', typeId))
                 l.append(misc.dynamicSize(len(s)))
                 l.append(s)
