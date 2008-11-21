@@ -2791,6 +2791,10 @@ class Trove(streams.StreamSet):
                 raise TroveError, \
                             "Illegal characters in trove name '%s'" % name
 
+            if 0 in [ len(x) for x in name.split(":") ]:
+                raise TroveError, \
+                            'Trove and component names cannot be empty'
+
             assert(flavor is not None)
             self.name.set(name)
             self.version.set(version)
