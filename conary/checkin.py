@@ -906,6 +906,12 @@ def findRelativeVersion(repos, troveName, count, newV):
 
 
 def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
+    i = _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion)
+    if i is not None:
+        for line in i:
+            print line
+
+def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
 	troveName += ":source"
 
@@ -945,7 +951,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 					    (newV, deps.deps.Flavor()), 
                                  False)])
 
-    _showChangeSet(repos, cs, old, new)
+    return _iterChangeSet(repos, cs, old, new)
 
 def revert(repos, fileList):
     conaryState = ConaryStateFromFile("CONARY")
@@ -1019,18 +1025,30 @@ def revert(repos, fileList):
 
     conaryState.write("CONARY")
 
-def diff(repos, versionStr = None, pathList = None):
+def diff(repos, versionStr = None, pathList = None, logErrors = True, dirName='.'):
     # return 0 if no differences, 1 if differences, 2 on error
-    state = ConaryStateFromFile("CONARY", repos).getSourceState()
+    i = _getIterDiff(repos, versionStr, pathList, logErrors, dirName)
+    if i in (0, 2):
+        return i
+    for line in i:
+        print line
+    return 1
+
+def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
+    def error(s):
+        if logErrors: log.error(s)
+
+    state = ConaryStateFromFile(os.sep.join((dirName, 'CONARY')),
+                                repos).getSourceState()
 
     if state.getVersion() == versions.NewVersion():
-        log.error("no versions have been committed")
+        error("no versions have been committed")
         return 2
 
     if pathList:
         for path in pathList:
             if not os.path.exists(path):
-                log.error("File %s can not be found" % path)
+                error("File %s can not be found" % path)
                 return 2
 
     if versionStr:
@@ -1039,12 +1057,12 @@ def diff(repos, versionStr = None, pathList = None):
         try:
             pkgList = repos.findTrove(None, (state.getName(), versionStr, None))
         except errors.TroveNotFound, e:
-            log.error("Unable to find source component %s with version %s: %s",
+            error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
             return 2
         
 	if len(pkgList) > 1:
-	    log.error("%s specifies multiple versions" % versionStr)
+	    error("%s specifies multiple versions" % versionStr)
 	    return 2
 
 	oldTrove = repos.getTrove(*pkgList[0])
@@ -1054,24 +1072,34 @@ def diff(repos, versionStr = None, pathList = None):
     result = update.buildLocalChanges(repos, 
 	    [(state, oldTrove, versions.NewVersion(),
               update.UpdateFlags(ignoreUGids = True))],
-            forceSha1=True, ignoreAutoSource = True)
+            forceSha1=True, ignoreAutoSource = True,
+            root = dirName)
     if not result: return 2
 
     result = localAutoSourceChanges(oldTrove, result)
 
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return 0
-    _showChangeSet(repos, changeSet, oldTrove, state,
-                   displayAutoSourceFiles = False, pathList = pathList)
-    return 1
+
+    return _iterChangeSet(repos, changeSet, oldTrove, state,
+                          displayAutoSourceFiles = False, pathList = pathList)
 
 def _showChangeSet(repos, changeSet, oldTrove, newTrove,
+                   displayAutoSourceFiles = True, pathList = None):
+    for line in _iterChangeSet(repos, changeSet, oldTrove, newTrove,
+                       displayAutoSourceFiles = displayAutoSourceFiles,
+                       pathList = pathList):
+        print line
+
+def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
                    displayAutoSourceFiles = True, pathList = None):
     troveChanges = changeSet.iterNewTroveList()
     troveCs = troveChanges.next()
     assert(util.assertIteratorAtEnd(troveChanges))
 
-    showOneLog(troveCs.getNewVersion(), troveCs.getChangeLog())
+    for line in formatOneLog(troveCs.getNewVersion(), troveCs.getChangeLog()):
+        yield line
+    yield ''
 
     fileList = [ (x[0], x[1], True, x[2], x[3]) for x in troveCs.getNewFileList() ]
     fileList += [ (x[0], x[1], False, x[2], x[3]) for x in 
@@ -1081,7 +1109,7 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
     fileList.sort()
     for (pathId, path, isNew, fileId, newVersion) in fileList:
 	if isNew:
-	    print "%s: new" % path
+	    yield '%s: new' % path
 	    chg = changeSet.getFileChange(None, fileId)
 	    f = files.ThawFile(chg, pathId)
 	    if pathList:
@@ -1093,13 +1121,12 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
 		(contType, contents) = changeSet.getFileContents(pathId, fileId)
                 lines = contents.get().readlines()
 
-                print '--- /dev/null'
-                print '+++', path
-                print '@@ -0,0 +%s @@' %len(lines)
+                yield '--- /dev/null'
+                yield '+++ ' +path
+                yield '@@ -0,0 +%s @@' %len(lines)
                 for line in lines:
-                    sys.stdout.write('+')
-                    sys.stdout.write(line)
-                print
+                    yield '+%s' %line.rstrip('\n')
+                yield ''
 	    continue
 
         # changed file
@@ -1119,34 +1146,34 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove,
         oldFileId = oldTrove.getFile(pathId)[1]
 
         if not newVersion:
-            sys.stdout.write(dispStr + '\n')
+            yield dispStr
             continue
 
-        sys.stdout.write(dispStr + ": changed\n")
+        yield dispStr + ': changed'
 
-        sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
+        yield 'Index: %s' %path
+        yield '=' * 68
 
         csInfo = changeSet.getFileChange(oldFileId, fileId)
         if csInfo:
-            print '\n'.join(files.fieldsChanged(csInfo))
+            for line in files.fieldsChanged(csInfo):
+                yield line
         else:
-            print 'version'
+            yield 'version'
 
 	if csInfo and files.contentsChanged(csInfo):
 	    (contType, contents) = changeSet.getFileContents(pathId, fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
-                sys.stdout.write('--- %s %s\n+++ %s %s\n'
-                                 %(path, oldTrove.getVersion().asString(),
-                                   path, newVersion.asString()))
-
-		lines = contents.get().readlines()
-		str = "".join(lines)
-		print str
-		print
+                yield '--- %s %s' %(path, oldTrove.getVersion().asString())
+                yield '+++ %s %s' %(path, newVersion.asString())
+                for line in contents.get().readlines():
+                    yield line.rstrip('\n')
+                yield ''
+                yield ''
 
     for pathId in troveCs.getOldFileList():
 	path = oldTrove.getFile(pathId)[0]
-	print "%s: removed" % path
+	yield '%s: removed' % path
 
 @api.developerApi
 def updateSrc(repos, versionList = None, callback = None):
@@ -1894,6 +1921,8 @@ def iterLogMessages(troves):
 	cl = trove.getChangeLog()
 	for line in formatOneLog(v, cl):
             yield line
+        # separate log entries (RBLD-115)
+        yield ''
 
 def showOneLog(version, changeLog=''):
     print '\n'.join(formatOneLog(version, changeLog))
@@ -1911,10 +1940,13 @@ def formatOneLog(version, changeLog=''):
 	logMessage.append("%s %s (%s) %s" %
 	    (versionStr, changeLog.getName(), changeLog.getContact(), when))
 	lines = changeLog.getMessage().split("\n")
+        if not lines[-1]:
+            # remove trailing newline in log message (RBLD-115)
+            del lines[-1]
 	for l in lines:
 	    logMessage.append("    %s" % l)
     else:
-	logMessage.extend(['%s %s (no log message)' %(versionStr, when), ''])
+	logMessage.append('%s %s (no log message)' %(versionStr, when))
     return logMessage
 
 def setContext(cfg, contextName=None, ask=False, repos=None):
