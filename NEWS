@@ -1,3 +1,8 @@
+Changes in @VERSION@:
+  o Bug Fixes:
+    * Conary would unpack 64 bit integers incorrectly on platforms where
+      long was 64 bits instead of 32 (CNY-3042)
+
 Changes in 2.0.29:
   o New Features:
     * cvc diff now optionally takes a set of files to diff.  Note that

@@ -62,12 +62,12 @@ typedef struct {
 
 typedef struct {
     NumericStreamObject_HEAD
-    int val;
+    int32_t val;
 } IntStreamObject;
 
 typedef struct {
     NumericStreamObject_HEAD
-    short val;
+    int16_t val;
 } ShortStreamObject;
 
 typedef struct {
@@ -77,7 +77,7 @@ typedef struct {
 
 typedef struct {
     NumericStreamObject_HEAD
-    unsigned long long val;
+    uint64_t val;
 } LongLongStreamObject;
 
 /* ------------------------------------- */
@@ -422,7 +422,7 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
         if (!frozenLen)
             o->isNone = 1;
         else
-            o->val = ntohl(*((int *) frozen));
+            o->val = ntohl(*((int32_t *) frozen));
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
 
@@ -435,7 +435,7 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
         if (!frozenLen)
             o->isNone = 1;
         else
-            o->val = ntohs(*((int *) frozen));
+            o->val = ntohs(*((int32_t *) frozen));
     } else if (STREAM_CHECK(self, BYTE_STREAM)) {
         ByteStreamObject * o = (void *) self;
 
@@ -461,9 +461,9 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
         if (!frozenLen)
             o->isNone = 1;
         else {
-	    o->val = (unsigned long long) ntohl(*((long *) frozen)) << 32;
+	    o->val = (uint64_t) ntohl(*((uint32_t *) frozen)) << 32;
 	    frozen += 4;
-	    o->val |= (unsigned long long) ntohl(*((long *) frozen));
+	    o->val |= (uint64_t) ntohl(*((uint32_t *) frozen));
 	    return 0;
 	}
     } else {
@@ -511,7 +511,7 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
         assert(diffLen == 0 || diffLen == 4);
 
         if (diffLen)
-            newVal = ntohl(*((int *) diff));
+            newVal = ntohl(*((int32_t *) diff));
 
         if (o->isNone == base->isNone && o->val == base->val) {
             if (!diffLen)
@@ -536,7 +536,7 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
         assert(diffLen == 0 || diffLen == 2);
 
         if (diffLen)
-            newVal = ntohs(*((int *) diff));
+            newVal = ntohs(*((int32_t *) diff));
         if (o->isNone == base->isNone && o->val == base->val) {
             if (!diffLen)
                 o->isNone = 1;
@@ -580,13 +580,13 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
         LongLongStreamObject * base = (void *) other;
-        unsigned long long newVal = 0;
+        uint64_t newVal = 0;
 
         assert(diffLen == 0 || diffLen == 8);
 
         if (diffLen) {
-	    newVal = (unsigned long long) ntohl(*((long *) diff)) << 32;
-	    newVal |= (unsigned long long) ntohl(*((long *) (diff + 4)));
+	    newVal = (uint64_t) ntohl(*((int32_t *) diff)) << 32;
+	    newVal |= (uint64_t) ntohl(*((int32_t *) (diff + 4)));
 	}
 
         if (o->isNone == base->isNone && o->val == base->val) {
