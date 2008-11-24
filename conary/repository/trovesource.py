@@ -767,7 +767,7 @@ class SearchableTroveSource(AbstractTroveSource):
                 nomatches.append(flavor)
         if matchingFlavors:
             if scoreToMatch >= minScore:
-                return minScore, matchingFlavors + nomatches, nomatches
+                return minScore, matchingFlavors, nomatches
             elif nomatches:
                 return scoreToMatch, nomatches, nomatches
             else:
