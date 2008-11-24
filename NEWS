@@ -7,6 +7,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Conary would unpack 64 bit integers incorrectly on platforms where
       long was 64 bits instead of 32 (CNY-3042)
+    * Conary unpacked 16 bit values by treating them as 32 bit values,
+      which broke on big endian machines (CNY-3042)
     * Disallow empty trove names and component names
     * Metadata now allows new types to be added, and key/value metadata
       is a new type. Without this troves with key/data metadata attached

@@ -435,7 +435,7 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
         if (!frozenLen)
             o->isNone = 1;
         else
-            o->val = ntohs(*((int32_t *) frozen));
+            o->val = ntohs(*((int16_t *) frozen));
     } else if (STREAM_CHECK(self, BYTE_STREAM)) {
         ByteStreamObject * o = (void *) self;
 
@@ -536,7 +536,7 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
         assert(diffLen == 0 || diffLen == 2);
 
         if (diffLen)
-            newVal = ntohs(*((int32_t *) diff));
+            newVal = ntohs(*((int16_t *) diff));
         if (o->isNone == base->isNone && o->val == base->val) {
             if (!diffLen)
                 o->isNone = 1;
