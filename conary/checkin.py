@@ -1035,8 +1035,8 @@ def diff(repos, versionStr = None, pathList = None, logErrors = True, dirName='.
     return 1
 
 def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
-    def error(s):
-        if logErrors: log.error(s)
+    def error(*s):
+        if logErrors: log.error(*s)
 
     state = ConaryStateFromFile(os.sep.join((dirName, 'CONARY')),
                                 repos).getSourceState()
@@ -1057,12 +1057,12 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
         try:
             pkgList = repos.findTrove(None, (state.getName(), versionStr, None))
         except errors.TroveNotFound, e:
-            error("Unable to find source component %s with version %s: %s",
+            log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
             return 2
         
 	if len(pkgList) > 1:
-	    error("%s specifies multiple versions" % versionStr)
+	    log.error("%s specifies multiple versions" % versionStr)
 	    return 2
 
 	oldTrove = repos.getTrove(*pkgList[0])
