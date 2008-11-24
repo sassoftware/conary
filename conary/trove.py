@@ -443,6 +443,9 @@ class VersionedSignaturesSet(streams.StreamCollection):
 
         raise KeyNotFound
 
+    def clear(self):
+        self.getStreams(1).clear()
+
     def __iter__(self):
         for item in self.getStreams(1):
             yield item
@@ -750,6 +753,10 @@ class MetadataItem(streams.StreamSet):
             self.oldSignatures.sign(keyId, version)
         else:
             self.signatures.sign(keyId, version)
+
+    def clearDigitalSignatures(self):
+        self.oldSignatures.clear()
+        self.signatures.clear()
 
     def verifyDigitalSignatures(self, label=None):
         keyCache = openpgpkey.getKeyCache()
