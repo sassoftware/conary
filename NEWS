@@ -15,6 +15,8 @@ Changes in @NEW@:
       were unuseable by older versions of conary (CNY-3040).
     * Added a new signature type which includes new metadata types.
     * Made Trove.verifyDigests() verify signatures of metadata.
+    * A bug that caused python dependencies to not be discovered when
+      using alternate versions of python has been fixed (CNY-3029).
 
 Changes in 2.0.29:
   o New Features:

@@ -58,15 +58,28 @@ class DirBasedModuleFinder(modulefinder.ModuleFinder):
         else:
             return modulefinder.ModuleFinder.scan_code(self, co, m)
 
-    def import_hook(self, name, caller=None, fromlist=None):
+    def import_hook(self, *args, **kwargs):
+        assert len(args) < 4
+
+        if len(args) > 1:
+            kwargs['caller'] = args[1]
+
+            if len(args) > 2:
+                kwargs['fromlist'] = args[2]
+
+            if len(args) > 3:
+                kwargs['level'] = args[3]
+
+            args = (args[0], )
+
         oldCaller = self.caller
-        if caller:
-            self.caller = caller.__file__
+        if 'caller' in kwargs:
+            self.caller = kwargs['caller'].__file__
         else:
             self.caller = None
 
         try:
-            modulefinder.ModuleFinder.import_hook(self, name, caller, fromlist)
+            modulefinder.ModuleFinder.import_hook(self, *args, **kwargs)
         finally:
             self.caller = oldCaller
 
