@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.30:
   o Internal Changes:
     * Refactored the code used for cvc diff and cvc rdiff to provide
       an internal iterator interface that does not directly print
