@@ -45,7 +45,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 64 + 1)
+SERVER_VERSIONS = range(36, 65 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -2378,7 +2378,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addMetadataItems(self, authToken, clientVersion, itemList):
         self.log(2, "adding %i metadata items" %len(itemList))
         l = []
-        metadata = self.getTroveInfo(authToken, clientVersion,
+        metadata = self.getTroveInfo(authToken, SERVER_VERSIONS[-1],
                                      trove._TROVEINFO_TAG_METADATA,
                                      [ x[0] for x in itemList ])
         # if we're signaled that any trove is missing, bail out
@@ -2663,6 +2663,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
                         labels):
+
+        def freezeTroveInfo(returnList, mark, trove, troveInfo):
+            if not trove: return
+            if clientVersion <= 64:
+                # mask out extended metadata
+                returnList.add((mark, trove, troveInfo.freeze(
+                                skipSet = troveInfo._newMetadataItems)))
+            else:
+                returnList.add((mark, trove, troveInfo.freeze()))
+
         # only show troves the user is allowed to see
         try:
             mark = long(mark)
@@ -2738,8 +2748,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for name, version, flavor, tag, data, tmark in cu:
             t = (name, version, flavor)
             if currentTrove != t:
-                if currentTroveInfo != None:
-                    l.add((currentMark, currentTrove, currentTroveInfo.freeze()))
+                freezeTroveInfo(l, currentMark, currentTrove, currentTroveInfo)
+
                 currentTrove = t
                 currentTroveInfo = trove.TroveInfo()
                 currentMark = tmark
@@ -2751,8 +2761,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if currentMark is None:
                 currentMark = tmark
             currentMark = min(currentMark, tmark)
-        if currentTrove:
-            l.add((currentMark, currentTrove, currentTroveInfo.freeze()))
+
+        freezeTroveInfo(l, currentMark, currentTrove, currentTroveInfo)
+
         return [ (x[0], x[1], base64.b64encode(x[2])) for x in l ]
 
     @accessReadWrite
@@ -2995,7 +3006,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
-        WHERE Instances.changed >= ?
+            WHERE Instances.changed >= ?
           AND Instances.isPresent = %d
           AND ugi.userGroupId in (%s)
         ORDER BY Instances.changed
@@ -3070,7 +3081,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if data is None:
                 ret[i] = (0, '') # value missing
                 continue
+
             # else, we have a value we need to return
+            if (infoType == trove._TROVEINFO_TAG_METADATA and 
+                clientVersion <= 64):
+                # ugly, but just instantiates a metadata object
+                md = trove.TroveInfo.streamDict[
+                                 trove._TROVEINFO_TAG_METADATA][1]()
+
+                md.thaw(data)
+                data = md.freeze(skipSet = trove.TroveInfo._newMetadataItems)
+
             ret[i] = (1, base64.encodestring(cu.frombinary(data)))
         return ret
 

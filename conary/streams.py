@@ -465,7 +465,10 @@ class StreamCollection(InfoStream):
 
     def freeze(self, skipSet = {}):
         if self._data is not None:
-            return self._data
+            if not skipSet:
+                return self._data
+            else:
+                self._thaw()
 
         l = []
         for typeId, itemDict in sorted(self._items.iteritems()):
@@ -570,7 +573,10 @@ class OrderedStreamCollection(StreamCollection):
 
     def freeze(self, skipSet = {}):
         if self._data is not None:
-            return self._data
+            if not skipSet:
+                return self._data
+            else:
+                self._thaw()
 
         l = []
         for typeId, itemList in (self._items.iteritems()):

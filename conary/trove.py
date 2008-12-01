@@ -607,7 +607,7 @@ _METADATA_ITEM_TAG_BIBLIOGRAPHY = 7
 _METADATA_ITEM_TAG_OLD_SIGNATURES = 8
 _METADATA_ITEM_TAG_NOTES = 9
 _METADATA_ITEM_TAG_LANGUAGE = 10
-_METADATA_ORIG_ITEMS = 10
+_METADATA_ITEM_ORIG_ITEMS = 10
 _METADATA_ITEM_TAG_KEY_VALUE = 11
 _METADATA_ITEM_TAG_NEW_SIGNATURES = 12
 
@@ -723,7 +723,7 @@ class MetadataItem(streams.StreamSet):
             # version 0 of the digest
             skip = self._skipSet.copy()
             skip.update((x[1][2], True) for x in self.streamDict.items() if
-                            x[0] > _METADATA_ORIG_ITEMS)
+                            x[0] > _METADATA_ITEM_ORIG_ITEMS)
             frz = streams.StreamSet.freeze(self, skipSet = skip,
                                            freezeUnknown = False)
         else:
@@ -1043,10 +1043,10 @@ class TroveInfo(streams.StreamSet):
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
     _oldMetadataItems = dict([ (x[1][2], True) for x in
                                MetadataItem.streamDict.items() if
-                               x[0] <= _METADATA_ORIG_ITEMS ])
+                               x[0] <= _METADATA_ITEM_ORIG_ITEMS ])
     _newMetadataItems = dict([ (x[1][2], True) for x in
                                MetadataItem.streamDict.items() if
-                               x[0] > _METADATA_ORIG_ITEMS ])
+                               x[0] > _METADATA_ITEM_ORIG_ITEMS ])
 
     def diff(self, other):
         return streams.StreamSet.diff(self, other, ignoreUnknown=True)

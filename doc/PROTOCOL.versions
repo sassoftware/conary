@@ -1,4 +1,8 @@
 # this file documents the wire protocol changes for conary.
+Version 65:
+  - getTroveInfo and getNewTroveInfo calls filter extended metadata from
+    results for older clients
+
 Version 64:
   - getTroveInfo call understands CLONEDFROMLIST troveInfo
 
