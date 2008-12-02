@@ -198,10 +198,13 @@ class Database(BaseDatabase):
         cdb = self._connectData()
         if not cdb.get("port", None):
             cdb["port"] = -1
+        import epdb
+        epdb.serve()
         try:
             self.dbh = pgsql.connect(**cdb)
         except pgsql.InternalError:
             raise sqlerrors.DatabaseError("Could not connect to database", cdb)
+            
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False

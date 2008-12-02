@@ -1838,7 +1838,9 @@ class Database(SqlDbRepository):
 
         #del opJournal
 
-        if not (commitFlags.justDatabase or commitFlags.test):
+        runScripts = not (commitFlags.justDatabase 
+                          or (commitFlags.test and not tagScript))
+        if runScripts:
             fsJob.runPostTagScripts(tagSet, tagScript)
 
         if rollbackPhase is None and updateDatabase and invalidateRollbacks:
@@ -1847,7 +1849,7 @@ class Database(SqlDbRepository):
         if rollbackPhase is not None:
             return fsJob
 
-        if not commitFlags.justDatabase:
+        if runScripts:
             fsJob.orderPostScripts(uJob)
             fsJob.runPostScripts(tagScript)
 

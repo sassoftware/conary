@@ -175,6 +175,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
     if needTroves or showFlags:
         troves = troveSource.getTroves(troveTups, withFiles=False, **kw)
+        import epdb
+        epdb.st()
         troveCache = dict(itertools.izip(troveTups, troves))
     elif recurseAll or recurseOne or recursePackages:
         if recursePackages:
