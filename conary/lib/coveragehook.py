@@ -19,6 +19,7 @@ import atexit
 import imp
 import os
 import signal
+import traceback
 import sys
 
 from conary.lib import util
@@ -102,7 +103,11 @@ def _installOsWrapper():
             return 0
 
     def exit_wrapper(*args):
-        sys.modules['coverage'].the_coverage.save()
+        try:
+            sys.modules['coverage'].the_coverage.save()
+        except:
+            print 'Uncaught exception while saving coverage in exit_wrapper:'
+            traceback.print_exc()
         origOsExit(*args)
 
     def exec_wrapper(fn):
