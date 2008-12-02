@@ -739,12 +739,17 @@ class MetadataItem(streams.StreamSet):
 
     def _updateDigests(self):
         self._updateId()
+        skip = dict(
+            (x[1][2], True) for x in self.streamDict.items() if
+                        x[0] <= _METADATA_ITEM_ORIG_ITEMS)
+        newFrz = self.freeze(skipSet = skip)
+
         for version in _METADATA_ITEM_SIG_VER_ALL:
             if version == 0:
                 if not self.oldSignatures.getDigest(version):
                     self.oldSignatures.addDigest(self._digest(version), version)
             else:
-                if not self.signatures.getDigest(version):
+                if not self.signatures.getDigest(version) and newFrz:
                     self.signatures.addDigest(self._digest(version), version)
 
     def computeDigests(self):

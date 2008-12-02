@@ -2,6 +2,8 @@ Changes in 2.0.31:
   o Client Changes:
     * addMetadataItems() automatically creates digests
     * MetadataItem.freeze() no longer creates metadata digests
+    * Metadata now has a version 1 digest computed only if it includes
+      extended metadata
 
   o Server Changes:
     * Hide extended metadata from old clients (CNY-3050)
