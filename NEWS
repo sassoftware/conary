@@ -1,3 +1,12 @@
+Changes in 2.0.31:
+  o Client Changes:
+    * addMetadataItems() automatically creates digests
+    * MetadataItem.freeze() no longer creates metadata digests
+
+  o Server Changes:
+    * Hide extended metadata from old clients (CNY-3050)
+    * addMetadataItems() now rejects metadata items which don't have digests
+
 Changes in 2.0.30:
   o Internal Changes:
     * Refactored the code used for cvc diff and cvc rdiff to provide

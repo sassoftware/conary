@@ -747,6 +747,9 @@ class MetadataItem(streams.StreamSet):
                 if not self.signatures.getDigest(version):
                     self.signatures.addDigest(self._digest(version), version)
 
+    def computeDigests(self):
+        self._updateDigests()
+
     def addDigitalSignature(self, keyId, version=0):
         self._updateDigests()
         if version == 0:
@@ -804,7 +807,6 @@ class MetadataItem(streams.StreamSet):
         return True
 
     def freeze(self, *args, **kw):
-        self._updateDigests()
         return streams.StreamSet.freeze(self, *args, **kw)
 
     def keys(self):
@@ -837,6 +839,10 @@ class Metadata(streams.OrderedStreamCollection):
     def __iter__(self):
         for item in self.getStreams(1):
             yield item
+
+    def computeDigests(self):
+        for item in self:
+            item.computeDigests()
 
     def _replaceAll(self, new):
         self._items[1] = new._items[1]
@@ -921,7 +927,7 @@ _TROVEINFO_ORIGINAL_SIG       = _TROVEINFO_TAG_INCOMPLETE
 # in v1 signatures as well
 _TROVEINFO_TAG_DIR_HASHES     = 15
 _TROVEINFO_TAG_SCRIPTS        = 16
-_TROVEINFO_TAG_METADATA       = 17  # Old format metadata, ignored
+_TROVEINFO_TAG_METADATA       = 17
 _TROVEINFO_TAG_COMPLETEFIXUP  = 18  # indicates that this trove went through 
                                     # a fix for incompleteness. only used on
                                     # the client, and left out of frozen forms
@@ -1425,6 +1431,8 @@ class Trove(streams.StreamSet):
             sigVersions = [ _TROVESIG_VER_CLASSIC, _TROVESIG_VER_NEW2 ]
         else:
             sigVersions = [ _TROVESIG_VER_CLASSIC, _TROVESIG_VER_NEW ]
+
+        self.troveInfo.metadata.computeDigests()
 
         for sigVersion in sigVersions:
             s = self._sigString(version = sigVersion)

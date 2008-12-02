@@ -2389,6 +2389,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for (troveTup, item), (presence, existing) in itertools.izip(itemList, metadata):
             m = trove.Metadata(base64.decodestring(existing))
             mi = trove.MetadataItem(base64.b64decode(item))
+            # don't allow items which don't have digests
+            if not list(itertools.chain(mi.oldSignatures, mi.signatures)):
+                raise errors.RepositoryError("Metadata cannot be added "
+                                             "without a digest")
+            mi.verifyDigests()
             m.addItem(mi)
             i = trove.TroveInfo()
             i.metadata = m

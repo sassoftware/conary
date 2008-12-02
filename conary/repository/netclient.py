@@ -731,6 +731,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def addMetadataItems(self, itemList):
         byServer = {}
         for (name, version, flavor), item in itemList:
+            # this does nothing if it's already been digested
+            item.computeDigests()
             l = byServer.setdefault(version.getHost(), [])
             l.append(
                 ((name, self.fromVersion(version), self.fromFlavor(flavor)),
