@@ -12,9 +12,9 @@
 # full details.
 #
 
-from conary.dbstore.postgresql_drv import Cursor as PgCursor
-from conary.dbstore.postgresql_drv import Database as PgDatabase
-from conary.dbstore import sqllib
+from postgresql_drv import Cursor as PgCursor
+from postgresql_drv import Database as PgDatabase
+import sqllib
 
 class Cursor(PgCursor):
     driver = "pgpool"

@@ -176,7 +176,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
             self.__delDB = True
-        self.db.loadSchema()
         dbVer = schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)

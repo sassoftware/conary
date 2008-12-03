@@ -198,8 +198,6 @@ class Database(BaseDatabase):
         cdb = self._connectData()
         if not cdb.get("port", None):
             cdb["port"] = -1
-        import epdb
-        epdb.serve()
         try:
             self.dbh = pgsql.connect(**cdb)
         except pgsql.InternalError:
