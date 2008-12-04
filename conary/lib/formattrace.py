@@ -52,7 +52,7 @@ class TraceRepr(Repr):
         self.maxset = 160
         self.maxlist = 20
         self.maxdict = 20
-        self.maxstring = 160
+        self.maxstring = 1600
         self.maxother = 160
 
         self.maxLineLen = 160

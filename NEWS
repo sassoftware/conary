@@ -1,3 +1,7 @@
+Changes in @NEW@:
+  o Internal Changes:
+    * Extended traceback representations display longer strings. (CNY-3053)
+
 Changes in 2.0.31:
   o Client Changes:
     * addMetadataItems() automatically creates digests
