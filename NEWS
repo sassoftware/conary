@@ -1,6 +1,9 @@
 Changes in @NEW@:
   o Internal Changes:
     * Extended traceback representations display longer strings. (CNY-3053)
+  o API Changes:
+    * Extended logic in deps.getShortFlavorDescriptors to handle cases where
+      prefers vs requires needs to be distinguished. (CNY-3054)
 
 Changes in 2.0.31:
   o Client Changes:
