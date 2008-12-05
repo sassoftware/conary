@@ -1611,7 +1611,6 @@ def getMajorArch(flavor):
 
 @api.developerApi
 def getShortFlavorDescriptors(flavors):
-    differences = flavorDifferences(flavors, strict=False)
     contextStr = {}
     descriptors = {}
     for flavor in flavors:
@@ -1621,14 +1620,30 @@ def getShortFlavorDescriptors(flavors):
         else:
             descriptors[flavor] = ()
     if len(set(descriptors.values())) != len(descriptors):
+        differences = flavorDifferences(flavors, strict=False)
         for flavor, shortenedFlavor in differences.iteritems():
             useFlags = getUseFlags(shortenedFlavor)
             positiveFlags = sorted(x[0] for x in useFlags
                                     if x[1] in (FLAG_SENSE_PREFERRED,
                                                 FLAG_SENSE_REQUIRED))
             descriptors[flavor] = descriptors[flavor] + tuple(positiveFlags)
+    if len(set(descriptors.values())) != len(descriptors):
+        # at this point the only differences are between
+        # prefers + requires and prefernot and requirenot and missing
+        differences = flavorDifferences(flavors, strict=True)
+        for flavor, shortenedFlavor in differences.iteritems():
+            majorArch = getMajorArch(flavor)
+            veryShortFlavor = Flavor()
+            useFlags = list(shortenedFlavor.iterDepsByClass(UseDependency))
+            if useFlags:
+                veryShortFlavor.addDeps(UseDependency, useFlags)
+            if majorArch:
+                veryShortFlavor.addDep(InstructionSetDependency,
+                                        Dependency(majorArch))
+            descriptors[flavor] = (str(veryShortFlavor),)
     if len(set(descriptors.values())) == len(set(descriptors)):
         return dict((x[0], '-'.join(x[1])) for x in descriptors.iteritems())
+
     raise NotImplementedError
 
 
