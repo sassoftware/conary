@@ -1475,7 +1475,8 @@ class addGitSnapshot(_RevisionControl):
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
-        util.execute("cd '%s' && git pull -q %s" % (lookasideDir, self.url))
+        util.execute("cd '%s' && git pull -q %s master" % (lookasideDir, 
+                                                           self.url))
 
     def showInfo(self, lookasideDir):
         log.info('Most recent repository commit message:')
