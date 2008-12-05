@@ -1038,6 +1038,7 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
     def error(*s):
         if logErrors: log.error(*s)
 
+    dirName = os.path.abspath(dirName)
     state = ConaryStateFromFile(os.sep.join((dirName, 'CONARY')),
                                 repos).getSourceState()
 
@@ -1878,6 +1879,7 @@ def iterLog(repos, branch = None, newer = False, dirName = '.'):
     if branch and newer:
         raise errors.CvcError(
             'cannot specify --newer and a different branch together')
+    dirName = os.path.abspath(dirName)
     state = ConaryStateFromFile(os.sep.join((dirName, "CONARY")),
                                 repos).getSourceState()
     if not branch:
@@ -2049,11 +2051,13 @@ def setFileFlags(repos, paths, text = False, binary = False):
 
     state.write('CONARY')
 
-def refresh(repos, cfg, refreshPatterns=[], callback=None):
+@api.developerApi
+def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     if not callback:
         callback = CheckinCallback()
 
-    conaryState = ConaryStateFromFile("CONARY")
+    dirName = os.path.abspath(dirName)
+    conaryState = ConaryStateFromFile(os.sep.join((dirName, 'CONARY')))
     state = conaryState.getSourceState()
 
     if len(refreshPatterns) == 1 and refreshPatterns[0] is None:
@@ -2083,7 +2087,8 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
     recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
                                     cfg = cfg, repos = repos,
                                     branch = state.getBranch(),
-                                    ignoreInstalled = True).getRecipe()
+                                    ignoreInstalled = True,
+                                    parentDir = dirName).getRecipe()
 
     # fetch all the sources
 
@@ -2098,14 +2103,13 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
         raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter)
-    srcdirs = [ os.getcwd(),
+    srcdirs = [ dirName,
                 cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
     try:
         recipeObj = recipeClass(cfg, lcache, srcdirs, lightInstance=True)
     except builderrors.RecipeFileError, msg:
-        log.error(str(msg))
-        sys.exit(1)
+        raise errors.CvcError(msg)
 
     recipeObj.populateLcache()
     recipeObj.sourceVersion = state.getVersion()
@@ -2143,7 +2147,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None):
             state.fileNeedsRefresh(pathId, True)
 
     conaryState.setSourceState(state)
-    conaryState.write('CONARY')
+    conaryState.write(os.sep.join((dirName, 'CONARY')))
 
 
 @api.developerApi

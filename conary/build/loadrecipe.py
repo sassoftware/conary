@@ -1185,9 +1185,14 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
 
     def __init__(self, trv, branch = None, cfg = None, repos = None,
                  ignoreInstalled = None, sourceFiles = None,
-                 buildFlavor = None, labelPath = None):
+                 buildFlavor = None, labelPath = None, parentDir = None):
         def getFile(repos, fileId, fileVersion, path):
+            if parentDir:
+                return open(os.sep.join((parentDir, path)))
             return open(path)
+
+        if parentDir is None:
+            parentDir = os.getcwd()
 
         if branch:
             versionStr = str(branch)
@@ -1200,4 +1205,4 @@ class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
                                              getFileFunction = getFile,
                                              branch = branch,
                                              buildFlavor = buildFlavor,
-                                             parentDir = os.getcwd())
+                                             parentDir = parentDir)
