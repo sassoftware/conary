@@ -1155,7 +1155,7 @@ class _GroupRecipe(_BaseGroupRecipe):
         SYNOPSIS
         ========
 
-        C{r.replace(I{name}, [I{groupName},] [I{newFlavor},] [I{newVersionStr}], [I{allowNoMatch}], [I{searchPath}])}
+        C{r.replace(I{name}, [I{groupName},]  [I{newVersionStr}], [I{newFlavor},], [I{allowNoMatch}], [I{searchPath}])}
 
         DESCRIPTION
         ===========
