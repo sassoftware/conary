@@ -97,6 +97,8 @@ class FlavorPreferences:
         'ppc ppc64'     : ['is: ppc64', 'is:ppc'],
         'sparc64'       : ['is: sparc64', 'is:sparc'],
         'sparc sparc64' : ['is: sparc64', 'is:sparc'],
+        's390x'         : ['is: s390x', 'is:s390'],
+        's390 s390x'    : ['is: s390x', 'is:s390'],
         'x86_64'        : ['is: x86_64', 'is:x86' ],
         'x86 x86_64'    : ['is: x86_64', 'is:x86'],
     }

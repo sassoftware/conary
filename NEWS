@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o New Features:
+    * flavorPreferences now handling s390{,x} (CNY-3056)
+
   o Internal Changes:
     * Extended traceback representations display longer strings. (CNY-3053)
 
