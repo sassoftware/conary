@@ -65,7 +65,11 @@ def post(port, isSecure, repos, req):
             # otherwise, we've read the data, let's process it
             if encoding == 'deflate':
                 sio.seek(0)
-                sio = util.decompressStream(sio)
+                try:
+                    sio = util.decompressStream(sio)
+                except zlib.error, error:
+                    req.log_error("zlib inflate error in POST: %s" % error)
+                    return apache.HTTP_BAD_REQUEST
 
             startTime = time.time()
             sio.seek(0)
