@@ -286,6 +286,10 @@ def putFile(port, isSecure, repos, req):
             while s:
                 f.write(s)
                 s = req.read(BUFFER)
+        except IOError:
+            # Client timed out, etc. Even if they're not around to get
+            # a response, apache can make a useful log entry.
+            retcode = apache.HTTP_BAD_REQUEST
         except Exception, e:
             # for some reason, this is a different instance of the
             # apache.SERVER_RETURN class than we have available from
