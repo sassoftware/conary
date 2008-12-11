@@ -1,6 +1,6 @@
-Changes in @NEW@:
+Changes in 2.0.32:
   o New Features:
-    * flavorPreferences now handling s390{,x} (CNY-3056)
+    * flavorPreferences now handle s390{,x}. (CNY-3056)
 
   o Internal Changes:
     * Extended traceback representations display longer strings. (CNY-3053)
