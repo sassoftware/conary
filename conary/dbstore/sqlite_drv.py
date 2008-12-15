@@ -228,6 +228,14 @@ class Database(BaseDatabase):
             self.commit()
             self.loadSchema()
 
+    # Transaction support
+    def inTransaction(self):
+        """
+        Return C{True} if the connection currently has an active
+        transaction.
+        """
+        return self.dbh.inTransaction
+
     # A trigger that syncs up the changed column
     def createTrigger(self, table, column, onAction, pinned=None):
         if pinned is not None:

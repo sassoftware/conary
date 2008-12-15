@@ -274,6 +274,15 @@ class Database(BaseDatabase):
         version = self.getVersion()
         return version
 
+    # Transaction support
+    def inTransaction(self):
+        """
+        Return C{True} if the connection currently has an active
+        transaction.
+        """
+        return self.dbh.transaction in (pgsql.TRANS_INTRANS,
+                pgsql.TRANS_INERROR, pgsql.TRANS_ACTIVE)
+
     # Postgresql's trigegr syntax kind of sucks because we have to
     # create a function first and then call that function from the
     # trigger
