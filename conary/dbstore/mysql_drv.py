@@ -236,16 +236,9 @@ class Database(BaseDatabase):
     sequenceClass = Sequence
     driver = "mysql"
     MaxPacket = 1024 * 1024
+
     keywords = KeywordDict()
-
-    _inTransaction = False
-
-    def __init__(self, *args, **kwargs):
-        BaseDatabase.__init__(*args, **kwargs)
-        # Keep track of temp tables and transaction state when
-        # switching databases.
-        self.tempTableStorage = {}
-        self._inTransStorage = {}
+    tempTableStorage = {}
 
     def _setCharSet(self, cu):
         cu.execute("SELECT default_character_set_name "
@@ -295,8 +288,6 @@ class Database(BaseDatabase):
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
-        self.tempTableStorage = {}
-        self._inTransaction = False
         return True
 
     def alive(self):
@@ -340,14 +331,6 @@ class Database(BaseDatabase):
             return self.version
         version = self.getVersion()
         return version
-
-    # Transaction support
-    def inTransacton(self):
-        """
-        Return C{True} if the connection currently has an active
-        transaction.
-        """
-        return self._inTransaction
 
     # A trigger that syncs up a column to the timestamp
     def createTrigger(self, table, column, onAction, pinned=None):
@@ -467,13 +450,9 @@ class Database(BaseDatabase):
     def use(self, dbName):
         cu = self.cursor()
         oldDbName = cu.execute("SELECT database()").fetchone()[0]
-        # Need to save and restore temp tables and transaction state
-        # because mysql preserves them across database switches.
-        # Note that any open transactions remain open, so roll back
-        # before switching if you weren't expecting that, or it'll
-        # still be there when you switch back.
+        # need to save and restore self.tempTables because mysql
+        # preserves them as we switch from databse to database
         self.tempTableStorage[oldDbName] = self.tempTables
-        self._inTransStorage[oldDbName] = self._inTransaction
 
         try:
             self.dbh.select_db(dbName)
@@ -490,7 +469,6 @@ class Database(BaseDatabase):
         # load up the new one - on mysql this is a very expensive operation
         BaseDatabase.loadSchema(self)
         self.tempTables = self.tempTableStorage.get(dbName, sqllib.CaselessDict())
-        self._inTransaction = self._inTransStorage.get(dbName, False)
 
     # analyze one or all tables in the database
     def analyze(self, table=""):
