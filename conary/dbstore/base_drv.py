@@ -336,6 +336,13 @@ class BaseDatabase:
         assert(self.dbh)
         return self.dbh.rollback()
 
+    def inTransaction(self):
+        """
+        Return C{True} if the connection currently has an active
+        transaction.
+        """
+        raise NotImplementedError("This function should be provided by the SQL drivers")
+
     # trigger schema handling
     def createTrigger(self, table, when, onAction, sql):
         assert(table in self.tables)
