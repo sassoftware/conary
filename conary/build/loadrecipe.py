@@ -405,7 +405,10 @@ class RecipeLoaderFromString(object):
 
         # Look on the repository first to match the trove specs
         try:
-            nvfDict = repos.findTroves(cfg.installLabelPath, troveSpecs)
+            nvfDict = repos.findTroves(cfg.installLabelPath, troveSpecs, 
+                                       buildFlavor, 
+                                       allowMissing=True,
+                                       bestFlavor=True)
         except (IOError, errors.ProxyError), err:
             nvfDict = {}
 
