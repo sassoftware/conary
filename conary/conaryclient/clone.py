@@ -274,6 +274,9 @@ class ClientClone:
 
             for pathId, path, newFileId, finalFileVersion in \
                                                     trvCs.getChangedFileList():
+                if not finalFileVersion:
+                    # the file was renamed but its the same file.
+                    continue
                 fromFileVersion = fromTrove.getFile(pathId)[2]
                 if _sameHost(fromFileVersion, finalFileVersion):
                     # The server already has this file on it; no reason to

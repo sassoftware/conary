@@ -1,11 +1,14 @@
 Changes in @NEW@:
   o Bug Fixes:
-     *  fix reporting of errors when using glob objects in actions such as r.Remove. (CNY-3055)
+     * Fixed reporting of errors when using glob objects in actions such as 
+       r.Remove. (CNY-3055)
+     * Promotion of source components where files have been renamed across
+       repositories has been fixed. (CNY-3059)
 
 
 Changes in 2.0.32:
   o New Features:
-    * flavorPreferences now handle s390{,x}. (CNY-3056)
+    * FlavorPreferences now handle s390{,x}. (CNY-3056)
 
   o Internal Changes:
     * Extended traceback representations display longer strings. (CNY-3053)
