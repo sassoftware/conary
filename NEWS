@@ -5,7 +5,6 @@ Changes in @NEW@:
      * Promotion of source components where files have been renamed across
        repositories has been fixed. (CNY-3059)
 
-
 Changes in 2.0.32:
   o New Features:
     * FlavorPreferences now handle s390{,x}. (CNY-3056)
