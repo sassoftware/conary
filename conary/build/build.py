@@ -137,9 +137,9 @@ class BuildAction(action.RecipeAction):
 
     def missingFiles(self, files, warn = False):
         if len(files) == 1:
-            fileMsg = "'" + files[0] + "'"
+            fileMsg = repr(files[0])
         else:
-            fileMsg = "('" + "', '".join(x for x in files) + "')"
+            fileMsg = "(" + ", ".join(repr(x) for x in files) + ")"
         message = "%s: No files matched: %s" % \
                 (self.__class__.__name__, fileMsg)
         if warn:

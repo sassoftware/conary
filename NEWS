@@ -1,4 +1,7 @@
 Changes in @NEW@:
+  o Bug Fixes:
+     *  fix reporting of errors when using glob objects in actions such as r.Remove. (CNY-3055)
+
 
 Changes in 2.0.32:
   o New Features:
