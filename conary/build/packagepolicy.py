@@ -2659,6 +2659,7 @@ class Provides(_dependency):
             sys.path = []
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
+            site.PREFIXES=[sys.prefix, sys.exec_prefix]  
             site.addsitepackages(None)
             systemPaths.update(self._stripDestDir(sys.path, destdir))
 
@@ -3472,6 +3473,7 @@ class Requires(_addInfo, _dependency):
             sys.path = [destdir + pythonDir]
             sys.prefix = destdir + sys.prefix
             sys.exec_prefix = destdir + sys.exec_prefix
+            site.PREFIXES=[sys.prefix, sys.exec_prefix]  
             site.addsitepackages(None)
             systemPaths = sys.path + systemPaths
 

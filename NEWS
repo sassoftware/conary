@@ -4,6 +4,9 @@ Changes in @NEW@:
        r.Remove. (CNY-3055)
      * Promotion of source components where files have been renamed across
        repositories has been fixed. (CNY-3059)
+     * Added support for python module discovery in python 2.6, which 
+       uses a new PREFIXES variable to determine where to search for modules.
+       (CNY-3063)
 
 Changes in 2.0.32:
   o New Features:
