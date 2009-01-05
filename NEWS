@@ -9,6 +9,9 @@ Changes in @NEW@:
     * Added support for python module discovery in python 2.6, which 
       uses a new PREFIXES variable to determine where to search for modules.
       (CNY-3063)
+    * You can now have flavored groups for superclass groups - these can
+      be created when superclass groups are created as a part of another
+      group recipe. (CNY-3061)
 
 Changes in 2.0.32:
   o New Features:
@@ -26,9 +29,6 @@ Changes in 2.0.32:
   o Bug Fixes:
     * Git no longer defaults to the master branch, so we now specify the 
       branch when pulling. (CNY-3012)
-    * You can now have flavored groups for superclass groups - these can
-      be created when superclass groups are created as a part of another
-      group recipe. (CNY-3061)
 
 Changes in 2.0.31:
   o Client Changes:
