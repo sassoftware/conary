@@ -70,6 +70,7 @@ cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
     'pam(d|)', 'patch', 'pl', 'py',
     'recipe', 'sysconfig',
     'tag(handler|description)', 'tmpwatch', 'txt',
+    'xml',
     )),
     '|'.join((
     # full filenames

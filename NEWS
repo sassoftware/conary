@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o New Features:
+    * When adding an XML file (filename ending in ".xml") to a source
+      component, it will be added as a text (config) file by default,
+      and so changes will be managed with diff/patch merging.  Specify
+      the --binary option to avoid merging. (CNY-3045)
+
   o Bug Fixes:
     * Fixed reporting of errors when using glob objects in actions such as 
       r.Remove. (CNY-3055)
