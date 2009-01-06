@@ -4,6 +4,8 @@ Changes in @NEW@:
       component, it will be added as a text (config) file by default,
       and so changes will be managed with diff/patch merging.  Specify
       the --binary option to avoid merging. (CNY-3045)
+    * When adding groups via addAll, conary now reports the exact
+      name, version, and flavor of the group being added. (CNY-2977)
 
   o Bug Fixes:
     * Fixed reporting of errors when using glob objects in actions such as 
@@ -21,6 +23,9 @@ Changes in @NEW@:
     * Metadata promotion is more robust in the context of other inaccessible
       or missing older troves. (CNY-2611)
     * Promotion of inidividual components is no longer allowed. (CNY-2941)
+    * Fixed a case conaryclient.makeSourceTrove could fail to create
+      a trove because it tried to assign it a previously existing version.
+      (CNY-3028)
 
 Changes in 2.0.32:
   o New Features:

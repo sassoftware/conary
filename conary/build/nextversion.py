@@ -209,3 +209,56 @@ def nextLocalVersion(db, troveNames, latest, troveFlavorSet):
         latest.incrementBuildCount()
     return latest
 
+def nextSourceVersion(targetBranch, revision, existingVersionList):
+    """
+        Returns the correct source version on the branch given
+        with the revision number specified given the list of
+        existing versions. 
+        @param targetBranch: the branch to create the version on
+        @param revision: a revision object that contains the desired upstream 
+        version and source count to use in the version.  
+        This may be or modified to fit the target branch (for example, 
+        if it has too many .'s in it for the branch it is being moved to).
+        @param existingVersionList: list of version objects that are the other
+        source versions for this package on this branch.
+    """
+    # we're going to be incrementing this
+    revision = revision.copy()
+    # not sure if we actually need to copy this but it can't hurt...
+    desiredVersion = targetBranch.createVersion(revision).copy()
+    # this could have too many .'s in it
+    if desiredVersion.shadowLength() < revision.shadowCount():
+        # this truncates the dotted version string
+        revision.getSourceCount().truncateShadowCount(
+                                    desiredVersion.shadowLength())
+        desiredVersion = targetBranch.createVersion(revision)
+
+    # the last shadow count is not allowed to be a 0
+    if [ x for x in revision.getSourceCount().iterCounts() ][-1] == 0:
+        desiredVersion.incrementSourceCount()
+    # if 1-3.6 exists we don't want to be created 1-3.5.
+    matchingUpstream = [ x.trailingRevision()
+                         for x in existingVersionList
+                         if (x.trailingRevision().getVersion()
+                             == revision.getVersion()) ]
+    if (revision in matchingUpstream
+        and desiredVersion.shadowLength() > revision.shadowCount()):
+        desiredVersion.incrementSourceCount()
+        revision = desiredVersion.trailingRevision()
+
+    if matchingUpstream:
+        def _sourceCounts(revision):
+            return list(revision.getSourceCount().iterCounts())
+        shadowCounts = _sourceCounts(revision)
+        matchingShadowCounts = [ x for x in matchingUpstream
+                           if _sourceCounts(x)[:-1] == shadowCounts[:-1] ]
+        if matchingShadowCounts:
+            latest = sorted(matchingShadowCounts, key=_sourceCounts)[-1]
+            if (revision in matchingShadowCounts
+                or _sourceCounts(latest) > _sourceCounts(revision)):
+                revision = latest.copy()
+                desiredVersion = targetBranch.createVersion(revision)
+                desiredVersion.incrementSourceCount()
+
+    assert(not desiredVersion in existingVersionList)
+    return desiredVersion

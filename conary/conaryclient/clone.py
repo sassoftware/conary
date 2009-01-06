@@ -46,7 +46,7 @@ from conary import callbacks
 from conary import errors, files
 from conary import trove
 from conary import versions
-from conary.build.nextversion import nextVersions
+from conary.build import nextversion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import api, log
@@ -1526,45 +1526,9 @@ class LeafMap(object):
         targetBranchVersionList = [x[1] for x in 
                                    self.branchMap.get((name, targetBranch,   
                                                       flavor), [])]
-
         revision = version.trailingRevision().copy()
-        desiredVersion = targetBranch.createVersion(revision).copy()
-        # this could have too many .'s in it
-        if desiredVersion.shadowLength() < revision.shadowCount():
-            # this truncates the dotted version string
-            revision.getSourceCount().truncateShadowCount(
-                                        desiredVersion.shadowLength())
-            desiredVersion = targetBranch.createVersion(revision)
-
-        # the last shadow count is not allowed to be a 0
-        if [ x for x in revision.getSourceCount().iterCounts() ][-1] == 0:
-            desiredVersion.incrementSourceCount()
-        # if 1-3.6 exists we don't want to be created 1-3.5.
-        matchingUpstream = [ x.trailingRevision()
-                             for x in targetBranchVersionList
-                             if (x.trailingRevision().getVersion()
-                                 == revision.getVersion()) ]
-        if (revision in matchingUpstream
-            and desiredVersion.shadowLength() > revision.shadowCount()):
-            desiredVersion.incrementSourceCount()
-            revision = desiredVersion.trailingRevision()
-
-        if matchingUpstream:
-            def _sourceCounts(revision):
-                return list(revision.getSourceCount().iterCounts())
-            shadowCounts = _sourceCounts(revision)
-            matchingShadowCounts = [ x for x in matchingUpstream
-                               if _sourceCounts(x)[:-1] == shadowCounts[:-1] ]
-            if matchingShadowCounts:
-                latest = sorted(matchingShadowCounts, key=_sourceCounts)[-1]
-                if (revision in matchingShadowCounts
-                    or _sourceCounts(latest) > _sourceCounts(revision)):
-                    revision = latest.copy()
-                    desiredVersion = targetBranch.createVersion(revision)
-                    desiredVersion.incrementSourceCount()
-
-        assert(not desiredVersion in targetBranchVersionList)
-        return desiredVersion
+        return nextversion.nextSourceVersion(targetBranch, revision, 
+                                             targetBranchVersionList)
 
     def createBinaryVersion(self, repos, binaryList, sourceVersion):
         # We should be able to avoid the repos calls made in here...
@@ -1591,8 +1555,8 @@ class LeafMap(object):
         for bumpVersions, troveList in bumpList.items():
             indexes = [ x[0] for x in troveList ]
             troveList = [ x[1] for x in troveList ]
-            newVersions = nextVersions(repos, None, troveList,
-                                       alwaysBumpCount=bumpVersions)
+            newVersions = nextversion.nextVersions(repos, None, troveList,
+                                                   alwaysBumpCount=bumpVersions)
             for idx, newVersion in itertools.izip(indexes, newVersions):
                 allVersions[idx] = newVersion
         return allVersions
