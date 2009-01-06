@@ -2389,6 +2389,8 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
         componentMatches = set(newTroveComponents) & set(oldTroveComponents)
         componentMatches = [ (x, oldTup[1], oldTup[2])
                                 for x in componentMatches ]
+        hasTroves = repos.hasTroves(componentMatches)
+        componentMatches = [x for x in componentMatches if hasTroves[x]]
         componentMatches = repos.getTroves(componentMatches, withFiles=False)
         componentMatches = dict((x.getName(), x) for x in componentMatches)
         for childTrv in childrenByTrove.get(
