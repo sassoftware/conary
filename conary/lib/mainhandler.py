@@ -135,17 +135,14 @@ class MainHandler(object):
         return self._getUsageByClass(commandClass, commandName)
 
     def _getUsageByClass(self, commandClass, commandName=None):
-        if self.name:
-            progName = self.name
-        else:
-            progName = argv[0]
+        assert self.name, 'You must define the "name" attribute for class "%s"' % self.__class__.__name__
         if not commandName:
             if hasattr(commandClass, 'name'):
                 commandName = commandClass.name
             else:
                 commandName = commandClass.commands[0]
 
-        commandUsage = '%s %s %s' % (progName, commandName,
+        commandUsage = '%s %s %s' % (self.name, commandName,
                                      commandClass.paramHelp)
         return commandUsage
 
