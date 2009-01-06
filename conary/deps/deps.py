@@ -1640,7 +1640,7 @@ def getShortFlavorDescriptors(flavors):
             if majorArch:
                 veryShortFlavor.addDep(InstructionSetDependency,
                                         Dependency(majorArch))
-            descriptors[flavor] = (str(veryShortFlavor),)
+            descriptors[flavor] = tuple(str(veryShortFlavor).split(','))
     if len(set(descriptors.values())) == len(set(descriptors)):
         return dict((x[0], '-'.join(x[1])) for x in descriptors.iteritems())
 
