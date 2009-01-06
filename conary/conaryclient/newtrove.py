@@ -13,6 +13,7 @@
 
 import os
 
+from conary.build import nextversion
 from conary.deps import deps
 from conary.repository import changeset
 from conary.repository import filecontents
@@ -94,29 +95,17 @@ class ClientNewTrove:
             trovesSeen.add((name, versionSpec))
             troveSpecs[name, str(version.trailingLabel()), None] = troveObj
 
-        results = repos.findTroves(None, troveSpecs, None, allowMissing=True)
+        results = repos.findTroves(None, troveSpecs, None, allowMissing=True,
+                                   getLeaves=False)
         for troveSpec, troveObj in troveSpecs.iteritems():
+            branch = troveObj.getVersion().branch()
+            revision = troveObj.getVersion().trailingRevision()
             tupList = results.get(troveSpec, [])
-            assert (len(tupList) in (0, 1))
+            newVersion = nextversion.nextSourceVersion(branch, revision, [x[1] for x in tupList])
+            troveObj.changeVersion(newVersion)
             if tupList:
-                previousUpstreamVersion = tupList[0][1].trailingRevision().getVersion()
-            else:
-                previousUpstreamVersion = None
-            currentUpstreamVersion = troveObj.getVersion().trailingRevision().getVersion()
-            if previousUpstreamVersion == currentUpstreamVersion:
-                latestVersion = tupList[0][1]
-                newVersion = latestVersion.copy()
-                newVersion.incrementSourceCount()
-                troveObj.changeVersion(newVersion)
-            else:
-                version = troveObj.getVersion()
-                branch = version.branch()
-                upstreamVer = version.trailingRevision().getVersion()
-                revision = versions.Revision('%s-1' % upstreamVer)
-                newVersion = branch.createVersion(revision)
-                troveObj.changeVersion(newVersion)
-            if tupList:
-                previousVersionMap[troveObj.getNameVersionFlavor()] = tupList[0]
+                # add the latest source component to the previousVersionMap
+                previousVersionMap[troveObj.getNameVersionFlavor()] = sorted(tupList, key = lambda x: x[1])[-1]
         return previousVersionMap
 
     def _addAllNewFiles(self, cs, troveAndPathList, previousVersionMap):

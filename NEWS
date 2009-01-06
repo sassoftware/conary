@@ -23,6 +23,9 @@ Changes in @NEW@:
     * Metadata promotion is more robust in the context of other inaccessible
       or missing older troves. (CNY-2611)
     * Promotion of inidividual components is no longer allowed. (CNY-2941)
+    * Fixed a case conaryclient.makeSourceTrove could fail to create
+      a trove because it tried to assign it a previously existing version.
+      (CNY-3028)
 
 Changes in 2.0.32:
   o New Features:
