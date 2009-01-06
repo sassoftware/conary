@@ -57,6 +57,10 @@ def troveIsComponent(troveName):
     return ":" in troveName
 
 @api.developerApi
+def troveIsSourceComponent(troveName):
+    return troveName.endswith(':source')
+
+@api.developerApi
 def troveIsFileSet(troveName):
     return (troveName.startswith('fileset-')
             and not troveName.endswith(':source'))

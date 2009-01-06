@@ -440,8 +440,33 @@ class ClientClone:
             byDefaultDict.update(defaults)
         chooser.setByDefaultMap(byDefaultDict)
 
+    def _checkCloneListSanity(self, troveList):
+        # check to make sure the list of troves we're
+        # attempting to clone are sane.
+        packages = set()
+        components = {}
+        for troveTup in troveList:
+            #do not promote single component without parent
+            troveName = troveTup[0]
+            if not trove.troveIsComponent(troveName):
+                packages.add(troveTup)
+            elif not trove.troveIsSourceComponent(troveName):
+                package = (troveName.split(':', 1)[0], troveTup[1], 
+                           troveTup[2])
+                components.setdefault(package, []).append(troveName)
+
+        missingPackages =  set(components) - packages
+        if not missingPackages:
+            return 
+        componentNames = []
+        for packageTup in missingPackages:
+            for componentName in components[packageTup]:
+                componentNames.append(componentName)
+        raise errors.CvcError('Cannot promote/clone components: %s.  Please specify package names instead.' % (','.join(repr(x) for x in sorted(componentNames)),))
+
     def _determineTrovesToClone(self, chooser, cloneMap, cloneJob, troveCache,
                                 callback):
+        self._checkCloneListSanity(chooser.getPrimaryTroveList())
         trvs = troveCache.getTroves(chooser.getPrimaryTroveList())
         toClone = []
 
