@@ -2293,6 +2293,7 @@ def processAddAllDirectives(recipeObj, troveMap, cache, repos):
         for troveSpec, flags in group.iterAddAllSpecs():
             for troveTup in \
                     troveMap[(flags.ref, flags.requireLatest)][troveSpec]:
+                log.info("Adding all from %s=%s[%s]" % troveTup)
                 processOneAddAllDirective(group, troveTup, flags,
                                           recipeObj, cache, repos)
 

@@ -4,6 +4,8 @@ Changes in @NEW@:
       component, it will be added as a text (config) file by default,
       and so changes will be managed with diff/patch merging.  Specify
       the --binary option to avoid merging. (CNY-3045)
+    * When adding groups via addAll, conary now reports the exact
+      name, version, and flavor of the group being added. (CNY-2977)
 
   o Bug Fixes:
     * Fixed reporting of errors when using glob objects in actions such as 
