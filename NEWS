@@ -26,6 +26,8 @@ Changes in @NEW@:
     * Fixed a case conaryclient.makeSourceTrove could fail to create
       a trove because it tried to assign it a previously existing version.
       (CNY-3028)
+    * A bug that caused an IOError when a repository attempted to
+      commit a changeset larger than 2 GiB has been fixed (CNY-3065)
 
 Changes in 2.0.32:
   o New Features:

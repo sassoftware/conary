@@ -1270,21 +1270,42 @@ static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
 }
 
 static PyObject * sha1Copy(PyObject *module, PyObject *args) {
-    int inFd, inSize, inStart, inStop, inAt;
-    PyObject * outFdList;
-    int * outFds;
-    int outFdCount;
+    off_t inFd, inSize, inStart, inStop, inAt;
+    PyObject * outFdList, *pyInStart, *pyInSize;
+    int * outFds, outFdCount, i, rc;
     char inBuf[1024 * 256];
     char outBuf[1024 * 256];
     SHA_CTX sha1state;
-    int i;
     z_stream zs;
-    int rc;
     char sha1[20];
 
-    if (!PyArg_ParseTuple(args, "(iii)O!", &inFd, &inStart, &inSize,
+    if (!PyArg_ParseTuple(args, "(iOO)O!", &inFd, &pyInStart, &pyInSize,
                           &PyList_Type, &outFdList ))
         return NULL;
+    if (!PyInt_CheckExact(pyInStart) &&
+	!PyLong_CheckExact(pyInStart)) {
+        PyErr_SetString(PyExc_TypeError, "second item in first argument must be an int or long");
+        return NULL;
+    }
+    if (!PyInt_CheckExact(pyInSize) &&
+	!PyLong_CheckExact(pyInSize)) {
+        PyErr_SetString(PyExc_TypeError, "third item in first argument must be an int or long");
+        return NULL;
+    }
+
+    if (PyInt_CheckExact(pyInStart))
+	inStart = PyLong_AsUnsignedLong(pyInStart);
+    else
+	inStart = PyLong_AsUnsignedLongLong(pyInStart);
+    if (inStart == (off_t) -1)
+	return NULL;
+
+    if (PyInt_CheckExact(pyInSize))
+	inSize = PyLong_AsUnsignedLong(pyInSize);
+    else
+	inSize = PyLong_AsUnsignedLongLong(pyInSize);
+    if (inSize == (off_t) -1)
+	return NULL;
 
     outFdCount = PyList_Size(outFdList);
     outFds = alloca(sizeof(*outFds) * outFdCount);
@@ -1301,7 +1322,6 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 
     inStop = inSize + inStart;
     inAt = inStart;
-
     rc = 0;
     while (rc != Z_STREAM_END) {
         if (!zs.avail_in) {
@@ -1345,21 +1365,45 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 }
 
 static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
-    int inFd, outFd;
-    int inSize, inStart, inStop, inAt, i;
+    int inFd, outFd, i, rc;
+    off_t inStop, inAt, inSize, inStart;
+    PyObject *pyInStart, *pyInSize;
     z_stream zs;
     char inBuf[1024 * 256];
     char outBuf[1024 * 256];
-    int rc;
     SHA_CTX sha1state;
     char sha1[20];
     char * path, * baseName;
     struct stat sb;
     char * tmpPath, * targetPath;
-
-    if (!PyArg_ParseTuple(args, "(iii)sss", &inFd, &inStart, &inSize,
-                                           &path, &baseName, &targetPath))
+    if (!PyArg_ParseTuple(args, "(iOO)sss", &inFd, &pyInStart, &pyInSize,
+			  &path, &baseName, &targetPath))
         return NULL;
+
+    if (!PyInt_CheckExact(pyInStart) &&
+	!PyLong_CheckExact(pyInStart)) {
+        PyErr_SetString(PyExc_TypeError, "second item in first argument must be an int or long");
+        return NULL;
+    }
+    if (!PyInt_CheckExact(pyInSize) &&
+	       !PyLong_CheckExact(pyInSize)) {
+        PyErr_SetString(PyExc_TypeError, "third item in first argument must be an int or long");
+        return NULL;
+    }
+
+    if (PyInt_CheckExact(pyInStart))
+	inStart = PyLong_AsUnsignedLong(pyInStart);
+    else
+	inStart = PyLong_AsUnsignedLongLong(pyInStart);
+    if (inStart == (off_t) -1)
+	return NULL;
+
+    if (PyInt_CheckExact(pyInSize))
+	inSize = PyLong_AsUnsignedLong(pyInSize);
+    else
+	inSize = PyLong_AsUnsignedLongLong(pyInSize);
+    if (inSize == (off_t) -1)
+	return NULL;
 
     tmpPath = alloca(strlen(path) + strlen(baseName) + 10);
     sprintf(tmpPath, "%s/.ct%sXXXXXX", path, baseName);
