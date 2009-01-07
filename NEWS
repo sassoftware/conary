@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.33:
   o New Features:
     * When adding an XML file (filename ending in ".xml") to a source
       component, it will be added as a text (config) file by default,
