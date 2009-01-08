@@ -2001,7 +2001,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                                             labelPath = labelPath,
                                             buildFlavor=buildFlavor)[0:2]
             except builderrors.RecipeFileError, msg:
-                raise CookError(str(msg))
+                raise CookError, str(msg), sys.exc_info()[2]
 
             recipeClass = loader.getRecipe()
 

@@ -1,3 +1,12 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * You can now have flavored groups for superclass groups - these can
+      be created when superclass groups are created as a part of another
+      group recipe. This release includes additional fixes over
+      those added in 2.0.33.  (CNY-3061)
+    * Post-mortem debugging sessions with recipes using --debug-all now start 
+      at the point of the innermost exception, making debugging easier.
+
 Changes in 2.0.33:
   o New Features:
     * When adding an XML file (filename ending in ".xml") to a source
@@ -17,15 +26,15 @@ Changes in 2.0.33:
     * Added support for python module discovery in python 2.6, which 
       uses a new PREFIXES variable to determine where to search for modules.
       (CNY-3063)
-    * You can now have flavored groups for superclass groups - these can
-      be created when superclass groups are created as a part of another
-      group recipe. (CNY-3061)
     * Metadata promotion is more robust in the context of other inaccessible
       or missing older troves. (CNY-2611)
     * Promotion of inidividual components is no longer allowed. (CNY-2941)
     * Fixed a case conaryclient.makeSourceTrove could fail to create
       a trove because it tried to assign it a previously existing version.
       (CNY-3028)
+    * You can now have flavored groups for superclass groups - these can
+      be created when superclass groups are created as a part of another
+      group recipe.  (CNY-3061)
     * A bug that caused an IOError when a repository attempted to
       commit a changeset larger than 2 GiB has been fixed (CNY-3065)
 

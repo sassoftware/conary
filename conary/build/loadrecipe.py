@@ -306,7 +306,7 @@ class Importer(object):
                 msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
             else:
                 msg += err.text
-            raise builderrors.RecipeFileError(msg)
+            raise builderrors.RecipeFileError, msg, sys.exc_info()[2]
 
         use.resetUsed()
         try:
@@ -325,7 +325,7 @@ class Importer(object):
                                 (self.baseName, linenum, err))
 
 
-            raise builderrors.RecipeFileError(msg)
+            raise builderrors.RecipeFileError, msg, sys.exc_info()[2]
         except Exception, err:
             tb = sys.exc_info()[2]
             while tb and tb.tb_frame.f_code.co_filename != self.fileName:
@@ -337,7 +337,7 @@ class Importer(object):
             err = ''.join(traceback.format_exception(err.__class__, err, tb))
             del tb
             msg = ('Error in recipe file "%s":\n %s' %(self.baseName, err))
-            raise builderrors.RecipeFileError(msg)
+            raise builderrors.RecipeFileError, msg, sys.exc_info()[2]
 
 class RecipeLoaderFromString(object):
 
@@ -355,8 +355,9 @@ class RecipeLoaderFromString(object):
                        overrides=overrides, factory = factory,
                        objDict = objDict, loadAutoRecipes = loadAutoRecipes)
         except Exception, err:
-            raise builderrors.LoadRecipeError('unable to load recipe file %s:\n%s'\
-                                              % (filename, err))
+            raise builderrors.LoadRecipeError, \
+                    'unable to load recipe file %s:\n%s' % (filename, err), \
+                    sys.exc_info()[2]
 
     @staticmethod
     def _loadAutoRecipes(importer, cfg, repos, db = None, buildFlavor = None):
@@ -713,9 +714,9 @@ class RecipeLoader(RecipeLoaderFromString):
             codeString = f.read()
             f.close()
         except Exception, err:
-            raise builderrors.LoadRecipeError(
-                                    'unable to load recipe file %s:\n%s'\
-                                   % (filename, err))
+            raise builderrors.LoadRecipeError, \
+                   'unable to load recipe file %s:\n%s' % (filename, err), \
+                   sys.exc_info()[2]
 
         RecipeLoaderFromString.__init__(self, codeString, filename,
                 cfg = cfg, repos = repos, component = component,
@@ -1163,6 +1164,7 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
 
         loader = RecipeLoaderFromRepository(name, cfg, repos,
                                      labelPath=labelPath,
+                                     buildFlavor=buildFlavor,
                                      versionStr=versionStr,
                                      ignoreInstalled=alwaysIgnoreInstalled,
                                      filterVersions=True,
