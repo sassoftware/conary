@@ -17,6 +17,7 @@ from mod_python.util import FieldStorage
 import os
 import sys
 import time
+import xmlrpclib
 import zlib
 
 from conary.lib import log, util
@@ -73,7 +74,11 @@ def post(port, isSecure, repos, req):
 
             startTime = time.time()
             sio.seek(0)
-            (params, method) = util.xmlrpcLoad(sio)
+            try:
+                (params, method) = util.xmlrpcLoad(sio)
+            except xmlrpclib.ResponseError:
+                req.log_error('error parsing XMLRPC request')
+                return apache.HTTP_BAD_REQUEST
             repos.log(3, "decoding=%s" % method, authToken[0],
                       "%.3f" % (time.time()-startTime))
             # req.connection.local_addr[0] is the IP address the server
