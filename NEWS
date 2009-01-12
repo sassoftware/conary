@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.34:
   o Bug Fixes:
     * You can now have flavored groups for superclass groups - these can
       be created when superclass groups are created as a part of another
