@@ -140,9 +140,6 @@ def Path(str):
 class _Path(str):
     __slots__ = []
 
-    def __init__(self, s):
-        str.__init__(self, s)
-
     def _getUnexpanded(self):
         return self
 
