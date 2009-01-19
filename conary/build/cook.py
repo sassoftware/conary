@@ -473,7 +473,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
             sys.exit(1)
 
         if type == recipe.RECIPE_TYPE_FACTORY:
-            assert(False, 'Factory recipe types should not get this far')
+            assert False, 'Factory recipe types should not get this far'
 
         if type in (recipe.RECIPE_TYPE_INFO,
                       recipe.RECIPE_TYPE_PACKAGE):
