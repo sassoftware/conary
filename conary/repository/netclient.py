@@ -2620,7 +2620,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             infoList = [ ((n,self.fromVersion(v),self.fromFlavor(f)), ti)
                      for (n,v,f),ti in infoList ]
             if freeze: # need to freeze the troveinfo as well
-                infoList = [ (t, base64.b64encode(ti.freeze()))
+                if server.getProtocolVersion() < 65:
+                    skipSet = ti._newMetadataItems
+                else:
+                    skipSet = None
+                infoList = [ (t, base64.b64encode(ti.freeze(skipSet=skipSet)))
                              for t, ti in infoList ]
             total += server.setTroveInfo(infoList)
         return total

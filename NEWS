@@ -1,3 +1,8 @@
+Changes in 2.0.35:
+  o Bug Fixes:
+    * setTroveInfo no longer sends extended metadata information to 
+      update services that cannot understand it. (CNY-3050)
+
 Changes in 2.0.34:
   o Bug Fixes:
     * You can now have flavored groups for superclass groups - these can
