@@ -379,6 +379,10 @@ class HTTPServer(BaseHTTPServer.HTTPServer):
         BaseHTTPServer.HTTPServer.close_request(self, request)
 
 if SSL:
+    class SSLConnection(SSL.Connection):
+        def gettimeout(self):
+            return self.socket.gettimeout()
+
     class SecureHTTPServer(HTTPServer):
         isSecure = True
 
@@ -388,7 +392,7 @@ if SSL:
 
         def server_bind(self):
             HTTPServer.server_bind(self)
-            conn = SSL.Connection(self.sslContext, self.socket)
+            conn = SSLConnection(self.sslContext, self.socket)
             self.socket = conn
 
         def handle_request(self):

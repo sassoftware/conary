@@ -16,7 +16,6 @@ import grp
 import gzip
 import os
 import pwd
-import sha
 import socket
 import stat
 import string
@@ -25,7 +24,7 @@ import tempfile
 import time
 
 from conary import errors, streams
-from conary.lib import util, sha1helper, log
+from conary.lib import util, sha1helper, log, digestlib
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
@@ -524,7 +523,7 @@ class RegularFile(File):
             else:
                 tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
                 try:
-                    d = sha.new()
+                    d = digestlib.sha1()
                     f = os.fdopen(tmpfd, 'w')
                     util.copyfileobj(src, f, digest = d)
                     f.close()

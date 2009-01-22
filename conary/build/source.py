@@ -22,12 +22,11 @@ import gzip
 import os
 import re
 import shutil, subprocess
-import sha
 import shlex
 import sys
 import tempfile
 
-from conary.lib import debugger, log, magic
+from conary.lib import debugger, digestlib, log, magic
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
@@ -79,7 +78,7 @@ class _Source(_AnySource):
                                           "and '%s'" % (archiveName, fName))
 
                 nsources.append(baseUrl)
-            s = sha.new()
+            s = digestlib.sha1()
             for src in nsources:
                 s.update(src)
             multiurlMapName = s.hexdigest()

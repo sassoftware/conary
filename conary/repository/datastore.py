@@ -24,10 +24,10 @@ import errno
 import gzip
 import itertools
 import os
-import sha
 import tempfile
 
 from conary.lib import misc, util
+from conary.lib import digestlib
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents
 
@@ -46,7 +46,7 @@ class AbstractDataStore:
         else:
             for fd in outFds:
                 outFileObj = os.fdopen(fd, "w")
-                contentSha1 = sha.new()
+                contentSha1 = digestlib.sha1()
                 if precompressed and computeSha1:
                     tee = Tee(fileObj, outFileObj)
                     uncompObj = gzip.GzipFile(mode = "r", fileobj = tee)

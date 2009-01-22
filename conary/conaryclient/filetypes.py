@@ -20,12 +20,11 @@ on the filesystem.
 
 import itertools
 import os
-import sha
 import time
 
 from conary import errors, files
 from conary.deps import deps
-from conary.lib import sha1helper, util
+from conary.lib import digestlib, sha1helper, util
 from conary.repository import filecontents
 
 class ParameterError(errors.ClientError):
@@ -105,7 +104,7 @@ class _File(object):
                 self.owner, self.group)
         self._touchupFileStream(f)
         if self.needSha1:
-            sha1 = sha.new()
+            sha1 = digestlib.sha1()
             contents = self.contents.get()
             devnull = open(os.devnull, 'w')
             util.copyfileobj(contents, devnull, digest = sha1)
