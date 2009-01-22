@@ -17,9 +17,7 @@ import binascii
 import errno
 import fcntl
 import itertools
-import md5
 import os
-import sha
 import stat
 import struct
 import sys
@@ -40,10 +38,15 @@ from Crypto.Cipher import DES3
 from Crypto.Cipher import Blowfish
 from Crypto.Cipher import CAST
 from Crypto.PublicKey import RSA
+
+# We know pycrypto imports sha directly
+import warnings
+warnings.filterwarnings("ignore", r"the sha module is deprecated",
+    DeprecationWarning, "^.*Crypto\.Hash\.SHA.*$")
 from Crypto.PublicKey import DSA
 
 from conary import constants
-from conary.lib import util
+from conary.lib import util, digestlib
 
 # key types defined in RFC 2440 page 49
 PK_ALGO_RSA                  = 1
@@ -377,25 +380,25 @@ def stringToAscii(sequence):
     Return the string with the hex representation for each character"""
     return "".join("%02x" % ord(c) for c in sequence).upper()
 
-def simpleS2K(passPhrase, hash, keySize):
+def simpleS2K(passPhrase, hashAlg, keySize):
     # RFC 2440 3.6.1.1.
     r = ''
     iteration = 0
     keyLength = ((keySize + 7) // 8)
     while len(r) < keyLength:
-        d = hash.new(chr(0) * iteration)
+        d = hashAlg(chr(0) * iteration)
         d.update(passPhrase)
         r += d.digest()
         iteration += 1
     return r[:keyLength]
 
-def saltedS2K(passPhrase, hash, keySize, salt):
+def saltedS2K(passPhrase, hashAlg, keySize, salt):
     # RFC 2440 3.6.1.2.
     r = ''
     iteration = 0
     keyLength = ((keySize + 7) // 8)
     while(len(r) < keyLength):
-        d = hash.new()
+        d = hashAlg()
         buf = chr(0) * iteration
         buf += salt + passPhrase
         d.update(buf)
@@ -403,7 +406,7 @@ def saltedS2K(passPhrase, hash, keySize, salt):
         iteration += 1
     return r[:keyLength]
 
-def iteratedS2K(passPhrase, hash, keySize, salt, count):
+def iteratedS2K(passPhrase, hashAlg, keySize, salt, count):
     # RFC 2440 3.6.1.3.
     r=''
     iteration = 0
@@ -411,7 +414,7 @@ def iteratedS2K(passPhrase, hash, keySize, salt, count):
     buf = salt + passPhrase
     keyLength = (keySize + 7) // 8
     while(len(r) < keyLength):
-        d = hash.new()
+        d = hashAlg()
         d.update(iteration * chr(0))
         total = 0
         while (count - total) > len(buf):
@@ -545,7 +548,7 @@ def verifyRFC2440Checksum(data):
 def verifySHAChecksum(data):
     if len(data) < 20:
         return 0
-    m = sha.new()
+    m = digestlib.sha1()
     m.update(data[:-20])
     return m.digest() == data[-20:]
 
@@ -1238,7 +1241,7 @@ class PGP_BasePacket(object):
         ret = set([])
         for stream in items:
             stream.seek(0)
-            hobj = sha.new()
+            hobj = digestlib.sha1()
             PGP_BasePacket._updateHash(hobj, stream)
             ret.add(hobj.digest())
         return ret
@@ -1762,9 +1765,9 @@ class PGP_Signature(PGP_BaseKeySig):
 
         if not (0 < self.hashAlg <= 2):
             raise UnsupportedHashAlgorithm(self.hashAlg)
-        hashAlgList = [ None, md5, sha]
+        hashAlgList = [ None, digestlib.md5, digestlib.sha1]
         hashFunc = hashAlgList[self.hashAlg]
-        hashObj = hashFunc.new()
+        hashObj = hashFunc()
 
         dataFile.seek(0, SEEK_SET)
         self._updateHash(hashObj, dataFile)
@@ -2016,7 +2019,7 @@ class PGP_UserAttribute(PGP_UserID):
 
     def parseBody(self):
         # Digest the packet
-        m = sha.new()
+        m = digestlib.sha1()
         self._updateHash(m, self.getBodyStream())
 
         self.id = '[image, digest = %s]' % m.hexdigest().upper()
@@ -2115,7 +2118,7 @@ class PGP_Key(PGP_BaseKeySig):
             # (public modulus n, followed by exponent e) with MD5.
             self._readCountMPIs(self.mpiFile, 1, discard = True)
             end2 = self.mpiFile.tell()
-            fpr = md5.new()
+            fpr = digestlib.md5()
             # Skip the 2-octet length 
             fpr.update(self.mpiFile.pread(end1 - 2, 2))
             fpr.update(self.mpiFile.pread((end2 - end1) - 2, end1 + 2))
@@ -2146,7 +2149,7 @@ class PGP_Key(PGP_BaseKeySig):
         # 0110 indicates public key
         # 01 indicates 2 bytes length
 
-        m = sha.new()
+        m = digestlib.sha1()
         sio = util.ExtendedStringIO()
         # Write only the header, we can copy the body directly from the
         # body stream
@@ -2614,7 +2617,7 @@ class PGP_SecretAnyKey(PGP_Key):
                  'count', 'initialVector', 'encMpiFile']
     pubTag = None
 
-    _hashes = [ 'Unknown', md5, sha, RIPEMD, 'Double Width SHA',
+    _hashes = [ 'Unknown', digestlib.md5, digestlib.sha1, RIPEMD, 'Double Width SHA',
                 'MD2', 'Tiger/192', 'HAVAL-5-160' ]
     # Ciphers and their associated key sizes
     _ciphers = [ ('Unknown', 0), ('IDEA', 0), (DES3, 192), (CAST, 128),

@@ -12,12 +12,11 @@
 # full details.
 #
 
-import sha
-import md5
 import os
 import stat
 import struct
-from Crypto.Hash import SHA256
+
+from conary.lib import digestlib
 
 def sha1FileBin(path):
     oldmode = None
@@ -30,7 +29,7 @@ def sha1FileBin(path):
     if oldmode is not None:
         os.chmod(path, oldmode)
 
-    m = sha.new()
+    m = digestlib.sha1()
     buf = os.read(fd, 40960)
     while len(buf):
 	m.update(buf)
@@ -40,7 +39,7 @@ def sha1FileBin(path):
     return m.digest()
 
 def sha1String(buf):
-    m = sha.new()
+    m = digestlib.sha1()
     m.update(buf)
     return m.digest()
 
@@ -55,7 +54,7 @@ def sha1FromString(val):
 			int(val[24:32], 16), int(val[32:40], 16))
 
 def sha256String(buf):
-    m = SHA256.new()
+    m = digestlib.sha256()
     m.update(buf)
     return m.digest()
 
@@ -72,7 +71,7 @@ def sha256FromString(val):
                         int(val[56:64], 16) )
 
 def md5String(buf):
-    m = md5.new()
+    m = digestlib.md5()
     m.update(buf)
     return m.digest()
 

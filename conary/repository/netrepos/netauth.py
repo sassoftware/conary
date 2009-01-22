@@ -12,7 +12,6 @@
 # full details.
 #
 import itertools
-import md5
 import os
 import time
 import urllib, urllib2
@@ -20,7 +19,7 @@ import xml
 
 from conary import conarycfg, versions
 from conary.repository import errors
-from conary.lib import sha1helper, tracelog
+from conary.lib import digestlib, sha1helper, tracelog
 from conary.dbstore import sqlerrors
 from conary.repository.netrepos import items, versionops, accessmap
 from conary.server.schema import resetTable
@@ -102,7 +101,7 @@ class UserAuthorization:
 
             isValid = p.validPassword()
         else:
-            m = md5.new()
+            m = digestlib.md5()
             m.update(salt)
             m.update(challenge)
             isValid = m.hexdigest() == password
@@ -669,7 +668,7 @@ class NetworkAuthorization:
         self.log(3, user)
 
         salt = os.urandom(4)
-        m = md5.new()
+        m = digestlib.md5()
         m.update(salt)
         m.update(password)
 
@@ -757,7 +756,7 @@ class NetworkAuthorization:
     def changePassword(self, user, newPassword):
         self.log(3, user)
         salt = os.urandom(4)
-        m = md5.new()
+        m = digestlib.md5()
         m.update(salt)
         m.update(newPassword)
 

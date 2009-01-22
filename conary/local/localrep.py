@@ -13,7 +13,6 @@
 #
 
 import gzip
-import sha
 import zlib
 try:
     from cStringIO import StringIO
@@ -21,6 +20,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary.repository import errors, repository, datastore
+from conary.lib import digestlib
 from conary.local import schema
 from conary import files
 
@@ -195,7 +195,7 @@ class SqlDataStore(datastore.AbstractDataStore):
                 rawData = fileObj.read()
 
             data = zlib.compress(rawData)
-            digest = sha.new()
+            digest = digestlib.sha1()
             digest.update(rawData)
             if digest.hexdigest() != hash:
                 raise errors.IntegrityError

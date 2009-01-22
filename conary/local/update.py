@@ -20,7 +20,6 @@ import errno
 import itertools
 import os
 import select
-import sha
 import stat
 import sys
 import tempfile
@@ -30,7 +29,7 @@ from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
-from conary.lib import log, patch, sha1helper, util, fixedglob
+from conary.lib import digestlib, log, patch, sha1helper, util, fixedglob
 from conary.local.errors import *
 from conary.local.journal import NoopJobJournal
 from conary.repository import changeset, filecontents
@@ -351,7 +350,7 @@ class FilesystemJob:
 				       fileObj.flags.isConfig():
 		# config file sha1's are verified when they get inserted
 		# into the config file cache
-		d = sha.new()
+		d = digestlib.sha1()
 		fileObj.restore(contents, root, target, journal=journal,
 				sha1 = fileObj.contents.sha1())
 	    else:

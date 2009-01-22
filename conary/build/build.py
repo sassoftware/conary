@@ -31,7 +31,6 @@ the permissions on files in classes derived from _PutFile.
 
 import os
 import re
-import sha
 import shutil
 import stat
 import sys
@@ -40,7 +39,7 @@ import textwrap
 
 #conary imports
 from conary.build import action, errors
-from conary.lib import fixedglob, log, util
+from conary.lib import fixedglob, digestlib, log, util
 from conary.build.use import Use
 from conary.build.manifest import Manifest, ExplicitManifest
 
@@ -3672,7 +3671,7 @@ class IncludeLicense(BuildAction):
         self.successiveLines = re.compile(r'\n\n+')
 
     def sha1sum(self, text):
-        shaObj = sha.new(text)
+        shaObj = digestlib.sha1(text)
         return shaObj.hexdigest()
 
     def normalize(self, text):
