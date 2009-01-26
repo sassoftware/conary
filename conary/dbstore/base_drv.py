@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,9 +13,21 @@
 #
 
 import sys
+import traceback
 import re
 
 import sqlerrors, sqllib
+
+from epdb import epdb
+
+
+(DEBUG_OFF,
+        DEBUG_WARN, # Print stack on invalid txn ops
+        DEBUG_WARN_ALL, # Print stack on all txn ops
+        DEBUG_ERROR, # Enter debugger on invalid txn ops
+    ) = range(4)
+DEBUG_TRANSACTIONS = DEBUG_OFF
+
 
 # class for encapsulating binary strings for dumb drivers
 class BaseBinary:
@@ -317,30 +329,67 @@ class BaseDatabase:
         assert(self.database)
         pass
 
+    # transaction support
+    def _logTransaction(self, command):
+        """
+        Check for txn sanity, when configured to do so.
+        """
+        # pylint: disable-msg=W0212
+        #  * _getframe needed to make a nicer stack dump.
+        assert command in ('BEGIN', 'ROLLBACK', 'COMMIT')
+        if DEBUG_TRANSACTIONS == DEBUG_OFF:
+            return
+        shouldBeInTrans = (command != 'BEGIN')
+        inTrans = self.inTransaction(default=shouldBeInTrans)
+        if inTrans == shouldBeInTrans:
+            if DEBUG_TRANSACTIONS == DEBUG_WARN_ALL:
+                print 'Transaction: %s at' % (command,)
+                traceback.print_stack(sys._getframe(2))
+            return
+
+        where = (inTrans and 'inside' or 'outside')
+        if DEBUG_TRANSACTIONS == DEBUG_ERROR:
+            print 'Transaction bug: %s %s of transaction' % (command, where)
+            epdb.st()
+        else:
+            print 'Transaction bug: %s %s of transaction at:' % (command, where)
+            traceback.print_stack(sys._getframe(2))
+
     def commit(self):
         assert(self.dbh)
+        self._logTransaction('COMMIT')
         return self.dbh.commit()
-    # transaction support
+
     def transaction(self, name = None):
         "start transaction [ named point ]"
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
+        self._logTransaction('BEGIN')
         c = self.cursor()
         c.execute(self.basic_transaction)
         return c
+
     def rollback(self, name=None):
         "rollback [ to transaction point ]"
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
+        self._logTransaction('ROLLBACK')
         return self.dbh.rollback()
 
-    def inTransaction(self):
+    @staticmethod
+    def inTransaction(default=None):
         """
         Return C{True} if the connection currently has an active
         transaction.
+
+        If C{default} is not C{None}, return C{default} if the database
+        engine does not have a working implementation of this method.
+        Otherwise, raises C{NotImplementedError}.
         """
+        if default is not None:
+            return default
         raise NotImplementedError("This function should be provided by the SQL drivers")
 
     # trigger schema handling
@@ -430,18 +479,38 @@ class BaseDatabase:
         self.triggers = sqllib.CaselessDict()
         self.version = 0
 
-    def getVersion(self):
+    def getVersion(self, raiseOnError=False):
+        """
+        Get the current schema version. If the version table is not
+        present, return a zero version.
+
+        @param raiseOnError: If set, raise instead of returning zero if 
+                the table is missing.
+        @type  raiseOnError: C{bool}
+        @rtype L{DBversion<conary.dbstore.sqllib.DBversion>}
+        """
+
         assert(self.dbh)
         c = self.cursor()
-        # schema might not be loaded, so we have to try: except: here
-        # instead of looking at the self.tables
+
+        # If self.tables is non-empty, loadSchema() has probably been
+        # called, so we can do a fast (and non-intrusive) check for
+        # our table.
+        if self.tables and 'DatabaseVersion' not in self.tables:
+            self.version = sqllib.DBversion(0, 0)
+            return self.version
+
+        # Otherwise, the schema might not be loaded so use a try/except
+        # pattern.
 
         # DatabaseVersion canbe an old style table that has only a version column
         # or it could be a new style version that has (version, minor) columns
         # or it can be a mint table that has (version, timestamps) columns
         try:
             c.execute("select * from DatabaseVersion limit 1")
-        except sqlerrors.InvalidTable, e:
+        except sqlerrors.InvalidTable:
+            if raiseOnError:
+                raise
             self.version = sqllib.DBversion(0,0)
             return self.version
         # keep compatibility with old style table versioning
@@ -455,7 +524,7 @@ class BaseDatabase:
             self.version = sqllib.DBversion(c.fetchone()[0])
         return self.version
 
-    def setVersion(self, version):
+    def setVersion(self, version, skipCommit=False):
         assert(self.dbh)
         if isinstance(version, int):
             version = sqllib.DBversion(version)
@@ -477,11 +546,14 @@ class BaseDatabase:
             c.execute("CREATE TABLE DatabaseVersion (version INTEGER, minor INTEGER)")
             c.execute("INSERT INTO DatabaseVersion (version, minor) VALUES (?,?)",
                       (version.major, version.minor))
-            self.commit()
+            if not skipCommit:
+                self.commit()
+            self.tables['DatabaseVersion'] = []
             return version
         c.execute("UPDATE DatabaseVersion SET version = ?, minor = ?",
                   (version.major, version.minor))
-        self.commit()
+        if not skipCommit:
+            self.commit()
         return version
 
     def shell(self):

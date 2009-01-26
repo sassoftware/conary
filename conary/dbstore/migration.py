@@ -65,23 +65,33 @@ class SchemaMigration:
     def message(self, msg = None):
         pass
 
-    def __migrate(self, toVer, func):
+    def __migrate(self, toVer, func, skipCommit):
         self.message("converting from schema %s to schema %s..." % (self.version, toVer))
-        if not func():
-            raise sqlerrors.SchemaVersionError(
-                "schema version migration failed from %s to %s" %(
-                self.version, toVer), self.version, self.Version)
-        self.db.setVersion(toVer)
+        if not skipCommit:
+            self.db.transaction()
+        try:
+            if not func():
+                raise sqlerrors.SchemaVersionError(
+                    "schema version migration failed from %s to %s" %(
+                    self.version, toVer), self.version, self.Version)
+            self.db.setVersion(toVer, skipCommit=True)
+        except:
+            if not skipCommit:
+                self.db.rollback()
+            raise
+        else:
+            if not skipCommit:
+                self.db.commit()
         return toVer
     
-    def __call__(self):
+    def __call__(self, skipCommit=False):
         if not self.canUpgrade():
             return self.version
         # is a major schema update needed?
         if self.version.major < self.Version.major:
             # we can perform the major schema update
             toVer = self._dbVersion(self.Version.major)
-            self.version = self.__migrate(toVer, self.migrate)
+            self.version = self.__migrate(toVer, self.migrate, skipCommit)
         assert(self.version.major == self.Version.major)
 
         # perform minor version upgrades, if needed
@@ -89,7 +99,7 @@ class SchemaMigration:
             nextmin = self.version.minor + 1
             toVer = self._dbVersion((self.version.major, nextmin))
             func = getattr(self, "migrate%d" % (nextmin,))
-            self.version = self.__migrate(toVer, func)
+            self.version = self.__migrate(toVer, func, skipCommit)
         self.message("")
         # all done migrating
         return self.version
