@@ -2,6 +2,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * Schema migrations are now transactional, meaning that any failure
       during migration will roll back cleanly where possible. (CNY-2789)
+    * If a user removes a file, and then recreates the file as a
+      directory, the warning message previously did not include the
+      affected path.  This has been fixed. (CNY-3076)
 
 Changes in 2.0.35:
   o Bug Fixes:
