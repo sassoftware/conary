@@ -18,8 +18,6 @@ import re
 
 import sqlerrors, sqllib
 
-from epdb import epdb
-
 
 (DEBUG_OFF,
         DEBUG_WARN, # Print stack on invalid txn ops
@@ -350,7 +348,8 @@ class BaseDatabase:
         where = (inTrans and 'inside' or 'outside')
         if DEBUG_TRANSACTIONS == DEBUG_ERROR:
             print 'Transaction bug: %s %s of transaction' % (command, where)
-            epdb.st()
+            from conary.lib import debugger
+            debugger.st()
         else:
             print 'Transaction bug: %s %s of transaction at:' % (command, where)
             traceback.print_stack(sys._getframe(2))
