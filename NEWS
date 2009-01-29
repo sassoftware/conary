@@ -5,6 +5,7 @@ Changes in @NEW@:
     * If a user removes a file, and then recreates the file as a
       directory, the warning message previously did not include the
       affected path.  This has been fixed. (CNY-3076)
+    * Path conflicts generated during group cooks correctly print. (CNY-3079)
 
 Changes in 2.0.35:
   o Bug Fixes:
