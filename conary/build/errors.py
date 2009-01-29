@@ -50,10 +50,10 @@ class GroupPathConflicts(CookError):
                 errStrings.append('')
             
         # CNY-3079: self.args has to be an array or tuple
-        self.args = ["""
+        self.args = ("""
 The following troves in the following groups have conflicts:
 
-%s""" % ('\n'.join(errStrings))]
+%s""" % ('\n'.join(errStrings)), )
 
 class GroupDependencyFailure(CookError):
     def __init__(self, groupName, failedDeps):
