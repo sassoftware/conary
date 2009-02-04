@@ -193,7 +193,7 @@ class _Config:
         return self._options[key].isDefault()
 
     def resetToDefault(self, key):
-        self[key] = self.getDefaultValue(key)
+        self[key] = copy.deepcopy(self.getDefaultValue(key))
         return self._options[key].setIsDefault(True)
 
     def keys(self):

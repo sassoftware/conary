@@ -4,8 +4,7 @@
 .*\~$
 .*\.o$
 .*\.so$
-^tmp/
-bin/conary-wrapper$
+^(bin|tmp)/
 conary/constants.py$
 conary/pysqlite3/build
 conary/sqlite3
