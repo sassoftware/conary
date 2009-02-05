@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * More fixes for flavored superclass groups - you can now commit
+      recipes when autoloading flavored superclass groups. (CNY-3061)
+
 Changes in 2.0.35:
   o Bug Fixes:
     * setTroveInfo no longer sends extended metadata information to 
