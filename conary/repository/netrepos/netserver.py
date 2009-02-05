@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -258,10 +258,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         try:
             try:
                 r = self._callWrapper(method, authToken, orderedArgs, kwArgs)
-                self.db.commit()
+                if self.db.inTransaction(default=True):
+                    # Commit if someone left a transaction open (or the
+                    # DB doesn't have a way to tell)
+                    self.db.commit()
             except Exception, e:
                 # on exceptions we rollback the database
-                self.db.rollback()
+                if self.db.inTransaction(default=True):
+                    self.db.rollback()
             else:
                 if self.callLog:
                     self.callLog.log(remoteIp, authToken, methodname,

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -202,7 +202,7 @@ def createDatabaseAttributes(db):
     db.commit()
     db.loadSchema()
 
-def createDepTable(db, cu, name, isTemp):
+def createDepTable(db, cu, name, isTemp, skipCommit=False):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
     if isTemp:
@@ -222,10 +222,11 @@ def createDepTable(db, cu, name, isTemp):
                (name, name), start_transaction = startTrans)
     if isTemp:
         db.tempTables[name] = True
-    db.commit()
+    if not skipCommit:
+        db.commit()
     return True
 
-def createRequiresTable(db, cu, name, isTemp):
+def createRequiresTable(db, cu, name, isTemp, skipCommit=False):
     d = { "tmp" : "",
           "name" : name,
           "constraint" : "",
@@ -265,10 +266,11 @@ def createRequiresTable(db, cu, name, isTemp):
                start_transaction = startTrans)
     if isTemp:
         db.tempTables[name] = True
-    db.commit()
+    if not skipCommit:
+        db.commit()
     return True
 
-def createProvidesTable(db, cu, name, isTemp):
+def createProvidesTable(db, cu, name, isTemp, skipCommit=False):
     d = { "tmp" : "",
           "name" : name,
           "constraint" : "" }
@@ -300,10 +302,11 @@ def createProvidesTable(db, cu, name, isTemp):
     if isTemp:
         db.tempTables[name] = True
 
-    db.commit()
+    if not skipCommit:
+        db.commit()
     return True
 
-def createDepWorkTable(db, cu, name):
+def createDepWorkTable(db, cu, name, skipCommit=False):
     if name in db.tempTables:
         return False
     cu.execute("""
@@ -322,17 +325,21 @@ def createDepWorkTable(db, cu, name):
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
     """ % (name, name), start_transaction = False)
     db.tempTables[name] = True
-    db.commit()
+    if not skipCommit:
+        db.commit()
     return True
 
 # This should be called only once per establishing a db connection
-def setupTempDepTables(db, cu = None):
+def setupTempDepTables(db, cu=None, skipCommit=False):
     if cu is None:
-        cu  = db.cursor()
-    createRequiresTable(db, cu, "TmpRequires", isTemp = True)
-    createProvidesTable(db, cu, "TmpProvides", isTemp = True)
-    createDepTable(db, cu, 'TmpDependencies', isTemp = True)
-    createDepWorkTable(db, cu, "DepCheck")
+        db.transaction()
+        cu = db.cursor()
+    else:
+        skipCommit = True
+    createRequiresTable(db, cu, "TmpRequires", isTemp=True, skipCommit=True)
+    createProvidesTable(db, cu, "TmpProvides", isTemp=True, skipCommit=True)
+    createDepTable(db, cu, 'TmpDependencies', isTemp=True, skipCommit=True)
+    createDepWorkTable(db, cu, "DepCheck", skipCommit=True)
 
     if "suspectDepsOrig" not in db.tempTables:
         cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
@@ -365,26 +372,28 @@ def setupTempDepTables(db, cu = None):
             )""" % db.keywords, start_transaction = False)
         db.tempTables["RemovedTroves"] = True
 
-    db.commit()
+    if not skipCommit:
+        db.commit()
 
-def createDependencies(db):
+def createDependencies(db, skipCommit=False):
     commit = False
     cu = db.cursor()
 
     if "Dependencies" not in db.tables:
-        createDepTable(db, cu, "Dependencies", False)
+        createDepTable(db, cu, "Dependencies", False, skipCommit=True)
         commit = True
     if "Requires" not in db.tables:
-        createRequiresTable(db, cu, "Requires", False)
+        createRequiresTable(db, cu, "Requires", False, skipCommit=True)
         commit = True
     if "Provides" not in db.tables:
-        createProvidesTable(db, cu, "Provides", False)
+        createProvidesTable(db, cu, "Provides", False, skipCommit=True)
         commit = True
     if commit:
-        db.commit()
+        if not skipCommit:
+            db.commit()
         db.loadSchema()
 
-def setupTempTables(db, cu = None):
+def setupTempTables(db, cu=None, skipCommit=False):
     if cu is None:
         cu = db.cursor()
 
@@ -396,7 +405,8 @@ def setupTempTables(db, cu = None):
         ) %(TABLEOPTS)s""" % db.keywords, start_transaction=False)
         db.tempTables["getFilesTbl"] = True
 
-    db.commit()
+    if not skipCommit:
+        db.commit()
 
 def createSchema(db):
     createVersions(db)

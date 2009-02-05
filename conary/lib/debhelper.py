@@ -16,6 +16,7 @@
 Contains functions to assist in dealing with deb files.
 """
 
+import os
 import gzip
 import rfc822
 import tarfile
@@ -100,7 +101,7 @@ class DebianPackageHeader(object):
         gf = gzip.GzipFile(fileobj=arFile.data)
         tf = tarfile.TarFile(fileobj=gf)
         # Look for a 'control' file
-        arr = [ x for x in tf if x.name == 'control' ]
+        arr = [ x for x in tf if os.path.basename(x.name) == 'control' ]
         if not arr:
             raise Error("Control file not found")
         cf = tf.extractfile(arr[0])

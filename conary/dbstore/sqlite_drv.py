@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -229,7 +229,7 @@ class Database(BaseDatabase):
             self.loadSchema()
 
     # Transaction support
-    def inTransaction(self):
+    def inTransaction(self, default=None):
         """
         Return C{True} if the connection currently has an active
         transaction.
@@ -378,6 +378,7 @@ class Database(BaseDatabase):
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):
         assert(self.dbh)
+        self._logTransaction('BEGIN')
         cu = self.cursor()
         if self.dbh.inTransaction:
             return cu

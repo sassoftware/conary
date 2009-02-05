@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2005-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,

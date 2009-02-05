@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -275,7 +275,7 @@ class Database(BaseDatabase):
         return version
 
     # Transaction support
-    def inTransaction(self):
+    def inTransaction(self, default=None):
         """
         Return C{True} if the connection currently has an active
         transaction.
@@ -333,11 +333,14 @@ class Database(BaseDatabase):
 
     # avoid leaving around invalid transations when schema is not initialized
     def getVersion(self):
-        ret = BaseDatabase.getVersion(self)
-        if ret == 0:
-            # need to rollback the last transaction
+        try:
+            return BaseDatabase.getVersion(self, raiseOnError=True)
+        except sqlerrors.InvalidTable:
+            # Postgres is so nice that it ruined the current
+            # transaction because of the missing table, so roll back.
             self.dbh.rollback()
-        return ret
+            self.version = sqllib.DBversion(0, 0)
+            return self.version
 
     def analyze(self, table=""):
         cu = self.cursor()

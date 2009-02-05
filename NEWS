@@ -2,6 +2,12 @@ Changes in @NEW@:
   o Bug Fixes:
     * More fixes for flavored superclass groups - you can now commit
       recipes when autoloading flavored superclass groups. (CNY-3061)
+    * Schema migrations are now transactional, meaning that any failure
+      during migration will roll back cleanly where possible. (CNY-2789)
+    * If a user removes a file, and then recreates the file as a
+      directory, the warning message previously did not include the
+      affected path.  This has been fixed. (CNY-3076)
+    * Path conflicts generated during group cooks correctly print. (CNY-3079)
 
 Changes in 2.0.35:
   o Bug Fixes:

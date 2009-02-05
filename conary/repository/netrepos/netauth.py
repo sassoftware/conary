@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -715,8 +715,13 @@ class NetworkAuthorization:
         self.log(3, user)
         self._checkValidName(user)
         cu = self.db.transaction()
-        uid = self.userAuth.addUserByMD5(cu, user, salt, password)
-        self.db.commit()
+        try:
+            uid = self.userAuth.addUserByMD5(cu, user, salt, password)
+        except:
+            self.db.rollback()
+            raise
+        else:
+            self.db.commit()
 
     def deleteUserByName(self, user):
         self.log(3, user)

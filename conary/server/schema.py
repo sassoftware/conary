@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -70,8 +70,8 @@ def createInstances(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createFlavors(db):
     cu = db.cursor()
@@ -120,8 +120,8 @@ def createFlavors(db):
         commit = True
     db.createIndex("FlavorScores", "FlavorScoresIdx", "request, present", unique = True)
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createNodes(db):
     cu = db.cursor()
@@ -164,8 +164,8 @@ def createNodes(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createLatest(db, withIndexes = True):
     assert("Instances" in db.tables)
@@ -344,8 +344,8 @@ def createLatest(db, withIndexes = True):
     
     # a cache table for netauth.checktrove calls for use in SQL
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createUsers(db):
     cu = db.cursor()
@@ -435,8 +435,8 @@ def createUsers(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createEntitlements(db):
     cu = db.cursor()
@@ -515,8 +515,8 @@ def createEntitlements(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createPGPKeys(db):
     cu = db.cursor()
@@ -561,8 +561,8 @@ def createPGPKeys(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createTroves(db, createIndex = True):
     cu = db.cursor()
@@ -732,8 +732,8 @@ def createTroves(db, createIndex = True):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createMetadata(db):
     commit = False
@@ -783,8 +783,8 @@ def createMetadata(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createMirrorTracking(db):
     cu = db.cursor()
@@ -794,7 +794,6 @@ def createMirrorTracking(db):
             host            VARCHAR(254),
             mark            NUMERIC(14,0) NOT NULL
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.commit()
         db.loadSchema()
 
 def createChangeLog(db):
@@ -822,7 +821,6 @@ def createChangeLog(db):
         commit = True
 
     if commit:
-        db.commit()
         db.loadSchema()
 
 def createLabelMap(db):
@@ -852,9 +850,10 @@ def createLabelMap(db):
     db.createIndex("LabelMap", "LabelMapLabelIdx", "labelId")
     db.createIndex("LabelMap", "LabelMapItemIdBranchIdIdx", "itemId, branchId")
     db.createIndex("LabelMap", "LabelMapBranchId_fk", "branchId")
+
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createIdTables(db):
     commit = False
@@ -878,10 +877,10 @@ def createIdTables(db):
         db.tables["Items"] = []
         cu.execute("INSERT INTO Items (itemId, item) VALUES (0, 'ALL')")
         commit = True
-    db.createIndex("Items", "Items_uq", "item", unique = True)
+    commit |= db.createIndex("Items", "Items_uq", "item", unique = True)
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 # cached access map for (userGroupId, instanceId)
 def createAccessMaps(db):
@@ -1009,9 +1008,10 @@ def createAccessMaps(db):
     db.createIndex("CheckTroveCache", "CheckTroveCache_itemId_fk",
                    "itemId,patternId", unique = True)
     db.createIndex("CheckTroveCache", "CheckTroveCache_patternId_fk", "patternId")
+
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 def createLockTables(db):
     commit = False
@@ -1026,9 +1026,10 @@ def createLockTables(db):
         cu.execute("INSERT INTO CommitLock (lockId, lockName) VALUES(0, 'ALL')")
         commit = True
     db.createIndex("CommitLock", "CommitLockName_uq", "lockName", unique=True)
+
     if commit:
-        db.commit()
         db.loadSchema()
+
 
 # sets up temporary tables for a brand new connection
 def setupTempTables(db):
@@ -1275,15 +1276,18 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpGroupInsertShim"] = True
 
-    db.commit()
 
 def resetTable(cu, name):
     cu.execute("DELETE FROM %s" % name, start_transaction = False)
 
 # create the (permanent) server repository schema
-def createSchema(db):
+def createSchema(db, commit=True):
+    if commit:
+        db.transaction()
+
     if not hasattr(db, "tables"):
         db.loadSchema()
+
     createIdTables(db)
     createLabelMap(db)
     createFlavors(db)
@@ -1300,11 +1304,14 @@ def createSchema(db):
 
     createTroves(db)
 
-    createDependencies(db)
+    createDependencies(db, skipCommit=True)
     createMetadata(db)
     createMirrorTracking(db)
 
     createLockTables(db)
+
+    if commit:
+        db.commit()
 
 # we can only serialize commits after db schema 16.1. We need to
 # do this in a way that avoids the necessity of a major version schema bump

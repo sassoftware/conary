@@ -807,7 +807,7 @@ class FilesystemJob:
                 # the user removed this file, and then remade it as a
                 # directory.  That is as good as a removal in my book.
                 self.callback.warning("%s was changed to a directory - "
-                                      "ignoring")
+                                      "ignoring", path)
                 continue
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsTrove.removeFile(pathId)
