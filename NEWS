@@ -8,6 +8,8 @@ Changes in @NEW@:
       directory, the warning message previously did not include the
       affected path.  This has been fixed. (CNY-3076)
     * Path conflicts generated during group cooks correctly print. (CNY-3079)
+    * You can now display buildreqs using --show-buildreqs for other
+      types of recipes other than packages (CNY-3075)
   o New Features:
     * Policy can now be added per distribution in the directory
       /usr/lib/conary/distro/policy. (CNY-3071)

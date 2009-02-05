@@ -2012,10 +2012,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         loaderDict.setdefault(sourceVersion, []).append(loader)
 
         if showBuildReqs:
-            if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
-                raise CookError("--show-buildreqs is available only for PackageRecipe subclasses")
             recipeObj = recipeClass(cfg, None, [], lightInstance=True)
-            sys.stdout.write('\n'.join(sorted(recipeObj.buildRequires)))
+            buildRequires = getattr(recipeObj, 'buildRequires', [])
+            sys.stdout.write('\n'.join(sorted(buildRequires)))
             sys.stdout.write('\n')
             sys.stdout.flush()
     if showBuildReqs:
