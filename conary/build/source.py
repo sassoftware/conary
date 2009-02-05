@@ -543,7 +543,7 @@ class addArchive(_Source):
                     # we can put the trailing $ in too, just to make sure
                     # that we only apply this ownership to an exact match
                     # (in case somehow a path has a trailing /)
-                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path))
+                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path).replace('%', '%%'))
         elif f.endswith(".iso"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
@@ -664,7 +664,7 @@ class addArchive(_Source):
                     # FIXME: this should be refactored to remove duplicate
                     # code above
                     path = util.normpath(os.path.join(self.dir, path))
-                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path))
+                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path).replace('%', '%%'))
 
         if guessMainDir:
             bd = self.builddir

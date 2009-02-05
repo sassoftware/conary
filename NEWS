@@ -10,6 +10,8 @@ Changes in @NEW@:
     * Path conflicts generated during group cooks correctly print. (CNY-3079)
     * You can now display buildreqs using --show-buildreqs for other
       types of recipes other than packages (CNY-3075)
+    * You can now add archives with files with % in them when perserving 
+      ownership. (CNY-3080)
   o New Features:
     * Policy can now be added per distribution in the directory
       /usr/lib/conary/distro/policy. (CNY-3071)
