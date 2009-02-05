@@ -540,6 +540,7 @@ class ConaryContext(ConfigSection):
     quiet		  =  CfgBool
     pinTroves		  =  CfgRegExpList
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
+                                            '/usr/lib/conary/distro/policy',
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
     shortenGroupFlavors   =  CfgBool
