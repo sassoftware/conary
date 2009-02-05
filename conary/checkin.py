@@ -337,7 +337,8 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
                             cfg = cfg, repos = repos,
                             branch = state.getBranch(),
                             ignoreInstalled = True,
-                            sourceFiles = allPaths).getRecipe()
+                            sourceFiles = allPaths,
+                            buildFlavor=cfg.buildFlavor).getRecipe()
     finally:
         use.allowUnknownFlags(False)
 
@@ -1434,7 +1435,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         recipeClass = loadrecipe.RecipeLoaderFromSourceDirectory(state,
                                 cfg = cfg, repos = repos,
                                 branch = state.getBranch(),
-                                ignoreInstalled = True).getRecipe()
+                                ignoreInstalled = True,
+                                buildFlavor=cfg.buildFlavor).getRecipe()
     else:
         recipeClass = None.__class__
 
@@ -1442,7 +1444,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
         # Merges between non-derived recipes and derived recipes don't
         # do a patch merge.
         loader = loadrecipe.recipeLoaderFromSourceComponent(troveName, cfg,
-                               repos, versionStr = str(parentHeadVersion))[0]
+                               repos, versionStr = str(parentHeadVersion),
+                               buildFlavor=cfg.buildFlavor)[0]
         parentRecipeClass = loader.getRecipe()
         if not issubclass(parentRecipeClass,
                           derivedrecipe.DerivedPackageRecipe):
@@ -2089,7 +2092,8 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
                                     cfg = cfg, repos = repos,
                                     branch = state.getBranch(),
                                     ignoreInstalled = True,
-                                    parentDir = dirName).getRecipe()
+                                    parentDir = dirName,
+                                    buildFlavor=cfg.buildFlavor).getRecipe()
 
     # fetch all the sources
 
