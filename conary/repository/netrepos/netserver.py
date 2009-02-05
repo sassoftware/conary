@@ -1696,10 +1696,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 else:
                     sigItems.append(None)
 
-        pureSigList = self.getTroveInfo(authToken, clientVersion,
+        pureSigList = self.getTroveInfo(authToken, SERVER_VERSIONS[-1],
                                         trove._TROVEINFO_TAG_SIGS,
                                         [ x for x in sigItems if x ])
-        pureMetaList = self.getTroveInfo(authToken, clientVersion,
+        pureMetaList = self.getTroveInfo(authToken, SERVER_VERSIONS[-1],
                                         trove._TROVEINFO_TAG_METADATA,
                                         [ x for x in sigItems if x ])
         sigList = []

@@ -12,6 +12,10 @@ Changes in @NEW@:
       types of recipes other than packages (CNY-3075)
     * You can now add archives with files with % in them when perserving 
       ownership. (CNY-3080)
+    * All troveInfo is now used to calculate a changeset fingerprint, 
+      regardless of the client version specified.  This allows a proxy 
+      to expire its cached version when extended trove info is 
+      updated. (CNY-3083)
   o New Features:
     * Policy can now be added per distribution in the directory
       /usr/lib/conary/distro/policy. (CNY-3071)
