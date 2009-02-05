@@ -729,7 +729,7 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
     for policyDir in recipeObj.cfg.policyDirs:
         if not os.path.isdir(policyDir):
             continue
-        for filename in os.listdir(policyDir):
+        for filename in sorted(os.listdir(policyDir)):
             fullpath = os.sep.join((policyDir, filename))
             if not filename.endswith('.py') or not util.isregular(fullpath):
                 continue
