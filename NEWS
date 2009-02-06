@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.36:
   o New Features:
     * Policy can now be added per distribution in the directory
       /usr/lib/conary/distro/policy. (CNY-3071)
