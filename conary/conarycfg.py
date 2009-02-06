@@ -552,8 +552,10 @@ class ConaryContext(ConfigSection):
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
     pubRing               =  (CfgPathList, _getDefaultPublicKeyrings())
-    uploadRateLimit       =  (CfgInt, 0)
-    downloadRateLimit     =  (CfgInt, 0)
+    uploadRateLimit       =  (CfgInt, 0,
+            "Upload rate limit, in bytes per second")
+    downloadRateLimit     =  (CfgInt, 0,
+            "Download rate limit, in bytes per second")
 
     recipeTemplate        =  None
     repositoryMap         =  CfgRepoMap

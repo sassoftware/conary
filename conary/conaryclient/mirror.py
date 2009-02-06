@@ -95,8 +95,10 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     labels                =  conarycfg.CfgInstallLabelPath
     matchTroves           =  cfg.CfgSignedRegExpList
     recurseGroups         =  (cfg.CfgBool, False)
-    uploadRateLimit       =  (conarycfg.CfgInt, 0)
-    downloadRateLimit     =  (conarycfg.CfgInt, 0)
+    uploadRateLimit       =  (conarycfg.CfgInt, 0,
+            "Upload rate limit, in bytes per second")
+    downloadRateLimit     =  (conarycfg.CfgInt, 0,
+            "Download rate limit, in bytes per second")
     lockFile              =  cfg.CfgString
     useHiddenCommits      =  (cfg.CfgBool, True)
     absoluteChangesets    =  (cfg.CfgBool, False)
