@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o New Features:
+    * Policy can now be added per distribution in the directory
+      /usr/lib/conary/distro/policy. (CNY-3071)
+
   o Bug Fixes:
     * More fixes for flavored superclass groups - you can now commit
       recipes when autoloading flavored superclass groups. (CNY-3061)
@@ -16,9 +20,9 @@ Changes in @NEW@:
       regardless of the client version specified.  This allows a proxy 
       to expire its cached version when extended trove info is 
       updated. (CNY-3083)
-  o New Features:
-    * Policy can now be added per distribution in the directory
-      /usr/lib/conary/distro/policy. (CNY-3071)
+    * Bugs that could cause erroneous error messages in
+      conary.lib.misc.sha1Copy() and conary.lib.misc.sha1Uncompress()
+      have been fixed.
 
 Changes in 2.0.35:
   o Bug Fixes:

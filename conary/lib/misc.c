@@ -1329,14 +1329,23 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
             zs.next_in = inBuf;
             rc = pread(inFd, inBuf, zs.avail_in, inAt);
             inAt += zs.avail_in;
-            if (rc != zs.avail_in) {
+            if (rc == -1) {
                 PyErr_SetFromErrno(PyExc_OSError);
+                return NULL;
+            }
+            if (rc != zs.avail_in) {
+                PyErr_SetString(PyExc_RuntimeError, "short pread");
                 return NULL;
             }
 
             for (i = 0; i < outFdCount; i++) {
-                if (write(outFds[i], inBuf, zs.avail_in) != zs.avail_in) {
+                rc = write(outFds[i], inBuf, zs.avail_in); 
+                if (rc == -1) {
                     PyErr_SetFromErrno(PyExc_OSError);
+                    return NULL;
+                }
+                if (rc != zs.avail_in) {
+                    PyErr_SetString(PyExc_RuntimeError, "short write");
                     return NULL;
                 }
             }
@@ -1432,8 +1441,13 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
             zs.next_in = inBuf;
             rc = pread(inFd, inBuf, zs.avail_in, inAt);
             inAt += zs.avail_in;
-            if (rc != zs.avail_in) {
+            if (rc == -1) {
                 PyErr_SetFromErrno(PyExc_OSError);
+                unlink(tmpPath);
+                return NULL;
+            }
+            if (rc != zs.avail_in) {
+                PyErr_SetString(PyExc_RuntimeError, "short pread");
                 unlink(tmpPath);
                 return NULL;
             }
@@ -1450,8 +1464,14 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
 
         i = sizeof(outBuf) - zs.avail_out;
         SHA1_Update(&sha1state, outBuf, i);
-        if (write(outFd, outBuf, i) != i) {
+        rc = write(outFd, outBuf, i);
+        if (rc == -1) {
             PyErr_SetFromErrno(PyExc_OSError);
+            unlink(tmpPath);
+            return NULL;
+        }
+        if (rc != i) {
+            PyErr_SetString(PyExc_RuntimeError, "short write");
             unlink(tmpPath);
             return NULL;
         }
