@@ -1,3 +1,8 @@
+Changes in 2.0.37:
+  o Bug Fixes:
+    * Resolved a bug introducts in the 2.0.36 sha1Uncompress function
+      that could cause update operations to fail.
+
 Changes in 2.0.36:
   o New Features:
     * Policy can now be added per distribution in the directory

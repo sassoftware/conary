@@ -1272,7 +1272,7 @@ static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
 static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     off_t inFd, inSize, inStart, inStop, inAt;
     PyObject * outFdList, *pyInStart, *pyInSize;
-    int * outFds, outFdCount, i, rc;
+    int * outFds, outFdCount, i, rc, inflate_rc;
     char inBuf[1024 * 256];
     char outBuf[1024 * 256];
     SHA_CTX sha1state;
@@ -1322,8 +1322,8 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 
     inStop = inSize + inStart;
     inAt = inStart;
-    rc = 0;
-    while (rc != Z_STREAM_END) {
+    inflate_rc = 0;
+    while (inflate_rc != Z_STREAM_END) {
         if (!zs.avail_in) {
             zs.avail_in = MIN(sizeof(inBuf), inStop - inAt);
             zs.next_in = inBuf;
@@ -1353,8 +1353,8 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 
         zs.avail_out = sizeof(outBuf);
         zs.next_out = outBuf;
-        rc = inflate(&zs, 0);
-        if (rc < 0) {
+        inflate_rc = inflate(&zs, 0);
+        if (inflate_rc < 0) {
             PyErr_SetString(PyExc_RuntimeError, zError(rc));
             return NULL;
         }
@@ -1374,7 +1374,7 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 }
 
 static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
-    int inFd, outFd, i, rc;
+    int inFd, outFd, i, rc, inflate_rc;
     off_t inStop, inAt, inSize, inStart;
     PyObject *pyInStart, *pyInSize;
     z_stream zs;
@@ -1434,8 +1434,8 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     inStop = inSize + inStart;
     inAt = inStart;
 
-    rc = 0;
-    while (rc != Z_STREAM_END) {
+    inflate_rc = 0;
+    while (inflate_rc != Z_STREAM_END) {
         if (!zs.avail_in) {
             zs.avail_in = MIN(sizeof(inBuf), inStop - inAt);
             zs.next_in = inBuf;
@@ -1455,8 +1455,8 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
 
         zs.avail_out = sizeof(outBuf);
         zs.next_out = outBuf;
-        rc = inflate(&zs, 0);
-        if (rc < 0) {
+        inflate_rc = inflate(&zs, 0);
+        if (inflate_rc < 0) {
             PyErr_SetString(PyExc_RuntimeError, zError(rc));
             unlink(tmpPath);
             return NULL;
