@@ -53,8 +53,8 @@ def sha1FromString(val):
 			int(val[ 8:16], 16), int(val[16:24], 16), 
 			int(val[24:32], 16), int(val[32:40], 16))
 
-def sha256String(buf):
-    m = digestlib.sha256()
+def nonstandardSha256String(buf):
+    m = digestlib.sha256_nonstandard()
     m.update(buf)
     return m.digest()
 
