@@ -11,8 +11,8 @@ Changes in 2.0.38:
            
 Changes in 2.0.37:
   o Bug Fixes:
-    * Resolved a bug introducts in the 2.0.36 sha1Uncompress function
-      that could cause update operations to fail.
+    * Resolved a bug introduced in the 2.0.36 sha1Uncompress function
+      that could cause update operations to fail. (CNY-3084)
 
 Changes in 2.0.36:
   o New Features:
