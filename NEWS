@@ -1,6 +1,6 @@
 Changes in 2.0.38:
   o Bug Fixes:
-    * Conary versions 1.1.20 (April 2007) through 2.0.36, inclusive, use a 
+    * Conary versions 1.1.20 (April 2007) through 2.0.37, inclusive, use a 
       SHA256 implementation provided by the pycrypto package, which contained 
       an implementation that generates faulty digests for certain message 
       lengths. To compensate, a backward compatibility module that implements 
