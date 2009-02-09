@@ -151,7 +151,7 @@ class AbsoluteSha1Stream(Sha1Stream):
         # always return ourself, since this is an absolute stream
         return self.freeze()
 
-class Sha256Stream(StringStream):
+class NonStandardSha256Stream(StringStream):
     allowedSize = (32,)
     def freeze(self, skipSet = None):
 	assert(len(self()) in self.allowedSize)
@@ -165,10 +165,10 @@ class Sha256Stream(StringStream):
         StringStream.set(self, val)
 
     def compute(self, message):
-        self.set(sha1helper.sha256String(message))
+        self.set(sha1helper.nonstandardSha256String(message))
 
     def verify(self, message):
-        return self() == sha1helper.sha256String(message)
+        return self() == sha1helper.nonstandardSha256String(message)
 
     def setFromString(self, hexdigest):
         StringStream.set(self, sha1helper.sha256FromString(hexdigest))

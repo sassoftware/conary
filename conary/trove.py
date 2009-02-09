@@ -502,7 +502,7 @@ class TroveSignatures(streams.StreamSet):
             return
 
         if sigVersion in (_TROVESIG_VER_NEW, _TROVESIG_VER_NEW2):
-            digest = streams.Sha256Stream()
+            digest = streams.NonStandardSha256Stream()
             digest.compute(message)
         else:
             raise NotImplementedError
@@ -559,7 +559,7 @@ class TroveSignatures(streams.StreamSet):
         for versionedBlock in self.vSigs:
             ver = versionedBlock.version()
             if ver in (_TROVESIG_VER_NEW, _TROVESIG_VER_NEW2):
-                digest = streams.Sha256Stream()
+                digest = streams.NonStandardSha256Stream()
             else:
                 # Ignore digest types we don't know about.
                 continue
@@ -733,7 +733,7 @@ class MetadataItem(streams.StreamSet):
         else:
             frz = streams.StreamSet.freeze(self, skipSet = self._skipSet)
 
-        digest = streams.Sha256Stream()
+        digest = streams.NonStandardSha256Stream()
         digest.compute(frz)
         return digest()
 

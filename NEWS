@@ -1,4 +1,34 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * Unfortunately, Conary versions 1.1.20 (April 2007) and later have used 
+      this SHA256 implementation. Conary 2.0.37 introduces a backward 
+      compatibility modules that implements bug-for-bug compatibility with the 
+      incorrect sha256 algorithm in pycrypto, in order to interoperate 
+      (generate and validate signatures) with Conary versions which use the 
+      incorrect sha256 implementation in pycrypto.
+  
+      Updating pycrypto to a version with this bug resolved and using Conary 
+      versions between 1.1.20 and 2.0.36, inclusive, will cause Conary to be 
+      unable to apply some changesets; in these cases it will generate a 
+      TroveIntegrityError instead. Committing changesets to a repository with 
+      one of those Conary versions and an updated pycrypto will create 
+      changesets that cannot be applied to an unaffected Conary system.
+  
+      The largest potential security impact from this bug in pycrypto would be 
+      causing a Conary update to fail that would otherwise deliver a critical 
+      security fix to a system affected by some significant security 
+      vulnerability that can be directly attacked.
+  
+      For this reason, rPath will delay implementing the fix for the SHA256 
+      algorithm in pycrypto to allow for some version overlap to facilitate 
+      testing and deployment. (CNY-3086)
+           
+Changes in 2.0.37:
+  o Bug Fixes:
+    * Resolved a bug introducts in the 2.0.36 sha1Uncompress function
+      that could cause update operations to fail.
+
+Changes in 2.0.36:
   o New Features:
     * Policy can now be added per distribution in the directory
       /usr/lib/conary/distro/policy. (CNY-3071)

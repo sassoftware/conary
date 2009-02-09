@@ -13,15 +13,16 @@
 #
 
 python_files=$(wildcard *.py)
-python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
+python_modules=elfmodule.so miscmodule.so cstreamsmodule.so SHA256_nonstandardmodule.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 elfmodule_objs=elf.o
+sha256module_objs=SHA256_nonstandard.o
 miscmodule_objs=misc.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
-generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs)
+generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs) $(sha256_objs)
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
-             stringstream.c cstreams.h filename_wrapper.c Makefile
+             stringstream.c cstreams.h filename_wrapper.c SHA256_nonstandard.c Makefile
 libelf = $(shell \
 if [ -x /usr/bin/pkg-config ] && /usr/bin/pkg-config --exists libelf; then \
     pkg-config --cflags --libs libelf; \
@@ -41,6 +42,12 @@ elf.o: elf.c
 
 elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< $(libelf)
+
+SHA256.o: SHA256_nonstandard.c
+	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
+
+SHA256_nonstandardmodule.so: $(sha256module_objs)
+	$(CC) -pthread -shared -o $@ $< 
 
 miscmodule.so: $(miscmodule_objs)
 	$(CC) -shared -lcrypto -lz -lresolv -o $@ $<
