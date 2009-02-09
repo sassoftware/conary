@@ -18,11 +18,10 @@ try:
     import hashlib
     sha1 = hashlib.sha1
     md5 = hashlib.md5
-    sha256 = hashlib.sha256
 except ImportError:
     import sha
     import md5
-    from Crypto.Hash import SHA256
     sha1 = sha.new
     md5 = md5.new
-    sha256 = SHA256.new
+from Crypto.Hash import SHA256
+sha256 = SHA256.new
