@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.38:
   o Bug Fixes:
     * Unfortunately, Conary versions 1.1.20 (April 2007) and later have used 
       this SHA256 implementation. Conary 2.0.37 introduces a backward 
