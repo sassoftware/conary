@@ -21,6 +21,7 @@ import httplib
 import itertools
 import select
 import socket
+import sys
 import time
 import xmlrpclib
 import urllib
@@ -210,15 +211,23 @@ class URLOpener(urllib.FancyURLopener):
         resp.close()
 
         # Wrap the socket in an SSL socket
-        sslSock = socket.ssl(sock, None, None)
         h = httplib.HTTPConnection("%s:%s" % (endpointHost, endpointPort))
         # Force HTTP/1.0 (this is the default for the old-style HTTP;
         # new-style HTTPConnection defaults to 1.1)
         h._http_vsn = 10
         h._http_vsn_str = 'HTTP/1.0'
         # This is a bit unclean
-        h.sock = httplib.FakeSocket(sock, sslSock)
+        h.sock = self._wrapSsl(sock)
         return h
+
+    def _wrapSsl(self, sock):
+        # python 2.6 deprecates socket.ssl in favor of ssl.SSLSocket
+        if sys.version_info[:2] == (2, 6):
+            import ssl
+            return ssl.SSLSocket(sock)
+        # Old-style Python
+        sslSock = socket.ssl(sock, None, None)
+        return httplib.FakeSocket(sock, sslSock)
 
     def proxyBypass(self, proxy, host):
         if self.forceProxy:
