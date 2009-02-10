@@ -403,7 +403,7 @@ class ClientClone:
         self._targetSources(chooser, cloneMap, cloneJob, leafMap, troveCache,
                             cloneOptions.callback)
         _logMe('target binaries')
-        self._targetBinaries(cloneMap, cloneJob, leafMap, troveCache,
+        self._targetBinaries(chooser, cloneMap, cloneJob, leafMap, troveCache,
                              cloneOptions.callback)
 
         # some clones may rewrite the child troves (if cloneOnlyByDefaultTroves
@@ -653,9 +653,10 @@ class ClientClone:
                             "Cannot find required source %s on branch %s." \
                                      % (sourceTup[0], targetBranch))
 
-    def _targetBinaries(self, cloneMap, cloneJob, leafMap, troveCache, callback):
-        allBinaries = itertools.chain(*[x[1] for x in
-                                        cloneMap.getBinaryTrovesBySource()])
+    def _targetBinaries(self, chooser, cloneMap, cloneJob, leafMap, 
+                        troveCache, callback):
+        allBinaries = list(itertools.chain(*[x[1] for x in
+                                        cloneMap.getBinaryTrovesBySource()]))
         _logMe("Getting clonedFromInfo for binaries")
         leafMap.addClonedFromInfo(troveCache, allBinaries)
         _logMe("Actually targeting binaries")
@@ -663,6 +664,8 @@ class ClientClone:
         total = len(list(itertools.chain(*[x[0] for x in cloneMap.getBinaryTrovesBySource()])))
         current = 0
         for sourceTup, binaryList in cloneMap.getBinaryTrovesBySource():
+            if not binaryList:
+                continue
             targetSourceVersion = cloneMap.getTargetVersion(sourceTup)
             if targetSourceVersion is None:
                 raise errors.InternalConaryError(
@@ -678,6 +681,7 @@ class ClientClone:
                                                 {})
                 byFlavor.setdefault(binaryTup[2], []).append(binaryTup)
 
+            cloneSource = False
             for byFlavor in byVersion.itervalues():
                 finalNewVersion = None
                 for flavor, binaryList in byFlavor.iteritems():
@@ -698,6 +702,13 @@ class ClientClone:
                 else:
                     binaryList = list(itertools.chain(*byFlavor.itervalues()))
                     versionsToGet.append((targetSourceVersion, binaryList))
+                    cloneSource = True
+            if not cloneSource:
+                # all binaries for this version were marked as already cloned
+                # which means we don't need to retarget this source
+                # component either.
+                if not chooser._matchesPrimaryTrove(sourceTup, None):
+                    cloneJob.alreadyCloned(sourceTup)
         if not versionsToGet:
             return
         _logMe("getting new version for %s binaries" % (len(versionsToGet)))

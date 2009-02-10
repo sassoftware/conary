@@ -1,3 +1,13 @@
+Chagnes in @NEW@:
+  o Bug Fixes:
+    * Promoting a binary foo from a to b, and then promoting a group containing
+      foo from b to a will no longer cause foo to be unnecessarily repromoted.
+      (CNY-3088)
+  o New Features:
+    * Attempting to promote a binary will no longer reclone the binary 
+      if a binary is already the latest at the target branch, even if
+      there is a later source committed on the target branch. (CNY-3089)
+
 Changes in 2.0.38:
   o Bug Fixes:
     * Conary versions 1.1.20 (April 2007) through 2.0.37, inclusive, use a 
