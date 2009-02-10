@@ -1145,21 +1145,23 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
                 while version.isOnLocalHost():
                     version = version.parentVersion()
                 versionStr = str(version)
+                flavorSpec = flavor
 
         if recipeToLoad:
             name, versionStr, flavor = recipeToLoad
 
-        if flavor is not None:
+        if flavorSpec is not None:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
             # trove was found.
             if buildFlavor is None:
                 oldBuildFlavor = cfg.buildFlavor
-                cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, 
+                                                      flavorSpec)
                 use.setBuildFlagsFromFlavor(name, cfg.buildFlavor, error=False)
             else:
                 oldBuildFlavor = buildFlavor
-                buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavorSpec)
                 use.setBuildFlagsFromFlavor(name, buildFlavor, error=False)
 
         loader = RecipeLoaderFromRepository(name, cfg, repos,
@@ -1172,7 +1174,7 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
                                      defaultToLatest=True,
                                      db=db, overrides=newOverrideDict)
 
-    if flavor is not None:
+    if flavorSpec is not None:
         if buildFlavor is None:
             buildFlavor = cfg.buildFlavor = oldBuildFlavor
         else:

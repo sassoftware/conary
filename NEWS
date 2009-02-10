@@ -3,6 +3,10 @@ Chagnes in @NEW@:
     * Promoting a binary foo from a to b, and then promoting a group containing
       foo from b to a will no longer cause foo to be unnecessarily repromoted.
       (CNY-3088)
+    * Fixed an interaction with loadRecipe overrides used by rmake and
+      autoloadRecipes that would cause rmake to not find any matches
+      for autoloadRecipes that were included in biarch flavored superclasses.
+      (CNY-3090)
   o New Features:
     * Attempting to promote a binary will no longer reclone the binary 
       if a binary is already the latest at the target branch, even if
