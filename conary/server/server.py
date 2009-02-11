@@ -395,11 +395,11 @@ if SSL:
             conn = SSLConnection(self.sslContext, self.socket)
             self.socket = conn
 
-        def handle_request(self):
+        def get_request(self):
             try:
-                return HTTPServer.handle_request(self)
-            except SSL.SSLError:
-                return
+                return HTTPServer.get_request(self)
+            except SSL.SSLError, e:
+                raise socket.error(*e.args)
 
         def close_request(self, request):
             pollObj = select.poll()
