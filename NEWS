@@ -7,6 +7,8 @@ Chagnes in @NEW@:
       autoloadRecipes that would cause rmake to not find any matches
       for autoloadRecipes that were included in biarch flavored superclasses.
       (CNY-3090)
+    * Redirect components should not have build requires set (CNY-3069)
+
   o New Features:
     * Attempting to promote a binary will no longer reclone the binary 
       if a binary is already the latest at the target branch, even if

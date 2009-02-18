@@ -596,7 +596,9 @@ def cookRedirectObject(repos, db, cfg, recipeClass, sourceVersion, macros={},
                             None, type = trove.TROVE_TYPE_REDIRECT)
 
         redirList.append(redir.getNameVersionFlavor())
-        redir.setBuildRequirements(buildReqs)
+        if trove.troveIsCollection(redir.getName()):
+            # only packages and groups have build requirements
+            redir.setBuildRequirements(buildReqs)
 
         for redirSpec in redirSpecList:
             for subName in redirSpec.components:
