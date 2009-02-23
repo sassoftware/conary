@@ -46,6 +46,8 @@ class PrintDatabase:
 
     def connect(self, *args, **kwargs):
         pass
+    def transaction(self):
+        pass
     def commit(self):
         pass
     def rollback(self):
@@ -177,6 +179,7 @@ class PrintDatabase:
         END
         """ % (create, name, when.upper(), onAction.upper(), table, sql)
         self.execute(sql)
+        return True
 
     def createIndex(self, table, name, columns, unique = False):
         if unique:
@@ -186,6 +189,7 @@ class PrintDatabase:
         sql = "CREATE %s INDEX %s on %s (%s)" % (
             unique, name, table, columns)
         self.execute(sql)
+        return True
 
     def setVersion(self, version):
         self.version = version
