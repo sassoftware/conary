@@ -23,8 +23,9 @@ catchableSignalNames = [ 'SIGABRT', 'SIGALRM', 'SIGFPE', 'SIGHUP',
                          'SIGILL', 'SIGINT', 'SIGIO', 'SIGIOT', 'SIGPIPE',
                          'SIGPOLL', 'SIGPROF', 'SIGPWR', 'SIGQUIT', 'SIGRTMAX',
                          'SIGRTMIN', 'SIGSYS', 'SIGTERM', 'SIGTRAP', 'SIGTSTP',
-                         'SIGTTIN', 'SIGTTOU', 'SIGURG', 'SIGUSR1', 'SIGUSR2',
-                         'SIGVTALRM', 'SIGWINCH', 'SIGXCPU', 'SIGXFSZ' ]
+                         'SIGTTIN', 'SIGTTOU', 'SIGUSR1', 'SIGUSR2',
+                         'SIGVTALRM', 'SIGXCPU', 'SIGXFSZ' ]
+# SIGWINCH, SIGURG and ignored by default - they're not in the above list.
 # list(set()) here removes duplicates (SIGIO/SIGPOLL for instance)
 catchableSignals = list(set([ signal.__dict__[x] for x in catchableSignalNames
                      if x in signal.__dict__ ]))

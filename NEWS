@@ -8,7 +8,10 @@ Chagnes in @NEW@:
       for autoloadRecipes that were included in biarch flavored superclasses.
       (CNY-3090)
     * Redirect components should not have build requires set (CNY-3069)
-
+    * Updates are no longer halted by the signal SIGWINCH, or SIGURG, which are 
+      normally ignored. (CNY-3098)
+    * getTrovesBySource now returns a list of the accessible binaries associated
+      with a source even if the source is not accessible. (CNY-3099)
   o New Features:
     * Attempting to promote a binary will no longer reclone the binary 
       if a binary is already the latest at the target branch, even if

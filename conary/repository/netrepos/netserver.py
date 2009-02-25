@@ -2316,9 +2316,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getTrovesBySource(self, authToken, clientVersion, sourceName,
                           sourceVersion):
-	if not self.auth.check(authToken, write = False, trove = sourceName,
-                   label = self.toVersion(sourceVersion).branch().label()):
-	    raise errors.InsufficientPermission
+        # You should be able to get all the troves associated with a source 
+        # even if you cannot get the source itself.   This is important
+        # for derived recipes.  Thus, we don't check access until
+        # we've calculated a result.
         self.log(2, sourceName, sourceVersion)
         versionMatch = sourceVersion + '-%'
         cu = self.db.cursor()
@@ -2344,7 +2345,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute(query, args)
         self.log(4, "execute query", query, args)
         # tuple(x) so that xmlrpc can marshal it
-        return [ tuple(x) for x in cu ]
+        troveList = [ tuple(x) for x in cu ]
+        hasAccess = self.auth.batchCheck(authToken, troveList, write=False, cu=cu)
+        if False in hasAccess:
+            # don't return a partial answer to this question.
+	    raise errors.InsufficientPermission
+        return troveList
 
     @accessReadOnly
     def getPackageCreatorTroves(self, authToken, clientVersion, serverName):
