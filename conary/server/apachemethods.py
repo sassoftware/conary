@@ -79,6 +79,9 @@ def post(port, isSecure, repos, req):
             except xmlrpclib.ResponseError:
                 req.log_error('error parsing XMLRPC request')
                 return apache.HTTP_BAD_REQUEST
+            except UnicodeDecodeError:
+                req.log_error('unicode decode error parsing XMLRPC request')
+                return apache.HTTP_BAD_REQUEST
             repos.log(3, "decoding=%s" % method, authToken[0],
                       "%.3f" % (time.time()-startTime))
             # req.connection.local_addr[0] is the IP address the server
