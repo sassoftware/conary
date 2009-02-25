@@ -7,6 +7,7 @@ Chagnes in @NEW@:
       autoloadRecipes that would cause rmake to not find any matches
       for autoloadRecipes that were included in biarch flavored superclasses.
       (CNY-3090)
+    * Redirect components should not have build requires set (CNY-3069)
     * Updates are no longer halted by the signal SIGWINCH, or SIGURG, which are 
       normally ignored. (CNY-3098)
     * getTrovesBySource now returns a list of the accessible binaries associated
