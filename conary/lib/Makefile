@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -20,7 +20,7 @@ elfmodule_objs=elf.o
 sha256module_objs=SHA256_nonstandard.o
 miscmodule_objs=misc.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
-generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs) $(sha256_objs)
+generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs) $(sha256module_objs)
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
              stringstream.c cstreams.h filename_wrapper.c SHA256_nonstandard.c Makefile
 libelf = $(shell \
