@@ -34,6 +34,10 @@
 #include "Python.h"
 #include "structmember.h"
 
+#if PY_MINOR_VERSION < 5
+typedef int Py_ssize_t;
+#endif
+
 #include "sqlite3.h"
 
 #include "port/strsep.h"
@@ -412,7 +416,7 @@ set_result(sqlite3_context* context, PyObject *obj)
 	}
 	else if (PyString_Check(obj)) {
 		char *buf;
-		int len;
+		Py_ssize_t len;
 
 		PyString_AsStringAndSize(obj, &buf, &len);
 		if (memchr(buf, '\0', len))
@@ -443,7 +447,7 @@ set_result(sqlite3_context* context, PyObject *obj)
 
 		if (o != NULL && PyCallable_Check(o)) {
 			char *buf;
-			int len;
+			Py_ssize_t len;
 			PyObject *str = PyObject_CallObject(o, NULL);
 
 			PyString_AsStringAndSize(str, &buf, &len);
@@ -1370,7 +1374,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 	PyObject *idobj;
 	int idx, rc;
 	char *bName = NULL;
-	int bLen = 0;
+	Py_ssize_t bLen = 0;
 	
 	if (!PyArg_ParseTuple(args, "OO", &idobj, &obj)) {
 		return NULL;
@@ -1420,7 +1424,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 	}
 	else if (PyString_Check(obj)) {
 		char *buf;
-		int len;
+		Py_ssize_t len;
 		PyString_AsStringAndSize(obj, &buf, &len);
 		if (memchr(buf, '\0', len))
 			rc = sqlite3_bind_blob(self->p_stmt, idx, buf, len,
@@ -1452,7 +1456,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 
 		if (o != NULL && PyCallable_Check(o)) {
 			char *buf;
-			int len;
+			Py_ssize_t len;
 			PyObject *str = PyObject_CallObject(o, NULL);
 
 			PyString_AsStringAndSize(str, &buf, &len);

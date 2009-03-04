@@ -1,5 +1,7 @@
 Chagnes in @NEW@:
   o Bug Fixes:
+    * Fixed potential segfault in sqlite bindings when running under
+      python 2.6. (CNY-3103)
     * Promoting a binary foo from a to b, and then promoting a group containing
       foo from b to a will no longer cause foo to be unnecessarily repromoted.
       (CNY-3088)
