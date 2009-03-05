@@ -12,6 +12,8 @@ Chagnes in @NEW@:
       normally ignored. (CNY-3098)
     * getTrovesBySource now returns a list of the accessible binaries associated
       with a source even if the source is not accessible. (CNY-3099)
+    * Changeset-based migrations no longer fail when a flavor is dropped
+      from the group that is being migrated. (CNY-3101)
   o New Features:
     * Attempting to promote a binary will no longer reclone the binary 
       if a binary is already the latest at the target branch, even if
