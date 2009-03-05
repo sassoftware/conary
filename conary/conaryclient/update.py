@@ -3130,6 +3130,7 @@ conary erase '%s=%s[%s]'
 
             csSource = trovesource.ChangesetFilesTroveSource(self.db,
                                                              storeDeps=True)
+            csSource.searchAsRepository()
             for cs in fromChangesets:
                 self._replaceIncomplete(cs, self.db, self.db, self.repos)
                 csSource.addChangeSet(cs, includesFileContents = True)
