@@ -341,17 +341,17 @@ class BaseDatabase:
         inTrans = self.inTransaction(default=shouldBeInTrans)
         if inTrans == shouldBeInTrans:
             if DEBUG_TRANSACTIONS == DEBUG_WARN_ALL:
-                print 'Transaction: %s at' % (command,)
+                print >> sys.stderr, 'Transaction: %s at' % (command,)
                 traceback.print_stack(sys._getframe(2))
             return
 
         where = (inTrans and 'inside' or 'outside')
         if DEBUG_TRANSACTIONS == DEBUG_ERROR:
-            print 'Transaction bug: %s %s of transaction' % (command, where)
+            print >> sys.stderr, 'Transaction bug: %s %s of transaction' % (command, where)
             from conary.lib import debugger
             debugger.st()
         else:
-            print 'Transaction bug: %s %s of transaction at:' % (command, where)
+            print >> sys.stderr, 'Transaction bug: %s %s of transaction at:' % (command, where)
             traceback.print_stack(sys._getframe(2))
 
     def commit(self):
