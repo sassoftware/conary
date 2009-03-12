@@ -45,7 +45,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 65 + 1)
+SERVER_VERSIONS = range(36, 66 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -3170,6 +3170,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             s.add((n,v,f))
         ret = [ list(x) for x in ret ]
         return ret
+
+    @accessReadOnly
+    def getLabelsForHost(self, authToken, clientVersion, serverName):
+        cu = self.db.cursor()
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        cu.execute('''
+             SELECT branch FROM 
+                (SELECT DISTINCT branchId 
+                    FROM LatestCache 
+                    WHERE userGroupId IN (%s) 
+                    AND latestType=1) AS AvailBranches 
+             JOIN Branches USING(branchId)''' 
+                % (", ".join("%d" % x for x in roleIds),))
+        # NOTE: this is faster than joining against the LabelMap,
+        # as there is no direct branchId -> labelId mapping (you 
+        # must also use the itemId.)  The python done below is
+        # going to be faster than SQL until we add such an table.
+        # And in general neither number of labels or number of branches is 
+        # likely to go beyond thousands.
+        labelList = (versions.VersionFromString(x[0]).label() for x in cu)
+        labelList = (str(x) for x in labelList if x.getHost() == serverName)
+        # dedup.
+        return list(set(labelList))
 
     @accessReadOnly
     def getTroveDescendants(self, authToken, clientVersion, troveList):
