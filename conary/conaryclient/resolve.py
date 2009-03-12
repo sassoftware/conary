@@ -405,7 +405,7 @@ class DependencySolver(object):
                     log.debug(msg, *args)
                     break
 
-                oldTrv = self.db.getTrove(withFiles = False,
+                oldTrv = self.db.getTrove(withFiles = False, pristine = False,
                                           *provInfo)
                 newTrv = trvSrc.getTrove(job[0], job[2][0], job[2][1],
                                          withFiles = False)
