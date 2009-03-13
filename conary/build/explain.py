@@ -198,7 +198,7 @@ def docClass(cfg, recipeType):
     if recipeType == 'PackageRecipe':
         Actions = display['Build'][:]
         display['Source'] = [x for x in Actions if x.startswith('add')]
-        display['Build'] = [x for x in Actions if x not in display['Source']]
+        display['Build'] = [x for x in Actions if x not in display['Source'] and x not in display['Policy'] ]
     for key, val in [x for x in display.iteritems()]:
         if val:
             display[key] = '\n    '.join(val)
