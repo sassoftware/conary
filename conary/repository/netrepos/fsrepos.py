@@ -37,6 +37,9 @@ class FilesystemChangeSetJob(ChangeSetJob):
         ChangeSetJob.__init__(self, repos, cs, *args, **kw)
         repos.troveStore.addTroveSetDone()
 
+    def _containsFileContents(self, sha1iter):
+        return self.repos.troveStore.hasFileContents(sha1iter)
+
     def markTroveRemoved(self, name, version, flavor):
         self.repos.markTroveRemoved(name, version, flavor)
 

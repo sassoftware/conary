@@ -34,6 +34,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     to the old version of things.
     """
 
+    def _containsFileContents(self, sha1iter):
+        return [ self.repos._hasFileContents(sha1) for sha1 in sha1iter ]
+
     def addTrove(self, oldTroveSpec, trove, hidden = False):
         assert(not hidden), "This code pathway does not accept hidden trove commits"
         info = trove.getNameVersionFlavor()

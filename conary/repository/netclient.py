@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 65 + 1)
+CLIENT_VERSIONS = range(36, 66 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2686,6 +2686,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 data = base64.decodestring(dataStr)
                 results[i] = trove.TroveInfo.streamDict[infoType][1](data)
         return results
+
+    @api.publicApi
+    def getLabelsForHost(self, hostname):
+        """
+        Returns the list of labels that have troves on them for the given
+        host.
+
+        @param hostname: hostname to return labels for
+        @return: list of labels that exist for that host.
+        """
+        return [self.toLabel(x) for x 
+                 in self.c[hostname].getLabelsForHost(hostname) ]
 
     @api.publicApi
     def findTroves(self, labelPath, troves, defaultFlavor = None, 

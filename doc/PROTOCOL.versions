@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Version 66:
+  - added getLabelsForHost
+
 Version 65:
   - getTroveInfo and getNewTroveInfo calls filter extended metadata from
     results for older clients

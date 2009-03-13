@@ -1248,7 +1248,7 @@ order by
             if not withFiles:
                 yield trv
 
-        if withFiles:
+        if not pristine or withFiles:
             cu.execute("""SELECT idx, pathId, path, version, fileId, isPresent
                           FROM getTrovesTbl
                           JOIN DBTroveFiles USING(instanceId)
@@ -1266,8 +1266,14 @@ order by
                     curIdx += 1
 
             while curIdx < len(results):
+                if not pristine:
+                    results[idx].computePathHashes()
+                if not withFiles:
+                    results[idx].removeAllFiles()
+
                 yield results[curIdx]
                 curIdx += 1
+
         cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
     def eraseTrove(self, troveName, troveVersion, troveFlavor):

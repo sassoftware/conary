@@ -1265,6 +1265,13 @@ def setupTempTables(db):
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpPathIdLookup"] = True
 
+    if "tmpSha1s" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpSha1s(
+            sha1        %(BINARY20)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpSha1s"] = True
+
     if "tmpGroupInsertShim" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpGroupInsertShim(

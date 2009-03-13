@@ -1610,6 +1610,9 @@ class Trove(streams.StreamSet):
 
 	return self.idMap.iteritems()
 
+    def removeAllFiles(self):
+        self.idMap = TroveRefsFilesStream()
+
     def iterFileList(self):
 	# don't use idMap.iteritems() here; we don't want to exposure
 	# our internal format

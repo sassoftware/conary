@@ -743,6 +743,19 @@ class TroveStore:
         md["language"] = language
         return metadata.Metadata(md)
 
+    def hasFileContents(self, sha1iter):
+        cu = self.db.cursor()
+        schema.resetTable(cu, 'tmpSha1s')
+        self.db.bulkload("tmpSha1s", ((cu.binary(x),) for x in sha1iter),
+                         [ "sha1" ], start_transaction = False)
+        cu.execute("""
+        select case when exists
+            (select 1 from FileStreams where filestreams.sha1 = tmpSha1s.sha1)
+        then 1 else 0 end from tmpSha1s;
+        """)
+
+        return [ x[0] for x in cu ]
+
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = None):
         self.log(3, troveName, troveVersion, troveFlavor)
 

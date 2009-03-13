@@ -14,6 +14,8 @@
 
 # defines the Conary repository
 
+import itertools
+
 from conary.repository import changeset, errors, filecontents
 from conary import files, trove
 from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper, util
@@ -364,19 +366,7 @@ class ChangeSetJob:
 
         contentInfo = files.frozenFileContentInfo(fileStream)
 
-        # we already have the contents of this file... we can go
-        # ahead and restore it reusing those contents
-        if repos._hasFileContents(contentInfo.sha1()):
-            # if we already have the file in the data store we can
-            # get the contents from there
-            fileContents = filecontents.FromDataStore(
-                             repos.contentsStore, 
-                             contentInfo.sha1())
-            contType = changeset.ChangedFileTypes.file
-            self.addFileContents(contentInfo.sha1(),
-                                 fileContents, restoreContents, 
-                                 fileFlags.isConfig())
-        elif fileFlags.isConfig():
+        if fileFlags.isConfig():
             tup = (pathId, fileId, contentInfo.sha1(),
                    oldfile, fileId, oldVersion, oldFileId,
                    restoreContents)
@@ -385,6 +375,37 @@ class ChangeSetJob:
             tup = (pathId, fileId, contentInfo.sha1(),
                    restoreContents)
             normalRestoreList.append(tup)
+
+    def _containsFileContents(self, sha1iter):
+        raise NotImplementedError
+
+    def _filterRestoreList(self, configRestoreList, normalRestoreList):
+
+        def filterOne(l, isConfig):
+            newL = []
+            inReposList = self._containsFileContents(tup[2] for tup in l)
+            for tup, inRepos in itertools.izip(l, inReposList):
+                if inRepos:
+                    (pathId, fileId, sha1) = tup[0:3]
+                    restoreContents = tup[-1]
+                    # if we already have the file in the data store we can
+                    # get the contents from there. This double store looks 
+                    # crazy, but we need it to get reference counting right.
+                    fileContents = filecontents.FromDataStore(
+                                     self.repos.contentsStore, sha1)
+                    contType = changeset.ChangedFileTypes.file
+                    self.addFileContents(sha1, fileContents,
+                                         restoreContents, isConfig)
+                else:
+                    newL.append(tup)
+
+
+            return newL
+
+        configRestoreList = filterOne(configRestoreList, True)
+        normalRestoreList = filterOne(normalRestoreList, False)
+
+        return configRestoreList, normalRestoreList
 
     def _getCheckFilesList(self, csTrove, troveInfo, fileHostFilter,
             configRestoreList, normalRestoreList):
@@ -692,6 +713,9 @@ class ChangeSetJob:
                                             callback = callback,
                                             mirror = mirror, hidden = hidden,
                                             allowIncomplete = allowIncomplete)
+        configRestoreList, normalRestoreList = \
+            self._filterRestoreList(configRestoreList, normalRestoreList)
+
         # use a key to select data up to, but not including, the first
         # version.  We can't sort on version because we don't have timestamps
         configRestoreList.sort(key=lambda x: x[0:5])
