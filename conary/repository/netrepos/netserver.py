@@ -202,6 +202,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.troveStore = self.repos = self.auth = self.deptable = None
             self.open(connect=False)
 
+    def reset(self):
+        """
+        Free temporary resources that do not need to persist between requests,
+        e.g. pooled database connections.
+        """
+        if self.db.poolmode:
+            self.db.close()
+
     # does the actual method calling and the retry when hitting deadlocks
     def _callWrapper(self, method, authToken, orderedArgs, kwArgs):
         methodname = method.im_func.__name__
@@ -256,28 +264,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         exceptionOverride = None
         start = time.time()
         try:
-            try:
-                r = self._callWrapper(method, authToken, orderedArgs, kwArgs)
-                if self.db.inTransaction(default=True):
-                    # Commit if someone left a transaction open (or the
-                    # DB doesn't have a way to tell)
-                    self.db.commit()
-            except Exception, e:
-                # on exceptions we rollback the database
-                if self.db.inTransaction(default=True):
-                    self.db.rollback()
-            else:
-                if self.callLog:
-                    self.callLog.log(remoteIp, authToken, methodname,
-                                     orderedArgs, kwArgs,
-                                     latency = time.time() - start)
-                return r
-        finally:
-            # when we're done with database work we need to close the
-            # connection to free it for others if we're running in
-            # pool mode
-            if self.db.poolmode:
-                self.db.close()
+            r = self._callWrapper(method, authToken, orderedArgs, kwArgs)
+            if self.db.inTransaction(default=True):
+                # Commit if someone left a transaction open (or the
+                # DB doesn't have a way to tell)
+                self.db.commit()
+        except Exception, e:
+            # on exceptions we rollback the database
+            if self.db.inTransaction(default=True):
+                self.db.rollback()
+        else:
+            if self.callLog:
+                self.callLog.log(remoteIp, authToken, methodname,
+                                 orderedArgs, kwArgs,
+                                 latency = time.time() - start)
+            return r
 
         if self.callLog:
             if isinstance(e, HiddenException):
@@ -3301,6 +3302,9 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
 
     def getAsciiOpenPGPKey(self, *args, **kwargs):
         return None
+
+    def reset(self):
+        pass
 
 class HiddenException(Exception):
 

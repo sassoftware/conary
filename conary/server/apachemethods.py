@@ -33,7 +33,7 @@ def post(port, isSecure, repos, req):
     if authToken is None:
         return apache.HTTP_BAD_REQUEST
 
-    if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
+    if authToken[0] != "anonymous" and not isSecure and repos.cfg.forceSSL:
         return apache.HTTP_FORBIDDEN
 
     if isSecure:
@@ -201,7 +201,7 @@ def get(port, isSecure, repos, req):
     if authToken is None:
         return apache.HTTP_BAD_REQUEST
 
-    if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
+    if authToken[0] != "anonymous" and not isSecure and repos.cfg.forceSSL:
         return apache.HTTP_FORBIDDEN
 
     if cmd == "changeset":
@@ -278,7 +278,7 @@ def putFile(port, isSecure, repos, req):
         status, reason = netclient.httpPutFile(req.unparsed_uri, req, contentLength)
         return status
 
-    if not isSecure and repos.forceSecure or '/' in req.args:
+    if not isSecure and repos.cfg.forceSSL or '/' in req.args:
         return apache.HTTP_FORBIDDEN
 
     path = repos.tmpPath + "/" + req.args + "-in"

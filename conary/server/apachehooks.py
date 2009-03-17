@@ -133,7 +133,9 @@ def handler(req):
 
 def _handler(req):
     repName = req.filename
-    if not repositories.has_key(repName):
+    if repName in repositories:
+        repServer, proxyServer = repositories[repName]
+    else:
         cfg = netserver.ServerConfig()
         cfg.read(req.filename)
 
@@ -164,37 +166,42 @@ def _handler(req):
             log.error("tmpDir cannot include symbolic links")
 
         if cfg.closed:
-            repos = netserver.ClosedRepositoryServer(cfg)
-            repositories[repName] = proxy.SimpleRepositoryFilter(
-                                                cfg, urlBase, repos)
-            repositories[repName].forceSecure = False
-            repositories[repName].cfg = cfg
+            # Closed repository
+            repServer = netserver.ClosedRepositoryServer(cfg)
+            proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase, repServer)
         elif cfg.proxyContentsDir:
-            repositories[repName] = proxy.ProxyRepositoryServer(cfg, urlBase)
-            repositories[repName].forceSecure = False
+            # Caching proxy
+            repServer = None
+            proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
         else:
-            repos = netserver.NetworkRepositoryServer(cfg, urlBase)
-            repositories[repName] = proxy.SimpleRepositoryFilter(
-                                                cfg, urlBase, repos)
-            repositories[repName].forceSecure = cfg.forceSSL
-            repositories[repName].cfg = cfg
+            # Full repository with changeset cache
+            repServer = netserver.NetworkRepositoryServer(cfg, urlBase)
+            proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase, repServer)
+
+        repositories[repName] = repServer, proxyServer
 
     port = req.connection.local_addr[1]
     # newer versions of mod_python provide a req.is_https() method
     secure = (req.subprocess_env.get('HTTPS', 'off').lower() == 'on')
 
-    repos = repositories[repName]
     method = req.method.upper()
 
     try:
-        if method == "POST":
-            return post(port, secure, repos, req)
-        elif method == "GET":
-            return get(port, secure, repos, req)
-        elif method == "PUT":
-            return putFile(port, secure, repos, req)
-        else:
-            return apache.HTTP_METHOD_NOT_ALLOWED
+        try:
+            if method == "POST":
+                return post(port, secure, proxyServer, req)
+            elif method == "GET":
+                return get(port, secure, proxyServer, req)
+            elif method == "PUT":
+                return putFile(port, secure, proxyServer, req)
+            else:
+                return apache.HTTP_METHOD_NOT_ALLOWED
+        finally:
+            # Free temporary resources used by the repserver
+            # e.g. pooled DB connections.
+            if repServer:
+                repServer.reset()
+
     except apache.SERVER_RETURN:
         # if the exception was an apache server return code,
         # re-raise it and let mod_python handle it.
@@ -206,7 +213,7 @@ def _handler(req):
         else:
             raise
     except:
-        cfg = repos.cfg
+        cfg = proxyServer.cfg
         exception, e, bt = sys.exc_info()
         logErrorAndEmail(req, cfg, exception, e, bt)
         return apache.HTTP_INTERNAL_SERVER_ERROR
