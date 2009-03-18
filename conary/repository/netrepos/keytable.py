@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+import weakref
 
 try:
     from cStringIO import StringIO
@@ -177,21 +179,19 @@ class OpenPGPKeyTable:
 class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
     def __init__(self, keyTable = None):
         openpgpkey.OpenPGPKeyCache.__init__(self)
-        self.keyTable = keyTable
-
-    def setKeyTable(self, keyTable):
-        self.keyTable = keyTable
+        self.keyTable = weakref.ref(keyTable)
 
     def getPublicKey(self, keyId, label = None, warn=False):
         if keyId in self.publicDict:
             return self.publicDict[keyId]
 
+        keyTable = self.keyTable()
         if self.keyTable is None:
             raise openpgpkey.KeyNotFound(keyId, "Can't open database")
 
         # get the key data from the database
-        fingerprint = self.keyTable.getFingerprint(keyId)
-        keyData = self.keyTable.getPGPKeyData(keyId)
+        fingerprint = keyTable.getFingerprint(keyId)
+        keyData = keyTable.getPGPKeyData(keyId)
 
         # instantiate the key object from the raw key data
         key = openpgpfile.getKeyFromString(keyId, keyData)

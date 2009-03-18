@@ -250,6 +250,7 @@ class BaseDatabase:
 
     # close the connection when going out of scope
     def __del__(self):
+        print 'Garbage collecting %r' % self
         self.stderr = self.tempTables = None
         try:
             self.dbh.close()
