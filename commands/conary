@@ -69,6 +69,7 @@ class ConaryCommand(command.ConaryCommand):
     paramHelp = ''
     defaultGroup = 'Common Options'
     commandGroup = 'Miscellaneous Commands'
+    ignoreConfigErrors = False
 
     def addConfigOptions(self, cfgMap, argDef):
         cfgMap['components'] = 'showComponents', NO_PARAM
@@ -265,6 +266,7 @@ class RemoveCommand(ConaryCommand):
     help = 'Remove a file the system and Conary control'
     commandGroup = 'System Modification'
     hidden = True
+    ignoreConfigErrors = True
 
     def runCommand(self, cfg, argSet, otherArgs):
         if len(otherArgs) < 3: return self.usage()
@@ -330,6 +332,7 @@ class RevertCommand(ConaryCommand):
     commandGroup = 'System Modification'
     help = 'Revert the journal from a failed operation.'
     hidden = True
+    ignoreConfigErrors = True
 
     def runCommand(self, cfg, argSet, otherArgs):
         if argSet or len(otherArgs) > 2: return self.usage()
@@ -340,6 +343,8 @@ class ListRollbackCommand(ConaryCommand):
     commands = ['rblist']
     commandGroup = 'Information Display'
     help = 'List the rollbacks available in the rollback stack'
+    ignoreConfigErrors = True
+
     def runCommand(self, cfg, argSet, otherArgs):
         if argSet or len(otherArgs) > 2: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
@@ -388,6 +393,7 @@ class RemoveRollbackCommand(ConaryCommand):
     paramHelp = "<rollback>"
     help = 'Remove old rollbacks'
     commandGroup = 'System Modification'
+    ignoreConfigErrors = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -485,6 +491,7 @@ class QueryCommand(_AbstractQueryCommand):
     help = 'Query the local system database'
     docs = {'all-troves' : 'Display troves that are not installed'}
     commandGroup = 'Information Display'
+    ignoreConfigErrors = True
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
@@ -741,6 +748,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
                                     'search the repository for troves not '
                                     'contained in the changeset when recursing')
            }
+    ignoreConfigErrors = True
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
@@ -1119,6 +1127,7 @@ class VerifyCommand(ConaryCommand):
     help = 'Verify software integrity on the system'
     docs = {'all' : 'verify all troves on system'}
     commandGroup = 'Information Display'
+    ignoreConfigErrors = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -1152,9 +1161,6 @@ class ConaryMain(command.MainHandler):
         return options.MainHandler.usage(self, rc, showAll=showAll)
 
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
-        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
-                                            debugCtrlC=debugAll)
-
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]
 
@@ -1205,15 +1211,7 @@ def main(argv=sys.argv):
             debuggerException = conary.repository.errors.InternalConaryError
 
         conaryMain = ConaryMain()
-        ccfg = conaryMain.getConfigFile(argv)
-
-        if debugAll:
-            ccfg.debugExceptions = True
-        # reset the excepthook (using cfg values for exception settings)
-        sys.excepthook = util.genExcepthook(debug=ccfg.debugExceptions,
-                                            debugCtrlC=debugAll)
-        return conaryMain.main(argv, debuggerException, 
-                               debugAll=debugAll, cfg=ccfg)
+        return conaryMain.main(argv, debuggerException, debugAll=debugAll)
     except IOError, e:
         # allow broken pipe to exit
         if e.errno != errno.EPIPE:

@@ -15,7 +15,7 @@ import inspect
 import sys
 
 from conary import errors
-from conary.lib import options
+from conary.lib import options, util
 
 __developer_api__ = True
 
@@ -119,7 +119,7 @@ class MainHandler(object):
                                      command.help)
         return rc
 
-    def getConfigFile(self, argv):
+    def getConfigFile(self, argv, ignoreErrors=False):
         """
             Find the appropriate config file
         """
@@ -128,9 +128,11 @@ class MainHandler(object):
                                  ' main handler')
         if '--skip-default-config' in argv:
             argv.remove('--skip-default-config')
-            ccfg = self.configClass(readConfigFiles=False)
+            ccfg = self.configClass(readConfigFiles=False,
+                                    ignoreErrors=ignoreErrors)
         else:
-            ccfg = self.configClass(readConfigFiles=True)
+            ccfg = self.configClass(readConfigFiles=True,
+                                    ignoreErrors=ignoreErrors)
         return ccfg
 
     def getParser(self, command):
@@ -179,7 +181,7 @@ class MainHandler(object):
                     addVerboseOptions=self.useConaryOptions,
                     description=description)
 
-    def getCommand(self, argv, cfg):
+    def getCommand(self, argv):
         if len(argv) == 1:
             # no command specified
             return None
@@ -190,8 +192,8 @@ class MainHandler(object):
             raise errors.ParseError("%s: unknown command: '%s'" % (self.name, commandName))
         return self._supportedCommands[commandName]
 
-    def main(self, argv=None, debuggerException=Exception,
-             cfg=None, **kw):
+    def main(self, argv=None, debuggerException=Exception, cfg=None,
+             debugAll=False, **kw):
         """
             Process argv and execute commands as specified.
         """
@@ -200,12 +202,27 @@ class MainHandler(object):
         from conary import versions
         supportedCommands = self._supportedCommands
 
-        if cfg is None:
-            cfg = self.getConfigFile(argv)
-
         if '--version' in argv:
             print self.version
             return
+
+        # we have to call _getPreCommandOptions twice.  It's easier
+        # this way so we can get rid of any extraneous options that
+        # may precede the command name.
+        dummyCfg = self.configClass(readConfigFiles=False)
+        cmdArgv = self._getPreCommandOptions(argv, dummyCfg)[1]
+        thisCommand = self.getCommand(cmdArgv)
+        if thisCommand is None:
+            return self.usage()
+
+        if cfg is None:
+            ignoreErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
+            cfg = self.getConfigFile(argv, ignoreErrors=ignoreErrors)
+
+        if debugAll:
+            cfg.debugExceptions = True
+        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+                                            debugCtrlC=debugAll)
 
         try:
             argSet, argv = self._getPreCommandOptions(argv, cfg)
@@ -215,9 +232,6 @@ class MainHandler(object):
             self.usage()
             print >>sys.stderr, e
             sys.exit(e.val)
-        thisCommand = self.getCommand(argv, cfg)
-        if thisCommand is None:
-            return self.usage()
         commandName = argv[1]
         params, cfgMap = thisCommand.prepare()
         kwargs = self._getParserFlags(thisCommand)

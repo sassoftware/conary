@@ -4,6 +4,9 @@ Changes in @NEW@:
       removed, preventing file conflicts with incoming troves
     * Fixed formatting error in cvc explain that caused policy actions to be
       listed twice. (CNY-3107)
+    * Conary ignores configuration file errors for certain local
+      operations including conary query, rblist, and showcs. (CNY-3111)
+
   o New Features:
     * Added getLabelsForHost call, and bumped server protocol to 66. (CNY-2771)
     * Repositories now check the database to see which files already exist
