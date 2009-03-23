@@ -219,9 +219,14 @@ class MainHandler(object):
             ignoreErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
             cfg = self.getConfigFile(argv, ignoreErrors=ignoreErrors)
 
+        # get the default setting for exception debugging from the
+        # config object (if it has a setting).
+        debug = getattr(cfg, 'debugExceptions', False)
         if debugAll:
-            cfg.debugExceptions = True
-        sys.excepthook = util.genExcepthook(debug=cfg.debugExceptions,
+            if hasattr(cfg, 'debugExceptions'):
+                cfg.debugExceptions = True
+            debug = True
+        sys.excepthook = util.genExcepthook(debug=debug,
                                             debugCtrlC=debugAll)
 
         try:
