@@ -1,16 +1,16 @@
 #
-## Copyright (c) 2008 rPath, Inc.
+# Copyright (c) 2008-2009 rPath, Inc.
 #
-## This program is distributed under the terms of the Common Public License,
+# This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
-# # source file in a file called LICENSE. If it is not present, the license
-# # is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
-# #
-# # This program is distributed in the hope that it will be useful, but
-# # without any warranty; without even the implied warranty of merchantability
-# # or fitness for a particular purpose. See the Common Public License for
-# # full details.
-# #
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
 
 """
 This module defines helper classes designed to define filestream objects.
@@ -457,6 +457,143 @@ class Directory(_File):
     associated with it.
     """
     fileClass = files.Directory
+    kwargs = _File.kwargs.copy()
+    kwargs.update({'perms': 0755})
+
+    def __init__(self, **kwargs):
+        _File.__init__(self, **kwargs)
+
+class Socket(_File):
+    """
+    NAME
+    ====
+
+    B{C{Socket}} - Define a unix domain socket filestream helper.
+
+    SYNOPSIS
+    ========
+
+    C{Socket([I{requires}, I{provides}, I{flavor}, I{mode}, I{owner}, I{group}, I{tags}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{Socket} class defines a socket filestream helper.
+
+    PARAMETERS
+    ==========
+    The following parameters apply to the Socket class.
+
+    B{requires}: (None) Marks this socket with the specified requirements.
+    This parameter is a deps.Dependency object.
+
+    B{provides}: (None) Marks this socket as providing certain features or
+    characteristics.  This parameter is a deps.Dependency object.
+
+    B{flavor}: (None) Marks this socket with the specified flavor.  File
+    flavors are aggregated to determine trove flavors.  This parameter
+    is a deps.Flavor object.
+
+    B{owner}: ('root') Marks this socket as owned by I{owner}.
+    This parameter is a string
+
+    B{group}: ('root') Marks this socket as belonging to I{group}.  This
+    parameter is a string
+
+    B{mode}: (0644) Defines the access permissons of this socket.  This
+    parameter is an integer.
+
+    B{tags} : (None) Tags associated with this socket.  When a file with a
+    tag is installed, removed, or changed, the listed tag handler is executed.
+    See documentation on tag handlers for more information.  This parameter
+    is a list of strings.
+
+    USER COMMANDS
+    =============
+    The following user commands are applicable to C{Socket}:
+
+        - L{get(I{pathId})} : Returns a filestream with the settings
+          represented by this class.
+
+    EXAMPLES
+    ========
+
+    C{dir = Socket(contents = 'foo')}
+    C{dir.get()}
+
+    Creates a socket filestream helper, and retrieves the filestream
+    associated with it.
+    """
+    fileClass = files.Socket
+    kwargs = _File.kwargs.copy()
+    kwargs.update({'perms': 0755})
+
+    def __init__(self, **kwargs):
+        _File.__init__(self, **kwargs)
+
+
+class NamedPipe(_File):
+    """
+    NAME
+    ====
+
+    B{C{NamedPipe}} - Define a named pipe filestream helper.
+
+    SYNOPSIS
+    ========
+
+    C{NamedPipe([I{requires}, I{provides}, I{flavor}, I{mode}, I{owner}, I{group}, I{tags}])}
+
+    DESCRIPTION
+    ===========
+
+    The C{NamedPipe} class defines a named pipe filestream helper.
+
+    PARAMETERS
+    ==========
+    The following parameters apply to the NamedPipe class.
+
+    B{requires}: (None) Marks this named pipe with the specified requirements.
+    This parameter is a deps.Dependency object.
+
+    B{provides}: (None) Marks this named pipe as providing certain features or
+    characteristics.  This parameter is a deps.Dependency object.
+
+    B{flavor}: (None) Marks this named pipe with the specified flavor.  File
+    flavors are aggregated to determine trove flavors.  This parameter
+    is a deps.Flavor object.
+
+    B{owner}: ('root') Marks this named pipe as owned by I{owner}.
+    This parameter is a string
+
+    B{group}: ('root') Marks this named pipe as belonging to I{group}.  This
+    parameter is a string
+
+    B{mode}: (0644) Defines the access permissons of this named pipe.  This
+    parameter is an integer.
+
+    B{tags} : (None) Tags associated with this named pipe.  When a file with a
+    tag is installed, removed, or changed, the listed tag handler is executed.
+    See documentation on tag handlers for more information.  This parameter
+    is a list of strings.
+
+    USER COMMANDS
+    =============
+    The following user commands are applicable to C{NamedPipe}:
+
+        - L{get(I{pathId})} : Returns a filestream with the settings
+          represented by this class.
+
+    EXAMPLES
+    ========
+
+    C{dir = NamedPipe(contents = 'foo')}
+    C{dir.get()}
+
+    Creates a socket filestream helper, and retrieves the filestream
+    associated with it.
+    """
+    fileClass = files.NamedPipe
     kwargs = _File.kwargs.copy()
     kwargs.update({'perms': 0755})
 

@@ -12,6 +12,8 @@ Changes in @NEW@:
     * Repositories now check the database to see which files already exist
       instead of looking in the filesystem for a noticeable speedup in commit
       time for systems with NFS based data stores.
+    * Added types to allow creation of sockets and named pipes via
+      conaryclient/newtrove.py code paths
 
 Changes in 2.0.39:
   o Bug Fixes:
