@@ -2639,7 +2639,6 @@ class Provides(_dependency):
         oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
         libdir = self.macros.libdir
-        systemPythonFlags = set()
 
         try:
             # get preferred sys.path (not modified by Conary wrapper)
@@ -3429,11 +3428,11 @@ class Requires(_addInfo, _dependency):
         # but it creates an ordered path list with and without destdir prefix,
         # while provides only needs a complete list without destdir prefix.
         # Returns tuple:
-        #  (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
+        #  (sysPath, pythonModuleFinder, pythonVersion)
 
         pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
         if not pythonPath:
-            return (None, None, None, None)
+            return (None, None, None)
 
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
@@ -3444,7 +3443,6 @@ class Requires(_addInfo, _dependency):
         destdir = self.macros.destdir
         libdir = self.macros.libdir
         pythonVersion = None
-        systemPythonFlags = set()
 
         try:
             # get preferred sys.path (not modified by Conary wrapper)
@@ -3453,18 +3451,10 @@ class Requires(_addInfo, _dependency):
             systemPaths = self._getPythonSysPath(pythonPath, destdir, libdir)
 
             pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
-            if not bootstrapPython:
-                # determine dynamically whether to require version
-                # and libname (lib/lib64/...) based on whether the
-                # python in the destdir provides them.  Note that
-                # this means that when building python itself,
-                # we'll have to provide this information from the
-                # recipe.
-                systemPythonFlags.update(
-                    self._getPythonTroveFlags(pythonPath))
 
-            if bootstrapPython and self.bootstrapPythonFlags:
-                systemPythonFlags = set(self.bootstrapPythonFlags)
+            if not bootstrapPython:
+                # update pythonTroveFlagCache to require correct flags
+                self._getPythonTroveFlags(pythonPath)
 
             # generate site-packages list for destdir
             # (look in python base directory first)
@@ -3496,7 +3486,7 @@ class Requires(_addInfo, _dependency):
             bootstrapPython)
 
         self.pythonSysPathMap[pythonPath] = (
-            sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion)
+            sysPath, pythonModuleFinder, pythonVersion)
         return self.pythonSysPathMap[pythonPath]
 
     def _getPythonRequiresModuleFinder(self, pythonPath, destdir, libdir, sysPath, bootstrapPython):
@@ -3530,7 +3520,7 @@ class Requires(_addInfo, _dependency):
         destdir = self.recipe.macros.destdir
         destDirLen = len(destdir)
         
-        (sysPath, pythonModuleFinder, systemPythonFlags, pythonVersion
+        (sysPath, pythonModuleFinder, pythonVersion
         )= self._getPythonRequiresSysPath(path)
 
         if not sysPath:
