@@ -137,3 +137,75 @@ def toDatabaseTimestamp(secsSinceEpoch=None, offset=0):
 
     timeToGet = time.gmtime(secsSinceEpoch + float(offset))
     return long(time.strftime('%Y%m%d%H%M%S', timeToGet))
+
+
+class Row(object):
+    """
+    Immutable wrapper around a single result row from a query.
+
+    Behaves as both a tuple and a dictionary, including unpacking.
+    
+    For example:
+    >>> row = Row([1, 2, 3], ['foo', 'bar', 'baz'])
+    >>> print row[0]
+    1
+    >>> print row['foo']
+    1
+    >>> x, y, z = row
+    >>> print x
+    1
+    """
+
+    __slots__ = ('data', 'fields', 'mapping')
+
+    def __init__(self, data, fields):
+        assert len(data) == len(fields)
+        self.data = tuple(data)
+        self.fields = tuple(fields)
+        self.mapping = None
+
+    # Most slots behave like the data tuple
+    def __len__(self):
+        return len(self.data)
+
+    def __hash__(self):
+        return hash(self.data)
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __repr__(self):
+        return repr(self.data)
+
+    def __eq__(self, other):
+        return self.data == other
+
+    # And these behave like a mapping
+    def keys(self):
+        return list(self.fields)
+
+    def values(self):
+        return list(self.data)
+
+    def items(self):
+        return zip(self.fields, self.data)
+
+    # But the item slot is magic
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            # Used as a sequence
+            return self.data[key]
+        else:
+            # Used as a mapping
+            if self.mapping is None:
+                self._makeMapping()
+            return self.mapping[key]
+
+    def _makeMapping(self):
+        """
+        An underlying dictionary is used for mapping-like accesses,
+        but it slows things down when the row is used only as a sequence.
+        So this method generates the mapping when it is first needed.
+        """
+        self.mapping = dict((x.lower(), y)
+                for (x, y) in zip(self.fields, self.data))

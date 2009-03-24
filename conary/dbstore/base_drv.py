@@ -165,6 +165,13 @@ class BaseCursor:
                                      row = row, desc = self._cursor.description)
         return dict(zip(self.fields(), row))
 
+    def _row(self, data):
+        "Convert a data tuple to a C{Row} object."
+        assert self._cursor
+        if data is None:
+            return None
+        return sqllib.Row(data, self.fields())
+
     # (a,b)
     def fetchone(self):
         return self._cursor.fetchone()
@@ -191,7 +198,7 @@ class BaseCursor:
         if item is None:
             raise StopIteration
         else:
-            return item
+            return self._row(item)
 
 # A class for working with sequences
 class BaseSequence:
