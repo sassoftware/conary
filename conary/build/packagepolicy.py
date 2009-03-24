@@ -3595,10 +3595,6 @@ class Requires(_addInfo, _dependency):
                 # requires list.
                 continue
 
-            # in order to limit requiring flags, we remove from flags
-            # anything that is not provided by systemPythonFlags
-            flags.intersection_update(systemPythonFlags)
-
             if depPath.endswith('module.so'):
                 # Strip 'module.so' from the end, make it a candidate
                 cands = [ depPath[:-9] + '.so', depPath ]
