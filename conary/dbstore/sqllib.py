@@ -177,8 +177,18 @@ class Row(object):
     def __repr__(self):
         return repr(self.data)
 
+    def __lt__(self, other):
+        return self.data < other
+    def __le__(self, other):
+        return self.data <= other
     def __eq__(self, other):
         return self.data == other
+    def __ne__(self, other):
+        return self.data != other
+    def __gt__(self, other):
+        return self.data > other
+    def __ge__(self, other):
+        return self.data >= other
 
     # And these behave like a mapping
     def keys(self):
