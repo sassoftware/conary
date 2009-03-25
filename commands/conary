@@ -1015,7 +1015,6 @@ class MigrateCommand(_UpdateCommand):
     def addParameters(self, argDef):
         _UpdateCommand.addParameters(self, argDef)
         d = argDef.pop('Update Options')
-        del d['from-file']
         del d['keep-existing']
         del d['sync-to-parents']
         del d['no-recurse']

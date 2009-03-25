@@ -17,6 +17,7 @@ Changes in @NEW@:
       time for systems with NFS based data stores.
     * Added types to allow creation of sockets and named pipes via
       conaryclient/newtrove.py code paths
+    * The "migrate" command now accepts the "--from-file" option (CNY-3114)
 
 Changes in 2.0.39:
   o Bug Fixes:
