@@ -209,7 +209,7 @@ class Row(object):
             # Used as a mapping
             if self.mapping is None:
                 self._makeMapping()
-            return self.mapping[key]
+            return self.mapping[key.lower()]
 
     def _makeMapping(self):
         """
