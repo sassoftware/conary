@@ -257,7 +257,7 @@ class Database(BaseDatabase):
     # need to propagate the MaxPacket value to the cursors
     def cursor(self):
         assert (self.dbh)
-        ret = self.cursorClass(self.dbh)
+        ret = self.cursorClass(self.dbh, self.encoding)
         ret.MaxPacket = self.MaxPacket
         return ret
 
