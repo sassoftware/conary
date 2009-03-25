@@ -32,6 +32,12 @@ try:
 except ImportError:
     SSL = None
 
+cresthooks = None
+try:
+    from crest import standalone as cresthooks
+except ImportError:
+    pass
+
 thisFile = sys.modules[__name__].__file__
 thisPath = os.path.dirname(thisFile)
 if thisPath:
@@ -99,6 +105,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
             sizeCb(size, tag)
             bytes = util.copyfileobj(f, outF)
+
+        if (self.restHandler and self.path.startswith(self.restUri)):
+            self.restHandler.handle(self, self.path)
+            return
 
         if self.path.endswith('/'):
             self.path = self.path[:-1]
@@ -623,6 +633,14 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
 
         netRepos = NetworkRepositoryServer(cfg, baseUrl)
         reqClass.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
+        reqClass.restHandler = None
+        if cresthooks and cfg.baseUri:
+            try:
+                reqClass.restUri = cfg.baseUri + '/api'
+                reqClass.restHandler = cresthooks.StandaloneHandler(
+                                                reqClass.restUri, netRepos)
+            except ImportError:
+                pass
 
         if 'add-user' in argSet:
             admin = argSet.pop('admin', False)

@@ -28,6 +28,12 @@ from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
 from conary.server.apachemethods import get, post, putFile
 
+cresthooks = None
+try:
+    from crest import standalone as cresthooks
+except ImportError:
+    pass
+
 def formatRequestInfo(req):
     c = req.connection
     req.add_common_vars()
@@ -132,18 +138,22 @@ def handler(req):
         coveragehook.save()
 
 def _handler(req):
+    #if not req.filename.endswith('.cnr'):
     repName = req.filename
     if repName in repositories:
-        repServer, proxyServer = repositories[repName]
+        repServer, proxyServer, restHandler = repositories[repName]
     else:
         cfg = netserver.ServerConfig()
         cfg.read(req.filename)
 
         # Throw away any subdir portion.
-        rest = req.uri[:-len(req.path_info)] + '/'
+        if cfg.baseUri:
+            baseUri = cfg.baseUri
+        else:
+            baseUri = req.uri[:-len(req.path_info)] + '/'
 
         urlBase = "%%(protocol)s://%s:%%(port)d" % \
-                        (req.server.server_hostname) + rest
+                        (req.server.server_hostname) + baseUri
 
         if not cfg.repositoryDB and not cfg.proxyContentsDir:
             log.error("repositoryDB or proxyContentsDir is required in %s" % 
@@ -169,16 +179,23 @@ def _handler(req):
             # Closed repository
             repServer = netserver.ClosedRepositoryServer(cfg)
             proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase, repServer)
+            restHandler = None
         elif cfg.proxyContentsDir:
             # Caching proxy
             repServer = None
             proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
+            restHandler = None
         else:
             # Full repository with changeset cache
             repServer = netserver.NetworkRepositoryServer(cfg, urlBase)
             proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase, repServer)
+            if cresthooks and cfg.baseUri:
+                restUri = cfg.baseUri + '/api'
+                restHandler = cresthooks.ApacheHandler(restUri, repServer)
+            else:
+                restHandler = None
 
-        repositories[repName] = repServer, proxyServer
+        repositories[repName] = repServer, proxyServer, restHandler
 
     port = req.connection.local_addr[1]
     # newer versions of mod_python provide a req.is_https() method
@@ -191,7 +208,7 @@ def _handler(req):
             if method == "POST":
                 return post(port, secure, proxyServer, req)
             elif method == "GET":
-                return get(port, secure, proxyServer, req)
+                return get(port, secure, proxyServer, restHandler, req)
             elif method == "PUT":
                 return putFile(port, secure, proxyServer, req)
             else:

@@ -3340,6 +3340,7 @@ class GlobListType(list):
 
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
+    baseUri                 = CfgString
     bugsToEmail             = CfgString
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository')

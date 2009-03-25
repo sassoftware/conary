@@ -189,8 +189,7 @@ def _writeNestedFile(req, name, tag, size, f, sizeCb):
         sizeCb(size, tag)
         req.write(f.read())
 
-def get(port, isSecure, repos, req):
-
+def get(port, isSecure, repos, restHandler, req):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]
@@ -204,7 +203,9 @@ def get(port, isSecure, repos, req):
     if authToken[0] != "anonymous" and not isSecure and repos.cfg.forceSSL:
         return apache.HTTP_FORBIDDEN
 
-    if cmd == "changeset":
+    if restHandler and uri.startswith(restHandler.prefix):
+        return restHandler.handle(req, req.unparsed_uri)
+    elif cmd == "changeset":
         if not req.args:
             # the client asked for a changeset, but there is no
             # ?tmpXXXXXX.cf after /conary/changeset (CNY-1142)
