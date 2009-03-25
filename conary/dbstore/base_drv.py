@@ -113,8 +113,8 @@ class BaseCursor:
         # unwrap unwanted encapsulation
         if len(args) == 1:
             if isinstance(args[0], dict):
-                args = ()
                 kw.update(args[0])
+                args = ()
             elif isinstance(args[0], (tuple, list)):
                 args = tuple(args[0])
 
@@ -124,7 +124,7 @@ class BaseCursor:
             return x
 
         args = tuple(sanitize(x) for x in args)
-        kw = dict((key, sanitize(value)) for (key, value) in kw)
+        kw = dict((key, sanitize(value)) for (key, value) in kw.items())
         return args, kw
 
     # basic sanity checks for executes
