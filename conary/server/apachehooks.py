@@ -138,7 +138,6 @@ def handler(req):
         coveragehook.save()
 
 def _handler(req):
-    #if not req.filename.endswith('.cnr'):
     repName = req.filename
     if repName in repositories:
         repServer, proxyServer, restHandler = repositories[repName]
