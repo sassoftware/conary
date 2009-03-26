@@ -354,7 +354,7 @@ class _GroupRecipe(_BaseGroupRecipe):
     addTrove = add
 
     def remove(self, name, versionStr = None, flavor = None, groupName = None,
-               allowNoMatch=False):
+               allowNoMatch=False, use=True):
         """
         B{C{r.remove()}} - Removes a trove
 
@@ -409,6 +409,8 @@ class _GroupRecipe(_BaseGroupRecipe):
         Removes the trove C{kernel:configs} from the current group for the
         flavor C{kernel.smp}.
         """
+        if not use:
+            return
         flavor = self._parseFlavor(flavor)
         for group in self._getGroups(groupName):
             group.removeSpec(name, versionStr = versionStr, flavor = flavor,
