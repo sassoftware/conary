@@ -495,8 +495,9 @@ class Label(AbstractLabel):
 	@param value: String representation of a Label
 	@type value: str
 	"""
-	if value.find("/") != -1:
-	    raise ParseError("/ should not appear in a label")
+        for disallowed in "/'" + '"\\()[]':
+            if value.find(disallowed) != -1:
+                raise ParseError("%s should not appear in a label" % disallowed)
 
 	i = value.count(":")
 	if i > 1:
