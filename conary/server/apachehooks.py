@@ -30,7 +30,7 @@ from conary.server.apachemethods import get, post, putFile
 
 cresthooks = None
 try:
-    from crest import standalone as cresthooks
+    from crest import webhooks as cresthooks
 except ImportError:
     pass
 

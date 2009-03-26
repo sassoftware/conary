@@ -34,7 +34,7 @@ except ImportError:
 
 cresthooks = None
 try:
-    from crest import standalone as cresthooks
+    from crest import webhooks as cresthooks
 except ImportError:
     pass
 
