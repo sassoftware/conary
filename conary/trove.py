@@ -2758,7 +2758,7 @@ class Trove(streams.StreamSet):
         return self.troveInfo.buildTime()
 
     def setBuildTime(self, nm):
-        return self.troveInfo.buildTime.set(int(nm))
+        return self.troveInfo.buildTime.set(nm)
 
     def getConaryVersion(self):
         return self.troveInfo.conaryVersion()
