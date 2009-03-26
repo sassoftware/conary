@@ -19,6 +19,8 @@ import re
 import sqlerrors, sqllib
 
 
+DEFAULT_ENCODING = 'UTF-8'
+
 (DEBUG_OFF,
         DEBUG_WARN, # Print stack on invalid txn ops
         DEBUG_WARN_ALL, # Print stack on all txn ops
@@ -66,8 +68,9 @@ class BaseKeywordDict(dict):
 # interface
 class BaseCursor:
     binaryClass = BaseBinary
-    def __init__(self, dbh=None):
+    def __init__(self, dbh=None, encoding=DEFAULT_ENCODING):
         self.dbh = dbh
+        self.encoding = encoding
         self._cursor = self._getCursor()
 
     # map some attributes back to self._cursor
@@ -99,23 +102,29 @@ class BaseCursor:
     def _tryExecute(self, *args, **kw):
         raise NotImplementedError("This function should be provided by the SQL drivers")
 
-    # normalize the execute args and kwargs for passing into the driver
-    # on return is a tuple that contains all the positional parameters
-    # and kwargs is a hash of all the named arguments passed in
     def _executeArgs(self, args, kw):
+        """
+        Normalize the execute() args and kwargs for passing to the driver.
+        This includes encoding C{unicode} objects.
+        """
         assert(isinstance(args, tuple))
         assert(isinstance(kw, dict))
-        if len(args) == 0:
-            return (), kw
+
         # unwrap unwanted encapsulation
         if len(args) == 1:
             if isinstance(args[0], dict):
                 kw.update(args[0])
-                return (), kw
-            if isinstance(args[0], tuple):
-                args = args[0]
-            elif isinstance(args[0], list):
+                args = ()
+            elif isinstance(args[0], (tuple, list)):
                 args = tuple(args[0])
+
+        def sanitize(x):
+            if isinstance(x, unicode):
+                x = x.encode(self.encoding)
+            return x
+
+        args = tuple(sanitize(x) for x in args)
+        kw = dict((key, sanitize(value)) for (key, value) in kw.items())
         return args, kw
 
     # basic sanity checks for executes
@@ -245,9 +254,10 @@ class BaseDatabase:
     triggers = None
     version = 0
 
-    def __init__(self, db):
+    def __init__(self, db, encoding=DEFAULT_ENCODING):
         assert(db)
         self.database = db
+        self.encoding = encoding
         self.dbh = None
         # stderr needs to be around to print errors. hold a reference
         self.stderr = sys.stderr
@@ -322,7 +332,7 @@ class BaseDatabase:
     # creating cursors
     def cursor(self):
         assert (self.dbh)
-        return self.cursorClass(self.dbh)
+        return self.cursorClass(self.dbh, self.encoding)
     itercursor = cursor
 
     def sequence(self, name):
