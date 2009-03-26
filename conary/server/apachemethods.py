@@ -189,7 +189,7 @@ def _writeNestedFile(req, name, tag, size, f, sizeCb):
         sizeCb(size, tag)
         req.write(f.read())
 
-def get(port, isSecure, repos, restHandler, req):
+def get(port, isSecure, repos, req, restHandler=None):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]

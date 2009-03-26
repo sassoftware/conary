@@ -207,7 +207,7 @@ def _handler(req):
             if method == "POST":
                 return post(port, secure, proxyServer, req)
             elif method == "GET":
-                return get(port, secure, proxyServer, restHandler, req)
+                return get(port, secure, proxyServer, req, restHandler)
             elif method == "PUT":
                 return putFile(port, secure, proxyServer, req)
             else:
