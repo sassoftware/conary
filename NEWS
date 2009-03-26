@@ -16,6 +16,8 @@ Changes in @NEW@:
     * Repositories now check the database to see which files already exist
       instead of looking in the filesystem for a noticeable speedup in commit
       time for systems with NFS based data stores.
+    * In a GroupRecipe, r.remove now takes a use flag to determine if a trove
+      should be removed. This matches the behavior of r.add*. (CNY-3115)
     * Added types to allow creation of sockets and named pipes via
       conaryclient/newtrove.py code paths
     * The "migrate" command now accepts the "--from-file" option (CNY-3114)
