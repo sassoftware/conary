@@ -38,6 +38,7 @@ class MainHandler(object):
                             # and use cfgMap.
 
     def __init__(self):
+        self._ignoreConfigErrors = False
         self._supportedCommands = {}
         for class_ in reversed(inspect.getmro(self.__class__)):
             if not hasattr(class_, 'commandList'):
@@ -119,7 +120,7 @@ class MainHandler(object):
                                      command.help)
         return rc
 
-    def getConfigFile(self, argv, ignoreErrors=False):
+    def getConfigFile(self, argv):
         """
             Find the appropriate config file
         """
@@ -129,10 +130,10 @@ class MainHandler(object):
         if '--skip-default-config' in argv:
             argv.remove('--skip-default-config')
             ccfg = self.configClass(readConfigFiles=False,
-                                    ignoreErrors=ignoreErrors)
+                                    ignoreErrors=self._ignoreConfigErrors)
         else:
             ccfg = self.configClass(readConfigFiles=True,
-                                    ignoreErrors=ignoreErrors)
+                                    ignoreErrors=self._ignoreConfigErrors)
         return ccfg
 
     def getParser(self, command):
@@ -216,8 +217,8 @@ class MainHandler(object):
             return self.usage()
 
         if cfg is None:
-            ignoreErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
-            cfg = self.getConfigFile(argv, ignoreErrors=ignoreErrors)
+            self._ignoreConfigErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
+            cfg = self.getConfigFile(argv)
 
         # get the default setting for exception debugging from the
         # config object (if it has a setting).
