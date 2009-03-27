@@ -182,7 +182,9 @@ class MainHandler(object):
                     addVerboseOptions=self.useConaryOptions,
                     description=description)
 
-    def getCommand(self, argv):
+    def getCommand(self, argv, cfg):
+        # note, cfg is not used by this implementation, but it
+        # may be used by classes that derive from this one.
         if len(argv) == 1:
             # no command specified
             return None
@@ -207,17 +209,7 @@ class MainHandler(object):
             print self.version
             return
 
-        # we have to call _getPreCommandOptions twice.  It's easier
-        # this way so we can get rid of any extraneous options that
-        # may precede the command name.
-        dummyCfg = self.configClass(readConfigFiles=False)
-        cmdArgv = self._getPreCommandOptions(argv, dummyCfg)[1]
-        thisCommand = self.getCommand(cmdArgv)
-        if thisCommand is None:
-            return self.usage()
-
         if cfg is None:
-            self._ignoreConfigErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
             cfg = self.getConfigFile(argv)
 
         # get the default setting for exception debugging from the
@@ -238,7 +230,12 @@ class MainHandler(object):
             self.usage()
             print >>sys.stderr, e
             sys.exit(e.val)
+
+        thisCommand = self.getCommand(argv, cfg)
+        if thisCommand is None:
+            return self.usage()
         commandName = argv[1]
+
         params, cfgMap = thisCommand.prepare()
         kwargs = self._getParserFlags(thisCommand)
 

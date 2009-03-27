@@ -1159,6 +1159,20 @@ class ConaryMain(command.MainHandler):
             print 'Common Commands (use "conary help" for the full list)'
         return options.MainHandler.usage(self, rc, showAll=showAll)
 
+
+    def main(self, argv, debuggerException, **kw):
+        # override generic main handler so we can set the
+        # "ignoreConfigErrors" flag
+
+        # we have to call _getPreCommandOptions twice.  It's easier
+        # this way so we can get rid of any extraneous options that
+        # may precede the command name.
+        dummyCfg = self.configClass(readConfigFiles=False)
+        cmdArgv = self._getPreCommandOptions(argv, dummyCfg)[1]
+        thisCommand = self.getCommand(cmdArgv, dummyCfg)
+        self._ignoreConfigErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
+        return command.MainHandler.main(self, argv, debuggerException, **kw)
+
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]
