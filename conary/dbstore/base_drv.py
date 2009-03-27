@@ -102,6 +102,26 @@ class BaseCursor:
     def _tryExecute(self, *args, **kw):
         raise NotImplementedError("This function should be provided by the SQL drivers")
 
+    def encode(self, string):
+        """
+        If C{string} is a C{unicode} object, encode it using this
+        connection's chosen encoding. Otherwise, pass it through
+        unharmed.
+        @returns: the encoded string
+        @rtype: C{str}
+        """
+        if isinstance(string, unicode):
+            string = string.encode(self.encoding)
+        return string
+
+    def decode(self, string):
+        """
+        Decode C{string} using this connections' chosen encoding.
+        @returns: the decoded string
+        @rtype: C{unicode}
+        """
+        return string.decode(self.encoding)
+
     def _executeArgs(self, args, kw):
         """
         Normalize the execute() args and kwargs for passing to the driver.
@@ -118,13 +138,8 @@ class BaseCursor:
             elif isinstance(args[0], (tuple, list)):
                 args = tuple(args[0])
 
-        def sanitize(x):
-            if isinstance(x, unicode):
-                x = x.encode(self.encoding)
-            return x
-
-        args = tuple(sanitize(x) for x in args)
-        kw = dict((key, sanitize(value)) for (key, value) in kw.items())
+        args = tuple(self.encode(x) for x in args)
+        kw = dict((key, self.encode(value)) for (key, value) in kw.items())
         return args, kw
 
     # basic sanity checks for executes
