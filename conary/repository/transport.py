@@ -449,7 +449,14 @@ class URLOpener(urllib.FancyURLopener):
             if check():
                 raise AbortError
             # wait 5 seconds for a response
-            l = pollObj.poll(5000)
+            try:
+                l = pollObj.poll(5000)
+            except select.error, err:
+                if err.args[0] == errno.EINTR:
+                    # Interrupted system call -- we caught a signal but
+                    # it was handled safely.
+                    continue
+                raise
 
             if not l:
                 # still no response from the server.  send a space to
