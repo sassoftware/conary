@@ -17,6 +17,7 @@
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
+import errno
 import httplib
 import itertools
 import select
