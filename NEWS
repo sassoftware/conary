@@ -25,6 +25,8 @@ Changes in @NEW@:
       project if the code is available. Note that restlib and xobj are
       required for the crest implementation, and that the "baseUri" must
       be specified in the server config file (it's normally /conary).
+    * Repository commits now take advantage of knowing which parts of the
+      commit have not changed since the old version for better performance
 
 Changes in 2.0.39:
   o Bug Fixes:

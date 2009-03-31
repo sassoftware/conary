@@ -249,10 +249,12 @@ class TroveStore:
                        (instances.INSTANCE_PRESENT_NORMAL, instanceId))
             self.latest.update(cu, itemId, branchId, flavorId)
 
-    def addTrove(self, trv, hidden = False):
-	cu = self.db.cursor()
+    def addTrove(self, trv, trvCs, hidden = False):
+        cu = self.db.cursor()
         schema.resetTable(cu, 'tmpNewRedirects')
-	return (cu, trv, hidden, [])
+        changeMap = dict((x[0], x) for x in trvCs.getChangedFileList())
+        newSet = set(x[0] for x in trvCs.getNewFileList())
+        return (cu, trv, trvCs, hidden, [], newSet, changeMap)
 
     # walk the trove and insert any missing flavors we need into the Flavors table
     def _addTroveNewFlavors(self, cu, trv):
@@ -329,6 +331,7 @@ class TroveStore:
         # We split these steps into separate queries because most DB
         # backends I have tried will get the optimization of a single
         # query wrong --gafton
+        self.db.analyze("tmpNewFiles")
 
         # In the extreme case of binary shadowing this might require a
         # bit of of memory for larger troves, but it is preferable to
@@ -364,13 +367,13 @@ class TroveStore:
         """)
         # need to keep a list of new dirnames we're inserting
         cu.execute(""" select distinct tnf.dirname from tmpNewFiles as tnf
-        where not exists (
+        where pathChanged = 1 and not exists (
             select 1 from Dirnames as d where d.dirname = tnf.dirname )""")
         newDirnames = cu.fetchall()
         self.db.bulkload("Dirnames", newDirnames, ["dirname"])
         # now get the new dirnames for which we have not computed prefixes yet
         cu.execute(""" select distinct tnf.dirname from tmpNewFiles as tnf
-        where not exists (
+        where pathChanged = 1 and not exists (
             select 1 from Dirnames as d
             join Prefixes as p using(dirnameId)
             where d.dirname = tnf.dirname
@@ -386,14 +389,14 @@ class TroveStore:
         # done with processing the Prefixes for new Dirnames
         cu.execute(""" insert into Basenames(basename)
         select distinct tnf.basename from tmpNewFiles as tnf
-        where not exists (
+        where pathChanged = 1 and not exists (
             select 1 from Basenames as b where b.basename = tnf.basename ) """)
         cu.execute(""" insert into FilePaths (pathId, dirnameId, basenameId)
         select tnf.pathId, d.dirnameId, b.basenameId
         from tmpNewFiles as tnf
         join Dirnames as d on tnf.dirname = d.dirname
         join Basenames as b on tnf.basename = b.basename
-        where not exists (
+        where pathChanged = 1 and not exists (
             select 1 from FilePaths as fp
             where fp.pathId = tnf.pathId
               and fp.dirnameId = d.dirnameId
@@ -516,7 +519,7 @@ class TroveStore:
         """)
 
     def addTroveDone(self, troveInfo, mirror=False):
-        (cu, trv, hidden, newFilesInsertList) = troveInfo
+        (cu, trv, trvCs, hidden, newFilesInsertList) = troveInfo[0:5]
 
         self.log(3, trv)
 
@@ -572,6 +575,28 @@ class TroveStore:
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depTables.add(cu, trv, troveInstanceId)
         self.ri.addInstanceId(troveInstanceId)
+
+        if trvCs.getOldVersion():
+            oldTroveVersionId = self.versionTable.get(trvCs.getOldVersion(),
+                                                      None)
+            oldFlavorId = self.flavors.get(trvCs.getOldFlavor(), None)
+            oldInstanceId = self.instances[(troveItemId,
+                                            oldTroveVersionId,
+                                            oldFlavorId)]
+        else:
+            oldInstanceId = None
+
+        cu.execute("""
+        INSERT INTO tmpNewTroves (itemId, branchId, flavorId,
+                                  instanceId, versionId,
+                                  finalTimeStamp, troveType,
+                                  oldInstanceId)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, troveItemId, troveBranchId, troveFlavorId,
+             troveInstanceId, troveVersionId,
+             '%.3f' % trv.getVersion().timeStamps()[-1],
+             trv.getType(), oldInstanceId)
+
         self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
 
         # Fold tmpNewFiles into FileStreams
@@ -580,7 +605,8 @@ class TroveStore:
                              [ x + (troveInstanceId,) for x in
                                     newFilesInsertList ],
                              [ "pathId", "versionId", "fileId", "stream",
-                               "dirname", "basename", "sha1", "instanceId" ])
+                               "dirname", "basename", "sha1", "pathChanged",
+                               "instanceId" ])
             #self.db.analyze("tmpNewFiles")
 
         # iterate over both strong and weak troves, and set weakFlag to
@@ -673,6 +699,7 @@ class TroveStore:
         cu = self.db.cursor()
         schema.resetTable(cu, 'tmpTroves')
         schema.resetTable(cu, 'tmpNewFiles')
+        schema.resetTable(cu, 'tmpNewTroves')
 
     def addTroveSetDone(self):
         cu = self.db.cursor()
@@ -1051,13 +1078,27 @@ class TroveStore:
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
                 fileStream = None):
-	cu = troveInfo[0]
-        newFilesInsertList = troveInfo[3]
+        (cu, trv, trvCs, hidden, newFilesInsertList, newSet,
+         changeMap) = troveInfo
         dirname, basename = os.path.split(path)
-        
+
+        pathChanged = 1
+
+        changeInfo = changeMap.get(pathId, None)
+        if changeInfo:
+            if not changeInfo[1]:
+                pathChanged = 0
+            if not changeInfo[3]:
+                versionChanged = False
+            else:
+                versionChanged = True
+        else:
+            versionChanged = (pathId in newSet)
+
 	versionId = self.getVersionId(fileVersion)
-        # if we have seen this fileId before, ignore the new stream data
-        if fileId in self.seenFileId:
+        # If the file version is the same as in the old trove, or if we have
+        # seen this fileId before, ignore the new stream data
+        if not versionChanged or (fileId in self.seenFileId):
             fileObj = fileStream = None
         if fileObj or fileStream:
             sha1 = None
@@ -1073,11 +1114,13 @@ class TroveStore:
             self.seenFileId.add(fileId)
             newFilesInsertList.append((cu.binary(pathId), versionId,
                                        cu.binary(fileId), cu.binary(fileStream),
-                                       dirname, basename, cu.binary(sha1)))
+                                       dirname, basename, cu.binary(sha1),
+                                       pathChanged))
 	else:
             newFilesInsertList.append((cu.binary(pathId), versionId,
                                        cu.binary(fileId), None,
-                                       dirname, basename, None))
+                                       dirname, basename, None,
+                                       pathChanged))
 
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()

@@ -1061,6 +1061,7 @@ def setupTempTables(db):
             sha1        %(BINARY20)s,
             dirname     %(PATHTYPE)s,
             basename    %(PATHTYPE)s,
+            pathChanged INTEGER,
             instanceId  INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpNewFiles"] = True
@@ -1214,6 +1215,21 @@ def setupTempTables(db):
         # XXX: this index helps postgresql and hurts mysql.
         #db.createIndex("tmpTroves", "tmpTrovesIdx", "item",
         #               check = False)
+
+    if "tmpNewTroves" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpNewTroves(
+            itemId        INTEGER NOT NULL,
+            branchId      INTEGER NOT NULL,
+            flavorId      INTEGER NOT NULL,
+            versionId     INTEGER NOT NULL,
+            instanceId    INTEGER NOT NULL,
+            oldInstanceId INTEGER,
+            finalTimestamp      NUMERIC(13,3) NOT NULL,
+            troveType       INTEGER NOT NULL DEFAULT 0
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpNewTroves"] = True
+
     # for processing markRemoved
     if "tmpRemovals" not in db.tempTables:
         cu.execute("""

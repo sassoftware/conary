@@ -300,8 +300,8 @@ class ChangeSetJob:
 
     storeOnlyConfigFiles = False
 
-    def addTrove(self, oldTroveSpec, trove, hidden = False):
-	return self.repos.addTrove(trove, hidden = hidden,
+    def addTrove(self, oldTroveSpec, trove, trvCs, hidden = False):
+	return self.repos.addTrove(trove, trvCs, hidden = hidden,
                                    oldTroveSpec = oldTroveSpec)
 
     def addTroveDone(self, troveId, mirror=False):
@@ -524,9 +524,10 @@ class ChangeSetJob:
             if oldTroveVersion is not None:
                 troveInfo = self.addTrove(
                         (troveName, oldTroveVersion, oldTroveFlavor), newTrove,
-                        hidden = hidden)
+                        csTrove, hidden = hidden)
             else:
-                troveInfo = self.addTrove(None, newTrove, hidden = hidden)
+                troveInfo = self.addTrove(None, newTrove, csTrove,
+                                          hidden = hidden)
 
             checkFilesList = self._getCheckFilesList(csTrove, troveInfo, 
                 fileHostFilter, configRestoreList, normalRestoreList)
