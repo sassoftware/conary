@@ -847,6 +847,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
             csCache = None
 
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
+        self.repos = repos
         self.callFactory = RepositoryCallFactory(repos, self.log)
 
 class ProxyRepositoryServer(ChangesetFilter):
