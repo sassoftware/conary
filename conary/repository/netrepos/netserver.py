@@ -1110,7 +1110,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         roleIds = self.auth.getAuthRoles(cu, authToken)
         if not roleIds:
-            return {}
+            return []
 
         if troveTypes == TROVE_QUERY_PRESENT:
             troveTypeClause = \
