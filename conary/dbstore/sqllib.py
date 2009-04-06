@@ -15,6 +15,9 @@
 # Various stuff used by the dbstore drivers
 import time
 
+
+_SIGIL = []
+
 # class to aid in comparing database versions
 class DBversion:
     def __init__(self, major, minor=0):
@@ -55,7 +58,7 @@ class CaselessDict(dict):
             self.update(d)
     # lowercase the key
     def __l(self, s):
-        if isinstance(s, str):
+        if isinstance(s, basestring):
             return s.lower()
         return s
     def __getitem__(self, key):
@@ -79,6 +82,14 @@ class CaselessDict(dict):
     def update(self, other):
         for item in other.iteritems():
             self.__setitem__(*item)
+    def pop(self, key, default=_SIGIL):
+        key = self.__l(key)
+        if dict.__contains__(self, key):
+            return dict.pop(self, key)[1]
+        elif default is not _SIGIL:
+            return default
+        else:
+            raise KeyError(key)
     def __contains__(self, key):
         return dict.__contains__(self, self.__l(key))
     def __repr__(self):
