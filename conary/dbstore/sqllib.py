@@ -228,5 +228,5 @@ class Row(object):
         but it slows things down when the row is used only as a sequence.
         So this method generates the mapping when it is first needed.
         """
-        self.mapping = dict((x.lower(), y)
-                for (x, y) in zip(self.fields, self.data))
+        self.mapping = CaselessDict(dict((x.lower(), y)
+                for (x, y) in zip(self.fields, self.data)))
