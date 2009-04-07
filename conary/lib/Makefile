@@ -41,25 +41,25 @@ elf.o: elf.c
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
 elfmodule.so: $(elfmodule_objs)
-	$(CC) -shared -o $@ $< $(libelf)
+	$(CC) -shared -lgcov -fprofile-arcs -ftest-coverage -o $@ $< $(libelf)
 
 SHA256.o: SHA256_nonstandard.c
-	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
+	$(CC) $(CFLAGS) -fprofile-arcs -ftest-coverage -fno-strict-aliasing -DNDEBUG -fwrapv -Wstrict-prototypes -c -o $@ $^
 
 SHA256_nonstandardmodule.so: $(sha256module_objs)
-	$(CC) -pthread -shared -o $@ $< 
+	$(CC) -pthread -shared -lgcov -fprofile-arcs -ftest-coverage -o $@ $< 
 
 miscmodule.so: $(miscmodule_objs)
-	$(CC) -shared -lcrypto -lz -lresolv -o $@ $<
+	$(CC) -shared -lcrypto -lz -lresolv -lgcov -fprofile-arcs -ftest-coverage -fno-strict-aliasing -o $@ $<
 
 $(cstreamsmodule_objs): cstreams.h
 
 cstreamsmodule.so: $(cstreamsmodule_objs)
-	$(CC) -shared -o $@ $^
+	$(CC) -shared -o $@ $^ -lgcov -fprofile-arcs -ftest-coverage 
 
 filename_wrapper.so: filename_wrapper.c
-	$(CC) -Wall -fPIC -rdynamic -c filename_wrapper.c
-	$(CC) -shared -rdynamic -o filename_wrapper.so filename_wrapper.o -lc -ldl
+	$(CC) -Wall -fPIC -fprofile-arcs -ftest-coverage -rdynamic -c filename_wrapper.c
+	$(CC) -shared -rdynamic -o filename_wrapper.so filename_wrapper.o -lc -ldl -lgcov -fprofile-arcs -ftest-coverage 
 
 install: pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
@@ -73,6 +73,6 @@ dist: default-dist
 
 include ../../Make.rules
 # needs to come after including Make.rules so that PYINCLUDE is defined
-CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
+CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -fprofile-arcs -ftest-coverage -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
 
 $(cstreamsmodule_objs): cstreams.h

@@ -45,7 +45,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 66 + 1)
+SERVER_VERSIONS = range(36, 67 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1310,6 +1310,63 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           troveTypes = troveTypes)
 
     @accessReadOnly
+    def getFileContentsFromTrove(self, authToken, clientVersion, 
+                                 troveTup, pathList):
+        self.log(2, troveTup, pathList)
+        troveName, version, flavor = troveTup
+        if not self.auth.check(authToken, 
+                               label=self.toVersion(version).trailingLabel(), 
+                               trove=troveName):
+            raise errors.InsufficientPermission
+        pathList = [ base64.decodestring(x) for x in pathList ]
+        cu = self.db.cursor()
+        schema.resetTable(cu, 'tmpFilePaths')
+        for row, path in enumerate(pathList):
+            dirname, basename = os.path.split(path)
+            cu.execute("INSERT INTO tmpFilePaths (row, dirname, basename) "
+                       " VALUES (?, ?, ?)",
+                       (row, dirname, basename), start_transaction=False)
+        #self.db.analyze("tmpFilePaths")
+
+        sql = '''
+                SELECT row, fileId,FileVersions.version FROM 
+                Versions
+                JOIN Flavors ON (Flavors.flavor=?)
+                JOIN Items ON (Items.item=?)
+                JOIN Instances ON
+                    (Items.itemId = Instances.itemId AND
+                     Versions.versionId = Instances.versionId AND
+                     Flavors.flavorId = Instances.flavorId)
+                JOIN TroveFiles USING(instanceId)
+                JOIN FilePaths USING (filePathId)
+                JOIN (SELECT tfp.row as row, fp.filePathId as filePathId
+                       from FilePaths as fp
+                       join Dirnames as d on fp.dirnameId = d.dirnameId
+                       join Basenames as b on fp.basenameId = b.basenameId
+                       join tmpFilePaths as tfp on
+                           tfp.dirname = d.dirname and
+                           tfp.basename = b.basename ) AS blah
+                     USING(filePathId)
+                JOIN FileStreams ON (TroveFiles.streamId=FileStreams.streamId)
+                JOIN Versions AS FileVersions 
+                    ON (TroveFiles.versionId=FileVersions.versionId)
+                WHERE Versions.version=?'''
+        sql = cu.execute(sql, flavor, troveName, version)
+        fileList = [None] * len(pathList)
+        for row, fileId, fileVer in cu:
+            fileList[row] = (fileId, fileVer)
+        if None in fileList:
+            missingPaths = [ pathList[idx] 
+                             for (idx, x) in enumerate(fileList)
+                             if x is None ]
+            raise errors.PathsNotFound(missingPaths)
+
+        fileIdGen = (x[0] for x in fileList)
+        rawStreams = self._getFileStreams(authToken, fileIdGen)
+        rc = self._getFileContents(clientVersion, fileList, rawStreams)
+        return rc
+
+    @accessReadOnly
     def getFileContents(self, authToken, clientVersion, fileList,
                         authCheckOnly = False):
         self.log(2, "fileList", fileList)
@@ -1326,7 +1383,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                     self.toFileId(encFileId),
                                     self.toVersion(encVersion))
             return True
+        return self._getFileContents(clientVersion, fileList, rawStreams)
 
+    def _getFileContents(self, clientVersion, fileList, rawStreams):
         try:
             (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
                                           suffix = '.cf-out')

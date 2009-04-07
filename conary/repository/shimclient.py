@@ -47,6 +47,16 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
         os.unlink(path)
         return [ x.split(" ")[0] for x in paths ]
 
+    @netserver.accessReadOnly
+    def getFileContentsFromTrove(self, *args, **kwargs):
+        location, sizes = netserver.NetworkRepositoryServer.getFileContentsFromTrove(
+                                            self, *args, **kwargs)
+        path = os.path.join(self.tmpPath,location.split('?')[1] + '-out')
+        paths = open(path).readlines()
+        os.unlink(path)
+        return [ x.split(" ")[0] for x in paths ]
+
+
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
         paths = []
@@ -135,6 +145,25 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
                 f = gzip.GzipFile(path, "r")
                 fileObjList.append(filecontents.FromFile(f))
 
+        return fileObjList
+
+    def getFileContentsFromTrove(self, troveTuple, pathList,
+                                 callback = None, compressed = False):
+        pathList = [self.fromPath(x) for x in pathList]
+        n,v,f = troveTuple
+        v = self.fromVersion(v)
+        f = self.fromFlavor(f)
+        server = troveTuple[1].trailingLabel().getHost()
+        filePaths = self.c[server].getFileContentsFromTrove((n,v,f),
+                                                             pathList)
+        fileObjList = []
+        for path in filePaths:
+            if compressed:
+                fileObjList.append(
+                    filecontents.FromFilesystem(path, compressed = True))
+            else:
+                f = gzip.GzipFile(path, "r")
+                fileObjList.append(filecontents.FromFile(f))
         return fileObjList
 
     def commitChangeSet(self, chgSet, callback = None, mirror = False,

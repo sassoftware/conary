@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 66 + 1)
+CLIENT_VERSIONS = range(36, 67 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2308,9 +2308,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromPathId(pathId), 
 				   self.fromFileId(fileId)))
 
+
     def getFileContentsObjects(self, server, fileList, callback, outF,
                                compressed):
-        (url, sizes) = self.c[server].getFileContents(fileList)
+        url, sizes = self.c[server].getFileContents(fileList)
+        return self._getFileContentsObjects(server, url, sizes, 
+                                            fileList, callback, outF, 
+                                            compressed)
+
+    def _getFileContentsObjects(self, server, url, sizes, 
+                                fileList, callback, outF, compressed):
         # protocol version 44 and later return sizes as strings rather
         # than ints to avoid 2 GiB limits
         sizes = [ int(x) for x in sizes ]
@@ -2360,6 +2367,32 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         assert(totalSize == 0)
 
         return fileObjList
+
+    def getFileContentsFromTrove(self, troveTuple, pathList,
+                                 callback = None, compressed = False):
+        pathList = [self.fromPath(x) for x in pathList]
+        n,v,f = troveTuple
+        v = self.fromVersion(v)
+        f = self.fromFlavor(f)
+        if callback:
+            if hasattr(callback, 'requestingFileContentsWithCount'):
+                callback.requestingFileContentsWithCount(len(fileList))
+            else:
+                callback.requestingFileContents()
+
+        server = troveTuple[1].trailingLabel().getHost()
+        url, sizes = self.c[server].getFileContentsFromTrove((n,v,f), 
+                                                             pathList)
+
+        (fd, path) = util.mkstemp(suffix = 'filecontents')
+        outF = util.ExtendedFile(path, "r+", buffering = False)
+        os.close(fd)
+        os.unlink(path)
+        return self._getFileContentsObjects(server, url, sizes, 
+                                            pathList, callback, outF, 
+                                            compressed)
+
+        
 
     def getFileContents(self, fileList, tmpFile = None, lookInLocal = False,
                         callback = None, compressed = False):

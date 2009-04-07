@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import base64
+
 import conary.errors
 from conary.errors import ConaryError, FilesystemError, InternalConaryError
 from conary.errors import TroveNotFound, InvalidRegex
@@ -352,6 +354,7 @@ fileId: %s
 fileVersion: %s
 '''
 
+
 class FileHasNoContents(GetFileContentsError):
     error = '''File Has No Contents
 The following file is not a regular file and therefore has no contents:
@@ -427,6 +430,24 @@ class ReadOnlyRepositoryError(RepositoryError):
 
 class CannotCalculateDownloadSize(RepositoryError):
     pass
+
+class PathsNotFound(RepositoryError):
+    def __init__(self, pathList):
+        self.pathList = pathList
+
+    def marshall(self, marshaller):
+        return tuple([ base64.encodestring(x) for x in self.pathList]), {}
+
+    @staticmethod
+    def demarshall(marshaller, tup, kwArgs):
+        return [base64.decodestring(x) for x in tup], {}
+
+    def __str__(self):
+        return """The following paths were not found: %s""" % (self.pathList,)
+
+    def getPathList(self):
+        return self.pathList
+
 
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that

@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Version 67:
+  - added getFileContentsFromTrove
+
 Version 66:
   - added getLabelsForHost
 
