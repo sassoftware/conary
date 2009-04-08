@@ -161,6 +161,10 @@ ENCRYPTION_TYPE_S2K_SPECIFIED  = 0xff
 #     for now: experimentally determined to be 0xFE
 ENCRYPTION_TYPE_SHA1_CHECK = 0xfe
 
+S2K_TYPE_SIMPLE = 0x00
+S2K_TYPE_SALTED = 0x01
+S2K_TYPE_ITER_SALTED = 0x03
+
 OLD_PKT_LEN_ONE_OCTET  = 0
 OLD_PKT_LEN_TWO_OCTET  = 1
 OLD_PKT_LEN_FOUR_OCTET = 2
@@ -539,18 +543,26 @@ def verifyRFC2440Checksum(data):
         return 0
     checksum = [ ord(x) for x in data[-2:] ]
     checksum = int2FromBytes(*checksum)
-    runningCount=0
-    for i in range(len(data) - 2):
-        runningCount += ord(data[i])
-        runningCount %= 65536
+    runningCount = computeRFC2440Checksum(data[:-2])
     return (runningCount == checksum)
+
+def computeRFC2440Checksum(data):
+    runningCount=0
+    for c in data:
+        runningCount += ord(c)
+        runningCount %= 65536
+    return runningCount
 
 def verifySHAChecksum(data):
     if len(data) < 20:
         return 0
+    digest = computeSHAChecksum(data[:-20])
+    return digest == data[-20:]
+
+def computeSHAChecksum(data):
     m = digestlib.sha1()
-    m.update(data[:-20])
-    return m.digest() == data[-20:]
+    m.update(data)
+    return m.digest()
 
 def xorStr(str1, str2):
     return ''.join(chr(ord(x) ^ ord(y)) for x, y in zip(str1, str2))
@@ -2096,6 +2108,40 @@ class PGP_Key(PGP_BaseKeySig):
         self.mpiFile = util.SeekableNestedFile(self._bodyStream, self.mpiLen,
             start = mpiStart)
 
+    def rewrite(self, stream):
+        """
+        Rewrite this key to a different stream, usually after it was
+        modified (otherwise write is more efficient)"""
+        self._rewritePacket()
+        self.write(stream)
+
+    def rewriteAll(self, stream):
+        """
+        Rewrite this key to a different stream, usually after it was
+        modified (otherwise write is more efficient)"""
+        self._rewritePacket()
+        self.writeAll(stream)
+
+    def _rewritePacket(self):
+        bodyStream = util.ExtendedStringIO()
+        self.rewriteBody(bodyStream)
+        self._bodyStream = bodyStream
+        self.bodyLength = self._getBodyLength()
+        # We invalidated this packet
+        self._parsed = False
+
+    def rewriteBody(self, stream):
+        # We only write keys version 4
+        # Write key version
+        self._writeBin(stream, [ 4 ])
+        self._writeKeyV4(stream)
+
+    def _writeKeyV4(self, stream):
+        self._writeBin(stream, int4ToBytes(self.createdTimestamp))
+        self._writeBin(stream, [ self.pubKeyAlg ])
+        self.mpiFile.seek(0)
+        self._copyStream(self.mpiFile, stream)
+
     def getKeyFingerprint(self):
         if self._keyId is not None:
             if self.version == 3:
@@ -2614,7 +2660,7 @@ class PGP_PublicKey(PGP_PublicAnyKey, PGP_MainKey):
 
 class PGP_SecretAnyKey(PGP_Key):
     __slots__ = ['s2k', 'symmEncAlg', 's2kType', 'hashAlg', 'salt',
-                 'count', 'initialVector', 'encMpiFile']
+                 'count', 'encMpiFile']
     pubTag = None
 
     _hashes = [ 'Unknown', digestlib.md5, digestlib.sha1, RIPEMD, 'Double Width SHA',
@@ -2629,7 +2675,8 @@ class PGP_SecretAnyKey(PGP_Key):
         PGP_Key.initialize(self)
         self.s2k = self.symmEncAlg = self.s2kType = None
         self.hashAlg = self.salt = self.count = None
-        self.initialVector = self.encMpiFile = None
+        # We do not store the initial vector, it is part of the encoded file
+        self.encMpiFile = None
 
     def parse(self, force = False):
         PGP_Key.parse(self, force = force)
@@ -2648,16 +2695,32 @@ class PGP_SecretAnyKey(PGP_Key):
                     # Private/Experimental s2k
                     pass
                 else:
-                    if self.s2kType not in (0x01, 0x03):
+                    if self.s2kType not in (S2K_TYPE_SALTED, S2K_TYPE_ITER_SALTED):
                         raise IncompatibleKey('Unknown string-to-key type %s' %
                                               self.s2kType)
                     self.salt = self.readExact(8)
-                    if self.s2kType == 0x03:
+                    if self.s2kType == S2K_TYPE_ITER_SALTED:
                         self.count, = self.readBin(1)
+        # The Initial Vector is part of the encrypted MPI file
         # The MPIs are most likely encrypted, we'll just have to trust that
         # there are enough of them for now.
         dataLen = self._bodyStream.size - self._bodyStream.tell()
         self.encMpiFile = util.SeekableNestedFile(self._bodyStream, dataLen)
+
+    def rewriteBody(self, stream):
+        PGP_Key.rewriteBody(self, stream)
+        self._writeBin(stream, [ self.s2k ])
+        if self.s2k in [ENCRYPTION_TYPE_SHA1_CHECK,
+                        ENCRYPTION_TYPE_S2K_SPECIFIED]:
+            self._writeBin(stream, [ self.symmEncAlg, self.s2kType,
+                                     self.hashAlg ])
+            if self.s2kType in (0x01, 0x03):
+                assert len(self.salt) == 8
+                stream.write(self.salt)
+                if self.s2kType == 0x03:
+                    self._writeBin(stream, [ self.count ])
+        self.encMpiFile.seek(0)
+        self._copyStream(self.encMpiFile, stream)
 
     def _getSecretMPICount(self):
         if self.pubKeyAlg in PK_ALGO_ALL_RSA:
@@ -2679,21 +2742,83 @@ class PGP_SecretAnyKey(PGP_Key):
                                          minHeaderLen = minHeaderLen)
         return pkt
 
+    def recrypt(self, oldPassPhrase, newPassPhrase = None, _salt = None):
+        if newPassPhrase is None and self.s2k == ENCRYPTION_TYPE_UNENCRYPTED:
+            # Nothing to do here
+            return False
+        if oldPassPhrase == newPassPhrase:
+            # Nothing to do either
+            return False
+        # decrypt the MPIs
+        mpis = self.decrypt(oldPassPhrase)
+        stream = util.ExtendedStringIO()
+        for mpi in mpis:
+            self._writeMPI(stream, mpi)
+        if newPassPhrase is None:
+            self.s2k = ENCRYPTION_TYPE_UNENCRYPTED
+            self.salt = None
+            self._writeBin(stream,
+                int2ToBytes(computeRFC2440Checksum(stream.getvalue())))
+        else:
+            self.s2k = ENCRYPTION_TYPE_SHA1_CHECK
+            stream.write(computeSHAChecksum(stream.getvalue()))
+            # DES3
+            self.symmEncAlg = 2
+            # We force iterated + salted
+            self.s2kType = 0x03
+            # SHA1 protection
+            self.hashAlg = 2
+            # Iterate 96 times (seems pretty standard)
+            self.count = 96
+            if isinstance(self, PGP_SecretSubKey):
+                # Use the same salt as the main key
+                self.salt = _salt
+            else:
+                self.salt = file("/dev/urandom").read(8)
+
+            stream.seek(0)
+            io = self._encryptStream(stream, newPassPhrase)
+            stream = io
+        self.encMpiFile = stream
+        stream.seek(0)
+        # Re-crypt subkeys too
+        for sk in self.iterSubKeys():
+            if isinstance(sk, PGP_SecretSubKey):
+                sk.recrypt(oldPassPhrase, newPassPhrase, _salt = self.salt)
+                sk._rewritePacket()
+        return True
+
     def decrypt(self, passPhrase):
         self.parse()
         self.encMpiFile.seek(0, SEEK_SET)
 
+        if passPhrase is None:
+            passPhrase = ''
         if self.s2k == ENCRYPTION_TYPE_UNENCRYPTED:
             return self._readCountMPIs(self.encMpiFile,
                 self._getSecretMPICount(), discard = False)
 
+        io = self._decryptStream(self.encMpiFile, passPhrase)
+        unenc = io.read()
+        if self.s2k == ENCRYPTION_TYPE_S2K_SPECIFIED:
+            check = verifyRFC2440Checksum(unenc)
+        else:
+            check = verifySHAChecksum(unenc)
+
+        if not check:
+            raise BadPassPhrase('Pass phrase incorrect')
+
+        io.seek(0)
+        return self._readCountMPIs(io, self._getSecretMPICount(),
+                                   discard = False)
+
+    def _getCipher(self, passPhrase):
         if self.symmEncAlg not in self._legalCiphers:
-            if self.symmetricEngAlg >= len(self._ciphers):
+            # We only support the algorithms in self._legalCiphers
+            if self.symmEngAlg >= len(self._ciphers):
                 raise IncompatibleKey("Unknown cipher %s" %
-                                      self.symmetricEngAlg)
-            
-            cipher, cipherKeySize = self._ciphers[self.symmEncAlg]
-            raise IncompatibleKey("Cipher %s is unusable" % cipher)
+                                      self.symmEngAlg)
+            raise IncompatibleKey("Cipher %s is unusable" % self.symmEncAlg)
 
         if self.hashAlg >= len(self._hashes):
             raise IncompatibleKey("Unknown hash algorithm %s" % self.hashAlg)
@@ -2710,34 +2835,48 @@ class PGP_SecretAnyKey(PGP_Key):
         elif self.s2kType == 0x03:
             key = iteratedS2K(passPhrase, hashAlg, cipherKeySize, self.salt,
                               self.count)
-        # Dark magic here --misa
         if self.symmEncAlg > 6:
             cipherBlockSize = 16
         else:
             cipherBlockSize = 8
 
-        io = util.ExtendedStringIO()
         cipher = cipherAlg.new(key,1)
+        return cipher, cipherBlockSize
+
+    def _decryptStream(self, stream, passPhrase):
+        cipher, cipherBlockSize = self._getCipher(passPhrase)
+        cryptFunc = cipher.encrypt
+        io = util.ExtendedStringIO()
+
         block = self._readExact(self.encMpiFile, cipherBlockSize)
-        FRE = cipher.encrypt(block)
+        FRE = cryptFunc(block)
         while 1:
-            block = self.encMpiFile.read(cipherBlockSize)
+            block = stream.read(cipherBlockSize)
             io.write(xorStr(FRE, block))
             if len(block) != cipherBlockSize:
                 break
-            FRE = cipher.encrypt(block)
-        unenc = io.getvalue()
-        if self.s2k == ENCRYPTION_TYPE_S2K_SPECIFIED:
-            check = verifyRFC2440Checksum(unenc)
-        else:
-            check = verifySHAChecksum(unenc)
-
-        if not check:
-            raise BadPassPhrase('Pass phrase incorrect')
-
+            FRE = cryptFunc(block)
         io.seek(0)
-        return self._readCountMPIs(io, self._getSecretMPICount(),
-                                   discard = False)
+        return io
+
+    def _encryptStream(self, stream, passPhrase):
+        cipher, cipherBlockSize = self._getCipher(passPhrase)
+        io = util.ExtendedStringIO()
+        cryptFunc = cipher.encrypt
+        # Initial vector is random data
+        block = file("/dev/urandom").read(cipherBlockSize)
+        FRE = cryptFunc(block)
+        io.write(FRE)
+        FRE = cryptFunc(FRE)
+        while 1:
+            block = stream.read(cipherBlockSize)
+            block = xorStr(FRE, block)
+            io.write(block)
+            if len(block) != cipherBlockSize:
+                break
+            FRE = cryptFunc(block)
+        io.seek(0)
+        return io
 
     def makePgpKey(self, passPhrase = None):
         assert passPhrase is not None

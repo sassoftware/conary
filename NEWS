@@ -28,6 +28,8 @@ Changes in @NEW@:
       be specified in the server config file (it's normally /conary).
     * Repository commits now take advantage of knowing which parts of the
       commit have not changed since the old version for better performance
+    * The internal OpenPGP implementation can now change passphrases
+      on secret keys. (CNY-3123)
 
 Changes in 2.0.39:
   o Bug Fixes:
