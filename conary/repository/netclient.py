@@ -2368,31 +2368,48 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return fileObjList
 
-    def getFileContentsFromTrove(self, troveTuple, pathList,
+    # added at protocol version 67
+    def getFileContentsFromTrove(self, name, version, flavor, pathList,
                                  callback = None, compressed = False):
+        server = version.trailingLabel().getHost()
+        if self.c[server].getProtocolVersion() < 67:
+            self._getFilesFromTrove(name, version, flavor, pathList)
         pathList = [self.fromPath(x) for x in pathList]
-        n,v,f = troveTuple
-        v = self.fromVersion(v)
-        f = self.fromFlavor(f)
+        version = self.fromVersion(version)
+        flavor = self.fromFlavor(flavor)
         if callback:
             if hasattr(callback, 'requestingFileContentsWithCount'):
-                callback.requestingFileContentsWithCount(len(fileList))
+                callback.requestingFileContentsWithCount(len(pathList))
             else:
                 callback.requestingFileContents()
 
-        server = troveTuple[1].trailingLabel().getHost()
-        url, sizes = self.c[server].getFileContentsFromTrove((n,v,f), 
-                                                             pathList)
+        url, sizes = self.c[server].getFileContentsFromTrove(name, version,
+                                                             flavor, pathList)
 
         (fd, path) = util.mkstemp(suffix = 'filecontents')
         outF = util.ExtendedFile(path, "r+", buffering = False)
         os.close(fd)
         os.unlink(path)
-        return self._getFileContentsObjects(server, url, sizes, 
-                                            pathList, callback, outF, 
+        return self._getFileContentsObjects(server, url, sizes,
+                                            pathList, callback, outF,
                                             compressed)
 
-        
+    def _getFilesFromTrove(self, name, version, flavor, pathList):
+        # Backwards compatibility interface for getFileContentsFromTrove.
+        # Should not be called directory
+        trv = self.getTrove(name, version, flavor, withFiles=True)
+        results = {}
+
+        filesToGet = []
+        paths = []
+        for pathId, path, fileId, fileVer in trv.iterFileList():
+            if path in pathList:
+                filesToGet.append((fileId, fileVer))
+                paths.append((path))
+        fileContents = self.getFileContents(filesToGet)
+        for (contents, path) in zip(fileContents, paths):
+            results[path] = contents
+        return [results[x] for x in pathList]
 
     def getFileContents(self, fileList, tmpFile = None, lookInLocal = False,
                         callback = None, compressed = False):

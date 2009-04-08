@@ -440,7 +440,7 @@ class PathsNotFound(RepositoryError):
 
     @staticmethod
     def demarshall(marshaller, tup, kwArgs):
-        return [base64.decodestring(x) for x in tup], {}
+        return ([base64.decodestring(x) for x in tup],), {}
 
     def __str__(self):
         return """The following paths were not found: %s""" % (self.pathList,)

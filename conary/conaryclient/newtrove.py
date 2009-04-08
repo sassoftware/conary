@@ -160,28 +160,17 @@ class ClientNewTrove:
 
     def getFilesFromTrove(self, name, version, flavor, fileList=None, trv=None):
         repos = self.getRepos()
-        if trv is None:
+        if not fileList:
+            fileList = []
             trv = repos.getTrove(name, version, flavor, withFiles=True)
-        results = {}
-
-        filesToGet = []
-        paths = []
-        if fileList is None:
             fileObs = repos.getFileVersions([(x[0], x[2], x[3]) \
                     for x in trv.iterFileList()])
             for idx, (pathId, path, fileId, fileVer) in \
                     enumerate(trv.iterFileList()):
                 fileObj = fileObs[idx]
                 if fileObj.hasContents:
-                    filesToGet.append((fileId, fileVer))
-                    paths.append((path))
-        else:
-            for pathId, path, fileId, fileVer in trv.iterFileList():
-                if path in fileList:
-                    filesToGet.append((fileId, fileVer))
-                    paths.append((path))
-        fileContents = repos.getFileContents(filesToGet)
-        for (contents, path) in zip(fileContents, paths):
-            results[path] = contents.get()
-        return results
+                    fileList.append((path))
+        contents = repos.getFileContentsFromTrove(name, version, flavor,
+                                                  fileList)
+        return dict((x[0], x[1].get()) for x in zip(fileList, contents))
 

@@ -1310,11 +1310,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           troveTypes = troveTypes)
 
     @accessReadOnly
-    def getFileContentsFromTrove(self, authToken, clientVersion, 
-                                 troveTup, pathList):
-        self.log(2, troveTup, pathList)
-        troveName, version, flavor = troveTup
-        if not self.auth.check(authToken, 
+    def getFileContentsFromTrove(self, authToken, clientVersion,
+                                 troveName, version, flavor, pathList):
+        self.log(2, troveName, version, flavor, pathList)
+        if not self.auth.check(authToken,
                                label=self.toVersion(version).trailingLabel(), 
                                trove=troveName):
             raise errors.InsufficientPermission
