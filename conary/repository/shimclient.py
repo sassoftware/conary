@@ -147,10 +147,9 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
 
         return fileObjList
 
-    def getFileContentsFromTrove(self, troveTuple, pathList,
+    def getFileContentsFromTrove(self, n, v, f, pathList,
                                  callback = None, compressed = False):
         pathList = [self.fromPath(x) for x in pathList]
-        n,v,f = troveTuple
         v = self.fromVersion(v)
         f = self.fromFlavor(f)
         server = troveTuple[1].trailingLabel().getHost()
