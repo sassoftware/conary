@@ -350,7 +350,8 @@ class ServerCache:
         self.userMap.addServerGlob(host, user, pw)
         return user, pw
 
-    def _getServerName(self, item):
+    @staticmethod
+    def _getServerName(item):
 	if isinstance(item, (versions.Label, versions.VersionSequence)):
 	    serverName = item.getHost()
 	elif isinstance(item, str):

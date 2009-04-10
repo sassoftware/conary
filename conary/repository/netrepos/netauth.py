@@ -130,6 +130,20 @@ class UserAuthorization:
         authorized via these credentials
         """
 
+        if isinstance(user, ValidUser):
+            # Short-circuit for shim-using code that knows what roles
+            # it wants.
+            if '*' in user.roles:
+                cu.execute("SELECT userGroupId FROM UserGroups")
+            else:
+                roles = set([x for x in user.roles if isinstance(x, int)])
+
+                names = set([x for x in user.roles if not isinstance(x, int)])
+                places = ', '.join('?' for x in names)
+                cu.execute("""SELECT userGroupId FROM UserGroups
+                        WHERE userGroup IN ( %s )""" % (places,), *names)
+            return set(x[0] for x in cu)
+
         cu.execute("""
         SELECT Users.salt, Users.password, UserGroupMembers.userGroupId,
                Users.userName, UserGroups.canMirror
@@ -1254,7 +1268,7 @@ class PasswordCheckParser(dict):
         dict.__init__(self)
 
 
-class ValidPasswordTokenType:
+class ValidPasswordTokenType(object):
     """
     Type of L{ValidPasswordToken}, a token used in lieu of a password in
     authToken to represent a user that has been authorized by other
@@ -1269,9 +1283,53 @@ class ValidPasswordTokenType:
     This type should be instantiated exactly once (as
     L{ValidPasswordToken}).
     """
+    __slots__ = ()
+
     def __str__(self):
         return '<Valid Password>'
 
     def __repr__(self):
-        return 'ValidPasswordToken'
+        return self.__class__.__name__
 ValidPasswordToken = ValidPasswordTokenType()
+
+
+class ValidUser(object):
+    """
+    Object used in lieu of a username in authToken to represent an imaginary
+    user with a given set of roles.
+
+    For example, a script that needs to perform a repository operation with a
+    particular set of permissions, but has direct access to the database via
+    a shim client, may use an instance of L{ValidUser} instead of a username
+    in authToken to bypass username and password checks while still adhering
+    to the limitations of the specified set of roles.
+
+    The set of roles is given as a list containing role names, or integer
+    roleIds. Mixing of names and IDs is allowed. Additionally, a role of '*'
+    will entitle the user to all roles in the repository; if no arguments are
+    given this is the default.
+    """
+    __slots__ = ('roles',)
+
+    def __init__(self, *roles):
+        if not roles:
+            roles = ['*']
+        if isinstance(roles[0], (list, tuple)):
+            roles = roles[0]
+        self.roles = frozenset(roles)
+
+    def __str__(self):
+        if '*' in self.roles:
+            return '<User with all roles>'
+        else:
+            return '<User with roles %s>' % (
+                    ', '.join(unicode(x) for x in self.roles))
+
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, sorted(self.roles))
+
+    def __reduce__(self):
+        # Be pickleable, but don't actually pickle the object as it could
+        # then cross a RPC boundary and become a security vulnerability. Plus,
+        # it would confuse logcat.
+        return str, (str(self),)

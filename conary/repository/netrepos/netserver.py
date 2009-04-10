@@ -2164,6 +2164,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
         roleIds = self.auth.getAuthRoles(cu, authToken)
         results = [ (False, False) ] * len(troveList)
+        if not roleIds:
+            return results
 
         schema.resetTable(cu, "tmpNVF")
         def _iterTroveList(troveList):
