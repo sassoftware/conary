@@ -185,6 +185,7 @@ class UserAuthorization:
                         WHERE Users.userName = ?""", user)
         return [ x[0] for x in cu ]
 
+
     def getUserIdByName(self, userName):
         cu = self.db.cursor()
 
@@ -713,6 +714,14 @@ class NetworkAuthorization:
                    (int(bool(admin)), role))
         self.db.commit()
 
+    def setUserRoles(self, userName, roleList):
+        cu = self.db.cursor()
+        userId = self.userAuth.getUserIdByName(userName)
+        cu.execute("""DELETE FROM userGroupMembers WHERE userId=?""", userId)
+        for role in roleList:
+            self.addRoleMember(role, userName, commit = False)
+        self.db.commit()
+
     def setMirror(self, role, canMirror):
         self.log(3, role, canMirror)
         cu = self.db.transaction()
@@ -737,38 +746,39 @@ class NetworkAuthorization:
         else:
             self.db.commit()
 
-    def deleteUserByName(self, user):
+    def deleteUserByName(self, user, deleteRole=True):
         self.log(3, user)
 
         cu = self.db.cursor()
 
-        # for historical reasons:
-        # - if the role of the same name exists
-        # - and the role is empty or the user is the sole member
-        # - and the role doesn't have any special permissions
-        # - and the role doesn't have any acls
-        # then we attempt to delete it as well
-        cu.execute("""
-        select sum(c) from (
-            select count(*) as c from UserGroups
-            where userGroup = :user and admin + canMirror > 0
-            union
-            select count(*) as c from Users
-            join UserGroupMembers using(userId)
-            join UserGroups using(userGroupId) where userGroup = :user and userName != :user
-            union
-            select count(*) as c from Permissions
-            join UserGroups using(userGroupId) where userGroup = :user
-            union
-            select count(*) as c from UserGroupTroves
-            join UserGroups using(userGroupId) where userGroup = :user
-        ) as counters """, {"user": user})
-        # a !0 sum means this role can't be deleted
-        if cu.fetchone()[0] == 0:
-            try:
-                self.deleteRole(user, False)
-            except errors.RoleNotFound, e:
-                pass
+        if deleteRole:
+            # for historical reasons:
+            # - if the role of the same name exists
+            # - and the role is empty or the user is the sole member
+            # - and the role doesn't have any special permissions
+            # - and the role doesn't have any acls
+            # then we attempt to delete it as well
+            cu.execute("""
+            select sum(c) from (
+                select count(*) as c from UserGroups
+                where userGroup = :user and admin + canMirror > 0
+                union
+                select count(*) as c from Users
+                join UserGroupMembers using(userId)
+                join UserGroups using(userGroupId) where userGroup = :user and userName != :user
+                union
+                select count(*) as c from Permissions
+                join UserGroups using(userGroupId) where userGroup = :user
+                union
+                select count(*) as c from UserGroupTroves
+                join UserGroups using(userGroupId) where userGroup = :user
+            ) as counters """, {"user": user})
+            # a !0 sum means this role can't be deleted
+            if cu.fetchone()[0] == 0:
+                try:
+                    self.deleteRole(user, False)
+                except errors.RoleNotFound, e:
+                    pass
         self.userAuth.deleteUser(cu, user)
         self.db.commit()
 
