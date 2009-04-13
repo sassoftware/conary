@@ -67,7 +67,8 @@ def main(argv):
     cu = db.db.db.cursor()
 
     cu.execute('SELECT pathId, path, versionId, stream '
-               'FROM DBTroveFiles where isPresent=1')
+               'FROM DBTroveFiles where isPresent=1 '
+               'ORDER BY path')
     for pathId, path, versionId, stream in cu:
         f = files.ThawFile(stream, pathId)
         fullpath = os.path.join(cfg.root, path)
