@@ -149,8 +149,12 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
 
     def getFileContentsFromTrove(self, n, v, f, pathList,
                                  callback = None, compressed = False):
-        pathList = [self.fromPath(x) for x in pathList]
         server = v.trailingLabel().getHost()
+        if not isinstance(self.c[server], ShimServerProxy):
+            return netclient.NetworkRepositoryClient.getFileContentsFromTrove(
+                self, n, v, f, pathList, callback = callback,
+                compressed = compressed)
+        pathList = [self.fromPath(x) for x in pathList]
         v = self.fromVersion(v)
         f = self.fromFlavor(f)
         filePaths = self.c[server].getFileContentsFromTrove(n,v,f,
