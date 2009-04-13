@@ -213,7 +213,7 @@ class Row(object):
 
     # But the item slot is magic
     def __getitem__(self, key):
-        if isinstance(key, int):
+        if isinstance(key, (int, slice)):
             # Used as a sequence
             return self.data[key]
         else:
