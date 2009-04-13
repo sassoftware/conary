@@ -593,6 +593,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
             usage()
 
         reqClass.netProxy = ProxyRepositoryServer(cfg, baseUrl)
+        reqClass.restHandler = None
     elif cfg.repositoryDB:
         if len(otherArgs) > 1:
             usage()
