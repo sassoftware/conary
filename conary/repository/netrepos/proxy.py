@@ -886,6 +886,76 @@ class ProxyRepositoryServer(ChangesetFilter):
             items[1] = proxyHost
             self._baseUrlOverride = urlparse.urlunparse(items)
 
+    def getFileContentsFromTrove(self, caller, authToken, clientVersion,
+                                 troveName, version, flavor, pathList):
+        (url, sizes) = caller.getFileContentsFromTrove(
+                clientVersion, troveName, version, flavor, pathList)
+
+        # insure that the size is an integer -- protocol version
+        # 44 returns a string to avoid XML-RPC marshal limits
+        sizes = [ int(x) for x in sizes ]
+
+        (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                         suffix = '.tmp')
+        dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
+        os.close(fd)
+        os.unlink(tmpPath)
+        inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+        size = util.copyfileobj(inUrl, dest)
+        inUrl.close()
+        dest.seek(0)
+
+        totalSize = sum(sizes)
+        start = 0
+
+        # We skip the integrity check here because (1) the hash we're using
+        # has '-c' applied and (2) the hash is a fileId sha1, not a file
+        # contents sha1
+        fileList = []
+        for size in sizes:
+            nestedF = util.SeekableNestedFile(dest, size, start)
+            (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                             suffix = '.tmp')
+            size = util.copyfileobj(nestedF, os.fdopen(fd, 'w'))
+            totalSize -= size
+            start += size
+            fileList.append(tmpPath)
+
+        assert(totalSize == 0)
+        # this closes the underlying fd opened by mkstemp for us
+        dest.close()
+
+        (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
+                                      suffix = '.cf-out')
+        sizeList = []
+
+        try:
+            for filePath in fileList:
+                size = os.stat(filePath).st_size
+                sizeList.append(size)
+
+                # 0 means it's not a changeset
+                # 0 means it is not cached (erase it after sending)
+                os.write(fd, "%s %d 0 0\n" % (filePath, size))
+
+            url = os.path.join(self.urlBase(),
+                               "changeset?%s" % os.path.basename(path)[:-4])
+
+            # client versions >= 44 use strings instead of ints for size
+            # because xmlrpclib can't marshal ints > 2GiB
+            if clientVersion >= 44:
+                sizeList = [ str(x) for x in sizeList ]
+            else:
+                for size in sizeList:
+                    if size >= 0x80000000:
+                        raise errors.InvalidClientVersion(
+                             'This version of Conary does not support '
+                             'downloading file contents larger than 2 '
+                             'GiB.  Please install a new Conary client.')
+            return (url, sizeList)
+        finally:
+            os.close(fd)
+
     def getFileContents(self, caller, authToken, clientVersion, fileList,
                         authCheckOnly = False):
         if clientVersion < 42:
