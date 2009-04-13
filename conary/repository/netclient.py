@@ -2374,7 +2374,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                  callback = None, compressed = False):
         server = version.trailingLabel().getHost()
         if self.c[server].getProtocolVersion() < 67:
-            self._getFilesFromTrove(name, version, flavor, pathList)
+            return self._getFilesFromTrove(name, version, flavor, pathList)
         pathList = [self.fromPath(x) for x in pathList]
         version = self.fromVersion(version)
         flavor = self.fromFlavor(flavor)
