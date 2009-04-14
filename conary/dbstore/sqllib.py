@@ -167,13 +167,12 @@ class Row(object):
     1
     """
 
-    __slots__ = ('data', 'fields', 'mapping')
+    __slots__ = ('data', 'fields')
 
     def __init__(self, data, fields):
         assert len(data) == len(fields)
         self.data = tuple(data)
         self.fields = tuple(fields)
-        self.mapping = None
 
     # Most slots behave like the data tuple
     def __len__(self):
@@ -218,15 +217,24 @@ class Row(object):
             return self.data[key]
         else:
             # Used as a mapping
-            if self.mapping is None:
-                self._makeMapping()
-            return self.mapping[key.lower()]
+            return self.data[self._indexOf(key)]
 
-    def _makeMapping(self):
-        """
-        An underlying dictionary is used for mapping-like accesses,
-        but it slows things down when the row is used only as a sequence.
-        So this method generates the mapping when it is first needed.
-        """
-        self.mapping = CaselessDict(dict((x.lower(), y)
-                for (x, y) in zip(self.fields, self.data)))
+    def __setitem__(self, key, value):
+        if isinstance(key, (int, slice)):
+            # Used as a sequence
+            self.data[key] = value
+        else:
+            # Used as a mapping
+            try:
+                self.data[self._indexOf(key)] = value
+            except KeyError:
+                self.fields += (key,)
+                self.data += (value,)
+
+    def _indexOf(self, key):
+        key_ = key.lower()
+        for n, field in enumerate(self.fields):
+            if field.lower() == key_:
+                return n
+        else:
+            raise KeyError(key)
