@@ -201,6 +201,14 @@ class Row(object):
         return self.data >= other
 
     # And these behave like a mapping
+    def _indexOf(self, key):
+        key_ = key.lower()
+        for n, field in enumerate(self.fields):
+            if field.lower() == key_:
+                return n
+        else:
+            raise KeyError(key)
+
     def keys(self):
         return list(self.fields)
 
@@ -209,6 +217,19 @@ class Row(object):
 
     def items(self):
         return zip(self.fields, self.data)
+
+    __SIGIL = []
+    def pop(self, key, default=__SIGIL):
+        try:
+            index = self._indexOf(key)
+        except KeyError:
+            if default is not self.__SIGIL:
+                return default
+            raise
+        value = self.data[index]
+        self.fields = self.fields[:index] + self.fields[index+1:]
+        self.data = self.data[:index] + self.data[index+1:]
+        return value
 
     # But the item slot is magic
     def __getitem__(self, key):
@@ -225,16 +246,6 @@ class Row(object):
             self.data[key] = value
         else:
             # Used as a mapping
-            try:
-                self.data[self._indexOf(key)] = value
-            except KeyError:
-                self.fields += (key,)
-                self.data += (value,)
-
-    def _indexOf(self, key):
-        key_ = key.lower()
-        for n, field in enumerate(self.fields):
-            if field.lower() == key_:
-                return n
-        else:
-            raise KeyError(key)
+            self.pop(key, None)
+            self.fields += (key,)
+            self.data += (value,)
