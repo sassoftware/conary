@@ -161,7 +161,11 @@ class Cursor(BaseCursor):
         vals = []
         for parms in paramList:
             try:
-                ps = valStr % tuple(self.dbh.literal(x) for x in parms)
+                if isinstance(parms, (tuple, list, sqllib.Row)):
+                    parms = tuple(self.dbh.literal(x) for x in parms)
+                else:
+                    parms = self.dbh.literal(parms)
+                ps = valStr % parms
             except TypeError, e:
                 raise sqlerrors.CursorError(e.args[0], e.args)
             if crtLen + len(ps) + 1 >= self.MaxPacket:
