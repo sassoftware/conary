@@ -1167,6 +1167,10 @@ class ConaryMain(command.MainHandler):
         # we have to call _getPreCommandOptions twice.  It's easier
         # this way so we can get rid of any extraneous options that
         # may precede the command name.
+        if '--version' in argv:
+            print self.version
+            return
+
         dummyCfg = self.configClass(readConfigFiles=False)
         cmdArgv = self._getPreCommandOptions(argv, dummyCfg)[1]
         thisCommand = self.getCommand(cmdArgv, dummyCfg)
