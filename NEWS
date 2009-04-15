@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.40:
   o Bug Fixes:
     * keepRequired now recognizes that local troves may have had files
       removed, preventing file conflicts with incoming troves
