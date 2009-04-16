@@ -159,7 +159,7 @@ class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
             d = repos.getTroveVersionsByLabel(
                     { self.name : { parentBranch.label() : [ None ] } } )
 
-            if not d[self.name]:
+            if self.name not in d or not d[self.name]:
                 raise builderrors.RecipeFileError(
                     'No versions of %s found on label %s' %
                             (self.name, parentBranch.label()))

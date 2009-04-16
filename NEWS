@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * When a derived packages was created incorrectly, Conary could
+      sometimes trace back; in these cases, Conary will now print a
+      more useful error message. (CNY-3125)
+
 Changes in 2.0.40:
   o Bug Fixes:
     * keepRequired now recognizes that local troves may have had files
