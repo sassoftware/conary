@@ -3,6 +3,10 @@ Changes in @NEW@:
     * When a derived packages was created incorrectly, Conary could
       sometimes trace back; in these cases, Conary will now print a
       more useful error message. (CNY-3125)
+    * Displaying the output from verify spent a significant amount of time
+      querying repositories for information which was available in the local
+      database. All data accesses for verify are now satisfied locally
+      for a significant (10x) speedup in performance).
 
 Changes in 2.0.40:
   o Bug Fixes:

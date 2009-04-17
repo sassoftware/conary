@@ -1455,7 +1455,8 @@ class SourceStack(object):
         for source in self.sources:
             newTroveList = []
             try:
-                hasTroves = source.hasTroves([x[1] for x in troveList])
+                hasTroves = source.hasTroves(
+                    [ info for (i, info) in troveList if not(results[i]) ] )
             except errors.OpenError:
                 hasTroves = [ False] * len(troveList)
             if isinstance(hasTroves, list):
@@ -1463,7 +1464,7 @@ class SourceStack(object):
                                                 hasTroves))
 
             for (index, troveTup) in troveList:
-                if not hasTroves[troveTup]:
+                if not hasTroves.get(troveTup, False):
                     newTroveList.append((index, troveTup))
                 else:
                     results[index] = True
@@ -1974,7 +1975,8 @@ class ChangeSetJobSource(JobSource):
             oldTrove = None
         else:
             oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
-                                                    withFiles=True)
+                                                    withFiles=True,
+                                                    pristine=True)
             trvCs = None
 
         if not withFiles:
@@ -1985,8 +1987,6 @@ class ChangeSetJobSource(JobSource):
                 yield fileInfo
             return
         else:
-            
-
             cs = self.getChangeSet(job)
 
             if isDel:
@@ -2008,7 +2008,12 @@ class ChangeSetJobSource(JobSource):
                                                             withFiles=True)
 
                 if newFiles or modFiles:
-                    newTrove = self.newTroveSource.getTrove(n, newVer, newFla,
+                    if trvCs:
+                        newTrove = oldTrove.copy()
+                        newTrove.applyChangeSet(trvCs)
+                    else:
+                        newTrove = self.newTroveSource.getTrove(n, newVer,
+                                                                newFla,
                                                                 withFiles=True)
 
             # sort files by pathId

@@ -99,6 +99,7 @@ def verifyTrove(trv, db, cfg, defaultMap, display = True):
                                           ignoreTransient=True)
         if not result: return
         cs = result[0]
+        changed = False
         for (changed, trv) in result[1]:
             if changed:
                 changedTroves.add(trv.getNameVersionFlavor())
