@@ -1124,13 +1124,15 @@ class VerifyCommand(ConaryCommand):
     commands = ['verify']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
     help = 'Verify software integrity on the system'
-    docs = {'all' : 'verify all troves on system'}
+    docs = {'all' : 'verify all troves on system',
+            'changeset' : 'store the verify output in the named file' }
     commandGroup = 'Information Display'
     ignoreConfigErrors = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["all"] = NO_PARAM
+        argDef["changesetPath"] = ONE_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         db = openDatabase(cfg.root, cfg.dbPath)
@@ -1139,7 +1141,8 @@ class VerifyCommand(ConaryCommand):
         if len(otherArgs) < 2 or argSet:
             return self.usage()
         troves = otherArgs[2:]
-        verify.verify(troves, db, cfg, all=all)
+        verify.verify(troves, db, cfg, all=all,
+                      changesetPath = argSet.get('changeset', None))
 _register(VerifyCommand)
 
 

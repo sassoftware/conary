@@ -20,13 +20,19 @@ from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
 from conary.local import defaultmap, update
+from conary.repository import changeset
 from conary import errors
 
 def usage():
     print "conary verify [--all] [trove[=version]]*"
     print ""
 
-def verify(troveNameList, db, cfg, all=False):
+def verify(troveNameList, db, cfg, all=False, changesetPath=None):
+    if changesetPath:
+        cs = changeset.ReadOnlyChangeSet()
+    else:
+        cs = None
+
     troveNames = [ cmdline.parseTroveSpec(x) for x in troveNameList ]
     if not troveNames and not all:
         usage()
@@ -62,9 +68,14 @@ def verify(troveNameList, db, cfg, all=False):
     troves = db.getTroves(troveInfo)
 
     for trove in troves:
-        verifyTrove(trove, db, cfg, defaultMap)
+        newCs = verifyTrove(trove, db, cfg, defaultMap, display = (cs == None))
+        if cs and newCs:
+            cs.merge(newCs)
 
-def verifyTrove(trv, db, cfg, defaultMap):
+    if changesetPath:
+        cs.writeToFile(changesetPath)
+
+def verifyTrove(trv, db, cfg, defaultMap, display = True):
     l = []
     collections = []
     if trove.troveIsCollection(trv.getName()):
@@ -109,7 +120,12 @@ def verifyTrove(trv, db, cfg, defaultMap):
     for (changed, fsTrove) in result[1]:
         if changed:
             break
+
     if not changed:
-        return
-    showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True,
-                                   showChanges=True, asJob=True)
+        return None
+
+    if display:
+        showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True,
+                                       showChanges=True, asJob=True)
+
+    return cs
