@@ -14,12 +14,12 @@
 """
 Provides the output for the "conary verify" command
 """
-from conary import showchangeset
+from conary import showchangeset, trove
 from conary import versions
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
-from conary.local import update
+from conary.local import defaultmap, update
 from conary import errors
 
 def usage():
@@ -36,12 +36,12 @@ def verify(troveNameList, db, cfg, all=False):
 	troveNames = [ (x, None, None) for x in db.iterAllTroveNames() \
                                                   if x.find(':') == -1 ]
 	troveNames.sort()
+
+    troveInfo = []
+
     for (troveName, versionStr, flavor) in troveNames:
         try:
-            troves = db.findTrove(None, (troveName, versionStr, flavor))
-            troves = db.getTroves(troves)
-            for trove in troves:
-                verifyTrove(trove, db, cfg)
+            troveInfo += db.findTrove(None, (troveName, versionStr, flavor))
         except errors.TroveNotFound:
             if versionStr:
                 if flavor is not None and not flavor.isEmpty():
@@ -58,14 +58,28 @@ def verify(troveNameList, db, cfg, all=False):
             else:
                 log.error("trove %s is not installed", troveName)
 
-def verifyTrove(trove, db, cfg):
+    defaultMap = defaultmap.DefaultMap(db, troveInfo)
+    troves = db.getTroves(troveInfo)
+
+    for trove in troves:
+        verifyTrove(trove, db, cfg, defaultMap)
+
+def verifyTrove(trv, db, cfg, defaultMap):
     l = []
-    for trove in db.walkTroveSet(trove):
-        ver = trove.getVersion()
-        origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
-                                pristine = False)
-        ver = ver.createShadow(versions.LocalLabel())
-        l.append((trove, origTrove, ver, update.UpdateFlags()))
+    collections = []
+    if trove.troveIsCollection(trv.getName()):
+        collections.append(trv)
+
+    for subTrv in db.walkTroveSet(trv):
+        if trove.troveIsCollection(subTrv.getName()):
+            collections.append(subTrv)
+        else:
+            origTrove = db.getTrove(pristine = False,
+                                    *subTrv.getNameVersionFlavor())
+            ver = subTrv.getVersion().createShadow(versions.LocalLabel())
+            l.append((subTrv, origTrove, ver, update.UpdateFlags()))
+
+    changedTroves = set()
 
     try:
         result = update.buildLocalChanges(db, l, root = cfg.root, 
@@ -74,27 +88,28 @@ def verifyTrove(trove, db, cfg):
                                           ignoreTransient=True)
         if not result: return
         cs = result[0]
-
-        troveSpecs = []
-	for item in l:
-            trove = item[0]
-            ver = trove.getVersion().createShadow(versions.LocalLabel())
-
-            trvCs = cs.getNewTroveVersion(trove.getName(), 
-                                          ver, trove.getFlavor())
-            if trvCs.hasChangedFiles():
-                troveSpecs.append('%s=%s[%s]' % (trove.getName(), ver, 
-                                                 trove.getFlavor()))
-
-        for (changed, fsTrove) in result[1]:
+        for (changed, trv) in result[1]:
             if changed:
-                break
-        if not changed:
-            return
-        showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True, 
-                                       showChanges=True, asJob=True)
-                                       
+                changedTroves.add(trv.getNameVersionFlavor())
     except OSError, err:
         if err.errno == 13:
             log.warning("Permission denied creating local changeset for"
-                        " %s " % trove.getName())
+                        " %s " % str([ x[0].getName() for x in l ]))
+        return
+
+    troveSpecs = []
+    for item in l:
+        trv = item[0]
+        ver = trv.getVersion().createShadow(versions.LocalLabel())
+        nvf = (trv.getName(), ver, trv.getFlavor())
+        trvCs = cs.getNewTroveVersion(*nvf)
+        if trvCs.hasChangedFiles():
+            troveSpecs.append('%s=%s[%s]' % nvf)
+
+    for (changed, fsTrove) in result[1]:
+        if changed:
+            break
+    if not changed:
+        return
+    showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True,
+                                   showChanges=True, asJob=True)
