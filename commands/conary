@@ -1139,11 +1139,12 @@ class VerifyCommand(ConaryCommand):
         db = openDatabase(cfg.root, cfg.dbPath)
         all = argSet.has_key('all')
         if all: del argSet['all']
+        csPath = argSet.pop('changeset', None)
+
         if len(otherArgs) < 2 or argSet:
             return self.usage()
         troves = otherArgs[2:]
-        verify.verify(troves, db, cfg, all=all,
-                      changesetPath = argSet.get('changeset', None))
+        verify.verify(troves, db, cfg, all=all, changesetPath = csPath)
 _register(VerifyCommand)
 
 
