@@ -75,25 +75,12 @@ def verify(troveNameList, db, cfg, all=False, changesetPath=None):
     if changesetPath:
         cs.writeToFile(changesetPath)
 
-def verifyTrove(trv, db, cfg, defaultMap, display = True):
-    l = []
-    collections = []
-    if trove.troveIsCollection(trv.getName()):
-        collections.append(trv)
-
-    for subTrv in db.walkTroveSet(trv):
-        if trove.troveIsCollection(subTrv.getName()):
-            collections.append(subTrv)
-        else:
-            origTrove = db.getTrove(pristine = False,
-                                    *subTrv.getNameVersionFlavor())
-            ver = subTrv.getVersion().createShadow(versions.LocalLabel())
-            l.append((subTrv, origTrove, ver, update.UpdateFlags()))
-
+def _verifyTroveList(db, troveList, cfg, display = True):
+    log.info('Verifying %s' % " ".join(x[1].getName() for x in troveList))
     changedTroves = set()
 
     try:
-        result = update.buildLocalChanges(db, l, root = cfg.root, 
+        result = update.buildLocalChanges(db, troveList, root = cfg.root,
                                           withFileContents=False,
                                           forceSha1=True,
                                           ignoreTransient=True)
@@ -110,7 +97,7 @@ def verifyTrove(trv, db, cfg, defaultMap, display = True):
         return
 
     troveSpecs = []
-    for item in l:
+    for item in troveList:
         trv = item[0]
         ver = trv.getVersion().createShadow(versions.LocalLabel())
         nvf = (trv.getName(), ver, trv.getFlavor())
@@ -128,5 +115,36 @@ def verifyTrove(trv, db, cfg, defaultMap, display = True):
     if display:
         showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True,
                                        showChanges=True, asJob=True)
+
+    return cs
+
+def verifyTrove(trv, db, cfg, defaultMap, display = True):
+    collections = []
+    if trove.troveIsCollection(trv.getName()):
+        collections.append(trv)
+
+    cs = changeset.ReadOnlyChangeSet()
+    troveList = []
+
+    for subTrv in db.walkTroveSet(trv):
+        if trove.troveIsCollection(subTrv.getName()):
+            collections.append(subTrv)
+        else:
+            if troveList and (troveList[-1][0].getName().split(':')[0] !=
+                              subTrv.getName().split(':')[0]):
+                subCs = _verifyTroveList(db, troveList, cfg, display = display)
+                if subCs:
+                    cs.merge(subCs)
+
+                troveList = []
+
+            origTrove = db.getTrove(pristine = False,
+                                    *subTrv.getNameVersionFlavor())
+            ver = subTrv.getVersion().createShadow(versions.LocalLabel())
+            troveList.append((subTrv, origTrove, ver, update.UpdateFlags()))
+
+    subCs = _verifyTroveList(db, troveList, cfg, display = display)
+    if subCs:
+        cs.merge(subCs)
 
     return cs
