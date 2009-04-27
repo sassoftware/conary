@@ -16,6 +16,7 @@ Provides the output for the "conary verify" command
 """
 from conary import showchangeset, trove
 from conary import versions
+from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
@@ -39,30 +40,31 @@ def verify(troveNameList, db, cfg, all=False, changesetPath=None):
         log.error("must specify either a trove or --all")
         return 1
     elif not troveNames:
-	troveNames = [ (x, None, None) for x in db.iterAllTroveNames() \
-                                                  if x.find(':') == -1 ]
-	troveNames.sort()
+        client = conaryclient.ConaryClient(cfg)
+        troveInfo = client.getUpdateItemList()
+        troveInfo.sort()
+    else:
+        troveInfo = []
 
-    troveInfo = []
-
-    for (troveName, versionStr, flavor) in troveNames:
-        try:
-            troveInfo += db.findTrove(None, (troveName, versionStr, flavor))
-        except errors.TroveNotFound:
-            if versionStr:
-                if flavor is not None and not flavor.isEmpty():
-                    flavorStr = deps.formatFlavor(flavor)
-                    log.error("version %s with flavor '%s' of trove %s is not"
-                              " installed", versionStr, flavorStr, troveName)
-                else:
-                    log.error("version %s of trove %s is not installed", 
+        for (troveName, versionStr, flavor) in troveNames:
+            try:
+                troveInfo += db.findTrove(None, (troveName, versionStr, flavor))
+            except errors.TroveNotFound:
+                if versionStr:
+                    if flavor is not None and not flavor.isEmpty():
+                        flavorStr = deps.formatFlavor(flavor)
+                        log.error("version %s with flavor '%s' of trove %s is "
+                                  "not installed", versionStr, flavorStr,
+                                  troveName)
+                    else:
+                        log.error("version %s of trove %s is not installed",
                                                       versionStr, troveName)
-            elif flavor is not None and not flavor.isEmpty():
-                flavorStr = deps.formatFlavor(flavor)
-                log.error("flavor '%s' of trove %s is not installed", 
+                elif flavor is not None and not flavor.isEmpty():
+                    flavorStr = deps.formatFlavor(flavor)
+                    log.error("flavor '%s' of trove %s is not installed",
                                                           flavorStr, troveName)
-            else:
-                log.error("trove %s is not installed", troveName)
+                else:
+                    log.error("trove %s is not installed", troveName)
 
     defaultMap = defaultmap.DefaultMap(db, troveInfo)
     troves = db.getTroves(troveInfo)
