@@ -180,15 +180,15 @@ class AbstractTroveSource:
 
     def walkTroveSet(self, trove, ignoreMissing = True,
                      withFiles=True):
-	"""
-	Generator returns all of the troves included by trove, including
-	trove itself.
-	"""
+        """
+        Generator returns all of the troves included by trove, including
+        trove itself. It is a depth first search of strong refs.
+        """
 	yield trove
 	seen = { trove.getName() : [ (trove.getVersion(),
 				      trove.getFlavor()) ] }
 
-	troveList = [x for x in trove.iterTroveList(strongRefs=True)]
+	troveList = [x for x in sorted(trove.iterTroveList(strongRefs=True))]
 
 	while troveList:
 	    (name, version, flavor) = troveList[0]
@@ -211,7 +211,9 @@ class AbstractTroveSource:
 
                 yield trv
 
-                troveList += [ x for x in trv.iterTroveList(strongRefs=True) ]
+                troveList = ([ x for x in
+                                sorted(trv.iterTroveList(strongRefs=True)) ]
+                              + troveList)
 	    except errors.TroveMissing:
 		if not ignoreMissing:
 		    raise

@@ -8,6 +8,9 @@ Changes in @NEW@:
       database. All data accesses for verify are now satisfied locally
       for a significant (10x) speedup in performance).
 
+  o Internal Changes:
+    * TroveSource.walkTroveSet now walks troves in a sorted, depth first order
+
 Changes in 2.0.40:
   o Bug Fixes:
     * keepRequired now recognizes that local troves may have had files
@@ -59,6 +62,7 @@ Changes in 2.0.39:
       with a source even if the source is not accessible. (CNY-3099)
     * Changeset-based migrations no longer fail when a flavor is dropped
       from the group that is being migrated. (CNY-3101)
+
   o New Features:
     * Attempting to promote a binary will no longer reclone the binary 
       if a binary is already the latest at the target branch, even if
