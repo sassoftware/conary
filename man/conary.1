@@ -86,21 +86,6 @@ locally.
 Creates a local changeset, which represents the changes made on the
 local system to \fItrovename\fP, relative to the package as it is
 represented in the repository.
-.RS 4
-.TP 4
-.B \-\-deps
-Displays full dependency information
-.TP
-.B \-\-full-versions
-Full version strings are displayed instead of abbreviated version numbers
-.TP
-.B \-\-info
-Displays information on the specified troves, including flavors, requirements
-and pin status.
-.TP
-.B \-\-signatures
-Displays digital signatures for the specified troves.
-.RE
 .TP
 .B rblist
 Lists available rollbacks.
@@ -330,6 +315,16 @@ through a \fBconary update conary\fP invocation.
 Compares the files in the given \fItrove\fP (or all troves if the --all 
 option if given) against the trove files as they were  at the time of install,
 and displays any differences.
+.RS 4
+.TP 4
+.B \-\-all
+Verify all troves on the system.
+.TP
+.B \-\-hash
+Normally files are assumed to be unchanged if their size and mtime have
+not changed. This option forces a hash to be computed for each file being
+verified in to validate their contents.
+.RE
 .\"
 .\"
 .\"

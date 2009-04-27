@@ -28,7 +28,8 @@ def usage():
     print "conary verify [--all] [trove[=version]]*"
     print ""
 
-def verify(troveNameList, db, cfg, all=False, changesetPath=None):
+def verify(troveNameList, db, cfg, all=False, changesetPath = None,
+           forceHashCheck = False):
     if changesetPath:
         cs = changeset.ReadOnlyChangeSet()
     else:
@@ -70,21 +71,23 @@ def verify(troveNameList, db, cfg, all=False, changesetPath=None):
     troves = db.getTroves(troveInfo)
 
     for trove in troves:
-        newCs = verifyTrove(trove, db, cfg, defaultMap, display = (cs == None))
+        newCs = verifyTrove(trove, db, cfg, defaultMap, display = (cs == None),
+                            forceHashCheck = forceHashCheck)
         if cs and newCs:
             cs.merge(newCs)
 
     if changesetPath:
         cs.writeToFile(changesetPath)
 
-def _verifyTroveList(db, troveList, cfg, display = True):
+def _verifyTroveList(db, troveList, cfg, display = True,
+                     forceHashCheck = False):
     log.info('Verifying %s' % " ".join(x[1].getName() for x in troveList))
     changedTroves = set()
 
     try:
         result = update.buildLocalChanges(db, troveList, root = cfg.root,
                                           withFileContents=False,
-                                          forceSha1=True,
+                                          forceSha1=forceHashCheck,
                                           ignoreTransient=True)
         if not result: return
         cs = result[0]
@@ -120,7 +123,8 @@ def _verifyTroveList(db, troveList, cfg, display = True):
 
     return cs
 
-def verifyTrove(trv, db, cfg, defaultMap, display = True):
+def verifyTrove(trv, db, cfg, defaultMap, display = True,
+                forceHashCheck = False):
     collections = []
     if trove.troveIsCollection(trv.getName()):
         collections.append(trv)
@@ -145,7 +149,8 @@ def verifyTrove(trv, db, cfg, defaultMap, display = True):
             ver = subTrv.getVersion().createShadow(versions.LocalLabel())
             troveList.append((subTrv, origTrove, ver, update.UpdateFlags()))
 
-    subCs = _verifyTroveList(db, troveList, cfg, display = display)
+    subCs = _verifyTroveList(db, troveList, cfg, display = display,
+                             forceHashCheck = forceHashCheck)
     if subCs:
         cs.merge(subCs)
 

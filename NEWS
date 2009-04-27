@@ -8,6 +8,12 @@ Changes in @NEW@:
       database. All data accesses for verify are now satisfied locally
       for a significant (10x) speedup in performance).
     * Using --verbose on verify now gives some progress indication
+    * Removed improper options for localcs from the man page
+
+  o New Features:
+    * Verify now relies on file size and mtime to determine whether files have
+      been modified. The --hash option has been added to verify to force
+      sha1s to be used instead.
 
   o Internal Changes:
     * TroveSource.walkTroveSet now walks troves in a sorted, depth first order
