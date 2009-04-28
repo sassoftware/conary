@@ -71,9 +71,11 @@ def verify(troveNameList, db, cfg, all=False, changesetPath = None,
     troves = db.getTroves(troveInfo, withDeps = False, withFileObjects = True,
                           pristine = False)
 
+    seen = set()
     for trove in troves:
         newCs = verifyTrove(trove, db, cfg, defaultMap, display = (cs == None),
-                            forceHashCheck = forceHashCheck)
+                            forceHashCheck = forceHashCheck,
+                            duplicateFilterSet = seen)
         if cs and newCs:
             cs.merge(newCs)
 
@@ -125,7 +127,7 @@ def _verifyTroveList(db, troveList, cfg, display = True,
     return cs
 
 def verifyTrove(trv, db, cfg, defaultMap, display = True,
-                forceHashCheck = False):
+                forceHashCheck = False, duplicateFilterSet = None):
     collections = []
     if trove.troveIsCollection(trv.getName()):
         collections.append(trv)
@@ -134,16 +136,15 @@ def verifyTrove(trv, db, cfg, defaultMap, display = True,
     verifyList = []
 
     queue = [ trv ]
-    seen = set()
-    seen.add(trv.getNameVersionFlavor())
+    duplicateFilterSet.add(trv.getNameVersionFlavor())
     while queue:
         thisTrv = queue.pop(0)
         if trove.troveIsCollection(thisTrv.getName()):
             collections.append(thisTrv)
 
             subTrvInfo = set(thisTrv.iterTroveList(strongRefs=True))
-            subTrvInfo = subTrvInfo - seen
-            seen.update(subTrvInfo)
+            subTrvInfo = subTrvInfo - duplicateFilterSet
+            duplicateFilterSet.update(subTrvInfo)
             subTrvInfo = sorted(list(subTrvInfo))
 
             subTrvs = db.getTroves(subTrvInfo, pristine = False,
