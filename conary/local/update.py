@@ -1779,9 +1779,12 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     isSrcTrove = curTrove.getName().endswith(':source')
 
-    srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
-                                                    fileList ],
-                                        allowMissingFiles=allowMissingFiles)
+    if isinstance(srcTrove, trove.TroveWithFileObjects):
+        srcFileObjs = [ srcTrove.getFileObject(x[2]) for x in fileList ]
+    else:
+        srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in
+                                                        fileList ],
+                                            allowMissingFiles=allowMissingFiles)
     for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
                     itertools.izip(fileList, srcFileObjs):
 	# files which disappear don't need to make it into newTrove

@@ -1124,7 +1124,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     @api.publicApi
     def getTrove(self, name, version, flavor, pristine = True,
-                 withFiles = True, withDeps = True):
+                 withFiles = True, withDeps = True,
+                 withFileObjects = False):
         """
         @raises TroveMissing:
         @note:
@@ -1132,18 +1133,20 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         DatabaseError defined in L{dbstore.sqlerrors}
         """
         l = self.getTroves([ (name, version, flavor) ], pristine = pristine,
-                           withDeps = withDeps, withFiles = withFiles)
+                           withDeps = withDeps, withFiles = withFiles,
+                           withFileObjects = withFileObjects)
         if l[0] is None:
             raise errors.TroveMissing(name, version)
 
         return l[0]
 
     def getTroves(self, troveList, pristine = True, withFiles = True,
-                  withDeps = True, callback = None):
+                  withDeps = True, callback = None, withFileObjects = False):
         if not troveList:
             return []
         return self.db.getTroves(troveList, pristine, withFiles = withFiles,
-                                 withDeps = withDeps)
+                                 withDeps = withDeps,
+                                 withFileObjects = withFileObjects)
 
     def getTroveLatestVersion(self, name, branch):
         cu = self.db.db.cursor()

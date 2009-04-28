@@ -68,7 +68,8 @@ def verify(troveNameList, db, cfg, all=False, changesetPath = None,
                     log.error("trove %s is not installed", troveName)
 
     defaultMap = defaultmap.DefaultMap(db, troveInfo)
-    troves = db.getTroves(troveInfo)
+    troves = db.getTroves(troveInfo, withDeps = False, withFileObjects = True,
+                          pristine = False)
 
     for trove in troves:
         newCs = verifyTrove(trove, db, cfg, defaultMap, display = (cs == None),
@@ -130,26 +131,40 @@ def verifyTrove(trv, db, cfg, defaultMap, display = True,
         collections.append(trv)
 
     cs = changeset.ReadOnlyChangeSet()
-    troveList = []
+    verifyList = []
 
-    for subTrv in db.walkTroveSet(trv):
-        if trove.troveIsCollection(subTrv.getName()):
-            collections.append(subTrv)
+    queue = [ trv ]
+    seen = set()
+    seen.add(trv.getNameVersionFlavor())
+    while queue:
+        thisTrv = queue.pop(0)
+        if trove.troveIsCollection(thisTrv.getName()):
+            collections.append(thisTrv)
+
+            subTrvInfo = set(thisTrv.iterTroveList(strongRefs=True))
+            subTrvInfo = subTrvInfo - seen
+            seen.update(subTrvInfo)
+            subTrvInfo = sorted(list(subTrvInfo))
+
+            subTrvs = db.getTroves(subTrvInfo, pristine = False,
+                                   withDeps = False, withFileObjects = True)
+            # depth first
+            queue = [ x for x in subTrvs if x is not None ] + queue
         else:
-            if troveList and (troveList[-1][0].getName().split(':')[0] !=
-                              subTrv.getName().split(':')[0]):
-                subCs = _verifyTroveList(db, troveList, cfg, display = display)
+            if verifyList and (verifyList[-1][0].getName().split(':')[0] !=
+                               thisTrv.getName().split(':')[0]):
+                subCs = _verifyTroveList(db, verifyList, cfg, display = display)
                 if subCs:
                     cs.merge(subCs)
 
-                troveList = []
+                verifyList = []
 
-            origTrove = db.getTrove(pristine = False,
-                                    *subTrv.getNameVersionFlavor())
-            ver = subTrv.getVersion().createShadow(versions.LocalLabel())
-            troveList.append((subTrv, origTrove, ver, update.UpdateFlags()))
+            #origTrv = db.getTrove(pristine = False,
+                                  #*origTrv.getNameVersionFlavor())
+            ver = thisTrv.getVersion().createShadow(versions.LocalLabel())
+            verifyList.append((thisTrv, thisTrv, ver, update.UpdateFlags()))
 
-    subCs = _verifyTroveList(db, troveList, cfg, display = display,
+    subCs = _verifyTroveList(db, verifyList, cfg, display = display,
                              forceHashCheck = forceHashCheck)
     if subCs:
         cs.merge(subCs)
