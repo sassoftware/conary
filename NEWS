@@ -7,6 +7,9 @@ Changes in @NEW@:
       querying repositories for information which was available in the local
       database. All data accesses for verify are now satisfied locally
       for a significant (10x) speedup in performance).
+    * The output for conary verify is more succinct; instead of two
+      summary lines per component validated, it now prints one line
+      per component that has differences to display. (CNY-2419)
     * Using --verbose on verify now gives some progress indication.
     * Removed improper options for localcs from the man page.
     * Verify significantly sped up.
