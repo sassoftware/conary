@@ -12,6 +12,7 @@ Changes in @NEW@:
     * Verify significantly sped up.
     * Turned off threading in recreatedb, because threading broke
       for some manifests. (CNY-3128)
+    * Rewrote SQL query which removes old dependencies for better performance
 
   o New Features:
     * Verify now relies on file size and mtime to determine whether files have

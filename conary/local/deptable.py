@@ -1200,10 +1200,15 @@ class DependencyTables:
 
         cu.execute("""
         DELETE FROM Dependencies WHERE depId IN
-            (SELECT suspectDeps.depId FROM suspectDeps WHERE depId NOT IN
-                (SELECT distinct depId AS depId1 FROM Requires UNION
-                 SELECT distinct depId AS depId1 FROM Provides))
-        """)
+            (SELECT suspectDeps.depId FROM suspectDeps
+                LEFT OUTER JOIN Requires ON
+                    suspectDeps.depId = Requires.depId
+                LEFT OUTER JOIN Provides ON
+                    suspectDeps.depId = Provides.depId
+                WHERE
+                    Requires.depId IS NULL AND
+                    Provides.depId IS NULL
+            )""")
 
     def _restrictResolveByLabel(self, label, leavesOnly=False):
         """ Restrict resolution by label
