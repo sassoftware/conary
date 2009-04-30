@@ -16,134 +16,280 @@
 Provides a cache for storing files locally, including
 downloads and unpacking layers of files.
 """
-
+import cookielib
 import errno
-from conary.lib import log
-from conary.lib import sha1helper
-from conary.lib import util
-from conary import callbacks
-# fully featured callbacks...
-from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
-from conary.build.mirror import Mirror
 import os
 import socket
 import time
 import urllib2
 import urlparse
-import cookielib
 
-# location is normally the package name.
-# lookaside:// is used internally only for things that are inserted
-# into the cache but managed by calling code.  It should not be
-# referenced from recipes. So is multiurl://
-networkPrefixes = ('http://', 'https://', 'ftp://', 'mirror://',
-                   'lookaside://')
+from conary.lib import log
+from conary.lib import sha1helper
+from conary.lib import util
+from conary import callbacks
+from conary.build.mirror import Mirror
+from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
 
-def _truncateName(name):
-    for prefix in networkPrefixes:
-        if name.startswith(prefix):
-            return name[len(prefix):]
-    return name
 
-def createCacheName(cfg, name, location, negative=''):
-    name = _truncateName(name)
-    cachedname = os.sep.join((cfg.lookaside, negative + location, name))
-    normcachedname = os.path.normpath(cachedname)
-    return normcachedname
+NETWORK_PREFIXES = ('http', 'https', 'ftp', 'mirror')
 
-def _createCacheEntry(cfg, name, location, infile):
-    # cache needs to be hierarchical to avoid collisions, thus we
-    # use location so that files with the same name and different
-    # contents in different packages do not collide
-    cachedname = createCacheName(cfg, name, location)
-    util.mkdirChain(os.path.dirname(cachedname))
-    f = open(cachedname, "w+")
+# some recipes reach into Conary internals here, and have references
+# to searchAll
+def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
+              httpHeaders={}, localOnly=False):
+    return findAll(cfg, repCache, name, location, srcdirs, autoSource,
+                   httpHeaders, localOnly, allowNone=True)
 
-    try:
-        BLOCKSIZE = 1024 * 4
+# bw compatible findAll method.
+def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
+            httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
+            allowNone=False, refreshFilter=None, multiurlMap=None,
+            unifiedSourcePath = None):
+    if guessName:
+        name = name + guessName
+    ff = FileFinder(recipeName=location, repositoryCache=repCache,
+                          localDirs=srcdirs, multiurlMap=multiurlMap,
+                          mirrorDirs=cfg.mirrorDirs)
 
-        got = 0
-        if infile.info().has_key('content-length'):
-            need = int(infile.info()['content-length'])
-        else:
-            need = 0
+    searchExternal = not localOnly
+    searchRepository = not localOnly or not srcdirs
+    searchLocal = not autoSource
 
-        if cfg.quiet:
-            callback = callbacks.FetchCallback()
-        else:
-            callback = FetchCallback()
+    results = ff.fetch(name, suffixes=suffixes, archivePath=unifiedSourcePath,
+                       allowNone=allowNone, searchRepository=searchRepository,
+                       searchExternal=searchExternal, searchLocal=searchLocal,
+                       headers=httpHeaders, refreshFilter=refreshFilter)
+    return results[1]
 
-        wrapper = callbacks.CallbackRateWrapper(callback, callback.fetch,
-                                                need)
-        total = util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
-                                 rateLimit = cfg.downloadRateLimit,
-                                 callback = wrapper.callback)
+# backwards compatible fetchURL method
+def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
+    repCache = RepositoryCache(cfg.lookaside, None, cfg)
+    ff = FileFinder(recipeName=location, repositoryCache=repCache,
+                          )
+    return ff.searchNetworkSources(name, name, headers=httpHeaders)
 
-        f.close()
-        infile.close()
-    except:
-        os.unlink(cachedname)
-        raise
+class FileFinder(object):
+    def __init__(self, recipeName, repositoryCache, localDirs=None,
+                 multiurlMap=None, refreshFilter=None, mirrorDirs = None):
+        self.recipeName = recipeName
+        self.repCache = repositoryCache
+        if localDirs is None:
+            localDirs = []
+        self.localDirs = localDirs
+        self.multiurlMap = multiurlMap
+        self.mirrorDirs = mirrorDirs
 
-    # work around FTP bug (msw had a better way?)
-    if name.startswith("ftp://"):
-	if os.stat(cachedname).st_size == 0:
-	    os.unlink(cachedname)
-	    _createNegativeCacheEntry(cfg, name[5:], location)
-	    return None
 
-    return cachedname
+    def fetch(self, uri, suffixes=None, archivePath=None, headers=None, 
+              allowNone=False,
+              searchLocal=True, searchRepository=True,
+              searchExternal=True, refreshFilter=None):
+        uriList = self._getPathsToSearch(uri, suffixes)
+        for newUri in uriList:
+            results = self._fetch(newUri, uri,
+                               archivePath, headers=headers,
+                               refreshFilter=refreshFilter,
+                               searchLocal=searchLocal,
+                               searchRepository=searchRepository,
+                               searchExternal=searchExternal)
+            if results:
+                return results
+        if not allowNone:
+            raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), uri)
+        return None, None
 
-def _createNegativeCacheName(cfg, name, location):
-    name = _truncateName(name)
-    negativeEntry = createCacheName(cfg, name, location, 'NEGATIVE' + os.sep)
-    return negativeEntry
+    def _fetch(self, uri, originalUri, archivePath, headers=None,
+               refreshFilter=None, searchLocal=True,
+               searchRepository=True, searchExternal=True):
+        if searchLocal:
+            path = self.searchFilesystem(uri)
+            if path: return (False, path)
+        if archivePath:
+            path = self.searchArchive(archivePath, uri)
+            if path: return (True, path)
 
-def _createNegativeCacheEntry(cfg, name, location):
-    negativeEntry = _createNegativeCacheName(cfg, name, location)
-    util.mkdirChain(os.path.dirname(negativeEntry))
-    open(negativeEntry, "w+").close()
+        basename = os.path.basename(uri)
+        refresh = (refreshFilter and
+                   refreshFilter(os.path.basename(uri)))
+        if searchRepository and not refresh:
+            path = self.searchRepository(uri)
+            if path: return (True, path)
 
-def _searchCache(cfg, name, location, refreshFilter=None):
+        if searchLocal and not refresh:
+            path = self.searchLocalCache(uri)
+            if path: return (False, path)
 
-    basename = os.path.basename(name)
+        # finally search upstream
+        prefix = uri.split('://', 1)[0]
+        if prefix in NETWORK_PREFIXES and searchExternal:
+            path = self.searchNetworkSources(uri, originalUri, headers)
+            if path: return False, path
 
-    # check if we trying to refresh sources
-    if refreshFilter:
-        if refreshFilter(basename):
+    def searchRepository(self, uri):
+        if self.repCache.hasFileName(uri):
+            log.info('found %s in repository', uri)
+            return self.repCache.cacheFile(self.recipeName, uri, uri)
+        basename = os.path.basename(uri)
+        if self.repCache.hasFileName(basename):
+            log.info('found %s in repository', basename)
+            return self.repCache.cacheFile(self.recipeName, uri, basename)
+
+    def searchLocalCache(self,  uri):
+        # exact match first, then look for cached responses from other servers
+        path = self.repCache.getCacheEntry(self.recipeName, uri)
+        if path: return path
+        basename = os.path.basename(uri)
+        prefix = uri.split('://', 1)[0]
+        if prefix in NETWORK_PREFIXES or prefix == 'lookaside':
+            return self.repCache.findInCache(self.recipeName, basename)
+
+    def searchFilesystem(self, uri):
+        if uri[0] == '/':
+            return
+        return util.searchFile(uri, self.localDirs)
+
+    def searchArchive(self, archiveName, path):
+        return self.repCache.getArchiveCacheEntry(archiveName, path)
+
+    def searchNetworkSources(self, uri, originalUri, headers):
+        # Save users from themselves - encode some characters automatically
+        uri = uri.replace(' ', '%20')
+        # check for negative cache entries to avoid spamming servers
+        negativePath =  self.repCache.checkNegativeCache(self.recipeName, uri)
+        if negativePath:
+            log.warning('not fetching %s (negative cache entry %s exists)',
+                        uri, negativePath)
             return None
 
-    networkSource = False
-    for prefix in networkPrefixes:
-        if name.startswith(prefix):
-            networkSource = True
-            break
+        log.info('Trying %s...', uri)
+        explicit = (uri == originalUri)
+        if headers is None:
+            headers = {}
+        inFile = self._fetchUrl(uri, headers, explicit=explicit)
+        if inFile is None:
+            self.repCache.createNegativeCacheEntry(self.recipeName, uri)
+        else:
+            contentLength = int(inFile.headers.get('Content-Length', 0))
+            return self.repCache.addFileToCache(self.recipeName, uri,
+                                                inFile, contentLength)
+        return None
 
-    if networkSource:
-        # exact match first, then look for cached responses from other servers
-        positiveName = createCacheName(cfg, name, location)
-        if os.path.exists(positiveName):
-            return positiveName
-        return util.searchPath(basename, os.sep.join((cfg.lookaside,
-                                                      location, basename)))
-    else:
-        return util.searchFile(basename,
-                               [os.sep.join((cfg.lookaside, location))])
+    def _getPathsToSearch(self, uri, suffixes):
+        if '://' in uri:
+            prefix, path = uri.split('://', 1)
+        else:
+            prefix = None
+            path = uri
+
+        if prefix == 'multiurl':
+            host, path = path.split('/', 1)
+            pathList = self.multiurlMap[host]
+            pathList = [ "%s/%s" % (x, path) for x in pathList ]
+        else:
+            pathList = [uri]
+
+        newPathList = []
+        for uri in pathList:
+            if '://' in uri:
+                prefix, path = uri.split('://', 1)
+            else:
+                prefix = None
+                path = None
+            if prefix == 'mirror':
+                mirrorType, path = path.split('/', 1)
+                for mirrorUrl in Mirror(self.mirrorDirs, mirrorType):
+                    newPathList.append('%s/%s' % (mirrorUrl, path))
+            else:
+                newPathList.append(uri)
+        pathList = newPathList
+
+        if suffixes is not None:
+            newPathList = []
+            for path in pathList:
+                for suffix in suffixes:
+                    newPathList.append(path + '.' + suffix)
+            pathList = newPathList
+
+        return pathList
 
 
-def _searchRepository(cfg, repCache, name, location):
-    """searches repository, and retrieves to cache"""
-    if repCache.hasFileName(name):
-	log.info('found %s in repository', name)
-	return repCache.cacheFile(cfg, name, location, name)
-    basename = os.path.basename(name)
-    if repCache.hasFileName(basename):
-	log.info('found %s in repository', basename)
-	return repCache.cacheFile(cfg, name, location, basename)
 
-
-    return None
-
+    def _fetchUrl(self, uri, headers, explicit=True):
+        retries = 0
+        inFile = None
+        while retries < 5:
+            try:
+                # set up a urlopener that tracks cookies to handle
+                # sites like Colabnet that want to set a session cookie
+                cj = cookielib.LWPCookieJar()
+                pwm = PasswordManager()
+                # set up a urllib2 opener that can handle cookies and basic
+                # authentication.
+                # FIXME: should digest auth be handled too?
+                opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj),
+                                              urllib2.HTTPBasicAuthHandler(pwm))
+                split = list(urlparse.urlsplit(uri))
+                protocol = split[0]
+                if protocol != 'ftp':
+                    server = split[1]
+                    if '@' in server:
+                        # username, and possibly password, were given
+                        login, server = server.split('@')
+                        # get rid of the username/password part of the server
+                        split[1] = server
+                        if ':' in login:
+                            # password was given
+                            user, passwd = login.split(':')
+                        else:
+                            # we don't have the ability to prompt.  Assume
+                            # a blank password
+                            user = login
+                            passwd = ''
+                        pwm.add_password(user, passwd)
+                name = urlparse.urlunsplit(split)
+                req = urllib2.Request(name, headers=headers)
+                inFile = opener.open(req)
+                if not name.startswith('ftp://'):
+                    content_type = inFile.info()['content-type']
+                    if not explicit and 'text/html' in content_type:
+                        raise urllib2.URLError('"%s" not found' % name)
+                log.info('Downloading %s...', name)
+                break
+            except urllib2.HTTPError, msg:
+                if msg.code == 404:
+                    return None
+                else:
+                    log.error('error downloading %s: %s',
+                              name, str(msg))
+                    return None
+            except urllib2.URLError:
+                return None
+            except socket.error, err:
+                num, msg = err
+                if num == errno.ECONNRESET:
+                    log.info('Connection Reset by FTP server'
+                             'while retrieving %s.'
+                             '  Retrying in 10 seconds.', name, msg)
+                    time.sleep(10)
+                    retries += 1
+                else:
+                    return None
+            except IOError, msg:
+                # only retry for server busy.
+                ftp_error = msg.args[1]
+                if isinstance(ftp_error, EOFError):
+                    # server just hung and gave no response
+                    return None
+                response = msg.args[1].args[0]
+                if isinstance(response, str) and response.startswith('421'):
+                    log.info('FTP server busy when retrieving %s.'
+                             '  Retrying in 10 seconds.', name)
+                    time.sleep(10)
+                    retries += 1
+                else:
+                    return None
+        return inFile
 
 class PasswordManager:
     # password manager class for urllib2 that handles exactly 1 password
@@ -159,267 +305,22 @@ class PasswordManager:
         return self.user, self.passwd
 
 
-def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
 
-    retries = 0
-    url = None
+class RepositoryCache(object):
 
-    # Save users from themselves - encode some characters automatically
-    name = name.replace(' ', '%20')
-    # check for negative cache entries to avoid spamming servers
-    negativeName = _createNegativeCacheName(cfg, name, location)
-    if os.path.exists(negativeName):
-        if time.time() > 60*60 + os.path.getmtime(negativeName):
-            os.remove(negativeName)
-        else:
-            log.warning('not fetching %s (negative cache entry %s exists)',
-                        name, negativeName)
-            return None
-
-    log.info('Trying %s...', name)
-    while retries < 5:
-        try:
-            # set up a urlopener that tracks cookies to handle
-            # sites like Colabnet that want to set a session cookie
-            cj = cookielib.LWPCookieJar()
-            pwm = PasswordManager()
-            # set up a urllib2 opener that can handle cookies and basic
-            # authentication.
-            # FIXME: should digest auth be handled too?
-            opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj),
-                                          urllib2.HTTPBasicAuthHandler(pwm))
-            split = list(urlparse.urlsplit(name))
-            protocol = split[0]
-            if protocol != 'ftp':
-                server = split[1]
-                if '@' in server:
-                    # username, and possibly password, were given
-                    login, server = server.split('@')
-                    # get rid of the username/password part of the server
-                    split[1] = server
-                    if ':' in login:
-                        # password was given
-                        user, passwd = login.split(':')
-                    else:
-                        # we don't have the ability to prompt.  Assume
-                        # a blank password
-                        user = login
-                        passwd = ''
-                    pwm.add_password(user, passwd)
-            name = urlparse.urlunsplit(split)
-            req = urllib2.Request(name, headers=httpHeaders)
-            url = opener.open(req)
-            if not name.startswith('ftp://'):
-                content_type = url.info()['content-type']
-                if (guessName or mirror) and 'text/html' in content_type:
-                    raise urllib2.URLError('"%s" not found' % name)
-            log.info('Downloading %s...', name)
-            break
-        except urllib2.HTTPError, msg:
-            if msg.code == 404:
-                _createNegativeCacheEntry(cfg, name, location)
-                return None
-            else:
-                log.error('error downloading %s: %s',
-                          name, str(msg))
-                return None
-        except urllib2.URLError:
-            _createNegativeCacheEntry(cfg, name, location)
-            return None
-        except socket.error, err:
-            num, msg = err
-            if num == errno.ECONNRESET:
-                log.info('Connection Reset by FTP server'
-                         'while retrieving %s.'
-                         '  Retrying in 10 seconds.', name, msg)
-                time.sleep(10)
-                retries += 1
-            else:
-                _createNegativeCacheEntry(cfg, name, location)
-                return None
-        except IOError, msg:
-            # only retry for server busy.
-            ftp_error = msg.args[1]
-            if isinstance(ftp_error, EOFError):
-                # server just hung and gave no response
-                _createNegativeCacheEntry(cfg, name, location)
-                return None
-                
-            response = msg.args[1].args[0]
-            if isinstance(response, str) and response.startswith('421'):
-                log.info('FTP server busy when retrieving %s.'
-                         '  Retrying in 10 seconds.', name)
-                time.sleep(10)
-                retries += 1
-            else:
-                _createNegativeCacheEntry(cfg, name, location)
-                return None
-    if url is None:
-        return None
-
-    mirror = mirror or name
-    rc = _createCacheEntry(cfg, mirror, location, url)
-    return rc
-
-# some recipes reach into Conary internals here, and have references
-# to searchAll
-def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
-              httpHeaders={}, localOnly=False):
-    return findAll(cfg, repCache, name, location, srcdirs, autoSource,
-                   httpHeaders, localOnly, allowNone=True)
-
-def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
-            httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
-            allowNone=False, refreshFilter=None, multiurlMap=None,
-            unifiedSourcePath = None):
-
-    """
-    searches all locations, including populating the cache if the
-    file can't be found in srcdirs, and returns the name of the file.
-    """
-
-    if not autoSource and not suffixes and not guessName and not name.startswith('/'):
-        # these are files that do not start with / and are not
-        # indirectly fetched via RPMs, so we look in the local directory
-        f = util.searchFile(name, srcdirs)
-        if f: return f
-
-    # Multi-url case
-    specialPrefix = "multiurl://"
-    if name.startswith(specialPrefix):
-        mapName, restLen = _splitSpecialURL(specialPrefix, name)
-        possibleNames = multiurlMap[mapName]
-        rest = name[restLen:]
-        # Append the name of the archive
-        possibleNames = [ "%s/%s" % (x, rest) for x in possibleNames ]
-    else:
-        possibleNames = [ name ]
-
-    if not guessName:
-        if suffixes:
-            possibleNames = [ ("%s.%s" % (n, s), n)
-                for (n, s) in _carthesianProduct(possibleNames, suffixes) ]
-        else:
-            possibleNames = [ (n, n) for n in possibleNames ]
-    else:
-        suffixes = suffixes or ( 'tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip' )
-        possibleNames = [ ("%s%s.%s" % (n, guessName, s), n)
-            for (n, s) in _carthesianProduct(possibleNames, suffixes) ]
-
-    # This for r.addArchive('%(name)s-%(version)s.tar.gz', keyid='9BB19A22') case
-    if not autoSource and guessName:
-        for sourcename, origname in possibleNames:
-            if '/' not in origname:
-                f = util.searchFile(sourcename, srcdirs)
-                if f: return f
-
-    if localOnly and not srcdirs:
-        # This is a "local only cook from the repository", so we need
-        # to ensure that what we have is the same as what is in the
-        # repository, not what is in the cache
-        for sourcename, origname in possibleNames:
-            f = _searchRepository(cfg, repCache, origname, location)
-            if f: return f
-
-    if localOnly:
-        if not allowNone:
-            raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
-        else:
-            # we do not guess suffixes for local changes
-            return None
-
-    for sourcename, origname in possibleNames:
-        # this specialPrefix (and possibly future patterns of this nature)
-        # must come before the _searchRepository call because this prefix
-        # is on a separate path (and also guaranteed to already be in the
-        # lookaside cache)
-        if unifiedSourcePath:
-            # CNY-2627 introduced a separate lookaside stack for rpm contents
-            # this dir tree is parallel to NEGATIVE and trovenames.
-            # the name =XXX_CONTENTS= pattern was chosen because = is an
-            # illegal character in a trovename and thus will never conflict
-            # with real troves.
-            contentsName, trailingPath = unifiedSourcePath.split('://', 1)
-            contentsName = "=%s_CONTENTS=" % contentsName.upper()
-
-            unifiedPath = os.path.sep.join((contentsName, trailingPath))
-            unifiedSource = util.searchFile(unifiedPath, [cfg.lookaside])
-            if not (unifiedSource or allowNone):
-                raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
-            return unifiedSource
-
-        # this needs to come as soon as possible to preserve reproducability
-        f = _searchRepository(cfg, repCache, sourcename, location)
-        if f: return f
-
-        # OK, now look in the lookaside cache
-        # this is for sources that will later be auto-added
-        # one way or another
-        f = _searchCache(cfg, sourcename, location, refreshFilter)
-        if f: return f
-
-        # finally, look in srcdirs if appropriate
-        if not autoSource and not guessName and '/' not in origname:
-            f = util.searchFile(sourcename, srcdirs)
-            if f: return f
-
-
-    # Need to fetch a file that will be auto-added to the repository
-    # on commit
-
-    specialPrefix = 'mirror://'
-    urls = []
-    for sourcename, origname in possibleNames:
-        if not origname.startswith(specialPrefix):
-            urls.append(sourcename)
-            continue
-        # mirror://foo/bar -> mirrorType = "foo", trailingName = "bar"
-        mirrorType, mirrorLen = _splitSpecialURL(specialPrefix, origname)
-        for mirrorBaseURL in Mirror(cfg, mirrorType):
-            trailingName = sourcename[mirrorLen:]
-            urls.append(('/'.join((mirrorBaseURL, trailingName)), sourcename))
-
-    names = urls
-
-    for name in names:
-
-        mirror=None
-        if type(name) == type(()):
-            name, mirror = name
-
-        prefix = name.split('://', 1)[0] + '://'
-        if not prefix in networkPrefixes or prefix == 'lookaside://':
-            continue
-
-        f = fetchURL(cfg, name, location, httpHeaders, guessName, mirror)
-        if f: return f
-
-    if not allowNone:
-        raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
-
-def _splitSpecialURL(prefix, url):
-    prefixType = url.split('//')[1].split('/', 1)[0]
-    prefixLen = len(prefix) + len(prefixType) + 1
-    return prefixType, prefixLen
-
-def _carthesianProduct(*iterables):
-    itrcount = len(iterables)
-    value = [ None ] * itrcount
-    for i in range(itrcount):
-        for v in iterables[i]:
-            value[i] = v
-            for j in range(i+1, itrcount):
-                for v in iterables[j]:
-                    value[j] = v
-                    if j == itrcount - 1:
-                        yield value
-
-class RepositoryCache:
+    def __init__(self, basePath, repos, cfg, refreshFilter=None):
+        self.basePath = basePath
+	self.repos = repos
+        self.refreshFilter = refreshFilter
+	self.nameMap = {}
+        self.cacheMap = {}
+        self.quiet = cfg.quiet
+        self.downloadRateLimit = cfg.downloadRateLimit
 
     def addFileHash(self, troveName, troveVersion, pathId, path, fileId,
-                    fileVersion, sha1):
+                    fileVersion, sha1, mode):
 	self.nameMap[path] = (troveName, troveVersion, pathId, path, fileId,
-                              fileVersion, sha1)
+                              fileVersion, sha1, mode)
 
     def hasFileName(self, fileName):
         if self.refreshFilter:
@@ -427,18 +328,19 @@ class RepositoryCache:
                 return False
 	return fileName in self.nameMap
 
-    def cacheFile(self, cfg, fileName, location, basename):
-	cachedname = createCacheName(cfg, fileName, location)
-        util.mkdirChain(os.path.dirname(cachedname))
+    def cacheFile(self, prefix, fileName, basename):
+	cachePath = self.getCachePath(prefix, fileName)
+        util.mkdirChain(os.path.dirname(cachePath))
 
         if basename in self.cacheMap:
             # don't check sha1 twice
             return self.cacheMap[basename]
 	(troveName, troveVersion, pathId, troveFile, fileId,
-                    troveFileVersion, sha1) = self.nameMap[basename]
+                    troveFileVersion, sha1, mode) = self.nameMap[basename]
         sha1Cached = None
-	if os.path.exists(cachedname):
-            sha1Cached = sha1helper.sha1FileBin(cachedname)
+        cachedMode = None
+	if os.path.exists(cachePath):
+            sha1Cached = sha1helper.sha1FileBin(cachePath)
         if sha1Cached != sha1:
             if sha1Cached:
                 log.info('%s sha1 %s != %s; fetching new...', basename,
@@ -447,25 +349,117 @@ class RepositoryCache:
             else:
                 log.info('%s not yet cached, fetching...', fileName)
 
-            if cfg.quiet:
+            if self.quiet:
                 csCallback = None
             else:
                 csCallback = ChangesetCallback()
 
             f = self.repos.getFileContents(
                 [ (fileId, troveFileVersion) ], callback = csCallback)[0].get()
-            util.copyfileobj(f, open(cachedname, "w"))
+            util.copyfileobj(f, open(cachePath, "w"))
             fileObj = self.repos.getFileVersion(
                 pathId, fileId, troveFileVersion)
-            fileObj.chmod(cachedname)
-        self.cacheMap[basename] = cachedname
-	return cachedname
+            fileObj.chmod(cachePath)
+
+        cachedMode = os.stat(cachePath).st_mode & 0777
+        if mode != cachedMode:
+            os.chmod(cachePath, mode)
+        self.cacheMap[basename] = cachePath
+	return cachePath
+
+    def addFileToCache(self, prefix, name, infile, contentLength):
+        # cache needs to be hierarchical to avoid collisions, thus we
+        # use prefix so that files with the same name and different
+        # contents in different packages do not collide
+        cachedname = self.getCachePath(prefix, name)
+        util.mkdirChain(os.path.dirname(cachedname))
+        f = open(cachedname, "w+")
+
+        try:
+            BLOCKSIZE = 1024 * 4
+
+            if self.quiet:
+                callback = callbacks.FetchCallback()
+            else:
+                callback = FetchCallback()
+
+            wrapper = callbacks.CallbackRateWrapper(callback, callback.fetch,
+                                                    contentLength)
+            total = util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
+                                     rateLimit = self.downloadRateLimit,
+                                     callback = wrapper.callback)
+
+            f.close()
+            infile.close()
+        except:
+            os.unlink(cachedname)
+            raise
+
+        # work around FTP bug (msw had a better way?)
+        if name.startswith("ftp://"):
+            if os.stat(cachedname).st_size == 0:
+                os.unlink(cachedname)
+                self.createNegativeCacheEntry(prefix, name[5:])
+                return None
+
+        return cachedname
 
     def setRefreshFilter(self, refreshFilter):
         self.refreshFilter = refreshFilter
 
-    def __init__(self, repos, refreshFilter=None):
-	self.repos = repos
-        self.refreshFilter = refreshFilter
-	self.nameMap = {}
-        self.cacheMap = {}
+    def getCachePath(self, prefix, name, negative=False):
+        name = self._truncateName(name)
+        if negative:
+            prefix = 'NEGATIVE' + os.sep + prefix
+
+        path = os.sep.join((self.basePath, prefix, name))
+        return os.path.normpath(path)
+
+    def createNegativeCacheEntry(self, prefix, name):
+        path = self.getCachePath(prefix, name, negative=True)
+        util.mkdirChain(os.path.dirname(path))
+        open(path, 'w+')
+
+    def findInCache(self, prefix, basename):
+        return util.searchPath(basename,
+                               os.path.join(self.basePath, prefix))
+
+    def getCacheEntry(self, prefix, path):
+        path = self.getCachePath(prefix, path)
+        if os.path.exists(path):
+            return path
+
+    def checkNegativeCache(self, prefix, name):
+        path = self.getCachePath(prefix, name, negative=True)
+        if os.path.exists(path):
+            # Keep negative cache for 1h
+            if time.time() < (60*60 + os.path.getmtime(path)):
+                return path
+            else:
+                os.remove(path)
+        return False
+
+    def _truncateName(self, uri):
+        items = uri.split('://', 1)
+        if len(items) == 1:
+            return uri
+        prefix, path = items
+        if prefix in NETWORK_PREFIXES or prefix == 'lookaside':
+            return path
+        return uri
+
+    def getArchiveCachePath(self, archiveName, path=''):
+        # CNY-2627 introduced a separate lookaside stack for archive contents
+        # this dir tree is parallel to NEGATIVE and trovenames.
+        # the name =X_CONTENTS= was chosen because = is an illegal character
+        # in a trovename and thus will never conflict with real troves.
+        archiveType, trailingPath = archiveName.split('://', 1)
+        contentsPrefix = "=%s_CONTENTS=" % archiveType.upper()
+        return self.getCachePath(contentsPrefix,
+                                 os.path.join(trailingPath, path))
+
+
+    def getArchiveCacheEntry(self, archiveName, path):
+        fullPath = self.getArchiveCachePath(archiveName, path)
+        if os.path.exists(fullPath):
+            return fullPath

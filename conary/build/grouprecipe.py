@@ -15,6 +15,7 @@ import copy
 from itertools import chain, izip
 
 from conary.build import defaultrecipes
+from conary.build import lookaside
 from conary.build import policy
 from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP, loadMacros
 from conary.build.errors import RecipeFileError, CookError, GroupPathConflicts
@@ -144,7 +145,10 @@ class _GroupRecipe(_BaseGroupRecipe):
         klass.__init__(self, laReposCache = laReposCache,
                                   srcdirs = srcdirs,
                                   lightInstance = lightInstance)
-
+        self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
+                                               localDirs=self.srcdirs,
+                                               multiurlMap=self.multiurlMap,
+                                               mirrorDirs=cfg.mirrorDirs)
         self.troveSource = repos
         self.labelPath = [ label ]
         self.cfg = cfg

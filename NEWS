@@ -16,6 +16,11 @@ Changes in @NEW@:
     * Turned off threading in recreatedb, because threading broke
       for some manifests. (CNY-3128)
     * Rewrote SQL query which removes old dependencies for better performance
+    * The cvc file cache now understand file mode changes as well as 
+      content changes (CNY-3082)
+    * Key signatures for archives in source components are no longer checked 
+      when the source is in the repository, but rather checked at commit
+      time.  (CNY-3130)
 
   o New Features:
     * Verify now relies on file size and mtime to determine whether files have

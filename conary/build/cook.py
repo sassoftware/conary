@@ -40,6 +40,7 @@ from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util
 from conary.local import database
 from conary.repository import changeset, errors
+from conary import conaryclient
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
 
@@ -130,7 +131,7 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-class CookCallback(lookaside.ChangesetCallback, callbacks.CookCallback):
+class CookCallback(conaryclient.callbacks.ChangesetCallback, callbacks.CookCallback):
 
     def buildingChangeset(self):
         self._message('Building changeset...')
@@ -660,7 +661,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
     troveCache = grouprecipe.TroveCache(repos, callback)
-    lcache = lookaside.RepositoryCache(repos)
+    lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg)
 
     changeSet = changeset.ChangeSet()
 
@@ -1043,7 +1044,7 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
     recipeClass = loader.getRecipe()
     fullName = recipeClass.name
 
-    lcache = lookaside.RepositoryCache(repos)
+    lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg)
 
     srcdirs = []
     if not requireCleanSources:

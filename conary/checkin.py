@@ -354,7 +354,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     # don't download sources for groups or filesets
     if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
             recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
-        lcache = lookaside.RepositoryCache(repos)
+        lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg)
         srcdirs = [ cwd,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
@@ -2107,7 +2107,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
         raise errors.CvcError('Only package recipes can have files refreshed')
 
-    lcache = lookaside.RepositoryCache(repos, refreshFilter)
+    lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg, refreshFilter)
     srcdirs = [ dirName,
                 cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 

@@ -18,6 +18,7 @@ import itertools
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
 from conary.build import defaultrecipes
+from conary.build import lookaside
 from conary.build.errors import RecipeFileError
 from conary import trove
 
@@ -508,6 +509,10 @@ class AbstractPackageRecipe(Recipe):
                  crossCompile=None, lightInstance=False):
         Recipe.__init__(self, lightInstance = lightInstance,
                         laReposCache = laReposCache, srcdirs = srcdirs)
+        self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
+                                           localDirs=self.srcdirs,
+                                           multiurlMap=self.multiurlMap,
+                                           mirrorDirs=cfg.mirrorDirs)
 	self._build = []
 
         # lightInstance for only instantiating, not running (such as checkin)
