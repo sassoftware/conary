@@ -81,7 +81,6 @@ class DependencySolver(object):
                                        keepRequired = keepRequired,
                                        criticalUpdateInfo = criticalUpdateInfo,
                                        check = check)
-
         if not resolveDeps:
             # we're not supposed to resolve deps here; just skip the
             # rest of this
