@@ -21,6 +21,11 @@ Changes in @NEW@:
     * Key signatures for archives in source components are no longer checked 
       when the source is in the repository, but rather checked at commit
       time.  (CNY-3130)
+    * Fixed bug which caused files to be dropped from builds when two paths
+      shared the same pathId somewhere in the history of that trove (CNY-3133)
+    * Updates and local changeset generation handle troves with renames,
+      though cases w/ multiple versions of such troves being installed
+      simultaneously have known shortcomings (CNY-3134)
 
   o New Features:
     * Verify now relies on file size and mtime to determine whether files have

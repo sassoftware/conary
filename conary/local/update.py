@@ -1200,8 +1200,11 @@ class FilesystemJob:
                 # now assemble what the file is supposed to look like on head
                 headChanges = changeSet.getFileChange(baseFileId, headFileId)
 
-            headFile = self._mergeFile(baseFile, headFileId, headChanges,
-                                       pathId)
+            if headFileId == baseFileId:
+                headFile = baseFile
+            else:
+                headFile = self._mergeFile(baseFile, headFileId, headChanges,
+                                           pathId)
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root

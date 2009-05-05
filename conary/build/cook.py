@@ -70,6 +70,12 @@ def _createComponent(repos, bldPkg, newVersion, ident):
         else:
             flavor = None
         (pathId, fileVersion, oldFileId) = ident(path, newVersion, flavor)
+        if p.hasFile(pathId):
+            # This pathId is already being used. Force a new pathId to be
+            # generated
+            (pathId, fileVersion, oldFileId) = ident(path, newVersion, flavor,
+                                                     forceNew = True)
+
 	f.pathId(pathId)
 
         linkGroupId = linkGroups.get(path, None)
@@ -101,8 +107,8 @@ def _createComponent(repos, bldPkg, newVersion, ident):
     return (p, fileMap)
 
 class _IdGen:
-    def __call__(self, path, version, flavor):
-	if self.map.has_key(path):
+    def __call__(self, path, version, flavor, forceNew = False):
+	if self.map.has_key(path) and not(forceNew):
 	    return self.map[path]
 
 	pathid = sha1helper.md5String("%s %s" % (path, version.asString()))
