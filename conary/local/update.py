@@ -1696,6 +1696,10 @@ class FilesystemJob:
                                     troveCs.getNewFlavor(), troveCs.getChangeLog())
                 baseTrove = None
 
+            # the newFsTrove.troveInfo handling here is harsh, but since
+            # newFsTrove is only used by source code handling it's actually
+            # okay
+            newFsTrove.troveInfo = troveCs.getTroveInfo()
             troveList.append((troveCs, baseTrove, newFsTrove))
 
 	for (troveCs, baseTrove, newFsTrove) in troveList:

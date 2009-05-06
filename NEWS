@@ -26,6 +26,8 @@ Changes in @NEW@:
     * Updates and local changeset generation handle troves with renames,
       though cases w/ multiple versions of such troves being installed
       simultaneously have known shortcomings (CNY-3134)
+    * Updating source directories to versions which added or removed a
+      factory now updates the CONARY file properly (CNY-3073)
 
   o New Features:
     * Verify now relies on file size and mtime to determine whether files have
