@@ -1200,7 +1200,8 @@ class FilesystemJob:
                 # now assemble what the file is supposed to look like on head
                 headChanges = changeSet.getFileChange(baseFileId, headFileId)
 
-            if headFileId == baseFileId:
+            if (not headChanges) and (headFileId == baseFileId):
+                # this was a rename; the file itself didn't change
                 headFile = baseFile
             else:
                 headFile = self._mergeFile(baseFile, headFileId, headChanges,
