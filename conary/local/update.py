@@ -1358,8 +1358,10 @@ class FilesystemJob:
                                                 util.normpath(realPath)))
 		else:
 		    # this forces the change to apply
-		    fsFile.twm(headChanges, fsFile, 
-                               skip = { "contents" : True })
+                    if headChanges is not None:
+                        fsFile.twm(headChanges, fsFile, 
+                                   skip = { "contents" : True })
+
 		    attributesChanged = True
 
 	    beenRestored = False
