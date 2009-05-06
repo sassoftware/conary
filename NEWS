@@ -1,3 +1,44 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * When a derived packages was created incorrectly, Conary could
+      sometimes trace back; in these cases, Conary will now print a
+      more useful error message. (CNY-3125)
+    * Displaying the output from verify spent a significant amount of time
+      querying repositories for information which was available in the local
+      database. All data accesses for verify are now satisfied locally
+      for a significant (10x) speedup in performance).
+    * The output for conary verify is more succinct; instead of two
+      summary lines per component validated, it now prints one line
+      per component that has differences to display. (CNY-2419)
+    * Using --verbose on verify now gives some progress indication.
+    * Removed improper options for localcs from the man page.
+    * Verify significantly sped up.
+    * Turned off threading in recreatedb, because threading broke
+      for some manifests. (CNY-3128)
+    * Rewrote SQL query which removes old dependencies for better performance
+    * The cvc file cache now understand file mode changes as well as 
+      content changes (CNY-3082)
+    * Key signatures for archives in source components are no longer checked 
+      when the source is in the repository, but rather checked at commit
+      time.  (CNY-3130)
+    * Fixed bug which caused files to be dropped from builds when two paths
+      shared the same pathId somewhere in the history of that trove (CNY-3133)
+    * Updates and local changeset generation handle troves with renames,
+      though cases w/ multiple versions of such troves being installed
+      simultaneously have known shortcomings (CNY-3134)
+    * Updating source directories to versions which added or removed a
+      factory now updates the CONARY file properly (CNY-3073)
+
+  o New Features:
+    * Verify now relies on file size and mtime to determine whether files have
+      been modified. The --hash option has been added to verify to force
+      sha1s to be used instead.
+    * System database can now return file objects along with troves to avoid
+      double walking of the file tables.
+
+  o Internal Changes:
+    * TroveSource.walkTroveSet now walks troves in a sorted, depth first order.
+
 Changes in 2.0.40:
   o Bug Fixes:
     * keepRequired now recognizes that local troves may have had files
@@ -49,6 +90,7 @@ Changes in 2.0.39:
       with a source even if the source is not accessible. (CNY-3099)
     * Changeset-based migrations no longer fail when a flavor is dropped
       from the group that is being migrated. (CNY-3101)
+
   o New Features:
     * Attempting to promote a binary will no longer reclone the binary 
       if a binary is already the latest at the target branch, even if

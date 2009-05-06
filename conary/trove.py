@@ -2898,6 +2898,19 @@ class Trove(streams.StreamSet):
 
             self.type.set(type)
 
+class TroveWithFileObjects(Trove):
+
+    def addFileObject(self, fileId, obj):
+        self.fileObjs[fileId] = obj
+
+    def getFileObject(self, fileId):
+        return self.fileObjs[fileId]
+
+    def __init__(self, *args, **kwargs):
+        # indexed by fileId
+        self.fileObjs = {}
+        Trove.__init__(self, *args, **kwargs)
+
 class ReferencedTroveSet(dict, streams.InfoStream):
 
     def freeze(self, skipSet = {}):

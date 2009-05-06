@@ -806,7 +806,9 @@ def createFlavor(recipeName, *flagIterables, **kw):
             set.union(flag._toDependency(flag._parent._name))
     return set
 
-def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
+crossFlavor = deps.parseFlavor('cross')
+def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False,
+                            useCross=True):
     """ Sets the truth of the build Flags based on the build flavor.
         All the set build flags must already exist.  Flags not mentioned
         in this flavor will be untouched.
@@ -814,6 +816,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
         is that we don't know whether the flag is required or not based
         on the flavor; we would only be able to do as half-baked job
     """
+    crossCompiling = False
     for depGroup in flavor.getDepClasses().values():
         if isinstance(depGroup, deps.UseDependency):
             for dep in depGroup.getDeps():
@@ -825,6 +828,8 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                         value = False
                     # see if there is a . -- indicating this is a 
                     # local flag
+                    if flag == 'cross':
+                        crossCompiling = True
                     parts = flag.split('.',1)
                     if len(parts) == 1:
                         try:
@@ -850,7 +855,17 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                             raise RuntimeError('Trying to set a flavor with '
                                                'localflag %s when no trove '
                                                'name was given' % flag)
-        elif isinstance(depGroup, deps.InstructionSetDependency):
+        elif isinstance(depGroup, (deps.InstructionSetDependency,
+                                   deps.TargetInstructionSetDependency)):
+            if isinstance(depGroup, deps.InstructionSetDependency):
+                hasTargetISDep = flavor.getDepClasses().get(
+                                              deps.DEP_CLASS_TARGET_IS, None)
+                if hasTargetISDep and useCross:
+                    # use target instruction set dependency instead
+                    continue
+            elif not useCross:
+                continue
+
             found = False
             try:
                 majorArch = arch.getMajorArch(depGroup.getDeps())
@@ -867,6 +882,13 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False):
                              deps.FLAG_SENSE_PREFERRED):
                     subarches.append(flag)
             Arch._setArch(majorArch.name, subarches)
+    Arch._setAttr('crossCompiling', crossCompiling)
+
+def setArchFlags(name, flavor):
+    # given an flavor, make use.Arch match that flavor.
+    for flag in Arch._iterAll():
+        flag._set(False)
+    setBuildFlagsFromFlavor(name, flavor, error=False)
 
 Arch = ArchCollection()
 Use = UseCollection()

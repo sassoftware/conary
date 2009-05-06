@@ -1200,8 +1200,12 @@ class FilesystemJob:
                 # now assemble what the file is supposed to look like on head
                 headChanges = changeSet.getFileChange(baseFileId, headFileId)
 
-            headFile = self._mergeFile(baseFile, headFileId, headChanges,
-                                       pathId)
+            if (not headChanges) and (headFileId == baseFileId):
+                # this was a rename; the file itself didn't change
+                headFile = baseFile
+            else:
+                headFile = self._mergeFile(baseFile, headFileId, headChanges,
+                                           pathId)
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
@@ -1355,8 +1359,10 @@ class FilesystemJob:
                                                 util.normpath(realPath)))
 		else:
 		    # this forces the change to apply
-		    fsFile.twm(headChanges, fsFile, 
-                               skip = { "contents" : True })
+                    if headChanges is not None:
+                        fsFile.twm(headChanges, fsFile, 
+                                   skip = { "contents" : True })
+
 		    attributesChanged = True
 
 	    beenRestored = False
@@ -1690,6 +1696,10 @@ class FilesystemJob:
                                     troveCs.getNewFlavor(), troveCs.getChangeLog())
                 baseTrove = None
 
+            # the newFsTrove.troveInfo handling here is harsh, but since
+            # newFsTrove is only used by source code handling it's actually
+            # okay
+            newFsTrove.troveInfo = troveCs.getTroveInfo()
             troveList.append((troveCs, baseTrove, newFsTrove))
 
 	for (troveCs, baseTrove, newFsTrove) in troveList:
@@ -1779,9 +1789,12 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     isSrcTrove = curTrove.getName().endswith(':source')
 
-    srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in 
-                                                    fileList ],
-                                        allowMissingFiles=allowMissingFiles)
+    if isinstance(srcTrove, trove.TroveWithFileObjects):
+        srcFileObjs = [ srcTrove.getFileObject(x[2]) for x in fileList ]
+    else:
+        srcFileObjs = repos.getFileVersions( [ (x[0], x[2], x[3]) for x in
+                                                        fileList ],
+                                            allowMissingFiles=allowMissingFiles)
     for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
                     itertools.izip(fileList, srcFileObjs):
 	# files which disappear don't need to make it into newTrove

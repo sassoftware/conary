@@ -180,15 +180,15 @@ class AbstractTroveSource:
 
     def walkTroveSet(self, trove, ignoreMissing = True,
                      withFiles=True):
-	"""
-	Generator returns all of the troves included by trove, including
-	trove itself.
-	"""
+        """
+        Generator returns all of the troves included by trove, including
+        trove itself. It is a depth first search of strong refs.
+        """
 	yield trove
 	seen = { trove.getName() : [ (trove.getVersion(),
 				      trove.getFlavor()) ] }
 
-	troveList = [x for x in trove.iterTroveList(strongRefs=True)]
+	troveList = [x for x in sorted(trove.iterTroveList(strongRefs=True))]
 
 	while troveList:
 	    (name, version, flavor) = troveList[0]
@@ -211,7 +211,9 @@ class AbstractTroveSource:
 
                 yield trv
 
-                troveList += [ x for x in trv.iterTroveList(strongRefs=True) ]
+                troveList = ([ x for x in
+                                sorted(trv.iterTroveList(strongRefs=True)) ]
+                              + troveList)
 	    except errors.TroveMissing:
 		if not ignoreMissing:
 		    raise
@@ -1455,7 +1457,8 @@ class SourceStack(object):
         for source in self.sources:
             newTroveList = []
             try:
-                hasTroves = source.hasTroves([x[1] for x in troveList])
+                hasTroves = source.hasTroves(
+                    [ info for (i, info) in troveList if not(results[i]) ] )
             except errors.OpenError:
                 hasTroves = [ False] * len(troveList)
             if isinstance(hasTroves, list):
@@ -1463,7 +1466,7 @@ class SourceStack(object):
                                                 hasTroves))
 
             for (index, troveTup) in troveList:
-                if not hasTroves[troveTup]:
+                if not hasTroves.get(troveTup, False):
                     newTroveList.append((index, troveTup))
                 else:
                     results[index] = True
@@ -1974,7 +1977,8 @@ class ChangeSetJobSource(JobSource):
             oldTrove = None
         else:
             oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
-                                                    withFiles=True)
+                                                    withFiles=True,
+                                                    pristine=True)
             trvCs = None
 
         if not withFiles:
@@ -1985,8 +1989,6 @@ class ChangeSetJobSource(JobSource):
                 yield fileInfo
             return
         else:
-            
-
             cs = self.getChangeSet(job)
 
             if isDel:
@@ -2008,7 +2010,12 @@ class ChangeSetJobSource(JobSource):
                                                             withFiles=True)
 
                 if newFiles or modFiles:
-                    newTrove = self.newTroveSource.getTrove(n, newVer, newFla,
+                    if trvCs:
+                        newTrove = oldTrove.copy()
+                        newTrove.applyChangeSet(trvCs)
+                    else:
+                        newTrove = self.newTroveSource.getTrove(n, newVer,
+                                                                newFla,
                                                                 withFiles=True)
 
             # sort files by pathId

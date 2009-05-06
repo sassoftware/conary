@@ -14,87 +14,160 @@
 """
 Provides the output for the "conary verify" command
 """
-from conary import showchangeset
+from conary import showchangeset, trove
 from conary import versions
+from conary import conaryclient
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
-from conary.local import update
+from conary.local import defaultmap, update
+from conary.repository import changeset
 from conary import errors
 
 def usage():
     print "conary verify [--all] [trove[=version]]*"
     print ""
 
-def verify(troveNameList, db, cfg, all=False):
+def verify(troveNameList, db, cfg, all=False, changesetPath = None,
+           forceHashCheck = False):
+    if changesetPath:
+        cs = changeset.ReadOnlyChangeSet()
+    else:
+        cs = None
+
     troveNames = [ cmdline.parseTroveSpec(x) for x in troveNameList ]
     if not troveNames and not all:
         usage()
         log.error("must specify either a trove or --all")
         return 1
     elif not troveNames:
-	troveNames = [ (x, None, None) for x in db.iterAllTroveNames() \
-                                                  if x.find(':') == -1 ]
-	troveNames.sort()
-    for (troveName, versionStr, flavor) in troveNames:
-        try:
-            troves = db.findTrove(None, (troveName, versionStr, flavor))
-            troves = db.getTroves(troves)
-            for trove in troves:
-                verifyTrove(trove, db, cfg)
-        except errors.TroveNotFound:
-            if versionStr:
-                if flavor is not None and not flavor.isEmpty():
-                    flavorStr = deps.formatFlavor(flavor)
-                    log.error("version %s with flavor '%s' of trove %s is not"
-                              " installed", versionStr, flavorStr, troveName)
-                else:
-                    log.error("version %s of trove %s is not installed", 
-                                                      versionStr, troveName)
-            elif flavor is not None and not flavor.isEmpty():
-                flavorStr = deps.formatFlavor(flavor)
-                log.error("flavor '%s' of trove %s is not installed", 
-                                                          flavorStr, troveName)
-            else:
-                log.error("trove %s is not installed", troveName)
+        client = conaryclient.ConaryClient(cfg)
+        troveInfo = client.getUpdateItemList()
+        troveInfo.sort()
+    else:
+        troveInfo = []
 
-def verifyTrove(trove, db, cfg):
-    l = []
-    for trove in db.walkTroveSet(trove):
-        ver = trove.getVersion()
-        origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
-                                pristine = False)
-        ver = ver.createShadow(versions.LocalLabel())
-        l.append((trove, origTrove, ver, update.UpdateFlags()))
+        for (troveName, versionStr, flavor) in troveNames:
+            try:
+                troveInfo += db.findTrove(None, (troveName, versionStr, flavor))
+            except errors.TroveNotFound:
+                if versionStr:
+                    if flavor is not None and not flavor.isEmpty():
+                        flavorStr = deps.formatFlavor(flavor)
+                        log.error("version %s with flavor '%s' of trove %s is "
+                                  "not installed", versionStr, flavorStr,
+                                  troveName)
+                    else:
+                        log.error("version %s of trove %s is not installed",
+                                                      versionStr, troveName)
+                elif flavor is not None and not flavor.isEmpty():
+                    flavorStr = deps.formatFlavor(flavor)
+                    log.error("flavor '%s' of trove %s is not installed",
+                                                          flavorStr, troveName)
+                else:
+                    log.error("trove %s is not installed", troveName)
+
+    defaultMap = defaultmap.DefaultMap(db, troveInfo)
+    troves = db.getTroves(troveInfo, withDeps = False, withFileObjects = True,
+                          pristine = False)
+
+    seen = set()
+    for trove in troves:
+        newCs = verifyTrove(trove, db, cfg, defaultMap, display = (cs == None),
+                            forceHashCheck = forceHashCheck,
+                            duplicateFilterSet = seen)
+        if cs and newCs:
+            cs.merge(newCs)
+
+    if changesetPath:
+        cs.writeToFile(changesetPath)
+
+def _verifyTroveList(db, troveList, cfg, display = True,
+                     forceHashCheck = False):
+    log.info('Verifying %s' % " ".join(x[1].getName() for x in troveList))
+    changedTroves = set()
 
     try:
-        result = update.buildLocalChanges(db, l, root = cfg.root, 
+        result = update.buildLocalChanges(db, troveList, root = cfg.root,
                                           withFileContents=False,
-                                          forceSha1=True,
+                                          forceSha1=forceHashCheck,
                                           ignoreTransient=True)
         if not result: return
         cs = result[0]
-
-        troveSpecs = []
-	for item in l:
-            trove = item[0]
-            ver = trove.getVersion().createShadow(versions.LocalLabel())
-
-            trvCs = cs.getNewTroveVersion(trove.getName(), 
-                                          ver, trove.getFlavor())
-            if trvCs.hasChangedFiles():
-                troveSpecs.append('%s=%s[%s]' % (trove.getName(), ver, 
-                                                 trove.getFlavor()))
-
-        for (changed, fsTrove) in result[1]:
+        changed = False
+        for (changed, trv) in result[1]:
             if changed:
-                break
-        if not changed:
-            return
-        showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True, 
-                                       showChanges=True, asJob=True)
-                                       
+                changedTroves.add(trv.getNameVersionFlavor())
     except OSError, err:
         if err.errno == 13:
             log.warning("Permission denied creating local changeset for"
-                        " %s " % trove.getName())
+                        " %s " % str([ x[0].getName() for x in l ]))
+        return
+
+    troveSpecs = []
+    for item in troveList:
+        trv = item[0]
+        ver = trv.getVersion().createShadow(versions.LocalLabel())
+        nvf = (trv.getName(), ver, trv.getFlavor())
+        trvCs = cs.getNewTroveVersion(*nvf)
+        if trvCs.hasChangedFiles():
+            troveSpecs.append('%s=%s[%s]' % nvf)
+
+    for (changed, fsTrove) in result[1]:
+        if changed:
+            break
+
+    if not changed:
+        return None
+
+    if display:
+        showchangeset.displayChangeSet(db, cs, troveSpecs, cfg, ls=True,
+                                       showChanges=True, asJob=True)
+
+    return cs
+
+def verifyTrove(trv, db, cfg, defaultMap, display = True,
+                forceHashCheck = False, duplicateFilterSet = None):
+    collections = []
+    if trove.troveIsCollection(trv.getName()):
+        collections.append(trv)
+
+    cs = changeset.ReadOnlyChangeSet()
+    verifyList = []
+
+    queue = [ trv ]
+    duplicateFilterSet.add(trv.getNameVersionFlavor())
+    while queue:
+        thisTrv = queue.pop(0)
+        if trove.troveIsCollection(thisTrv.getName()):
+            collections.append(thisTrv)
+
+            subTrvInfo = set(thisTrv.iterTroveList(strongRefs=True))
+            subTrvInfo = subTrvInfo - duplicateFilterSet
+            duplicateFilterSet.update(subTrvInfo)
+            subTrvInfo = sorted(list(subTrvInfo))
+
+            subTrvs = db.getTroves(subTrvInfo, pristine = False,
+                                   withDeps = False, withFileObjects = True)
+            # depth first
+            queue = [ x for x in subTrvs if x is not None ] + queue
+        else:
+            if verifyList and (verifyList[-1][0].getName().split(':')[0] !=
+                               thisTrv.getName().split(':')[0]):
+                subCs = _verifyTroveList(db, verifyList, cfg, display = display)
+                if subCs:
+                    cs.merge(subCs)
+
+                verifyList = []
+
+            #origTrv = db.getTrove(pristine = False,
+                                  #*origTrv.getNameVersionFlavor())
+            ver = thisTrv.getVersion().createShadow(versions.LocalLabel())
+            verifyList.append((thisTrv, thisTrv, ver, update.UpdateFlags()))
+
+    subCs = _verifyTroveList(db, verifyList, cfg, display = display,
+                             forceHashCheck = forceHashCheck)
+    if subCs:
+        cs.merge(subCs)
+
+    return cs

@@ -36,10 +36,11 @@ from conary.build.manifest import Manifest
 from conary.repository import transport
 
 class _AnySource(action.RecipeAction):
-
+    def checkSignature(self, f):
+        pass
     # marks classes which have source files which need committing
 
-    pass
+DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip')
 
 class _Source(_AnySource):
     keywords = {'rpm': '',
@@ -50,7 +51,7 @@ class _Source(_AnySource):
                 'sourceDir': None}
 
     def __init__(self, recipe, *args, **keywords):
-        self.unifiedSourcePath = None
+        self.archivePath = None
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
         if isinstance(sourcename, (list, tuple)):
@@ -126,21 +127,19 @@ class _Source(_AnySource):
             self.manifest.create()
 
     def _addSignature(self, filename):
-
         sourcename=self.sourcename
         if not self.guessname:
             sourcename=sourcename[:-len(filename)]
 
         suffixes = ( 'sig', 'sign', 'asc' )
-        self.localgpgfile = lookaside.findAll(self.recipe.cfg,
-                                self.recipe.laReposCache, sourcename,
-                                self.recipe.name, self.recipe.srcdirs,
-                                guessName=filename, suffixes=suffixes,
-                                allowNone=True)
 
-	if not self.localgpgfile:
+        inRepos, f = self.recipe.fileFinder.fetch(sourcename + filename,
+                                                   suffixes=suffixes,
+                                                   allowNone=True)
+        if f:
+            self.localgpgfile = f
+        else:
 	    log.warning('No GPG signature file found for %s', self.sourcename)
-	    del self.localgpgfile
 
     def _getPublicKey(self):
         keyringPath = os.path.join(self.recipe.cfg.buildPath, 'pubring.pgp')
@@ -192,7 +191,7 @@ class _Source(_AnySource):
 
         return keyData
 
-    def _checkSignature(self, filepath):
+    def checkSignature(self, filepath):
         if self.keyid:
             filename = os.path.basename(filepath)
             self._addSignature(filename)
@@ -226,9 +225,8 @@ class _Source(_AnySource):
         source lookaside cache for the extracted file.
         """
         # Always pull from RPM
-	r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-			      self.rpm, self.recipe.name,
-			      self.recipe.srcdirs)
+        inRepos, r = self.recipe.fileFinder.fetch(self.rpm)
+        self.archiveInRepos = inRepos
 
         # by using the rpm's name in the full path, we ensure that different
         # rpms can contain files of the same name.
@@ -240,17 +238,19 @@ class _Source(_AnySource):
         # in a trovename and thus will never conflict with real troves.
         loc = os.path.sep.join(('=RPM_CONTENTS=', prefix))
         loc = os.path.normpath(loc)
-        c = lookaside.createCacheName(self.recipe.cfg, self.sourcename, loc)
+        c = self.recipe.laReposCache.getCachePath(loc, self.sourcename)
         util.mkdirChain(os.path.dirname(c))
         _extractFilesFromRPM(r, targetfile=c, action=self)
-        sourcename = os.path.sep.join((prefix, '', self.sourcename))
-        self.unifiedSourcePath = 'rpm://%s' % sourcename
+        sourcename = os.path.sep.join((prefix, self.sourcename))
+        self.archivePath = 'rpm://%s' % os.path.dirname(sourcename)
 
     def _guessName(self):
 
         self.guessname = None
+        self.suffixes = None
         if self.sourcename.endswith('/'):
             self.guessname = "%(archive_name)s-%(archive_version)s" % self.recipe.macros
+            self.suffixes = DEFAULT_SUFFIXES
 
     def _findSource(self, httpHeaders={}, braceGlob = False):
         if self.sourceDir is not None:
@@ -259,26 +259,37 @@ class _Source(_AnySource):
             sourceDir = self.sourceDir or '.'
             return action._expandOnePath(util.joinPaths(sourceDir, self.sourcename), self.recipe.macros, defaultDir = defaultDir, braceGlob = braceGlob)
 
-        multiurlMap = self.recipe.multiurlMap
-        source = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-            self.sourcename, self.recipe.name, self.recipe.srcdirs,
-            httpHeaders=httpHeaders, guessName=self.guessname,
-            multiurlMap=multiurlMap, unifiedSourcePath = self.unifiedSourcePath)
+        sourcename = self.sourcename
+        if self.guessname:
+            sourcename += self.guessname
 
+        inRepos, source = self.recipe.fileFinder.fetch(sourcename,
+                                            headers=httpHeaders,
+                                           suffixes=self.suffixes,
+                                           archivePath=self.archivePath)
+        if self.archivePath:
+            inRepos = self.archiveInRepos
+        if source and not inRepos:
+            self.checkSignature(source)
         return source
 
     def fetch(self, refreshFilter=None):
 	if 'sourcename' not in self.__dict__:
 	    return None
 
-        toFetch = self.getPath()
+        toFetch, guessname, suffixes = self.getPathAndSuffix()
 
-        multiurlMap = self.recipe.multiurlMap
-        f = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-            toFetch, self.recipe.name, self.recipe.srcdirs,
-            guessName=self.guessname, refreshFilter=refreshFilter,
-            multiurlMap=multiurlMap, unifiedSourcePath = self.unifiedSourcePath)
-	self._checkSignature(f)
+        if guessname:
+            toFetch += guessname
+        inRepos, f = self.recipe.fileFinder.fetch(toFetch,
+                                          suffixes=suffixes,
+                                          refreshFilter=refreshFilter,
+                                          archivePath = self.archivePath)
+
+        if self.archivePath:
+            inRepos = self.archiveInRepos
+        if f and not inRepos:
+            self.checkSignature(f)
 	return f
 
     def fetchLocal(self):
@@ -290,10 +301,13 @@ class _Source(_AnySource):
         return self.recipe._fetchFile(toFetch, localOnly = True)
 
     def getPath(self):
+        return self.getPathAndSuffix()[0]
+
+    def getPathAndSuffix(self):
         if self.rpm:
-            return self.rpm
+            return self.rpm, None, None
         else:
-            return self.sourcename
+            return self.sourcename, self.guessname, self.suffixes
 
     def do(self):
 	raise NotImplementedError
@@ -470,9 +484,7 @@ class addArchive(_Source):
 	_Source.__init__(self, recipe, *args, **keywords)
 
     def doDownload(self):
-	f = self._findSource(self.httpHeaders)
-	self._checkSignature(f)
-        return f
+	return self._findSource(self.httpHeaders)
 
     @staticmethod
     def _cpioOwners(fullOutput):
@@ -987,10 +999,6 @@ class addPatch(_Source):
 
     def doDownload(self):
         f = self._findSource(braceGlob = self.sourceDir is not None)
-        if isinstance(f, (list, tuple)):
-            [self._checkSignature(x) for x in f]
-        else:
-            self._checkSignature(f)
         return f
 
     def do(self):
@@ -1224,7 +1232,6 @@ class addSource(_Source):
         if self.contents is not None:
             return
         f = self._findSource()
-        self._checkSignature(f)
         return f
 
     def do(self):
@@ -1380,17 +1387,17 @@ class _RevisionControl(addArchive):
         # don't look in the lookaside for a snapshot if we need to refresh
         # the lookaside
         if not refreshFilter or not refreshFilter(os.path.basename(fullPath)):
-            path = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-                url, self.recipe.name, self.recipe.srcdirs, allowNone = True,
-                autoSource = True, refreshFilter = refreshFilter)
-
+            inRepos, path = self.recipe.fileFinder.fetch(url, allowNone=True,
+                                                searchLocal=False,
+                                                refreshFilter=refreshFilter)
+            if not inRepos:
+                self.checkSignature(path)
             if path:
                 return path
 
         # the source doesn't exist; we need to create the snapshot
-        repositoryDir = lookaside.createCacheName(self.recipe.cfg,
-                                                  reposPath,
-                                                  self.recipe.name)
+        repositoryDir = self.recipe.laReposCache.getCachePath(self.recipe.name,
+                                                  reposPath)
         del reposPath
 
         if not os.path.exists(repositoryDir):
@@ -1402,9 +1409,7 @@ class _RevisionControl(addArchive):
 
         self.showInfo(repositoryDir)
 
-        path = lookaside.createCacheName(self.recipe.cfg, fullPath,
-                                         self.recipe.name)
-
+        path = self.recipe.laReposCache.getCachePath(self.recipe.name, fullPath)
         self.createSnapshot(repositoryDir, path)
 
         return path
@@ -1858,6 +1863,7 @@ class TroveScript(_AnySource):
                 raise RecipeFileError('file "%s" not found for group script' %
                                       self.sourcename)
             self.contents = open(f).read()
+            return f
 
     def fetchLocal(self):
         # Used by rMake to find files that are not autosourced.
@@ -1867,8 +1873,11 @@ class TroveScript(_AnySource):
     def getPath(self):
         return self.sourcename
 
+    def getPathAndSuffix(self):
+        return self.sourcename, None, None
+
     def doDownload(self):
-        self.fetch()
+        return self.fetch()
 
     def do(self):
         self.doDownload()

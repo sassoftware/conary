@@ -1124,22 +1124,36 @@ class VerifyCommand(ConaryCommand):
     commands = ['verify']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
     help = 'Verify software integrity on the system'
-    docs = {'all' : 'verify all troves on system'}
+    docs = {'all' : 'verify all troves on system',
+            'changeset' : (VERBOSE_HELP,
+                           'store the verify output in the named file' ),
+            'hash' : "verify file contents even if the file's inode has "
+                     "not changed" }
     commandGroup = 'Information Display'
     ignoreConfigErrors = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["all"] = NO_PARAM
+        argDef["changeset"] = ONE_PARAM
+        argDef["hash"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         db = openDatabase(cfg.root, cfg.dbPath)
         all = argSet.has_key('all')
         if all: del argSet['all']
+        csPath = argSet.pop('changeset', None)
+        if 'hash' in argSet:
+            hash = True
+            argSet.pop('hash')
+        else:
+            hash = False
+
         if len(otherArgs) < 2 or argSet:
             return self.usage()
         troves = otherArgs[2:]
-        verify.verify(troves, db, cfg, all=all)
+        verify.verify(troves, db, cfg, all=all, changesetPath = csPath,
+                      forceHashCheck = hash)
 _register(VerifyCommand)
 
 

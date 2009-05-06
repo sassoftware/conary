@@ -1111,7 +1111,7 @@ order by
         return result
 
     def getTroves(self, troveList, pristine = True, withFiles = True,
-                  withDeps = True):
+                  withDeps = True, withFileObjects = False):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         instances = self._lookupTroves(troveList)
@@ -1128,7 +1128,8 @@ order by
         instances = list(self._iterTroves(pristine,
                                           instanceIds = toFind,
                                           withFiles = withFiles,
-                                          withDeps = withDeps))
+                                          withDeps = withDeps,
+                                          withFileObjects = withFileObjects))
         for instanceId, instance in itertools.izip(toFind, instances):
             for slot in toFind[instanceId]:
                 results[slot] = instance
@@ -1173,11 +1174,31 @@ order by
 
         return r
 
-    def _iterTroves(self, pristine, instanceIds,
-		    withFiles = True, withDeps = True, errorOnMissing=True):
+    def _iterTroves(self, pristine, instanceIds, withFiles = True,
+                    withDeps = True, errorOnMissing=True,
+                    withFileObjects = False):
         """
+        Iterates over the troves associated with a list of instanceIds.
+
+        @param pristine: Return the trove unmodified based on the local system.
+        @type pristine: boolean
+        @param instanceId: Instance ids to iterate over.
+        @type instanceId: list of int
+        @param withFiles: Include (pathId, path, fileId, version) information
+        for the files referenced by troves.
+        @type withFiles: boolean
+        @param errorOnMissing: Raise an error on a missing instanceId,
+        otherwise return None
+        @type errorOnMissing: boolean
+        @param withFileObjects: Return Trove objects w/ file objects included.
+        @type withFileObjects: boolean
         """
         instanceIds = list(instanceIds)
+
+        if withFileObjects:
+            troveClass = trove.TroveWithFileObjects
+        else:
+            troveClass = trove.Trove
 
         cu = self.db.cursor()
         cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
@@ -1203,8 +1224,8 @@ order by
             troveFlavor = flavorCache.get(flavorStr)
             troveVersion = versionCache.get(versionStr, timeStamps)
 
-            trv = trove.Trove(troveName, troveVersion, troveFlavor, None,
-                              setVersion = False)
+            trv = troveClass(troveName, troveVersion, troveFlavor, None,
+                             setVersion = False)
             results[idx] = trv
 
         # add all of the troves which are references from this trove; the
@@ -1249,18 +1270,27 @@ order by
                 yield trv
 
         if not pristine or withFiles:
-            cu.execute("""SELECT idx, pathId, path, version, fileId, isPresent
+            if withFileObjects:
+                streamStr = "stream"
+            else:
+                streamStr = "NULL"
+
+            cu.execute("""SELECT idx, pathId, path, version, fileId, isPresent,
+                          %s
                           FROM getTrovesTbl
                           JOIN DBTroveFiles USING(instanceId)
                           JOIN Versions ON
                               Versions.versionId = DBTroveFiles.versionId
-                          """)
+                          """ % streamStr)
             curIdx = 0
-            for (idx, pathId, path, version, fileId, isPresent) in cu:
+            for (idx, pathId, path, version, fileId, isPresent, stream) in cu:
                 if not pristine and not isPresent:
                     continue
                 version = versions.VersionFromString(version)
                 results[idx].addFile(pathId, path, version, fileId)
+                if stream:
+                    results[idx].addFileObject(fileId,
+                                               files.ThawFile(stream, pathId))
                 while idx != curIdx:
                     yield results[curIdx]
                     curIdx += 1

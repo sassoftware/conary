@@ -181,6 +181,7 @@ def main(argv):
 
     cfg = conarycfg.ConaryConfiguration(True)
     cfg.root = sys.argv[2]
+    cfg.threaded = False
     client = conaryclient.ConaryClient(cfg)
     callback = updatecmd.UpdateCallback()
 

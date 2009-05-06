@@ -114,6 +114,8 @@ class Recipe(object):
 
     def __init__(self, lightInstance = False, laReposCache = None,
                  srcdirs = None):
+        if laReposCache is None:
+            laReposCache = lookaside.RepositoryCache(None)
         assert(self.__class__ is not Recipe)
         self.validate()
         self.externalMethods = {}
@@ -411,7 +413,8 @@ class Recipe(object):
                     # it only makes sense to fetch regular files, skip
                     # anything that isn't
                     self.laReposCache.addFileHash(srcName, srcVersion, pathId,
-                        path, fileId, version, fileObj.contents.sha1())
+                        path, fileId, version, fileObj.contents.sha1(),
+                        fileObj.inode.perms())
 
     def sourceMap(self, path):
         if os.path.exists(path):
@@ -527,10 +530,14 @@ class Recipe(object):
                 logFile.popDescriptor(bucketName)
 
     def _fetchFile(self, sourceName, refreshFilter = None, localOnly = False):
-        f = lookaside.findAll(self.cfg, self.laReposCache,
-            sourceName, self.name, self.srcdirs,
-            refreshFilter = refreshFilter, localOnly = localOnly,
-            allowNone = True)
+        if localOnly:
+            kw = dict(searchRepository=not self.srcdirs,
+                      searchExternal=False)
+        else:
+            kw = {}
+
+        inRepos, f = self.fileFinder.fetch(sourceName, refreshFilter=refreshFilter,
+                                          allowNone=True, **kw)
         return f
 
     def _addMetadataItem(self, troveNames, metadataItemDict):
