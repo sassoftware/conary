@@ -50,7 +50,8 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         name = name + guessName
     ff = FileFinder(recipeName=location, repositoryCache=repCache,
                           localDirs=srcdirs, multiurlMap=multiurlMap,
-                          mirrorDirs=cfg.mirrorDirs)
+                          mirrorDirs=cfg.mirrorDirs,
+                          cfg=cfg)
 
     searchExternal = not localOnly
     searchRepository = not localOnly or not srcdirs
@@ -64,16 +65,19 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 
 # backwards compatible fetchURL method
 def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
-    repCache = RepositoryCache(cfg.lookaside, None, cfg)
+    repCache = RepositoryCache(None, cfg=cfg)
     ff = FileFinder(recipeName=location, repositoryCache=repCache,
-                          )
+                    cfg=cfg)
     return ff.searchNetworkSources(name, name, headers=httpHeaders)
 
 class FileFinder(object):
     def __init__(self, recipeName, repositoryCache, localDirs=None,
-                 multiurlMap=None, refreshFilter=None, mirrorDirs = None):
+                 multiurlMap=None, refreshFilter=None, mirrorDirs = None,
+                 cfg=None):
         self.recipeName = recipeName
         self.repCache = repositoryCache
+        if self.repCache:
+            self.repCache.setConfig(cfg)
         if localDirs is None:
             localDirs = []
         self.localDirs = localDirs
@@ -308,14 +312,28 @@ class PasswordManager:
 
 class RepositoryCache(object):
 
-    def __init__(self, basePath, repos, cfg, refreshFilter=None):
-        self.basePath = basePath
+    def __init__(self, repos, refreshFilter=None, cfg=None):
 	self.repos = repos
         self.refreshFilter = refreshFilter
 	self.nameMap = {}
         self.cacheMap = {}
-        self.quiet = cfg.quiet
-        self.downloadRateLimit = cfg.downloadRateLimit
+        self.quiet = False
+        self._basePath = self.downloadRatedLimit = None
+        self.setConfig(cfg)
+
+    def setConfig(self, cfg):
+        if cfg:
+            self.quiet = cfg.quiet
+            self._basePath = cfg.lookaside
+            self.downloadRateLimit = cfg.downloadRateLimit
+
+    def _getBasePath(self):
+        if self._basePath is None:
+            raise RuntimeError('Tried to use repository cache with unset'
+                               ' basePath')
+        return self._basePath
+
+    basePath = property(_getBasePath)
 
     def addFileHash(self, troveName, troveVersion, pathId, path, fileId,
                     fileVersion, sha1, mode):

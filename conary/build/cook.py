@@ -661,7 +661,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
     troveCache = grouprecipe.TroveCache(repos, callback)
-    lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg)
+    lcache = lookaside.RepositoryCache(repos, cfg=cfg)
 
     changeSet = changeset.ChangeSet()
 
@@ -1044,7 +1044,7 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
     recipeClass = loader.getRecipe()
     fullName = recipeClass.name
 
-    lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg)
+    lcache = lookaside.RepositoryCache(repos, cfg=cfg)
 
     srcdirs = []
     if not requireCleanSources:

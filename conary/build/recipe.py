@@ -114,6 +114,8 @@ class Recipe(object):
 
     def __init__(self, lightInstance = False, laReposCache = None,
                  srcdirs = None):
+        if laReposCache is None:
+            laReposCache = lookaside.RepositoryCache(None)
         assert(self.__class__ is not Recipe)
         self.validate()
         self.externalMethods = {}

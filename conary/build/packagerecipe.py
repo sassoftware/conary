@@ -512,7 +512,8 @@ class AbstractPackageRecipe(Recipe):
         self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
                                            localDirs=self.srcdirs,
                                            multiurlMap=self.multiurlMap,
-                                           mirrorDirs=cfg.mirrorDirs)
+                                           mirrorDirs=cfg.mirrorDirs,
+                                           cfg=cfg)
 	self._build = []
 
         # lightInstance for only instantiating, not running (such as checkin)
