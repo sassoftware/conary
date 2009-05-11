@@ -198,7 +198,6 @@ class BaseCursor:
 
     # (a,b)
     def fetchone(self):
-        return self._cursor.fetchone()
         return self._row(self._cursor.fetchone())
     # [(a1,b1),(a2, b2)]
     def fetchall(self):
