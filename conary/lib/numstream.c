@@ -634,7 +634,7 @@ static PyMethodDef NumericStreamMethods[] = {
 };
 
 PyTypeObject NumericStreamType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.NumericStream",       /*tp_name*/
     sizeof(NumericStreamObject),    /*tp_basicsize*/
@@ -674,7 +674,7 @@ PyTypeObject NumericStreamType = {
 };
 
 PyTypeObject IntStreamType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.IntStream",	    /*tp_name*/
     sizeof(IntStreamObject),        /*tp_basicsize*/
@@ -709,7 +709,7 @@ PyTypeObject IntStreamType = {
 };
 
 PyTypeObject ShortStreamType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.ShortStream",	    /*tp_name*/
     sizeof(ShortStreamObject),      /*tp_basicsize*/
@@ -744,7 +744,7 @@ PyTypeObject ShortStreamType = {
 };
 
 PyTypeObject ByteStreamType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.ByteStream",	    /*tp_name*/
     sizeof(ByteStreamObject),      /*tp_basicsize*/
@@ -779,7 +779,7 @@ PyTypeObject ByteStreamType = {
 };
 
 PyTypeObject LongLongStreamType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.LongLongStream",	    /*tp_name*/
     sizeof(LongLongStreamObject),      /*tp_basicsize*/

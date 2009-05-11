@@ -969,7 +969,7 @@ class FilesystemJob:
                 self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
                 continue
 
-            headRealPath = os.path.normpath(rootFixup + headPath)
+            headRealPath = util.joinPaths(rootFixup, headPath)
             headFile = files.ThawFile(
                             changeSet.getFileChange(None, headFileId), pathId)
 
@@ -1833,9 +1833,9 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     isAutoSource = True
             else:
                 isAutoSource = False
-                realPath = root + "/" + path
+                realPath = util.joinPaths(root, path)
         else:
-	    realPath = root + path
+	    realPath = util.joinPaths(root, path)
 
         if forceSha1:
             possibleMatch = None

@@ -1596,7 +1596,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            #"changeset?%s" % os.path.basename(retpath[:-4]))
         # we use a local file for the parent class; this means this class
         # won't work over the wire (but we never use it that way anyway)
-        url = 'file://localhost/' + retpath
+        assert(retpath.startswith('/'))
+        url = 'file://localhost' + retpath
         os.close(fd)
 
         # try to log more information about these requests

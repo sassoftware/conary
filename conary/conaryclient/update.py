@@ -2927,7 +2927,7 @@ conary erase '%s=%s[%s]'
         if self.cfg.root == ':memory:' or self.cfg.dbPath == ':memory:':
             return
         manifest = sorted('%s=%s[%s]\n' % x for x in self.db.iterAllTroves())
-        manifestPath = '%s%s/manifest' % (self.cfg.root, self.cfg.dbPath)
+        manifestPath = util.joinPaths(self.cfg.root, self.cfg.dbPath, 'manifest')
         fd, tmpfile = tempfile.mkstemp(dir=os.path.dirname(manifestPath),
                                        prefix='.manifest.')
         try:

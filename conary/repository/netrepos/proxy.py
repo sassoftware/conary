@@ -736,7 +736,7 @@ class ChangesetFilter(BaseProxy):
                 changeSetList[jobIdx] = csInfo
 
             if url.startswith('file://localhost/'):
-                os.unlink(url[17:])
+                os.unlink(url[16:])
 
             inF.close()
 
