@@ -199,11 +199,12 @@ class BaseCursor:
     # (a,b)
     def fetchone(self):
         return self._cursor.fetchone()
+        return self._row(self._cursor.fetchone())
     # [(a1,b1),(a2, b2)]
     def fetchall(self):
-        return list(self._cursor.fetchall())
+        return [self._row(x) for x in self._cursor.fetchall()]
     def fetchmany(self, count=1):
-        return list(self._cursor.fetchmany(count))
+        return [self._row(x) for x in self._cursor.fetchmany(count)]
 
     # { name_a : a, name_b : b }
     def fetchone_dict(self):
@@ -222,7 +223,7 @@ class BaseCursor:
         if item is None:
             raise StopIteration
         else:
-            return self._row(item)
+            return item
 
 # A class for working with sequences
 class BaseSequence:
@@ -596,8 +597,17 @@ class BaseDatabase:
         On sqlite, this emulates a straight new connect() """
         raise RuntimeError("This function has to be provided by the database driver")
 
-    # faster data load for large tables. by default we redirect to executemany()
-    def bulkload(self, tableName, rows, columnNames, start_transaction = True):
+    def bulkload(self, tableName, rows, columnNames, start_transaction=True):
+        """
+        Faster data loading for large tables.
+        """
+        # This method tupliefies the data input in case it was copied from
+        # fetchall() and thus contains Row objects. Drivers may override the
+        # _bulkload method but should leave this one alone.
+        rows = [tuple(x) for x in rows]
+        return self._bulkload(tableName, rows, columnNames, start_transaction)
+
+    def _bulkload(self, tableName, rows, columnNames, start_transaction = True):
         cu = self.cursor()
         cols = ",".join(columnNames)
         values = ",".join("?" for x in range(len(columnNames)))
