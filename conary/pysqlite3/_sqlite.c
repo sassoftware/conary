@@ -177,7 +177,7 @@ staticforward PyMethodDef _con_methods[];
 staticforward struct memberlist _con_memberlist[];
 
 PyTypeObject pysqlc_Type = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "Connection",                   /*tp_name*/
     sizeof(pysqlc),                 /*tp_basicsize*/
@@ -217,7 +217,7 @@ PyTypeObject pysqlc_Type = {
 };
 
 PyTypeObject pysqlstmt_Type = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "Statement",                    /*tp_name*/
     sizeof(pysqlstmt),              /*tp_basicsize*/
