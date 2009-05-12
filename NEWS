@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Internal Changes:
+    * Additional information is now included when Conary receives
+      corrupt changesets, to assist in diagnosing the cause of
+      the changeset corruption. (CNY-2629)
+
 Changes in 2.0.41:
   o Bug Fixes:
     * When a derived packages was created incorrectly, Conary could
