@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.41:
   o Bug Fixes:
     * When a derived packages was created incorrectly, Conary could
       sometimes trace back; in these cases, Conary will now print a
