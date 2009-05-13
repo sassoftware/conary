@@ -157,7 +157,6 @@ class DependencyWorkTables:
 
     def _populateTmpTable(self, depList, troveNum, requires,
                           provides, multiplier = 1):
-        # FIXME: switch back to preparsed statments when dbstore supports it
         allDeps = []
         if requires:
             allDeps += [ (0, x) for x in
@@ -165,12 +164,6 @@ class DependencyWorkTables:
         if provides:
             allDeps += [ (1,  x) for x in
                             sorted(provides.getDepClasses().iteritems()) ]
-
-        #populateStmt = self.cu.compile("""
-        #INSERT INTO DepCheck
-        #(troveId, depNum, flagCount, isProvides, class, name, flag)
-        #VALUES(?, ?, ?, ?, ?, ?, ?)
-        #""")
 
         toInsert = []
         _len = len
