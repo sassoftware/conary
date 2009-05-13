@@ -148,7 +148,8 @@ class _GroupRecipe(_BaseGroupRecipe):
         self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
                                                localDirs=self.srcdirs,
                                                multiurlMap=self.multiurlMap,
-                                               mirrorDirs=cfg.mirrorDirs)
+                                               mirrorDirs=cfg.mirrorDirs,
+                                               cfg=cfg)
         self.troveSource = repos
         self.labelPath = [ label ]
         self.cfg = cfg

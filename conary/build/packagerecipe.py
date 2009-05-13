@@ -325,7 +325,8 @@ class AbstractPackageRecipe(Recipe):
             # given an flavor, make use.Arch match that flavor.
             for flag in use.Arch._iterAll():
                 flag._set(False)
-            use.setBuildFlagsFromFlavor(self.name, flavor, error=False)
+            use.setBuildFlagsFromFlavor(self.name, flavor, error=False,
+                                        useCross=False)
 
         def _setTargetMacros(crossTarget, macros):
             targetFlavor, vendor, targetOs = _parseArch(crossTarget)
@@ -360,6 +361,7 @@ class AbstractPackageRecipe(Recipe):
         def _setBuildMacros(macros):
             # get the necessary information about the build system
             # the only information we can grab is the arch.
+            _setArchFlags(self._buildFlavor)
             macros['buildarch'] = use.Arch._getMacro('targetarch')
             self.buildmacros = _createMacros('%(build)s')
 
@@ -512,7 +514,8 @@ class AbstractPackageRecipe(Recipe):
         self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
                                            localDirs=self.srcdirs,
                                            multiurlMap=self.multiurlMap,
-                                           mirrorDirs=cfg.mirrorDirs)
+                                           mirrorDirs=cfg.mirrorDirs,
+                                           cfg=cfg)
 	self._build = []
 
         # lightInstance for only instantiating, not running (such as checkin)
