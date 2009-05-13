@@ -1781,7 +1781,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             for size in sizes:
                 f = util.SeekableNestedFile(outFile, size, start)
-                newCs = changeset.ChangeSetFromFile(f)
+                try:
+                    newCs = changeset.ChangeSetFromFile(f)
+                except IOError, err:
+                    assert False, 'IOError in changeset (%s); args = %r' % (
+                            str(err), args,)
 
                 if not cs:
                     cs = newCs

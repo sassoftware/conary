@@ -1001,7 +1001,8 @@ class SeekableNestedFile:
             newPos = self.size + offset
 
         if newPos > self.size or newPos < 0:
-            raise IOError
+            raise IOError("Position %d is outside file (len %d)"
+                    % (newPos, self.size))
 
         self.pos = newPos
         return self.pos
