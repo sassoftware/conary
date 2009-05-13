@@ -1,3 +1,8 @@
+Changes in 2.0.42:
+  o Bug Fixes:
+    * A previous change that normalized paths before being passed into
+     tag handlers has been reverted. (CNY-3141)
+
 Changes in 2.0.41:
   o Bug Fixes:
     * When a derived packages was created incorrectly, Conary could
