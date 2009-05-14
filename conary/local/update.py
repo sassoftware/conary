@@ -237,7 +237,7 @@ class FilesystemJob:
 
     def preapply(self, tagSet = {}, tagScript = None):
 	# this is run before the change make it to the database
-	rootLen = len(self.root)
+	rootLen = len(self.root.rstrip('/'))
 	tagCommands = TagCommand(callback = self.callback)
 
         # processing these before the tagRemoves taghandler files ensures
@@ -345,6 +345,7 @@ class FilesystemJob:
 
 	def restoreFile(fileObj, contents, root, target, journal, opJournal):
             opJournal.backup(target)
+            rootLen = len(root.rstrip('/'))
 
 	    if fileObj.hasContents and contents and not \
 				       fileObj.flags.isConfig():
@@ -397,7 +398,7 @@ class FilesystemJob:
             except OSError, e:
                 if e.errno == errno.ENOENT:
                     self.callback.warning("%s has already been removed",
-                                          target[len(self.root):])
+                                          target[rootLen:])
                 else:
                     self.callback.error("%s could not be removed: %s",
                                         target, e.strerror)
@@ -407,7 +408,7 @@ class FilesystemJob:
                     and not isinstance(fileObj, files.Directory)):
                     self.callback.warning('%s was changed into a directory'
                                           ' - not removing', 
-                                          target[len(self.root):])
+                                          target[rootLen:])
                     continue
 
                 opJournal.backup(target)
@@ -416,7 +417,7 @@ class FilesystemJob:
                     opJournal.remove(target)
                 except OSError, e:
                     self.callback.error("%s could not be removed: %s",
-                                        target[len(self.root):], e.strerror)
+                                        target[rootLen:], e.strerror)
                     raise
 
 	    log.debug(msg, target)
@@ -613,7 +614,7 @@ class FilesystemJob:
         # they are committed
         tagCommands = TagCommand(callback = self.callback)
         runLdconfig = False
-        rootLen = len(self.root)
+        rootLen = len(self.root.rstrip('/'))
 
         # FIXME: the next two operations need to be combined into one;
         # groups can depend on users, and vice-versa.  This ordering
@@ -678,7 +679,7 @@ class FilesystemJob:
             # installed
 
             tagInfo = newTagSetByDescFile[path]
-            path = path[len(self.root):]
+            path = path[rootLen:]
             
             # don't run these twice
             if self.tagUpdates.has_key(tagInfo.tag):
@@ -1671,7 +1672,8 @@ class FilesystemJob:
             for (pathId, path, fileId, version), fileObj in \
                     itertools.izip(oldTrove.iterFileList(), fileObjs):
                 if path not in pathsMoved:
-                    self._remove(fileObj, root + path, "removing %s")
+                    self._remove(fileObj, util.joinPaths(root, path),
+                                 "removing %s")
             # We catch removals here
             oldTroveCs = oldTrove.diff(None)[0]
             # Queue up the posterase script
@@ -2114,7 +2116,7 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
 
     newlines = []
     # Remove trailing / to avoid like "usr/lib" instead of "/usr/lib" CNY-2982
-    rootlen = max(len(root.rstrip('/')), 1)
+    rootlen = len(root.rstrip('/'))
 
     for path in shlibList:
 	dirname = os.path.dirname(path)[rootlen:]
