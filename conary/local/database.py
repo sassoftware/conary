@@ -218,7 +218,7 @@ class RollbackStack:
     def new(self, opJournal = None):
         if not opJournal:
             opJournal = NoopJobJournal()
-        rbDir = "%s/%d" % (self.dir, self.last + 1)
+        rbDir = "/%s/%d" % (self.dir, self.last + 1)
         if os.path.exists(rbDir):
             opJournal.backup(rbDir)
             shutil.rmtree(rbDir)
@@ -2420,9 +2420,8 @@ class Database(SqlDbRepository):
             self.lockFile = path 
             self.opJournalPath = None
         else:
-            conarydbPath = util.joinPaths(root, path) 
-            SqlDbRepository.__init__(self, conarydbPath, timeout = timeout)
-            self.opJournalPath = conarydbPath + '/journal'
+            SqlDbRepository.__init__(self, root + path, timeout = timeout)
+            self.opJournalPath = util.joinPaths(root, path) + '/journal'
             top = util.joinPaths(root, path)
 
             self.lockFile = top + "/syslock"
