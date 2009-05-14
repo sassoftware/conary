@@ -1,4 +1,15 @@
 Changes in @NEW@:
+  o Internal Changes:
+    * Additional information is now included when Conary receives
+      corrupt changesets, to assist in diagnosing the cause of
+      the changeset corruption. (CNY-2629)
+
+Changes in 2.0.42:
+  o Bug Fixes:
+    * A previous change that normalized paths before being passed into
+     tag handlers has been reverted. (CNY-3141)
+
+Changes in 2.0.41:
   o Bug Fixes:
     * When a derived packages was created incorrectly, Conary could
       sometimes trace back; in these cases, Conary will now print a
@@ -15,19 +26,27 @@ Changes in @NEW@:
     * Verify significantly sped up.
     * Turned off threading in recreatedb, because threading broke
       for some manifests. (CNY-3128)
-    * Rewrote SQL query which removes old dependencies for better performance
+    * Rewrote SQL query which removes old dependencies for better performance.
     * The cvc file cache now understand file mode changes as well as 
-      content changes (CNY-3082)
+      content changes. (CNY-3082)
     * Key signatures for archives in source components are no longer checked 
       when the source is in the repository, but rather checked at commit
-      time.  (CNY-3130)
+      time. (CNY-3130)
+    * Fixed bug which caused files to be dropped from builds when two
+      paths shared the same pathId somewhere in the history of that
+      trove. (CNY-3133)
+    * Updates and local changeset generation handle troves with renames,
+      though cases with multiple versions of such troves being installed
+      simultaneously have known shortcomings. (CNY-3134)
+    * Updating source directories to versions which added or removed a
+      factory now updates the CONARY file properly. (CNY-3073)
 
   o New Features:
-    * Verify now relies on file size and mtime to determine whether files have
-      been modified. The --hash option has been added to verify to force
-      sha1s to be used instead.
-    * System database can now return file objects along with troves to avoid
-      double walking of the file tables.
+    * Verify now relies on file size and mtime to determine whether files
+      have been modified.  The --hash option has been added to verify to
+      force sha1s to be used instead.
+    * The system database can now return file objects along with troves
+      to avoid double walking of the file tables.
 
   o Internal Changes:
     * TroveSource.walkTroveSet now walks troves in a sorted, depth first order.

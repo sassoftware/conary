@@ -354,7 +354,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     # don't download sources for groups or filesets
     if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
             recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
-        lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg)
+        lcache = lookaside.RepositoryCache(repos, cfg=cfg)
         srcdirs = [ cwd,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
@@ -2107,7 +2107,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
         raise errors.CvcError('Only package recipes can have files refreshed')
 
-    lcache = lookaside.RepositoryCache(cfg.lookaside, repos, cfg, refreshFilter)
+    lcache = lookaside.RepositoryCache(repos, refreshFilter, cfg=cfg)
     srcdirs = [ dirName,
                 cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
@@ -2285,8 +2285,12 @@ def localAutoSourceChanges(oldTrove, (changeSet, ((isDifferent, newState),))):
 
     return (changeSet, ((isDifferent, newState),))
 
-def factory(newFactory = None):
-    conaryState = ConaryStateFromFile("CONARY")
+def factory(newFactory = None, targetDir=None):
+    if targetDir:
+        stateFile = os.path.join(targetDir, "CONARY")
+    else:
+        stateFile = "CONARY"
+    conaryState = ConaryStateFromFile(stateFile)
     state = conaryState.getSourceState()
 
     if newFactory is None:
@@ -2296,5 +2300,5 @@ def factory(newFactory = None):
             print "(none)"
     else:
         state.setFactory(newFactory)
-        conaryState.write("CONARY")
+        conaryState.write(stateFile)
 

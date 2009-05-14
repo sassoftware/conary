@@ -33,6 +33,7 @@ import struct
 import sys
 import tempfile
 import time
+import types
 import urllib
 import urlparse
 import weakref
@@ -191,6 +192,7 @@ def genExcepthook(debug=True,
     def excepthook(typ, value, tb):
         if typ is bdb.BdbQuit:
             sys.exit(1)
+        #pylint: disable-msg=E1101
         sys.excepthook = sys.__excepthook__
         if not _debugAll and (typ == KeyboardInterrupt and not debugCtrlC):
             sys.exit(1)
@@ -838,9 +840,6 @@ class ExtendedFdopen(object):
     def fileno(self):
         return self.fd
 
-    def pread(self, bytes, offset):
-        return misc.pread(self.fd, bytes, offset)
-
     def close(self):
         os.close(self.fd)
         self.fd = None
@@ -895,7 +894,7 @@ class ExtendedFile(ExtendedFdopen):
         self.fObj = None
 
     def __repr__(self):
-        return '<ExtendedFile %r>' % (path,)
+        return '<ExtendedFile %r>' % (self.name,)
 
     def __init__(self, path, mode = "r", buffering = True):
         self.fd = None
@@ -1001,7 +1000,8 @@ class SeekableNestedFile:
             newPos = self.size + offset
 
         if newPos > self.size or newPos < 0:
-            raise IOError
+            raise IOError("Position %d is outside file (len %d)"
+                    % (newPos, self.size))
 
         self.pos = newPos
         return self.pos
@@ -1130,6 +1130,28 @@ pread = misc.pread
 res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
 
+
+def _LazyFile_reopen(method):
+    """Decorator to perform the housekeeping of opening/closing of fds"""
+    def wrapper(self, *args, **kwargs):
+        if self._realFd is not None:
+            # Object is already open
+            # Mark it as being used
+            self._timestamp = time.time()
+            # Return the real method
+            return getattr(self._realFd, method.func_name)(*args, **kwargs)
+        if self._cache is None:
+            raise Exception("Cache object is closed")
+        try:
+            self._cache()._getSlot()
+        except ReferenceError:
+            # re-raise for now, until we decide what to do
+            raise
+        self._reopen()
+        return getattr(self._realFd, method.func_name)(*args, **kwargs)
+    return wrapper
+
+
 class _LazyFile(object):
     __slots__ = ['path', 'marker', 'mode', '_cache', '_hash', '_realFd',
                  '_timestamp']
@@ -1141,26 +1163,6 @@ class _LazyFile(object):
         self._cache = weakref.ref(cache, self._closeCallback)
         self._realFd = None
         self._timestamp = time.time()
-
-    def reopen(method):
-        """Decorator to perform the housekeeping of opening/closing of fds"""
-        def wrapper(self, *args, **kwargs):
-            if self._realFd is not None:
-                # Object is already open
-                # Mark it as being used
-                self._timestamp = time.time()
-                # Return the real method
-                return getattr(self._realFd, method.func_name)(*args, **kwargs)
-            if self._cache is None:
-                raise Exception("Cache object is closed")
-            try:
-                self._cache()._getSlot()
-            except ReferenceError:
-                # re-raise for now, until we decide what to do
-                raise
-            self._reopen()
-            return getattr(self._realFd, method.func_name)(*args, **kwargs)
-        return wrapper
 
     def _reopen(self):
         # Initialize the file descriptor
@@ -1177,23 +1179,27 @@ class _LazyFile(object):
         self._close()
         self._cache = None
 
-    @reopen
+    @_LazyFile_reopen
     def read(self, bytes):
         pass
 
-    @reopen
+    @_LazyFile_reopen
     def pread(self, bytes, offset):
         pass
 
-    @reopen
+    @_LazyFile_reopen
     def seek(self, loc, type):
         pass
 
-    @reopen
+    @_LazyFile_reopen
+    def tell(self):
+        pass
+
+    @_LazyFile_reopen
     def trucate(self):
         pass
 
-    @reopen
+    @_LazyFile_reopen
     def fileno(self):
         pass
 
@@ -1216,10 +1222,6 @@ class _LazyFile(object):
                 # cache object is already gone
                 pass
         self._cache = None
-
-    @reopen
-    def tell(self):
-        pass
 
     def __hash__(self):
         return self._hash
@@ -1346,26 +1348,25 @@ def stripUserPassFromUrl(url):
     arr[1] = host
     return urlparse.urlunparse(arr)
 
-class FileIgnoreEpipe:
 
-    def ignoreEpipe(fn):
+def _FileIgnoreEpipe_ignoreEpipe(fn):
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except IOError, e:
+            if e.errno != errno.EPIPE:
+                raise
+        return
+    return wrapper
 
-        def wrapper(*args, **kwargs):
-            try:
-                return fn(*args, **kwargs)
-            except IOError, e:
-                if e.errno != errno.EPIPE:
-                    raise
 
-            return
+class FileIgnoreEpipe(object):
 
-        return wrapper
-
-    @ignoreEpipe
+    @_FileIgnoreEpipe_ignoreEpipe
     def write(self, *args):
         return self.f.write(*args)
 
-    @ignoreEpipe
+    @_FileIgnoreEpipe_ignoreEpipe
     def close(self, *args):
         return self.f.close(*args)
 
@@ -1474,6 +1475,9 @@ class ProtectedString(str):
     __repr__ = __safe_str__
 
 class ProtectedTemplate(str):
+    _substArgs = None
+    _templ = None
+
     """A string template that hides parts of its components.
     The first argument is a template (see string.Template for a complete
     documentation). The values that can be filled in are using the format
@@ -1548,7 +1552,7 @@ class XMLRPCMarshaller(xmlrpclib.Marshaller):
             for type_ in type(value).__mro__:
                 if type_ in self.dispatch.keys():
                     raise TypeError, "cannot marshal %s objects" % type(value)
-            f = self.dispatch[InstanceType]
+            f = self.dispatch[types.InstanceType]
         f(self, value, write)
 
     dispatch[str] = dump_string

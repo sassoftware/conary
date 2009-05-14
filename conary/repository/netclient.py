@@ -1775,12 +1775,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             if totalSize == None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            assert(totalSize == sum(sizes))
+            assert totalSize == sum(sizes), 'exp %d got %d args %r' %(
+                sum(sizes), totalSize, args)
             inF.close()
 
             for size in sizes:
                 f = util.SeekableNestedFile(outFile, size, start)
-                newCs = changeset.ChangeSetFromFile(f)
+                try:
+                    newCs = changeset.ChangeSetFromFile(f)
+                except IOError, err:
+                    assert False, 'IOError in changeset (%s); args = %r' % (
+                            str(err), args,)
 
                 if not cs:
                     cs = newCs
@@ -1790,7 +1795,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 totalSize -= size
                 start += size
 
-            assert(totalSize == 0)
+            assert totalSize == 0, '%d unexpected trailing bytes fetching args %r' %(totalSize, args)
+
             return (cs, _cvtTroveList(extraTroveList),
                     _cvtFileList(extraFileList))
 

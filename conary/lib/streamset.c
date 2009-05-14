@@ -1101,7 +1101,7 @@ static PyMethodDef StreamSetDefMethods[] = {
 };
 
 static PyTypeObject StreamSetDefType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.StreamSetDef",        /*tp_name*/
     sizeof(StreamSetDefObject),     /*tp_basicsize*/
@@ -1153,7 +1153,7 @@ static PyMethodDef StreamSetMethods[] = {
 };
 
 PyTypeObject StreamSetType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.StreamSet",           /*tp_name*/
     sizeof(StreamSetObject),        /*tp_basicsize*/

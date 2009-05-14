@@ -278,7 +278,7 @@ static PyMethodDef StringStreamMethods[] = {
 };
 
 PyTypeObject StringStreamType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,                              /*ob_size*/
     "cstreams.StringStream",        /*tp_name*/
     sizeof(StringStreamObject),     /*tp_basicsize*/

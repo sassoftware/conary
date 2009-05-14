@@ -582,6 +582,9 @@ class ChangeSet(streams.StreamSet):
 		else:
 		    invertedTrove.changedFile(pathId, None, curFileId, curVersion)
 
+                if curFileId == newFileId:
+                    continue
+
                 try:
                     csInfo = self.files[(curFileId, newFileId)]
                 except KeyError:

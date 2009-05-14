@@ -347,12 +347,10 @@ class Database(BaseDatabase):
         assert (isinstance(table, str))
         cu.execute("ANALYZE %s" %table)
         
-    # faster data load for large tables. by default we redirect to executemany()
-    def bulkload(self, tableName, rows, columnNames, start_transaction = True):
+    def _bulkload(self, tableName, rows, columnNames, start_transaction = True):
         # first, make sure we do this in a transaction so we can roll it back
-        if self.dbh.transaction not in [ pgsql.TRANS_INERROR, pgsql.TRANS_INTRANS,
-                                         pgsql.TRANS_ACTIVE ]:
-            self.dbh.execute(self.basic_transaction)
+        if not self.inTransaction():
+            self.transaction()
         # now it's safe to do the bulkload
         return self.dbh.bulkload(tableName, rows, columnNames)
 
