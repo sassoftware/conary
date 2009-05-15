@@ -364,6 +364,7 @@ class FilesystemJob:
                 opJournal.create(target)
 
         assert(not self.errors)
+        rootLen = len(self.root.rstrip('/'))
 
         if not opJournal:
             opJournal = NoopJobJournal()

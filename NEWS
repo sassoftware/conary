@@ -3,6 +3,13 @@ Changes in @NEW@:
     * Additional information is now included when Conary receives
       corrupt changesets, to assist in diagnosing the cause of
       the changeset corruption. (CNY-2629)
+  o Bug Fixes:
+    * File paths from changesets are now properly normalized, and the
+      rest of the code correctly handles the single-slash prefix in
+      the case of installing to the main root directory. This fix
+      completes the change introduced in Conary 2.0.41 and reverted
+      in Conary 2.0.42, that caused tag handlers to malfunction.
+      (CNY-3142)
 
 Changes in 2.0.42:
   o Bug Fixes:
