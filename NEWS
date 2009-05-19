@@ -3,6 +3,7 @@ Changes in @NEW@:
     * Additional information is now included when Conary receives
       corrupt changesets, to assist in diagnosing the cause of
       the changeset corruption. (CNY-2629)
+
   o Bug Fixes:
     * File paths from changesets are now properly normalized, and the
       rest of the code correctly handles the single-slash prefix in
@@ -10,6 +11,9 @@ Changes in @NEW@:
       completes the change introduced in Conary 2.0.41 and reverted
       in Conary 2.0.42, that caused tag handlers to malfunction.
       (CNY-3142)
+    * Conary now puts libtool .la files in :devellib components
+      by default, rather than in :lib components, for better
+      multilib development environment support. (CNY-3143)
 
 Changes in 2.0.42:
   o Bug Fixes:
