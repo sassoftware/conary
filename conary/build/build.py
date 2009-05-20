@@ -1903,8 +1903,8 @@ class Install(_PutFiles):
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe.
 
-    B{mode} : The mode of the file. If one of the executable bits is set, the
-    mode is 0755, otherwise it is 0644.
+    B{mode} : The mode of the file, as an octal number.  If one of the
+    executable bits is set, the default mode is 0755, otherwise it is 0644.
 
     B{preserveSymlinks} : (False) If set to True, symbolic links are copied.
     The default behavior is to de-reference symbolic links when copying the
@@ -2690,7 +2690,7 @@ class Create(_FileAction):
 
     B{macros}  : Whether to interpolate macros into the contents
 
-    B{mode} : The mode of the file (defaults to 0644)
+    B{mode} : The mode of the file in octal (Default: 0644)
 
     B{package} : (None) If set, must be a string that specifies the package
     (C{package='packagename'}), component (C{package=':componentname'}), or
@@ -2769,7 +2769,7 @@ class MakeDirs(_FileAction):
     B{component} : (None) Set to component name if package is responsible for the
     directory.
 
-    B{mode} : (0755) Specify directory access permissions
+    B{mode} : The mode of the directory, in octal (Default: 0755)
 
     B{package} : (None) If set, must be a string that specifies the package
     (C{package='packagename'}), component (C{package=':componentname'}), or
@@ -3263,7 +3263,7 @@ class XInetdService(_FileAction):
  
     B{filename} : (None) Specifies service definition filename
  
-    B{mode} : (0644) Specifies permissions of service definition file
+    B{mode} : File mode of the service definition file, in octal (Default: 0644)
 
     B{otherlines} : (None) Specifies additional service definition lines
 
@@ -3746,7 +3746,7 @@ class MakeFIFO(_FileAction):
 
     The C{r.MakeFIFO()} class accepts the following keywords:
 
-    B{mode} : The mode of the file (defaults to 0644)
+    B{mode} : The mode of the file in octal (Default: 0644)
 
     EXAMPLES
     ========

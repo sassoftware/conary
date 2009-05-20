@@ -17,6 +17,9 @@ Changes in @NEW@:
     * An internal function used to create directories could fall victim
       to a race condition on Python 2.4, this has been corrected.
       (CNY-3145)
+    * The documentation for the mode= argument to several build
+      actions has been improved to make it clearer to specify an
+      octal number. (CNY-3146)
 
 Changes in 2.0.42:
   o Bug Fixes:
