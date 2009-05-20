@@ -66,22 +66,32 @@ def realpath(path):
 def isregular(path):
     return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
 
+
+def _mkdirs(path, mode=0777):
+    """
+    Recursive helper to L{mkdirChain}. Internal use only.
+    """
+    head, tail = os.path.split(path)
+    if head and tail and not os.path.exists(head):
+        _mkdirs(head, mode)
+
+    # Make the directory while ignoring errors about it existing.
+    misc.mkdirIfMissing(path)
+
+
 @api.developerApi
 def mkdirChain(*paths):
-    _ignoredErrors = set((errno.ENOENT, errno.ENOTDIR, errno.EACCES))
+    """
+    Make one or more directories if they do not already exist, including any
+    needed parent directories. Similar to L{os.makedirs} except that it does
+    not error if the requested directory already exists, and it is more
+    resilient to race conditions.
+    """
     for path in paths:
-        if path[0] != os.sep:
-            path = os.getcwd() + os.sep + path
-        normpath = os.path.normpath(path)
+        path = normpath(os.path.abspath(path))
+        if not os.path.exists(path):
+            _mkdirs(path)
 
-        try:
-            misc.mkdirIfMissing(normpath)
-            continue
-        except OSError, exc:
-            if exc.errno not in _ignoredErrors:
-                raise
-
-        os.makedirs(normpath)
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]
