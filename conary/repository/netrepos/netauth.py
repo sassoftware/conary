@@ -133,6 +133,7 @@ class UserAuthorization:
         if isinstance(user, ValidUser):
             # Short-circuit for shim-using code that knows what roles
             # it wants.
+            roles = set()
             if '*' in user.roles:
                 cu.execute("SELECT userGroupId FROM UserGroups")
             else:
@@ -142,7 +143,7 @@ class UserAuthorization:
                 places = ', '.join('?' for x in names)
                 cu.execute("""SELECT userGroupId FROM UserGroups
                         WHERE userGroup IN ( %s )""" % (places,), *names)
-            return set(x[0] for x in cu)
+            return roles + set(x[0] for x in cu)
 
         cu.execute("""
         SELECT Users.salt, Users.password, UserGroupMembers.userGroupId,
