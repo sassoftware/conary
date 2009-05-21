@@ -531,13 +531,13 @@ class Recipe(object):
 
     def _fetchFile(self, sourceName, refreshFilter = None, localOnly = False):
         if localOnly:
-            kw = dict(searchRepository=not self.srcdirs,
-                      searchExternal=False)
+            kw = dict(searchMethod=self.fileFinder.SEARCH_LOCAL_ONLY)
         else:
             kw = {}
 
-        inRepos, f = self.fileFinder.fetch(sourceName, refreshFilter=refreshFilter,
-                                          allowNone=True, **kw)
+        inRepos, f = self.fileFinder.fetch(sourceName, 
+                                           refreshFilter=refreshFilter,
+                                           allowNone=True, **kw)
         return f
 
     def _addMetadataItem(self, troveNames, metadataItemDict):

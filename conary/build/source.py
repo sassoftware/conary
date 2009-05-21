@@ -1387,9 +1387,10 @@ class _RevisionControl(addArchive):
         # don't look in the lookaside for a snapshot if we need to refresh
         # the lookaside
         if not refreshFilter or not refreshFilter(os.path.basename(fullPath)):
-            inRepos, path = self.recipe.fileFinder.fetch(url, allowNone=True,
-                                                searchLocal=False,
-                                                refreshFilter=refreshFilter)
+            ff = self.recipe.fileFinder
+            inRepos, path = ff.fetch(url, allowNone=True,
+                            searchMethod=ff.SEARCH_REPOSITORY_ONLY,
+                            refreshFilter=refreshFilter)
             if not inRepos:
                 self.checkSignature(path)
             if path:

@@ -41,6 +41,8 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
     return findAll(cfg, repCache, name, location, srcdirs, autoSource,
                    httpHeaders, localOnly, allowNone=True)
 
+
+
 # bw compatible findAll method.
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
@@ -53,13 +55,22 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
                           mirrorDirs=cfg.mirrorDirs,
                           cfg=cfg)
 
-    searchExternal = not localOnly
-    searchRepository = not localOnly or not srcdirs
-    searchLocal = not autoSource
+    if localOnly:
+        if srcdirs:
+            searchMethod = ff.SEARCH_LOCAL_ONLY
+        else:
+            # BW COMPATIBLE HACK - since we know we aren't actually searching
+            # srcdirs since they're empty, we take this to mean 
+            # repository only.
+            searchMethod = ff.SEARCH_REPOSITORY_ONLY
+    elif autoSource:
+        searchMethod = ff.SEARCH_REPOSITORY_ONLY
+    else:
+        searchMethod = ff.SEARCH_ALL
+
 
     results = ff.fetch(name, suffixes=suffixes, archivePath=unifiedSourcePath,
-                       allowNone=allowNone, searchRepository=searchRepository,
-                       searchExternal=searchExternal, searchLocal=searchLocal,
+                       allowNone=allowNone, searchMethod=searchMethod,
                        headers=httpHeaders, refreshFilter=refreshFilter)
     return results[1]
 
@@ -68,9 +79,17 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     repCache = RepositoryCache(None, cfg=cfg)
     ff = FileFinder(recipeName=location, repositoryCache=repCache,
                     cfg=cfg)
-    return ff.searchNetworkSources(name, name, headers=httpHeaders)
+    try:
+        return ff.searchNetworkSources(name, name, headers=httpHeaders)
+    except PathFound, pathInfo:
+        return pathInfo.path
 
 class FileFinder(object):
+
+    SEARCH_ALL = 0
+    SEARCH_REPOSITORY_ONLY = 1
+    SEARCH_LOCAL_ONLY = 2
+
     def __init__(self, recipeName, repositoryCache, localDirs=None,
                  multiurlMap=None, refreshFilter=None, mirrorDirs = None,
                  cfg=None):
@@ -84,79 +103,85 @@ class FileFinder(object):
         self.multiurlMap = multiurlMap
         self.mirrorDirs = mirrorDirs
 
-
-    def fetch(self, uri, suffixes=None, archivePath=None, headers=None, 
-              allowNone=False,
-              searchLocal=True, searchRepository=True,
-              searchExternal=True, refreshFilter=None):
+    def fetch(self, uri, suffixes=None, archivePath=None, headers=None,
+              allowNone=False, searchMethod=0, # SEARCH_ALL
+              refreshFilter=None):
         uriList = self._getPathsToSearch(uri, suffixes)
         for newUri in uriList:
-            results = self._fetch(newUri, uri,
-                               archivePath, headers=headers,
-                               refreshFilter=refreshFilter,
-                               searchLocal=searchLocal,
-                               searchRepository=searchRepository,
-                               searchExternal=searchExternal)
-            if results:
-                return results
+            try:
+                self._fetch(newUri, uri,
+                            archivePath, headers=headers,
+                            refreshFilter=refreshFilter,
+                            searchMethod=searchMethod)
+            except PathFound, pathInfo:
+                return pathInfo.isFromRepos, pathInfo.path
+
+        # we didn't find any matching url.
         if not allowNone:
             raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), uri)
         return None, None
 
-    def _fetch(self, uri, originalUri, archivePath, headers=None,
-               refreshFilter=None, searchLocal=True,
-               searchRepository=True, searchExternal=True):
-        if searchLocal:
-            path = self.searchFilesystem(uri)
-            if path: return (False, path)
-        if archivePath:
-            path = self.searchArchive(archivePath, uri)
-            if path: return (True, path)
-
-        basename = os.path.basename(uri)
+    def _fetch(self, uri, originalUri, archivePath, searchMethod, headers=None,
+               refreshFilter=None):
         refresh = (refreshFilter and
                    refreshFilter(os.path.basename(uri)))
-        if searchRepository and not refresh:
-            path = self.searchRepository(uri)
-            if path: return (True, path)
-
-        if searchLocal and not refresh:
-            path = self.searchLocalCache(uri)
-            if path: return (False, path)
-
-        # finally search upstream
-        prefix = uri.split('://', 1)[0]
-        if prefix in NETWORK_PREFIXES and searchExternal:
-            path = self.searchNetworkSources(uri, originalUri, headers)
-            if path: return False, path
+        if searchMethod == self.SEARCH_LOCAL_ONLY:
+            self.searchFilesystem(uri)
+            return
+        elif searchMethod == self.SEARCH_REPOSITORY_ONLY:
+            if archivePath:
+                self.searchArchive(archivePath, uri)
+            elif refresh:
+                self.searchNetworkSources(uri, originalUri, headers)
+            self.searchRepository(uri)
+        else: #SEARCH_ALL
+            self.searchFilesystem(uri)
+            if archivePath:
+                self.searchArchive(archivePath, uri)
+            elif refresh:
+                self.searchNetworkSources(uri, originalUri, headers)
+            self.searchRepository(uri)
+            self.searchLocalCache(uri)
+            self.searchNetworkSources(uri, originalUri, headers)
 
     def searchRepository(self, uri):
         if self.repCache.hasFileName(uri):
             log.info('found %s in repository', uri)
-            return self.repCache.cacheFile(self.recipeName, uri, uri)
+            path = self.repCache.cacheFile(self.recipeName, uri, uri)
+            raise PathFound(path, True)
         basename = os.path.basename(uri)
         if self.repCache.hasFileName(basename):
             log.info('found %s in repository', basename)
-            return self.repCache.cacheFile(self.recipeName, uri, basename)
+            path = self.repCache.cacheFile(self.recipeName, uri, basename)
+            raise PathFound(path, True)
 
     def searchLocalCache(self,  uri):
         # exact match first, then look for cached responses from other servers
         path = self.repCache.getCacheEntry(self.recipeName, uri)
-        if path: return path
+        if path: raise PathFound(path, False)
         basename = os.path.basename(uri)
         prefix = uri.split('://', 1)[0]
         if prefix in NETWORK_PREFIXES or prefix == 'lookaside':
-            return self.repCache.findInCache(self.recipeName, basename)
+            path = self.repCache.findInCache(self.recipeName, basename)
+            if path:
+                raise PathFound(path, False)
 
     def searchFilesystem(self, uri):
         if uri[0] == '/':
             return
-        return util.searchFile(uri, self.localDirs)
+        path = util.searchFile(uri, self.localDirs)
+        if path:
+            raise PathFound(path, False)
 
     def searchArchive(self, archiveName, path):
-        return self.repCache.getArchiveCacheEntry(archiveName, path)
+        path =  self.repCache.getArchiveCacheEntry(archiveName, path)
+        if path:
+            raise PathFound(path, True)
 
     def searchNetworkSources(self, uri, originalUri, headers):
+        prefix = uri.split('://', 1)[0]
+        if prefix not in NETWORK_PREFIXES:
+            return
         # Save users from themselves - encode some characters automatically
         uri = uri.replace(' ', '%20')
         # check for negative cache entries to avoid spamming servers
@@ -164,7 +189,7 @@ class FileFinder(object):
         if negativePath:
             log.warning('not fetching %s (negative cache entry %s exists)',
                         uri, negativePath)
-            return None
+            return
 
         log.info('Trying %s...', uri)
         explicit = (uri == originalUri)
@@ -175,9 +200,11 @@ class FileFinder(object):
             self.repCache.createNegativeCacheEntry(self.recipeName, uri)
         else:
             contentLength = int(inFile.headers.get('Content-Length', 0))
-            return self.repCache.addFileToCache(self.recipeName, uri,
+            path = self.repCache.addFileToCache(self.recipeName, uri,
                                                 inFile, contentLength)
-        return None
+            if path:
+                raise PathFound(path, False)
+        return
 
     def _getPathsToSearch(self, uri, suffixes):
         if '://' in uri:
@@ -481,3 +508,8 @@ class RepositoryCache(object):
         fullPath = self.getArchiveCachePath(archiveName, path)
         if os.path.exists(fullPath):
             return fullPath
+
+class PathFound(Exception):
+    def __init__(self, path, isFromRepos):
+        self.path = path
+        self.isFromRepos = isFromRepos
