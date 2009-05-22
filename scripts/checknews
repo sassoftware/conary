@@ -35,7 +35,8 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
         keyre = re.compile('[A-Z]+-[0-9]+')
         project = argSet.pop('project', 'CNY')
         if len(args) != 3:
-            sys.exit(1)
+            self.usage()
+            return
         news = args[2]
         f = open(news)
         started = False

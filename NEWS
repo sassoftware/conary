@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.43:
   o Internal Changes:
     * Additional information is now included when Conary receives
       corrupt changesets, to assist in diagnosing the cause of
