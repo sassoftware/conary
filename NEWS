@@ -14,12 +14,14 @@ Changes in @NEW@:
     * Conary now puts libtool .la files in :devellib components
       by default, rather than in :lib components, for better
       multilib development environment support. (CNY-3143)
-    * An internal function used to create directories could fall victim
-      to a race condition on Python 2.4, this has been corrected.
-      (CNY-3145)
+    * An internal function, mkdirChain, used to create directories,
+      could be subject to a race condition on Python 2.4. This has
+      been corrected.  (CNY-3145)
     * The documentation for the mode= argument to several build
       actions has been improved to make it clearer to specify an
       octal number. (CNY-3146)
+    * cvc refresh properly handles URL strings that contain username and
+      password specifications. (CNY-3108)
 
 Changes in 2.0.42:
   o Bug Fixes:
