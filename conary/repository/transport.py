@@ -144,8 +144,7 @@ class HTTPSConnection(httplib.HTTPConnection):
 
         self.ssl_ctx = SSL.Context('sslv23')
         if caCerts:
-            self.ssl_ctx.set_verify(SSL.verify_peer |
-                    SSL.verify_fail_if_no_peer_cert, depth=9)
+            self.ssl_ctx.set_verify(SSL.verify_peer, depth=9)
             paths = []
             for path in caCerts:
                 paths.extend(sorted(list(glob.glob(path))))
