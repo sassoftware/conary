@@ -120,16 +120,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         proxy = conarycfg.getProxyFromConfig(cfg)
 
         repos = NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
-                                       pwPrompt = passwordPrompter,
-                                       localRepository = db,
-                                       entitlementDir =
-                                          cfg.entitlementDirectory,
-                                       downloadRateLimit =
-                                          cfg.downloadRateLimit,
-                                       uploadRateLimit =
-                                          cfg.uploadRateLimit,
-                                       entitlements = cfg.entitlement,
-                                       proxy = proxy)
+                pwPrompt=passwordPrompter, localRepository=db,
+                entitlementDir=cfg.entitlementDirectory,
+                downloadRateLimit=cfg.downloadRateLimit,
+                uploadRateLimit=cfg.uploadRateLimit,
+                entitlements=cfg.entitlement, proxy=proxy,
+                caCerts=cfg.trustedCerts)
         repos.setFlavorPreferenceList(cfg.flavorPreferences)
         return repos
 

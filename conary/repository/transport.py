@@ -18,19 +18,28 @@
 
 import base64
 import errno
+import glob
 import httplib
 import itertools
+import os
 import select
 import socket
 import sys
 import time
 import xmlrpclib
 import urllib
+import warnings
 import zlib
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+try:
+    # Use m2crypto for checking server certificates
+    from M2Crypto import SSL
+except ImportError:
+    SSL = None
+
 
 LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
                   socket.gethostname()])
@@ -113,6 +122,74 @@ class DecompressFileObj:
     def fileno(self):
         return self.fp.fileno()
 
+
+class HTTPSConnection(httplib.HTTPConnection):
+    """
+    HTTPS connection that supports m2crypto contexts plus some other features.
+
+    m2crypto's httpslib isn't used here because it is too simple to bother
+    inheriting.
+
+    Currently supported "extra" features:
+     * Can pass in a list of peer certificate authorities.
+     * Can set the hostname used to check the peer's certificate.
+    """
+    default_port = httplib.HTTPS_PORT
+
+    def __init__(self, host, port=None, strict=None, caCerts=None,
+            commonName=None):
+        httplib.HTTPConnection.__init__(self, host, port, strict)
+        self.caCerts = caCerts
+        self.commonName = commonName
+
+        self.ssl_ctx = SSL.Context('sslv23')
+        if caCerts:
+            self.ssl_ctx.set_verify(SSL.verify_peer |
+                    SSL.verify_fail_if_no_peer_cert, depth=9)
+            paths = []
+            for path in caCerts:
+                paths.extend(sorted(list(glob.glob(path))))
+            for path in paths:
+                if os.path.isdir(path):
+                    self.ssl_ctx.load_verify_locations(capath=path)
+                elif os.path.exists(path):
+                    self.ssl_ctx.load_verify_locations(cafile=path)
+
+    def connect(self):
+        self.sock = SSL.Connection(self.ssl_ctx)
+        self.sock.clientPostConnectionCheck = self.checkSSL
+        self.sock.connect((self.host, self.port))
+
+    def adopt(self, sock):
+        """
+        Set this connection's underlying socket to C{sock} and wrap it with the
+        SSL connection object. Assume the socket is already open but has not
+        exchanged any SSL traffic.
+        """
+        self.sock = SSL.Connection(self.ssl_ctx, sock)
+        self.sock.setup_ssl()
+        self.sock.set_connect_state()
+        self.sock.connect_ssl()
+        if not self.checkSSL(self.sock.get_peer_cert(), self.host):
+            raise SSL.Checker.SSLVerificationError(
+                    'post connection check failed')
+
+    def close(self):
+        # See M2Crypto/httpslib.py:67
+        pass
+
+    def checkSSL(self, cert, host):
+        """
+        Peer cert checker that will use an alternate hostname for the
+        comparison, e.g. if the actual connect host is an IP this can be used
+        to specify the original hostname.
+        """
+        if self.commonName:
+            host = self.commonName
+        checker = SSL.Checker.Checker()
+        return checker(cert, host)
+
+
 _ipCache = {}
 def getIPAddress(hostAndPort):
     host, port = urllib.splitport(hostAndPort)
@@ -148,6 +225,7 @@ class URLOpener(urllib.FancyURLopener):
     _sendConaryProxyHostHeader = True
 
     def __init__(self, *args, **kw):
+        self.caCerts = kw.pop('caCerts', None)
         self.compress = False
         self.abortCheck = None
         self.usedProxy = False
@@ -212,13 +290,21 @@ class URLOpener(urllib.FancyURLopener):
         resp.close()
 
         # Wrap the socket in an SSL socket
-        h = httplib.HTTPConnection("%s:%s" % (endpointHost, endpointPort))
+        if SSL and self.caCerts:
+            # Doing server cert checking; use m2crypto
+            h = HTTPSConnection(endpointHost, endpointPort,
+                    caCerts=self.caCerts, commonName=endpointHost)
+            h.adopt(sock)
+        else:
+            # No cert checking or no m2crypto
+            h = httplib.HTTPConnection(endpointHost, endpointPort)
+            # This is a bit unclean
+            h.sock = self._wrapSsl(sock)
+
         # Force HTTP/1.0 (this is the default for the old-style HTTP;
         # new-style HTTPConnection defaults to 1.1)
         h._http_vsn = 10
         h._http_vsn_str = 'HTTP/1.0'
-        # This is a bit unclean
-        h.sock = self._wrapSsl(sock)
         return h
 
     def _wrapSsl(self, sock):
@@ -339,9 +425,23 @@ class URLOpener(urllib.FancyURLopener):
         headers = []
 
         if ssl:
+            if self.caCerts and not SSL:
+                # There are two places to do cert checking but we only want to
+                # warn once, so check for this early.
+                warnings.warn('m2crypto not installed; server certificates '
+                        'will not be validated')
+
             if host != realhost and not useConaryProxy:
                 h = self.proxy_ssl(host, realhost, proxyAuth)
+            elif self.caCerts and SSL:
+                # If cert checking is requested use our HTTPSConnection (which
+                # uses m2crypto)
+                commonName = urllib.splitport(host)[0]
+                h = HTTPSConnection(ipOrHost, caCerts=self.caCerts,
+                        commonName=commonName)
             else:
+                # Either no cert checking was requested, or we don't have the
+                # module to support it, so use vanilla httpslib.
                 h = httplib.HTTPSConnection(ipOrHost)
         else:
             h = httplib.HTTPConnection(ipOrHost)
@@ -514,13 +614,14 @@ class Transport(xmlrpclib.Transport):
     failedHosts = set()
 
     def __init__(self, https = False, proxies = None, serverName = None,
-                 extraHeaders = None):
+                 extraHeaders = None, caCerts=None):
         self.https = https
         self.compress = False
         self.abortCheck = None
         self.proxies = proxies
         self.serverName = serverName
         self.setExtraHeaders(extraHeaders)
+        self.caCerts = caCerts
         self.responseHeaders = None
         self.responseProtocol = None
         self.usedProxy = False
@@ -567,7 +668,7 @@ class Transport(xmlrpclib.Transport):
 
         protocol = self._protocol()
 
-        opener = XMLOpener(self.proxies)
+        opener = XMLOpener(self.proxies, caCerts=self.caCerts)
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 

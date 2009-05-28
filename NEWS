@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o New Features
+    * Conary can now be configured with a set of certificate authorities
+      (trustedCerts) against which all secure repository access will be
+      validated. (CNY-2735)
+
 Changes in 2.0.43:
   o Internal Changes:
     * Additional information is now included when Conary receives

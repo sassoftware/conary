@@ -576,6 +576,9 @@ class ConaryContext(ConfigSection):
     downloadFirst         =  (CfgBool, False)
     tmpDir                =  (CfgPath, '/var/tmp')
     trustThreshold        =  (CfgInt, 0)
+    trustedCerts          =  (CfgPathList, (),
+            'List of CA certificates which are trusted to identify a remote '
+            'repository using SSL. Entries may be files, dirs, or globs.')
     trustedKeys           =  (CfgList(CfgString), [])
     updateThreshold       =  (CfgInt, 15)
     useDirs               =  (CfgPathList, ('/etc/conary/use',

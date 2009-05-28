@@ -326,7 +326,7 @@ class ServerProxy(util.ServerProxy):
 
 class ServerCache:
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
-                 callback=None, proxies=None, entitlementDir = None):
+            callback=None, proxies=None, entitlementDir=None, caCerts=None):
 	self.cache = {}
         self.shareCache = {}
 	self.map = repMap
@@ -335,6 +335,7 @@ class ServerCache:
         self.entitlements = entitlements
         self.proxies = proxies
         self.entitlementDir = entitlementDir
+        self.caCerts = caCerts
         self.callLog = None
 
         if 'CONARY_CLIENT_LOG' in os.environ:
@@ -467,8 +468,8 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         transporter = transport.Transport(https = (protocol == 'https'),
-                                          proxies = self.proxies,
-                                          serverName = serverName)
+                proxies=self.proxies, serverName=serverName,
+                caCerts=self.caCerts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
@@ -540,11 +541,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
 
     # fixme: take a cfg object instead of all these parameters
-    def __init__(self, repMap, userMap,
-                 localRepository = None, pwPrompt = None,
-                 entitlementDir = None, downloadRateLimit = 0,
-                 uploadRateLimit = 0, entitlements = None,
-                 proxy = None):
+    def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
+            entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
+            entitlements=None, proxy=None, caCerts=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -567,9 +566,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 newEnts.addEntitlement(server, ent, entClass = entClass)
             entitlements = newEnts
 
-	self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
-                             proxies = self.proxies,
-                             entitlementDir = entitlementDir)
+        self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
+                proxies=self.proxies, entitlementDir=entitlementDir,
+                caCerts=caCerts)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
