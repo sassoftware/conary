@@ -1,8 +1,12 @@
 Changes in @NEW@:
-  o New Features
+  o New Features:
     * Conary can now be configured with a set of certificate authorities
       (trustedCerts) against which all secure repository access will be
       validated. (CNY-2735)
+
+  o Bug Fixes:
+    * An internal function used to install files no longer leaks a file
+      descriptor on error. (CNY-3152)
 
 Changes in 2.0.43:
   o Internal Changes:

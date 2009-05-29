@@ -1273,11 +1273,11 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     off_t inFd, inSize, inStart, inStop, inAt;
     PyObject * outFdList, *pyInStart, *pyInSize;
     int * outFds, outFdCount, i, rc, inflate_rc;
-    char inBuf[1024 * 256];
-    char outBuf[1024 * 256];
+    uint8_t inBuf[1024 * 256];
+    uint8_t outBuf[1024 * 256];
     SHA_CTX sha1state;
     z_stream zs;
-    char sha1[20];
+    uint8_t sha1[20];
 
     if (!PyArg_ParseTuple(args, "(iOO)O!", &inFd, &pyInStart, &pyInSize,
                           &PyList_Type, &outFdList ))
@@ -1370,34 +1370,35 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 
     SHA1_Final(sha1, &sha1state);
 
-    return PyString_FromStringAndSize(sha1, sizeof(sha1));
+    return PyString_FromStringAndSize((char*)sha1, sizeof(sha1));
 }
 
 static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
-    int inFd, outFd, i, rc, inflate_rc;
+    int inFd, outFd = -1, i, rc, inflate_rc;
     off_t inStop, inAt, inSize, inStart;
     PyObject *pyInStart, *pyInSize;
     z_stream zs;
-    char inBuf[1024 * 256];
-    char outBuf[1024 * 256];
+    uint8_t inBuf[1024 * 256];
+    uint8_t outBuf[1024 * 256];
     SHA_CTX sha1state;
-    char sha1[20];
+    uint8_t sha1[20];
     char * path, * baseName;
     struct stat sb;
-    char * tmpPath, * targetPath;
+    char * tmpPath = NULL, * targetPath;
+
     if (!PyArg_ParseTuple(args, "(iOO)sss", &inFd, &pyInStart, &pyInSize,
 			  &path, &baseName, &targetPath))
-        return NULL;
+        goto onerror;
 
     if (!PyInt_CheckExact(pyInStart) &&
 	!PyLong_CheckExact(pyInStart)) {
         PyErr_SetString(PyExc_TypeError, "second item in first argument must be an int or long");
-        return NULL;
+        goto onerror;
     }
     if (!PyInt_CheckExact(pyInSize) &&
 	       !PyLong_CheckExact(pyInSize)) {
         PyErr_SetString(PyExc_TypeError, "third item in first argument must be an int or long");
-        return NULL;
+        goto onerror;
     }
 
     if (PyInt_CheckExact(pyInStart))
@@ -1405,28 +1406,27 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     else
 	inStart = PyLong_AsUnsignedLongLong(pyInStart);
     if (inStart == (off_t) -1)
-	return NULL;
+        goto onerror;
 
     if (PyInt_CheckExact(pyInSize))
 	inSize = PyLong_AsUnsignedLong(pyInSize);
     else
 	inSize = PyLong_AsUnsignedLongLong(pyInSize);
     if (inSize == (off_t) -1)
-	return NULL;
+        goto onerror;
 
     tmpPath = alloca(strlen(path) + strlen(baseName) + 10);
     sprintf(tmpPath, "%s/.ct%sXXXXXX", path, baseName);
     outFd = mkstemp(tmpPath);
     if (outFd == -1) {
         PyErr_SetFromErrno(PyExc_OSError);
-        return NULL;
+        goto onerror;
     }
 
     memset(&zs, 0, sizeof(zs));
     if ((rc = inflateInit2(&zs, 31)) != Z_OK) {
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
-        unlink(tmpPath);
-        return NULL;
+        goto onerror;
     }
 
     SHA1_Init(&sha1state);
@@ -1443,13 +1443,11 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
             inAt += zs.avail_in;
             if (rc == -1) {
                 PyErr_SetFromErrno(PyExc_OSError);
-                unlink(tmpPath);
-                return NULL;
+                goto onerror;
             }
             if (rc != zs.avail_in) {
                 PyErr_SetString(PyExc_RuntimeError, "short pread");
-                unlink(tmpPath);
-                return NULL;
+                goto onerror;
             }
         }
 
@@ -1458,8 +1456,7 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
         inflate_rc = inflate(&zs, 0);
         if (inflate_rc < 0) {
             PyErr_SetString(PyExc_RuntimeError, zError(rc));
-            unlink(tmpPath);
-            return NULL;
+            goto onerror;
         }
 
         i = sizeof(outBuf) - zs.avail_out;
@@ -1467,49 +1464,51 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
         rc = write(outFd, outBuf, i);
         if (rc == -1) {
             PyErr_SetFromErrno(PyExc_OSError);
-            unlink(tmpPath);
-            return NULL;
+            goto onerror;
         }
         if (rc != i) {
             PyErr_SetString(PyExc_RuntimeError, "short write");
-            unlink(tmpPath);
-            return NULL;
+            goto onerror;
         }
     }
 
     if ((rc = inflateEnd(&zs)) != Z_OK) {
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
-        return NULL;
+        goto onerror;
     }
 
     SHA1_Final(sha1, &sha1state);
 
     if (close(outFd)) {
         PyErr_SetFromErrno(PyExc_OSError);
-        unlink(tmpPath);
-        return NULL;
+        goto onerror;
     }
+    outFd = -1;
 
     rc = stat(targetPath, &sb);
     if (rc && errno != ENOENT) {
         PyErr_SetFromErrno(PyExc_OSError);
-        unlink(tmpPath);
-        return NULL;
+        goto onerror;
     } else if (!rc && S_ISDIR(sb.st_mode)) {
         if (rmdir(targetPath)) {
             PyErr_SetFromErrno(PyExc_OSError);
-            unlink(tmpPath);
-            return NULL;
+            goto onerror;
         }
     }
 
     if (rename(tmpPath, targetPath)) {
         PyErr_SetFromErrno(PyExc_OSError);
-        unlink(tmpPath);
-        return NULL;
+        goto onerror;
     }
 
-    return PyString_FromStringAndSize(sha1, sizeof(sha1));
+    return PyString_FromStringAndSize((char*)sha1, sizeof(sha1));
+
+onerror:
+    if (outFd != -1)
+        close(outFd);
+    if (tmpPath != NULL)
+        unlink(tmpPath);
+    return NULL;
 }
 
 static PyObject * py_res_init(PyObject *self, PyObject *args) {
@@ -1523,3 +1522,6 @@ initmisc(void)
     Py_InitModule3("misc", MiscMethods, 
 		   "miscelaneous low-level C functions for conary");
 }
+
+
+/* vim: set sts=4 sw=4 expandtab : */
