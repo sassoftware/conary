@@ -215,8 +215,15 @@ class DependencyWorkTables:
                                 multiplier = -1)
 
     def mergeRemoves(self):
+        # The COALESCE here handles RemovedTroveIds being empty. The max
+        # tells us how many rows from RemovedTroveIds have already been
+        # merged into TmpRequires and DepCheck so we can just merge the
+        # new changes.
+        self.cu.execute("SELECT COALESCE(MAX(rowId), -1) FROM RemovedTroveIds")
+        max = self.cu.next()[0]
+
         self.cu.execute("""
-        INSERT INTO RemovedTroveIds
+        INSERT INTO RemovedTroveIds (troveId, nodeId)
         SELECT instanceId, nodeId
         FROM RemovedTroves
         JOIN Versions ON RemovedTroves.version = Versions.version
@@ -234,7 +241,6 @@ class DependencyWorkTables:
         # we've removed. We insert those dependencies into our temporary
         # tables (which define everything which needs to be checked) with
         # a positive depNum which matches the depNum from the Requires table.
-        self.cu.execute("DELETE FROM TmpRequires WHERE instanceId > 0")
         self.cu.execute("""
         INSERT INTO TmpRequires (instanceId, depId, depNum, depCount)
         SELECT DISTINCT
@@ -243,9 +249,9 @@ class DependencyWorkTables:
         FROM RemovedTroveIds
         JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
         JOIN Requires ON Provides.depId = Requires.depId
-        """)
+        WHERE RemovedTroveIds.rowId > ?
+        """, max)
 
-        self.cu.execute("DELETE FROM DepCheck WHERE depNum > 0")
         self.cu.execute("""
         INSERT INTO DepCheck
         SELECT DISTINCT
@@ -256,8 +262,8 @@ class DependencyWorkTables:
         JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
         JOIN Requires ON Provides.depId = Requires.depId
         JOIN Dependencies ON Dependencies.depId = Requires.depId
-        WHERE Dependencies.class != ?
-        """, deps.AbiDependency.tag)
+        WHERE Dependencies.class != ? AND RemovedTroveIds.rowId > ?
+        """, deps.AbiDependency.tag, max)
 
     def removeTrove(self, (name, version, flavor), nodeId):
         if flavor is None or flavor.isEmpty():

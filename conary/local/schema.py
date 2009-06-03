@@ -356,9 +356,10 @@ def setupTempDepTables(db, cu=None, skipCommit=False):
     if "RemovedTroveIds" not in db.tempTables:
         cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroveIds(
+		rowId %(PRIMARYKEY)s,
                 troveId INTEGER,
                 nodeId INTEGER
-            )""", start_transaction=False)
+            )""" % db.keywords, start_transaction=False)
         cu.execute("CREATE INDEX RemovedTroveIdsIdx ON RemovedTroveIds(troveId)",
                    start_transaction=False)
         db.tempTables["RemovedTroveIds"] = True
