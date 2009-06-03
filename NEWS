@@ -16,6 +16,10 @@ Changes in @NEW@:
   o Bug Fixes:
     * --lsprof option now writes out profiling information even if an
       exception occurs for both the conary and cvc commands
+    * Dependency numbers in temporary dependency checking tables no longer
+      overlap dependency numbers in the persistent database
+    * Dependencies with multiple flags were not marked as satisfied during
+      dependency resolution passes, forcing extra work on subsequant passes
 
 Changes in 2.0.43:
   o Internal Changes:

@@ -103,11 +103,13 @@ class DependencyWorkTables:
                 count = self.cu.next()[0]
                 assert(not count)
 
-        self.cu.execute("SELECT MAX(depNum) FROM %(reqTable)s" % substDict)
-        base = self.cu.next()[0]
-        if base is None:
-            base = 0
-        substDict['baseReqNum'] = base + 1
+            self.cu.execute("SELECT COALESCE(MIN(depNum), 0) "
+                            "FROM %(reqTable)s" % substDict)
+        else:
+            self.cu.execute("SELECT COALESCE(MAX(depNum), 0) "
+                            "FROM %(reqTable)s" % substDict)
+
+        substDict['baseReqNum'] = self.cu.next()[0] + multiplier
 
         if len(dependencyTables) == 1:
             substDict['depId'] = "%s.depId" % dependencyTables
@@ -399,7 +401,7 @@ class DependencyChecker:
         newOldEdges = set()
 
         for (depId, depNum, reqInstId, reqNodeIdx,
-             provInstId, provNodeIdx) in result:
+             provInstId, provNodeIdx, reqDepNum) in result:
             if depNum < 0:
                 fromNodeId = -depList[-depNum][0]
                 assert(fromNodeId > 0)
@@ -590,7 +592,7 @@ class DependencyChecker:
         wasIn = {}
 
         for (depId, depNum, reqInstanceId,
-             reqNodeIdx, provInstId, provNodeIdx) in result:
+             reqNodeIdx, provInstId, provNodeIdx, reqDepNum) in result:
             if provNodeIdx is not None:
                 if reqNodeIdx is not None:
                     # this is an old dependency and an old provide.
@@ -652,7 +654,8 @@ class DependencyChecker:
                 subselect += """ UNION ALL """
 
             subselect += """
-            SELECT %(requires)s.depId      AS reqDepId,
+            SELECT %(requires)s.depId   AS reqDepId,
+                %(requires)s.depNum     AS reqDepNum,
                 %(requires)s.instanceId AS reqInstId,
                 %(provides)s.depId      AS provDepId,
                 %(provides)s.instanceId AS provInstId,
@@ -682,6 +685,7 @@ class DependencyChecker:
         SELECT MAX(Matched.reqDepId) as depId,
             depCheck.depNum as depNum,
             Matched.reqInstId as reqInstanceId,
+            Matched.reqDepNum as reqDepNum,
             Matched.provInstId as provInstanceId,
             DepCheck.flagCount as flagCount
         FROM ( %s ) AS Matched
@@ -1006,8 +1010,8 @@ class DependencyChecker:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         stmt = """
-        SELECT depId, depNum, reqInstanceId, Required.nodeId,
-        provInstanceId, Provided.nodeId
+        SELECT Resolved.depId, Resolved.depNum, reqInstanceId, Required.nodeId,
+        provInstanceId, Provided.nodeId, Resolved.reqDepNum
         FROM (%s) AS Resolved
         LEFT OUTER JOIN RemovedTroveIds AS Required ON
             reqInstanceId = Required.troveId
@@ -1061,21 +1065,23 @@ class DependencyChecker:
                                                 unresolveable,
                                                 wasIn)
 
+        l = set()
         if not unsatisfiedList and not unresolveableList:
             # Everything was satisfied. No reason to be careful about updating
             # the satisfied list.
             self.cu.execute("update tmprequires set satisfied=1")
         else:
             for (depId, depNum, reqInstanceId,
-                 reqNodeIdx, provInstId, provNodeIdx) in result:
+                 reqNodeIdx, provInstId, provNodeIdx, reqDepNum) in result:
                 if not provInstId: continue
                 if provNodeIdx is not None:
                     # it's provided by something we're erasing,
                     # so don't count that.
                     continue
-                self.cu.execute("update tmprequires set satisfied=1 where "
-                        "depId = ? and instanceId = ?",
-                        depId, reqInstanceId)
+                l.add(reqDepNum)
+
+        self.cu.execute("update tmprequires set satisfied=1 where "
+                        "depNum in (%s)" % ",".join(["%d" % x for x in l]))
 
         return (unsatisfiedList, unresolveableList, changeSetList, depGraph,
                 criticalUpdates)
