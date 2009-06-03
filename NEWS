@@ -15,6 +15,8 @@ Changes in @NEW@:
     * Dependency tables for removed troves are no longer dropped and rebuilt
       during each iteration of dependency solving; they are now incrementally
       built during subsequant iterations.
+    * Dependency ordering code now looks in the local database for trove
+      references instead of instantiating troves to get that information
 
   o Bug Fixes:
     * --lsprof option now writes out profiling information even if an

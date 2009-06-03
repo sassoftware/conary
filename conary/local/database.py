@@ -1110,6 +1110,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def getTroveContainers(self, l):
         return self.db.getTroveContainers(l)
 
+    def getTroveReferences(self, l, weakRefs = False):
+        return self.db.getTroveReferences(l, weakRefs = weakRefs)
+
     def findTroveContainers(self, names):
         return self.db.findTroveContainers(names)
 

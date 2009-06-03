@@ -1565,6 +1565,21 @@ order by
         cu.execute("DROP TABLE mlt")
 
     def getTroveContainers(self, l):
+        """
+        Return the troves which include the troves listed in l as strong
+        references.
+        """
+        return self._getTroveInclusions(l, False, weakRefs = False)
+
+    def getTroveReferences(self, l, weakRefs = False):
+        """
+        Return the troves which the troves in l include as strong references.
+        If weakRefs is True, also include the troves included as weak
+        references.
+        """
+        return self._getTroveInclusions(l, True, weakRefs = weakRefs)
+
+    def _getTroveInclusions(self, l, included, weakRefs = False):
         cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE ftc(
@@ -1581,6 +1596,16 @@ order by
         cu.executemany("INSERT INTO ftc VALUES(?, ?, ?, ?)", 
                        _iter(l, result), start_transaction = False)
 
+        if included:
+            sense = ("instanceId", "includedId")
+        else:
+            sense = ("includedId", "instanceId")
+
+        if weakRefs:
+            weakRefsFilter = 0
+        else:
+            weakRefsFilter = schema.TROVE_TROVES_WEAKREF
+
         cu.execute("""SELECT idx, instances.troveName, Versions.version,
                              Flavors.flavor, flags
                       FROM ftc
@@ -1591,9 +1616,9 @@ order by
                       JOIN Flavors AS IncFlavor ON
                           IncFlavor.flavorId = IncInst.flavorId
                       JOIN TroveTroves ON
-                          TroveTroves.includedId = IncInst.instanceId
+                          TroveTroves.%s = IncInst.instanceId
                       JOIN Instances ON
-                          Instances.instanceId = TroveTroves.instanceId
+                          Instances.instanceId = TroveTroves.%s
                       JOIN Versions ON
                           Versions.versionId = Instances.versionId
                       JOIN Flavors ON
@@ -1601,14 +1626,10 @@ order by
                       WHERE
                           IncVersion.version = ftc.version AND
                           (IncFlavor.flavor = ftc.flavor OR
-                           (IncFlavor.flavor IS NULL AND ftc.flavor = ""))
-                   """)
+                           (IncFlavor.flavor IS NULL AND ftc.flavor = "")) AND
+                          (TroveTroves.flags & %d) == 0
+                   """ % (sense + (weakRefsFilter,)))
         for (idx, name, version, flavor, flags) in cu:
-            if flags & schema.TROVE_TROVES_WEAKREF:
-                # don't include weak references, they are not direct
-                # containers
-                continue
-
             result[idx].append((name, versions.VersionFromString(version),
                                 deps.deps.ThawFlavor(flavor)))
 

@@ -382,9 +382,9 @@ class DependencyChecker:
             if not trove.troveIsCollection(job[0]): continue
 
             if job[1][0]:
-                trv = self.troveSource.db.getTrove(job[0], job[1][0], job[1][1],
-                                                   withFiles = False)
-                for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                for info in self.troveSource.db.getTroveReferences(
+                            [ (job[0], job[1][0], job[1][1]) ],
+                            weakRefs = True)[0]:
                     targetTrove = getOld(info, -1)
                     if targetTrove >= 0:
                         addEdge((i + 1, targetTrove, None))
