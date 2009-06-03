@@ -1218,15 +1218,16 @@ class ConaryMain(command.MainHandler):
             lsprof = True
             del argSet['lsprof']
 
-        rv = options.MainHandler.runCommand(self, thisCommand, cfg,
-                                             argSet, args)
-
-        if profile:
-            prof.stop()
-        if lsprof:
-            prof.disable()
-            prof.dump_stats('conary.lsprof')
-            prof.print_stats()
+        try:
+            rv = options.MainHandler.runCommand(self, thisCommand, cfg,
+                                                 argSet, args)
+        finally:
+            if profile:
+                prof.stop()
+            if lsprof:
+                prof.disable()
+                prof.dump_stats('conary.lsprof')
+                prof.print_stats()
 
         if log.errorOccurred():
             return 1

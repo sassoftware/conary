@@ -1053,18 +1053,20 @@ class CvcMain(command.MainHandler):
                                                        cfg)
         keyCache.setCallback(keyCacheCallback)
 
-        rv = options.MainHandler.runCommand(self, thisCommand,
-                                            cfg, argSet, args,
-                                            callback=callback,
-                                            repos=client.getRepos(),
-                                            profile=profile)
+        try:
+            rv = options.MainHandler.runCommand(self, thisCommand,
+                                                cfg, argSet, args,
+                                                callback=callback,
+                                                repos=client.getRepos(),
+                                                profile=profile)
+        finally:
+            if profile == 'lsprof':
+                prof.disable()
+                prof.dump_stats('cvc.lsprof')
+                prof.print_stats()
+            elif profile:
+                prof.stop()
 
-        if profile == 'lsprof':
-            prof.disable()
-            prof.dump_stats('cvc.lsprof')
-            prof.print_stats()
-        elif profile:
-            prof.stop()
         if log.errorOccurred():
             sys.exit(2)
         return rv

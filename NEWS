@@ -8,6 +8,10 @@ Changes in @NEW@:
     * An internal function used to install files no longer leaks a file
       descriptor on error. (CNY-3152)
 
+  o Bug Fixes:
+    * --lsprof option now writes out profiling information even if an
+      exception occurs for both the conary and cvc commands
+
 Changes in 2.0.43:
   o Internal Changes:
     * Additional information is now included when Conary receives
