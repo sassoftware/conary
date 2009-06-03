@@ -8,6 +8,11 @@ Changes in @NEW@:
     * An internal function used to install files no longer leaks a file
       descriptor on error. (CNY-3152)
 
+  o Internal Changes:
+    * Update handling now looks for preerase trove scripts in the local
+      database instead of instantiating full troves from the database and
+      looking in those troves.
+
   o Bug Fixes:
     * --lsprof option now writes out profiling information even if an
       exception occurs for both the conary and cvc commands

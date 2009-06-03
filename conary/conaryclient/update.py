@@ -1799,25 +1799,30 @@ conary erase '%s=%s[%s]'
 
         return newJob
 
-    def _addJobPreEraseScript(self, job, updJob):
-        # check for the old trove's erase scripts
-        oldTrv = self.db.getTrove(job[0], job[1][0], job[1][1])
-        oldTrvCs = oldTrv.diff(None)[0]
-        preScript = oldTrvCs._getPreEraseScript()
-        if preScript:
-            updJob.addJobPreScript(job, preScript,
-                                   oldTrv.getCompatibilityClass(), None,
-                                   action = "preerase")
+    def _addJobPreEraseScripts(self, jobList, updJob):
+        # check for old trove's erase scripts
+        removeList = [ job for job in jobList
+                             if job[2][0] is None ]
+        scripts = self.db.getTroveScripts(
+                    [ (job[0], job[1][0], job[1][1]) for job in removeList ] )
+        for job, scriptObj in itertools.izip(removeList, scripts):
+            if scriptObj is None: continue
+            if not scriptObj.preErase.script(): continue
+
+            compatClass = self.db.getTroveCompatibilityClass(
+                                job[0], job[1][0], job[1][1])
+            updJob.addJobPreScript(job, scriptObj.preErase.script(),
+                                   compatClass, None, action = "preerase")
 
     def _processJobList(self, jobList, updJob, troveSourceCallback):
         missingTroves = list()
         removedTroves = list()
         rollbackFence = False
 
+        self._addJobPreEraseScripts(jobList, updJob)
+
         for job in jobList:
             if job[2][0] is None:
-                # Removal
-                self._addJobPreEraseScript(job, updJob)
                 continue
 
             cs = troveSourceCallback(job)

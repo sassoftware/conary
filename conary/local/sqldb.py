@@ -1839,11 +1839,8 @@ order by
         if troveNames:
             cu.execute("DROP TABLE tmpInst", start_transaction = False)
 
-    def getPathHashesForTroveList(self, troveList):
-        """ 
-            Returns the pathHashes for the given trove list.
-        """
-        # returns a list parallel to troveList
+    def _getTroveInfo(self, troveList, troveInfoTag):
+        # returns a list parallel to troveList, None for troveinfo not present
         cu = self.db.cursor()
 
         cu.execute("""
@@ -1854,7 +1851,8 @@ order by
             flavorId  INTEGER
         ) """ % self.db.keywords, start_transaction = False)
 
-        r = []
+        # avoid walking troveList multiple times in case it's a generator
+        r = [ ]
         def _iter(tl, r):
             for i, (name, version, flavor) in enumerate(tl):
                 flavorId = self.flavors.get(flavor, None)
@@ -1877,14 +1875,28 @@ order by
                             Instances.isPresent == 1
                         INNER JOIN TroveInfo USING (instanceId)
                         WHERE TroveInfo.infoType = ?
-                    """, trove._TROVEINFO_TAG_PATH_HASHES)
+                    """, troveInfoTag)
 
         for (idx, data) in cu:
-            r[idx] = trove.PathHashes(data)
+            r[idx] = trove.TroveInfo.streamDict[troveInfoTag][1](data)
 
         cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
         return r
+
+    def getPathHashesForTroveList(self, troveList):
+        """ 
+            Returns the pathHashes for the given trove list.
+        """
+        return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_PATH_HASHES)
+
+    def getTroveScripts(self, troveList):
+        """ 
+            Returns the trove scripts for the given trove list. None is
+            returned for troves with no scripts. Returns a list of
+            trove.TroveScripts objects.
+        """
+        return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_SCRIPTS)
 
     def getTroveCompatibilityClass(self, name, version, flavor):
         if flavor is None or flavor.isEmpty():

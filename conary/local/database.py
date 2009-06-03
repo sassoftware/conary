@@ -2305,6 +2305,9 @@ class Database(SqlDbRepository):
         updJob.addJob(jobs)
         return preScripts
 
+    def getTroveScripts(self, troveList):
+        return self.db.getTroveScripts(troveList)
+
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
 
