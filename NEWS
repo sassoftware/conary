@@ -3,6 +3,8 @@ Changes in @NEW@:
     * Conary can now be configured with a set of certificate authorities
       (trustedCerts) against which all secure repository access will be
       validated. (CNY-2735)
+    * Conary now logs the starting, output, and error exit codes of
+      trove scripts to the /var/log/conary file. (CNY-3150)
 
   o Bug Fixes:
     * An internal function used to install files no longer leaks a file
@@ -14,7 +16,7 @@ Changes in @NEW@:
       looking in those troves.
     * Dependency tables for removed troves are no longer dropped and rebuilt
       during each iteration of dependency solving; they are now incrementally
-      built during subsequant iterations.
+      built during subsequent iterations.
     * Dependency ordering code now looks in the local database for trove
       references instead of instantiating troves to get that information
 
@@ -24,7 +26,7 @@ Changes in @NEW@:
     * Dependency numbers in temporary dependency checking tables no longer
       overlap dependency numbers in the persistent database
     * Dependencies with multiple flags were not marked as satisfied during
-      dependency resolution passes, forcing extra work on subsequant passes
+      dependency resolution passes, forcing extra work on subsequent passes
 
 Changes in 2.0.43:
   o Internal Changes:

@@ -2648,6 +2648,7 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
         stderrPipe = os.pipe()
 
         callback.troveScriptStarted(scriptId)
+        log.syslog('running script %s' %scriptId)
         pid = os.fork()
 
         if pid == 0:
@@ -2710,6 +2711,7 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
                 else:
                     for line in lines:
                         callback.troveScriptOutput(scriptId, line)
+                        log.syslog('[%s] %s' %(scriptId, line.strip()))
 
         (id, status) = os.waitpid(pid, 0)
         os.unlink(scriptName)
@@ -2722,9 +2724,11 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
             else:
                 rc = os.WEXITSTATUS(status)
             callback.troveScriptFailure(scriptId, rc)
+            log.syslog('script %s failed with exit code %d' %(scriptId, rc))
         else:
             rc = 0
             callback.troveScriptFinished(scriptId)
+            log.syslog('script %s finished' %scriptId)
 
     return rc
 
