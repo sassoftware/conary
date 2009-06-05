@@ -9,6 +9,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * An internal function used to install files no longer leaks a file
       descriptor on error. (CNY-3152)
+    * Unknown errors while retrieving PGP keys for archive verification
+      are gracefully handled. (CNY-3120)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local

@@ -185,6 +185,8 @@ class _Source(_AnySource):
                 log.info('Error retrieving PGP key %s from key server %s: %s' %
                     (self.keyid, ks, e))
                 continue
+            except Exception, e:
+                log.info('Unknown error encountered while retrieving PGP key %s from key server %s: %s' % (self.keyid, ks, e))
 
         if keyData is None:
             raise SourceError, "Failed to retrieve PGP key %s" % self.keyid
