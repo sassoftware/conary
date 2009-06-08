@@ -32,6 +32,9 @@ Changes in @NEW@:
           instantiating troves to get that information
         - Batches reference checks, pin checks, and presence checks across
           troves instead of checking those for each trove individually
+    * Fast pathed code which matches old troves with new troves for the
+      case where only a single old trove and a single new trove with
+      a given name exist
 
   o Bug Fixes:
     * --lsprof option now writes out profiling information even if an

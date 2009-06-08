@@ -2614,6 +2614,18 @@ class Trove(streams.StreamSet):
                     trvList.append((name, (None, None), (version, newFlavor),
                                     False))
                 del addedDict[name]
+            elif (len(addedDict[name]) == 1 and len(removedDict[name]) == 1):
+                # there's only one thing to match it to. some match is better
+                # than no match. the complicated matching logic later on
+                # would give the same result at the end of it all, but just
+                # doing it here avoids fetching the path hashes, which is
+                # relatively expensive if those hashes are in the local
+                # database
+                trvList.append( (name, list(removedDict[name])[0],
+                                 list(addedDict[name])[0], False) )
+                del addedDict[name]
+                del removedDict[name]
+
         for name in removedDict.keys():
             if not name in addedDict:
                 # there isn't anything which disappeared that has the same
