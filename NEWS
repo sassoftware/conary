@@ -12,6 +12,8 @@ Changes in @NEW@:
     * Unknown errors while retrieving PGP keys for archive verification
       are gracefully handled. (CNY-3120)
     * cvc refresh now ignores negative cache entries. (CNY-3157)
+    * cvc sign properly handles keys specified by key ID, in addition
+      to fingerprints. (CNY-3139)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local

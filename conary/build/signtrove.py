@@ -88,6 +88,11 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
 
             continue
 
+        # Look for a public key for this key; don't catch the exception
+        keyCache = trove.openpgpkey.getKeyCache()
+        key = keyCache.getPublicKey(signatureKey)
+        signatureKey = key.getFingerprint()
+
         try:
             trv.getDigitalSignature(signatureKey)
             if not cfg.quiet:
@@ -109,8 +114,10 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
             repos.addDigitalSignature(trv.getName(), trv.getVersion(),
                                       trv.getFlavor(),
                                       trv.getDigitalSignature(signatureKey))
-        except (errors.AlreadySignedError, KeyNotFound):
-            misfires.append(trv.getName())
+        except (errors.AlreadySignedError, KeyNotFound), e:
+            misfires.append((trv.getName(), str(e)))
 
     if misfires:
-        raise errors.DigitalSignatureError('The following troves could not be signed: %s' % str(misfires))
+        troves = [ x[0] for x in misfires ]
+        errs = set(x[1] for x in misfires)
+        raise errors.DigitalSignatureError('The following troves could not be signed: %s; reason(s): %s' % (troves, list(errs)))
