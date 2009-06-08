@@ -2127,6 +2127,8 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
         else:
             raise errors.CvcError('Recipe requires setup() method')
 
+    # Get rid of the negative cache entries (CNY-3157)
+    lcache.clearCacheDir(recipeObj.name, negative = True)
     try:
         srcFiles = recipeObj.fetchAllSources(refreshFilter = refreshFilter,
                                              skipFilter = skipFilter)

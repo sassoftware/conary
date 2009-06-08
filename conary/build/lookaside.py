@@ -452,13 +452,21 @@ class RepositoryCache(object):
     def setRefreshFilter(self, refreshFilter):
         self.refreshFilter = refreshFilter
 
-    def getCachePath(self, prefix, name, negative=False):
-        name = self._truncateName(name)
+    def getCacheDir(self, prefix, negative=False):
         if negative:
             prefix = 'NEGATIVE' + os.sep + prefix
 
-        path = os.sep.join((self.basePath, prefix, name))
+        return os.sep.join((self.basePath, prefix))
+
+    def getCachePath(self, prefix, name, negative=False):
+        name = self._truncateName(name)
+        cacheDir = self.getCacheDir(prefix, negative=negative)
+        path = os.sep.join((cacheDir, name))
         return os.path.normpath(path)
+
+    def clearCacheDir(self, prefix, negative=False):
+        negativeCachePath = self.getCacheDir(prefix, negative = negative)
+        util.rmtree(os.path.dirname(negativeCachePath), ignore_errors = True)
 
     def createNegativeCacheEntry(self, prefix, name):
         path = self.getCachePath(prefix, name, negative=True)
