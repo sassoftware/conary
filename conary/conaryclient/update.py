@@ -326,6 +326,43 @@ class ClientUpdate:
 
 	def _findErasures(primaryErases, newJob, referencedTroves, recurse,
                           ineligible):
+            # this batches a bunch of hasTrove/trovesArePinned calls. It
+            # doesn't get the ones we find implicitly, unfortunately
+            class ErasureInfoCache:
+
+                def __init__(self, db):
+                    self.db = db
+                    self.hasTrovesCache = {}
+                    self.pinnedCache = {}
+                    self.referencesCache = {}
+
+                def hasTrove(self, info):
+                    return self.hasTrovesCache.get(info, None)
+
+                def isPinned(self, info):
+                    return self.pinnedCache[info]
+
+                def getReferences(self, info):
+                    return self.referencesCache[info]
+
+                def populate(self, jobList):
+                    erasures = [ (job[0], job[1][0], job[1][1]) for job
+                                    in jobList if job[1][0] is not None ]
+                    hasTroveList = self.db.hasTroves(erasures)
+                    self.hasTrovesCache.update(
+                                itertools.izip(erasures, hasTroveList))
+                    present = [ x[0] for x in
+                                    itertools.izip(erasures, hasTroveList)
+                                    if x[1] ]
+                    pinnedList = self.db.trovesArePinned(present)
+                    self.pinnedCache.update(
+                            itertools.izip(present, pinnedList))
+
+                    referenceList = self.db.getTroveReferences(
+                                                present, weakRefs = False)
+                    self.referencesCache.update(
+                            itertools.izip(present, referenceList))
+
 	    # each node is a ((name, version, flavor), state, edgeList
 	    #		       fromUpdate)
 	    # state is ERASE, KEEP, or UNKNOWN
@@ -340,6 +377,10 @@ class ClientUpdate:
 	    KEEP = 2
 	    UNKNOWN = 3
 
+            infoCache = ErasureInfoCache(self.db)
+            infoCache.populate(newJob)
+            infoCache.populate(primaryErases)
+
             jobQueue = util.IterableQueue()
             # The order of this chain matters. It's important that we handle
             # all of the erasures we already know about before getting to the
@@ -351,7 +392,6 @@ class ClientUpdate:
                         itertools.izip(newJob, itertools.repeat(False)),
                         itertools.izip(primaryErases, itertools.repeat(True)), 
                         jobQueue):
-
                 oldInfo = (job[0], job[1][0], job[1][1])
 
                 if oldInfo[1] is None: 
@@ -363,12 +403,15 @@ class ClientUpdate:
                     # work w/o it)
                     continue
 
-                if not self.db.hasTrove(*oldInfo):
-                    # no need to erase something we don't have installed
-                    continue
+                present = infoCache.hasTrove(oldInfo)
+                if present is None:
+                    infoCache.populate(
+                        [ job ] + [ x[0] for x in jobQueue.peekRemainder() ] )
+                    present = infoCache.hasTrove(oldInfo)
 
-                # XXX this needs to be batched
-                pinned = self.db.trovesArePinned([ oldInfo ])[0]
+                if not present:
+                     # no need to erase something we don't have installed
+                     continue
 
                 # erasures which are part of an
                 # update are guaranteed to occur
@@ -378,7 +421,7 @@ class ClientUpdate:
                     fromUpdate = True
                 else:
                     # If it's pinned, we keep it.
-                    if pinned:
+                    if infoCache.isPinned(oldInfo):
                         state = KEEP
                         if isPrimary and checkPrimaryPins:
                             raise UpdatePinnedTroveError(oldInfo)
@@ -398,10 +441,7 @@ class ClientUpdate:
                 if not recurse: continue
 
                 if not trove.troveIsCollection(oldInfo[0]): continue
-                trv = self.db.getTrove(withFiles = False, pristine = False,
-                                       withDeps = False, *oldInfo)
-
-                for inclInfo in trv.iterTroveList(strongRefs=True):
+                for inclInfo in infoCache.getReferences(oldInfo):
                     # we only use strong references when erasing.
                     if inclInfo in ineligible:
                         continue

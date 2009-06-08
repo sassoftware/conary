@@ -1607,7 +1607,7 @@ order by
             weakRefsFilter = schema.TROVE_TROVES_WEAKREF
 
         cu.execute("""SELECT idx, instances.troveName, Versions.version,
-                             Flavors.flavor, flags
+                             Flavors.flavor, instances.timeStamps, flags
                       FROM ftc
                       JOIN Instances AS IncInst ON
                           IncInst.troveName = ftc.name
@@ -1629,8 +1629,11 @@ order by
                            (IncFlavor.flavor IS NULL AND ftc.flavor = "")) AND
                           (TroveTroves.flags & %d) == 0
                    """ % (sense + (weakRefsFilter,)))
-        for (idx, name, version, flavor, flags) in cu:
-            result[idx].append((name, versions.VersionFromString(version),
+        for (idx, name, version, flavor, ts, flags) in cu:
+            ts = [ float(x) for x in ts.split(":") ]
+            result[idx].append((name,
+                                versions.VersionFromString(version,
+                                                           timeStamps = ts),
                                 deps.deps.ThawFlavor(flavor)))
 
         cu.execute("DROP TABLE ftc", start_transaction = False)
