@@ -398,10 +398,9 @@ class ClientUpdate:
                 if not recurse: continue
 
                 if not trove.troveIsCollection(oldInfo[0]): continue
-                trv = self.db.getTrove(withFiles = False, pristine = False,
-                                       withDeps = False, *oldInfo)
-
-                for inclInfo in trv.iterTroveList(strongRefs=True):
+                # XXX this needs to be batched, too
+                for inclInfo in self.db.getTroveReferences([ oldInfo ],
+                                                           weakRefs = False)[0]:
                     # we only use strong references when erasing.
                     if inclInfo in ineligible:
                         continue
