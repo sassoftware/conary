@@ -372,22 +372,32 @@ class DependencyChecker:
     def _createCollectionEdges(self):
         edges = []
 
-        nodes = iter(self.nodes)
-        nodes.next()
         addEdge = edges.append
         getOld = self.oldInfoToNodeId.get
         getNew = self.newInfoToNodeId.get
 
-        for i, (job, _, _) in enumerate(nodes):
+        # skip node 0, which is None
+        oldTroveIndexes = [ (i, job) for i, (job, _, _) in
+                              itertools.islice(enumerate(self.nodes), 1, None)
+                              if trove.troveIsCollection(job[0]) and
+                                 job[1][0] is not None ]
+        referencesList = self.troveSource.db.getTroveReferences(
+                          [ (job[0], job[1][0], job[1][1])
+                                for i, job in oldTroveIndexes ],
+                          weakRefs = True)
+
+        # skip node 0, which is None
+        for i, (job, _, _) in itertools.islice(enumerate(self.nodes), 1, None):
             if not trove.troveIsCollection(job[0]): continue
 
             if job[1][0]:
-                for info in self.troveSource.db.getTroveReferences(
-                            [ (job[0], job[1][0], job[1][1]) ],
-                            weakRefs = True)[0]:
+                references = referencesList.pop(0)
+                assert(oldTroveIndexes.pop(0)[0] == i)
+
+                for info in references:
                     targetTrove = getOld(info, -1)
                     if targetTrove >= 0:
-                        addEdge((i + 1, targetTrove, None))
+                        addEdge((i, targetTrove, None))
 
             if job[2][0]:
                 trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
@@ -396,7 +406,7 @@ class DependencyChecker:
                 for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
                     targetTrove = getNew(info, -1)
                     if targetTrove >= 0:
-                        addEdge((i + 1, targetTrove, None))
+                        addEdge((i, targetTrove, None))
 
         return set(edges)
 
