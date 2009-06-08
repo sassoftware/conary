@@ -14,6 +14,8 @@ Changes in @NEW@:
     * cvc refresh now ignores negative cache entries. (CNY-3157)
     * cvc sign properly handles keys specified by key ID, in addition
       to fingerprints. (CNY-3139)
+    * conary updateall --items now honors --labels, --full-versions and
+      --flavors flags. (CNY-3138)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local

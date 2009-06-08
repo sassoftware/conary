@@ -701,6 +701,16 @@ def updateConary(cfg, conaryVersion):
     return client.applyUpdate(job, localRollbacks = cfg.localRollbacks,
                               replaceFiles = True)
 
+class UpdateAllFormatter(object):
+    def formatNVF(self, name, version, flavor):
+        if version and (flavor is not None) and not flavor.isEmpty():
+            return "'%s=%s[%s]'" % (name, version.asString(), deps.formatFlavor(flavor))
+        if (flavor is not None) and not flavor.isEmpty():
+            return "'%s[%s]'" % (name, deps.formatFlavor(flavor))
+        if version:
+            return "%s=%s" % (name, version.asString())
+        return name
+
 def updateAll(cfg, **kwargs):
     showItems = kwargs.pop('showItems', False)
     restartInfo = kwargs.get('restartInfo', None)
@@ -709,24 +719,28 @@ def updateAll(cfg, **kwargs):
     kwargs['callback'] = UpdateCallback(cfg)
 
     client = conaryclient.ConaryClient(cfg)
+    # We want to be careful not to break the old style display, for whoever
+    # might have a parser for that output.
+    withLongDisplay = (cfg.fullFlavors or cfg.fullVersions or cfg.showLabels)
+    formatter = UpdateAllFormatter()
     if restartInfo:
         updateItems = []
         applyList = None
     else:
-        updateItems = client.fullUpdateItemList()
-        applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
+        if showItems and withLongDisplay:
+            updateItems = client.getUpdateItemList()
+            dcfg = display.DisplayConfig()
+            dcfg.setTroveDisplay(fullFlavors = cfg.fullFlavors,
+                                 fullVersions = cfg.fullVersions,
+                                 showLabels = cfg.showLabels)
+            formatter = display.TroveTupFormatter(dcfg)
+        else:
+            updateItems = client.fullUpdateItemList()
+            applyList = [ (x[0], (None, None), x[1:], True) for x in updateItems ]
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
-            if version and (flavor is not None) and not flavor.isEmpty():
-                print "'%s=%s[%s]'" % (name, version.asString(), deps.formatFlavor(flavor))
-            elif (flavor is not None) and not flavor.isEmpty():
-                print "'%s[%s]'" % (name, deps.formatFlavor(flavor))
-            elif version:
-                print "%s=%s" % (name, version.asString())
-            else:
-                print name
-
+            print formatter.formatNVF(name, version, flavor)
         return
 
     _updateTroves(cfg, applyList, **kwargs)
