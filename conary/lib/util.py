@@ -1085,6 +1085,9 @@ class IterableQueue:
     def add(self, item):
         self.l.append(item)
 
+    def peekRemainder(self):
+        return self.l
+
     def __iter__(self):
         while self.l:
             yield self.l.pop(0)
