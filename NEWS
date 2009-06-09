@@ -36,6 +36,9 @@ Changes in @NEW@:
     * Fast pathed code which matches old troves with new troves for the
       case where only a single old trove and a single new trove with
       a given name exist
+    * Graph calculations for dependency ordering now only occur when the
+      results are needed instead of for every pass through the dependency
+      resolver
 
   o Bug Fixes:
     * --lsprof option now writes out profiling information even if an

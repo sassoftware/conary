@@ -1058,21 +1058,6 @@ class DependencyChecker:
         if linkedJobs is None:
             linkedJobs = set()
 
-        if createGraph or self.findOrdering:
-            changeSetList, criticalUpdates = self._findOrdering(result,
-                                               brokenByErase, satisfied,
-                                               linkedJobSets = linkedJobs,
-                                               criticalJobs = criticalJobs,
-                                               finalJobs = finalJobs)
-        else:
-            changeSetList = []
-            criticalUpdates = []
-
-        if createGraph:
-            depGraph = self.g
-        else:
-            depGraph = None
-
         brokenByErase = set(brokenByErase)
         self.satisfied.update(set(satisfied))
 
@@ -1099,21 +1084,55 @@ class DependencyChecker:
         self.cu.execute("update tmprequires set satisfied=1 where "
                         "depNum in (%s)" % ",".join(["%d" % x for x in l]))
 
-        return (unsatisfiedList, unresolveableList, changeSetList, depGraph,
-                criticalUpdates)
+        class _CheckResult:
+            def getChangeSetList(self):
+                self._order()
+                return self._changeSetList
+
+            def getCriticalUpdates(self):
+                self._order()
+                return self._criticalUpdates
+
+            def _order(self):
+                if self._changeSetList is None:
+                    a, b = orderer()
+                    self._changeSetList = a
+                    self._criticalUpdates = b
+
+            def __init__(self, unsatisfiedList, unresolveableList,
+                         depGraph, orderer):
+                self.unsatisfiedList = unsatisfiedList
+                self.unresolveableList = unresolveableList
+                self.depGraph = depGraph
+                self._changeSetList = None
+                self._criticalUpdates = None
+                self._linkedJobs = set()
+
+        if createGraph or self.findOrdering:
+            orderer = lambda : self._findOrdering(result,
+                                                  brokenByErase, satisfied,
+                                                  linkedJobSets = linkedJobs,
+                                                  criticalJobs = criticalJobs,
+                                                  finalJobs = finalJobs)
+        else:
+            orderer = lambda : ([], [])
+
+        if createGraph:
+            depGraph = self.g
+        else:
+            depGraph = None
+
+        return _CheckResult(unsatisfiedList, unresolveableList,
+                            depGraph, orderer)
 
     def check(self, linkedJobs = None,
               criticalJobs = None, finalJobs = None):
-        (unsatisfiedList, unresolveableList, changeSetList, depGraph,
-         criticalUpdates) = \
-                self._check(linkedJobs=linkedJobs,
-                            createGraph=False, criticalJobs=criticalJobs,
-                            finalJobs=finalJobs)
-        return unsatisfiedList, unresolveableList, changeSetList, criticalUpdates
+        return self._check(linkedJobs=linkedJobs,
+                           createGraph=False, criticalJobs=criticalJobs,
+                           finalJobs=finalJobs)
 
     def createDepGraph(self, linkedJobs=None):
-        unsatisfiedList, unresolveableList, changeSetList, depGraph, criticalUpdates = \
-                self._check(linkedJobs=linkedJobs, createGraph=True)
+        result = self._check(linkedJobs=linkedJobs, createGraph=True)
 
         externalDepGraph = graph.DirectedGraph()
         for nodeId in depGraph.iterNodes():
@@ -1124,7 +1143,8 @@ class DependencyChecker:
             externalDepGraph.addEdge(self.nodes[fromNode][0],
                                      self.nodes[toNode][0])
 
-        return unsatisfiedList, unresolveableList, externalDepGraph
+        return (result.unsatisfiedList, result.unresolveableList,
+                result.externalDepGraph)
 
     def done(self):
         if self.inTransaction:
