@@ -2085,6 +2085,17 @@ class Database(SqlDbRepository):
         dir = self.rollbackCache + "/" + "%d" % num
         return Rollback(dir, load = True)
 
+    def removeInvalidRollbacks(self):
+        self.readRollbackStatus()
+        dirEntries = os.listdir(self.rollbackCache)
+        rollbacks = [ int(x) for x in dirEntries if x.isdigit() ]
+        rollbacks.sort()
+        for num in rollbacks:
+            if num >= self.firstRollback:
+                break
+
+            shutil.rmtree(self.rollbackCache + '/' + "%d" % num)
+
     def applyRollbackList(self, *args, **kwargs):
         try:
             self.commitLock(True)

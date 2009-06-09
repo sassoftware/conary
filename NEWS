@@ -5,6 +5,7 @@ Changes in @NEW@:
       validated. (CNY-2735)
     * Conary now logs the starting, output, and error exit codes of
       trove scripts to the /var/log/conary file. (CNY-3150)
+    * Added removeInvalidRollbacks() to client API (CNY-2933)
 
   o Bug Fixes:
     * An internal function used to install files no longer leaks a file
