@@ -1058,11 +1058,10 @@ class DependencyChecker:
         if linkedJobs is None:
             linkedJobs = set()
 
-        brokenByErase = set(brokenByErase)
         self.satisfied.update(set(satisfied))
 
         unsatisfiedList, unresolveableList = \
-                self._gatherDependencyErrors(self.satisfied, brokenByErase,
+                self._gatherDependencyErrors(self.satisfied, set(brokenByErase),
                                                 unresolveable,
                                                 wasIn)
 
