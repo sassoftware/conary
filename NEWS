@@ -23,6 +23,8 @@ Changes in @NEW@:
       overlap dependency numbers in the persistent database
     * Dependencies with multiple flags were not marked as satisfied during
       dependency resolution passes, forcing extra work on subsequent passes
+    * Local rollbacks would fail to apply when a files metadata changed but
+      the contents stayed the same
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local
