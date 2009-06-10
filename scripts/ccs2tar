@@ -61,17 +61,7 @@ fileList.sort()
 
 del troveList
 
-class Wrapper:
-
-    def tell(self):
-        return 0
-
-    def __init__(self, f):
-        self.f = f
-        self.write = f.write
-        self.flush = f.flush
-
-tf = tarfile.TarFile("", "w", Wrapper(sys.stdout))
+tf = tarfile.open(fileobj=sys.stdout, mode='w|')
 
 delayedContents = {}
 linkGroups = {}
