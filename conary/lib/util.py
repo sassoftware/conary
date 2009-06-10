@@ -319,33 +319,188 @@ def literalRegex(s):
 
 
 # shutil module extensions, with {}-expansion and globbing
+class BraceExpander(object):
+    """Class encapsulating the logic required by the brace expander parser"""
+    class Alternative(list):
+        def __repr__(self):
+            return "Alternative%s" % list.__repr__(self)
+    class Product(list):
+        def __repr__(self):
+            return "Product%s" % list.__repr__(self)
+    class Comma(object):
+        "Comma operator"
+    class Concat(object):
+        "Concatenation operator"
+
+    @classmethod
+    def _collapseNode(cls, node):
+        if isinstance(node, basestring):
+            # Char data
+            return [ node ]
+        if not node:
+            return []
+        components = [ cls._collapseNode(x) for x in node ]
+        if isinstance(node, cls.Product):
+            ret = cls._cartesianProduct(components)
+            return ret
+        ret = []
+        for comp in components:
+            ret.extend(comp)
+        if not isinstance(node, cls.Alternative) or len(components) != 1:
+            return ret
+        # CNY-3158 - single-length items should not be expanded
+        return [ '{%s}' % x for x in ret ]
+
+    @classmethod
+    def _cartesianProduct(cls, components):
+        ret = list(components.pop())
+        while components:
+            comp = components.pop()
+            nret = []
+            for j in comp:
+                nret.extend("%s%s" % (j, x) for x in ret)
+            ret = nret
+        return ret
+
+    @classmethod
+    def _reversePolishNotation(cls, listObj):
+        haveComma = False
+        haveText = False
+        # Sentinel
+        listObj.append(None)
+        outputQ = []
+        operators = []
+        lastWasLiteral = False
+        for item in listObj:
+            if isinstance(item, basestring):
+                if not haveText:
+                    text = []
+                    outputQ.append(text)
+                    haveText = True
+                else:
+                    text = outputQ[-1]
+                text.append(item)
+                continue
+            if haveText:
+                topNode = outputQ.pop()
+                topNode = ''.join(topNode)
+                haveText = False
+                outputQ.append(topNode)
+                lastWasLiteral = True
+
+            if item is None:
+                # We've reached the sentinel
+                break
+            if item is cls.Comma:
+                haveComma = True
+                lastWasLiteral = False
+                while operators:
+                    op = operators.pop()
+                    outputQ.append(op)
+                operators.append(item)
+                continue
+            outputQ.append(item)
+            if not lastWasLiteral:
+                lastWasLiteral = True
+                continue
+            # Concatenation
+            while operators and operators[-1] is not cls.Comma:
+                op = operators.pop()
+                outputQ.append(op)
+            operators.append(cls.Concat)
+        while operators:
+            op = operators.pop()
+            outputQ.append(op)
+        # Now collapse into meaningful nodes
+        stack = []
+        opMap = {
+            cls.Comma: cls.Alternative,
+            cls.Concat: cls.Product,
+        }
+        for item in outputQ:
+            if not (item is cls.Comma or item is cls.Concat):
+                stack.append(item)
+                continue
+            op2 = stack.pop()
+            op1 = stack.pop()
+            ncls = opMap[item]
+            if isinstance(op1, ncls):
+                op1.append(op2)
+                stack.append(op1)
+            elif isinstance(op2, ncls):
+                op2[0:0] = [op1]
+                stack.append(op2)
+            else:
+                nobj = ncls()
+                nobj.extend([op1, op2])
+                stack.append(nobj)
+        ret = stack[0]
+        if not haveComma:
+            ret = cls.Alternative([ret])
+        return ret
+
+    @classmethod
+    def removeComma(cls, l):
+        for item in l:
+            if item is cls.Comma:
+                yield ','
+            else:
+                yield item
+
+    @classmethod
+    def braceExpand(cls, path):
+        stack = [ cls.Product() ]
+        isEscaping = False
+        for c in path:
+            if isEscaping:
+                if c not in r'{}\,':
+                    # Escaping unknown char; strip the backslash
+                    pass
+                isEscaping = False
+                stack[-1].append(c)
+                continue
+            if c == '\\':
+                isEscaping = True
+                continue
+            if c == '{':
+                stack.append([])
+                continue
+            if not stack:
+                raise ValueError, 'path %s has unbalanced {}' %path
+            if c == '}':
+                if len(stack) == 1:
+                    # Unbalanced }; add it as literal
+                    stack[-1].append(c)
+                    continue
+                n = stack.pop()
+                # ,} case
+                if n and n[-1] is cls.Comma:
+                    n.append("")
+                stack[-1].append(cls._reversePolishNotation(n))
+                continue
+            if c == ',':
+                # Mark the comma separator, but only if a previous { was
+                # found, otherwise treat it as a regular character
+                if len(stack) > 1:
+                    # {,a} case - leading comma will produce an empty string
+                    if not stack[-1]:
+                        stack[-1].append("")
+                    c = cls.Comma
+            stack[-1].append(c)
+        if len(stack) > 1:
+            # Unbalanced {; add it as literal
+            node = stack[0]
+            for onode in stack[1:]:
+                node.append('{')
+                node.extend(cls.removeComma(onode))
+        node = stack[0]
+        del stack
+        # We need to filter empty strings from the output:
+        # a{,b} should produce a ab while {,a} should produce a
+        return [ x for x in cls._collapseNode(node) if x]
 
 def braceExpand(path):
-    obrace = string.find(path, "{")
-    if obrace < 0:
-	return [path]
-
-    level=1
-    pathlist = []
-    h = obrace
-    while level:
-	(h, it) = find(path, "{}", h)
-	if h < 0:
-	    raise ValueError, 'path %s has unbalanced {}' %path
-	if it == "{":
-	    level = level + 1
-	    obrace = h
-	else:
-	    segments = path[obrace+1:h].split(',')
-	    start = path[:obrace]
-	    end = path[h+1:]
-	    for segment in segments:
-		newbits = braceExpand(start+segment+end)
-		for bit in newbits:
-		    if not bit in pathlist:
-			pathlist.append(bit)
-	    return pathlist
-	h = h + 1
+    return BraceExpander.braceExpand(path)
 
 @api.publicApi
 def braceGlob(paths):
