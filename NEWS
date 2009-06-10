@@ -6,16 +6,30 @@ Changes in @NEW@:
     * Conary now logs the starting, output, and error exit codes of
       trove scripts to the /var/log/conary file. (CNY-3150)
 
+  o API Changes:
+    * Added removeInvalidRollbacks() to client API. (CNY-2933)
+
   o Bug Fixes:
     * An internal function used to install files no longer leaks a file
       descriptor on error. (CNY-3152)
     * Unknown errors while retrieving PGP keys for archive verification
       are gracefully handled. (CNY-3120)
-    * cvc refresh now ignores negative cache entries. (CNY-3157)
-    * cvc sign properly handles keys specified by key ID, in addition
-      to fingerprints. (CNY-3139)
-    * conary updateall --items now honors --labels, --full-versions and
-      --flavors flags. (CNY-3138)
+    * The cvc refresh command now ignores negative cache entries. (CNY-3157)
+    * The cvc sign command properly handles keys specified by key ID, in
+      addition to fingerprints. (CNY-3139)
+    * The conary updateall --items command now honors --labels,
+      --full-versions and --flavors flags. (CNY-3138)
+    * The --lsprof option now writes out profiling information even if an
+      exception occurs, for both the conary and cvc commands.
+    * Dependency numbers in temporary dependency checking tables no longer
+      overlap dependency numbers in the persistent database.
+    * Dependencies with multiple flags were not marked as satisfied during
+      dependency resolution passes, forcing extra work on subsequent passes.
+    * Local rollbacks would fail to apply when a files metadata changed but
+      the contents stayed the same.
+    * The ccs2tar script now uses a horrible hack to work around python
+      2.6's pathological need to tell() on a tar file to which it is
+      writing. (CNY-3160)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local
@@ -25,21 +39,19 @@ Changes in @NEW@:
       during each iteration of dependency solving; they are now incrementally
       built during subsequent iterations.
     * Dependency ordering code now looks in the local database for trove
-      references instead of instantiating troves to get that information
+      references instead of instantiating troves to get that information.
     * Code which decides what referenced troves need to be erased when
       collections are erased now:
         - Looks in the local database for trove references instead of
           instantiating troves to get that information
         - Batches reference checks, pin checks, and presence checks across
           troves instead of checking those for each trove individually
-
-  o Bug Fixes:
-    * --lsprof option now writes out profiling information even if an
-      exception occurs for both the conary and cvc commands
-    * Dependency numbers in temporary dependency checking tables no longer
-      overlap dependency numbers in the persistent database
-    * Dependencies with multiple flags were not marked as satisfied during
-      dependency resolution passes, forcing extra work on subsequent passes
+    * Fast pathed code which matches old troves with new troves for the
+      case where only a single old trove and a single new trove with
+      a given name exist.
+    * Graph calculations for dependency ordering now only occur when the
+      results are needed instead of for every pass through the dependency
+      resolver.
 
 Changes in 2.0.43:
   o Internal Changes:

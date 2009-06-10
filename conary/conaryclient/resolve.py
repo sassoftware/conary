@@ -74,13 +74,15 @@ class DependencySolver(object):
         check = self.db.getDepStateClass(uJob.getTroveSource(),
                                          findOrdering = split)
 
-        (depList, cannotResolve, changeSetList, keepList, ineligible,
-         criticalUpdates) = self.checkDeps(uJob, jobSet, troveSource,
+        (result, cannotResolve, keepList, ineligible) = \
+                        self.checkDeps(uJob, jobSet, troveSource,
                                        resolveDeps = resolveDeps,
                                        ineligible=ineligible,
                                        keepRequired = keepRequired,
                                        criticalUpdateInfo = criticalUpdateInfo,
                                        check = check)
+        depList = result.unsatisfiedList
+
         if not resolveDeps:
             # we're not supposed to resolve deps here; just skip the
             # rest of this
@@ -112,22 +114,23 @@ class DependencySolver(object):
             if not changedJob:
                 continue
 
-            (depList, cannotResolve, changeSetList, newKeepList,
-             ineligible, criticalUpdates) =  self.checkDeps(uJob, jobSet,
+            (result, cannotResolve, newKeepList, ineligible) = \
+                                       self.checkDeps(uJob, jobSet,
                                        uJob.getTroveSource(),
                                        resolveDeps = True,
                                        ineligible = ineligible,
                                        keepRequired = keepRequired,
                                        criticalUpdateInfo = criticalUpdateInfo,
                                        check = check)
+            depList = result.unsatisfiedList
             keepList.extend(newKeepList)
             depList = resolveSource.filterDependencies(depList)
 
         check.done()
 
-        if criticalUpdateInfo is None:
-            # backwards compatibility with conary v. 1.0.30/1.1.3 and earlier
-            return (depList, suggMap, cannotResolve, changeSetList, keepList)
+        changeSetList = result.getChangeSetList()
+        criticalUpdates = result.getCriticalUpdates()
+
         return (depList, suggMap, cannotResolve, changeSetList, keepList,
                 criticalUpdates)
 
@@ -189,12 +192,12 @@ class DependencySolver(object):
             criticalJobs, finalJobs, criticalOnly = self._findCriticalJobInfo(
                                                          jobSet,
                                                          criticalUpdateInfo)
-            (depList, cannotResolve, changeSetList, criticalUpdates) = \
-                            check.depCheck(jobSet,
-                                           linkedJobs = linkedJobs,
-                                           criticalJobs = criticalJobs,
-                                           finalJobs = finalJobs,
-                                           criticalOnly = criticalOnly)
+            result = check.depCheck(jobSet,
+                                    linkedJobs = linkedJobs,
+                                    criticalJobs = criticalJobs,
+                                    finalJobs = finalJobs,
+                                    criticalOnly = criticalOnly)
+            cannotResolve = result.unresolveableList
 
             if not resolveDeps or not cannotResolve:
                 break
@@ -247,8 +250,7 @@ class DependencySolver(object):
             if not changeMade:
                 break
 
-        return (depList, cannotResolve, changeSetList, keepList, ineligible,
-                criticalUpdates)
+        return (result, cannotResolve, keepList, ineligible)
 
     def resolveEraseByUpdating(self, trvSrc, cannotResolve, uJob, jobSet, 
                                ineligible, check):
@@ -346,12 +348,11 @@ class DependencySolver(object):
             uJob.getTroveSource().merge(newJob.getTroveSource())
             check.setTroveSource(uJob.getTroveSource())
 
-            (depList, newCannotResolve, changeSetList, criticalUpdates) = \
-                    check.depCheck(jobSet | newJobSet, criticalJobs=[])
+            newResult = check.depCheck(jobSet | newJobSet, criticalJobs=[])
             check.done()
 
-            if cannotResolve != newCannotResolve:
-                cannotResolve = newCannotResolve
+            if cannotResolve != newResult.unresolveableList:
+                cannotResolve = newResult.unresolveableList
             else:
                 newJobSet = set()
         except (errors.ClientError, errors.TroveNotFound):

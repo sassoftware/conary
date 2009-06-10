@@ -431,6 +431,13 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
             return searchSource
 
     @api.publicApi
+    def removeInvalidRollbacks(self):
+        """
+        Removes rollbacks from the system which have been outdated.
+        """
+        self.db.removeInvalidRollbacks()
+
+    @api.publicApi
     def applyRollback(self, rollbackSpec, replaceFiles = None,
             callback = None, tagScript = None, justDatabase = None,
             transactionCounter = None, showInfoOnly = False):

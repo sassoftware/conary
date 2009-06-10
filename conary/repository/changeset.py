@@ -557,7 +557,7 @@ class ChangeSet(streams.StreamSet):
                             raise
                         fsFile = None
 
-		    if fsFile and fsFile == origFile:
+		    if fsFile and fsFile.contents == origFile.contents:
 			cont = filecontents.FromFilesystem(fullPath)
                         contType = ChangedFileTypes.file
 		    else:

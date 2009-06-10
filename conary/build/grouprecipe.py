@@ -2998,7 +2998,8 @@ def checkGroupDependencies(group, cfg, cache, callback):
 
     checker = client.db.getDepStateClass(TroveCacheWrapper(cache),
                                          findOrdering = False)
-    failedDeps = checker.depCheck(jobSet)[0]
+    depResult = checker.depCheck(jobSet)
+    failedDeps = depResult.unsatisfiedList
     callback.done()
     return failedDeps
 

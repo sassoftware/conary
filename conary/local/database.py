@@ -1060,36 +1060,27 @@ class DepCheckState:
         #print "--- adding jobs"
         self.setJobs(jobSet)
         #print "--- checking deps"
-        unsatisfiedList, unresolveableList, changeSetList, criticalUpdates = \
-                self.checker.check(linkedJobs = linkedJobs,
-                                   criticalJobs = criticalJobs,
-                                   finalJobs = finalJobs)
+        result = self.checker.check(linkedJobs = linkedJobs,
+                                    criticalJobs = criticalJobs,
+                                    finalJobs = finalJobs)
         #print "--- done"
 
-        if criticalOnly and criticalUpdates:
+        if criticalOnly and result.getCriticalUpdates():
+            changeSetList = result.getChangeSetList()
+            criticalUpdates = result.getCriticalUpdates()
             changeSetList = changeSetList[:criticalUpdates[0] + 1]
             jobSet.clear()
             jobSet.update(itertools.chain(*changeSetList))
-            if criticalUpdates and (unresolveableList or unsatisfiedList):
+            if (criticalUpdates and
+                        (result.unresolveableList or result.unsatisfiedList)):
                 # we're trying to apply only critical updates, but
                 # there's a dep failure somewhere in the entire job.
                 # Try again to resolve dependencies, using only
                 # the critical changes
                 self.setJobs(jobSet)
-                (unsatisfiedList, unresolveableList, changeSetList,
-                 criticalUpdates) = self.checker.check(
-                                    linkedJobs = linkedJobs)
-                criticalUpdates = []
+                result = self.checker.check(linkedJobs = linkedJobs)
 
-        if criticalJobs is None and finalJobs is None:
-            # backwards compatibility.  For future code, pass in 
-            # criticalJobs = [] to make sure you get a consistant
-            # return value.  FIXME when we can break bw compatibility,
-            # we should remove this inconsistent
-            return (unsatisfiedList, unresolveableList, changeSetList)
-
-        return (unsatisfiedList, unresolveableList, changeSetList, 
-                criticalUpdates)
+        return result
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
@@ -2084,6 +2075,17 @@ class Database(SqlDbRepository):
 	num = int(name[2:])
         dir = self.rollbackCache + "/" + "%d" % num
         return Rollback(dir, load = True)
+
+    def removeInvalidRollbacks(self):
+        self.readRollbackStatus()
+        dirEntries = os.listdir(self.rollbackCache)
+        rollbacks = [ int(x) for x in dirEntries if x.isdigit() ]
+        rollbacks.sort()
+        for num in rollbacks:
+            if num >= self.firstRollback:
+                break
+
+            shutil.rmtree(self.rollbackCache + '/' + "%d" % num)
 
     def applyRollbackList(self, *args, **kwargs):
         try:
