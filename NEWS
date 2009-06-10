@@ -27,9 +27,8 @@ Changes in @NEW@:
       dependency resolution passes, forcing extra work on subsequent passes.
     * Local rollbacks would fail to apply when a files metadata changed but
       the contents stayed the same.
-    * The ccs2tar script now uses a horrible hack to work around python
-      2.6's pathological need to tell() on a tar file to which it is
-      writing. (CNY-3160)
+    * The ccs2tar script uses tarfile.open() in a way that is compatible
+      with both python 2.4 and 2.6 (CNY-3160)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local
