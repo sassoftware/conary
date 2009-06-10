@@ -30,6 +30,7 @@ Changes in @NEW@:
     * The ccs2tar script now uses a horrible hack to work around python
       2.6's pathological need to tell() on a tar file to which it is
       writing. (CNY-3160)
+    * Brace expansion produces results similar to bash. (CNY-3158)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local
