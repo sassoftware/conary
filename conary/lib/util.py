@@ -453,9 +453,6 @@ class BraceExpander(object):
         isEscaping = False
         for c in path:
             if isEscaping:
-                if c not in r'{}\,':
-                    # Escaping unknown char; strip the backslash
-                    pass
                 isEscaping = False
                 stack[-1].append(c)
                 continue
