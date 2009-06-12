@@ -98,7 +98,7 @@ class FromFilesystem(FileContents):
         try:
             f = open(self.path, "r")
         finally:
-            os.fchmod(f.fileno(), mode)
+            util.fchmod(f.fileno(), mode)
 
         return f
 

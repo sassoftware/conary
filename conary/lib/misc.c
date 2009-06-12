@@ -51,6 +51,7 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
 static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 static PyObject * py_res_init(PyObject *self, PyObject *args);
+static PyObject * pyfchmod(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -80,6 +81,7 @@ static PyMethodDef MiscMethods[] = {
     { "recvmsg", py_recvmsg, METH_VARARGS },
     { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
     { "res_init", py_res_init, METH_VARARGS },
+    { "fchmod", pyfchmod, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -1514,6 +1516,21 @@ onerror:
 static PyObject * py_res_init(PyObject *self, PyObject *args) {
     int rc = res_init();
     return Py_BuildValue("i", rc);
+}
+
+static PyObject * pyfchmod(PyObject *self, PyObject *args) {
+    int fd, mode;
+
+    if (!PyArg_ParseTuple(args, "ii", &fd, &mode))
+        return NULL;
+
+    if (fchmod(fd, mode)) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 PyMODINIT_FUNC
