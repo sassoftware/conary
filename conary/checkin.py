@@ -1087,13 +1087,6 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
     return _iterChangeSet(repos, changeSet, oldTrove, state,
                           displayAutoSourceFiles = False, pathList = pathList)
 
-def _showChangeSet(repos, changeSet, oldTrove, newTrove,
-                   displayAutoSourceFiles = True, pathList = None):
-    for line in _iterChangeSet(repos, changeSet, oldTrove, newTrove,
-                       displayAutoSourceFiles = displayAutoSourceFiles,
-                       pathList = pathList):
-        print line
-
 def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
                    displayAutoSourceFiles = True, pathList = None):
     troveChanges = changeSet.iterNewTroveList()
