@@ -952,17 +952,25 @@ def rdiffChangeSet(repos, job):
         fileDiff = newFile.diff(oldFile)
         cs.addFile(oldFileId, newFileId, fileDiff)
 
-        if (oldFile and oldFile.flags.isConfig()) or newFile.flags.isConfig():
-            contentsNeeded.append((pathId, oldFile, oldFileId, newFile,
+        if not newFile.hasContents or not newFile.flags.isConfig():
+            pass
+        elif not oldFile or not oldFile.hasContents:
+            contentRequest.append((newFileId, newFileVersion))
+            contentsNeeded.append((pathId, oldFile, False, newFile,
                                    newFileId))
-            if oldFile:
-                contentRequest.append((oldFileId, oldFileVersion))
-
+        elif oldFile.contents.sha1() == newFile.contents.sha1():
+            # don't get contents for files which haven't changed
+            continue
+        elif (oldFile and oldFile.flags.isConfig()) or newFile.flags.isConfig():
+            contentsNeeded.append((pathId, oldFile, True, newFile,
+                                   newFileId))
+            contentRequest.append((oldFileId, oldFileVersion))
             contentRequest.append((newFileId, newFileVersion))
 
     contents = repos.getFileContents(contentRequest)
-    for (pathId, oldFile, oldFileId, newFile, newFileId) in contentsNeeded:
-        if oldFileId:
+    for (pathId, oldFile, oldFileHasContents, newFile, newFileId) \
+                                                    in contentsNeeded:
+        if oldFileHasContents:
             oldContents = contents.pop(0)
         else:
             oldContents = None
