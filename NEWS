@@ -58,6 +58,8 @@ Changes in @NEW@:
       It now downloads only the config (text) files and diffs them on the
       client. This allows it to show diffs for changes across repositories
       and yields a nice speedup. (CNY-3039)
+    * Reworked "conary remove" functionality to generate a changeset for
+      the file remove and commit that through the normal update path.
 
 Changes in 2.0.43:
   o Internal Changes:

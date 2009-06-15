@@ -1443,7 +1443,8 @@ order by
 	instanceId = self.instances[(trove.getName(), versionId, flavorId)]
 	self.troveFiles.removePath(instanceId, path)
 
-    def removeFilesFromTrove(self, troveName, troveVersion, troveFlavor, pathIdList):
+    def removePathIdsFromTrove(self, troveName, troveVersion, troveFlavor,
+                               pathIdList):
 	versionId = self.versionTable[troveVersion]
         flavorId = self.flavors[troveFlavor]
 	instanceId = self.instances[(troveName, versionId, flavorId)]

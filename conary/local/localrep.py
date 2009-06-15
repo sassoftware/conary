@@ -231,13 +231,22 @@ class SqlDataStore(datastore.AbstractDataStore):
         self.db = db
         schema.createDataStore(db)
 
-def markAddedFiles(db, cs):
+def markChangedFiles(db, cs):
     """
-    Mark files added by this changeset as present -- they should already
-    be in the database.
+    Look for files that have been removed from a trove or restored to a trove,
+    and mark those changes in the database. This is used to record local
+    changes.
     """
     for trvCs in cs.iterNewTroveList():
+        ver = trvCs.getOldVersion()
+        if ver.onLocalLabel():
+            ver = trvCs.getNewVersion()
+
         # we only need the pathIds
-        pathIds = [ x[0] for x in trvCs.getNewFileList() ]
-        db.restorePathIdsToTrove(trvCs.getName(), trvCs.getOldVersion(),
-                                 trvCs.getOldFlavor(), pathIds)
+        newPathIds = [ x[0] for x in trvCs.getNewFileList() ]
+        db.restorePathIdsToTrove(trvCs.getName(), ver, trvCs.getOldFlavor(),
+                                 newPathIds)
+
+        oldPathIds = trvCs.getOldFileList()
+        db.removePathIdsFromTrove(trvCs.getName(), ver, trvCs.getOldFlavor(),
+                                  oldPathIds)
