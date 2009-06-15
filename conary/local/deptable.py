@@ -299,6 +299,22 @@ class DependencyChecker:
 
         return nodeId
 
+    @staticmethod
+    def _findNewDependencies(nodeId, depSet, idx):
+        new = deps.DependencySet()
+        for depClass, oneDep in depSet.iterDeps():
+            # we index my depTuple, which seems awfully slow
+            depTuple = (depClass.tag, oneDep)
+            l = idx.get(depTuple, None)
+            if l is None:
+                l = []
+                idx[depTuple] = l
+                new.addDep(depClass, oneDep)
+
+            l.append(nodeId)
+
+        return new
+
     def _buildEdges(self, oldOldEdges, newNewEdges, collectionEdges,
                     linkedIds, finalIds, criticalUpdates):
         edges = []
@@ -419,25 +435,31 @@ class DependencyChecker:
         for (depId, depNum, reqInstId, reqNodeIdx,
              provInstId, provNodeIdx, reqDepNum) in result:
             if depNum < 0:
-                fromNodeId = -depList[-depNum][0]
-                assert(fromNodeId > 0)
+                classId, dep = depList[-depNum][1:3]
 
-                if provNodeIdx is not None:
-                    # new trove depends on something old
-                    toNodeId = provNodeIdx
-                    if fromNodeId == toNodeId:
-                        continue
-                    newOldEdges.add((fromNodeId, toNodeId, depId))
-                elif provInstId > 0:
-                    # new trove depends on something already installed
-                    # which is not being removed. not interesting.
-                    pass
-                else:
-                    # new trove depends on something new
-                    toNodeId = -provInstId
-                    if fromNodeId == toNodeId:
-                        continue
-                    newNewEdges.add((fromNodeId, toNodeId, depId))
+                # we only put the first requirer of this dep in the
+                # sql database; we need to create edges for all of the
+                # users however
+                classId, dep = self.depList[-depNum][1:3]
+                for fromNodeId in self.requiresToNodeId[(classId, dep)]:
+                    assert(fromNodeId > 0)
+
+                    if provNodeIdx is not None:
+                        # new trove depends on something old
+                        toNodeId = provNodeIdx
+                        if fromNodeId == toNodeId:
+                            continue
+                        newOldEdges.add((fromNodeId, toNodeId, depId))
+                    elif provInstId > 0:
+                        # new trove depends on something already installed
+                        # which is not being removed. not interesting.
+                        pass
+                    else:
+                        # new trove depends on something new
+                        toNodeId = -provInstId
+                        if fromNodeId == toNodeId:
+                            continue
+                        newNewEdges.add((fromNodeId, toNodeId, depId))
             else: # dependency was provided by something before this
                   # update occurred
                 if reqNodeIdx is not None:
@@ -996,9 +1018,12 @@ class DependencyChecker:
                 for depClass in ignoreDepClasses:
                     requires.removeDepsByClass(depClass)
 
+                newRequires = self._findNewDependencies(newNodeId, requires,
+                                                        self.requiresToNodeId)
+
                 self.workTables._populateTmpTable(depList = self.depList,
                                                   troveNum = -newNodeId,
-                                                  requires = requires,
+                                                  requires = newRequires,
                                                   provides = provides,
                                                   multiplier = -1)
 
@@ -1041,7 +1066,7 @@ class DependencyChecker:
 
         # it's a shame we instantiate this, but merging _gatherResoltion
         # and _findOrdering doesn't seem like any fun
-        result = self.cu.fetchall()
+        sqlResult = self.cu.fetchall()
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -1053,7 +1078,7 @@ class DependencyChecker:
         #    erase (and need to be looked up in the Requires table in the
         #    database to get a nice description)
         satisfied, brokenByErase, wasIn, unresolveable = \
-                                self._gatherResolution(result)
+                                self._gatherResolution(sqlResult)
 
         if linkedJobs is None:
             linkedJobs = set()
@@ -1072,7 +1097,7 @@ class DependencyChecker:
             self.cu.execute("update tmprequires set satisfied=1")
         else:
             for (depId, depNum, reqInstanceId,
-                 reqNodeIdx, provInstId, provNodeIdx, reqDepNum) in result:
+                 reqNodeIdx, provInstId, provNodeIdx, reqDepNum) in sqlResult:
                 if not provInstId: continue
                 if provNodeIdx is not None:
                     # it's provided by something we're erasing,
@@ -1108,7 +1133,7 @@ class DependencyChecker:
                 self._linkedJobs = set()
 
         if createGraph or self.findOrdering:
-            orderer = lambda : self._findOrdering(result,
+            orderer = lambda : self._findOrdering(sqlResult,
                                                   brokenByErase, satisfied,
                                                   linkedJobSets = linkedJobs,
                                                   criticalJobs = criticalJobs,
@@ -1169,6 +1194,8 @@ class DependencyChecker:
         self.troveSource = troveSource
         self.findOrdering = findOrdering
         self.satisfied = set()
+        self.providesToNodeId = {}
+        self.requiresToNodeId = {}
         self.workTables = DependencyWorkTables(self.db, self.cu,
                                                removeTables = True)
 

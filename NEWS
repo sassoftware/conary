@@ -60,6 +60,10 @@ Changes in @NEW@:
       and yields a nice speedup. (CNY-3039)
     * Reworked "conary remove" functionality to generate a changeset for
       the file remove and commit that through the normal update path.
+    * During dependency checks for new troves, don't include every trove
+      which requires a given dependency in the sql tables. Instead only
+      include that dependency once and expand the matched requirements
+      when we order troves (which is the only time it matters).
 
 Changes in 2.0.43:
   o Internal Changes:
