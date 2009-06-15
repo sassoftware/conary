@@ -54,6 +54,10 @@ Changes in @NEW@:
     * Graph calculations for dependency ordering now only occur when the
       results are needed instead of for every pass through the dependency
       resolver.
+    * Reworked rdiff to not download a full changeset from the repository.
+      It now downloads only the config (text) files and diffs them on the
+      client. This allows it to show diffs for changes across repositories
+      and yields a nice speedup. (CNY-3039)
 
 Changes in 2.0.43:
   o Internal Changes:
