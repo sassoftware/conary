@@ -40,7 +40,6 @@ from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util
 from conary.local import database
 from conary.repository import changeset, errors
-from conary import conaryclient
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
 
