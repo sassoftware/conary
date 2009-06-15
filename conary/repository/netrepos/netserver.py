@@ -755,14 +755,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             for versionSpec, flavorList in versionDict.iteritems():
                 if flavorList is None:
                     cu.execute("INSERT INTO tmpGTVL VALUES (?, ?, NULL)",
-                               troveName, versionSpec,
+                               cu.encode(troveName), cu.encode(versionSpec),
                                start_transaction = False)
                 else:
                     for flavorSpec in flavorList:
                         flavorId = flavorIndices.get(flavorSpec, None)
                         cu.execute("INSERT INTO tmpGTVL VALUES (?, ?, ?)",
-                                   troveName, versionSpec, flavorId,
-                                   start_transaction = False)
+                                cu.encode(troveName), cu.encode(versionSpec),
+                                flavorId, start_transaction=False)
         self.db.analyze("tmpGTVL")
 
     def _latestType(self, queryType):
