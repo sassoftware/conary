@@ -1017,6 +1017,7 @@ class UpdateAllCommand(_UpdateCommand):
         ConaryCommand.addParameters(self, argDef)
         argDef["items"] = NO_PARAM
         argDef["info"] = '-i', NO_PARAM
+        argDef["just-db"] = NO_PARAM
         argDef["keep-required"] = NO_PARAM
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
@@ -1068,6 +1069,7 @@ class UpdateAllCommand(_UpdateCommand):
         if argSet.pop('keep-required', False):
             cfg.keepRequired = True
 
+        kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
 
