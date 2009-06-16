@@ -68,6 +68,8 @@ Changes in @NEW@:
       which requires a given dependency in the sql tables. Instead only
       include that dependency once and expand the matched requirements
       when we order troves (which is the only time it matters).
+    * Added simple caching of path hashes from the database to improve
+      performance of large system updates.
 
 Changes in 2.0.43:
   o Internal Changes:

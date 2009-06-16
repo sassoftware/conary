@@ -1348,7 +1348,7 @@ conary erase '%s=%s[%s]'
 """, *((name, name, name) + replacedInfo + replacedInfo))
         return (job[0], (None, None), job[2], False)
 
-    def _findOverlappingJobs(self, jobSet, troveSource):
+    def _findOverlappingJobs(self, jobSet, troveSource, pathHashCache = None):
         """
         Returns a list of sets of jobs.
 
@@ -1365,6 +1365,9 @@ conary erase '%s=%s[%s]'
         All sets in a job should be connected to each other through
         some chain of these relationships.
         """
+        if pathHashCache is None:
+            pathHashCache = {}
+
         # overlapping is a dict from jobSet id -> overlapping id OR
         # jobSet id -> list of other ids that overlap.
         # for example, overlapping[3] -> 2, and overlapping[2] -> [2,3]
@@ -1378,11 +1381,14 @@ conary erase '%s=%s[%s]'
 
         jobSet = list(enumerate(jobSet))
 
-        pathHashesList = self.db.getPathHashesForTroveList(
-                                           (x[0], x[1][0], x[1][1])
-                                           for idx, x in jobSet if x[1][0])
-        oldJobs = itertools.izip((x for x in jobSet if x[1][1][0]),
-                                 pathHashesList)
+        oldTroves = [ (idx, (x[0], x[1][0], x[1][1]))
+                        for idx, x in jobSet if x[1][0] ]
+        pathHashesNeeded = [ x for (idx, x) in oldTroves
+                                    if x not in pathHashCache ]
+        newPathHashes = self.db.getPathHashesForTroveList(pathHashesNeeded)
+        pathHashCache.update(itertools.izip(pathHashesNeeded, newPathHashes))
+        oldJobs = [ (jobSet[idx], pathHashCache[info])
+                                    for (idx, info) in oldTroves ]
 
         getHashes = troveSource.getPathHashesForTroveList
         newJobs = ((x, getHashes([(x[1][0], x[1][2][0], x[1][2][1])])[0])
