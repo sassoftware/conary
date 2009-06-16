@@ -34,6 +34,8 @@ Changes in @NEW@:
     * Brace expansion produces results similar to bash. (CNY-3158)
     * Trove searches with invalid (non-ASCII) input no longer cause a
       crash on PostgreSQL-backed repositories. (CNY-3165)
+    * Flavor processing in depSetFreeze did not properly handle return
+      codes from depFreezeRaw, which could lead to a segfault. (CNY-3166)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local

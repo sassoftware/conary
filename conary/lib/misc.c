@@ -343,7 +343,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
                           char ** resultPtr, int * resultSizePtr) {
     PyObject * depObjList, * tuple;
     PyObject * nameObj, * flagsObj;
-    int depCount, i;
+    int depCount, i, rc;
     struct depList * depList;
     int totalSize, tagLen;
     char * result, * next;
@@ -400,10 +400,15 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
             return -1;
         }
 
-        depFreezeRaw(nameObj, flagsObj, &depList[i].frz, &depList[i].frzSize);
+        rc = depFreezeRaw(nameObj, flagsObj, &depList[i].frz, &depList[i].frzSize);
 
         Py_DECREF(nameObj);
         Py_DECREF(flagsObj);
+
+        if (rc == -1) {
+            free(depList);
+            return -1;
+        }
 
         totalSize += depList[i].frzSize;
     }
