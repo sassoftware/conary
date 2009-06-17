@@ -7,6 +7,11 @@ Changes in @NEW@:
       trove scripts to the /var/log/conary file. (CNY-3150)
     * The "conary updateall" command now honors the --just-db
       option. (CNY-3167)
+    * The EULA_Conary.txt file has been renamed to
+      EULA_Conary_Dual_License.txt in order to highlight the contents
+      of the beginning of the file, which describe a choice of license
+      terms.  The contents of the file are not changed, and the licenses
+      under which Conary may be used are not changed. (CNY-3168)
 
   o API Changes:
     * Added removeInvalidRollbacks() to client API. (CNY-2933)
