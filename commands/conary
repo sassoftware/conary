@@ -307,23 +307,6 @@ class RemoveCommand(ConaryCommand):
             log.error("cannot remove %s: %s" % (fullPath, e.strerror))
             return 1
 
-        for (fullPath, path) in pathList:
-            try:
-                try:
-                    os.unlink(fullPath)
-                except OSError, e:
-                    if e.errno != errno.ENOENT:
-                        raise
-
-                    log.warning("%s has already been removed from the "
-                                "filesystem", fullPath)
-            except OSError, e:
-                log.error("cannot remove %s: %s" % (fullPath, e.strerror))
-                rc = 1
-            except Exception, e:
-                log.error("cannot remove %s: %s" % (fullPath, str(e)))
-                rc = 1
-
         log.syslog.commandComplete()
 _register(RemoveCommand)
 

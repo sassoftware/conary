@@ -913,6 +913,77 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
         for line in i:
             print line
 
+def rdiffChangeSet(repos, job):
+    # creates a changeset, but only puts in file contents for config files, and
+    # always puts those contents in as diffs (unless the file is new of course)
+    oldTroveInfo = (job[0], job[1][0], job[1][1])
+    newTroveInfo = (job[0], job[2][0], job[2][1])
+
+    if oldTroveInfo[1] is None:
+        oldTroveInfo = None
+        newTrove = repos.getTrove(*newTroveInfo)
+    else:
+        oldTrove, newTrove = repos.getTroves( [ oldTroveInfo, newTroveInfo ] )
+
+    trvCs, fileChangeList = newTrove.diff(oldTrove)[0:2]
+    cs = changeset.ChangeSet()
+    cs.newTrove(trvCs)
+
+    filesNeeded = []
+    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in \
+                                                fileChangeList:
+        if oldFileId:
+            filesNeeded.append((pathId, oldFileId, oldFileVersion))
+
+        filesNeeded.append((pathId, newFileId, newFileVersion))
+
+    fileObjects = repos.getFileVersions(filesNeeded)
+    contentsNeeded = []
+    contentRequest = []
+    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in \
+                                                fileChangeList:
+        if oldFileId:
+            oldFile = fileObjects.pop(0)
+        else:
+            oldFile = None
+
+        newFile = fileObjects.pop(0)
+
+        fileDiff = newFile.diff(oldFile)
+        cs.addFile(oldFileId, newFileId, fileDiff)
+
+        if not newFile.hasContents or not newFile.flags.isConfig():
+            pass
+        elif not oldFile or not oldFile.hasContents:
+            contentRequest.append((newFileId, newFileVersion))
+            contentsNeeded.append((pathId, oldFile, False, newFile,
+                                   newFileId))
+        elif oldFile.contents.sha1() == newFile.contents.sha1():
+            # don't get contents for files which haven't changed
+            continue
+        elif (oldFile and oldFile.flags.isConfig()) or newFile.flags.isConfig():
+            contentsNeeded.append((pathId, oldFile, True, newFile,
+                                   newFileId))
+            contentRequest.append((oldFileId, oldFileVersion))
+            contentRequest.append((newFileId, newFileVersion))
+
+    contents = repos.getFileContents(contentRequest)
+    for (pathId, oldFile, oldFileHasContents, newFile, newFileId) \
+                                                    in contentsNeeded:
+        if oldFileHasContents:
+            oldContents = contents.pop(0)
+        else:
+            oldContents = None
+
+        newContents = contents.pop(0)
+
+        (contType, cont) = changeset.fileContentsDiff(oldFile, oldContents,
+                                                      newFile, newContents)
+
+        cs.addFileContents(pathId, newFileId, contType, cont, True)
+
+    return cs
+
 def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
 	troveName += ":source"
@@ -949,9 +1020,8 @@ def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     else:
         new = repos.getTrove(*new)
 
-    cs = repos.createChangeSet([(troveName, (oldV, deps.deps.Flavor()),
-					    (newV, deps.deps.Flavor()), 
-                                 False)])
+    cs = rdiffChangeSet(repos, (troveName, (oldV, deps.deps.Flavor()),
+                                           (newV, deps.deps.Flavor()), False) )
 
     return _iterChangeSet(repos, cs, old, new)
 
@@ -1086,13 +1156,6 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
 
     return _iterChangeSet(repos, changeSet, oldTrove, state,
                           displayAutoSourceFiles = False, pathList = pathList)
-
-def _showChangeSet(repos, changeSet, oldTrove, newTrove,
-                   displayAutoSourceFiles = True, pathList = None):
-    for line in _iterChangeSet(repos, changeSet, oldTrove, newTrove,
-                       displayAutoSourceFiles = displayAutoSourceFiles,
-                       pathList = pathList):
-        print line
 
 def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
                    displayAutoSourceFiles = True, pathList = None):

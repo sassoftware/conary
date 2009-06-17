@@ -1516,13 +1516,26 @@ class Database(SqlDbRepository):
                 # of this job)
                 continue
 
-            self.db.removeFilesFromTrove(troveName, troveVersion,
-                                         troveFlavor, fileDict.keys())
+            self.db.removePathIdsFromTrove(troveName, troveVersion,
+                                           troveFlavor, fileDict.keys())
 
         dbConflicts = []
 
+        localChanges = None
+        for trvCs in cs.iterNewTroveList():
+            if (trvCs.getNewVersion().onLocalLabel() or
+                trvCs.getNewVersion().onRollbackLabel() or
+                trvCs.getOldVersion() and (
+                    trvCs.getOldVersion().onLocalLabel() or
+                    trvCs.getOldVersion().onRollbackLabel()
+                )):
+                assert(localChanges or localChanges is None)
+                localChanges = True
+            else:
+                localChanges = False
+
         # Build A->B
-        if updateDatabase:
+        if (updateDatabase and not localChanges):
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
@@ -1540,12 +1553,13 @@ class Database(SqlDbRepository):
                             troveName, version, flavor))
 
             self.db.mapPinnedTroves(uJob.getPinMaps())
+        elif updateDatabase and localChanges:
+            # We're applying the local part of changeset. Files which are newly
+            # added by local changesets need to be recorded in the database as
+            # being present (since they were previously erased)
+            localrep.markChangedFiles(self.db, cs)
+            csJob = None
         else:
-            # When updateDatabase is False, we're applying the local part
-            # of changeset. Files which are newly added by local changesets
-            # need to be recorded in the database as being present (since
-            # they were previously erased)
-            localrep.markAddedFiles(self.db, cs)
             csJob = None
 
         errList = fsJob.getErrorList()
@@ -1604,7 +1618,7 @@ class Database(SqlDbRepository):
         if not commitFlags.justDatabase:
             fsJob.apply(journal, opJournal = opJournal)
 
-        if updateDatabase:
+        if (updateDatabase and not localChanges):
             for (name, version, flavor) in fsJob.getOldTroveList():
                 # if to database if false, we're restoring the local
                 # branch of a rollback
@@ -1678,7 +1692,9 @@ class Database(SqlDbRepository):
 	    old = newTrove.getOldVersion()
 	    flavor = newTrove.getOldFlavor()
 	    if self.hasTroveByName(name) and old:
-		ver = old.createShadow(versions.LocalLabel())
+                if old.onLocalLabel():
+                    old = newTrove.getNewVersion()
+                ver = old.createShadow(versions.LocalLabel())
 		trv = dbCache.getTrove(name, old, flavor, pristine = False)
 		origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
 		assert(trv)
@@ -1881,85 +1897,45 @@ class Database(SqlDbRepository):
 
         return True
 
-
     def removeFiles(self, pathList):
 
-        def _doRemove(self, rb, pathList):
-            pathsByTrove = {}
-            troves = {}
+        pathsByTrove = {}
+        troves = {}
+
+        for path in pathList:
+            trvs = [ x for x in self.db.iterFindByPath(path) ]
+            if len(trvs) > 1:
+                raise DatabaseError, "multiple troves own %s" % path
+            elif not trvs:
+                raise DatabaseError, "no trove owns %s" % path
+
+            trv = trvs[0]
+            trvInfo = trv.getNameVersionFlavor()
+
+            troves[trvInfo] = trv
+            pathsByTrove.setdefault(trvInfo, []).append(path)
+
+        removeCs = changeset.ChangeSet()
+
+        for trvInfo, pathList in pathsByTrove.iteritems():
+            trv = troves[trvInfo]
+
+            newTrv = trv.copy()
+            newTrv.changeVersion(
+                        trv.getVersion().createShadow(versions.LocalLabel()))
 
             for path in pathList:
-                trvs = [ x for x in self.db.iterFindByPath(path) ]
-                if len(trvs) > 1:
-                    raise DatabaseError, "multiple troves own %s" % path
-                elif not trvs:
-                    raise DatabaseError, "no trove owns %s" % path
+                fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList() 
+                                                    if x[1] in path ]
+                assert(len(fileList) == 1)
+                pathId, fileId, fileVersion = fileList[0]
+                newTrv.removeFile(pathId)
 
-                trv = trvs[0]
-                trvInfo = trv.getNameVersionFlavor()
+            newTrv.computeDigests()
+            removeCs.newTrove(newTrv.diff(trv)[0])
 
-                troves[trvInfo] = trv
-                pathsByTrove.setdefault(trvInfo, []).append(path)
-
-            reposCs = changeset.ChangeSet()
-            localCs = changeset.ChangeSet()
-
-            for trvInfo, pathList in pathsByTrove.iteritems():
-                trv = troves[trvInfo]
-
-                newTrv = trv.copy()
-                newTrv.changeVersion(
-                            trv.getVersion().createShadow(versions.RollbackLabel()))
-
-                for path in pathList:
-                    fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList() 
-                                                        if x[1] in path ]
-                    assert(len(fileList) == 1)
-                    pathId, fileId, fileVersion = fileList[0]
-                    trv.removeFile(pathId)
-                    newTrv.removeFile(pathId)
-
-                    fullPath = util.joinPaths(self.root, path)
-
-                    try:
-                        f = files.FileFromFilesystem(fullPath, pathId)
-                    except OSError, e:
-                        if e.errno != errno.ENOENT:
-                            raise
-
-                        stream = self.db.getFileStream(fileId)
-                        newTrv.addFile(pathId, path, fileVersion, fileId)
-                        localCs.addFile(None, fileId, stream)
-                        localCs.addFileContents(pathId, fileId,
-                                changeset.ChangedFileTypes.hldr,
-                                filecontents.FromString(""), False)
-                    else:
-                        fileId = f.fileId()
-                        newTrv.addFile(pathId, path, fileVersion, fileId)
-                        localCs.addFile(None, fileId, f.freeze())
-                        localCs.addFileContents(pathId, fileId,
-                                changeset.ChangedFileTypes.file,
-                                filecontents.FromFilesystem(fullPath), False)
-
-                    self.db.removeFileFromTrove(trv, path)
-
-                    log.syslog("removed file %s from %s", path, trv.getName())
-
-                localCs.newTrove(newTrv.diff(trv)[0])
-
-            # No rollback scripts to add, since we don't have a real trove
-            # we're committing
-            rb.add(NoopJobJournal(), reposCs, localCs, [])
-
-        rb = self.rollbackStack.new()
-        try:
-            _doRemove(self, rb, pathList)
-        except Exception, e:
-            self.rollbackStack.removeLast()
-            raise
-
-        self._updateTransactionCounter = True
-        self.commit()
+        uJob = UpdateJob(self)
+        self.commitChangeSet(removeCs, uJob, callback = UpdateCallback())
 
     def commitLock(self, acquire):
         if not acquire:
@@ -2212,7 +2188,6 @@ class Database(SqlDbRepository):
                                      fsUpdateJob,
                                      rollbackPhase =
                                             update.ROLLBACK_PHASE_LOCAL,
-                                     updateDatabase = False,
                                      callback = callback,
                                      tagScript = tagScript,
                                      commitFlags = commitFlags)
@@ -2255,6 +2230,11 @@ class Database(SqlDbRepository):
 
         jobs = []
         for trvCs in cs.iterNewTroveList():
+            oldVersion = trvCs.getOldVersion()
+            if oldVersion and oldVersion.onLocalLabel():
+                # These were local changes, which have no scripts
+                continue
+
             job = trvCs.getJob()
             jobs.append(job)
             newCompatClass = trvCs.getNewCompatibilityClass()
@@ -2448,6 +2428,12 @@ class DatabaseCacheWrapper:
         return getattr(self.db, attr)
 
     def getTrove(self, name, version, flavor, pristine = True, *args, **kw):
+        if version.onLocalLabel():
+            # The local label is a handy fiction. It's the same as the
+            # nonpristine parent.
+            version = version.parentVersion()
+            pristine = False
+
         l = self.getTroves([ (name, version, flavor) ], pristine = pristine)
         if l[0] is None:
             raise errors.TroveMissing(name, version)

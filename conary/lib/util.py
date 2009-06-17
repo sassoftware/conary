@@ -1294,6 +1294,7 @@ removeIfExists = misc.removeIfExists
 pread = misc.pread
 res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
+fchmod = misc.fchmod
 
 
 def _LazyFile_reopen(method):

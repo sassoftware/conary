@@ -907,7 +907,9 @@ class FilesystemJob:
 	"""
 
 	if baseTrove:
-	    assert(troveCs.getOldVersion() == baseTrove.getVersion())
+            assert(troveCs.getOldVersion() == baseTrove.getVersion() or
+                   troveCs.getOldVersion().parentVersion() ==
+                                baseTrove.getVersion())
 
         # fully updated tracks whether any errors have occurred; if no
         # errors occur, the version for fsTrove gets set to the head version
@@ -1690,7 +1692,10 @@ class FilesystemJob:
 	for troveCs in changeSet.iterNewTroveList():
             old = troveCs.getOldVersion()
 	    if old:
-		localVer = old.createShadow(versions.LocalLabel())
+                if old.onLocalLabel():
+                    localVer = troveCs.getOldVersion()
+                else:
+                    localVer = old.createShadow(versions.LocalLabel())
                 newFsTrove = fsTroveDict[(troveCs.getName(), localVer, troveCs.getOldFlavor())].copy()
                 baseTrove = db.getTrove(troveCs.getName(), old, 
                                          troveCs.getOldFlavor())
@@ -1848,17 +1853,20 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 	try:
             f = files.FileFromFilesystem(realPath, pathId,
                                          possibleMatch = possibleMatch)
-	except OSError:
+	except OSError, e:
             if isSrcTrove:
 		callback.error(
                     "%s is missing (use remove if this is intentional)" 
 		    % util.normpath(path))
                 return None
 
-            if not flags.missingFilesOkay:
-		callback.warning(
+            if e.errno == errno.ENOENT and not flags.missingFilesOkay:
+                callback.warning(
                     "%s is missing (use remove if this is intentional)" 
-		    % util.normpath(path))
+                    % util.normpath(path))
+            else:
+                callback.warning(
+                    "cannot remove %s: %s" % (util.normpath(path), e.strerror))
 
             newTrove.removeFile(pathId)
             continue

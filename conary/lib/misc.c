@@ -51,6 +51,7 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
 static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 static PyObject * py_res_init(PyObject *self, PyObject *args);
+static PyObject * pyfchmod(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -80,6 +81,7 @@ static PyMethodDef MiscMethods[] = {
     { "recvmsg", py_recvmsg, METH_VARARGS },
     { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
     { "res_init", py_res_init, METH_VARARGS },
+    { "fchmod", pyfchmod, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -341,7 +343,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
                           char ** resultPtr, int * resultSizePtr) {
     PyObject * depObjList, * tuple;
     PyObject * nameObj, * flagsObj;
-    int depCount, i;
+    int depCount, i, rc;
     struct depList * depList;
     int totalSize, tagLen;
     char * result, * next;
@@ -398,10 +400,15 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
             return -1;
         }
 
-        depFreezeRaw(nameObj, flagsObj, &depList[i].frz, &depList[i].frzSize);
+        rc = depFreezeRaw(nameObj, flagsObj, &depList[i].frz, &depList[i].frzSize);
 
         Py_DECREF(nameObj);
         Py_DECREF(flagsObj);
+
+        if (rc == -1) {
+            free(depList);
+            return -1;
+        }
 
         totalSize += depList[i].frzSize;
     }
@@ -1514,6 +1521,21 @@ onerror:
 static PyObject * py_res_init(PyObject *self, PyObject *args) {
     int rc = res_init();
     return Py_BuildValue("i", rc);
+}
+
+static PyObject * pyfchmod(PyObject *self, PyObject *args) {
+    int fd, mode;
+
+    if (!PyArg_ParseTuple(args, "ii", &fd, &mode))
+        return NULL;
+
+    if (fchmod(fd, mode)) {
+        PyErr_SetFromErrno(PyExc_OSError);
+        return NULL;
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 PyMODINIT_FUNC

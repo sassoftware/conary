@@ -25,12 +25,17 @@ Changes in @NEW@:
       overlap dependency numbers in the persistent database.
     * Dependencies with multiple flags were not marked as satisfied during
       dependency resolution passes, forcing extra work on subsequent passes.
-    * Local rollbacks would fail to apply when a files metadata changed but
-      the contents stayed the same.
-    * The ccs2tar script now uses a horrible hack to work around python
-      2.6's pathological need to tell() on a tar file to which it is
-      writing. (CNY-3160)
+    * Local rollbacks would fail to restore contents when a files metadata
+      changed but the contents stayed the same.
+    * Generating local rollbacks would fail for nonroot users when the file
+      was unreadable due to permissions.
+    * The ccs2tar script uses tarfile.open() in a way that is compatible
+      with both python 2.4 and 2.6 (CNY-3160)
     * Brace expansion produces results similar to bash. (CNY-3158)
+    * Trove searches with invalid (non-ASCII) input no longer cause a
+      crash on PostgreSQL-backed repositories. (CNY-3165)
+    * Flavor processing in depSetFreeze did not properly handle return
+      codes from depFreezeRaw, which could lead to a segfault. (CNY-3166)
     * Path normalization no longer produces erroneous double-slash entries
       in /etc/ld.so.conf. (CNY-3142)
 
@@ -55,6 +60,18 @@ Changes in @NEW@:
     * Graph calculations for dependency ordering now only occur when the
       results are needed instead of for every pass through the dependency
       resolver.
+    * Reworked rdiff to not download a full changeset from the repository.
+      It now downloads only the config (text) files and diffs them on the
+      client. This allows it to show diffs for changes across repositories
+      and yields a nice speedup. (CNY-3039)
+    * Reworked "conary remove" functionality to generate a changeset for
+      the file remove and commit that through the normal update path.
+    * During dependency checks for new troves, don't include every trove
+      which requires a given dependency in the sql tables. Instead only
+      include that dependency once and expand the matched requirements
+      when we order troves (which is the only time it matters).
+    * Added simple caching of path hashes from the database to improve
+      performance of large system updates.
 
 Changes in 2.0.43:
   o Internal Changes:

@@ -185,10 +185,12 @@ class DependencySolver(object):
         assert(check)
 
         keepList = []
+        pathHashCache = {}
 
         while True:
             linkedJobs = self.client._findOverlappingJobs(jobSet,
-                                                          uJob.getTroveSource())
+                                      uJob.getTroveSource(),
+                                      pathHashCache = pathHashCache)
             criticalJobs, finalJobs, criticalOnly = self._findCriticalJobInfo(
                                                          jobSet,
                                                          criticalUpdateInfo)

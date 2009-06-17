@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,6 +16,8 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+
+import errno, os
 
 from conary.lib import sha1helper, util
 
@@ -85,7 +87,20 @@ class FromFilesystem(FileContents):
     __slots__ = ( "path" )
 
     def get(self):
-	return open(self.path, "r")
+        try:
+            return open(self.path, "r")
+        except IOError, e:
+            if e.errno != errno.EACCES:
+                raise
+
+        mode = os.stat(self.path).st_mode & 0777
+        os.chmod(self.path, mode | 0400)
+        try:
+            f = open(self.path, "r")
+        finally:
+            util.fchmod(f.fileno(), mode)
+
+        return f
 
     def __init__(self, path, compressed = False):
 	self.path = path
