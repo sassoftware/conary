@@ -778,10 +778,10 @@ class FilesystemJob:
 		continue
 
 	    if path[0] == '/':
-		realPath = root + path
+		realPath = util.joinPaths(root, path)
 	    else:
                 cwd = os.getcwd()
-		realPath = cwd + "/" + path
+		realPath = util.joinPaths(cwd, path)
 
 	    if flags.merge:
 		try:
@@ -830,7 +830,8 @@ class FilesystemJob:
 
             if (not flags.merge) or fsPath == basePath :
                 # the path changed in the repository, propagate that change
-                self._rename(rootFixup + fsPath, rootFixup + headPath,
+                self._rename(util.joinPaths(rootFixup, fsPath),
+                             util.joinPaths(rootFixup, headPath),
                              "renaming %s to %s" % (fsPath, headPath))
 
                 finalPath = headPath
@@ -1211,7 +1212,7 @@ class FilesystemJob:
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
-	    realPath = os.path.normpath(rootFixup + finalPath)
+            realPath = util.joinPaths(rootFixup, finalPath)
 
             # FIXME we should be able to inspect headChanges directly
             # to see if we need to go into the if statement which follows
@@ -1267,7 +1268,7 @@ class FilesystemJob:
                 fsTrove.addFile(pathId, finalPath, fsVersion, fsFileId)
 
             if fileOnSystem:
-                fsFile = files.FileFromFilesystem(rootFixup + fsPath, pathId)
+                fsFile = files.FileFromFilesystem(util.joinPaths(rootFixup, fsPath), pathId)
 
             # link groups come from the database; they aren't inferred from
             # the filesystem
@@ -1358,7 +1359,7 @@ class FilesystemJob:
 		    else:
 			contentsOkay = False
                         self.errors.append(FileAttributesConflictError(
-                                                util.normpath(realPath)))
+                                                realPath))
 		else:
 		    # this forces the change to apply
                     if headChanges is not None:
@@ -1484,12 +1485,11 @@ class FilesystemJob:
                             "".join([x.asString() for x in failedHunks]),
                             "conflicts from merging changes from " 
                             "head into %s saved as %s.conflicts" % 
-                        (util.normpath(realPath), util.normpath(realPath)))
+                        (realPath, realPath))
 
                     contentsOkay = True
 		else:
-                    self.errors.append(FileContentsConflictError(
-                                              util.normpath(realPath)))
+                    self.errors.append(FileContentsConflictError(realPath))
 		    contentsOkay = False
             elif headFile.hasContents and headFile.linkGroup():
                 # the contents haven't changed, but the link group has changed.
@@ -1939,7 +1939,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     realPath = curTrove.pathMap[path]
                     isAutoSource = True
             else:
-                realPath = root + "/" + path
+                realPath = util.joinPaths(root, path)
                 isAutoSource = False
 
             if not isinstance(version, versions.NewVersion):
@@ -1954,7 +1954,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                                      isAutoSource=True)
                     continue
         else:
-	    realPath = root + path
+	    realPath = util.joinPaths(root, path)
 
 	# if we're committing against head, this better be a new file.
 	# if we're generating a diff against someplace else, it might not 
