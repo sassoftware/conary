@@ -15,6 +15,10 @@ Changes in @NEW@:
 
   o API Changes:
     * Added removeInvalidRollbacks() to client API. (CNY-2933)
+    * The conary.lib.mainhandler.MainHandler.main() method now sets
+      sys.excepthook only if the setSysExcepthook method variable
+      is True (as it is by default), allowing subclasses to take
+      responsibility for setting sys.excepthook differently. (CNY-3170)
 
   o Bug Fixes:
     * An internal function used to install files no longer leaks a file

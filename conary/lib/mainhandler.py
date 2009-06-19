@@ -36,6 +36,7 @@ class MainHandler(object):
     configClass = None
     useConaryOptions = True # whether to add --config, --debug, --debugger
                             # and use cfgMap.
+    setSysExcepthook = True
 
     def __init__(self):
         self._ignoreConfigErrors = False
@@ -219,8 +220,9 @@ class MainHandler(object):
             if hasattr(cfg, 'debugExceptions'):
                 cfg.debugExceptions = True
             debug = True
-        sys.excepthook = util.genExcepthook(debug=debug,
-                                            debugCtrlC=debugAll)
+        if self.setSysExcepthook:
+            sys.excepthook = util.genExcepthook(debug=debug,
+                                                debugCtrlC=debugAll)
 
         try:
             argSet, argv = self._getPreCommandOptions(argv, cfg)
