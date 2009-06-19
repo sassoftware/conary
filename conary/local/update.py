@@ -1391,7 +1391,7 @@ class FilesystemJob:
 
 		    # the contents changed in just the repository, so take
 		    # those changes
-                    if headFile.flags.isConfig and \
+                    if headFile.flags.isConfig() and \
                                 changeSet.configFileIsDiff(pathId, headFileId):
 			(headFileContType,
 			 headFileContents) = changeSet.getFileContents(
