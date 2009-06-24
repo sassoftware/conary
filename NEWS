@@ -12,6 +12,9 @@ Changes in @NEW@:
       of the beginning of the file, which describe a choice of license
       terms.  The contents of the file are not changed, and the licenses
       under which Conary may be used are not changed. (CNY-3168)
+    * The SetModes build action now takes an optional allowNoMatch
+      keyword argument, that causes a warning to be printed instead of
+      failing the build when the target file does not exist. (CNY-3171)
 
   o API Changes:
     * Added removeInvalidRollbacks() to client API. (CNY-2933)

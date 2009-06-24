@@ -1769,6 +1769,8 @@ class SetModes(_FileAction):
     mode C{02755}.
     """
 
+    keywords = { 'allowNoMatch': False, }
+
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
 	split = len(args) - 1
@@ -1780,8 +1782,12 @@ class SetModes(_FileAction):
 
     def do(self, macros):
 	files = []
-        files = action._expandPaths(self.paths, macros, error=True)
+        files = action._expandPaths(self.paths, macros,
+                                    error=not self.allowNoMatch)
 	for f in files:
+            if self.allowNoMatch and not os.path.exists(f):
+                log.warning('no file matching %s found, ignoring.' % f)
+                continue
 	    log.info('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros.destdir, f)
             if self.manifest:
