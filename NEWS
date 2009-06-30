@@ -52,6 +52,8 @@ Changes in @NEW@:
       codes from depFreezeRaw, which could lead to a segfault. (CNY-3166)
     * Path normalization no longer produces erroneous double-slash entries
       in /etc/ld.so.conf. (CNY-3142)
+    * Accessing a server through a Conary proxy that injects entitlements
+      now correctly forces the use of SSL. (CNY-3176)
 
   o Internal Changes:
     * Update handling now looks for preerase trove scripts in the local

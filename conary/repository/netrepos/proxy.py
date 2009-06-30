@@ -150,7 +150,8 @@ class ProxyCallFactory:
             lheaders['Via'] = ', '.join(via)
 
         urlProtocol, urlRest = urllib.splittype(url)
-        urlHost, urlRest = urllib.splithost(urlRest)
+        urlUserHost, urlRest = urllib.splithost(urlRest)
+        _, urlHost = urllib.splituser(urlUserHost)
         # If the proxy injected entitlements or user information, switch to
         # SSL -- IF they are using
         # default ports (if they specify ports, we have no way of
