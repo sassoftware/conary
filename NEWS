@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.44:
   o New Features:
     * Conary can now be configured with a set of certificate authorities
       (trustedCerts) against which all secure repository access will be
