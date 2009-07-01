@@ -24,11 +24,12 @@ Changes in 2.0.44:
       responsibility for setting sys.excepthook differently. (CNY-3170)
 
   o Bug Fixes:
-    * An internal function used to install files no longer leaks a file
-      descriptor on error. (CNY-3152)
+    * An internal function used for installing files no longer leaks a
+      file descriptor on error. (CNY-3152)
     * Unknown errors while retrieving PGP keys for archive verification
       are now gracefully handled. (CNY-3120)
-    * The cvc refresh command now ignores negative cache entries. (CNY-3157)
+    * The cvc refresh command now ignores negative cache entries.
+      (CNY-3157)
     * The cvc sign command properly handles keys specified by key ID, in
       addition to fingerprints. (CNY-3139)
     * The conary updateall --items command now honors --labels,
@@ -61,33 +62,35 @@ Changes in 2.0.44:
     * Update handling now looks for preerase trove scripts in the local
       database instead of instantiating full troves from the database and
       looking in those troves.
-    * Dependency tables for removed troves are no longer dropped and rebuilt
-      during each iteration of dependency solving; they are now incrementally
-      built during subsequent iterations.
+    * Dependency tables for removed troves are no longer dropped and
+      rebuilt during each iteration of dependency solving; they are now
+      incrementally built during subsequent iterations.
     * Dependency ordering code now looks in the local database for trove
       references instead of instantiating troves to get that information.
     * Code which decides what referenced troves need to be erased when
       collections are erased now:
         - looks in the local database for trove references instead of
-          instantiating troves to get that information
-        - batches reference checks, pin checks, and presence checks across
-          troves instead of checking those for each trove individually
+          instantiating troves to get that information.
+        - batches reference checks, pin checks, and presence checks
+          across troves instead of checking those for each trove
+          individually.
     * Fast-pathed code which matches old troves with new troves for the
       case where only a single old trove and a single new trove with
       a given name exist.
     * Graph calculations for dependency ordering now only occur when the
       results are needed instead of for every pass through the dependency
       resolver.
-    * Reworked rdiff to not download a full changeset from the repository.
-      It now downloads only the config (text) files and diffs them on the
-      client. This allows it to show diffs for changes across repositories
-      and yields a nice speedup. (CNY-3039)
+    * Reworked rdiff to not download a full changeset from the
+      repository. It now downloads only the config (text) files and diffs
+      them on the client. This allows it to show diffs for changes across
+      repositories and yields a nice speedup. (CNY-3039)
     * Reworked "conary remove" functionality to generate a changeset for
       the file remove and commit that through the normal update path.
-    * During dependency checks for new troves, no longer include every
-      trove which requires a given dependency in the SQL tables.  Instead,
-      include that dependency only once and expand the matched requirements
-      when we order troves (which is the only time it matters).
+    * During dependency checks for new troves, Conary no longer includes
+      every trove which requires a given dependency in the SQL tables.
+      Instead, it includes that dependency only once and expands the
+      matched requirements when we order troves (which is the only time
+      it matters).
     * Added simple caching of path hashes from the database to improve
       performance of large system updates.
 
