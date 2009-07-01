@@ -36,7 +36,7 @@ SUBDIRS = commands conary config man scripts extra
 
 extra_files = \
 	LICENSE			\
-	EULA_Conary.txt		\
+	EULA_Conary_Dual_License.txt		\
 	Make.rules 		\
 	Makefile		\
 	NEWS			\

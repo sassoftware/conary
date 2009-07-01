@@ -27,7 +27,7 @@ Changes in @NEW@:
     * An internal function used to install files no longer leaks a file
       descriptor on error. (CNY-3152)
     * Unknown errors while retrieving PGP keys for archive verification
-      are gracefully handled. (CNY-3120)
+      are now gracefully handled. (CNY-3120)
     * The cvc refresh command now ignores negative cache entries. (CNY-3157)
     * The cvc sign command properly handles keys specified by key ID, in
       addition to fingerprints. (CNY-3139)
@@ -37,19 +37,21 @@ Changes in @NEW@:
       exception occurs, for both the conary and cvc commands.
     * Dependency numbers in temporary dependency checking tables no longer
       overlap dependency numbers in the persistent database.
-    * Dependencies with multiple flags were not marked as satisfied during
-      dependency resolution passes, forcing extra work on subsequent passes.
-    * Local rollbacks would fail to restore contents when a files metadata
-      changed but the contents stayed the same.
-    * Generating local rollbacks would fail for nonroot users when the file
-      was unreadable due to permissions.
+    * Dependencies with multiple flags previously were not marked as
+      satisfied during dependency resolution passes, forcing extra work
+      on subsequent passes.
+    * Local rollbacks previously failed to restore contents when a file's
+      metadata changed but the contents stayed the same.
+    * Generating local rollbacks previously failed for non-root users when
+      the file was unreadable due to permissions.
     * The ccs2tar script uses tarfile.open() in a way that is compatible
       with both python 2.4 and 2.6 (CNY-3160)
     * Brace expansion produces results similar to bash. (CNY-3158)
     * Trove searches with invalid (non-ASCII) input no longer cause a
       crash on PostgreSQL-backed repositories. (CNY-3165)
-    * Flavor processing in depSetFreeze did not properly handle return
-      codes from depFreezeRaw, which could lead to a segfault. (CNY-3166)
+    * Flavor processing in depSetFreeze previously did not properly handle
+      return codes from depFreezeRaw, which could lead to a segmentation
+      fault. (CNY-3166)
     * Path normalization no longer produces erroneous double-slash entries
       in /etc/ld.so.conf. (CNY-3142)
     * Accessing a server through a Conary proxy that injects entitlements
@@ -66,11 +68,11 @@ Changes in @NEW@:
       references instead of instantiating troves to get that information.
     * Code which decides what referenced troves need to be erased when
       collections are erased now:
-        - Looks in the local database for trove references instead of
+        - looks in the local database for trove references instead of
           instantiating troves to get that information
-        - Batches reference checks, pin checks, and presence checks across
+        - batches reference checks, pin checks, and presence checks across
           troves instead of checking those for each trove individually
-    * Fast pathed code which matches old troves with new troves for the
+    * Fast-pathed code which matches old troves with new troves for the
       case where only a single old trove and a single new trove with
       a given name exist.
     * Graph calculations for dependency ordering now only occur when the
@@ -82,9 +84,9 @@ Changes in @NEW@:
       and yields a nice speedup. (CNY-3039)
     * Reworked "conary remove" functionality to generate a changeset for
       the file remove and commit that through the normal update path.
-    * During dependency checks for new troves, don't include every trove
-      which requires a given dependency in the sql tables. Instead only
-      include that dependency once and expand the matched requirements
+    * During dependency checks for new troves, no longer include every
+      trove which requires a given dependency in the SQL tables.  Instead,
+      include that dependency only once and expand the matched requirements
       when we order troves (which is the only time it matters).
     * Added simple caching of path hashes from the database to improve
       performance of large system updates.
