@@ -35,8 +35,8 @@ except ImportError:
 cresthooks = None
 try:
     from crest import webhooks as cresthooks
-except ImportError:
-    pass
+except ImportError, e:
+    print 'warning: failed to import crest:', str(e)
 
 thisFile = sys.modules[__name__].__file__
 thisPath = os.path.dirname(thisFile)

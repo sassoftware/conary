@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o New Features:
+    * Standalone server now prints a message if it fails to import the REST
+      api.
+
 Changes in 2.0.44:
   o New Features:
     * Conary can now be configured with a set of certificate authorities
