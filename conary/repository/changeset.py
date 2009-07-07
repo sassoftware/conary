@@ -333,15 +333,22 @@ class ChangeSet(streams.StreamSet):
                                                                  compressed))
 
     def getFileContents(self, pathId, fileId, compressed = False):
-        assert(not compressed)
         key = makeKey(pathId, fileId)
 	if self.fileContents.has_key(key):
 	    cont = self.fileContents[key]
 	else:
 	    cont = self.configCache[key]
 
-        # this shouldn't be done on precompressed contents
-        assert(not cont[2])
+        if compressed and cont[2]:
+            # we have compressed contents, and we've been asked for compressed
+            # contnets
+            pass
+        else:
+            # ensure we have uncompressed contents, and we're being asked for
+            # uncompressed contents
+            assert(not compressed)
+            assert(not cont[2])
+
         cont = cont[:2]
 
 	return cont

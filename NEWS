@@ -2,6 +2,8 @@ Changes in @NEW@:
   o New Features:
     * Standalone server now prints a message if it fails to import the REST
       api.
+    * Added restore command which restores file ownership to troves which
+      they were removed from (because of a remove operation or --replace-files)
 
   o Internal Changes:
     * Fetching path hashes from a changeset now uses absolute trove info

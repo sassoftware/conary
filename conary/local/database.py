@@ -1937,6 +1937,74 @@ class Database(SqlDbRepository):
         uJob = UpdateJob(self)
         self.commitChangeSet(removeCs, uJob, callback = UpdateCallback())
 
+    def _expandCollections(self, troveInfoList):
+        troveSet = set()
+        q = util.IterableQueue()
+        for troveInfo in itertools.chain(sorted(troveInfoList), q):
+            if troveInfo in troveSet:
+                continue
+
+            troveSet.add(troveInfo)
+
+            if trove.troveIsCollection(troveInfo[0]):
+                for subTroveInfo in \
+                      itertools.chain(*self.db.getTroveReferences([troveInfo])):
+                    q.add(subTroveInfo)
+
+        return sorted(list(troveSet))
+
+    def _getFiles(self, repos, cs, filesChanged):
+        filesNeeded = []
+        for (pathId, oldFileId, oldFileVersion, newFileId, newVersion) \
+                                        in filesChanged:
+            assert(oldFileId is None)
+            filesNeeded.append((pathId, newFileId, newVersion))
+
+        fileObjs = repos.getFileVersions(filesNeeded)
+        contentsNeeded = []
+        for (pathId, newFileId, newVersion), fileObj in \
+                                    itertools.izip(filesNeeded, fileObjs):
+            cs.addFile(None, newFileId, fileObj.freeze())
+            if fileObj.hasContents:
+                contentsNeeded.append((pathId, fileObj, newFileId,
+                                       newVersion, fileObj.contents.sha1()))
+
+        contents = repos.getFileContents([ x[2:] for x in contentsNeeded ],
+                                         compressed = True)
+
+        for (pathId, fileObj, newFileId, newVersion, sha1), contentObj in \
+                        itertools.izip(contentsNeeded, contents):
+            cs.addFileContents(pathId, newFileId,
+                               changeset.ChangedFileTypes.file,
+                               contentObj, fileObj.flags.isConfig(),
+                               compressed = True)
+
+    def restoreTroves(self, repos, troveInfoList):
+        fullTroveInfoList = self._expandCollections(troveInfoList)
+        pristineTroves = self.db.getTroves(fullTroveInfoList, pristine = True)
+        localTroves = self.db.getTroves(fullTroveInfoList, pristine = False)
+
+        restoreCs = changeset.ChangeSet()
+        filesChanged = []
+        for pristineTrv, localTrv in itertools.izip(pristineTroves,
+                                                    localTroves):
+            if pristineTrv is None:
+                # this version isn't installed. that's okay.
+                continue
+
+            pristineTrv.changeVersion(
+                pristineTrv.getVersion().createShadow(versions.LocalLabel()))
+
+            pristineTrv.computeDigests()
+            trvCs, thisFilesChanged = pristineTrv.diff(localTrv)[0:2]
+            restoreCs.newTrove(trvCs)
+            filesChanged += thisFilesChanged
+
+        self._getFiles(repos, restoreCs, filesChanged)
+
+        uJob = UpdateJob(self)
+        self.commitChangeSet(restoreCs, uJob, callback = UpdateCallback())
+
     def commitLock(self, acquire):
         if not acquire:
             if self.lockFileObj is not None:

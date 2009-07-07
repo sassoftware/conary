@@ -243,7 +243,7 @@ _register(LocalCommitCommand)
 
 class PinUnpinCommand(ConaryCommand):
     commands = ['pin', 'unpin']
-    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+    paramHelp = "<pkgname>[=<version>][[flavor]]+"
     hidden = True
     commandGroup = 'System Modification'
     def runCommand(self, cfg, argSet, otherArgs):
@@ -309,6 +309,40 @@ class RemoveCommand(ConaryCommand):
 
         log.syslog.commandComplete()
 _register(RemoveCommand)
+
+class RestoreCommand(ConaryCommand):
+    commands = ['restore']
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+    help = 'Restore files which have been removed from installed troves'
+    commandGroup = 'System Modification'
+    hidden = True
+    ignoreConfigErrors = True
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if len(otherArgs) < 3: return self.usage()
+        if argSet: return self.usage()
+
+        client = conaryclient.ConaryClient(cfg)
+        db = client.db
+        log.syslog.command()
+
+        troveList = []
+        for item in otherArgs[2:]:
+            name, ver, flv = updatecmd.parseTroveSpec(item)
+            troves = client.db.findTrove(None, (name, ver, flv))
+            troveList += troves
+
+        try:
+            db.restoreTroves(client.getRepos(), troveList)
+        except conary.errors.DatabaseError, e:
+            log.error(str(e))
+            return 1
+        except OSError, e:
+            log.error("cannot remove %s: %s" % (fullPath, e.strerror))
+            return 1
+
+        log.syslog.commandComplete()
+_register(RestoreCommand)
 
 class RevertCommand(ConaryCommand):
     commands = ['revert']
