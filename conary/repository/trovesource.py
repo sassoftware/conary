@@ -1170,11 +1170,16 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                                                                    troveList)
 
             trvCs = cs.getNewTroveVersion(*info)
-            if trvCs.getOldVersion() is not None:
+            hashes = trvCs.getNewPathHashes()
+            if hashes is None:
+                # this happens for relative trvCs if there is no absolute
+                # trove info. that would be a really old server (server,
+                # not trove, since absolute trove info is a changeset
+                # artifact only).
                 trv = self.getTrove(withFiles=False, *info)
-                retList.append(trv.getPathHashes())
-            else:
-                retList.append(trvCs.getNewPathHashes())
+                hashes = trv.getPathHashes()
+
+            retList.append(hashes)
 
         return retList
 

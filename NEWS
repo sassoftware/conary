@@ -3,6 +3,12 @@ Changes in @NEW@:
     * Standalone server now prints a message if it fails to import the REST
       api.
 
+  o Internal Changes:
+    * Fetching path hashes from a changeset now uses absolute trove info
+      when available (which it is for any not-incredibly-old server) instead
+      of merging differential trove info with database trove info for a
+      significant speedup of update planning.
+
 Changes in 2.0.44:
   o New Features:
     * Conary can now be configured with a set of certificate authorities
