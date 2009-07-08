@@ -1806,7 +1806,14 @@ def xmlrpcLoad(stream):
     else:
         # Assume it's a string
         p.feed(stream)
-    p.close()
+    # This is not the most elegant solution, we could accommodate more parsers
+    if hasattr(xmlrpclib, 'expat'):
+        try:
+            p.close()
+        except xmlrpclib.expat.ExpatError:
+            raise xmlrpclib.ResponseError
+    else:
+        p.close()
     return u.close(), u.getmethodname()
 
 

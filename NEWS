@@ -11,6 +11,11 @@ Changes in @NEW@:
       of merging differential trove info with database trove info for a
       significant speedup of update planning.
 
+  o Bug Fixes:
+    * A consistent exception is now raised when bad XML-RPC data is fed
+      into conary's parser on systems without the sgmlop package installed.
+      (CNY-3180)
+
 Changes in 2.0.44:
   o New Features:
     * Conary can now be configured with a set of certificate authorities
