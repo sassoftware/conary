@@ -4,6 +4,7 @@ Changes in @NEW@:
       api.
     * Added restore command which restores file ownership to troves which
       they were removed from (because of a remove operation or --replace-files)
+    * The addGitSnapshot action now accepts a branch= argument.  (CNY-2368)
 
   o Internal Changes:
     * Fetching path hashes from a changeset now uses absolute trove info

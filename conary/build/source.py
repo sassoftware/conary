@@ -1476,32 +1476,38 @@ class addGitSnapshot(_RevisionControl):
             dirPath = urlBits[1]
         dirPath = dirPath.replace('/', '_')
 
-        return '/%s/%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
-                                       self.tag)
+        return '/%s/%s--%s--%s.tar.bz2' % (dirPath, self.url.split('/')[-1],
+                self.branch, self.tag)
 
     def createArchive(self, lookasideDir):
-        log.info('Cloning repository from %s', self.url)
-        util.execute('git clone -q %s \'%s\'' % (self.url, lookasideDir))
+        os.makedirs(lookasideDir)
+        util.execute("cd '%s' && git init --bare -q" % (lookasideDir,))
+        self.updateArchive(lookasideDir)
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
-        util.execute("cd '%s' && git pull -q %s master" % (lookasideDir, 
-                                                           self.url))
+        util.execute("cd '%s' && git fetch -q '%s' +%s:%s" % (lookasideDir,
+            self.url, self.branch, self.branch))
 
     def showInfo(self, lookasideDir):
         log.info('Most recent repository commit message:')
-        util.execute("cd '%s' && git log -1" % lookasideDir)
+        util.execute("cd '%s' && git log -1 '%s'" % (lookasideDir, 
+            self.branch))
 
     def createSnapshot(self, lookasideDir, target):
-        log.info('Creating repository snapshot for %s tag %s', self.url,
-                 self.tag)
+        if self.tag != 'HEAD':
+            tag = self.tag
+        else:
+            tag = self.branch
+        log.info('Creating repository snapshot for %s tag %s', self.url, tag)
         util.execute("cd '%s' && git archive --prefix=%s-%s/ %s | "
                         "bzip2 > '%s'" %
-                        (lookasideDir, self.recipe.name, self.tag, self.tag, target))
+                        (lookasideDir, self.recipe.name, tag, tag, target))
 
-    def __init__(self, recipe, url, tag = 'HEAD', **kwargs):
+    def __init__(self, recipe, url, tag='HEAD', branch='master', **kwargs):
         self.url = url % recipe.macros
         self.tag = tag % recipe.macros
+        self.branch = branch % recipe.macros
         sourceName = self.getFilename()
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
