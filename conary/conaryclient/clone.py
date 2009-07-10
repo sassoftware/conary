@@ -945,6 +945,9 @@ class ClientClone:
         targetBranch = newVersion.branch()
 
         needsNewVersions = []
+        assert(troveVersion.trailingRevision().getVersion() ==
+               newVersion.trailingRevision().getVersion())
+
         if cloneJob.options.trackClone:
             # cloned from tracks exactly where we cloned from
             trv.troveInfo.clonedFrom.set(troveVersion)
