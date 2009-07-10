@@ -1569,11 +1569,11 @@ class addMercurialSnapshot(_RevisionControl):
 
     def createArchive(self, lookasideDir):
         log.info('Cloning repository from %s', self.url)
-        util.execute('hg -q clone %s \'%s\'' % (self.url, lookasideDir))
+        util.execute('hg -q clone -U %s \'%s\'' % (self.url, lookasideDir))
 
     def updateArchive(self, lookasideDir):
         log.info('Updating repository %s', self.url)
-        util.execute("cd '%s' && hg -q pull %s" % (lookasideDir, self.url))
+        util.execute("cd '%s' && hg -q pull '%s'" % (lookasideDir, self.url))
 
     def showInfo(self, lookasideDir):
         log.info('Most recent repository commit message:')
@@ -1582,7 +1582,7 @@ class addMercurialSnapshot(_RevisionControl):
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s tag %s', self.url,
                  self.tag)
-        util.execute("cd '%s' && hg archive -r %s -t tbz2 '%s'" %
+        util.execute("cd '%s' && hg archive -r '%s' -t tbz2 '%s'" %
                         (lookasideDir, self.tag, target))
 
     def __init__(self, recipe, url, tag = 'tip', **kwargs):
