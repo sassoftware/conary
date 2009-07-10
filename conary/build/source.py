@@ -1491,7 +1491,7 @@ class addGitSnapshot(_RevisionControl):
 
     def showInfo(self, lookasideDir):
         log.info('Most recent repository commit message:')
-        util.execute("cd '%s' && git log -1 '%s'" % (lookasideDir, 
+        util.execute("cd '%s' && git --no-pager log -1 '%s'" % (lookasideDir, 
             self.branch))
 
     def createSnapshot(self, lookasideDir, target):
