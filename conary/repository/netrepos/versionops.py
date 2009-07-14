@@ -92,7 +92,7 @@ class LatestTable:
         if cu is None:
             cu = self.db.cursor()
         # prepare for rebuild
-        cu.execute("delete from LatestCache")
+        self.db.truncate("LatestCache")
         # populate the LatestCache table. We need to split the inserts
         # into chunks to make sure the backend can handle all the data
         # we're inserting.

@@ -613,6 +613,11 @@ class BaseDatabase:
         return cu.executemany("insert into %s (%s) values (%s)" % (
             tableName, cols, values), rows,
                               start_transaction = start_transaction)
+
+    def truncate(self, *tables):
+        cu = self.cursor()
+        for table in tables:
+            cu.execute("DELETE FROM " + table)
         
     # foreign key constraint management
     def addForeignKey(self, table, column, refTable, refColumn,

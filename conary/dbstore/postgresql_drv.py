@@ -354,6 +354,10 @@ class Database(BaseDatabase):
         # now it's safe to do the bulkload
         return self.dbh.bulkload(tableName, rows, columnNames)
 
+    def truncate(self, *tables):
+        cu = self.cursor()
+        cu.execute("TRUNCATE TABLE " + ", ".join(tables))
+
     # resetting the auto increment values of primary keys
     def setAutoIncrement(self, table, column, value = None):
         cu = self.cursor()
