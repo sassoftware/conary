@@ -143,7 +143,8 @@ class UserAuthorization:
                 places = ', '.join('?' for x in names)
                 cu.execute("""SELECT userGroupId FROM UserGroups
                         WHERE userGroup IN ( %s )""" % (places,), *names)
-            return roles + set(x[0] for x in cu)
+            roles.update(x[0] for x in cu)
+            return roles
 
         cu.execute("""
         SELECT Users.salt, Users.password, UserGroupMembers.userGroupId,
