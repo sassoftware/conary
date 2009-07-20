@@ -816,12 +816,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # None or { None:None} case
             coreQdict["trove"] = "Items"
             assert(versionType == self._GTL_VERSION_TYPE_NONE)
-        elif len(troveSpecs) == 1 and troveSpecs.has_key(None):
-            # no trove names, and a single version spec (multiple ones
-            # are disallowed)
-            assert(len(troveSpecs[None]) == 1)
-            coreQdict["trove"] = "Items"
-            singleVersionSpec = troveSpecs[None].keys()[0]
+        elif len(troveSpecs) == 1 and None in troveSpecs:
+            if len(troveSpecs[None]) == 1:
+                # no trove names, and a single version spec (multiple ones
+                # are disallowed)
+                coreQdict["trove"] = "Items"
+                singleVersionSpec = troveSpecs[None].keys()[0]
+            else:
+                self._setupTroveFilter(cu, troveSpecs, flavorIndices)
+                coreQdict["trove"] = "Items, tmpGTVL"
+                coreQdict["localFlavor"] = "tmpGTVL.flavorId"
         else:
             dropTroveTable = True
             self._setupTroveFilter(cu, troveSpecs, flavorIndices)

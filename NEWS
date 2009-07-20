@@ -18,6 +18,8 @@ Changes in @NEW@:
     * A consistent exception is now raised when bad XML-RPC data is fed
       into conary's parser on systems without the sgmlop package installed.
       (CNY-3180)
+    * An error in handling queries for labels sharing the host name
+      component has been fixed. (CNY-3187)
 
 Changes in 2.0.44:
   o New Features:
