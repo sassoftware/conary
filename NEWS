@@ -1,18 +1,18 @@
 Changes in 2.0.45:
   o New Features:
-    * Standalone server now prints a message if it fails to import the
-      REST api.
-    * Added restore command which restores file ownership to troves
-      which they were removed from (because of a remove operation or
+    * The standalone Conary repository server now prints a message if
+      it fails to import the Conary REST api.
+    * Added the restore command, which restores file ownership to troves
+      from which they were removed (because of a remove operation or
       --replace-files).
     * The addGitSnapshot action now accepts a branch= argument.
       (CNY-2368)
 
   o Internal Changes:
     * Fetching path hashes from a changeset now uses absolute trove info
-      when available (which it is for any recent enough server).
-      instead of merging differential trove info with database trove
-      info for a significant speedup of update planning.
+      when available (which it is for any recent enough server), instead
+      of merging differential trove info with database trove info, which
+      significantly speeds up update planning.
     * Database operations now use the TRUNCATE command where available,
       which may speed up some repository queries.
     * An internal API used for emulating repository access by certain
