@@ -737,7 +737,7 @@ static PyObject * pack(PyObject * self, PyObject * args) {
                     formatPtr++;
                 } else if (*formatPtr == 'I') {
                     fourBytes = htonl(len);
-                    memcpy(result + strLen, &fourBytes, sizeof(twoBytes));
+                    memcpy(result + strLen, &fourBytes, sizeof(fourBytes));
                     strLen += 4;
                     formatPtr++;
                 } else if (isdigit(*formatPtr)) {
