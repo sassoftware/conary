@@ -74,13 +74,8 @@ class FileInfo(streams.StreamSet):
 class ChangeSetNewTroveList(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
-	l = []
-	for info in sorted(self.iterkeys()):
-	    s = self[info].freeze()
-	    l.append(struct.pack("!I", len(s)))
-	    l.append(s)
-
-	return "".join(l)
+        l = [ x[1].freeze() for x in sorted(self.items()) ]
+        return misc.pack("!" + "SI" * len(l), *l)
 
     def thaw(self, data):
         while self:
