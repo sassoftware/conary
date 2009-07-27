@@ -1201,6 +1201,22 @@ class BZ2File:
             # read some more data and try to get enough uncompressed
             # data to return
 
+class PushIterator:
+
+    def push(self, val):
+        self.head.insert(0, val)
+
+    def next(self):
+        if self.head:
+            val = self.head.pop(0)
+            return val
+
+        return self.iter.next()
+
+    def __init__(self, iter):
+        self.head = []
+        self.iter = iter
+
 class PeekIterator:
 
     def _next(self):

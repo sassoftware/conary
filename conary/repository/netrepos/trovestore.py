@@ -892,7 +892,7 @@ class TroveStore:
             Instances.versionId = Nodes.versionId
         ORDER BY tmpInstanceId.idx
         """ % self.db.keywords)
-        troveTrovesCursor = util.PeekIterator(troveTrovesCursor)
+        troveTrovesCursor = util.PushIterator(troveTrovesCursor)
 
         # revert changes we forced on the postgresql optimizer
         if self.db.driver == 'postgresql':
@@ -917,7 +917,7 @@ class TroveStore:
             JOIN Basenames ON FilePaths.basenameId = Basenames.basenameId
             JOIN Versions ON TroveFiles.versionId = Versions.versionId
             ORDER BY tmpInstanceId.idx """ % (streamSel,))
-        troveFilesCursor = util.PeekIterator(troveFilesCursor)
+        troveFilesCursor = util.PushIterator(troveFilesCursor)
 
         troveRedirectsCursor = self.db.cursor()
         troveRedirectsCursor.execute("""
@@ -968,43 +968,53 @@ class TroveStore:
                               setVersion = False)
 
             try:
-                while troveTrovesCursor.peek()[0] == idx:
-                    idxA, name, version, flavor, flags, timeStamps = \
-                                                troveTrovesCursor.next()
+                next = troveTrovesCursor.next()
+                while next[0] == idx:
+                    idxA, name, version, flavor, flags, timeStamps = next
                     version = versionCache.get(version, timeStamps)
                     flavor = flavorCache.get(flavor)
                     byDefault = (flags & schema.TROVE_TROVES_BYDEFAULT) != 0
                     weakRef = (flags & schema.TROVE_TROVES_WEAKREF) != 0
                     trv.addTrove(name, version, flavor, byDefault = byDefault,
                                  weakRef = weakRef)
+                    next = troveTrovesCursor.next()
+
+                troveTrovesCursor.push(next)
             except StopIteration:
                 # we're at the end; that's okay
                 pass
 
 	    fileContents = {}
             try:
-                while troveFilesCursor.peek()[0] == idx:
-                    idxA, pathId, dirname, basename, versionId, fileId, stream = \
-                            troveFilesCursor.next()
+                next = troveFilesCursor.next()
+                while next[0] == idx:
+                    (idxA, pathId, dirname, basename, versionId, fileId,
+                     stream) = next
                     path = os.path.join(dirname, basename)
                     version = versions.VersionFromString(versionId)
                     trv.addFile(cu.frombinary(pathId), path, version, 
                                 cu.frombinary(fileId))
 		    if stream is not None:
 			fileContents[fileId] = stream
+                    next = troveFilesCursor.next()
+
+                troveFilesCursor.push(next)
             except StopIteration:
                 # we're at the end; that's okay
                 pass
 
             try:
-                while troveRedirectsCursor.peek()[0] == idx:
-                    idxA, targetName, targetBranch, targetFlavor = \
-                            troveRedirectsCursor.next()
+                next = troveRedirectsCursor.next()
+                while next[0] == idx:
+                    idxA, targetName, targetBranch, targetFlavor = next
                     targetBranch = versions.VersionFromString(targetBranch)
                     if targetFlavor is not None:
                         targetFlavor = deps.ThawFlavor(targetFlavor)
 
                     trv.addRedirect(targetName, targetBranch, targetFlavor)
+                    next = troveRedirectsCursor.next()
+
+                troveRedirectsCursor.push(next)
             except StopIteration:
                 # we're at the end; that's okay
                 pass
