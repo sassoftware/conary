@@ -929,7 +929,7 @@ class TroveStore:
         LEFT JOIN Flavors ON TroveRedirects.flavorId = Flavors.flavorId
         ORDER BY tmpInstanceId.idx
         """)
-        troveRedirectsCursor = util.PeekIterator(troveRedirectsCursor)
+        troveRedirectsCursor = util.PushIterator(troveRedirectsCursor)
 
         neededIdx = 0
         versionCache = VersionCache()
