@@ -11,6 +11,7 @@
 # full details.
 #
 
+import getpass
 import sys
 import traceback
 import types
@@ -448,6 +449,14 @@ class KeyCacheCallback(Callback):
 
     def getPublicKey(self, keyId, serverName, warn=False):
         return False
+
+    def getKeyPassphrase(self, keyId, prompt, message = None):
+        if message:
+            print message
+        print
+        print prompt
+        passPhrase = getpass.getpass("Passphrase: ")
+        return passPhrase
 
     def __init__(self, repos = None, cfg = None):
         Callback.__init__(self)

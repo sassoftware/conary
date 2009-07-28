@@ -14,7 +14,6 @@
 
 import os
 import sys
-import getpass
 import tempfile
 import subprocess
 from time import time
@@ -368,19 +367,18 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         except BadPassPhrase:
             pass
 
-        # FIXME: make this a callback
-        print "\nsignature key is: %s"% keyId
+        prompt = "signature key is: %s" % keyId
+        message = None
 
         tries = 0
         while tries < 5:
-            # FIXME: make this a callback
-            passPhrase = getpass.getpass("Passphrase: ")
+            passPhrase = self.callback.getKeyPassphrase(keyId, prompt, message)
             try:
                 cryptoKey = key.getCryptoKey(passPhrase)
                 self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
                 return self.privateDict[keyId]
             except BadPassPhrase:
-                print "Bad passphrase. Please try again."
+                message = "Bad passphrase. Please try again."
             tries += 1
 
         raise BadPassPhrase
