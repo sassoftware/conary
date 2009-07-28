@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o New Features
+    * If python-keyutils is available, cvc will try to interact with
+      the user's session keyring. (CNY-3190)
+
   o Bug Fixes:
     * PGP passphrases, required for signing troves, are now fetched
       using a callback. (CNY-3189)

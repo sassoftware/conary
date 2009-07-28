@@ -450,12 +450,27 @@ class KeyCacheCallback(Callback):
     def getPublicKey(self, keyId, serverName, warn=False):
         return False
 
-    def getKeyPassphrase(self, keyId, prompt, message = None):
-        if message:
-            print message
+    def getKeyPassphrase(self, keyId, prompt, errorMessage = None):
+        if errorMessage:
+            print errorMessage
+        keyDesc = "conary:pgp:%s" % keyId
+        try:
+            import keyutils
+            # We only initialize keyring if keyutils is not None
+            keyring = keyutils.KEY_SPEC_SESSION_KEYRING
+        except ImportError:
+            keyutils = None
+        # If the passphrase was invalidated, we don't want to be stuck; so, if
+        # the caller did set an error message, we will not try to use keyutils
+        if keyutils and not errorMessage:
+            keyId = keyutils.request_key(keyDesc, keyring)
+            if keyId is not None:
+                return keyutils.read_key(keyId)
         print
         print prompt
         passPhrase = getpass.getpass("Passphrase: ")
+        if keyutils:
+            keyutils.add_key(keyDesc, passPhrase, keyring)
         return passPhrase
 
     def __init__(self, repos = None, cfg = None):
