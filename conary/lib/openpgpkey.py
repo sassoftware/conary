@@ -368,17 +368,18 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
             pass
 
         prompt = "signature key is: %s" % keyId
-        message = None
+        errorMessage = None
 
         tries = 0
         while tries < 5:
-            passPhrase = self.callback.getKeyPassphrase(keyId, prompt, message)
+            passPhrase = self.callback.getKeyPassphrase(keyId, prompt,
+                errorMessage)
             try:
                 cryptoKey = key.getCryptoKey(passPhrase)
                 self.privateDict[keyId] = OpenPGPKey(key, cryptoKey)
                 return self.privateDict[keyId]
             except BadPassPhrase:
-                message = "Bad passphrase. Please try again."
+                errorMessage = "Bad passphrase. Please try again."
             tries += 1
 
         raise BadPassPhrase
