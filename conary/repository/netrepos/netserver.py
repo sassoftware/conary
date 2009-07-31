@@ -1562,18 +1562,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return new
 
         def oneChangeSet(destFile, jobs, **kwargs):
+            # dedup jobs here; duplicates confuse the createChangeSet
+            # iterator.
+            jobDict = dict.fromkeys(jobs)
+            jobOrder = jobDict.keys()
+            for result in self.repos.createChangeSet(jobOrder, **kwargs):
+                job = jobOrder.pop(0)
+                jobDict[job] = result
+
             rc = []
-            for cs, trovesNeeded, filesNeeded, removedTroves in \
-                        self.repos.createChangeSet(jobs, **kwargs):
+            for job in jobs:
+                cs, trovesNeeded, filesNeeded, removedTroves = jobDict[job]
                 start = destFile.tell()
                 size = cs.appendToFile(destFile, withReferences = True)
 
-                rc.append(((str(size), _cvtTroveList(trovesNeeded),
-                           _cvtFileList(filesNeeded),
-                           _cvtTroveList(removedTroves),
-                           str(destFile.tell() - start))))
+                rc.append((str(size), _cvtTroveList(trovesNeeded),
+                                  _cvtFileList(filesNeeded),
+                                  _cvtTroveList(removedTroves),
+                                  str(destFile.tell() - start)))
+
 
             return rc
+
+        # --- def _createChangeSet() begins here
 
         retList = []
 
@@ -1591,7 +1602,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                      withFiles, withFileContents, excludeAutoSource,
                      changeSetVersion = None, mirrorMode = False,
                      infoOnly = False):
-
         # infoOnly is for compatibilit with the network call; it's ignored
         # here (but implemented in the front-side proxy)
 
@@ -1614,7 +1624,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         try:
             self._checkPermissions(authToken, chgSetList)
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
-            #import epdb;epdb.st()
 
             rc = self._createChangeSet(outFile, chgSetList,
                                     recurse = recurse,
