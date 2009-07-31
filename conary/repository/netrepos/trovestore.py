@@ -816,8 +816,9 @@ class TroveStore:
 	    raise errors.TroveMissing(troveName, troveVersion)
         return trv
 
-    def iterTroves(self, troveInfoList, withFiles = True, withFileStreams = False,
-                   hidden = False):
+    def iterTroves(self, troveInfoList, withFiles = True,
+                   withFileStreams = False,
+                   hidden = False, permCheckFilter = None):
         self.log(3, troveInfoList, "withFiles=%s withFileStreams=%s hidden=%s" % (
                         withFiles, withFileStreams, hidden))
 
@@ -825,11 +826,14 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNVF')
         schema.resetTable(cu, 'tmpInstanceId')
 
+        l = []
         for idx, (n,v,f) in enumerate(troveInfoList):
-            cu.execute("INSERT INTO tmpNVF VALUES (?, ?, ?, ?)",
-                       (idx, n, v.asString(), f.freeze()),
-                       start_transaction = False)
+            l.append((idx, n, v.asString(), f.freeze()))
+        self.db.bulkload("tmpNVF", l, [ "idx", "name", "version", "flavor" ],
+                         start_transaction = False)
+        del l
         self.db.analyze("tmpNVF")
+
         args = [instances.INSTANCE_PRESENT_NORMAL]
         d = dict(presence = "Instances.isPresent = ?")
         if hidden:
@@ -861,12 +865,15 @@ class TroveStore:
             for i in xrange(len(troveInfoList)):
                 yield None
             return
-        for singleTroveIds in troveIdList:
-            cu.execute("INSERT INTO tmpInstanceId VALUES (?, ?)",
-                       singleTroveIds[0], singleTroveIds[1],
-                       start_transaction = False)
+        self.db.bulkload("tmpInstanceId",
+                         [ x[0:2] for x in troveIdList ],
+                         [ "idx", "instanceId" ],
+                         start_transaction = False)
         self.db.analyze("tmpInstanceId")
-        
+
+        if permCheckFilter:
+            permCheckFilter(cu, "tmpInstanceId")
+
         # unfortunately most cost-based optimizers will get the
         # following troveTrovesCursor queries wrong. Details in CNY-2695
 

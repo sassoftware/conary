@@ -241,7 +241,7 @@ class FileContainer:
 	if self.file:
 	    self.close()
 
-    def __init__(self, file, version = None):
+    def __init__(self, file, version = None, append = False):
         """
         Create a FileContainer object.
         
@@ -249,6 +249,8 @@ class FileContainer:
         container file on disk. If that file is empty (size 0) the
         file container is immediately initialized. A copy of the file
         is retained, so the caller may optionally close it.
+        @param append: if True, creates a new filecontainer at the end
+        of the passed flie object
         """
 
 	# make our own copy of this file which nobody can close underneath us
@@ -258,9 +260,11 @@ class FileContainer:
             version = FILE_CONTAINER_VERSION_LATEST
 
 	self.file.seek(0, SEEK_END)
-	if not self.file.tell():
-	    self.file.seek(SEEK_SET, 0)
-	    self.file.truncate()
+	if append or not self.file.tell():
+            if not append:
+                self.file.seek(SEEK_SET, 0)
+                self.file.truncate()
+
 	    self.file.write(FILE_CONTAINER_MAGIC)
 	    self.file.write(struct.pack("!I", version))
 

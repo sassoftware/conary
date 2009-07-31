@@ -395,7 +395,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
 class ChangeSetInfo(object):
 
     __slots__ = [ 'size', 'trovesNeeded', 'removedTroves', 'filesNeeded',
-                  'path', 'cached', 'version', 'fingerprint' ]
+                  'path', 'cached', 'version', 'fingerprint',
+                  'rawSize' ]
 
     def pickle(self):
         return cPickle.dumps(((self.trovesNeeded, self.filesNeeded,
@@ -671,12 +672,19 @@ class ChangesetFilter(BaseProxy):
                     # protocol version 38 does not return removedTroves.
                     # tack an empty list on it
                     rc.append([])
-                info = [ rc ]
+                allInfo = [ rc ]
             else:
-                info = rc[1]
-            for (size, trovesNeeded, filesNeeded, removedTroves) in info:
+                allInfo = rc[1]
+            for info in allInfo:
                 csInfo = ChangeSetInfo()
+                (size, trovesNeeded, filesNeeded, removedTroves) = info[0:4]
+                if len(info) > 4:
+                    rawSize = int(info[4])
+                else:
+                    rawSize = size
+
                 csInfo.size = int(size)
+                csInfo.rawSize = rawSize
                 csInfo.trovesNeeded = trovesNeeded
                 csInfo.filesNeeded = filesNeeded
                 csInfo.removedTroves = removedTroves
@@ -703,28 +711,19 @@ class ChangesetFilter(BaseProxy):
 
             for (jobIdx, (rawJob, fingerprint)), csInfo in \
                             itertools.izip(neededHere, csInfoList):
-                if url.startswith('file://'):
-                    # don't enforce the size limit for local files; we need
-                    # the whole thing anyway, and the size on disk won't
-                    # be equal to csInfo.size due to external references
-                    # to the content store within the change set
-                    sizeLimit = None
-                else:
-                    sizeLimit = csInfo.size
-
                 cachable = bool(fingerprint and self.csCache)
 
                 if cachable:
                     # Add it to the cache
                     path = self.csCache.set((fingerprint, csInfo.version),
-                        (csInfo, inF, sizeLimit))
+                        (csInfo, inF, csInfo.rawSize))
                 else:
                     # If only one file was requested, and it's already
                     # a file://, this is unnecessary :-(
                     (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                   suffix = '.ccs-out')
                     outF = os.fdopen(fd, "w")
-                    util.copyfileobj(inF, outF, sizeLimit = sizeLimit)
+                    util.copyfileobj(inF, outF, sizeLimit = csInfo.rawSize)
                     outF.close()
                     path = tmpPath
 
@@ -838,7 +837,7 @@ class ChangesetFilter(BaseProxy):
 class SimpleRepositoryFilter(ChangesetFilter):
 
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
-    forceSingleCsJob = True
+    forceSingleCsJob = False
 
     def __init__(self, cfg, basicUrl, repos):
         if cfg.changesetCacheDir:

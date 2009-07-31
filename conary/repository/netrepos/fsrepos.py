@@ -279,9 +279,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         return contents
 
-    def createChangeSet(self, troveList, recurse = True, withFiles = True,
-                        withFileContents = True, excludeAutoSource = False,
-                        authCheck = None, mirrorMode = False):
+    def createChangeSet(self, troveList, recurse = True,
+                        withFiles = True, withFileContents = True,
+                        excludeAutoSource = False,
+                        mirrorMode = False, roleIds = None):
 	"""
 	troveList is a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
@@ -290,14 +291,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	to be new for the purposes of the change set
 
 	if newVersion == None then the trove is being removed
+
+        if recurse is set, this yields one result for the entire troveList.
+        If recurse is not set, it yields one result per troveList entry.
 	"""
 	cs = changeset.ChangeSet()
-
         externalTroveList = []
         externalFileList = []
         removedTroveList = []
 
 	dupFilter = {}
+        resultList = []
 
 	# make a copy to remove things from
 	troveList = troveList[:]
@@ -305,7 +309,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         # def createChangeSet begins here
 
         troveWrapper = _TroveListWrapper(troveList, self.troveStore, withFiles,
-                                         authCheck = authCheck)
+                                         roleIds = roleIds)
 
         for job in troveWrapper:
 	    ((troveName, (oldVersion, oldFlavor),
@@ -390,6 +394,19 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         troveWrapper.append(refJob, True)
 
 	    cs.newTrove(troveChgSet)
+
+            if job in troveList:
+                # add the primary w/ timestamps on the version
+                if jobEntry[2][0] is None:
+                    continue
+
+                try:
+                    primary = troveChgSet.getNewNameVersionFlavor()
+                    cs.addPrimaryTrove(*primary)
+                except KeyError:
+                    # primary troves could be in the externalTroveList, in
+                    # which case they aren't primries
+                    pass
 
 	    # sort the set of files we need into bins based on the server
 	    # name
@@ -501,7 +518,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    cs.addFileContents(pathId, newFileId, contType, cont,
 				       newFile.flags.isConfig(),
                                        compressed = compressed)
-	return (cs, externalTroveList, externalFileList, removedTroveList)
+
+            if not recurse:
+                yield cs, externalTroveList, externalFileList, removedTroveList
+
+                cs = changeset.ChangeSet()
+                externalTroveList = []
+                externalFileList = []
+                removedTroveList = []
+
+        if recurse:
+            yield cs, externalTroveList, externalFileList, removedTroveList
 
 class _TroveListWrapper:
     def _handleJob(self, job, recursed, idx):
@@ -512,11 +539,6 @@ class _TroveListWrapper:
                 t, streams = t
             else:
                 streams = {}
-
-            if not self.authCheck(*t.getNameVersionFlavor()):
-                # If we don't have perms to see the trove, act like it doesn't
-                # exist
-                t, streams = None, {}
 
         if t is None:
             if recursed:
@@ -556,7 +578,8 @@ class _TroveListWrapper:
             # reset self.new for later additions
             self.trvIterator = self.troveStore.iterTroves(
                         troveList, withFiles = self.withFiles,
-                        withFileStreams = self.withFiles)
+                        withFileStreams = self.withFiles,
+                        permCheckFilter = self._permCheck)
             self.l = self.new
             self.new = []
 
@@ -582,6 +605,19 @@ class _TroveListWrapper:
         else:
             raise StopIteration
 
+    def _permCheck(self, cu, instanceTblName):
+        # returns a list of instance id's we're allowed to see
+        sql = """
+        DELETE FROM %s WHERE instanceId NOT IN
+            (SELECT DISTINCT ugi.instanceId
+             FROM %s JOIN UserGroupInstancesCache as ugi ON
+             %s.instanceId = ugi.instanceId
+             WHERE
+                ugi.userGroupId IN (%s))
+        """ % (instanceTblName, instanceTblName, instanceTblName,
+               ",".join("%d" % x for x in self.roleIds))
+        cu.execute(sql, start_transaction = False)
+
     def __iter__(self):
         while True:
             yield self.next()
@@ -589,14 +625,11 @@ class _TroveListWrapper:
     def append(self, item, recurse):
         self.new.append((item, recurse))
 
-    def __init__(self, l, troveStore, withFiles, authCheck = None):
+    def __init__(self, l, troveStore, withFiles, roleIds = None):
         self.trvIterator = None
         self.new = [ (x, False) for x in l ]
         self.l = []
         self.troveStore = troveStore
         self.withFiles = withFiles
-        if authCheck is None:
-            self.authCheck = lambda *args: True
-        else:
-            self.authCheck = authCheck
+        self.roleIds = roleIds
 

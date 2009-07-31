@@ -424,6 +424,20 @@ class ChangeSet(streams.StreamSet):
 
         return one + two
 
+    def appendToFile(self, outFile, withReferences = False,
+                     versionOverride = None):
+        start = outFile.tell()
+
+        csf = filecontainer.FileContainer(outFile,
+                                          version = versionOverride,
+                                          append = True)
+
+        str = self.freeze()
+        csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
+        correction = self.writeAllContents(csf, 
+                                           withReferences = withReferences)
+        return (outFile.tell() - start) + correction
+
     def writeToFile(self, outFileName, withReferences = False, mode = 0666,
                     versionOverride = None):
         # 0666 is right for mode because of umask
@@ -433,16 +447,10 @@ class ChangeSet(streams.StreamSet):
 
             outFile = os.fdopen(outFileFd, "w+")
 
-            csf = filecontainer.FileContainer(outFile,
-                                              version = versionOverride)
-
-	    str = self.freeze()
-	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
-	    correction = self.writeAllContents(csf, 
-                                               withReferences = withReferences)
-	    csf.close()
-
-            return os.stat(outFileName).st_size + correction
+            size = self.appendToFile(outFile, withReferences = withReferences,
+                                     versionOverride = versionOverride)
+            outFile.close()
+            return size
 	except:
 	    os.unlink(outFileName)
 	    raise

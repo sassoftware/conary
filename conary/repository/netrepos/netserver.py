@@ -1455,15 +1455,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return r[pkgName].keys()[0]
 
-    def _checkTrovePermission(self, authToken, n, v, f):
-        hasList = self._lookupTroves(authToken, 
-                                     [(n, self.fromVersion(v),
-                                       self.fromFlavor(f))])
-        present, hasAccess = hasList[0]
-        if not present:
-            raise errors.TroveNotFound
-        return hasAccess
-
     def _checkPermissions(self, authToken, chgSetList):
         trvList = self._lookupTroves(authToken,
                                      [(x[0], x[2][0], x[2][1])
@@ -1490,53 +1481,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # return a changeset object that has all the changesets
         # requested in chgSetList.  Also returns a list of extra
         # troves needed and files needed.
-        cs = changeset.ReadOnlyChangeSet()
+        cu = self.db.cursor()
+
         self._checkPermissions(authToken, chgSetList)
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            raise errors.InsufficientPermission
+
+        cs = changeset.ReadOnlyChangeSet()
         l = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
-        authCheckFn = lambda n, v, f: \
-                      self._checkTrovePermission(authToken, n, v, f)
-        ret = self.repos.createChangeSet(l,
+
+        allTrovesNeeded = []
+        allFilesNeeded = []
+        allRemovedTroves = []
+
+        for ret in self.repos.createChangeSet(l,
                                          recurse = recurse,
                                          withFiles = withFiles,
                                          withFileContents = withFileContents,
                                          excludeAutoSource = excludeAutoSource,
-                                         authCheck = authCheckFn)
-        (newCs, trovesNeeded, filesNeeded, removedTroves) = ret
-        cs.merge(newCs)
+                                         roleIds = roleIds):
+            (newCs, trovesNeeded, filesNeeded, removedTroves) = ret
+            cs.merge(newCs)
+            allTrovesNeeded += trovesNeeded
+            allFilesNeeded += filesNeeded
+            allRemovedTroves += removedTroves
 
-        return (cs, trovesNeeded, filesNeeded, removedTroves)
+        return (cs, allTrovesNeeded, allFilesNeeded, allRemovedTroves)
 
-    def _createChangeSet(self, path, jobList, **kwargs):
-        ret = self.repos.createChangeSet(jobList, **kwargs)
-        (cs, trovesNeeded, filesNeeded, removedTroves) = ret
-
-        # look up the version w/ timestamps
-        for jobEntry in jobList:
-            if jobEntry[2][0] is None:
-                continue
-
-            newJob = (jobEntry[0], jobEntry[2][0], jobEntry[2][1])
-            try:
-                trvCs = cs.getNewTroveVersion(*newJob)
-                primary = (jobEntry[0], trvCs.getNewVersion(), jobEntry[2][1])
-                cs.addPrimaryTrove(*primary)
-            except KeyError:
-                # primary troves could be in the externalTroveList, in
-                # which case they aren't primries
-                pass
-
-        size = cs.writeToFile(path, withReferences = True)
-        return (trovesNeeded, filesNeeded, removedTroves), size
-
-    @accessReadOnly
-    def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
-                     withFiles, withFileContents, excludeAutoSource,
-                     changeSetVersion = None, mirrorMode = False,
-                     infoOnly = False):
-
-        # infoOnly is for compatibilit with the network call; it's ignored
-        # here (but implemented in the front-side proxy)
-
+    def _createChangeSet(self, destFile, jobList, recurse = False, **kwargs):
         def _cvtTroveList(l):
             new = []
             for (name, (oldV, oldF), (newV, newF), absolute) in l:
@@ -1588,21 +1561,39 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             return new
 
-        assert(len(chgSetList) == 1)
+        def oneChangeSet(destFile, jobs, **kwargs):
+            rc = []
+            for cs, trovesNeeded, filesNeeded, removedTroves in \
+                        self.repos.createChangeSet(jobs, **kwargs):
+                start = destFile.tell()
+                size = cs.appendToFile(destFile, withReferences = True)
 
-        sizes = []
-        newChgSetList = []
-        allFilesNeeded = []
-        allRemovedTroves = []
-        (fd, retpath) = tempfile.mkstemp(dir = self.tmpPath,
-                                         suffix = '.ccs-out')
-        #url = os.path.join(self.urlBase(),
-                           #"changeset?%s" % os.path.basename(retpath[:-4]))
-        # we use a local file for the parent class; this means this class
-        # won't work over the wire (but we never use it that way anyway)
-        assert(retpath.startswith('/'))
-        url = 'file://localhost' + retpath
-        os.close(fd)
+                rc.append(((str(size), _cvtTroveList(trovesNeeded),
+                           _cvtFileList(filesNeeded),
+                           _cvtTroveList(removedTroves),
+                           str(destFile.tell() - start))))
+
+            return rc
+
+        retList = []
+
+        if recurse:
+            for job in jobList:
+                retList += oneChangeSet(destFile, [ job ], **kwargs)
+        else:
+            retList = oneChangeSet(destFile, jobList, recurse = recurse,
+                                   **kwargs)
+
+        return retList
+
+    @accessReadOnly
+    def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
+                     withFiles, withFileContents, excludeAutoSource,
+                     changeSetVersion = None, mirrorMode = False,
+                     infoOnly = False):
+
+        # infoOnly is for compatibilit with the network call; it's ignored
+        # here (but implemented in the front-side proxy)
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -1610,36 +1601,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                  "recurse=%s withFiles=%s withFileContents=%s" % (
             recurse, withFiles, withFileContents))
 
-        authCheckFn = lambda n, v, f: \
-                      self._checkTrovePermission(authToken, n, v, f)
-        # Big try-except to clean up files
+        (fd, retpath) = tempfile.mkstemp(dir = self.tmpPath,
+                                         suffix = '.ccs-out')
+        url = 'file://localhost' + retpath
+        outFile = util.ExtendedFdopen(fd)
+
+        cu = self.db.cursor()
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            raise errors.InsufficientPermission
+
         try:
             self._checkPermissions(authToken, chgSetList)
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
+            #import epdb;epdb.st()
 
-            otherDetails, size = self._createChangeSet(retpath, chgSetList,
+            rc = self._createChangeSet(outFile, chgSetList,
                                     recurse = recurse,
                                     withFiles = withFiles,
                                     withFileContents = withFileContents,
                                     excludeAutoSource = excludeAutoSource,
-                                    authCheck = authCheckFn,
+                                    roleIds = roleIds,
                                     mirrorMode = mirrorMode)
 
-            (trovesNeeded, filesNeeded, removedTroves) = otherDetails
-
-            newChgSetList.extend(_cvtTroveList(trovesNeeded))
-            allFilesNeeded.extend(_cvtFileList(filesNeeded))
-            allRemovedTroves.extend(removedTroves)
-            sizes.append(size)
+            outFile.close()
         except:
             util.removeIfExists(retpath)
             raise
 
-        sizes = [ str(x) for x in sizes ]
-
-        return url, [ (sizes[0], newChgSetList, allFilesNeeded,
-                       _cvtTroveList(allRemovedTroves) ) ]
-
+        return url, rc
 
     @accessReadOnly
     def getChangeSetFingerprints(self, authToken, clientVersion, chgSetList,
