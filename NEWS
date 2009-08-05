@@ -10,6 +10,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * PGP passphrases, required for signing troves, are now fetched
       using a callback. (CNY-3189)
+    * Repositories running on postgresql can properly handle queries
+      for labels sharing the hostname portion. (CNY-3192)
 
 Changes in 2.0.45:
   o New Features:

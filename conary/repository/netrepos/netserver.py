@@ -824,7 +824,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 singleVersionSpec = troveSpecs[None].keys()[0]
             else:
                 self._setupTroveFilter(cu, troveSpecs, flavorIndices)
-                coreQdict["trove"] = "Items, tmpGTVL"
+                coreQdict["trove"] = "Items CROSS JOIN tmpGTVL"
                 coreQdict["localFlavor"] = "tmpGTVL.flavorId"
         else:
             dropTroveTable = True
