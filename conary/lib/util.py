@@ -2003,6 +2003,8 @@ class LZMAFile:
                     self.executable = fullpath
                     commandLine = (executable,) + args
                     break
+        if self.executable is None:
+            raise RuntimeError('xz or unlzma is required to decompress this file')
 
         [ self.infd, outfd ] = os.pipe()
         self.childpid = os.fork()
