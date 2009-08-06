@@ -1995,6 +1995,15 @@ class LZMAFile:
         self.close()
 
     def __init__(self, fileobj = None):
+        self.executable = None
+        for executable, args in (('xz', ('-dc',)), ('unlzma', ())):
+            for pathElement in os.getenv('PATH', '').split(os.path.pathsep):
+                fullpath = os.sep.join((pathElement, executable))
+                if os.path.exists(fullpath):
+                    self.executable = fullpath
+                    commandLine = (executable,) + args
+                    break
+
         [ self.infd, outfd ] = os.pipe()
         self.childpid = os.fork()
         if self.childpid == 0:
@@ -2009,7 +2018,7 @@ class LZMAFile:
                 os.close(fd)
                 os.dup2(outfd, 1)
                 os.close(outfd)
-                os.execv('/usr/bin/unlzma', [ '/usr/bin/unlzma' ])
+                os.execv(self.executable, commandLine)
             finally:
                 os._exit(1)
 

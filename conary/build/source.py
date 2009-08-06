@@ -2090,8 +2090,6 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
             decompressor = lambda fobj: util.BZ2File(fobj)
         elif compression == 'lzma':
             decompressor = lambda fobj: util.LZMAFile(fobj)
-            if action is not None:
-                action._addActionPathBuildRequires(['unlzma'])
 
     # assemble the path/owner/group list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
@@ -2102,6 +2100,9 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     r.seek(0)
     rpmhelper.seekToData(r)
     uncompressed = decompressor(r)
+    if compression == 'lzma':
+        if action is not None:
+            action._addActionPathBuildRequires([uncompressed.executable])
     (rpipe, wpipe) = os.pipe()
     pid = os.fork()
     if not pid:
