@@ -279,7 +279,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         return contents
 
-    def createChangeSet(self, troveList, recurse = True,
+    def createChangeSet(self, origTroveList, recurse = True,
                         withFiles = True, withFileContents = True,
                         excludeAutoSource = False,
                         mirrorMode = False, roleIds = None):
@@ -304,7 +304,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         resultList = []
 
 	# make a copy to remove things from
-	troveList = troveList[:]
+	troveList = origTroveList[:]
 
         # def createChangeSet begins here
 
@@ -336,6 +336,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 			match = True
 			break
 
+                # this is a duplicate; stop now and don't yield anything
 		if match: continue
 
 		dupFilter[(troveName, oldFlavor, newFlavor)].append(
@@ -344,6 +345,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		dupFilter[(troveName, oldFlavor, newFlavor)] = \
 				    [(oldVersion, newVersion)]
 
+            done = False
 	    if not newVersion:
                 if oldVersion.getHost() not in self.serverNameList:
                     externalTroveList.append((troveName,
@@ -357,9 +359,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         troveWrapper.append((name, (version, flavor),
                                                    (None, None), absolute),
                                             False)
-		continue
-
-            if (newVersion.getHost() not in self.serverNameList
+                done = True
+            elif (newVersion.getHost() not in self.serverNameList
                 or (oldVersion and
                     oldVersion.getHost() not in self.serverNameList)):
                 # don't try to make changesets between repositories; the
@@ -369,10 +370,19 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 # present troves; that's up to the client
                 externalTroveList.append((troveName, (oldVersion, oldFlavor),
                                      (newVersion, newFlavor), absolute))
-                continue
+                done = True
             elif (oldVersion and old.type() == trove.TROVE_TYPE_REMOVED):
                 removedTroveList.append((troveName, (oldVersion, oldFlavor),
                                         (newVersion, newFlavor), absolute))
+                done = True
+
+            if done:
+                yield cs, externalTroveList, externalFileList, removedTroveList
+
+                cs = changeset.ChangeSet()
+                externalTroveList = []
+                externalFileList = []
+                removedTroveList = []
                 continue
 
 	    (troveChgSet, filesNeeded, pkgsNeeded) = \
@@ -395,11 +405,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	    cs.newTrove(troveChgSet)
 
-            if job in troveList:
+            if job[0] in origTroveList and job[0][2][0] is not None:
                 # add the primary w/ timestamps on the version
-                if jobEntry[2][0] is None:
-                    continue
-
                 try:
                     primary = troveChgSet.getNewNameVersionFlavor()
                     cs.addPrimaryTrove(*primary)
