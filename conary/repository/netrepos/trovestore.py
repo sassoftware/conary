@@ -871,8 +871,13 @@ class TroveStore:
                          start_transaction = False)
         self.db.analyze("tmpInstanceId")
 
+        # filter out troves we don't have permissions for
         if permCheckFilter:
             permCheckFilter(cu, "tmpInstanceId")
+
+            cu.execute("select idx from tmpInstanceId")
+            validIndexes = set(x[0] for x in cu)
+            troveIdList = [ x for x in troveIdList if x[0] in validIndexes ]
 
         # unfortunately most cost-based optimizers will get the
         # following troveTrovesCursor queries wrong. Details in CNY-2695
