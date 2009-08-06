@@ -681,7 +681,7 @@ class ChangesetFilter(BaseProxy):
                 if len(info) > 4:
                     rawSize = int(info[4])
                 else:
-                    rawSize = size
+                    rawSize = int(size)
 
                 csInfo.size = int(size)
                 csInfo.rawSize = rawSize
