@@ -2,6 +2,8 @@ Changes in @NEW@:
   o New Features
     * If python-keyutils is available, cvc will try to interact with
       the user's session keyring. (CNY-3190)
+    * Conary now uses xz in preference to unlzma to decompress lzma
+      data. (CNY-3194)
 
   o Internal Changes:
     * Reworked getChangeSet code path to use far fewer repository calls,
