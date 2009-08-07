@@ -18,6 +18,8 @@ Changes in @NEW@:
       for some cases involving shadows. This has been fixed, and a repository
       migration to version 17.3 has been provided to resolve this on
       existing repositories.
+    * Group pre-execution scripts now run exactly before any package that
+      is part of the group, instead of at the very beginning. (CNY-2705)
 
 Changes in 2.0.45:
   o New Features:
