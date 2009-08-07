@@ -14,6 +14,10 @@ Changes in @NEW@:
       using a callback. (CNY-3189)
     * Repositories running on postgresql can properly handle queries
       for labels sharing the hostname portion. (CNY-3192)
+    * The sha1 for files in a repository could be left as NULL improperly
+      for some cases involving shadows. This has been fixed, and a repository
+      migration to version 17.3 has been provided to resolve this on
+      existing repositories.
 
 Changes in 2.0.45:
   o New Features:

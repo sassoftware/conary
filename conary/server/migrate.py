@@ -654,7 +654,7 @@ class MigrateTo_16(SchemaMigration):
 
 
 class MigrateTo_17(SchemaMigration):
-    Version = (17,2)
+    Version = (17,3)
 
     # given a FilePaths table that only has a path column, split that into
     # a (dirnameid, basenameId) tuple and create/update the corresponding
@@ -802,6 +802,28 @@ class MigrateTo_17(SchemaMigration):
             logMe(2, "fixing missing dirnames/prefixes links in %d dirnames" % (len(ret),))
             trovestore.addPrefixesFromList(self.db, ret)
         self.db.analyze("Prefixes")
+        return True
+
+    # migrate to 17.3
+    def migrate3(self):
+        logMe(2, "fixing missing sha1s")
+        cu = self.db.cursor()
+
+        cu.execute("""select streamId, stream from filestreams
+                      where sha1 is NULL and stream is not NULL""")
+
+        count = 0
+        for (streamId, stream) in list(cu):
+            if not files.frozenFileHasContents(stream): continue
+            contentInfo = files.frozenFileContentInfo(stream)
+            cu.execute("update filestreams set sha1=? where streamId=?",
+                       cu.binary(contentInfo.sha1()), streamId)
+            count += 1
+
+        logMe(2, "fixed up %d rows" % count)
+        cu.execute("""select streamId, stream from filestreams
+                      where sha1 is NULL and stream is not NULL""")
+
         return True
 
 def _getMigration(major):

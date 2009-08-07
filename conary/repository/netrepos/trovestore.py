@@ -346,6 +346,13 @@ class TroveStore:
         for (fileId, stream) in cu.fetchall():
             cu.execute("UPDATE FileStreams SET stream = ? WHERE fileId = ?",
                        (cu.binary(stream), cu.binary(fileId)))
+            if files.frozenFileHasContents(stream):
+                cont = files.frozenFileContentInfo(stream)
+                sha1 = cont.sha1()
+                cu.execute("UPDATE FileStreams SET sha1 = ? "
+                           "WHERE fileId = ?",
+                           (cu.binary(sha1), cu.binary(fileId)))
+
         # select the new non-NULL streams out of tmpNewFiles and Insert
         # them in FileStreams
         cu.execute("""
