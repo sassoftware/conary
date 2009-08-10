@@ -3417,7 +3417,7 @@ conary erase '%s=%s[%s]'
         tagScript = kwargs['tagScript']
         justDatabase = kwargs['commitFlags'].justDatabase
         # Run pre scripts, if we have the per-job information
-        if uJob.hasJobPreScriptsOrder():
+        if not uJob.getRestartedFlag() and uJob.hasJobPreScriptsOrder():
             if not self.db.runPreScripts(uJob,
                                          callback = self.getUpdateCallback(),
                                          tagScript = tagScript,
