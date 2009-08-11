@@ -160,49 +160,13 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
 
 
     for changeSpec in changeSpecList:
-
-        isAbsolute = False
-
         if (allowChangeSets and os.path.exists(changeSpec) 
             and os.path.isfile(changeSpec)):
             applyList.append(_getChangeSet(changeSpec))
             continue
-
-        l = changeSpec.split("--")
-
-        if len(l) == 1:
-            (troveName, versionStr, flavor) = parseTroveSpec(l[0], False)
-
-            if troveName[0] == '-':
-                applyList.append((troveName, (versionStr, flavor), 
-                                  (None, None), False))
-            elif troveName[0] == '+' or updateByDefault:
-                applyList.append((troveName, (None, None), 
-                                  (versionStr, flavor), not keepExisting))
-            else:
-                applyList.append((troveName, (versionStr, flavor), 
-                                  (None, None), False))
-        elif len(l) != 2:
-            log.error("one -- expected in change spec '%s'", 
-                      changeSpec)
-            return
-        else:
-            oldSpec, newSpec = l
-            (troveName, oldVersion, oldFlavor) = parseTroveSpec(oldSpec)
-
-            if newSpec:
-                newSpec = troveName + "=" + newSpec
-                (troveName, newVersion, newFlavor) = parseTroveSpec(newSpec)
-            else:
-                newVersion, newFlavor = None, None
-
-            if (newVersion or (newFlavor is not None)) and \
-                   not (oldVersion or (oldFlavor is not None)):
-                # foo=--1.2
-                oldVersion, oldFlavor = None, None
-
-            applyList.append((troveName, (oldVersion, oldFlavor), 
-                              (newVersion, newFlavor), False))
+        applyList.append(
+            parseChangeSpec(changeSpec, keepExisting = keepExisting,
+                            updateByDefault = updateByDefault))
 
     # dedup, but keep ordering - this is a little slower but can be handy 
     # for lining up input -> output (if input is deduped)
@@ -212,6 +176,65 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
             finalList.append(item)
 
     return finalList
+
+@api.publicApi
+def parseChangeSpec(changeSpec, keepExisting=False, updateByDefault=True):
+    """
+    Parse a single change specification, as presented on the command line,
+    such as C{foo=1.1--1.2}, and turns it into a tuple
+    C{(name, (oldVersionSpec, oldFlavorSpec), (newVersionSpec, newFlavorSpec), isAbsolute)}.
+
+    @param changeSpec: a changeSpec, such as C{foo=1.1--1.2}
+    @type changeSpec: string
+
+    @param keepExisting: specifies whether an installed trove should be
+    kept in addition to an updated version.
+    @type keepExisting: bool
+
+    @param updateByDefault:
+    @type updateByDefault: bool
+
+    @raise TroveSpecError: Raised if an invalid TroveSpec is passed within the
+    ChangeSpec list.
+
+    @rtype: tuple
+    @return: a tuple
+    (name, (oldVersion, oldFlavor), (newVersion, newFlavor), replaceExisting)
+    where either the old or new version/flavor (but not both) may be
+    (None, None)
+    """
+
+    l = changeSpec.split("--")
+
+    if len(l) == 1:
+        (troveName, versionStr, flavor) = parseTroveSpec(l[0], False)
+
+        if troveName[0] == '-':
+            return (troveName, (versionStr, flavor), (None, None), False)
+        if troveName[0] == '+' or updateByDefault:
+            return (troveName, (None, None), (versionStr, flavor),
+                    not keepExisting)
+        return (troveName, (versionStr, flavor), (None, None), False)
+
+    if len(l) != 2:
+        log.error("one -- expected in change spec '%s'", changeSpec)
+        raise TroveSpecError(changeSpec, "one -- expected in change spec")
+
+    oldSpec, newSpec = l
+    (troveName, oldVersion, oldFlavor) = parseTroveSpec(oldSpec)
+
+    if newSpec:
+        newSpec = troveName + "=" + newSpec
+        (troveName, newVersion, newFlavor) = parseTroveSpec(newSpec)
+    else:
+        newVersion, newFlavor = None, None
+
+    if (newVersion or (newFlavor is not None)) and \
+           not (oldVersion or (oldFlavor is not None)):
+        # foo=--1.2
+        oldVersion, oldFlavor = None, None
+
+    return (troveName, (oldVersion, oldFlavor), (newVersion, newFlavor), False)
 
 @api.publicApi
 def toTroveSpec(name, versionStr, flavor):

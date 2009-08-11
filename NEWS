@@ -4,6 +4,9 @@ Changes in @NEW@:
       the user's session keyring. (CNY-3190)
     * Conary now uses xz in preference to unlzma to decompress lzma
       data. (CNY-3194)
+    * A new function, parseChangeSpec, that parses a single trove
+      update specification such as name=ver1[flv1]--ver2[flv2], was
+      added to cmdline.py. (CNY-3197)
 
   o Internal Changes:
     * Reworked getChangeSet code path to use far fewer repository calls,
