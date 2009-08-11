@@ -521,6 +521,9 @@ class UpdateJob:
         drep['invalidateRollbackStack'] = int(self._invalidateRollbackStack)
         drep['jobPreScripts'] = list(self._freezeJobPreScripts())
         drep['jobPreScriptsOrder'] = self._freezeJobPreScriptsOrder()
+        drep['jobPreScriptsAlreadyRun'] = list(
+            (x[0], self._freezeJob(x[1]))
+                for x in self._jobPreScriptsAlreadyRun)
         drep['jobPostRBScripts'] = list(self._freezeJobPostRollbackScripts())
         drep['changesetsDownloaded'] = int(self._changesetsDownloaded)
 
@@ -629,6 +632,9 @@ class UpdateJob:
             drep.get('jobPreScriptsOrder', None))
         self._jobPostRBScripts = list(self._thawJobPostRollbackScripts(
             list(drep.get('jobPostRBScripts', []))))
+        self._jobPreScriptsAlreadyRun = set(
+            (x[0], self._thawJob(x[1]))
+                for x in drep.get('jobPreScriptsAlreadyRun', []))
         self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
         self._fromChangesets = self._thawFromChangesets(drep.get('fromChangesets', []))
 
@@ -682,7 +688,9 @@ class UpdateJob:
     def _thawFlavor(self, flavor):
         if '*None*' == flavor:
             return None
-        return deps.ThawFlavor(flavor)
+        if isinstance(flavor, str):
+            return deps.ThawFlavor(flavor)
+        return flavor
 
     def _freezeJobPreScriptsOrder(self):
         if self._jobPreScriptsByJob is None:
@@ -1055,6 +1063,19 @@ class UpdateJob:
     def getFeatures(self):
         return self._features
 
+    def recordPreScriptRun(self, action, job):
+        self._jobPreScriptsAlreadyRun.add((action, job))
+
+    def wasPreScriptRun(self, action, job):
+        return (action, job) in self._jobPreScriptsAlreadyRun
+
+    def setJobPreScriptsAlreadyRun(self, iterable):
+        jobs = [ (x[0], self._thawJob(x[1])) for x in iterable ]
+        self._jobPreScriptsAlreadyRun = set(jobs)
+
+    def iterJobPreScriptsAlreadyRun(self):
+        return iter(self._jobPreScriptsAlreadyRun)
+
     def __init__(self, db, searchSource = None, lazyCache = None,
                  closeDatabase = True):
         # 20070714: lazyCache can be None for the users of the old API (when
@@ -1086,6 +1107,8 @@ class UpdateJob:
         # List of pre scripts to run for a particular job. This is ordered.
         self._jobPreScripts = []
         self._jobPreScriptsByJob = None
+        # We already ran pre scripts for these jobs
+        self._jobPreScriptsAlreadyRun = set()
         # Map of postrollback scripts (keyed on trove NVF)
         self._jobPostRBScripts = []
         # Changesets have been downloaded
@@ -1995,12 +2018,15 @@ class Database(SqlDbRepository):
 
             if isRollback and action != 'preerase':
                 continue
+            if uJob.wasPreScriptRun(action, job):
+                continue
             scriptId = "%s %s" % (job[0], action)
             rc = update.runTroveScript(job, script, tagScript, tmpDir,
                                        self.root, callback, isPre = True,
                                        scriptId = scriptId,
                                        oldCompatClass = oldCompatClass,
                                        newCompatClass = newCompatClass)
+            uJob.recordPreScriptRun(action, job)
             if rc:
                 return False
 
