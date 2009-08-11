@@ -58,7 +58,7 @@ class FactoryRecipe(AbstractPackageRecipe, BaseRequiresRecipe):
 
     def __init__(r, *arg, **kw):
         assert r.originalFactoryClass is not None,\
-            'You must set the originalFactoryClass before creating the FactoryRecipe object')
+            'You must set the originalFactoryClass before creating the FactoryRecipe object'
         AbstractPackageRecipe.__init__(r, *arg, **kw)
 
     def setup(r):
