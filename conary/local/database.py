@@ -377,6 +377,8 @@ class UpdateJobFeatures(util.Flags):
         return self
 
 class UpdateJob:
+    trvCsDir = 'trove-changesets'
+
     def __del__(self):
         try:
             self.close()
@@ -530,6 +532,7 @@ class UpdateJob:
         jobfile = os.path.join(frzdir, "jobfile")
 
         self._saveFrozenRepr(jobfile, drep)
+        self.saveTroveMap(util.joinPaths(frzdir, self.trvCsDir))
 
         # Save features too. We will not load them automatically unless we
         # find a need for that.
@@ -638,6 +641,7 @@ class UpdateJob:
         self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
         self._fromChangesets = self._thawFromChangesets(drep.get('fromChangesets', []))
 
+        self.loadTroveMap(util.joinPaths(frzdir, self.trvCsDir))
 
     def _freezeJobs(self, jobs):
         for jobList in jobs:
@@ -845,6 +849,32 @@ class UpdateJob:
         flags = CommitChangeSetFlags(**frzdict)
         return flags
 
+    def saveTroveMap(self, destdir):
+        troveMap = self._troveMap
+        util.mkdirChain(destdir)
+        for i, (nvf, trv) in enumerate(troveMap.items()):
+            destFile = util.joinPaths(destdir, '%s.ccs' % i)
+            cs = changeset.ChangeSet()
+            trvCs = trv.diff(None)[0]
+            cs.newTrove(trvCs)
+            cs.writeToFile(destFile)
+
+    def loadTroveMap(self, destdir):
+        ret = self._troveMap = {}
+        if not destdir or not os.path.exists(destdir):
+            return ret
+        files = os.listdir(destdir)
+        for f in files:
+            if not f.endswith('.ccs'):
+                continue
+            fileName = util.joinPaths(destdir, f)
+            cs = changeset.ChangeSetFromFile(
+                util.ExtendedFile(fileName, buffering = False))
+            trvCs = cs.iterNewTroveList().next()
+            trv = trove.Trove(trvCs)
+            ret[trv.getNameVersionFlavor()] = trv
+        return ret
+
     def setInvalidateRollbacksFlag(self, flag):
         self._invalidateRollbackStack = bool(flag)
 
@@ -857,9 +887,13 @@ class UpdateJob:
         return self._invalidateRollbackStack
 
     def addJobPreScript(self, job, script, oldCompatClass, newCompatClass,
-                        action = None):
+                        action = None, troveObj = None):
+        assert troveObj is not None
         if action is None:
             action = "preupdate"
+        nvf = troveObj.getNameVersionFlavor()
+        if nvf not in self._troveMap:
+            self._troveMap[nvf] = troveObj
         self._jobPreScripts.append((job, script, oldCompatClass,
                                     newCompatClass, action))
 
@@ -1003,6 +1037,11 @@ class UpdateJob:
         scriptIdxMap = dict(prerollback=dict(), preerase=dict(),
                             preinstall=dict(), preupdate=dict())
 
+        # Normally, we will not try to hit the repository again; we'll use the
+        # job's _troveMap to minimize that. However, if we're part of a
+        # critical update and the old Conary did not serialize _troveMap, we
+        # will have to.
+
         getTroveFromSearchSource = self.getSearchSource().getTrove
         getTroveFromLocalDb = self.getTroveSource().db.getTrove
         # Iterate over the scripts
@@ -1022,7 +1061,9 @@ class UpdateJob:
             minIdx = searchMap[trvSpec]
 
             # Grab the trove
-            trv = getTrove(*trvSpec, **dict(withFiles=False))
+            trv = self._troveMap.get(trvSpec)
+            if trv is None:
+                trv = getTrove(*trvSpec, **dict(withFiles=False))
             # Iterate over its troves
             for subTrv in trv.iterTroveList(strongRefs = True, weakRefs = True):
                 if subTrv not in searchMap:
@@ -1109,6 +1150,8 @@ class UpdateJob:
         self._jobPreScriptsByJob = None
         # We already ran pre scripts for these jobs
         self._jobPreScriptsAlreadyRun = set()
+        # Trove map, needed to walk the references when ordering pre scripts
+        self._troveMap = {}
         # Map of postrollback scripts (keyed on trove NVF)
         self._jobPostRBScripts = []
         # Changesets have been downloaded
@@ -2446,8 +2489,9 @@ class Database(SqlDbRepository):
                 script = trvCs._getPreInstallScript()
                 if not script:
                     continue
+                troveObj = trove.Trove(trvCs)
                 preScripts.append((job, script, None, newCompatClass,
-                                   "preinstall"))
+                                   "preinstall", troveObj))
                 continue
 
             # This is an update
@@ -2459,12 +2503,17 @@ class Database(SqlDbRepository):
             script = oldTrv.troveInfo.scripts.preRollback.script()
             if script:
                 preScripts.append((job, script, oldCompatClass, newCompatClass,
-                    "prerollback"))
+                    "prerollback", oldTrv))
 
             script = trvCs.getPreUpdateScript()
             if script:
+                if trvCs.isAbsolute():
+                    troveObj = trove.Trove(trvCs)
+                else:
+                    troveObj = oldTrv.copy()
+                    troveObj.applyChangeSet(trvCs)
                 preScripts.append((job, script, oldCompatClass, newCompatClass,
-                    "preupdate"))
+                    "preupdate", troveObj))
 
         jobs.sort()
         updJob.addJob(jobs)
@@ -2484,7 +2533,7 @@ class Database(SqlDbRepository):
                 oldCompatClass = trv.getCompatibilityClass()
                 if script:
                     preScripts.append((j, script, oldCompatClass, None,
-                                      "preerase"))
+                                      "preerase", trv))
 
                 # This is the rollback of an install, we shall not run the
                 # prerollback script (CNY-2844)

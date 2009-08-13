@@ -1849,16 +1849,19 @@ conary erase '%s=%s[%s]'
         # check for old trove's erase scripts
         removeList = [ job for job in jobList
                              if job[2][0] is None ]
-        scripts = self.db.getTroveScripts(
-                    [ (job[0], job[1][0], job[1][1]) for job in removeList ] )
-        for job, scriptObj in itertools.izip(removeList, scripts):
+        troveList = [ (job[0], job[1][0], job[1][1]) for job in removeList ]
+        scripts = self.db.getTroveScripts(troveList)
+        troves = self.db.getTroves(troveList, withFiles = False,
+            withDeps = False)
+        for job, scriptObj, troveObj in itertools.izip(removeList, scripts, troves):
             if scriptObj is None: continue
             if not scriptObj.preErase.script(): continue
 
             compatClass = self.db.getTroveCompatibilityClass(
                                 job[0], job[1][0], job[1][1])
             updJob.addJobPreScript(job, scriptObj.preErase.script(),
-                                   compatClass, None, action = "preerase")
+                                   compatClass, None, action = "preerase",
+                                   troveObj = troveObj)
 
     def _processJobList(self, jobList, updJob, troveSourceCallback):
         missingTroves = list()
@@ -1885,18 +1888,27 @@ conary erase '%s=%s[%s]'
             if job[1][0] is not None:
                 action = "preupdate"
                 # check for preupdate scripts
-                oldCompatClass = self.db.getTroveCompatibilityClass(
-                        job[0], job[1][0], job[1][1])
+                troveTup = (job[0], job[1][0], job[1][1])
+                oldCompatClass = self.db.getTroveCompatibilityClass(*troveTup)
                 preScript = troveCs.getPreUpdateScript()
+                if preScript:
+                    if troveCs.isAbsolute():
+                        troveObj = trove.Trove(troveCs)
+                    else:
+                        troveObj = self.db.getTrove(*troveTup,
+                            withFiles = False, withDeps = False)
+                        troveObj.applyChangeSet(troveCs)
             else:
                 action = "preinstall"
                 oldCompatClass = None
                 preScript = troveCs._getPreInstallScript()
+                if preScript:
+                    troveObj = trove.Trove(troveCs)
 
             if preScript:
                 updJob.addJobPreScript(job, preScript, oldCompatClass,
                                        troveCs.getNewCompatibilityClass(),
-                                       action = action)
+                                       action = action, troveObj = troveObj)
 
             postRollbackScript = troveCs.getPostRollbackScript()
             if postRollbackScript and job[1][0] is not None:
@@ -4074,6 +4086,9 @@ def _storeJobInfo(remainingJobs, updJob):
     file(path, "w").write(_serializePreScripts(
         updJob.iterJobPreScriptsAlreadyRun()))
 
+    troveMapDir = os.path.join(restartDir, "trove-changesets")
+    updJob.saveTroveMap(troveMapDir)
+
     return restartDir
 
 def _loadRestartInfo(restartDir, updJob):
@@ -4148,6 +4163,9 @@ def _loadRestartInfo(restartDir, updJob):
     except IOError:
         iterable = []
     updJob.setJobPreScriptsAlreadyRun(_unserializePreScripts(iterable))
+
+    troveMapDir = os.path.join(restartDir, "trove-changesets")
+    updJob.loadTroveMap(troveMapDir)
 
     return finalJobSet, changeSetList
 
