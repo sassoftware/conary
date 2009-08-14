@@ -871,7 +871,9 @@ class UpdateJob:
             cs = changeset.ChangeSetFromFile(
                 util.ExtendedFile(fileName, buffering = False))
             trvCs = cs.iterNewTroveList().next()
-            trv = trove.Trove(trvCs)
+            # We're only going to use the troves in troveMap for finding
+            # references, so it's acceptable to skip integrity checks
+            trv = trove.Trove(trvCs, skipIntegrityChecks = True)
             ret[trv.getNameVersionFlavor()] = trv
         return ret
 
