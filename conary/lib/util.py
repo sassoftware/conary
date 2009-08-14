@@ -1915,7 +1915,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
             passwd = ProtectedString(passwd)
             userpass = '%s:${passwd}' % user
             self.__host = ProtectedTemplate('%s@%s' % (userpass, hostport),
-                passwd = passwd)
+                passwd = urllib.quote(passwd))
 
 def copyStream(src, dest, length = None, bufferSize = 16384):
     """Copy from one stream to another, up to a specified length"""

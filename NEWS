@@ -25,6 +25,8 @@ Changes in @NEW@:
       is part of the group, instead of at the very beginning. (CNY-2705)
     * Group pre-execution scripts no longer unnecessarily fetch
       information they already have from the repostitiory. (CNY-3196)
+    * Password information for XMLRPC server URLs is now hidden in
+      tracebacks. (CNY-3198)
 
 Changes in 2.0.45:
   o New Features:
