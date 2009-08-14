@@ -1896,7 +1896,7 @@ conary erase '%s=%s[%s]'
                         troveObj = trove.Trove(troveCs)
                     else:
                         troveObj = self.db.getTrove(*troveTup,
-                            withFiles = False, withDeps = False)
+                            **dict(withFiles = False, withDeps = False))
                         troveObj.applyChangeSet(troveCs)
             else:
                 action = "preinstall"
