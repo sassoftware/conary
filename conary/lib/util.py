@@ -1681,6 +1681,45 @@ class ProtectedTemplate(str):
             nargs[k] = v
         return self._templ.safe_substitute(nargs)
 
+    __repr__ = __safe_str__
+
+def urlSplit(url, defaultPort = None):
+    """A function to split a URL in the format
+    <scheme>://<user>:<pass>@<host>:<port>/<path>;<params>#<fragment>
+    into a tuple
+    (<scheme>, <user>, <pass>, <host>, <port>, <path>, <params>, <fragment>)
+    Any missing pieces (user/pass) will be set to None.
+    If the port is missing, it will be set to defaultPort; otherwise, the port
+    should be a numeric value.
+    """
+    scheme, netloc, path, query, fragment = urlparse.urlsplit(url)
+    userpass, hostport = urllib.splituser(netloc)
+    host, port = urllib.splitnport(hostport, None)
+    if userpass:
+        user, passwd = urllib.splitpasswd(userpass)
+        passwd = ProtectedString(passwd)
+    else:
+        user, passwd = None, None
+    return scheme, user, passwd, host, port, path, \
+        query or None, fragment or None
+
+def urlUnsplit(urlTuple):
+    """Recompose a split URL as returned by urlSplit into a single string
+    """
+    scheme, user, passwd, host, port, path, query, fragment = urlTuple
+    userpass = None
+    if user and passwd:
+        userpass = "%s:${passwd}" % (urllib.quote(user))
+    hostport = host
+    if port:
+        hostport = urllib.quote("%s:%s" % (host, port), safe = ':')
+    netloc = hostport
+    if userpass:
+        netloc = "%s@%s" % (userpass, hostport)
+    urlTempl = urlparse.urlunsplit((scheme, netloc, path, query, fragment))
+    if passwd is None:
+        return urlTempl
+    return ProtectedTemplate(urlTempl, passwd = ProtectedString(urllib.quote(passwd)))
 
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
     """Marshaller for XMLRPC data"""
@@ -1861,6 +1900,22 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
     def _createMethod(self, name):
         return xmlrpclib._Method(self._request, name)
+
+    def __repr__(self):
+        return "<ServerProxy for %s%s>" % (repr(self.__host), self.__handler)
+
+    __str__ = __repr__
+
+    def __init__(self, *args, **kwargs):
+        xmlrpclib.ServerProxy.__init__(self, *args, **kwargs)
+        # Hide password
+        userpass, hostport = urllib.splituser(self.__host)
+        if userpass:
+            user, passwd = urllib.splitpasswd(userpass)
+            passwd = ProtectedString(passwd)
+            userpass = '%s:${passwd}' % user
+            self.__host = ProtectedTemplate('%s@%s' % (userpass, hostport),
+                passwd = passwd)
 
 def copyStream(src, dest, length = None, bufferSize = 16384):
     """Copy from one stream to another, up to a specified length"""
