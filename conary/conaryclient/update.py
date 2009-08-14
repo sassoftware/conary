@@ -3106,9 +3106,8 @@ conary erase '%s=%s[%s]'
                 newJob.extend(jobList)
                 inGroup = foundGroup
             else:
-                if (self.cfg.updateThreshold and newJob and
-                         (len(newJob)  + len(jobList))
-                         > self.cfg.updateThreshold):
+                if (updateMax and newJob and
+                         (len(newJob)  + len(jobList)) > updateMax):
                     uJob.addJob(newJob)
                     newJob = []
 
