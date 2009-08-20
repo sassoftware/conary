@@ -632,6 +632,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
         reqClass.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
         reqClass.restHandler = None
         if cfg.baseUri:
+            global cresthooks
             if cresthooks is None:
                 # we haven't tried to import cresthooks yet - let's give
                 # it a try
