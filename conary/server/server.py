@@ -638,7 +638,7 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
                 # it a try
                 try:
                     from crest import webhooks as cresthooks
-                except ImportError:
+                except ImportError, e:
                     print 'warning: failed to import crest:', str(e)
                     # fail - let's not try again by setting cresthooks to
                     # False instead of None
