@@ -33,10 +33,6 @@ except ImportError:
     SSL = None
 
 cresthooks = None
-try:
-    from crest import webhooks as cresthooks
-except ImportError, e:
-    print 'warning: failed to import crest:', str(e)
 
 thisFile = sys.modules[__name__].__file__
 thisPath = os.path.dirname(thisFile)
@@ -635,13 +631,21 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
         netRepos = NetworkRepositoryServer(cfg, baseUrl)
         reqClass.netRepos = proxy.SimpleRepositoryFilter(cfg, baseUrl, netRepos)
         reqClass.restHandler = None
-        if cresthooks and cfg.baseUri:
-            try:
+        if cfg.baseUri:
+            if cresthooks is None:
+                # we haven't tried to import cresthooks yet - let's give
+                # it a try
+                try:
+                    from crest import webhooks as cresthooks
+                except ImportError:
+                    print 'warning: failed to import crest:', str(e)
+                    # fail - let's not try again by setting cresthooks to
+                    # False instead of None
+                    cresthooks = False
+            if cresthooks:
                 reqClass.restUri = cfg.baseUri + '/api'
                 reqClass.restHandler = cresthooks.StandaloneHandler(
-                                                reqClass.restUri, netRepos)
-            except ImportError:
-                pass
+                                                    reqClass.restUri, netRepos)
 
         if 'add-user' in argSet:
             admin = argSet.pop('admin', False)
