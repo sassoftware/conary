@@ -9,20 +9,23 @@ Changes in @NEW@:
       added to cmdline.py. (CNY-3197)
 
   o Internal Changes:
-    * Reworked getChangeSet code path to use far fewer repository calls,
-      resulting in a massive speedup for uncached, large requests.
+    * The code path leading to getChangeSet was reworked to use
+      significantly fewer repository calls, resulting in a massive
+      speedup for uncached, large requests.
 
   o Bug Fixes:
     * PGP passphrases, required for signing troves, are now fetched
       using a callback. (CNY-3189)
     * Repositories running on postgresql can properly handle queries
       for labels sharing the hostname portion. (CNY-3192)
-    * The sha1 for files in a repository could be left as NULL improperly
-      for some cases involving shadows. This has been fixed, and a repository
-      migration to version 17.3 has been provided to resolve this on
-      existing repositories.
-    * Group pre-execution scripts now run exactly before any package that
-      is part of the group, instead of at the very beginning. (CNY-2705)
+    * The sha1 for files in a repository could be improperly left as
+      NULL for some cases involving shadows. This has been fixed,
+      and existing repositories can migrate to version 17.3.
+    * Group pre-execution scripts now run exactly before any package
+      that is part of the group. Previously, pre-execution scripts
+      were run at the very beginning of the update, where the
+      probability of their interpreter not being installed was high,
+      especially for pre-install scripts.  (CNY-2705)
     * Group pre-execution scripts no longer unnecessarily fetch
       information they already have from the repostitiory. (CNY-3196)
     * Password information for XMLRPC server URLs is now hidden in
