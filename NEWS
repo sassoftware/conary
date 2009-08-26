@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.46:
   o New Features
     * If python-keyutils is available, cvc will try to interact with
       the user's session keyring. (CNY-3190)
@@ -19,14 +19,14 @@ Changes in @NEW@:
     * Repositories running on postgresql can properly handle queries
       for labels sharing the hostname portion. (CNY-3192)
     * The sha1 for files in a repository could be improperly left as
-      NULL for some cases involving shadows.  This has been fixed,
+      NULL for some cases involving shadows. This has been fixed,
       and migrating existing repositories to version 17.3 will fix
       existing missing sha1 checksums.
     * Group pre-execution scripts now run exactly before any package
-      that is part of the group.  Previously, pre-execution scripts
+      that is part of the group. Previously, pre-execution scripts
       were run at the very beginning of the update, where the
       probability of their interpreter not being installed was high,
-      especially for pre-install scripts.  (CNY-2705)
+      especially for pre-install scripts. (CNY-2705)
     * Group pre-execution scripts no longer unnecessarily fetch
       information they already have from the repository. (CNY-3196)
     * Password information for XMLRPC server URLs is now hidden in
