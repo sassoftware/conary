@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Internal Changes:
+    * Repository internal getfile function now avoids and database access
+      when no files have been requested
+
 Changes in 2.0.46:
   o New Features
     * If python-keyutils is available, cvc will try to interact with
