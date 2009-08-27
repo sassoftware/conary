@@ -1169,6 +1169,9 @@ class TroveStore:
         # this only needs a list of (pathId, fileId) pairs, but it sometimes
         # gets (pathId, fileId, version) pairs instead (which is what
         # the network repository client uses)
+        if not l:
+            return {}
+
         retr = FileRetriever(self.db, self.log)
         d = retr.get(l)
         del retr
