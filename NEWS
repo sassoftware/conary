@@ -4,6 +4,9 @@ Changes in @NEW@:
       when no files have been requested
     * Use bulk operatings for loading troveinfo data, speeding up repository
       commits.
+    * Committing changesets now iterates over troves the changeset is
+      relative to rather than getting them one at a time, significantly
+      reducing the number of sql calls.
 
 Changes in 2.0.46:
   o New Features

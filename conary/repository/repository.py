@@ -462,6 +462,10 @@ class ChangeSetJob:
         repos = self.repos
         cs = self.cs
 
+        oldTrovesNeeded = [ x.getOldNameVersionFlavor() for x in
+                                newList if x.getOldVersion() ]
+        oldTroveIter = repos.iterTroves(oldTrovesNeeded, hidden = True)
+
         troveNo = 0
 	for csTrove in newList:
             if csTrove.troveType() == trove.TROVE_TYPE_REMOVED:
@@ -486,9 +490,9 @@ class ChangeSetJob:
 			(newVersion.asString(), csTrove.getName())
 
 	    if oldTroveVersion:
-                newTrove = repos.getTrove(troveName, oldTroveVersion, 
-                                          oldTroveFlavor, pristine = True,
-                                          hidden = hidden).copy()
+                newTrove = oldTroveIter.next()
+                assert(newTrove.getNameVersionFlavor() ==
+                        csTrove.getOldNameVersionFlavor())
                 self.oldTrove(newTrove, csTrove, troveName, oldTroveVersion,
                               oldTroveFlavor)
 

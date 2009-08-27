@@ -127,6 +127,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             pkgName, version, flavor, withFiles = withFiles,
             hidden = hidden)
 
+    def iterTroves(self, troveList, withFiles = True, hidden = False):
+        return self.troveStore.iterTroves(troveList, withFiles = withFiles,
+                                          hidden = hidden)
+
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)
 
