@@ -195,8 +195,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
                        fileVersion, fileStream = None):
-	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId,
-                                fileVersion, fileStream = fileStream)
+        troveInfo.addFile(pathId, fileObj, path, fileId, fileVersion,
+                          fileStream = fileStream)
 
     ###
 

@@ -57,6 +57,62 @@ class LocalRepVersionTable(versiontable.VersionTable):
 	except StopIteration:
             raise KeyError, itemId
 
+class TroveAdder:
+
+    def addFile(self, pathId, fileObj, path, fileId, fileVersion,
+                fileStream = None):
+        dirname, basename = os.path.split(path)
+
+        pathChanged = 1
+
+        changeInfo = self.changeMap.get(pathId, None)
+        if changeInfo:
+            if not changeInfo[1]:
+                pathChanged = 0
+            if not changeInfo[3]:
+                versionChanged = False
+            else:
+                versionChanged = True
+        else:
+            versionChanged = (pathId in self.newSet)
+
+        versionId = self.troveStore.getVersionId(fileVersion)
+        # If the file version is the same as in the old trove, or if we have
+        # seen this fileId before, ignore the new stream data
+        if not versionChanged or (fileId in self.troveStore.seenFileId):
+            fileObj = fileStream = None
+        if fileObj or fileStream:
+            sha1 = None
+
+            if fileStream is None:
+                fileStream = fileObj.freeze()
+            if fileObj is not None:
+                if fileObj.hasContents:
+                    sha1 = fileObj.contents.sha1()
+            elif files.frozenFileHasContents(fileStream):
+                cont = files.frozenFileContentInfo(fileStream)
+                sha1 = cont.sha1()
+            self.troveStore.seenFileId.add(fileId)
+            self.newFilesInsertList.append(
+                        (self.cu.binary(pathId), versionId,
+                         self.cu.binary(fileId), self.cu.binary(fileStream),
+                         dirname, basename, self.cu.binary(sha1),
+                         pathChanged))
+        else:
+            self.newFilesInsertList.append((self.cu.binary(pathId), versionId,
+                                            self.cu.binary(fileId), None,
+                                            dirname, basename, None,
+                                            pathChanged))
+
+    def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap):
+        self.troveStore = troveStore
+        self.cu = cu
+        self.trv = trv
+        self.trvCs = trvCs
+        self.hidden = hidden
+        self.newFilesInsertList = []
+        self.newSet = newSet
+        self.changeMap = changeMap
 
 # we need to call this from the schema migration as well, which is why
 # we extracted it from the TroveStore class
@@ -254,7 +310,7 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewRedirects')
         changeMap = dict((x[0], x) for x in trvCs.getChangedFileList())
         newSet = set(x[0] for x in trvCs.getNewFileList())
-        return (cu, trv, trvCs, hidden, [], newSet, changeMap)
+        return TroveAdder(self, cu, trv, trvCs, hidden, newSet, changeMap)
 
     # walk the trove and insert any missing flavors we need into the Flavors table
     def _addTroveNewFlavors(self, cu, trv):
@@ -526,7 +582,12 @@ class TroveStore:
         """)
 
     def addTroveDone(self, troveInfo, mirror=False):
-        (cu, trv, trvCs, hidden, newFilesInsertList) = troveInfo[0:5]
+        cu = troveInfo.cu
+        trv = troveInfo.trv
+        trvCs = troveInfo.trvCs
+        hidden = troveInfo.hidden
+
+        newFilesInsertList = troveInfo.newFilesInsertList
 
         self.log(3, trv)
 
@@ -1104,52 +1165,6 @@ class TroveStore:
 	    else:
 		yield (cu.frombinary(pathId), path, cu.frombinary(fileId), 
                        version)
-
-    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
-                fileStream = None):
-        (cu, trv, trvCs, hidden, newFilesInsertList, newSet,
-         changeMap) = troveInfo
-        dirname, basename = os.path.split(path)
-
-        pathChanged = 1
-
-        changeInfo = changeMap.get(pathId, None)
-        if changeInfo:
-            if not changeInfo[1]:
-                pathChanged = 0
-            if not changeInfo[3]:
-                versionChanged = False
-            else:
-                versionChanged = True
-        else:
-            versionChanged = (pathId in newSet)
-
-	versionId = self.getVersionId(fileVersion)
-        # If the file version is the same as in the old trove, or if we have
-        # seen this fileId before, ignore the new stream data
-        if not versionChanged or (fileId in self.seenFileId):
-            fileObj = fileStream = None
-        if fileObj or fileStream:
-            sha1 = None
-
-            if fileStream is None:
-                fileStream = fileObj.freeze()
-            if fileObj is not None:
-                if fileObj.hasContents:
-                    sha1 = fileObj.contents.sha1()
-            elif files.frozenFileHasContents(fileStream):
-                cont = files.frozenFileContentInfo(fileStream)
-                sha1 = cont.sha1()
-            self.seenFileId.add(fileId)
-            newFilesInsertList.append((cu.binary(pathId), versionId,
-                                       cu.binary(fileId), cu.binary(fileStream),
-                                       dirname, basename, cu.binary(sha1),
-                                       pathChanged))
-	else:
-            newFilesInsertList.append((cu.binary(pathId), versionId,
-                                       cu.binary(fileId), None,
-                                       dirname, basename, None,
-                                       pathChanged))
 
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()
