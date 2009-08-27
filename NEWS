@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
       when no files have been requested
+    * Use bulk operatings for loading troveinfo data, speeding up repository
+      commits.
 
 Changes in 2.0.46:
   o New Features
