@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Committing changesets now iterates over troves the changeset is
       relative to rather than getting them one at a time, significantly
       reducing the number of sql calls.
+    * Conary now uses a single call when validating that file objects exist
+      in the repository during a commit.
 
 Changes in 2.0.46:
   o New Features

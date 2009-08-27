@@ -457,6 +457,7 @@ class ChangeSetJob:
 
         configRestoreList = []
         normalRestoreList = []
+        checkFilesList = []
 
         newList = [ x for x in self.cs.iterNewTroveList() ]
         repos = self.repos
@@ -533,20 +534,8 @@ class ChangeSetJob:
                 troveInfo = self.addTrove(None, newTrove, csTrove,
                                           hidden = hidden)
 
-            checkFilesList = self._getCheckFilesList(csTrove, troveInfo, 
+            checkFilesList += self._getCheckFilesList(csTrove, troveInfo, 
                 fileHostFilter, configRestoreList, normalRestoreList)
-
-            try:
-                # we need to actualize this, not just get a generator
-                list(repos.getFileVersions(checkFilesList))
-            except errors.FileStreamMissing, e:
-                info = [ x for x in checkFilesList if x[1] == e.fileId ]
-                (pathId, fileId) = info[0][0:2]
-                # Missing from the repo; raise exception
-                raise errors.IntegrityError(
-                    "Incomplete changeset specified: missing pathId %s "
-                    "fileId %s" % (sha1helper.md5ToString(pathId),
-                                   sha1helper.sha1ToString(fileId)))
 
             for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
                 # handle files which haven't changed; we know which those
@@ -666,6 +655,18 @@ class ChangeSetJob:
 
 	    del newFileMap
 	    self.addTroveDone(troveInfo, mirror=mirror)
+
+        try:
+            # we need to actualize this, not just get a generator
+            list(repos.getFileVersions(checkFilesList))
+        except errors.FileStreamMissing, e:
+            info = [ x for x in checkFilesList if x[1] == e.fileId ]
+            (pathId, fileId) = info[0][0:2]
+            # Missing from the repo; raise exception
+            raise errors.IntegrityError(
+                "Incomplete changeset specified: missing pathId %s "
+                "fileId %s" % (sha1helper.md5ToString(pathId),
+                               sha1helper.sha1ToString(fileId)))
 
         return troveNo, configRestoreList, normalRestoreList
 
