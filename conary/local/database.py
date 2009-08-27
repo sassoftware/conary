@@ -1469,10 +1469,10 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def iterFilesWithTag(self, tag):
 	return self.db.iterFilesWithTag(tag)
 
-    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version,
+    def addFileVersion(self, troveId, pathId, path, fileId, version,
                        fileStream = None, isPresent = True):
         self._updateTransactionCounter = True
-	self.db.addFile(troveId, pathId, fileObj, path, fileId, version,
+	self.db.addFile(troveId, pathId, path, fileId, version,
                         fileStream = fileStream, isPresent = isPresent)
 
     def addTrove(self, trove, pin = False, oldTroveSpec = None):

@@ -9,6 +9,8 @@ Changes in @NEW@:
       reducing the number of sql calls.
     * Conary now uses a single call when validating that file objects exist
       in the repository during a commit.
+    * Repository commits now handle file paths and file streams separately
+      to reduce the size of the temporary tables and the commit path.
 
 Changes in 2.0.46:
   o New Features

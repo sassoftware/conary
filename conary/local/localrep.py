@@ -44,11 +44,10 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	return (info, self.repos.addTrove(trove, pin = pin,
                                           oldTroveSpec = oldTroveSpec))
 
-    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, 
+    def addFileVersion(self, troveId, pathId, path, fileId,
                        newVersion, fileStream = None):
         isPresent = not self.pathRemovedCheck(troveId[0], pathId)
-        self.repos.addFileVersion(troveId[1], pathId, fileObj, path,
-                                  fileId, newVersion,
+        self.repos.addFileVersion(troveId[1], pathId, path, fileId, newVersion,
                                   fileStream = fileStream,
                                   isPresent = isPresent)
 

@@ -1051,14 +1051,23 @@ def setupTempTables(db):
                        check = False)
         db.createIndex("tmpFlavorMap", "tmpFlavorMapSenseIdx", "flavorId,sense",
                        check = False)
+    if "tmpNewStreams" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpNewStreams(
+            fileId      %(BINARY20)s,
+            stream      %(MEDIUMBLOB)s,
+            sha1        %(BINARY20)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpNewStreams"] = True
+        db.createIndex("tmpNewStreams", "tmpNewStreamssFileIdx", "fileId",
+                       check = False)
+
     if "tmpNewFiles" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpNewFiles(
             pathId      %(BINARY16)s,
             versionId   INTEGER,
             fileId      %(BINARY20)s,
-            stream      %(MEDIUMBLOB)s,
-            sha1        %(BINARY20)s,
             dirname     %(PATHTYPE)s,
             basename    %(PATHTYPE)s,
             pathChanged INTEGER,

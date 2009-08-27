@@ -193,9 +193,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                 yield fileObj
 
-    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
+    def addFileVersion(self, troveInfo, pathId, path, fileId,
                        fileVersion, fileStream = None):
-        troveInfo.addFile(pathId, fileObj, path, fileId, fileVersion,
+        troveInfo.addFile(pathId, path, fileId, fileVersion,
                           fileStream = fileStream)
 
     ###

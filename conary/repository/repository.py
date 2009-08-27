@@ -328,10 +328,9 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
-    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
+    def addFileVersion(self, troveInfo, pathId, path, fileId,
                        newVersion, fileStream = None):
-        self.repos.addFileVersion(troveInfo, pathId, fileObj, path,
-                                  fileId, newVersion,
+        self.repos.addFileVersion(troveInfo, pathId, path, fileId, newVersion,
                                   fileStream = fileStream)
 
     def checkTroveCompleteness(self, trv):
@@ -346,7 +345,7 @@ class ChangeSetJob:
                         oldFileId = None, oldVersion = None, oldfile = None,
                         restoreContents = True):
         # files with contents need to be tracked so we can stick
-        # there contents in the archive "soon"; config files need
+        # their contents in the archive "soon"; config files need
         # extra magic for tracking since we may have to merge
         # contents
 
@@ -439,7 +438,7 @@ class ChangeSetJob:
                               "for pathId %s" %
                                     sha1helper.md5ToString(pathId))
 
-            self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+            self.addFileVersion(troveInfo, pathId, path, fileId,
                                 newVersion, fileStream = fileStream)
 
             self._handleContents(pathId, fileId, fileStream, configRestoreList, 
@@ -544,8 +543,7 @@ class ChangeSetJob:
                 if pathId in newFileMap:
                     continue
 
-                # None is the fileObj, which we don't have (or need)
-                self.addFileVersion(troveInfo, pathId, None, path, fileId,
+                self.addFileVersion(troveInfo, pathId, path, fileId,
                                     newVersion)
 
             filesNeeded = []
@@ -561,12 +559,10 @@ class ChangeSetJob:
 
                 if (fileHostFilter
                     and newVersion.getHost() not in fileHostFilter):
-                    fileObj = None
                     fileStream = None
                 elif (oldVersion == newVersion and oldFileId == fileId):
                     # the file didn't change between versions; we can just
                     # ignore it
-                    fileObj = None
                     fileStream = None
                 else:
                     fileStream = cs.getFileChange(oldFileId, fileId)
@@ -580,17 +576,10 @@ class ChangeSetJob:
                                                     oldVersion)))
                             continue
 
-                        fileObj = None
                         fileStream = None
-                    elif fileStream:
-                        fileObj = files.ThawFile(fileStream, pathId)
-                    else:
-                        # no contents are in the changeset; take it on
-                        # faith that we already have them
-                        fileObj = None
 
                 # None is the file object
-                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+                self.addFileVersion(troveInfo, pathId, path, fileId,
                                     newVersion, fileStream = fileStream)
 
                 if fileStream is not None:
@@ -643,7 +632,7 @@ class ChangeSetJob:
                           csTrove.getNewVersion(), csTrove.getNewFlavor(),
                           "fileObj.fileId() != fileId in changeset")
 
-                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId, 
+                self.addFileVersion(troveInfo, pathId, path, fileId, 
                                     newVersion, fileStream = fileStream)
 
                 self._handleContents(pathId, fileId, fileStream,

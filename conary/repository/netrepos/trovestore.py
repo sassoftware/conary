@@ -59,11 +59,36 @@ class LocalRepVersionTable(versiontable.VersionTable):
 
 class TroveAdder:
 
-    def addFile(self, pathId, fileObj, path, fileId, fileVersion,
+    def addStream(self, fileId, fileStream = None):
+        if fileId in self.troveStore.seenFileId:
+            return
+
+        if fileStream:
+            sha1 = None
+
+            if files.frozenFileHasContents(fileStream):
+                cont = files.frozenFileContentInfo(fileStream)
+                sha1 = cont.sha1()
+        else:
+            sha1 = None
+
+        self.troveStore.seenFileId.add(fileId)
+        self.newStreamsInsertList.append(
+                    (self.cu.binary(fileId), self.cu.binary(fileStream),
+                     self.cu.binary(sha1)))
+
+    def addFile(self, pathId, path, fileId, fileVersion,
                 fileStream = None):
         dirname, basename = os.path.split(path)
 
         pathChanged = 1
+
+        versionId = self.troveStore.getVersionId(fileVersion)
+
+        self.newFilesInsertList.append((self.cu.binary(pathId), versionId,
+                                        self.cu.binary(fileId),
+                                        dirname, basename,
+                                        pathChanged))
 
         changeInfo = self.changeMap.get(pathId, None)
         if changeInfo:
@@ -76,33 +101,12 @@ class TroveAdder:
         else:
             versionChanged = (pathId in self.newSet)
 
-        versionId = self.troveStore.getVersionId(fileVersion)
         # If the file version is the same as in the old trove, or if we have
         # seen this fileId before, ignore the new stream data
-        if not versionChanged or (fileId in self.troveStore.seenFileId):
-            fileObj = fileStream = None
-        if fileObj or fileStream:
-            sha1 = None
+        if not versionChanged:
+            fileStream = None
 
-            if fileStream is None:
-                fileStream = fileObj.freeze()
-            if fileObj is not None:
-                if fileObj.hasContents:
-                    sha1 = fileObj.contents.sha1()
-            elif files.frozenFileHasContents(fileStream):
-                cont = files.frozenFileContentInfo(fileStream)
-                sha1 = cont.sha1()
-            self.troveStore.seenFileId.add(fileId)
-            self.newFilesInsertList.append(
-                        (self.cu.binary(pathId), versionId,
-                         self.cu.binary(fileId), self.cu.binary(fileStream),
-                         dirname, basename, self.cu.binary(sha1),
-                         pathChanged))
-        else:
-            self.newFilesInsertList.append((self.cu.binary(pathId), versionId,
-                                            self.cu.binary(fileId), None,
-                                            dirname, basename, None,
-                                            pathChanged))
+        self.addStream(fileId, fileStream = fileStream)
 
     def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap):
         self.troveStore = troveStore
@@ -111,6 +115,7 @@ class TroveAdder:
         self.trvCs = trvCs
         self.hidden = hidden
         self.newFilesInsertList = []
+        self.newStreamsInsertList = []
         self.newSet = newSet
         self.changeMap = changeMap
 
@@ -388,16 +393,17 @@ class TroveStore:
         # backends I have tried will get the optimization of a single
         # query wrong --gafton
         self.db.analyze("tmpNewFiles")
+        self.db.analyze("tmpNewStreams")
 
         # In the extreme case of binary shadowing this might require a
         # bit of of memory for larger troves, but it is preferable to
         # constant full table scans in the much more common cases
         cu.execute("""
-        SELECT tmpNewFiles.fileId, tmpNewFiles.stream
-        FROM tmpNewFiles
+        SELECT tmpNewStreams.fileId, tmpNewStreams.stream
+        FROM tmpNewStreams
         JOIN FileStreams USING(fileId)
         WHERE FileStreams.stream IS NULL
-        AND tmpNewFiles.stream IS NOT NULL
+        AND tmpNewStreams.stream IS NOT NULL
         """)
         for (fileId, stream) in cu.fetchall():
             cu.execute("UPDATE FileStreams SET stream = ? WHERE fileId = ?",
@@ -413,18 +419,18 @@ class TroveStore:
         # them in FileStreams
         cu.execute("""
         INSERT INTO FileStreams (fileId, stream, sha1)
-        SELECT DISTINCT NF.fileId, NF.stream, NF.sha1
-        FROM tmpNewFiles AS NF
+        SELECT DISTINCT NS.fileId, NS.stream, NS.sha1
+        FROM tmpNewStreams AS NS
         LEFT JOIN FileStreams AS FS USING(fileId)
         WHERE FS.fileId IS NULL
-          AND NF.stream IS NOT NULL
+          AND NS.stream IS NOT NULL
           """)
         # now insert the other fileIds. select the new non-NULL streams
         # out of tmpNewFiles and insert them in FileStreams
         cu.execute("""
         INSERT INTO FileStreams (fileId, stream, sha1)
-        SELECT DISTINCT NF.fileId, NF.stream, NF.sha1
-        FROM tmpNewFiles AS NF
+        SELECT DISTINCT NS.fileId, NS.stream, NS.sha1
+        FROM tmpNewStreams AS NS
         LEFT JOIN FileStreams AS FS USING(fileId)
         WHERE FS.fileId IS NULL
         """)
@@ -588,6 +594,7 @@ class TroveStore:
         hidden = troveInfo.hidden
 
         newFilesInsertList = troveInfo.newFilesInsertList
+        newStreamsInsertList = troveInfo.newStreamsInsertList
 
         self.log(3, trv)
 
@@ -670,12 +677,15 @@ class TroveStore:
         # Fold tmpNewFiles into FileStreams
         if len(newFilesInsertList):
             self.db.bulkload("tmpNewFiles",
-                             [ x + (troveInstanceId,) for x in
-                                    newFilesInsertList ],
-                             [ "pathId", "versionId", "fileId", "stream",
-                               "dirname", "basename", "sha1", "pathChanged",
-                               "instanceId" ])
+                    [ x + (troveInstanceId,) for x in newFilesInsertList ],
+                    [ "pathId", "versionId", "fileId",
+                      "dirname", "basename", "pathChanged",
+                      "instanceId" ])
             #self.db.analyze("tmpNewFiles")
+
+        if len(newStreamsInsertList):
+            self.db.bulkload("tmpNewStreams", newStreamsInsertList,
+                             [ "fileId", "stream", "sha1" ] )
 
         # iterate over both strong and weak troves, and set weakFlag to
         # indicate which kind we're looking at when
@@ -768,6 +778,7 @@ class TroveStore:
         schema.resetTable(cu, 'tmpTroves')
         schema.resetTable(cu, 'tmpNewFiles')
         schema.resetTable(cu, 'tmpNewTroves')
+        schema.resetTable(cu, 'tmpNewStreams')
 
     def addTroveSetDone(self):
         cu = self.db.cursor()
