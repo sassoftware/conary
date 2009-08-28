@@ -12,6 +12,13 @@ Changes in @NEW@:
     * Repository commits now handle file paths and file streams separately
       to reduce the size of the temporary tables and the commit path.
 
+  o Build Changes:
+    * When cooking groups where checkOnlyByDefaultDeps is set to False added
+      dependencies will now inherit the byDefaultness of the depending
+      component. (CNY-3195)
+    * The imageGroup flag in group recipes now implies
+      checkOnlyByDefaultDeps=False. (CNY-3195)
+
 Changes in 2.0.46:
   o New Features
     * If python-keyutils is available, cvc will try to interact with
