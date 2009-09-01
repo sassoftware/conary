@@ -1,5 +1,9 @@
 Changes in @NEW@:
 
+  o Bug Fixes:
+    * Directory permissions are no longer unnecessarily updated if they
+      have not changed. (CNY-3202)
+
 Changes in 2.0.46:
   o New Features
     * If python-keyutils is available, cvc will try to interact with
