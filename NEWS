@@ -13,6 +13,8 @@ Changes in @NEW@:
       to reduce the size of the temporary tables and the commit path.
     * The number of SQL calls used to create the flavors needed by a repository
       commit has been dramatically reduced.
+    * Avoid noop SQL calls during repository commits when no redirects are
+      being commited.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added

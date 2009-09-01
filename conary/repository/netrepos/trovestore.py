@@ -312,7 +312,6 @@ class TroveStore:
 
     def addTrove(self, trv, trvCs, hidden = False):
         cu = self.db.cursor()
-        schema.resetTable(cu, 'tmpNewRedirects')
         changeMap = dict((x[0], x) for x in trvCs.getChangedFileList())
         newSet = set(x[0] for x in trvCs.getNewFileList())
         return TroveAdder(self, cu, trv, trvCs, hidden, newSet, changeMap)
@@ -733,53 +732,57 @@ class TroveStore:
         # process troveInfo and metadata...
         self.troveInfoTable.addInfo(cu, trv, troveInstanceId)
 
-        # now add the redirects
-        for (name, branch, flavor) in trv.iterRedirects():
-            if flavor is None:
-                frz = None
-            else:
-                frz = flavor.freeze()
-            cu.execute("INSERT INTO tmpNewRedirects (item, branch, flavor) "
-                       "VALUES (?, ?, ?)", (name, str(branch), frz),
-                       start_transaction=False)
-        self.db.analyze("tmpNewRedirects")
-        
-        # again need to pay attention to CheckTrovesCache and use items.addId()
-        cu.execute("""
-        SELECT tmpNewRedirects.item
-        FROM tmpNewRedirects
-        LEFT JOIN Items USING (item)
-        WHERE Items.itemId is NULL
-        """)
-        for (newItem,) in cu.fetchall():
-            self.items.addId(newItem)
-        
-        cu.execute("""
-        INSERT INTO Branches (branch)
-        SELECT tmpNewRedirects.branch
-        FROM tmpNewRedirects
-        LEFT JOIN Branches USING (branch)
-        WHERE Branches.branchId is NULL
-        """)
+        if len(list(trv.iterRedirects())):
+            # don't bother with any of this unless there actually are redirects
+            schema.resetTable(cu, 'tmpNewRedirects')
+            # now add the redirects
+            for (name, branch, flavor) in trv.iterRedirects():
+                if flavor is None:
+                    frz = None
+                else:
+                    frz = flavor.freeze()
+                cu.execute("INSERT INTO tmpNewRedirects (item, branch, flavor) "
+                           "VALUES (?, ?, ?)", (name, str(branch), frz),
+                           start_transaction=False)
+            self.db.analyze("tmpNewRedirects")
 
-        cu.execute("""
-        INSERT INTO Flavors (flavor)
-        SELECT tmpNewRedirects.flavor
-        FROM tmpNewRedirects
-        LEFT JOIN Flavors USING (flavor)
-        WHERE 
-            Flavors.flavor is not NULL 
-            AND Flavors.flavorId is NULL
-        """)
+            # again need to pay attention to CheckTrovesCache and use 
+            # items.addId()
+            cu.execute("""
+            SELECT tmpNewRedirects.item
+            FROM tmpNewRedirects
+            LEFT JOIN Items USING (item)
+            WHERE Items.itemId is NULL
+            """)
+            for (newItem,) in cu.fetchall():
+                self.items.addId(newItem)
+            
+            cu.execute("""
+            INSERT INTO Branches (branch)
+            SELECT tmpNewRedirects.branch
+            FROM tmpNewRedirects
+            LEFT JOIN Branches USING (branch)
+            WHERE Branches.branchId is NULL
+            """)
 
-        cu.execute("""
-        INSERT INTO TroveRedirects (instanceId, itemId, branchId, flavorId)
-        SELECT %d, Items.itemId, Branches.branchId, Flavors.flavorId
-        FROM tmpNewRedirects
-        JOIN Items USING (item)
-        JOIN Branches ON tmpNewRedirects.branch = Branches.branch
-        LEFT JOIN Flavors ON tmpNewRedirects.flavor = Flavors.flavor
-        """ % troveInstanceId)
+            cu.execute("""
+            INSERT INTO Flavors (flavor)
+            SELECT tmpNewRedirects.flavor
+            FROM tmpNewRedirects
+            LEFT JOIN Flavors USING (flavor)
+            WHERE 
+                Flavors.flavor is not NULL 
+                AND Flavors.flavorId is NULL
+            """)
+
+            cu.execute("""
+            INSERT INTO TroveRedirects (instanceId, itemId, branchId, flavorId)
+            SELECT %d, Items.itemId, Branches.branchId, Flavors.flavorId
+            FROM tmpNewRedirects
+            JOIN Items USING (item)
+            JOIN Branches ON tmpNewRedirects.branch = Branches.branch
+            LEFT JOIN Flavors ON tmpNewRedirects.flavor = Flavors.flavor
+            """ % troveInstanceId)
 
     def addTroveSetStart(self):
         cu = self.db.cursor()
