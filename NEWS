@@ -11,6 +11,8 @@ Changes in @NEW@:
       in the repository during a commit.
     * Repository commits now handle file paths and file streams separately
       to reduce the size of the temporary tables and the commit path.
+    * The number of SQL calls used to create the flavors needed by a repository
+      commit has been dramatically reduced.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added

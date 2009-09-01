@@ -42,6 +42,7 @@ class Flavors:
                    flavor.freeze())
 	flavorId = cu.lastrowid
         self.createFlavorMap(flavorId, flavor, cu)
+        return flavorId
         
     def __getitem__(self, flavor):
 	val = self.get(flavor, None)

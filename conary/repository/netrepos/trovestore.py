@@ -341,40 +341,48 @@ class TroveStore:
             if flavor is not None:
                 flavorsNeeded[flavor] = True
 
-	flavorIndex = {}
-        schema.resetTable(cu, "tmpItems")
-	for flavor in flavorsNeeded.iterkeys():
-	    flavorIndex[flavor.freeze()] = flavor
-	    cu.execute("INSERT INTO tmpItems(item) VALUES(?)", flavor.freeze(),
-                       start_transaction=False)
-	del flavorsNeeded
-        self.db.analyze("tmpItems")
+        if len(flavorsNeeded) == 1:
+            newFlavor = flavorsNeeded.keys()[0]
+            i = self.flavors.get(newFlavor, None)
+            if i is None:
+                i = self.flavors.createFlavor(newFlavor)
 
-	# it seems like there must be a better way to do this, but I can't
-	# figure it out. I *think* inserting into a view would help, but I
-	# can't with sqlite.
-	cu.execute("""
-        select tmpItems.item as flavor
-        from tmpItems
-        where not exists ( select flavor from Flavors
-                           where Flavors.flavor = tmpItems.item ) """)
-        # make a list of the flavors we're going to create.  Add them
-        # after we have retrieved all of the rows from this select
-        l = []
-	for (flavorStr,) in cu:
-            l.append(flavorIndex[flavorStr])
-        for flavor in l:
-	    self.flavors.createFlavor(flavor)
+            flavors = { newFlavor : i }
+        else:
+            flavorIndex = {}
+            schema.resetTable(cu, "tmpItems")
+            for flavor in flavorsNeeded.iterkeys():
+                flavorIndex[flavor.freeze()] = flavor
+                cu.execute("INSERT INTO tmpItems(item) VALUES(?)",
+                           flavor.freeze(), start_transaction=False)
+            del flavorsNeeded
+            self.db.analyze("tmpItems")
 
-	flavors = {}
-	cu.execute("""
-        SELECT Flavors.flavor, Flavors.flavorId
-        FROM tmpItems
-        JOIN Flavors ON tmpItems.item = Flavors.flavor""")
-	for (flavorStr, flavorId) in cu:
-	    flavors[flavorIndex[flavorStr]] = flavorId
+            # it seems like there must be a better way to do this, but I can't
+            # figure it out. I *think* inserting into a view would help, but I
+            # can't with sqlite.
+            cu.execute("""
+            select tmpItems.item as flavor
+            from tmpItems
+            where not exists ( select flavor from Flavors
+                               where Flavors.flavor = tmpItems.item ) """)
+            # make a list of the flavors we're going to create.  Add them
+            # after we have retrieved all of the rows from this select
+            l = []
+            for (flavorStr,) in cu:
+                l.append(flavorIndex[flavorStr])
+            for flavor in l:
+                self.flavors.createFlavor(flavor)
 
-	del flavorIndex
+            flavors = {}
+            cu.execute("""
+            SELECT Flavors.flavor, Flavors.flavorId
+            FROM tmpItems
+            JOIN Flavors ON tmpItems.item = Flavors.flavor""")
+            for (flavorStr, flavorId) in cu:
+                flavors[flavorIndex[flavorStr]] = flavorId
+
+            del flavorIndex
 
 	if troveFlavor is not None:
 	    troveFlavorId = flavors[troveFlavor]
