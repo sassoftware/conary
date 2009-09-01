@@ -80,13 +80,12 @@ class FilesystemJob:
 
     def _restore(self, fileObj, target, troveInfo, msg,
                  contentsOverride = "", overrideInternalConflicts = False,
-                 fileId = None):
+                 fileId = None, restoreFile = True):
         """
         @param overrideInternalConflicts: Should this restore override another
         restore rule for the same path in this job?
         """
         assert(contentsOverride != "" or fileId is not None)
-        restoreFile = True
 
         if target in self.restores:
             pathId = self.restores[target][0]
@@ -1516,7 +1515,7 @@ class FilesystemJob:
                       "file has not changed",
                       contentsOverride = None,
                       overrideInternalConflicts = flags.replaceManagedFiles,
-                      fileId = headFileId)
+                      fileId = headFileId, restoreFile = False)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
