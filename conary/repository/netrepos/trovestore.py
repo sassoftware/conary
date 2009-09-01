@@ -655,7 +655,7 @@ class TroveStore:
             troveInstanceId, trv.getNameVersionFlavor())
 
         troveBranchId = self.branchTable[troveVersion.branch()]
-        self.depTables.add(cu, trv, troveInstanceId)
+        self.depAdder.add(trv, troveInstanceId)
         self.ri.addInstanceId(troveInstanceId)
 
         if trvCs.getOldVersion():
@@ -790,11 +790,14 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewFiles')
         schema.resetTable(cu, 'tmpNewTroves')
         schema.resetTable(cu, 'tmpNewStreams')
+        self.depAdder = deptable.BulkDependencyLoader(self.db, cu)
 
     def addTroveSetDone(self):
         cu = self.db.cursor()
         self._mergeIncludedTroves(cu)
         self._mergeTroveNewFiles(cu)
+        self.depAdder.done()
+        self.depAdder = None
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
                     urls, licenses, categories, source, language):

@@ -1209,6 +1209,18 @@ class DependencyChecker:
         self.cu.execute("BEGIN")
         self.inTransaction = True
 
+class BulkDependencyLoader:
+
+    def __init__(self, db, cu):
+        self.workTables = DependencyWorkTables(db, cu)
+
+    def add(self, trove, troveId):
+        self.workTables._populateTmpTable([], troveId, trove.getRequires(),
+                                          trove.getProvides())
+
+    def done(self):
+        self.workTables.merge(intoDatabase = True)
+
 class DependencyTables:
     def get(self, cu, trv, troveId):
         for (tblName, setFn) in (('Requires', trv.setRequires),

@@ -15,6 +15,8 @@ Changes in @NEW@:
       commit has been dramatically reduced.
     * Avoid noop SQL calls during repository commits when no redirects are
       being commited.
+    * Repository commits now merge all dependencies from the temporary tables
+      into the final tables at once rather than once per trove.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
