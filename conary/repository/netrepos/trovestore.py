@@ -656,7 +656,6 @@ class TroveStore:
 
         troveBranchId = self.branchTable[troveVersion.branch()]
         self.depAdder.add(trv, troveInstanceId)
-        self.ri.addInstanceId(troveInstanceId)
 
         if trvCs.getOldVersion():
             oldTroveVersionId = self.versionTable.get(trvCs.getOldVersion(),
@@ -678,8 +677,6 @@ class TroveStore:
              troveInstanceId, troveVersionId,
              '%.3f' % trv.getVersion().timeStamps()[-1],
              trv.getType(), oldInstanceId)
-
-        self.latest.update(cu, troveItemId, troveBranchId, troveFlavorId)
 
         # Fold tmpNewFiles into FileStreams
         if len(newFilesInsertList):
@@ -796,6 +793,10 @@ class TroveStore:
         cu = self.db.cursor()
         self._mergeIncludedTroves(cu)
         self._mergeTroveNewFiles(cu)
+
+        # this updates the LatestCache as well
+        self.ri.addInstanceIdSet('tmpNewTroves', 'instanceId')
+
         self.depAdder.done()
         self.depAdder = None
 

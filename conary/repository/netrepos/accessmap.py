@@ -244,6 +244,31 @@ class RolePermissions(RoleTable):
         %s """ % (whereStr,), args)
         return True
 
+    def addInstanceSet(self, cu, table, column):
+        cu.execute("""
+        insert into UserGroupAllPermissions
+            (permissionId, userGroupId, instanceId, canWrite)
+        select
+            Permissions.permissionId as permissionId,
+            Permissions.userGroupId as userGroupId,
+            Instances.instanceId as instanceId,
+            Permissions.canWrite as canWrite
+        from %s
+        join Instances using(%s)
+        join Nodes on
+            Instances.itemId = Nodes.itemId and
+            Instances.versionId = Nodes.versionId
+        join LabelMap on
+            Nodes.itemId = LabelMap.itemId and
+            Nodes.branchId = LabelMap.branchId
+        join Permissions on
+            Permissions.labelId = 0 or
+            Permissions.labelId = LabelMap.labelId
+        join CheckTroveCache on
+            Permissions.itemId = CheckTroveCache.patternId and
+            Instances.itemId = CheckTroveCache.itemId
+        """ % (table, column))
+
     def deleteId(self, cu = None, permissionId = None, roleId = None,
                  instanceId = None):
         where, args = self.getWhereArgs("where", permissionId=permissionId,
@@ -490,6 +515,25 @@ class RoleInstances(RoleTable):
         group by userGroupId, instanceId
         """, instanceId)
         self.latest.updateInstanceId(cu, instanceId)
+
+    def addInstanceIdSet(self, table, column):
+        cu = self.db.cursor()
+        self.rp.addInstanceSet(cu, table, column)
+        cu.execute("""
+        insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
+        select userGroupId, instanceId,
+            case when sum(canWrite) = 0 then 0 else 1 end as canWrite
+        from %s join
+        UserGroupAllPermissions as ugap using (%s)
+        where not exists (
+              select 1 from UserGroupInstancesCache as ugi
+              where ugi.instanceId = ugap.instanceId
+                and ugi.userGroupId = ugap.userGroupId )
+        group by userGroupId, instanceId
+        """ % (table, column))
+        cu.execute("select %s from %s" % (column, table))
+        for instanceId in [ x[0] for x in cu ]:
+            self.latest.updateInstanceId(cu, instanceId)
 
     # these used used primarily by the markRemoved code
     def deleteInstanceId(self, instanceId):

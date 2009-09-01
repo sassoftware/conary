@@ -17,6 +17,8 @@ Changes in @NEW@:
       being commited.
     * Repository commits now merge all dependencies from the temporary tables
       into the final tables at once rather than once per trove.
+    * Repository commits now updates permission tables for all new troves
+      at once.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
