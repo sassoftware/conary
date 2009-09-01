@@ -325,7 +325,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                     # this exception is not marshalled back to the client.
                     # re-raise it now.  comment the next line out to fall into
                     # the debugger
-                    raise
+                    #raise
 
                     # uncomment the next line to translate exceptions into
                     # nicer errors for the client.

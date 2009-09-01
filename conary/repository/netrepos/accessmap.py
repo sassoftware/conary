@@ -531,6 +531,9 @@ class RoleInstances(RoleTable):
                 and ugi.userGroupId = ugap.userGroupId )
         group by userGroupId, instanceId
         """ % (table, column))
+
+    def _updateLatest(self, table, column):
+        cu = self.db.cursor()
         cu.execute("select %s from %s" % (column, table))
         for instanceId in [ x[0] for x in cu ]:
             self.latest.updateInstanceId(cu, instanceId)
