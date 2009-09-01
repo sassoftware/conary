@@ -19,6 +19,10 @@ Changes in @NEW@:
       into the final tables at once rather than once per trove.
     * Repository commits now updates permission tables for all new troves
       at once.
+    * Updates to latest tables are now done for all troves at once, and
+      are based on the current latest entries and the new trove. Formerly
+      they were done one at a time based on everything in the repository
+      (through a view).
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
