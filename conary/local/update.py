@@ -323,6 +323,29 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
+    @classmethod
+    def restoreFile(cls, fileObj, contents, root, target, journal, opJournal,
+            isSourceTrove):
+        opJournal.backup(target)
+        rootLen = len(root.rstrip('/'))
+
+        if fileObj.hasContents and contents and not \
+                                   fileObj.flags.isConfig():
+            # config file sha1's are verified when they get inserted
+            # into the config file cache
+            d = digestlib.sha1()
+            fileObj.restore(contents, root, target, journal=journal,
+                            sha1 = fileObj.contents.sha1())
+        else:
+            fileObj.restore(contents, root, target, journal=journal,
+                            nameLookup = (not isSourceTrove))
+
+        if isinstance(fileObj, files.Directory):
+            opJournal.mkdir(target)
+        else:
+            opJournal.create(target)
+
+
     def apply(self, journal = None, opJournal = None):
 
         def updatePtrs(ptrId, pathId, ptrTargets, override, contents, target):
@@ -341,26 +364,6 @@ class FilesystemJob:
                     ptrTargets[pathId] = contents
                 else:
                     ptrTargets[pathId] = target
-
-	def restoreFile(fileObj, contents, root, target, journal, opJournal):
-            opJournal.backup(target)
-            rootLen = len(root.rstrip('/'))
-
-	    if fileObj.hasContents and contents and not \
-				       fileObj.flags.isConfig():
-		# config file sha1's are verified when they get inserted
-		# into the config file cache
-		d = digestlib.sha1()
-		fileObj.restore(contents, root, target, journal=journal,
-				sha1 = fileObj.contents.sha1())
-	    else:
-		fileObj.restore(contents, root, target, journal=journal,
-                                nameLookup = (not self.isSourceTrove))
-
-            if isinstance(fileObj, files.Directory):
-                opJournal.mkdir(target)
-            else:
-                opJournal.create(target)
 
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
@@ -449,8 +452,8 @@ class FilesystemJob:
                                             pathId, fileId,
                                             compressed = True)
                 assert(contType == changeset.ChangedFileTypes.file)
-		restoreFile(fileObj, contents, self.root, target, journal,
-                            opJournal)
+		self.restoreFile(fileObj, contents, self.root, target, journal,
+                            opJournal, self.isSourceTrove)
                 del delayedRestores[match[0]]
 
                 if fileObj.hasContents and fileObj.linkGroup():
@@ -551,8 +554,8 @@ class FilesystemJob:
             if override != "":
                 contents = override
 
-	    restoreFile(fileObj, contents, self.root, target, journal,
-                        opJournal)
+	    self.restoreFile(fileObj, contents, self.root, target, journal,
+                        opJournal, self.isSourceTrove)
             lastRestored.pathId = pathId
             lastRestored.fileId = fileId
             lastRestored.target = target
@@ -589,9 +592,10 @@ class FilesystemJob:
                 contents = ptrTargets[ptrId]
                 ptrTargets[ptrId] = target
                 
-	    restoreFile(fileObj, contents,
+	    self.restoreFile(fileObj, contents,
 			self.root, target, journal=journal,
-                        opJournal = opJournal)
+                        opJournal = opJournal,
+                        isSourceTrove = self.isSourceTrove)
             log.debug(msg, target)
 
         del delayedRestores
