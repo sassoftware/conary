@@ -1511,11 +1511,12 @@ class FilesystemJob:
                 # to be fixed at some point, which would make headChanges
                 # None). We can't skip the _restore entirely because that
                 # does important file conflict handling.
+                restoreFile = (not isinstance(fsFile, files.Directory))
                 self._restore(fsFile, realPath, newTroveInfo,
                       "file has not changed",
                       contentsOverride = None,
                       overrideInternalConflicts = flags.replaceManagedFiles,
-                      fileId = headFileId, restoreFile = False)
+                      fileId = headFileId, restoreFile = restoreFile)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
