@@ -345,26 +345,26 @@ class FilesystemJob:
         else:
             opJournal.create(target)
 
+    @classmethod
+    def updatePtrs(cls, ptrId, pathId, ptrTargets, override, contents, target):
+        # someone is requesting that we use this path as a place
+        # to grab its contents from.  That will only
+        # work if the contents are correct - which isn't the case
+        # if we aren't updating the file on disk (because it's an
+        # initial contents file)
+        if ptrId in ptrTargets:
+            if override != "":
+                ptrTargets[ptrId] = contents
+            else:
+                ptrTargets[ptrId] = target
+        elif pathId in ptrTargets:
+            if override != "":
+                ptrTargets[pathId] = contents
+            else:
+                ptrTargets[pathId] = target
+
 
     def apply(self, journal = None, opJournal = None):
-
-        def updatePtrs(ptrId, pathId, ptrTargets, override, contents, target):
-            # someone is requesting that we use this path as a place 
-            # to grab its contents from.  That will only
-            # work if the contents are correct - which isn't the case
-            # if we aren't updating the file on disk (because it's an
-            # initial contents file)
-            if ptrId in ptrTargets:
-                if override != "":
-                    ptrTargets[ptrId] = contents
-                else:
-                    ptrTargets[ptrId] = target
-            elif pathId in ptrTargets:
-                if override != "":
-                    ptrTargets[pathId] = contents
-                else:
-                    ptrTargets[pathId] = target
-
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
 
@@ -484,7 +484,7 @@ class FilesystemJob:
                     # this creates links whose target we already know
                     # (because it was already present or already restored)
                     if self._createLink(fileObj.linkGroup(), target, opJournal):
-                        updatePtrs(ptrId, pathId, ptrTargets, override,
+                        self.updatePtrs(ptrId, pathId, ptrTargets, override,
                                    contents, target)
                         continue
                 else:
@@ -549,7 +549,7 @@ class FilesystemJob:
 
                         continue
 
-            updatePtrs(ptrId, pathId, ptrTargets, override, contents, target)
+            self.updatePtrs(ptrId, pathId, ptrTargets, override, contents, target)
 
             if override != "":
                 contents = override
