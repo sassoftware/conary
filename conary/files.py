@@ -288,11 +288,13 @@ class File(streams.StreamSet):
     def remove(self, target):
 	os.unlink(target)
 
-    def restore(self, root, target, skipMtime=False, journal=None, nameLookup=True):
+    def restore(self, root, target, skipMtime=False, journal=None,
+                nameLookup=True, **kwargs):
 	self.setPermissions(root, target, journal=journal, nameLookup=nameLookup)
 
 	if not skipMtime:
 	    self.setMtime(target)
+        return target
 
     def setMtime(self, target):
 	os.utime(target, (self.inode.mtime(), self.inode.mtime()))
@@ -384,44 +386,50 @@ class SymbolicLink(File):
     def sizeString(self):
 	return "%8d" % len(self.target())
 
-    def restore(self, fileContents, root, target, journal=None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, nameLookup=True,                **kwargs):
         util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.target(), target)
         # utime() follows symlinks and Linux currently does not implement
         # lutimes()
-	File.restore(self, root, target, skipMtime=True, journal=journal, nameLookup=nameLookup)
+	return File.restore(self, root, target, skipMtime=True, journal=journal,
+            nameLookup=nameLookup, **kwargs)
 
 class Socket(File):
 
     lsTag = "s"
     __slots__ = []
 
-    def restore(self, fileContents, root, target, journal=None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, nameLookup=True,
+                **kwargs):
         util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
+	return File.restore(self, root, target, journal=journal,
+            nameLookup=nameLookup, **kwargs)
 
 class NamedPipe(File):
 
     lsTag = "p"
     __slots__ = []
 
-    def restore(self, fileContents, root, target, journal=None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, nameLookup=True,
+                **kwargs):
         util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
-	File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
+	return File.restore(self, root, target, journal=journal,
+            nameLookup=nameLookup, **kwargs)
 
 class Directory(File):
 
     lsTag = "d"
     __slots__ = []
 
-    def restore(self, fileContents, root, target, journal=None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, nameLookup=True,
+                **kwargs):
         if util.exists(target):
             # we have something in the way
             sb = os.lstat(target)
@@ -433,7 +441,8 @@ class Directory(File):
         else:
 	    util.mkdirChain(target)
 
-	File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
+	return File.restore(self, root, target, journal=journal,
+            nameLookup=nameLookup, **kwargs)
 
     def remove(self, target):
 	raise NotImplementedError
@@ -448,7 +457,8 @@ class DeviceFile(File):
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
-    def restore(self, fileContents, root, target, journal=None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, nameLookup=True,
+                **kwargs):
         util.removeIfExists(target)
 
         if not journal and os.getuid(): return
@@ -467,7 +477,9 @@ class DeviceFile(File):
             os.mknod(target, flags, os.makedev(self.devt.major(), 
                                                self.devt.minor()))
 
-            File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
+            return File.restore(self, root, target, journal=journal,
+                nameLookup=nameLookup, **kwargs)
+        return target
 
 class BlockDevice(DeviceFile):
 
@@ -497,7 +509,11 @@ class RegularFile(File):
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def restore(self, fileContents, root, target, journal=None, sha1 = None, nameLookup=True):
+    def restore(self, fileContents, root, target, journal=None, sha1 = None,
+                nameLookup=True, **kwargs):
+
+        keepTempfile = kwargs.get('keepTempfile', False)
+
 	if fileContents != None:
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
@@ -512,15 +528,35 @@ class RegularFile(File):
                 else:
                     src = gzip.GzipFile(mode = "r", fileobj = src)
 
-	    path = os.path.dirname(target)
-	    name = os.path.basename(target)
+            name = os.path.basename(target)
+            path = os.path.dirname(target)
 	    if not os.path.isdir(path):
 		util.mkdirChain(path)
 
             if inFd is not None:
+                if keepTempfile:
+                    tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
+                    os.close(tmpfd)
+                    destName = os.path.basename(destTarget)
+                else:
+                    destName, destTarget = name, target
                 actualSha1 = util.sha1Uncompress((inFd, inStart, inSize),
-                                                 path, name, target)
+                                                 path, destName, destTarget)
+                if keepTempfile:
+                    # Set up the second temp file here. This makes
+                    # sure we get through the next if branch.
+                    inFd = None
+                    src = file(destTarget)
+            elif keepTempfile:
+                tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
+                f = os.fdopen(tmpfd, 'w')
+                util.copyfileobj(src, f)
+                f.close()
+                src = file(destTarget)
             else:
+                destTarget = target
+
+            if inFd is None:
                 tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
                 try:
                     d = digestlib.sha1()
@@ -536,14 +572,20 @@ class RegularFile(File):
                     # we've not renamed tmpname to target yet, we should
                     # clean up instead of leaving temp files around
                     os.unlink(tmpname)
+                    if keepTempfile:
+                        os.unlink(destTarget)
                     raise
 
             if (sha1 is not None and sha1 != actualSha1):
                 raise Sha1Exception(target)
 
-            File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
+            File.restore(self, root, target, journal=journal,
+                nameLookup=nameLookup, **kwargs)
 	else:
-	    File.restore(self, root, target, journal=journal, nameLookup=nameLookup)
+            destTarget = target
+	    File.restore(self, root, target, journal=journal,
+                nameLookup=nameLookup, **kwargs)
+        return destTarget
 
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)

@@ -325,7 +325,7 @@ class FilesystemJob:
 
     @classmethod
     def restoreFile(cls, fileObj, contents, root, target, journal, opJournal,
-            isSourceTrove):
+            isSourceTrove, keepTempfile = False):
         opJournal.backup(target)
         rootLen = len(root.rstrip('/'))
 
@@ -333,17 +333,21 @@ class FilesystemJob:
                                    fileObj.flags.isConfig():
             # config file sha1's are verified when they get inserted
             # into the config file cache
-            d = digestlib.sha1()
-            fileObj.restore(contents, root, target, journal=journal,
-                            sha1 = fileObj.contents.sha1())
+            tmpf = fileObj.restore(contents, root, target, journal=journal,
+                            sha1 = fileObj.contents.sha1(),
+                            keepTempfile = keepTempfile)
         else:
-            fileObj.restore(contents, root, target, journal=journal,
-                            nameLookup = (not isSourceTrove))
+            tmpf = fileObj.restore(contents, root, target, journal=journal,
+                            nameLookup = (not isSourceTrove),
+                            keepTempfile = keepTempfile)
+        if keepTempfile and tmpf != target:
+            opJournal.create(tmpf)
 
         if isinstance(fileObj, files.Directory):
             opJournal.mkdir(target)
         else:
             opJournal.create(target)
+        return tmpf
 
     @classmethod
     def updatePtrs(cls, ptrId, pathId, ptrTargets, override, contents, target):
@@ -362,6 +366,9 @@ class FilesystemJob:
                 ptrTargets[pathId] = contents
             else:
                 ptrTargets[pathId] = target
+        else:
+            return False
+        return True
 
 
     def apply(self, journal = None, opJournal = None):
@@ -386,6 +393,8 @@ class FilesystemJob:
         restores.sort()
         delayedRestores = []
         ptrTargets = {}
+        ptrTempFiles = {}
+        tmpPtrFiles = []
 
         # this sorting ensures /dir/file is removed before /dir
         paths = self.removes.keys()
@@ -452,14 +461,19 @@ class FilesystemJob:
                                             pathId, fileId,
                                             compressed = True)
                 assert(contType == changeset.ChangedFileTypes.file)
-		self.restoreFile(fileObj, contents, self.root, target, journal,
-                            opJournal, self.isSourceTrove)
+		tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
+                    target, journal, opJournal, self.isSourceTrove,
+                    keepTempfile = True)
                 del delayedRestores[match[0]]
+                # at this point we _should_ have tmpPtrFile != target
+                # but we'll test for it just to be safe
+                if tmpPtrFile != target:
+                    tmpPtrFiles.append(tmpPtrFile)
 
                 if fileObj.hasContents and fileObj.linkGroup():
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
-                ptrTargets[ptrId] = target
+                ptrTargets[ptrId] = tmpPtrFile
                 continue
 
 	    # None means "don't restore contents"; "" means "take the
@@ -549,16 +563,22 @@ class FilesystemJob:
 
                         continue
 
-            self.updatePtrs(ptrId, pathId, ptrTargets, override, contents, target)
+            isPtrTarget = self.updatePtrs(ptrId, pathId, ptrTargets, override, contents, target)
 
             if override != "":
                 contents = override
 
-	    self.restoreFile(fileObj, contents, self.root, target, journal,
-                        opJournal, self.isSourceTrove)
+	    tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
+                        target, journal, opJournal, self.isSourceTrove,
+                        keepTempfile = isPtrTarget)
+            if tmpPtrFile != target:
+                self.updatePtrs(ptrId, pathId, ptrTargets, override, contents,
+                                tmpPtrFile)
+                tmpPtrFiles.append(tmpPtrFile)
+
             lastRestored.pathId = pathId
             lastRestored.fileId = fileId
-            lastRestored.target = target
+            lastRestored.target = tmpPtrFile
             lastRestored.type = changeset.ChangedFileTypes.file
 	    log.debug(msg, target)
 
@@ -599,6 +619,9 @@ class FilesystemJob:
             log.debug(msg, target)
 
         del delayedRestores
+        # At this point, clean up all temporary ptr files
+        for fname in tmpPtrFiles:
+            os.unlink(fname)
 
 	for (target, contents, msg) in self.newFiles:
             opJournal.backup(target)
