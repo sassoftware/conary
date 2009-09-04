@@ -1,11 +1,10 @@
-Changes in @NEW@:
-
+Changes in 2.0.47:
   o Bug Fixes:
     * Directory permissions are no longer unnecessarily updated if they
       have not changed. (CNY-3202)
-    * A race condition in restoring files that share content has been fixed.
-      The race involved changing the contents of the restored file before
-      references to that file are restored. (CNY-3203)
+    * A race condition in restoring files that share content has been
+      fixed. The race involved changing the contents of the restored
+      file before references to that file are restored. (CNY-3203)
 
 Changes in 2.0.46:
   o New Features
