@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -571,7 +571,7 @@ class FilesystemJob:
 	    tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
                         target, journal, opJournal, self.isSourceTrove,
                         keepTempfile = isPtrTarget)
-            if tmpPtrFile != target:
+            if tmpPtrFile and tmpPtrFile != target:
                 self.updatePtrs(ptrId, pathId, ptrTargets, override, contents,
                                 tmpPtrFile)
                 tmpPtrFiles.append(tmpPtrFile)
