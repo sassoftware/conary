@@ -571,7 +571,7 @@ class FilesystemJob:
 	    tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
                         target, journal, opJournal, self.isSourceTrove,
                         keepTempfile = isPtrTarget)
-            if tmpPtrFile and tmpPtrFile != target:
+            if tmpPtrFile != target:
                 self.updatePtrs(ptrId, pathId, ptrTargets, override, contents,
                                 tmpPtrFile)
                 tmpPtrFiles.append(tmpPtrFile)

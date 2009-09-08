@@ -461,7 +461,7 @@ class DeviceFile(File):
                 **kwargs):
         util.removeIfExists(target)
 
-        if not journal and os.getuid(): return
+        if not journal and os.getuid(): return target
 
         util.mkdirChain(os.path.dirname(target))
 
