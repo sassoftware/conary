@@ -3,6 +3,8 @@ Changes in 2.0.48:
     * A bug introduced in the previous release that caused installations
       of device nodes as a non-root user to crash has been fixed.
       (CNY-2038)
+    * Old rpm packages that do not have a PAYLOADCOMPRESSOR tag in their
+      headers are correctly handled. (CNY-3210)
 
 Changes in 2.0.47:
   o Bug Fixes:

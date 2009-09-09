@@ -2090,6 +2090,11 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
             decompressor = lambda fobj: util.BZ2File(fobj)
         elif compression == 'lzma':
             decompressor = lambda fobj: util.LZMAFile(fobj)
+    else:
+        # rpm version 3.0.3 and later, as released by Red Hat, sets
+        # PAYLOADCOMPRESSOR; however there are packages with the tag unset,
+        # and they report as being built with rpm 3.0. See CNY-3210
+        compression = 'gzip'
 
     # assemble the path/owner/group list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
