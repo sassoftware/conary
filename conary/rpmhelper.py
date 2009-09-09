@@ -25,6 +25,7 @@ RELEASE         = 1002
 EPOCH           = 1003
 SUMMARY         = 1004
 DESCRIPTION     = 1005
+VENDOR          = 1011
 LICENSE         = 1014
 SOURCE          = 1018
 ARCH            = 1022
@@ -39,6 +40,7 @@ FILEFLAGS       = 1037 # bitmask; (1<<0 => config)
 FILEUSERNAME    = 1039
 FILEGROUPNAME   = 1040
 SOURCERPM       = 1044
+RPMVERSION      = 1064
 TRIGGERSCRIPTS  = 1065
 PREINPROG       = 1085
 POSTINPROG      = 1086
