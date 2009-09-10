@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o New Features
+    * The xz compression file format is now supported for decompressing
+      sources. (CNY-3207)
+
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
       when no files have been requested
