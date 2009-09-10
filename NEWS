@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Updates of flavored groups containing pre-update scripts no
+      longer fail to continue after the critical update is applied.
+      (CNY-3216)
+
 Changes in 2.0.48:
   o Bug Fixes:
     * A bug introduced in the previous release that caused installations

@@ -23,7 +23,7 @@ from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
 
 @api.publicApi
-def parseTroveSpec(specStr, allowEmptyName = True):
+def parseTroveSpec(specStr, allowEmptyName = True, withFrozenFlavor = False):
     """
     Parse a TroveSpec string
 
@@ -33,6 +33,9 @@ def parseTroveSpec(specStr, allowEmptyName = True):
     @param allowEmptyName: if set, will accept an empty string and some other 
     variations.
     @type allowEmptyName: bool 
+
+    @param withFrozenFlavor: if set, will accept a frozen flavor
+    @type withFrozenFlavor: bool
 
     @rtype: list
     @return: (name, version, flavor)
@@ -46,7 +49,10 @@ def parseTroveSpec(specStr, allowEmptyName = True):
         if len(l) != 2:
             raise TroveSpecError(origSpecStr, "bad flavor spec")
         specStr, flavorSpec = l
-        flavor = deps.parseFlavor(flavorSpec)
+        if withFrozenFlavor:
+            flavor = deps.ThawFlavor(flavorSpec)
+        else:
+            flavor = deps.parseFlavor(flavorSpec)
         if flavor is None:
             raise TroveSpecError(origSpecStr, "bad flavor spec")
     else:
@@ -80,7 +86,8 @@ def _getChangeSet(path):
         log.debug("found changeset file %s" % path)
         return cs
 
-def parseUpdateList(updateList, keepExisting, updateByDefault=True):
+def parseUpdateList(updateList, keepExisting, updateByDefault=True,
+        withFrozenFlavor=False):
     # If keepExisting is true, we want our specifications to be relative
     # to nothing. If it's false, they should be absolute as updateChangeSet
     # interperts absolute jobs as ones which should be rooted (if there is
@@ -98,7 +105,8 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
             applyList.append(_getChangeSet(updateStr))
             continue
         else:
-            troveSpec = parseTroveSpec(updateStr)
+            troveSpec = parseTroveSpec(updateStr,
+                withFrozenFlavor=withFrozenFlavor)
             if troveSpec[0][0] == '-':
                 applyList.append((troveSpec[0], troveSpec[1:],
                                   (None, None), False))
@@ -119,7 +127,7 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True):
 
 @api.publicApi
 def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
-                    allowChangeSets=True):
+                    allowChangeSets=True, withFrozenFlavor=False):
     """
     Parse a change specification list, as presented on the command line.
 
@@ -144,6 +152,9 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     allowed.
     @type allowChangeSets: bool
 
+    @param withFrozenFlavor: if set, will accept a frozen flavor
+    @type withFrozenFlavor: bool
+
     @raise TroveSpecError: Raised if an invalid TroveSpec is passed within the
     ChangeSpec list.
 
@@ -166,7 +177,8 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
             continue
         applyList.append(
             parseChangeSpec(changeSpec, keepExisting = keepExisting,
-                            updateByDefault = updateByDefault))
+                            updateByDefault = updateByDefault,
+                            withFrozenFlavor = withFrozenFlavor))
 
     # dedup, but keep ordering - this is a little slower but can be handy 
     # for lining up input -> output (if input is deduped)
@@ -178,7 +190,8 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     return finalList
 
 @api.publicApi
-def parseChangeSpec(changeSpec, keepExisting=False, updateByDefault=True):
+def parseChangeSpec(changeSpec, keepExisting=False, updateByDefault=True,
+        withFrozenFlavor = False):
     """
     Parse a single change specification, as presented on the command line,
     such as C{foo=1.1--1.2}, and turns it into a tuple
@@ -194,6 +207,9 @@ def parseChangeSpec(changeSpec, keepExisting=False, updateByDefault=True):
     @param updateByDefault:
     @type updateByDefault: bool
 
+    @param withFrozenFlavor: if set, will accept a frozen flavor
+    @type withFrozenFlavor: bool
+
     @raise TroveSpecError: Raised if an invalid TroveSpec is passed within the
     ChangeSpec list.
 
@@ -207,7 +223,8 @@ def parseChangeSpec(changeSpec, keepExisting=False, updateByDefault=True):
     l = changeSpec.split("--")
 
     if len(l) == 1:
-        (troveName, versionStr, flavor) = parseTroveSpec(l[0], False)
+        (troveName, versionStr, flavor) = parseTroveSpec(l[0], False,
+            withFrozenFlavor = withFrozenFlavor)
 
         if troveName[0] == '-':
             return (troveName, (versionStr, flavor), (None, None), False)
@@ -221,11 +238,13 @@ def parseChangeSpec(changeSpec, keepExisting=False, updateByDefault=True):
         raise TroveSpecError(changeSpec, "one -- expected in change spec")
 
     oldSpec, newSpec = l
-    (troveName, oldVersion, oldFlavor) = parseTroveSpec(oldSpec)
+    (troveName, oldVersion, oldFlavor) = parseTroveSpec(oldSpec,
+        withFrozenFlavor = withFrozenFlavor)
 
     if newSpec:
         newSpec = troveName + "=" + newSpec
-        (troveName, newVersion, newFlavor) = parseTroveSpec(newSpec)
+        (troveName, newVersion, newFlavor) = parseTroveSpec(newSpec,
+            withFrozenFlavor = withFrozenFlavor)
     else:
         newVersion, newFlavor = None, None
 

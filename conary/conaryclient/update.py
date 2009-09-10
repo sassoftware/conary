@@ -4017,7 +4017,8 @@ def _unserializePreScripts(iterable):
         arr = line.split(' ', 1)
         if len(arr) != 2:
             continue
-        ret.append((arr[0], cmdline.parseChangeSpec(arr[1])))
+        ret.append((arr[0], cmdline.parseChangeSpec(arr[1],
+                                                withFrozenFlavor = True)))
     return ret
 
 def _storeJobInfo(remainingJobs, updJob):
