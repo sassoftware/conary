@@ -2,6 +2,9 @@ Changes in @NEW@:
   o New Features
     * The xz compression file format is now supported for decompressing
       sources. (CNY-3207)
+    * The changemail.py repository commit action module now takes an
+      optional --maxsize argument and truncates changemail messages
+      to fit. (CNY-3205)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
