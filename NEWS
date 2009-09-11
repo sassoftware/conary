@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.49:
   o Bug Fixes:
     * Updates of flavored groups containing pre-update scripts no
       longer fail to continue after the critical update is applied.
