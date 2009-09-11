@@ -921,7 +921,7 @@ def rdiffChangeSet(repos, job):
 
     if oldTroveInfo[1] is None:
         oldTroveInfo = None
-        newTrove = repos.getTrove(*newTroveInfo)
+        oldTrove, newTrove = None, repos.getTrove(*newTroveInfo)
     else:
         oldTrove, newTrove = repos.getTroves( [ oldTroveInfo, newTroveInfo ] )
 
