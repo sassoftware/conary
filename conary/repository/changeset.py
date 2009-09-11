@@ -28,10 +28,17 @@ from conary import files, streams, trove, versions
 from conary.lib import enum, log, misc, patch, sha1helper, util, api
 from conary.repository import filecontainer, filecontents, errors
 
-# "refr" being the same length as "file" matters
-# "ptr" is for links
+# cft is a string used by the EnumeratedType class; it's not a type itself!
+#
+# "refr" being the same length as "file" matters. it means a path to a file's
+#    contents are stored, not the file itself. it's used for repository
+#    side changesets to avoid storing contents repeatedly
+# "ptr" is for duplicate file contents in a changeset (including hardlinks)
 # "hldr" means there are no contents and the file should be skipped
-#    (used for rollbacks)
+#    (used for locally stored rollbacks when the original file contents can't
+#     be ascertained)
+# "diff" means the file is stored as a unified diff, not absolute contents
+# "file" means the file contents are stored normally
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr",
                                        "refr", "hldr")
 
