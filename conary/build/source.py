@@ -40,7 +40,11 @@ class _AnySource(action.RecipeAction):
         pass
     # marks classes which have source files which need committing
 
-DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip')
+# This provides the set (and order) in which the suffix is guessed
+# Logically, .tar.xz ought to go first because it is smallest, but we
+# should wait until it is more prevalent before moving it to the front
+# of the list; we should also look for instances of .txz
+DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', '.tar.xz', 'zip')
 
 class _Source(_AnySource):
     keywords = {'rpm': '',
@@ -601,6 +605,9 @@ class addArchive(_Source):
                 elif debData.endswith('.bz2'):
                     _uncompress = "bzip2 -d -c"
                     actionPathBuildRequires.append('bzip2')
+                elif debData.endswith('.xz'):
+                    _uncompress = "xz -d -c"
+                    actionPathBuildRequires.append('xz')
                 else:
                     # data.tar?  Alternatively, yet another
                     # compressed format that we need to add
@@ -611,14 +618,17 @@ class addArchive(_Source):
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
                 _uncompress = "bzip2 -d -c"
                 actionPathBuildRequires.append('bzip2')
+            if isinstance(m, magic.xz) or f.endswith('xz'):
+                _uncompress = 'xz -d -c'
+                actionPathBuildRequires.append('xz')
             elif isinstance(m, magic.gzip) or f.endswith("gz") \
                    or f.endswith(".Z"):
                 _uncompress = "gzip -d -c"
                 actionPathBuildRequires.append('gzip')
 
             # There are things we know we know...
-            _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
-                           "tar.gz", "tar.bz2", "tar.Z"]
+            _tarSuffix  = ['tar', 'tgz', 'tbz2', 'txz', 'taZ',
+                           'tar.gz', 'tar.bz2', '.tar.xz', 'tar.Z']
             _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
 
             if True in [f.endswith(x) for x in _tarSuffix]:
@@ -1016,6 +1026,8 @@ class addPatch(_Source):
 	    provides = "zcat"
 	elif self.sourcename.endswith(".bz2"):
 	    provides = "bzcat"
+	elif self.sourcename.endswith(".xz"):
+	    provides = "xzcat"
         self._addActionPathBuildRequires([provides])
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,

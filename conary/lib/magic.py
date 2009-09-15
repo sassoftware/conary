@@ -101,6 +101,15 @@ class tar_bz2(bzip, tar):
         bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
         tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
+class xz(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+
+class tar_xz(bzip, tar):
+    def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
+        bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
+        tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
+
 class changeset(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
@@ -312,6 +321,9 @@ def magic(path, basedir=''):
             # bz2 raises IOError instead of any module specific errors
             pass
         return bzip(path, basedir, b)
+    elif len(b) > 6 and b[0:6] == "\xFD\x37\x7A\x58\x5A\x00":
+        # http://tukaani.org/xz/xz-file-format.txt
+        return xz(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":

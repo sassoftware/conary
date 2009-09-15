@@ -328,10 +328,9 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
-    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
+    def addFileVersion(self, troveInfo, pathId, path, fileId,
                        newVersion, fileStream = None):
-        self.repos.addFileVersion(troveInfo, pathId, fileObj, path,
-                                  fileId, newVersion,
+        self.repos.addFileVersion(troveInfo, pathId, path, fileId, newVersion,
                                   fileStream = fileStream)
 
     def checkTroveCompleteness(self, trv):
@@ -346,7 +345,7 @@ class ChangeSetJob:
                         oldFileId = None, oldVersion = None, oldfile = None,
                         restoreContents = True):
         # files with contents need to be tracked so we can stick
-        # there contents in the archive "soon"; config files need
+        # their contents in the archive "soon"; config files need
         # extra magic for tracking since we may have to merge
         # contents
 
@@ -439,7 +438,7 @@ class ChangeSetJob:
                               "for pathId %s" %
                                     sha1helper.md5ToString(pathId))
 
-            self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+            self.addFileVersion(troveInfo, pathId, path, fileId,
                                 newVersion, fileStream = fileStream)
 
             self._handleContents(pathId, fileId, fileStream, configRestoreList, 
@@ -457,10 +456,15 @@ class ChangeSetJob:
 
         configRestoreList = []
         normalRestoreList = []
+        checkFilesList = []
 
         newList = [ x for x in self.cs.iterNewTroveList() ]
         repos = self.repos
         cs = self.cs
+
+        oldTrovesNeeded = [ x.getOldNameVersionFlavor() for x in
+                                newList if x.getOldVersion() ]
+        oldTroveIter = repos.iterTroves(oldTrovesNeeded, hidden = True)
 
         troveNo = 0
 	for csTrove in newList:
@@ -486,9 +490,9 @@ class ChangeSetJob:
 			(newVersion.asString(), csTrove.getName())
 
 	    if oldTroveVersion:
-                newTrove = repos.getTrove(troveName, oldTroveVersion, 
-                                          oldTroveFlavor, pristine = True,
-                                          hidden = hidden).copy()
+                newTrove = oldTroveIter.next()
+                assert(newTrove.getNameVersionFlavor() ==
+                        csTrove.getOldNameVersionFlavor())
                 self.oldTrove(newTrove, csTrove, troveName, oldTroveVersion,
                               oldTroveFlavor)
 
@@ -529,20 +533,8 @@ class ChangeSetJob:
                 troveInfo = self.addTrove(None, newTrove, csTrove,
                                           hidden = hidden)
 
-            checkFilesList = self._getCheckFilesList(csTrove, troveInfo, 
+            checkFilesList += self._getCheckFilesList(csTrove, troveInfo, 
                 fileHostFilter, configRestoreList, normalRestoreList)
-
-            try:
-                # we need to actualize this, not just get a generator
-                list(repos.getFileVersions(checkFilesList))
-            except errors.FileStreamMissing, e:
-                info = [ x for x in checkFilesList if x[1] == e.fileId ]
-                (pathId, fileId) = info[0][0:2]
-                # Missing from the repo; raise exception
-                raise errors.IntegrityError(
-                    "Incomplete changeset specified: missing pathId %s "
-                    "fileId %s" % (sha1helper.md5ToString(pathId),
-                                   sha1helper.sha1ToString(fileId)))
 
             for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
                 # handle files which haven't changed; we know which those
@@ -551,8 +543,7 @@ class ChangeSetJob:
                 if pathId in newFileMap:
                     continue
 
-                # None is the fileObj, which we don't have (or need)
-                self.addFileVersion(troveInfo, pathId, None, path, fileId,
+                self.addFileVersion(troveInfo, pathId, path, fileId,
                                     newVersion)
 
             filesNeeded = []
@@ -568,12 +559,10 @@ class ChangeSetJob:
 
                 if (fileHostFilter
                     and newVersion.getHost() not in fileHostFilter):
-                    fileObj = None
                     fileStream = None
                 elif (oldVersion == newVersion and oldFileId == fileId):
                     # the file didn't change between versions; we can just
                     # ignore it
-                    fileObj = None
                     fileStream = None
                 else:
                     fileStream = cs.getFileChange(oldFileId, fileId)
@@ -587,17 +576,10 @@ class ChangeSetJob:
                                                     oldVersion)))
                             continue
 
-                        fileObj = None
                         fileStream = None
-                    elif fileStream:
-                        fileObj = files.ThawFile(fileStream, pathId)
-                    else:
-                        # no contents are in the changeset; take it on
-                        # faith that we already have them
-                        fileObj = None
 
                 # None is the file object
-                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId,
+                self.addFileVersion(troveInfo, pathId, path, fileId,
                                     newVersion, fileStream = fileStream)
 
                 if fileStream is not None:
@@ -650,7 +632,7 @@ class ChangeSetJob:
                           csTrove.getNewVersion(), csTrove.getNewFlavor(),
                           "fileObj.fileId() != fileId in changeset")
 
-                self.addFileVersion(troveInfo, pathId, fileObj, path, fileId, 
+                self.addFileVersion(troveInfo, pathId, path, fileId, 
                                     newVersion, fileStream = fileStream)
 
                 self._handleContents(pathId, fileId, fileStream,
@@ -662,6 +644,18 @@ class ChangeSetJob:
 
 	    del newFileMap
 	    self.addTroveDone(troveInfo, mirror=mirror)
+
+        try:
+            # we need to actualize this, not just get a generator
+            list(repos.getFileVersions(checkFilesList))
+        except errors.FileStreamMissing, e:
+            info = [ x for x in checkFilesList if x[1] == e.fileId ]
+            (pathId, fileId) = info[0][0:2]
+            # Missing from the repo; raise exception
+            raise errors.IntegrityError(
+                "Incomplete changeset specified: missing pathId %s "
+                "fileId %s" % (sha1helper.md5ToString(pathId),
+                               sha1helper.sha1ToString(fileId)))
 
         return troveNo, configRestoreList, normalRestoreList
 

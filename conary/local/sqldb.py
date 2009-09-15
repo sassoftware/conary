@@ -912,22 +912,16 @@ order by
                 """ % flavorStr, instanceId, flags, name,
                         newVersion.asString())
 
-    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
+    def addFile(self, troveInfo, pathId, path, fileId, fileVersion,
                 fileStream = None, isPresent = True):
 	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
-	if fileObj or fileStream:
-            if fileStream is None:
-                fileStream = fileObj.freeze()
-
+        if fileStream:
             cu.execstmt(addFileStmt, pathId, versionId, path, fileId, 
                         fileStream, isPresent)
 
-            if fileObj:
-                tags = fileObj.tags
-            else:
-                tags = files.frozenFileTags(fileStream)
+            tags = files.frozenFileTags(fileStream)
 
             if tags:
                 cu.executemany("INSERT INTO NewFileTags VALUES (?, ?)",
