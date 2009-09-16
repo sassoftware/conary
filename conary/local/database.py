@@ -1678,16 +1678,15 @@ class Database(SqlDbRepository):
             callback.runningPreTagHandlers()
             fsJob.preapply(tagSet, tagScript)
 
-        for (troveName, troveVersion, troveFlavor, fileDict) \
-                                            in fsJob.iterUserRemovals():
-            if sum(fileDict.itervalues()) == 0:
+        for (troveInfo, fileDict) in fsJob.iterUserRemovals():
+            if not [ x for x in fileDict.itervalues() if x is not None ]:
                 # Nothing to do (these are updates for a trove being installed
                 # as part of this job rather than for a trove which is part
                 # of this job)
                 continue
 
-            self.db.removePathIdsFromTrove(troveName, troveVersion,
-                                           troveFlavor, fileDict.keys())
+            self.db.removePathIdsFromTrove(troveInfo[0], troveInfo[1],
+                                           troveInfo[2], fileDict.keys())
 
         dbConflicts = []
 
@@ -1839,6 +1838,83 @@ class Database(SqlDbRepository):
         else:
             return False
 
+    def createRemoveRollback(self, fsJob):
+        cs = changeset.ChangeSet()
+
+        # Returns a changeset which undoes the user removals 
+        for (info, fileDict) in fsJob.iterUserRemovals():
+            if not [ x for x in fileDict.itervalues() if x is not None ]:
+                # skip the rest of this processing if there are no files
+                # to handle (it's likely that the trove referred to here
+                # isn't in the database yet)
+                continue
+
+            localTrove = self.db.getTroves([ info ])[0]
+            updatedTrove = localTrove.copy()
+            localTrove.changeVersion(
+                localTrove.getVersion().createShadow(
+                                            label = versions.LocalLabel()))
+            hasChanges = False
+            for (pathId, content) in fileDict.iteritems():
+                if not content: continue
+                path, fileId = updatedTrove.getFile(pathId)[0:2]
+                stream = self.db.getFileStream(fileId)
+                cs.addFile(None, fileId, stream)
+
+                if files.frozenFileHasContents(stream):
+                    flags = files.frozenFileFlags(stream)
+                    # this file is seen as *added* in the rollback
+                    cs.addFileContents(pathId, fileId,
+                       changeset.ChangedFileTypes.file, content,
+                       flags.isConfig())
+
+                updatedTrove.removeFile(pathId)
+                hasChanges = True
+
+            if not hasChanges: continue
+
+            # this is a rollback so the diff is backwards
+            trvCs = localTrove.diff(updatedTrove)[0]
+            cs.newTrove(trvCs)
+
+        return cs
+
+    def mergeRemoveRollback(self, localRollback, removeRollback):
+        # We now have two rollbacks we need to merge together, localRollback
+        # (which is the changes already made to the local system) and
+        # removeRollback, which contains local changes this update will do.
+        # Those two could overlap, so we need to merge them carefully.
+        for removeCs in [ x for x in removeRollback.iterNewTroveList() ]:
+            newInfo = (removeCs.getName(), removeCs.getNewVersion(), 
+                       removeCs.getNewFlavor())
+            if not localRollback.hasNewTrove(*newInfo):
+                continue
+
+            localCs = localRollback.getNewTroveVersion(*newInfo)
+
+            # troves can only be removed for one reason (either an update
+            # to one thing or erased)
+            assert(localCs.getOldVersion() == removeCs.getOldVersion() and
+                   localCs.getOldFlavor() == removeCs.getOldFlavor())
+
+            removeRollback.delNewTrove(*newInfo)
+
+            pathIdList = set()
+            for (pathId, path, fileId, version) in \
+                                        removeCs.getNewFileList():
+                pathIdList.add(pathId)
+                localCs.newFile(pathId, path, fileId, version)
+
+            changedList = localCs.getChangedFileList()
+            l = [ x for x in localCs.getChangedFileList() if
+                    x[0] not in pathIdList ]
+            del changedList[:]
+            changedList.extend(l)
+
+            continue
+
+        localRollback.merge(removeRollback)
+
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
@@ -1928,42 +2004,8 @@ class Database(SqlDbRepository):
         if rollbackPhase is None:
             # this is the rollback for files which the user is forcing the
             # removal of (probably due to removeFiles)
-            removeRollback = fsJob.createRemoveRollback()
-
-            # We now have two rollbacks we need to merge together, localRollback
-            # (which is the changes already made to the local system) and
-            # removeRollback, which contains local changes this update will do.
-            # Those two could overlap, so we need to merge them carefully.
-            for removeCs in [ x for x in removeRollback.iterNewTroveList() ]:
-                newInfo = (removeCs.getName(), removeCs.getNewVersion(), 
-                           removeCs.getNewFlavor())
-                if not localRollback.hasNewTrove(*newInfo):
-                    continue
-
-                localCs = localRollback.getNewTroveVersion(*newInfo)
-
-                # troves can only be removed for one reason (either an update
-                # to one thing or erased)
-                assert(localCs.getOldVersion() == removeCs.getOldVersion() and
-                       localCs.getOldFlavor() == removeCs.getOldFlavor())
-
-                removeRollback.delNewTrove(*newInfo)
-
-                pathIdList = set()
-                for (pathId, path, fileId, version) in \
-                                            removeCs.getNewFileList():
-                    pathIdList.add(pathId)
-                    localCs.newFile(pathId, path, fileId, version)
-
-                changedList = localCs.getChangedFileList()
-                l = [ x for x in localCs.getChangedFileList() if
-                        x[0] not in pathIdList ]
-                del changedList[:]
-                changedList.extend(l)
-
-                continue
-
-            localRollback.merge(removeRollback)
+            removeRollback = self.createRemoveRollback(fsJob)
+            self.mergeRemoveRollback(localRollback, removeRollback)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well

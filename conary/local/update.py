@@ -130,56 +130,13 @@ class FilesystemJob:
             l.append(target)
 
     def userRemoval(self, troveName, troveVersion, troveFlavor, pathId,
-                    replaced = False):
-        # replaced is True if this is an automatic replacement and False if
-        # it's the result of a preexisting replacement (True gets it into
-        # the replacement changeset, False leaves it out)
+                    content = None):
+        # content is a FileContainer object whose contents will be saved for
+        # a rollback. IT set if this is the result of replacing an existing
+        # files, None otherwise
         d = self.userRemovals.setdefault(
                     (troveName, troveVersion, troveFlavor), {})
-        d[pathId] = replaced
-
-    def createRemoveRollback(self):
-        cs = changeset.ChangeSet()
-
-        # Returns a changeset which undoes the user removals 
-        for (info, fileDict) in self.userRemovals.iteritems():
-            if sum(fileDict.itervalues()) == 0:
-                # skip the rest of this processing if there are no files
-                # to handle (it's likely that the trove referred to here
-                # isn't in the database yet)
-                continue
-
-            localTrove = self.db.getTrove(*info)
-            updatedTrove = localTrove.copy()
-            localTrove.changeVersion(
-                localTrove.getVersion().createShadow(
-                                            label = versions.LocalLabel()))
-            hasChanges = False
-            for (pathId, replaced) in fileDict.iteritems():
-                if not replaced: continue
-                path, fileId = updatedTrove.getFile(pathId)[0:2]
-                stream = self.db.getFileStream(fileId)
-                cs.addFile(None, fileId, stream)
-
-                if files.frozenFileHasContents(stream):
-                    flags = files.frozenFileFlags(stream)
-                    # this file is seen as *added* in the rollback
-                    cs.addFileContents(pathId, fileId,
-                       changeset.ChangedFileTypes.file,
-                       filecontents.FromFilesystem(util.joinPaths(self.root,
-                                                                  path)),
-                       flags.isConfig())
-
-                updatedTrove.removeFile(pathId)
-                hasChanges = True
-
-            if not hasChanges: continue
-
-            # this is a rollback so the diff is backwards
-            trvCs = localTrove.diff(updatedTrove)[0]
-            cs.newTrove(trvCs)
-
-        return cs
+        d[pathId] = content
 
     def pathRemoved(self, info, pathId):
         d = self.userRemovals.get(info, None)
@@ -227,9 +184,7 @@ class FilesystemJob:
         return pathId in missingPathIds
 
     def iterUserRemovals(self):
-	for ((troveName, troveVersion, troveFlavor), fileDict) \
-                                        in self.userRemovals.iteritems():
-	    yield (troveName, troveVersion, troveFlavor, fileDict)
+        return self.userRemovals.iteritems()
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
@@ -993,14 +948,16 @@ class FilesystemJob:
         # Create new files. If the files we are about to create already
         # exist, it's an error.
 	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
+            headRealPath = util.joinPaths(rootFixup, headPath)
+
             # a continue anywhere in this loop means that the file does not
             # get created
             if pathId in removalList:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
-                self.userRemoval(replaced = False, *(newTroveInfo + (pathId,)))
+                self.userRemoval(content = None,
+                                 *(newTroveInfo + (pathId,)))
                 continue
 
-            headRealPath = util.joinPaths(rootFixup, headPath)
             headFile = files.ThawFile(
                             changeSet.getFileChange(None, headFileId), pathId)
 
@@ -1134,7 +1091,10 @@ class FilesystemJob:
                         # mark the file as replaced in anything which used
                         # to own it
                         for info in existingOwners:
-                            self.userRemoval(replaced = True, *info)
+                            self.userRemoval(
+                                content =
+                                  filecontents.FromFilesystem(headRealPath),
+                                *info)
                     elif restoreFile:
                         self.errors.append(FileInWayError(
                                util.normpath(headRealPath),
@@ -1258,7 +1218,7 @@ class FilesystemJob:
                 else:
                     # the file was removed from the local system; we're not
                     # putting it back
-                    self.userRemoval(replaced = False,
+                    self.userRemoval(content = None,
                                      *(newTroveInfo + (pathId,)))
                     continue
 
@@ -1657,6 +1617,12 @@ class FilesystemJob:
 	@type root: str
 	@param flags: flags which modify update behavior.
 	@type flags: UpdateFlags
+        @param removeHints: Files which should not be written to disk
+        as part of this update. This is used when a later changeset is
+        coming in which will remove a file from here. It prevents false
+        conflicts.
+
+        @type removeHints: dict
         @param rollbackPhase: What part of a rollback is this (None for
         normal installs)
 	@type rollbackPhase: int
