@@ -967,7 +967,7 @@ order by
                         name STRING, version STRING, flavor STRING,
                         pathId BLOB)""")
         for (name, version, flavor), fileList in userReplaced.iteritems():
-            for pathId, content in fileList:
+            for pathId, content, fileObj in fileList:
                 flavorStr = flavor.freeze()
                 if not flavorStr:
                     flavorStr = None

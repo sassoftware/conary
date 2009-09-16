@@ -1846,20 +1846,20 @@ class Database(SqlDbRepository):
                 localTrove.getVersion().createShadow(
                                             label = versions.LocalLabel()))
             hasChanges = False
-            for (pathId, content) in fileList:
+            for (pathId, content, fileObj) in fileList:
                 if not content: continue
-                path, fileId = updatedTrove.getFile(pathId)[0:2]
-                stream = self.db.getFileStream(fileId)
-                cs.addFile(None, fileId, stream)
+                fileId = fileObj.fileId()
+                cs.addFile(None, fileId, fileObj.freeze())
 
-                if files.frozenFileHasContents(stream):
-                    flags = files.frozenFileFlags(stream)
+                if fileObj.hasContents:
                     # this file is seen as *added* in the rollback
                     cs.addFileContents(pathId, fileId,
                        changeset.ChangedFileTypes.file, content,
-                       flags.isConfig())
+                       fileObj.flags.isConfig())
 
                 updatedTrove.removeFile(pathId)
+                localTrove.updateFile(pathId, None, localTrove.getVersion(),
+                                      fileId)
                 hasChanges = True
 
             if not hasChanges: continue

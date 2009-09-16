@@ -130,13 +130,15 @@ class FilesystemJob:
             l.append(target)
 
     def userRemoval(self, troveName, troveVersion, troveFlavor, pathId,
-                    content = None):
+                    content = None, fileObj = None):
         # content is a FileContainer object whose contents will be saved for
-        # a rollback. IT set if this is the result of replacing an existing
-        # files, None otherwise
+        # a rollback, and fileObj is the associated file object. They are set
+        # if this is the result of replacing an existing files, None otherwise
+        # they need to be both set or both empty
+        assert((content and fileObj) or not(content or fileObj))
         d = self.userRemovals.setdefault(
                     (troveName, troveVersion, troveFlavor), [])
-        d.append((pathId, content))
+        d.append((pathId, content, fileObj))
 
     def iterUserRemovals(self):
         return self.userRemovals.iteritems()
@@ -909,8 +911,7 @@ class FilesystemJob:
             # get created
             if pathId in removalList:
                 fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
-                self.userRemoval(content = None,
-                                 *(newTroveInfo + (pathId,)))
+                self.userRemoval(*(newTroveInfo + (pathId,)))
                 continue
 
             headFile = files.ThawFile(
@@ -1017,6 +1018,11 @@ class FilesystemJob:
                     restoreFile = False
                 elif not self.removes.has_key(headRealPath):
                     fileConflict = True
+                    existingFile = files.FileFromFilesystem(
+                        headRealPath, pathId)
+                    # config flag is the only one that matters here
+                    # because it affects how changesets are ordered
+                    existingFile.flags.isConfig(headFile.flags.isConfig())
 
                     # removalHints contains None to match all
                     # files, or a list of pathIds.
@@ -1028,8 +1034,6 @@ class FilesystemJob:
                             break
 
                     if fileConflict:
-                        existingFile = files.FileFromFilesystem(
-                            headRealPath, pathId)
                         fileConflict = \
                                 not silentlyReplace(headFile, existingFile)
 
@@ -1045,6 +1049,7 @@ class FilesystemJob:
                         # to own it
                         for info in existingOwners:
                             self.userRemoval(
+                                fileObj = existingFile,
                                 content =
                                   filecontents.FromFilesystem(headRealPath),
                                 *info)
@@ -1171,8 +1176,7 @@ class FilesystemJob:
                 else:
                     # the file was removed from the local system; we're not
                     # putting it back
-                    self.userRemoval(content = None,
-                                     *(newTroveInfo + (pathId,)))
+                    self.userRemoval(*(newTroveInfo + (pathId,)))
                     continue
 
             # XXX is this correct?  all the other addFiles use
