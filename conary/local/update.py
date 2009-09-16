@@ -1019,9 +1019,7 @@ class FilesystemJob:
                     fileConflict = True
 
                     # removalHints contains None to match all
-                    # files, or a list of pathIds. If that doesn't
-                    # allow the update, see if a label-based priorities
-                    # resolve the conflict.
+                    # files, or a list of pathIds.
                     for info in existingOwners:
                         # info here is (name, version, flavor, pathID)
                         match = removalHints.get(info[0:3], [])
@@ -1029,7 +1027,7 @@ class FilesystemJob:
                             fileConflict = False
                             break
 
-                    if restoreFile and fileConflict:
+                    if fileConflict:
                         existingFile = files.FileFromFilesystem(
                             headRealPath, pathId)
                         fileConflict = \
@@ -1042,7 +1040,7 @@ class FilesystemJob:
                         # transient files silently replace unowned files
                         fileConflict = False
 
-                    if restoreFile and not fileConflict:
+                    if not fileConflict:
                         # mark the file as replaced in anything which used
                         # to own it
                         for info in existingOwners:
@@ -1050,7 +1048,7 @@ class FilesystemJob:
                                 content =
                                   filecontents.FromFilesystem(headRealPath),
                                 *info)
-                    elif restoreFile:
+                    else:
                         self.errors.append(FileInWayError(
                                util.normpath(headRealPath),
                                troveCs.getName(),
