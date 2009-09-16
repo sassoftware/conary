@@ -371,6 +371,18 @@ class File(streams.StreamSet):
 	else:
 	    streams.StreamSet.__init__(self)
 
+class MissingFile(File):
+
+    """
+    This is a special file type which is missing from the system. We don't
+    know much about files which don't exist!
+    """
+    lsTag = 'm'
+
+    streamDict = {
+        FILE_STREAM_FLAGS    : (SMALL, FlagsStream, "flags"),
+        }
+
 class SymbolicLink(File):
 
     lsTag = "l"
@@ -677,6 +689,8 @@ def ThawFile(frz, pathId):
 	return BlockDevice(pathId, streamData = frz)
     elif frz[0] == "c":
 	return CharacterDevice(pathId, streamData = frz)
+    elif frz[0] == "m":
+        return MissingFile(pathId, streamData = frz)
 
     raise AssertionError
 
@@ -744,6 +758,8 @@ def fieldsChanged(diff):
 	cl = SymbolicLink
     elif type == "p":
 	cl = NamedPipe
+    elif type == "m":
+        cl = MissingFile
     else:
 	raise AssertionError
 

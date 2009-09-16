@@ -1038,7 +1038,7 @@ order by
         """)
 
         conflicts = []
-        replaced = []
+        replaced = {}
         for (path, existingInstanceId, existingPathId, existingTroveName,
              existingVersion, existingFlavor,
              addedInstanceId, addedPathId, addedTroveName, addedVersion,
@@ -1047,12 +1047,14 @@ order by
                 cu2.execute("UPDATE DBTroveFiles SET isPresent = 0 "
                            "WHERE instanceId = ? AND pathId = ?",
                            existingInstanceId, existingPathId)
-                replaced.append(
-                        ((existingTroveName,
+                existingTroveInfo = (existingTroveName,
                           versions.VersionFromString(existingVersion),
-                          deps.deps.ThawFlavor(existingFlavor)),
-                          existingPathId))
-
+                          deps.deps.ThawFlavor(existingFlavor))
+                l = replaced.setdefault(existingTroveInfo, [])
+                # None's here are for compatibility with the replacement
+                # list the filesystem job generates. They tells the rollback
+                # generation code not to look on the disk for file contents.
+                l.append((existingPathId, None, None))
             else:
                 conflicts.append((path,
                         (existingPathId,

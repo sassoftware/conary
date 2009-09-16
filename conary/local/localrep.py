@@ -112,10 +112,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         self.oldFile(pathId, fileId, sha1)
 
-    # If retargetLocal is set, then localCs is for A->A.local whlie
-    # origJob is A->B, so localCs needs to be changed to be B->B.local.
-    # Otherwise, we're applying a rollback and origJob is B->A and
-    # localCs is A->A.local, so it doesn't need retargeting.
+    def iterDbRemovals(self):
+        return self.replacedFiles.iteritems()
+
     def __init__(self, repos, cs, callback, autoPinList, 
                  allowIncomplete = False,
                  replaceFiles = False, userReplaced = None):

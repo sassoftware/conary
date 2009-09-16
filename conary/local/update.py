@@ -86,6 +86,7 @@ class FilesystemJob:
         restore rule for the same path in this job?
         """
         assert(contentsOverride != "" or fileId is not None)
+        assert(fileObj.lsTag != 'm')
 
         if target in self.restores:
             pathId = self.restores[target][0]
@@ -916,6 +917,11 @@ class FilesystemJob:
 
             headFile = files.ThawFile(
                             changeSet.getFileChange(None, headFileId), pathId)
+            if headFile.lsTag == 'm':
+                # this is a "missing" file. we don't restore these to disk.
+                # they can only occur in the local portion of a rollback,
+                # and are handled properly by the database code.
+                continue
 
             if headPath in pathsMoved:
                 # this file looks new, but it's actually moved over from

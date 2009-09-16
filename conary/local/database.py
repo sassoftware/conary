@@ -1693,6 +1693,12 @@ class Database(SqlDbRepository):
             else:
                 localChanges = False
 
+        if rollbackPhase is None:
+            # this is the rollback for files which the user is forcing the
+            # removal of (probably due to removeFiles)
+            self.mergeRemoveRollback(localRollback,
+                         self.createRemoveRollback(fsJob.iterUserRemovals()))
+
         # Build A->B
         if (updateDatabase and not localChanges):
             # this updates the database from the changeset; the change
@@ -1710,6 +1716,7 @@ class Database(SqlDbRepository):
                     dbConflicts.append(DatabasePathConflictError(
                             util.joinPaths(self.root, path), 
                             troveName, version, flavor))
+                csJob = None
 
             self.db.mapPinnedTroves(uJob.getPinMaps())
         elif updateDatabase and localChanges:
@@ -1720,6 +1727,14 @@ class Database(SqlDbRepository):
             csJob = None
         else:
             csJob = None
+
+        if rollbackPhase is None and csJob:
+            # this is the rollback for file conflicts which are in the
+            # database only; the files may be missing in the filesystem
+            # altogether
+            self.mergeRemoveRollback(localRollback,
+                         self.createRemoveRollback(csJob.iterDbRemovals(),
+                                                   asMissing = True))
 
         # we have to do this before files get removed from the database,
         # which is a bit unfortunate since this rollback isn't actually
@@ -1828,12 +1843,29 @@ class Database(SqlDbRepository):
         else:
             return False
 
-    def createRemoveRollback(self, fsJob):
+    def createRemoveRollback(self, removalList, asMissing = False):
+        """
+        Returns a changeset which undoes the user removals.
+
+        @param removalList: Dict specifying files which have been removed
+        from troves. It is indexed by (name, version, flavor) tuples, and
+        is a list of (pathId, content, fileObj) tuples. If content/fileObj
+        are None, the file information is not placed into the changeset.
+        @type removalList: dict
+        @param asMissing: If True, files are placed in the changeset with the
+        original file object, but as files.MissingFiles instead of a normal
+        file type. This is used for removals which need to be repaired in the
+        database, but where there is no filesystem information to restore. If
+        this is used it is assumed that the content/fileObj elements of the
+        file lists are both None.
+        @type noteMissing: bool
+        @rtype changeset.ChangeSet
+        """
         cs = changeset.ChangeSet()
 
-        # Returns a changeset which undoes the user removals 
-        for (info, fileList) in fsJob.iterUserRemovals():
-            if not [ x for x in fileList if x[1] is not None ]:
+        for (info, fileList) in removalList:
+            if (not asMissing and
+                    not [ x for x in fileList if x[1] is not None ]):
                 # skip the rest of this processing if there are no files
                 # to handle (it's likely that the trove referred to here
                 # isn't in the database yet because it's being installed
@@ -1841,13 +1873,18 @@ class Database(SqlDbRepository):
                 continue
 
             localTrove = self.db.getTroves([ info ])[0]
-            updatedTrove = localTrove.copy()
+            origTrove = localTrove.copy()
             localTrove.changeVersion(
                 localTrove.getVersion().createShadow(
                                             label = versions.LocalLabel()))
             hasChanges = False
             for (pathId, content, fileObj) in fileList:
-                if not content: continue
+                if asMissing:
+                    hasChanges = True
+                    fileObj = files.MissingFile(pathId)
+                elif not content:
+                    continue
+
                 fileId = fileObj.fileId()
                 cs.addFile(None, fileId, fileObj.freeze())
 
@@ -1857,7 +1894,10 @@ class Database(SqlDbRepository):
                        changeset.ChangedFileTypes.file, content,
                        fileObj.flags.isConfig())
 
-                updatedTrove.removeFile(pathId)
+                # this makes the file show up as added instead of changed,
+                # which is easier for us here and makes no difference later
+                # on since this is only the local piece of a change set
+                origTrove.removeFile(pathId)
                 localTrove.updateFile(pathId, None, localTrove.getVersion(),
                                       fileId)
                 hasChanges = True
@@ -1865,7 +1905,7 @@ class Database(SqlDbRepository):
             if not hasChanges: continue
 
             # this is a rollback so the diff is backwards
-            trvCs = localTrove.diff(updatedTrove)[0]
+            trvCs = localTrove.diff(origTrove)[0]
             cs.newTrove(trvCs)
 
         return cs
@@ -1989,12 +2029,6 @@ class Database(SqlDbRepository):
                                      removeHints = removeHints,
                                      rollbackPhase = rollbackPhase,
                                      deferredScripts = deferredScripts)
-
-        if rollbackPhase is None:
-            # this is the rollback for files which the user is forcing the
-            # removal of (probably due to removeFiles)
-            removeRollback = self.createRemoveRollback(fsJob)
-            self.mergeRemoveRollback(localRollback, removeRollback)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
