@@ -1678,16 +1678,6 @@ class Database(SqlDbRepository):
             callback.runningPreTagHandlers()
             fsJob.preapply(tagSet, tagScript)
 
-        for (troveInfo, fileDict) in fsJob.iterUserRemovals():
-            if not [ x for x in fileDict.itervalues() if x is not None ]:
-                # Nothing to do (these are updates for a trove being installed
-                # as part of this job rather than for a trove which is part
-                # of this job)
-                continue
-
-            self.db.removePathIdsFromTrove(troveInfo[0], troveInfo[1],
-                                           troveInfo[2], fileDict.keys())
-
         dbConflicts = []
 
         localChanges = None
@@ -1712,7 +1702,7 @@ class Database(SqlDbRepository):
                 csJob = localrep.LocalRepositoryChangeSetJob(
                     dbCache, cs, callback, autoPinList, 
                     allowIncomplete = (rollbackPhase is not None),
-                    pathRemovedCheck = fsJob.pathRemoved,
+                    userReplaced = fsJob.userRemovals,
                     replaceFiles = flags.replaceManagedFiles)
             except DatabasePathConflicts, e:
                 for (path, (pathId, (troveName, version, flavor)),
@@ -1842,11 +1832,12 @@ class Database(SqlDbRepository):
         cs = changeset.ChangeSet()
 
         # Returns a changeset which undoes the user removals 
-        for (info, fileDict) in fsJob.iterUserRemovals():
-            if not [ x for x in fileDict.itervalues() if x is not None ]:
+        for (info, fileList) in fsJob.iterUserRemovals():
+            if not [ x for x in fileList if x[1] is not None ]:
                 # skip the rest of this processing if there are no files
                 # to handle (it's likely that the trove referred to here
-                # isn't in the database yet)
+                # isn't in the database yet because it's being installed
+                # as part of the same job)
                 continue
 
             localTrove = self.db.getTroves([ info ])[0]
@@ -1855,7 +1846,7 @@ class Database(SqlDbRepository):
                 localTrove.getVersion().createShadow(
                                             label = versions.LocalLabel()))
             hasChanges = False
-            for (pathId, content) in fileDict.iteritems():
+            for (pathId, content) in fileList:
                 if not content: continue
                 path, fileId = updatedTrove.getFile(pathId)[0:2]
                 stream = self.db.getFileStream(fileId)
@@ -1910,8 +1901,6 @@ class Database(SqlDbRepository):
                     x[0] not in pathIdList ]
             del changedList[:]
             changedList.extend(l)
-
-            continue
 
         localRollback.merge(removeRollback)
 

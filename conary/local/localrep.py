@@ -46,10 +46,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
     def addFileVersion(self, troveId, pathId, path, fileId,
                        newVersion, fileStream = None):
-        isPresent = not self.pathRemovedCheck(troveId[0], pathId)
         self.repos.addFileVersion(troveId[1], pathId, path, fileId, newVersion,
-                                  fileStream = fileStream,
-                                  isPresent = isPresent)
+                                  fileStream = fileStream)
 
     def addTroveDone(self, troveId, mirror=False):
         assert(not mirror), "This code pathway can not be used for mirroring"
@@ -119,8 +117,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs, callback, autoPinList, 
-                 allowIncomplete = False, pathRemovedCheck = None,
-                 replaceFiles = False):
+                 allowIncomplete = False,
+                 replaceFiles = False, userReplaced = None):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -129,7 +127,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.oldFiles = []
         self.trovesAdded = []
         self.autoPinList = autoPinList
-        self.pathRemovedCheck = pathRemovedCheck
 
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
                                          allowIncomplete=allowIncomplete)
@@ -140,8 +137,12 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         for (pathId, fileVersion, sha1) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)
 
+        if userReplaced:
+            self.repos.db.db.markUserReplacedFiles(userReplaced)
+
         # this raises an exception if this install would create conflicts
-        self.repos.db.db.checkPathConflicts(self.trovesAdded, replaceFiles)
+        self.replacedFiles = self.repos.db.db.checkPathConflicts(
+                                    self.trovesAdded, replaceFiles)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:
