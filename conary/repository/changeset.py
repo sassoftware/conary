@@ -707,6 +707,9 @@ class ChangeSet(streams.StreamSet):
                     if fileObj.flags.isConfig():
                         cont = filecontents.FromDataStore(db.contentsStore,
                                     fileObj.contents.sha1())
+                        # make a copy of the contents in memory in case
+                        # the database gets changed
+                        cont = filecontents.FromString(cont.get().read())
                         rollback.addFileContents(pathId, fileId,
                                                  ChangedFileTypes.file, cont,
                                                  fileObj.flags.isConfig())

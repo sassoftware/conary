@@ -1671,25 +1671,6 @@ class Database(SqlDbRepository):
                   reposRollback, localRollback, rollbackPhase, fsJob,
                   updateDatabase, callback, tagScript, dbCache,
                   autoPinList, flags, journal, directoryCandidates):
-        # we have to do this before files get removed from the database,
-        # which is a bit unfortunate since this rollback isn't actually
-        # valid until a bit later, but that's why we jounral
-        if (rollbackPhase is None) and not commitFlags.test:
-            rollback = uJob.getRollback()
-            rollbackScripts = None
-            if rollback is None:
-                rollback = self.rollbackStack.new(opJournal)
-                uJob.setRollback(rollback)
-                # Only save the rollback scripts once, and only if the job was
-                # not restarted or the previous Conary didn't know how to save
-                # scripts on the rollback stack (CNY-2845)
-                prflag = uJob.getFeatures().postRollbackScriptsOnRollbackStack
-                if not uJob.getRestartedFlag() or not prflag:
-                    rollbackScripts = list(uJob.iterJobPostRollbackScripts())
-            rollback.add(opJournal, reposRollback, localRollback,
-                rollbackScripts)
-            del rollback
-
         if not (commitFlags.justDatabase or commitFlags.test):
             # run preremove scripts before updating the database, otherwise
             # the file lists which get sent to them are incorrect. skipping
@@ -1750,6 +1731,25 @@ class Database(SqlDbRepository):
             csJob = None
         else:
             csJob = None
+
+        # we have to do this before files get removed from the database,
+        # which is a bit unfortunate since this rollback isn't actually
+        # valid until a bit later, but that's why we jounral
+        if (rollbackPhase is None) and not commitFlags.test:
+            rollback = uJob.getRollback()
+            rollbackScripts = None
+            if rollback is None:
+                rollback = self.rollbackStack.new(opJournal)
+                uJob.setRollback(rollback)
+                # Only save the rollback scripts once, and only if the job was
+                # not restarted or the previous Conary didn't know how to save
+                # scripts on the rollback stack (CNY-2845)
+                prflag = uJob.getFeatures().postRollbackScriptsOnRollbackStack
+                if not uJob.getRestartedFlag() or not prflag:
+                    rollbackScripts = list(uJob.iterJobPostRollbackScripts())
+            rollback.add(opJournal, reposRollback, localRollback,
+                rollbackScripts)
+            del rollback
 
         errList = fsJob.getErrorList()
 

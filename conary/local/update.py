@@ -1951,6 +1951,12 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                     else:
                         srcCont = repos.getFileContents(
                                         [ (srcFileId, srcFileVersion) ])[0]
+                        # make sure we don't depend on contents in the
+                        # database; those could disappear before we write
+                        # this out
+                        if srcCont:
+                            srcCont = filecontents.FromString(
+                                                        srcCont.get().read())
 
                         (contType, cont) = changeset.fileContentsDiff(
                                     srcFile, srcCont, f, newCont)
