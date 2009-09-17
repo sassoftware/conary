@@ -1483,6 +1483,22 @@ class FilesystemJob:
 	    else:
 		fullyUpdated = False
 
+        if troveCs.getOldVersion():
+            # if there are any files missing when we compare the fsTrove to
+            # the pristine trove being installed those files have been manually
+            # removed and we need to be sure we propogate that forward
+            trv = repos.getTrove(*troveCs.getOldNameVersionFlavor(),
+                                 pristine = True).copy()
+            # all pathIds in the old trove
+            missingPathIds = set(x[0] for x in trv.iterFileList())
+            # remove ones which are in the trove we're installing
+            missingPathIds -= set(x[0] for x in fsTrove.iterFileList())
+            # ones which were explicitly removed ought to be missing
+            missingPathIds -= set(troveCs.getOldFileList())
+            for pathId in missingPathIds:
+                self.userRemoval(
+                             *(troveCs.getNewNameVersionFlavor() + (pathId,)))
+
 	if fullyUpdated:
 	    fsTrove.changeVersion(troveCs.getNewVersion())
 
