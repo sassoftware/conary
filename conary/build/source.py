@@ -44,7 +44,7 @@ class _AnySource(action.RecipeAction):
 # Logically, .tar.xz ought to go first because it is smallest, but we
 # should wait until it is more prevalent before moving it to the front
 # of the list; we should also look for instances of .txz
-DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', '.tar.xz', 'zip')
+DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'tar.xz', 'zip')
 
 class _Source(_AnySource):
     keywords = {'rpm': '',
