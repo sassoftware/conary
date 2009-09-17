@@ -77,6 +77,11 @@ class CaselessDict(dict):
     def items(self):
         return dict.values(self)
 
+    def get(self, key, default=None):
+        key = self.__l(key)
+        if dict.__contains__(self, key):
+            return dict.__getitem__(self, key)[1]
+        return default
     def setdefault(self, key, val):
         return dict.setdefault(self, self.__l(key), (key, val))[1]
     def update(self, other):
