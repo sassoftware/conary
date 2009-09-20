@@ -16,8 +16,9 @@
 Contains functions to assist in dealing with rpm files.
 """
 
-import itertools, struct
+import itertools, struct, re
 from conary.lib.sha1helper import *
+from conary.deps import deps
 
 NAME            = 1000
 VERSION         = 1001
@@ -40,6 +41,8 @@ FILEFLAGS       = 1037 # bitmask; (1<<0 => config)
 FILEUSERNAME    = 1039
 FILEGROUPNAME   = 1040
 SOURCERPM       = 1044
+PROVIDENAME     = 1047
+REQUIRENAME     = 1049
 RPMVERSION      = 1064
 TRIGGERSCRIPTS  = 1065
 PREINPROG       = 1085
@@ -126,6 +129,49 @@ class RpmHeader(object):
             return self[item]
 
         return default
+
+    def _getDepsetFromHeader(self, tag):
+        depset = deps.DependencySet()
+        binprefixre = re.compile('/bin/|/sbin/|/usr/bin/|/usr/sbin/|/usr/libexec/')
+        flagre = re.compile('\((.*?)\)')
+        depnamere = re.compile('(.*?)\(.*')
+
+        for dep in self.get(tag, []):
+            if dep.startswith('/'):
+                # convert file deps to real Conary file deps
+                # FIXME: find a way to share this with the code at
+                # packagepolicy.py:2465
+                if binprefixre.match(dep):
+                    depset.addDep(deps.FileDependencies, deps.Dependency(dep))
+            else:
+                # convert anything inside () to a flag
+                flags = flagre.findall(dep)
+                if flags:
+                    # the dependency name is everything until the first (
+                    dep = depnamere.match(dep).group(1)
+                    if len(flags) == 2:
+                        # if we have (flags)(64bit), we need to pop
+                        # the 64bit marking off the end and namespace the
+                        # dependency name.
+                        dep += '[%s]' %flags.pop()
+                    flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags if x ]
+                else:
+                    flags = []
+                depset.addDep(deps.RpmDependencies, deps.Dependency(dep, flags))
+        return depset
+
+    def getDeps(self):
+        """
+        Create two dependency sets that represent the requires and
+        provides described in this RPM header object.
+
+        @return: (requires, provides)
+        @rtype: two-tuple of deps.DependencySet instances
+        """
+        reqset = self._getDepsetFromHeader(REQUIRENAME)
+        provset = self._getDepsetFromHeader(PROVIDENAME)
+
+        return reqset, provset
 
     def __getitem__(self, tag):
         if tag == OLDFILENAMES and tag not in self.entries:

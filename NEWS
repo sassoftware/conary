@@ -30,12 +30,19 @@ Changes in @NEW@:
       are based on the current latest entries and the new trove. Formerly
       they were done one at a time based on everything in the repository
       (through a view).
+    * The rpmhelper.Header object can now produce dependency sets that
+      represent what an RPM requires and provides.
+    * A new RPM dependency class has been added. This class is used
+      to represent dependencies expressed in RPM packages that cannot
+      be mapped directly to a native Conary repository.
+
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
       dependencies will now inherit the byDefaultness of the depending
       component. (CNY-3195)
     * The imageGroup flag in group recipes now implies
       checkOnlyByDefaultDeps=False. (CNY-3195)
+
   o Bug Fixes:
     * cvc rdiff now functions correctly on trove versions where no
       previous version exists. (CNY-3218)
