@@ -1483,7 +1483,7 @@ class FilesystemJob:
 	    else:
 		fullyUpdated = False
 
-        if troveCs.getOldVersion():
+        if not isSrcTrove and troveCs.getOldVersion():
             # if there are any files missing when we compare the fsTrove to
             # the pristine trove being installed those files have been manually
             # removed and we need to be sure we propogate that forward
