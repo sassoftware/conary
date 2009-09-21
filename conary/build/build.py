@@ -248,6 +248,10 @@ class Run(BuildCommand):
 
     def do(self, macros):
 	macros = macros.copy()
+        # blank initial macros for determining requirements (CNY-3222)
+        macros.envcmd = ''
+        macros.cdcmd = ''
+        self._addActionPathBuildRequires([self.command % macros])
 
         envStr = ''
         if self.wrapdir:

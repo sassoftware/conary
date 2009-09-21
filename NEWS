@@ -5,6 +5,8 @@ Changes in @NEW@:
     * The changemail.py repository commit action module now takes an
       optional --maxsize argument and truncates changemail messages
       to fit. (CNY-3205)
+    * The Run build action now does path-based build requirement
+      discovery like most build actions. (CNY-3222)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
