@@ -11,7 +11,7 @@ sources = ["_sqlite.c", "encode.c", "port/strsep.c"]
 macros = []
 
 if sys.platform in ("linux-i386", "linux2"): # most Linux
-    include_dirs = []
+    include_dirs = ['sqlite-3.6.18/']
     library_dirs = []
     libraries = [sqlite]
     runtime_library_dirs = []

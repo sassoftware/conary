@@ -6,6 +6,8 @@
 .PHONY: all dist clean install
 
 all:
+        # default (tested) sqlite to embed is 3.6.18
+	[ -f sqlite-3.6.18/.libs/libsqlite3.a ] && cp sqlite-3.6.18/.libs/libsqlite3.a .
 	$(PYTHON) setup.py build
 	$(PYTHON) setup.py install --install-lib=..
 
