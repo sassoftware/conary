@@ -7,6 +7,12 @@ Changes in @NEW@:
       The fixed Conary issue is related to CNY-3216, but only
       manifests itself when multiple groups are present.  (CNY-3219)
 
+  o Internal Changes:
+    * Conary will now link against an embedded copy of sqlite if a
+      specific version of sqlite has previously been configured and
+      built under the conary/pysqlite3/ directory.  At this time,
+      the supported version is 3.6.18.
+
 Changes in 2.0.49:
   o Bug Fixes:
     * Updates of flavored groups containing pre-update scripts no
