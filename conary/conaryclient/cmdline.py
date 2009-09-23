@@ -43,6 +43,9 @@ def parseTroveSpec(specStr, allowEmptyName = True, withFrozenFlavor = False):
     @raise TroveSpecError: Raised if the input string is not a valid TroveSpec
     """
     origSpecStr = specStr
+    # CNY-3219: strip leading and trailing whitespaces around job
+    # specification
+    specStr = specStr.strip()
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
         l = specStr.split('[')
