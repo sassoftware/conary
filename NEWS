@@ -6,6 +6,10 @@ Changes in @NEW@:
       scripts no longer fail after the critical update is applied.
       The fixed Conary issue is related to CNY-3216, but only
       manifests itself when multiple groups are present.  (CNY-3219)
+    * Path-based action build requirement discovery now functions
+      correctly when spaces are present in environment variables
+      or adjacent spaces are present before the name of the
+      executable in a command string. (CNY-3224)
 
   o Internal Changes:
     * Conary will now link against an embedded copy of sqlite if a
