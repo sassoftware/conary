@@ -37,10 +37,6 @@ Changes in @NEW@:
     * A new RPM dependency class has been added. This class is used
       to represent dependencies expressed in RPM packages that cannot
       be mapped directly to a native Conary dependency.
-    * Conary will now link against an embedded copy of sqlite if a
-      specific version of sqlite has previously been configured and
-      built under the conary/pysqlite3/ directory.  At this time,
-      the supported version is 3.6.18.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
