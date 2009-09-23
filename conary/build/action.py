@@ -19,6 +19,7 @@ from conary.lib import fixedfnmatch
 import itertools
 import os
 import re
+import shlex
 import sys
 import string
 import traceback
@@ -224,8 +225,9 @@ class RecipeAction(Action):
         paths = []
         buildRequires = self.recipe._getTransitiveBuildRequiresNames()
         for cmd in self._actionPathBuildRequires:
-            # Catch the case "python setup.py"
-            cmdarr = cmd.split(' ')
+            # Catch the case "python setup.py", as well as
+            # 'ENV="a b"  somecommand'
+            cmdarr = shlex.split(cmd)
             # Try to catch the command "ENVVAR=val make": skip all words that
             # have an equal sign in them
             c = cmd

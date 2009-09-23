@@ -52,6 +52,10 @@ Changes in @NEW@:
   o Bug Fixes:
     * cvc rdiff now functions correctly on trove versions where no
       previous version exists. (CNY-3218)
+    * Path-based action build requirement discovery now functions
+      correctly when spaces are present in environment variables
+      or adjacent spaces are present before the name of the
+      executable in a command string. (CNY-3224)
 
 Changes in 2.0.49:
   o Bug Fixes:
