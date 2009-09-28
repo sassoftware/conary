@@ -10,6 +10,11 @@ Changes in @NEW@:
       correctly when spaces are present in environment variables
       or adjacent spaces are present before the name of the
       executable in a command string. (CNY-3224)
+    * When building local changes, conary would sometimes look through
+      the database by fileId to get the path for a file it needed instead
+      of just looking in the filesystem directly. That caused a failure
+      when two paths had the same fileId but one of them had been
+      removed from the system. (CNY-3226)
 
   o Internal Changes:
     * Conary will now link against an embedded copy of sqlite if a
