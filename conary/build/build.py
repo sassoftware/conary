@@ -1781,7 +1781,7 @@ class SetModes(_FileAction):
 	self.paths = args[:split]
 	self.mode = args[split]
 	# raise error while we can still tell what is wrong...
-	if type(self.mode) is not int:
+        if not isinstance(self.mode, (int, long)):
 	    self.init_error(TypeError, 'mode %s is not integer' % str(self.mode))
 
     def do(self, macros):

@@ -1769,7 +1769,7 @@ class SingleGroup(object):
         return self.size
 
     def setCompatibilityClass(self, theClass):
-        if type(theClass) is not int:
+        if not isinstance(theClass, (int, long)):
             raise RecipeFileError('group compatibility classes must be '
                                   'integers')
 

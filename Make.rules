@@ -13,10 +13,9 @@
 # full details.
 #
 
-PYVER=`python -c 'import sys; print sys.version[0:3]'`
+PYVER=`python -c 'import sys; print(sys.version[0:3])'`
 PYTHON = /usr/bin/python${PYVER}
-PYVERSION = $(shell $(PYTHON) -c 'import os, sys; print sys.version[:3]')
-PYINCLUDE = $(shell $(PYTHON) -c 'import os, sys; print os.sep.join((sys.prefix, "include", "python" + sys.version[:3]))')
+PYINCLUDE = /usr/include/python${PYVER}
 
 PYFLAKES = /usr/bin/pyflakes
 
