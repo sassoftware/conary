@@ -265,10 +265,18 @@ class _Source(_AnySource):
         if self.guessname:
             sourcename += self.guessname
 
+        searchMethodMap = {
+            self.recipe.COOK_TYPE_REPOSITORY :
+                self.recipe.fileFinder.SEARCH_REPOSITORY_ONLY,
+        }
+        searchMethod = searchMethodMap.get(self.recipe.cookType,
+            self.recipe.fileFinder.SEARCH_ALL)
+
         inRepos, source = self.recipe.fileFinder.fetch(sourcename,
                                             headers=httpHeaders,
                                            suffixes=self.suffixes,
-                                           archivePath=self.archivePath)
+                                           archivePath=self.archivePath,
+                                           searchMethod=searchMethod)
         if self.archivePath:
             inRepos = self.archiveInRepos
         if source and not inRepos:

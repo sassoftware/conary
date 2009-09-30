@@ -1058,6 +1058,7 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
         srcdirs.append(cfg.sourceSearchDir % {'pkgname': recipeClass.name})
 
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros, crossCompile)
+    recipeObj.cookType = loader.cookType
 
     for k, v in cfg.environment.items():
         os.environ[k] = v % recipeObj.macros

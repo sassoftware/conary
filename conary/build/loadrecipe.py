@@ -343,6 +343,7 @@ class RecipeLoaderFromString(object):
 
     loadedTroves = None
     loadedSpecs = None
+    cookType = recipe.Recipe.COOK_TYPE_LOCAL
 
     def __init__(self, codeString, filename, cfg=None, repos=None,
                  component=None, branch=None, ignoreInstalled=False,
@@ -726,6 +727,8 @@ class RecipeLoader(RecipeLoaderFromString):
                 objDict = objDict)
 
 class RecipeLoaderFromSourceTrove(RecipeLoader):
+    # When building from a source trove, we should only search the repo
+    cookType = recipe.Recipe.COOK_TYPE_REPOSITORY
 
     @staticmethod
     def findFileByPath(sourceTrove, path):
@@ -1189,6 +1192,7 @@ def ChainedRecipeLoader(troveSpec, label, findInstalled, cfg,
     return loader
 
 class RecipeLoaderFromSourceDirectory(RecipeLoaderFromSourceTrove):
+    cookType = recipe.Recipe.COOK_TYPE_LOCAL
 
     def __init__(self, trv, branch = None, cfg = None, repos = None,
                  ignoreInstalled = None, sourceFiles = None,

@@ -105,6 +105,8 @@ class Recipe(object):
     _recipeType = RECIPE_TYPE_UNKNOWN
     _isDerived = False
     _sourceModule = None
+    COOK_TYPE_LOCAL = 0
+    COOK_TYPE_REPOSITORY = 1
 
     buildRequires = []
     crossRequires = []
@@ -144,6 +146,8 @@ class Recipe(object):
         self._filteredKeyValueMetadata = set()
         # Multi-URL map, used for multiple URL support in addArchive et al
         self.multiurlMap = {}
+        # Search method for sources
+        self.cookType = self.COOK_TYPE_LOCAL
 
         superClasses = self.__class__.__mro__
 
