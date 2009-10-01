@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.0.50:
   o Bug Fixes:
     * cvc rdiff now functions correctly on trove versions where no
       previous version exists. (CNY-3218)
