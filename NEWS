@@ -1,3 +1,50 @@
+Changes in @NEW@:
+  o New Features
+    * The xz compression file format is now supported for decompressing
+      sources. (CNY-3207)
+    * The changemail.py repository commit action module now takes an
+      optional --maxsize argument and truncates changemail messages
+      to fit. (CNY-3205)
+    * The Run build action now does path-based build requirement
+      discovery like most build actions. (CNY-3222)
+
+  o Internal Changes:
+    * Repository internal getfile function now avoids and database access
+      when no files have been requested
+    * Use bulk operatings for loading troveinfo data, speeding up repository
+      commits.
+    * Committing changesets now iterates over troves the changeset is
+      relative to rather than getting them one at a time, significantly
+      reducing the number of sql calls.
+    * Conary now uses a single call when validating that file objects exist
+      in the repository during a commit.
+    * Repository commits now handle file paths and file streams separately
+      to reduce the size of the temporary tables and the commit path.
+    * The number of SQL calls used to create the flavors needed by a repository
+      commit has been dramatically reduced.
+    * Avoid noop SQL calls during repository commits when no redirects are
+      being commited.
+    * Repository commits now merge all dependencies from the temporary tables
+      into the final tables at once rather than once per trove.
+    * Repository commits now updates permission tables for all new troves
+      at once.
+    * Updates to latest tables are now done for all troves at once, and
+      are based on the current latest entries and the new trove. Formerly
+      they were done one at a time based on everything in the repository
+      (through a view).
+    * The rpmhelper.Header object can now produce dependency sets that
+      represent what an RPM requires and provides.
+    * A new RPM dependency class has been added. This class is used
+      to represent dependencies expressed in RPM packages that cannot
+      be mapped directly to a native Conary dependency.
+
+  o Build Changes:
+    * When cooking groups where checkOnlyByDefaultDeps is set to False added
+      dependencies will now inherit the byDefaultness of the depending
+      component. (CNY-3195)
+    * The imageGroup flag in group recipes now implies
+      checkOnlyByDefaultDeps=False. (CNY-3195)
+
 Changes in 2.0.50:
   o Bug Fixes:
     * cvc rdiff now functions correctly on trove versions where no

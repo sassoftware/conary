@@ -34,7 +34,8 @@ DEP_CLASS_PERL          = 12
 DEP_CLASS_RUBY          = 13
 DEP_CLASS_PHP           = 14
 DEP_CLASS_TARGET_IS     = 15
-DEP_CLASS_SENTINEL      = 16
+DEP_CLASS_RPM           = 16
+DEP_CLASS_SENTINEL      = 17
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -751,6 +752,15 @@ class UseDependency(DependencyClass):
     allowParseDep = False
     depNameSignificant = False
 _registerDepClass(UseDependency)
+
+class RpmDependencies(DependencyClass):
+
+    tag = DEP_CLASS_RPM
+    tagName = "rpm"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(RpmDependencies)
 
 def UnknownDependencyFactory(intTag):
     # Factory for unknown classes

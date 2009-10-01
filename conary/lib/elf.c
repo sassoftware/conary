@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2004-2005,2007 rPath, Inc.
+ * Copyright (c) 2004-2005, 2007, 2009 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -24,6 +24,9 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/wait.h>
+
+#include "pycompat.h"
+
 
 static PyObject * ElfError;
 
@@ -499,7 +502,7 @@ static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
 	if (NULL == err)
 	    return PyErr_NoMemory();
 	read(p[0], err, len);
-	rc = PyString_FromStringAndSize(err, len);
+        rc = PYBYTES_FromStringAndSize(err, len);
 	free(err);
     } else {
 	/* child exited with a 0 return code, no unresolved symbols */
@@ -559,7 +562,7 @@ static PyObject *doGetSectionSymbols(Elf * elf, GElf_Word sh_type,
                  (GELF_ST_TYPE(sym.st_info) != STT_FUNC))
                 continue;
             name = elf_strptr(elf, shdr.sh_link, sym.st_name);
-            PyList_Append(rlist, PyString_FromString(name));
+            PyList_Append(rlist, PYBYTES_FromString(name));
         }
     }
     return rlist;
@@ -621,7 +624,7 @@ static PyObject *doGetRPATH(Elf * elf) {
 	}
     }
     if (NULL != runpath)
-	return PyString_FromString(runpath);
+	return PYBYTES_FromString(runpath);
     else {
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -740,16 +743,29 @@ static PyMethodDef ElfMethods[] = {
 };
 
 
+#define MODULE_DOCSTR "provides access to elf shared library dependencies"
+
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef ElfModule = {
+    PyModuleDef_HEAD_INIT,
+    "elf",
+    MODULE_DOCSTR,
+    -1,
+    ElfMethods
+};
+#endif
+
+
 #define ADD_CONST(name) \
 PyModule_AddObject(m, #name, PyLong_FromLong(name));
 
-PyMODINIT_FUNC
-initelf(void)
+PYMODULE_INIT(elf)
 {
     PyObject* m;
 
-    m = Py_InitModule3("elf", ElfMethods, 
-                       "provides access to elf shared library dependencies");
+    m = PYMODULE_CREATE("elf", ElfMethods, MODULE_DOCSTR, &ElfModule);
+    if (m == NULL)
+        PYMODULE_RETURN(NULL);
 
     ElfError = PyErr_NewException("elf.error", PyExc_Exception, NULL);
     PyModule_AddObject(m, "error", ElfError);
@@ -762,4 +778,7 @@ initelf(void)
 
     elf_version(EV_CURRENT);
 
+    PYMODULE_RETURN(m);
 }
+
+/* vim: set sts=4 sw=4 expandtab : */

@@ -496,3 +496,4 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
     return real_freopen(pathname, mode, stream);
 }
 
+/* vim: set sts=4 sw=4 expandtab : */

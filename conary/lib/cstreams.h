@@ -44,7 +44,7 @@ struct singleStream {
 
 extern struct singleStream allStreams[7];
 
-#define STREAM_CHECK(x, t) PyType_IsSubtype(x->ob_type, (PyTypeObject *) &allStreams[t])
+#define STREAM_CHECK(x, t) PyObject_TypeCheck((x), (PyTypeObject *) &allStreams[t])
 
 #define SMALL 0
 #define LARGE 1
@@ -52,3 +52,5 @@ extern struct singleStream allStreams[7];
 
 #define SKIP_UNKNOWN        1
 #define PRESERVE_UNKNOWN    2
+
+/* vim: set sts=4 sw=4 expandtab : */

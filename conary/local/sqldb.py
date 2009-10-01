@@ -912,22 +912,16 @@ order by
                 """ % flavorStr, instanceId, flags, name,
                         newVersion.asString())
 
-    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion,
+    def addFile(self, troveInfo, pathId, path, fileId, fileVersion,
                 fileStream = None, isPresent = True):
 	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
-	if fileObj or fileStream:
-            if fileStream is None:
-                fileStream = fileObj.freeze()
-
+        if fileStream:
             cu.execstmt(addFileStmt, pathId, versionId, path, fileId, 
                         fileStream, isPresent)
 
-            if fileObj:
-                tags = fileObj.tags
-            else:
-                tags = files.frozenFileTags(fileStream)
+            tags = files.frozenFileTags(fileStream)
 
             if tags:
                 cu.executemany("INSERT INTO NewFileTags VALUES (?, ?)",
@@ -967,71 +961,101 @@ order by
 
         return troveInstanceId
 
+    def markUserReplacedFiles(self, userReplaced):
+        cu = self.db.cursor()
+        cu.execute("""CREATE TEMPORARY TABLE UserReplaced(
+                        name STRING, version STRING, flavor STRING,
+                        pathId BLOB)""")
+        for (name, version, flavor), fileList in userReplaced.iteritems():
+            for pathId, content, fileObj in fileList:
+                flavorStr = flavor.freeze()
+                if not flavorStr:
+                    flavorStr = None
+
+                cu.execute("""
+                    INSERT INTO UserReplaced(name, version, flavor, pathId)
+                        VALUES (?, ?, ?, ?)
+                """, name, version.asString(), flavorStr, pathId)
+
+        cu.execute("""
+            UPDATE DBTroveFiles SET isPresent = 0 WHERE
+                rowId IN (SELECT DBTroveFiles.rowId FROM UserReplaced
+                    JOIN Versions ON
+                        UserReplaced.version = Versions.version
+                    JOIN Flavors ON
+                        UserReplaced.flavor = Flavors.flavor OR
+                        (UserReplaced.flavor IS NULL AND
+                         Flavors.flavor IS NULL)
+                    JOIN Instances ON
+                        Instances.troveName = UserReplaced.name AND
+                        Instances.versionId = versions.versionId AND
+                        Instances.flavorId = flavors.flavorId
+                    JOIN DBTroveFiles ON
+                        DBTroveFiles.instanceId = Instances.instanceId AND
+                        DBTroveFiles.pathId = UserReplaced.pathId)
+        """)
+
     def checkPathConflicts(self, instanceIdList, replaceFiles):
         cu = self.db.cursor()
+        cu2 = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
         for instanceId in instanceIdList:
             cu.execute("INSERT INTO NewInstances (instanceId) VALUES (?)",
                        instanceId)
 
+        cu.execute("""
+            SELECT AddedFiles.path,
+                   ExistingInstances.instanceId, ExistingFiles.pathId,
+                   ExistingInstances.troveName, ExistingVersions.version,
+                   ExistingFlavors.flavor,
+                   AddedInstances.instanceId, AddedFiles.pathId, 
+                   AddedInstances.troveName,
+                   AddedVersions.version, AddedFlavors.flavor
+
+                FROM NewInstances
+                JOIN DBTroveFiles AS AddedFiles USING (instanceId)
+                JOIN DBTroveFiles AS ExistingFiles ON
+                    AddedFiles.path = ExistingFiles.path AND
+                    AddedFiles.instanceId != ExistingFiles.instanceId
+
+                JOIN Instances AS ExistingInstances ON
+                    ExistingFiles.instanceId = ExistingInstances.instanceId
+                JOIN Versions AS ExistingVersions ON
+                    ExistingInstances.versionId = ExistingVersions.versionId
+                JOIN Flavors AS ExistingFlavors ON
+                    ExistingInstances.flavorId = ExistingFlavors.flavorId
+
+                JOIN Instances AS AddedInstances ON
+                    AddedInstances.instanceId = NewInstances.instanceId
+                JOIN Versions AS AddedVersions ON
+                    AddedInstances.versionId = AddedVersions.versionId
+                JOIN Flavors AS AddedFlavors ON
+                    AddedInstances.flavorId = AddedFlavors.flavorId
+
+                WHERE
+                    AddedFiles.isPresent = 1 AND
+                    ExistingFiles.isPresent = 1
+        """)
+
         conflicts = []
-
-        if replaceFiles:
-            # mark conflicting files as no longer present in the old trove
-            cu.execute("""
-                UPDATE DBTroveFiles SET isPresent = 0 WHERE _rowid_ IN
-                    (
-                        SELECT ExistingFiles._rowid_ FROM NewInstances
-                            JOIN DBTroveFiles AS NewFiles USING (instanceId)
-                            JOIN DBTroveFiles AS ExistingFiles ON
-                                NewFiles.path = ExistingFiles.path AND
-                                NewFiles.instanceId != ExistingFiles.instanceId
-                            WHERE
-                                NewFiles.isPresent = 1 AND
-                                ExistingFiles.isPresent = 1
-                    )
-            """)
-        else:
-            cu.execute("""
-                SELECT AddedFiles.path,
-                       ExistingInstances.instanceId, ExistingFiles.pathId,
-                       ExistingInstances.troveName, ExistingVersions.version,
-                       ExistingFlavors.flavor,
-                       AddedInstances.instanceId, AddedFiles.pathId, 
-                       AddedInstances.troveName,
-                       AddedVersions.version, AddedFlavors.flavor
-
-                    FROM NewInstances
-                    JOIN DBTroveFiles AS AddedFiles USING (instanceId)
-                    JOIN DBTroveFiles AS ExistingFiles ON
-                        AddedFiles.path = ExistingFiles.path AND
-                        AddedFiles.instanceId != ExistingFiles.instanceId
-
-                    JOIN Instances AS ExistingInstances ON
-                        ExistingFiles.instanceId = ExistingInstances.instanceId
-                    JOIN Versions AS ExistingVersions ON
-                        ExistingInstances.versionId = ExistingVersions.versionId
-                    JOIN Flavors AS ExistingFlavors ON
-                        ExistingInstances.flavorId = ExistingFlavors.flavorId
-
-                    JOIN Instances AS AddedInstances ON
-                        AddedInstances.instanceId = NewInstances.instanceId
-                    JOIN Versions AS AddedVersions ON
-                        AddedInstances.versionId = AddedVersions.versionId
-                    JOIN Flavors AS AddedFlavors ON
-                        AddedInstances.flavorId = AddedFlavors.flavorId
-
-                    WHERE
-                        AddedFiles.isPresent = 1 AND
-                        ExistingFiles.isPresent = 1
-            """)
-
-            markNotPresent = []
-
-            for (path, existingInstanceId, existingPathId, existingTroveName,
-                 existingVersion, existingFlavor,
-                 addedInstanceId, addedPathId, addedTroveName, addedVersion,
-                 addedFlavor) in cu:
+        replaced = {}
+        for (path, existingInstanceId, existingPathId, existingTroveName,
+             existingVersion, existingFlavor,
+             addedInstanceId, addedPathId, addedTroveName, addedVersion,
+             addedFlavor) in cu:
+            if replaceFiles:
+                cu2.execute("UPDATE DBTroveFiles SET isPresent = 0 "
+                           "WHERE instanceId = ? AND pathId = ?",
+                           existingInstanceId, existingPathId)
+                existingTroveInfo = (existingTroveName,
+                          versions.VersionFromString(existingVersion),
+                          deps.deps.ThawFlavor(existingFlavor))
+                l = replaced.setdefault(existingTroveInfo, [])
+                # None's here are for compatibility with the replacement
+                # list the filesystem job generates. They tells the rollback
+                # generation code not to look on the disk for file contents.
+                l.append((existingPathId, None, None))
+            else:
                 conflicts.append((path,
                         (existingPathId,
                          (existingTroveName,
@@ -1042,15 +1066,12 @@ order by
                           versions.VersionFromString(addedVersion),
                           deps.deps.ThawFlavor(addedFlavor)))))
 
-            for instanceId, pathId in markNotPresent:
-                cu.execute("UPDATE DBTroveFiles SET isPresent = 0 "
-                           "WHERE instanceId = ? AND pathId = ?",
-                           instanceId, pathId)
-
         cu.execute("DROP TABLE NewInstances")
 
         if conflicts:
             raise errors.DatabasePathConflicts(conflicts)
+
+        return replaced
 
     def getFile(self, pathId, fileId, pristine = False):
 	stream = self.troveFiles.getFileByFileId(fileId,

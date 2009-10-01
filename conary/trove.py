@@ -3268,7 +3268,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         # backwards-compatibility?
         if oldCompatibilityClass is None:
             return False
-        assert(type(oldCompatibilityClass) == int)
+        assert isinstance(oldCompatibilityClass, (int, long))
 
         thisCompatClass = self.getNewCompatibilityClass()
 
