@@ -2058,6 +2058,8 @@ class LZMAFile:
                     self.executable = fullpath
                     commandLine = (executable,) + args
                     break
+            if self.executable:
+                break
         if self.executable is None:
             raise RuntimeError('xz or unlzma is required to decompress this file')
 
