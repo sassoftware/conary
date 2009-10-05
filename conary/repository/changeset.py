@@ -1325,6 +1325,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self._mergeConfigs(otherCs)
         self.fileContainers += otherCs.fileContainers
+        self.csfWrappers += otherCs.csfWrappers
         for entry in otherCs.fileQueue:
             util.tupleListBsearchInsert(self.fileQueue, entry, 
                                         self.fileQueueCmp)

@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * In-core changesets could be merged into a ReadOnlyChangeSet a single
+      time. After multiple merges reset() no longer reset the underlying
+      in-core changeset.
+
   o New Features
     * The xz compression file format is now supported for decompressing
       sources. (CNY-3207)
