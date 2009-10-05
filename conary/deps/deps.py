@@ -74,7 +74,11 @@ senseReverseMap = {}
 for key, val in senseMap.iteritems():
     senseReverseMap[val] = key
 
-dependencyClasses = {}
+class DependencyClassRegistry(dict):
+    def __getitem__(self, key):
+        return self.get(key, UnknownDependencyFactory(key))
+
+dependencyClasses = DependencyClassRegistry()
 dependencyClassesByName = {}
 
 def _registerDepClass(classObj):
@@ -867,10 +871,7 @@ class DependencySet(object):
         depSetSplit = misc.depSetSplit
         while i < len(frz):
             (i, tag, frozen) = depSetSplit(i, frz)
-            if tag in dependencyClasses:
-                depClass = dependencyClasses[tag]
-            else:
-                depClass = UnknownDependencyFactory(tag)
+            depClass = dependencyClasses[tag]
             a(depClass, depClass.thawDependency(frozen))
 
     def copy(self):
