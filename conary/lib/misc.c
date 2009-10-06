@@ -171,7 +171,8 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
     origData = PYBYTES_AS_STRING(dataArg);
 
     /* Copy the original string over, replace single : with a '\0' and
-       double :: with a single : */
+       double :: with a single :, and \X with X (where X is anything,
+       including backslash)  */
     endPtr = data = malloc(strlen(origData) + 1);
     chptr = origData;
     while (*chptr) {
@@ -183,6 +184,9 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
             } else {
                 *endPtr++ = '\0';
             }
+        } else if (*chptr == '\\') {
+            chptr++;
+            *endPtr++ = *chptr++;
         } else { 
             *endPtr++ = *chptr++;
         }
@@ -211,10 +215,12 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
     return ret;
 }
 
-static void copyColonStr(char ** sPtr, PyObject * strObj) {
+static void escapeName(char ** sPtr, PyObject * strObj) {
     int size;
     char * s;
     char * r = *sPtr;
+
+    /* dep names get : turned into :: */
 
     s = PYBYTES_AS_STRING(strObj);
     size = PYBYTES_GET_SIZE(strObj);
@@ -222,6 +228,25 @@ static void copyColonStr(char ** sPtr, PyObject * strObj) {
     while (size--) {
         if (*s == ':')
             *r++ = ':';
+        *r++ = *s++;
+    }
+
+    *sPtr = r;
+}
+
+static void escapeFlags(char ** sPtr, PyObject * strObj) {
+    int size;
+    char * s;
+    char * r = *sPtr;
+
+    /* Flags get : turned to \: */
+
+    s = PYBYTES_AS_STRING(strObj);
+    size = PYBYTES_GET_SIZE(strObj);
+
+    while (size--) {
+        if (*s == ':')
+            *r++ = '\\';
         *r++ = *s++;
     }
 
@@ -292,7 +317,7 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
     result = malloc((PYBYTES_GET_SIZE(nameObj) * 2) + 1 +
                     (itemSize * 2) + itemCount * 3);
     next = result;
-    copyColonStr(&next, nameObj);
+    escapeName(&next, nameObj);
 
     for (i = 0; i < itemCount; i++) {
         *next++ = ':';
@@ -317,7 +342,7 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
                 return -1;
         }
 
-        copyColonStr(&next, flags[i].flag);
+        escapeFlags(&next, flags[i].flag);
     }
 
     *size = next - result;

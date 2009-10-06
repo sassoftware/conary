@@ -347,6 +347,8 @@ class DependencyClass(object):
 
     depFormat = 'WORD'
     flagFormat = 'WORD'
+    WORD = '(?:[.0-9A-Za-z_+-]+)'
+    IDENT = '(?:[0-9A-Za-z_-]+)'
     flags = DEP_CLASS_NO_FLAGS
 
     depNameSignificant = True
@@ -369,8 +371,8 @@ class DependencyClass(object):
         if not class_.allowParseDep:
             return
 
-        d = dict(flagFormat=class_.flagFormat,
-                 depFormat=class_.depFormat)
+        d = dict(flagFormat=class_.flagFormat, depFormat=class_.depFormat,
+                 WORD=class_.WORD, IDENT=class_.IDENT)
 
         # zero or more space-separated flags 
         flagFmt = '(?:\( *(%(flagFormat)s?(?: +%(flagFormat)s)*) *\))?' 
@@ -381,8 +383,8 @@ class DependencyClass(object):
         # sonames.  May need to be larger some day, and probably 
         # could be more restrictive for some groups.  Should not contain
         # /, as that's used as a special char in many dep classes.
-        regexp = regexp.replace('WORD', '(?:[.0-9A-Za-z_+-]+)')
-        regexp = regexp.replace('IDENT', '(?:[0-9A-Za-z_-]+)')
+        regexp = regexp.replace('WORD', d['WORD'])
+        regexp = regexp.replace('IDENT',d['IDENT'])
         class_.regexpStr = regexp
         class_.regexp = re.compile(regexp)
 
@@ -764,6 +766,10 @@ class RpmDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
+    WORD = '(?:[:.0-9A-Za-z_+-]+)'          # allow colons in flags
+    IDENT = '(?:[][0-9A-Za-z_-]+)'          # allow [] in dep names
+    flagFormat = "WORD"
+    depFormat = "IDENT"
 _registerDepClass(RpmDependencies)
 
 def UnknownDependencyFactory(intTag):

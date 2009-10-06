@@ -45,6 +45,8 @@ Changes in @NEW@:
     * A new RPM dependency class has been added. This class is used
       to represent dependencies expressed in RPM packages that cannot
       be mapped directly to a native Conary dependency.
+    * Colons in dependency flags are now escaped as \: to allow deterministic
+      thawing.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
