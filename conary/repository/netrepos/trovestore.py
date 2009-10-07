@@ -60,7 +60,10 @@ class LocalRepVersionTable(versiontable.VersionTable):
 class TroveAdder:
 
     def addStream(self, fileId, fileStream = None):
-        if fileId in self.troveStore.seenFileId:
+        existing = self.newStreamsByFileId.get(fileId)
+        if existing and existing[1]:
+            # we have the stream for this fileId already. we don't need
+            # it again
             return
 
         if fileStream:
@@ -72,10 +75,9 @@ class TroveAdder:
         else:
             sha1 = None
 
-        self.troveStore.seenFileId.add(fileId)
-        self.newStreamsInsertList.append(
-                    (self.cu.binary(fileId), self.cu.binary(fileStream),
-                     self.cu.binary(sha1)))
+        self.newStreamsByFileId[fileId] = (self.cu.binary(fileId),
+                                           self.cu.binary(fileStream),
+                                           self.cu.binary(sha1))
 
     def addFile(self, pathId, path, fileId, fileVersion,
                 fileStream = None):
@@ -115,7 +117,7 @@ class TroveAdder:
         self.trvCs = trvCs
         self.hidden = hidden
         self.newFilesInsertList = []
-        self.newStreamsInsertList = []
+        self.newStreamsByFileId = dict()
         self.newSet = newSet
         self.changeMap = changeMap
 
@@ -186,7 +188,6 @@ class TroveStore:
         self.LATEST_TYPE_PRESENT = versionops.LATEST_TYPE_PRESENT
 
         self.versionIdCache = {}
-        self.seenFileId = set()
         self.itemIdCache = {}
 
     def __del__(self):
@@ -601,7 +602,7 @@ class TroveStore:
         hidden = troveInfo.hidden
 
         newFilesInsertList = troveInfo.newFilesInsertList
-        newStreamsInsertList = troveInfo.newStreamsInsertList
+        newStreamsByFileId = troveInfo.newStreamsByFileId
 
         self.log(3, trv)
 
@@ -687,8 +688,8 @@ class TroveStore:
                       "instanceId" ])
             #self.db.analyze("tmpNewFiles")
 
-        if len(newStreamsInsertList):
-            self.db.bulkload("tmpNewStreams", newStreamsInsertList,
+        if len(newStreamsByFileId):
+            self.db.bulkload("tmpNewStreams", newStreamsByFileId.values(),
                              [ "fileId", "stream", "sha1" ] )
 
         # iterate over both strong and weak troves, and set weakFlag to
@@ -1349,7 +1350,7 @@ class TroveStore:
     def _cleanCache(self):
         self.versionIdCache = {}
         self.itemIdCache = {}
-        self.seenFileId = set()
+        self.newStreamsByFileId = dict()
 
     def begin(self, serialize=False):
         self._cleanCache()
