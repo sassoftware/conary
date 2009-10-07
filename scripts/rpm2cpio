@@ -14,7 +14,6 @@
 # full details.
 #
 
-import gzip
 import os
 import sys
 
@@ -29,7 +28,6 @@ else:
 sys.path.insert(0, os.path.dirname(fullPath))
 
 from conary import rpmhelper
-from conary.lib import util
 
 def usage():
     print "Usage: rpm2cpio <rpmpackage> | cpio -ivumd"
@@ -43,40 +41,14 @@ def main(argv):
     except:
         return usage()
 
-    # check to make sure that this is a cpio archive (though most rpms
-    # are cpio).  If the tag does not exist, assume it's cpio
-    h = rpmhelper.readHeader(r)
-    if h.has_key(rpmhelper.PAYLOADFORMAT):
-        if h[rpmhelper.PAYLOADFORMAT] != 'cpio':
-            print >> sys.stderr, 'payload is not in cpio format'
-            sys.exit(1)
-
-    # check to see how the payload is compressed.  Again, if the tag
-    # does not exist, assume that it's gzip.
-    if h.has_key(rpmhelper.PAYLOADCOMPRESSOR):
-        compression = h[rpmhelper.PAYLOADCOMPRESSOR]
-        if compression == 'gzip':
-            decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
-        elif compression == 'bzip2':
-            decompressor = lambda fobj: util.BZ2File(fobj)
-        elif compression == 'lzma':
-            decompressor = lambda fobj: util.LZMAFile(fobj)
-        else:
-            print >> sys.stderr, 'compression type', compression, 'unknown'
-            sys.exit(1)
-    else:
-        decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
-
-    # rewind the file to let seekToData do its job
-    r.seek(0)
-    rpmhelper.seekToData(r)
-    uncompressed = decompressor(r)
-    while 1:
-	buf = uncompressed.read(16384)
-	if not buf:
-	    break
-	sys.stdout.write(buf)
-
+    try:
+        rpmhelper.extractRpmPayload(r, sys.stdout)
+    except rpmhelper.UnknownPayloadFormat, e:
+        sys.stderr.write('payload is not in cpio format: %s\n' % e.args[0])
+        return 1
+    except rpmhelper.UnknownCompressionType, e:
+        sys.stderr.write('compression type %s unknown\n' % e.args[0])
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

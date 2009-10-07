@@ -16,8 +16,11 @@
 Contains functions to assist in dealing with rpm files.
 """
 
+import gzip
+
 import itertools, struct
 from conary.lib.sha1helper import *
+from conary.lib import util
 
 NAME            = 1000
 VERSION         = 1001
@@ -230,3 +233,50 @@ def readHeader(f):
             raise IOError, "file size does not match size specified by header"
 
     return RpmHeader(f, sha1 = sha1, isSource = isSource)
+
+class BaseError(Exception):
+    "Base exception class"
+
+class UnknownPayloadFormat(BaseError):
+    "The payload format is not supported"
+
+class UnknownCompressionType(BaseError):
+    "The payload format is not supported"
+
+def extractRpmPayload(fileIn, fileOut):
+    """
+    Given a (seekable) file object containing an RPM package, extract the
+    payload. Only cpio payloads are supported for now.
+    """
+    # check to make sure that this is a cpio archive (though most rpms
+    # are cpio).  If the tag does not exist, assume it's cpio
+    h = readHeader(fileIn)
+    if h.has_key(PAYLOADFORMAT):
+        if h[PAYLOADFORMAT] != 'cpio':
+            raise UnknownPayloadFormat(h[PAYLOADFORMAT])
+
+    # check to see how the payload is compressed.  Again, if the tag
+    # does not exist, assume that it's gzip.
+    if h.has_key(PAYLOADCOMPRESSOR):
+        compression = h[PAYLOADCOMPRESSOR]
+    else:
+        compression = 'gzip'
+
+    if compression == 'gzip':
+        decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
+    elif compression == 'bzip2':
+        decompressor = lambda fobj: util.BZ2File(fobj)
+    elif compression in ['lzma', 'xz']:
+        decompressor = lambda fobj: util.LZMAFile(fobj)
+    else:
+        raise UnknownCompressionType(compression)
+
+    # rewind the file to let seekToData do its job
+    fileIn.seek(0)
+    seekToData(fileIn)
+    uncompressed = decompressor(fileIn)
+    while 1:
+        buf = uncompressed.read(16384)
+        if not buf:
+            break
+        fileOut.write(buf)

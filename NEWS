@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * Decompression with xz is preferred over unlzma, as CNY-3194
       intended. (CNY-3231)
+    * rpm2cpio now correctly handles rpm packages compressed with xz.
+      (CNY-3234)
 
 Changes in 2.0.50:
   o Bug Fixes:
