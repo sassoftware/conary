@@ -246,19 +246,33 @@ class UnknownCompressionType(BaseError):
 def extractRpmPayload(fileIn, fileOut):
     """
     Given a (seekable) file object containing an RPM package, extract the
-    payload. Only cpio payloads are supported for now.
+    payload into the destination file. Only cpio payloads are supported for now.
     """
+    uncompressed = UncompressedRpmPayload(fileIn)
+
+    while 1:
+        buf = uncompressed.read(16384)
+        if not buf:
+            break
+        fileOut.write(buf)
+
+def UncompressedRpmPayload(fileIn):
+    """
+    Given a (seekable) file object containing an RPM package, return
+    a file-like object that can be used for streaming uncompressed content
+    """
+    fileIn.seek(0)
+    header = readHeader(fileIn)
     # check to make sure that this is a cpio archive (though most rpms
     # are cpio).  If the tag does not exist, assume it's cpio
-    h = readHeader(fileIn)
-    if h.has_key(PAYLOADFORMAT):
-        if h[PAYLOADFORMAT] != 'cpio':
-            raise UnknownPayloadFormat(h[PAYLOADFORMAT])
+    if header.has_key(PAYLOADFORMAT):
+        if header[PAYLOADFORMAT] != 'cpio':
+            raise UnknownPayloadFormat(header[PAYLOADFORMAT])
 
     # check to see how the payload is compressed.  Again, if the tag
     # does not exist, assume that it's gzip.
-    if h.has_key(PAYLOADCOMPRESSOR):
-        compression = h[PAYLOADCOMPRESSOR]
+    if header.has_key(PAYLOADCOMPRESSOR):
+        compression = header[PAYLOADCOMPRESSOR]
     else:
         compression = 'gzip'
 
@@ -275,8 +289,4 @@ def extractRpmPayload(fileIn, fileOut):
     fileIn.seek(0)
     seekToData(fileIn)
     uncompressed = decompressor(fileIn)
-    while 1:
-        buf = uncompressed.read(16384)
-        if not buf:
-            break
-        fileOut.write(buf)
+    return uncompressed
