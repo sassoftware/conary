@@ -6,6 +6,10 @@ Changes in @NEW@:
     * Conary no longer exits with an unhandled KeyError exception if
       an unknown dependency type is encountered in the local
       database. (CNY-3232)
+    * Decompression with xz is preferred over unlzma, as CNY-3194
+      intended. (CNY-3231)
+    * rpm2cpio now correctly handles rpm packages compressed with xz.
+      (CNY-3234)
 
   o New Features
     * The xz compression file format is now supported for decompressing
