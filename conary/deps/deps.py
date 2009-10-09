@@ -767,7 +767,7 @@ class RpmDependencies(DependencyClass):
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
     WORD = '(?:[:.0-9A-Za-z_+-]+)'          # allow colons in flags
-    IDENT = '(?:[][0-9A-Za-z_-]+)'          # allow [] in dep names
+    IDENT = '(?:[][.0-9A-Za-z_-]+)'          # allow [] in dep names
     flagFormat = "WORD"
     depFormat = "IDENT"
 _registerDepClass(RpmDependencies)
