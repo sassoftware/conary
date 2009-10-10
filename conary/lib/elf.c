@@ -379,6 +379,77 @@ static PyObject * stripped(PyObject *self, PyObject *args) {
     return Py_False;
 }
 
+static int isPrelinked(Elf * elf) {
+    Elf_Scn * sect = NULL;
+    GElf_Shdr shdr;
+    Elf_Data * data = NULL;
+
+    while ((sect = elf_nextscn(elf, sect))) {
+	if (!gelf_getshdr(sect, &shdr)) {
+	    PyErr_SetString(ElfError, "error getting section header!");
+	    return -1;
+	}
+
+	/* skip any section that isn't DYNAMIC */
+	if (shdr.sh_type != SHT_DYNAMIC) {
+	    continue;
+	}
+
+	while ((data = elf_getdata(sect, data)) != NULL) {
+	    int entries = data->d_size / shdr.sh_entsize;
+	    int i;
+	    for (i = 0; i < entries; i++) {
+		GElf_Dyn dyn;
+		gelf_getdyn(data, i, &dyn);
+		if (dyn.d_tag == DT_GNU_PRELINKED || dyn.d_tag == DT_GNU_LIBLIST) {
+		    return 1;
+		}
+	    }
+	}
+    }
+    return 0;
+}
+
+
+static PyObject * prelinked(PyObject *self, PyObject *args) {
+    char * fileName;
+    int fd;
+    Elf * elf;
+    int rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    lseek(fd, 0, 0);
+
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    rc = isPrelinked(elf);
+    elf_end(elf);
+    close(fd);
+
+    if (rc == -1) {
+	return NULL;
+    } else if (rc) {
+	Py_INCREF(Py_True);
+	return Py_True;
+    }
+
+    Py_INCREF(Py_False);
+    return Py_False;
+}
+
+
 static int doHasDebug(Elf * elf) {
     Elf_Scn * sect = NULL;
     GElf_Ehdr ehdr;
@@ -729,6 +800,8 @@ static PyMethodDef ElfMethods[] = {
 	"inspect an ELF file for dependency information" },
     { "stripped", stripped, METH_VARARGS, 
 	"returns whether or not an ELF file has been stripped" },
+    { "prelinked", prelinked, METH_VARARGS, 
+	"returns whether or not an ELF file has been prelinked" },
     { "hasDebug", hasDebug, METH_VARARGS, 
 	"returns whether or not an ELF file has debugging info" },
     { "hasUnresolvedSymbols", hasUnresolvedSymbols, METH_VARARGS,
