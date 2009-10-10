@@ -1706,10 +1706,11 @@ class Database(SqlDbRepository):
             # an object for historical reasons
             try:
                 csJob = localrep.LocalRepositoryChangeSetJob(
-                    dbCache, cs, callback, autoPinList, 
+                    dbCache, cs, callback, autoPinList,
                     allowIncomplete = (rollbackPhase is not None),
                     userReplaced = fsJob.userRemovals,
-                    replaceFiles = flags.replaceManagedFiles)
+                    replaceFiles = flags.replaceManagedFiles,
+                    sharedFiles = fsJob.sharedFilesByTrove)
             except DatabasePathConflicts, e:
                 for (path, (pathId, (troveName, version, flavor)),
                            newTroveInfo) in e.getConflicts():
@@ -1727,6 +1728,8 @@ class Database(SqlDbRepository):
             csJob = None
         else:
             csJob = None
+
+        fsJob.filterRemoves()
 
         if rollbackPhase is None and csJob:
             # this is the rollback for file conflicts which are in the
@@ -2626,6 +2629,9 @@ class Database(SqlDbRepository):
 
     def iterFindPathReferences(self, path, justPresent = False):
         return self.db.iterFindPathReferences(path, justPresent = justPresent)
+
+    def pathsOwned(self, pathList):
+        return self.db.pathsOwned(pathList)
 
     def getTrovesWithProvides(self, depSetList, splitByDep=False):
         """

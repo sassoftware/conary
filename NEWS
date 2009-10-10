@@ -19,6 +19,9 @@ Changes in @NEW@:
       to fit. (CNY-3205)
     * The Run build action now does path-based build requirement
       discovery like most build actions. (CNY-3222)
+    * Allow identical files to be shared during installs and updates. Both
+      troves own the shared files, and they must be updated at the same time
+      when the shared files change.
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access

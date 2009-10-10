@@ -115,9 +115,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def iterDbRemovals(self):
         return self.replacedFiles.iteritems()
 
-    def __init__(self, repos, cs, callback, autoPinList, 
-                 allowIncomplete = False,
-                 replaceFiles = False, userReplaced = None):
+    def __init__(self, repos, cs, callback, autoPinList,
+                 allowIncomplete = False, replaceFiles = False,
+                 userReplaced = None, sharedFiles = {}):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -141,7 +141,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         # this raises an exception if this install would create conflicts
         self.replacedFiles = self.repos.db.db.checkPathConflicts(
-                                    self.trovesAdded, replaceFiles)
+                                    self.trovesAdded, replaceFiles,
+                                    sharedFiles)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:

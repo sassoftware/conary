@@ -995,7 +995,7 @@ order by
                         DBTroveFiles.pathId = UserReplaced.pathId)
         """)
 
-    def checkPathConflicts(self, instanceIdList, replaceFiles):
+    def checkPathConflicts(self, instanceIdList, replaceFiles, sharedFiles):
         cu = self.db.cursor()
         cu2 = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
@@ -1043,6 +1043,11 @@ order by
              existingVersion, existingFlavor,
              addedInstanceId, addedPathId, addedTroveName, addedVersion,
              addedFlavor) in cu:
+            if existingPathId in sharedFiles.get((existingTroveName,
+                                versions.VersionFromString(existingVersion),
+                                deps.deps.parseDep(existingFlavor)), set()):
+                continue
+
             if replaceFiles:
                 cu2.execute("UPDATE DBTroveFiles SET isPresent = 0 "
                            "WHERE instanceId = ? AND pathId = ?",
@@ -1432,9 +1437,29 @@ order by
 	return self._iterTroves(instanceIds=self.troveFiles.iterPath(path),
                                 pristine=pristine)
 
+    def pathsOwned(self, pathList):
+        if not pathList:
+            return []
+
+        cu = self.db.cursor()
+        cu.execute("""
+        CREATE TEMPORARY TABLE pathList(
+            path        %(STRING)s
+        )""" % self.db.keywords, start_transaction = False)
+        self.db.bulkload("pathList", [ (x,) for x in pathList ], [ "path" ])
+        cu.execute("""
+            SELECT path FROM pathList JOIN DBTroveFiles USING(path) WHERE
+                DBTroveFiles.isPresent = 1
+        """)
+
+        pathsFound = set( x[0] for x in cu )
+        cu.execute("DROP TABLE pathList")
+
+        return [ path in pathsFound for path in pathList ]
+
     def iterFindPathReferences(self, path, justPresent = False):
         cu = self.db.cursor()
-        cu.execute("""SELECT troveName, version, flavor, pathId, 
+        cu.execute("""SELECT troveName, version, flavor, pathId, fileId,
                              DBTroveFiles.isPresent
                             FROM DBTroveFiles JOIN Instances ON
                                 DBTroveFiles.instanceId = Instances.instanceId
@@ -1446,7 +1471,7 @@ order by
                                 path = ?
                     """, path)
 
-        for (name, version, flavor, pathId, isPresent) in cu:
+        for (name, version, flavor, pathId, fileId, isPresent) in cu:
             if not isPresent and justPresent:
                 continue
 
@@ -1456,7 +1481,7 @@ order by
             else:
                 flavor = deps.deps.ThawFlavor(flavor)
 
-            yield (name, version, flavor, pathId)
+            yield (name, version, flavor, pathId, fileId)
 
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]
