@@ -125,14 +125,16 @@ class FilesystemJob:
 
     def _remove(self, fileObj, relativePath, target, msg):
 	if isinstance(fileObj, files.Directory):
-            self.directorySet.setdefault(target, 0)
+            self.directorySet.setdefault(relativePath, 0)
 	else:
 	    self.removes[target] = (relativePath, fileObj, msg)
 
             # track removals from each directory
-	    dir = os.path.dirname(target)
-            self.directorySet.setdefault(dir, 0)
-            self.directorySet[dir] += 1
+            if relativePath:
+                # relativePath is none for source operations
+                dir = os.path.dirname(relativePath)
+                self.directorySet.setdefault(dir, 0)
+                self.directorySet[dir] += 1
 
 	for tag in fileObj.tags:
             l = self.tagRemoves.setdefault(tag, [])
@@ -1103,7 +1105,7 @@ class FilesystemJob:
                                 fileObj = existingFile,
                                 content =
                                   filecontents.FromFilesystem(headRealPath),
-                                *info)
+                                *info[0:4])
                     else:
                         self.errors.append(FileInWayError(
                                util.normpath(headRealPath),

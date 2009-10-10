@@ -1796,20 +1796,16 @@ class Database(SqlDbRepository):
             lst = directoryCandidates.keys()
             lst.sort()
             keep = {}
-            for path in lst:
-                if keep.has_key(path):
-                    keep[os.path.dirname(path)] = True
+            for relativePath in lst:
+                if keep.has_key(relativePath):
+                    keep[os.path.dirname(relativePath)] = True
                     continue
-
-                relativePath = path[len(self.root):]
-                if relativePath[0] != '/': relativePath = '/' + relativePath
 
                 if self.db.pathIsOwned(relativePath):
-                    lst = [ x for x in self.db.iterFindByPath(path)]
                     keep[os.path.dirname(path)] = True
                     continue
 
-                opJournal.tryCleanupDir(path)
+                opJournal.tryCleanupDir(self.root + relativePath)
 
         if not commitFlags.justDatabase:
             fsJob.apply(journal, opJournal = opJournal)
@@ -2044,7 +2040,7 @@ class Database(SqlDbRepository):
 	    path = lst[0]
 	    del lst[0]
             try:
-                entries = len(os.listdir(path))
+                entries = len(os.listdir(self.root + '/' + path))
             except OSError, e:
                 if e.errno != errno.ENOENT:
                     raise

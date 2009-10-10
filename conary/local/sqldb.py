@@ -1034,7 +1034,8 @@ order by
 
                 WHERE
                     AddedFiles.isPresent = 1 AND
-                    ExistingFiles.isPresent = 1
+                    ExistingFiles.isPresent = 1 AND
+                    AddedFiles.fileId != ExistingFiles.fileId
         """)
 
         conflicts = []
