@@ -280,6 +280,22 @@ def readHeader(f):
 
     return RpmHeader(f, sha1 = sha1, isSource = isSource)
 
+
+def getRpmLibProvidesSet(rpm):
+    """
+    Retreieve a dependency set that represents the rpmlib provides
+    from the loaded rpm module
+    @param rpm: the rpm module
+    @type rpm: module
+    @return: A dependency containing the virtual items that rpmlib provides
+    @rtype: conary.deps.deps.DependencySet()
+    """
+    depset = deps.DependencySet()
+    for prov in rpm.ds.Rpmlib():
+        dep = deps.parseDep('rpm: '+prov.N())
+        depset.union(dep)
+    return depset
+
 class BaseError(Exception):
     "Base exception class"
 
