@@ -30,6 +30,7 @@ from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.deps import deps
 from conary.lib import digestlib, log, patch, sha1helper, util, fixedglob
+from conary.local import capsules
 from conary.local.errors import *
 from conary.local.journal import NoopJobJournal
 from conary.repository import changeset, filecontents
@@ -301,9 +302,16 @@ class FilesystemJob:
         return True
 
 
+    def _applyCapsules(self):
+        filePaths = {}              # indexed by (fileId, pathId, path)
+        removeList = []
+        self.capsules.apply()
+
     def apply(self, journal = None, opJournal = None):
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
+
+        self._applyCapsules()
 
         if not opJournal:
             opJournal = NoopJobJournal()
@@ -1676,6 +1684,7 @@ class FilesystemJob:
 	self.tagUpdates = {}
 	self.tagRemoves = {}
         self.linkGroups = {}
+        self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet)
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db
@@ -1698,6 +1707,9 @@ class FilesystemJob:
             self.oldTroves.append((name, oldVersion, oldFlavor))
             oldTrove = db.getTrove(name, oldVersion, oldFlavor, 
                                    pristine = False)
+            if self.capsules.remove(oldTrove):
+                continue
+
             fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
             fileObjs = db.getFileVersions(fileList)
             for (pathId, path, fileId, version), fileObj in \
@@ -1718,6 +1730,9 @@ class FilesystemJob:
         troveList = []
 
 	for troveCs in changeSet.iterNewTroveList():
+            if self.capsules.install(troveCs):
+                continue
+
             old = troveCs.getOldVersion()
 	    if old:
                 if old.onLocalLabel():
@@ -1802,6 +1817,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     assert(root)
 
     newTrove = curTrove.copy()
+    # we don't use capsules for local diffs, ever
+    newTrove.troveInfo.capsule.type.set('')
     newTrove.changeVersion(newVersion)
 
     pathIds = {}

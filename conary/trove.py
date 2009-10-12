@@ -40,6 +40,9 @@ TROVE_VERSION=10
 # and we allow group redirects; 11 is used *only* for those situations
 TROVE_VERSION_1_1=11
 
+# files with this magic pathId are capsules
+CAPSULE_PATHID = '\0' * 16
+
 @api.developerApi
 def troveIsCollection(troveName):
     return not(":" in troveName or troveName.startswith("fileset-"))
@@ -952,7 +955,36 @@ _TROVEINFO_TAG_SEARCH_PATH    = 24
 _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
-_TROVEINFO_TAG_LAST           = 27
+_TROVEINFO_TAG_CAPSULE        = 28
+_TROVEINFO_TAG_LAST           = 28
+
+_TROVECAPSULE_TYPE            = 0
+_TROVECAPSULE_RPM             = 1
+_TROVECAPSULE_TYPE_CONARY     = ''
+_TROVECAPSULE_TYPE_RPM        = 'rpm'
+
+_TROVECAPSULE_RPM_NAME        = 0
+_TROVECAPSULE_RPM_VERSION     = 1
+_TROVECAPSULE_RPM_RELEASE     = 2
+_TROVECAPSULE_RPM_ARCH        = 3
+_TROVECAPSULE_RPM_EPOCH       = 4
+
+class TroveContainerRpm(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_RPM_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_RPM_VERSION : (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_RPM_RELEASE : (DYNAMIC, streams.StringStream, 'release' ),
+        _TROVECAPSULE_RPM_ARCH    : (DYNAMIC, streams.StringStream, 'arch' ),
+        _TROVECAPSULE_RPM_EPOCH   : (DYNAMIC, streams.IntStream,    'epoch' ),
+    }
+
+class TroveContainer(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
+        _TROVECAPSULE_RPM      : (SMALL, TroveContainerRpm,    'rpm'  ),
+    }
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -1053,6 +1085,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_PKGCREATORDATA: (DYNAMIC, streams.StringStream,'pkgCreatorData'),
         _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
         _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,    'clonedFromList' ),
+        _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveContainer,       'capsule' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1581,6 +1614,17 @@ class Trove(streams.StreamSet):
         assert(not self.type())
 	self.idMap[pathId] = (path, fileId, version)
 
+    def addRpmCapsule(self, path, version, fileId, (name, pkgVersion,
+                      release, arch, epoch)):
+        assert(len(fileId) == 20)
+        self.idMap[CAPSULE_PATHID] = (path, fileId, version)
+        self.troveInfo.capsule.type.set('rpm')
+        self.troveInfo.capsule.rpm.name.set(name)
+        self.troveInfo.capsule.rpm.version.set(pkgVersion)
+        self.troveInfo.capsule.rpm.release.set(release)
+        self.troveInfo.capsule.rpm.arch.set(arch)
+        self.troveInfo.capsule.rpm.epoch.set(epoch)
+
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()
         self.troveInfo.dirHashes.clear()
@@ -1613,11 +1657,20 @@ class Trove(streams.StreamSet):
     def removeAllFiles(self):
         self.idMap = TroveRefsFilesStream()
 
-    def iterFileList(self):
-	# don't use idMap.iteritems() here; we don't want to exposure
-	# our internal format
-	for (theId, (path, fileId, version)) in self.idMap.iteritems():
-	    yield (theId, path, fileId, version)
+    def iterFileList(self, members = None, capsules = False):
+        if members is None:
+            members = (not capsules)
+
+        if capsules and not self.troveInfo.capsule.type():
+            # We were asked for only the capsules, but this is a
+            # conary format trove. That means everything is its own
+            # capsule, so return everything
+            members = True
+
+        for (theId, (path, fileId, version)) in self.idMap.iteritems():
+            if ( (theId != CAPSULE_PATHID and members) or
+                 (theId == CAPSULE_PATHID and capsules) ):
+                yield (theId, path, fileId, version)
 
     def emptyFileList(self):
         return len(self.idMap) == 0

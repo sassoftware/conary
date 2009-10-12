@@ -456,7 +456,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		cs.addFile(oldFileId, newFileId, filecs)
 
                 if not withFileContents or (excludeAutoSource and
-                   newFile.flags.isAutoSource()):
+                   newFile.flags.isAutoSource()) or newFile.flags.isPayload():
                     continue
 
 		# this test catches files which have changed from not

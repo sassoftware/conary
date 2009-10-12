@@ -40,6 +40,9 @@ _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
+# files which are payload -- not directly represented. config files cannot
+# be payload,
+_FILE_FLAG_PAYLOAD = 1 << 7
 
 FILE_STREAM_CONTENTS        = 1
 FILE_STREAM_DEVICE	    = 2
@@ -199,7 +202,11 @@ class InodeStream(streams.StreamSet):
 class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
-	return self._isFlag(_FILE_FLAG_CONFIG, set)
+	result = self._isFlag(_FILE_FLAG_CONFIG, set)
+        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
+               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+
+        return result
 
     def isPathDependencyTarget(self, set = None):
 	return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
@@ -215,6 +222,12 @@ class FlagsStream(streams.IntStream):
 
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
+
+    def isPayload(self, set = None):
+        result = self._isFlag(_FILE_FLAG_PAYLOAD, set)
+        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
+               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+        return result
 
     def _isFlag(self, flag, set):
 	if set != None:

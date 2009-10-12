@@ -355,7 +355,8 @@ class ChangeSetJob:
             # empty fileStream means there are no contents to restore
             return
 
-        hasContents = files.frozenFileHasContents(fileStream)
+        hasContents = (files.frozenFileHasContents(fileStream) and
+                       not files.frozenFileFlags(fileStream).isPayload())
         if not hasContents:
             return
 
@@ -536,7 +537,9 @@ class ChangeSetJob:
             checkFilesList += self._getCheckFilesList(csTrove, troveInfo, 
                 fileHostFilter, configRestoreList, normalRestoreList)
 
-            for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
+            for (pathId, path, fileId, newVersion) in \
+                            newTrove.iterFileList(members = True,
+                                                  capsules = True):
                 # handle files which haven't changed; we know which those
                 # are because they're in the merged trove but they aren't
                 # in the newFileMap
