@@ -3036,43 +3036,67 @@ def checkGroupDependencies(group, cfg, cache, callback):
 
 def calcSizeAndCheckHashes(group, troveCache, callback):
     def _getHashConflicts(group, troveCache):
-        # afaict, this is just going to be slow no matter what I do.
-        # I try to at least not have to iterate through any lists more
-        # than once.
-        allPathHashes = {}
-
+        # Get troveTup and pathHashes for all components that are
+        # byDefault True.
+        #import epdb;epdb.st()
         isColl = trove.troveIsCollection
-        neededInfo = [x for x in group.iterTroveListInfo() \
-                                if (x[1] or x[2]) and not isColl(x[0][0]) ]
+        neededInfo = [ (x[0], troveCache.getPathHashes(x[0]))
+                       for x in group.iterTroveListInfo()
+                            if x[2] and not isColl(x[0][0]) ]
 
-
-        for (troveTup, explicit, byDefault, components, requireLatest) \
-                in neededInfo:
-            if not byDefault:
-                continue
-            pathHashes = troveCache.getPathHashes(troveTup)
+        # Get set of conflicting pathHashes
+        allPaths = set()
+        conflictPaths = set()
+        for troveTup, pathHashes in neededInfo:
             if pathHashes is None:
                 continue
-            for pathHash in pathHashes:
-                allPathHashes.setdefault(pathHash, []).append(troveTup)
+            conflictPaths.update(pathHashes & allPaths)
+            allPaths.update(pathHashes)
 
-        conflicts = set(tuple(x) for x in allPathHashes.itervalues() if len(x) > 1)
-        # we've got the sets of conflicting troves, now
-        # determine the set of conflicting files
+        # Find all troves that have conflicting pathHashes
+        conflictLists = {}
+        for troveTup, pathHashes in neededInfo:
+            if pathHashes is None:
+                continue
+            for pathHash in conflictPaths & pathHashes:
+                conflictLists.setdefault(pathHash, set()).add(troveTup)
+
+        # We've got the sets of conflicting troves, now
+        # determine the set of conflicting files.
         trovesWithFiles = {}
-
         conflictsWithFiles = []
-        for conflictSet in conflicts:
+        for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
+            # Find troves to cache
             needed = [ x for x in conflictSet if x not in trovesWithFiles ]
             troves = troveCache.repos.getTroves(needed, withFiles=True)
             trovesWithFiles.update(dict(izip(needed, troves)))
-            conflicting = set(x[1] for x \
-                              in trovesWithFiles[conflictSet[0]].iterFileList())
-            for tup in conflictSet[1:]:
-                conflicting &= set(x[1] for x in \
-                                trovesWithFiles[tup].iterFileList())
 
-            conflictsWithFiles.append((conflictSet, conflicting))
+            # Build set of paths which conflicts across these troves
+            conflictingPaths = None
+            for tup in conflictSet:
+                newPaths = set( x[1] for x
+                          in trovesWithFiles[tup].iterFileList())
+                if conflictingPaths is None:
+                    conflictingPaths = newPaths
+                else:
+                    conflictingPaths &= newPaths
+
+            # If all of the troves share the same fileId for a path,
+            # it's not actually conflicting. This is expensive because
+            # we can't look up a path in a trove, just pathIds.
+            paths = []
+            for path in conflictingPaths:
+                fileIds = set()
+                for tup in conflictSet:
+                    fileIds |= set( x[2]
+                                for x in trovesWithFiles[tup].iterFileList()
+                                        if x[1] == path)
+
+                if len(fileIds) > 1:
+                    paths.append(path)
+
+            if paths:
+                conflictsWithFiles.append((conflictSet, paths))
 
         return conflictsWithFiles
 
