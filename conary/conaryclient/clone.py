@@ -333,6 +333,7 @@ class ClientClone:
                 # ptr links, but it commits just fine.
 
                 if (files.frozenFileHasContents(filecs) and
+                    not files.frozenFileFlags(filecs).isPayload() and
 			(pathId, newFileId) != lastContents):
                     # this copies the contents from the old changeset to the
                     # new without recompressing
@@ -353,7 +354,7 @@ class ClientClone:
                     itertools.izip(allFileObjects, individualFilesNeeded):
                 diff, hash = changeset.fileChangeSet(pathId, None, fileObject)
                 cs.addFile(oldFileId, newFileId, diff)
-                if hash:
+                if not fileObject.flags.isPayload() and hash:
                     contentsNeeded.append(
                             ((pathId, fileObject.flags.isConfig()),
                              (newFileId, fromFileVersion)))
@@ -979,7 +980,8 @@ class ClientClone:
         else:
             needsRewriteFn = chooser.fileNeedsRewrite
 
-        for (pathId, path, fileId, version) in trv.iterFileList():
+        for (pathId, path, fileId, version) in trv.iterFileList(
+                            members = True, capsules = True):
             if needsRewriteFn(troveBranch, targetBranch, version):
                 needsNewVersions.append((pathId, path, fileId))
 
@@ -994,7 +996,7 @@ class ClientClone:
                                               withFiles = True)
                 # pathId, fileId -> fileVersion map
                 fileMap = dict(((x[0], x[2]), x[3]) for x in
-                                        oldTrv.iterFileList())
+                        oldTrv.iterFileList(members = True, capsules = True))
             else:
                 fileMap = {}
 

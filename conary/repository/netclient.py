@@ -2038,11 +2038,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             oldFileObj) ) 
                         needItems.append( (pathId, None, oldFileObj) ) 
 
-                    fetchItems.append( (newFileId, newFileVersion, newFileObj) )
-                    needItems.append( (pathId, newFileId, newFileObj) )
-                    contentsNeeded += fetchItems
+                    if not newFileObj.flags.isPayload():
+                        fetchItems.append( (newFileId, newFileVersion, newFileObj) )
+                        contentsNeeded += fetchItems
 
-                    fileJob.extend([ needItems ])
+                        needItems.append( (pathId, newFileId, newFileObj) )
+                        fileJob.extend([ needItems ])
 
             contentList = self.getFileContents(contentsNeeded,
                                                tmpFile = outFile,
