@@ -3120,6 +3120,19 @@ conary erase '%s=%s[%s]'
 
         uJob.setCriticalJobs(finalCriticalJobs)
 
+    def _jobIsSplittable(self, uJob, jobSet):
+        troveSource = uJob.getTroveSource()
+        oldTrovesInfo = [ (x[0], x[1][0], x[1][1]) for x in jobSet
+                          if x[1][0] is not None ]
+        newTrovesInfo = [ (x[0], x[2][0], x[2][1]) for x in jobSet
+                          if x[2][0] is not None ]
+
+        capsules  = self.db.getCapsulesTroveList(oldTrovesInfo)
+        capsules += troveSource.getCapsulesForTroveList(newTrovesInfo)
+        capsules = [ x for x in capsules if x is not None and x.type() ]
+
+        return (capsules == [])
+
     @api.publicApi
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         resolveDeps = True, test = False,
@@ -3270,6 +3283,10 @@ conary erase '%s=%s[%s]'
                                        'relative change set'
 
         self.updateCallback.resolvingDependencies()
+
+        # if any of the things we're about to install or remove use capsules
+        # we cannot split the job
+        split = split and self._jobIsSplittable(uJob, jobSet)
 
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet

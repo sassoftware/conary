@@ -2620,6 +2620,9 @@ class Database(SqlDbRepository):
     def getPathHashesForTroveList(self, troveList):
         return self.db.getPathHashesForTroveList(troveList)
 
+    def getCapsulesTroveList(self, troveList):
+        return self.db.getCapsulesTroveList(troveList)
+
     def getTroveCompatibilityClass(self, name, version, flavor):
         return self.db.getTroveCompatibilityClass(name, version, flavor)
 

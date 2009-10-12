@@ -243,6 +243,9 @@ class AbstractTroveSource:
     def getDepsForTroveList(self, troveList):
         raise NotImplementedError
 
+    def getCapsulesForTroveList(self, troveList):
+        raise NotImplementedError
+
 # constants mostly stolen from netrepos/netserver
 _GET_TROVE_ALL_VERSIONS = 1
 _GET_TROVE_VERY_LATEST  = 2         # latest of any flavor
@@ -1152,11 +1155,35 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         for info in troveList:
             cs = self.troveCsMap.get(info, None)
             if cs is None:
+                # this isn't supported, and raises NotimplementedException
                 return SearchableTroveSource.getDepsForTroveList(self,
                                                                  troveList)
 
             trvCs = cs.getNewTroveVersion(*info)
             retList.append((trvCs.getProvides(), trvCs.getRequires()))
+
+        return retList
+
+    def getCapsulesForTroveList(self, troveList):
+        # returns a list of trove.TroveContainer objects, or none for
+        # troves w/o any capsules
+        retList = []
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            if cs is None:
+                # this isn't supported, and raises NotimplementedException
+                return SearchableTroveSource.getCapsulesForTroveList(
+                                self, troveList)
+
+            trvCs = cs.getNewTroveVersion(*info)
+            trvInfo = trvCs.getTroveInfo()
+            # None means an old server. I'm not about to lose sleep over
+            # servers too old to understand capsules
+            if trvInfo is None:
+                retList.append(None)
+            else:
+                retList.append(trvInfo.capsule)
 
         return retList
 
