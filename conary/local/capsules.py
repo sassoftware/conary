@@ -19,10 +19,12 @@ from conary.lib import util
 
 class CapsuleOperation(object):
 
-    def __init__(self, root, db, changeSet):
+    def __init__(self, root, db, changeSet, fsJob):
         self.root = root
         self.db = db
         self.changeSet = changeSet
+        self.fsJob = fsJob
+        self.errors = []
 
     def apply(self, root):
         raise NotImplementedException
@@ -32,6 +34,12 @@ class CapsuleOperation(object):
 
     def remove(self, trove):
         raise NotImplementedException
+
+    def getErrors(self):
+        return self.errors
+
+    def _error(self, e):
+        self.errors.append(e)
 
 class SingleCapsuleOperation(CapsuleOperation):
 
@@ -46,13 +54,14 @@ class SingleCapsuleOperation(CapsuleOperation):
     def apply(self):
         raise NotImplementedError
 
-    def install(self, troveCs):
+    def install(self, flags, troveCs):
         if troveCs.getOldVersion():
-            trv = self.db.getTrove(*troveCs.getOldNameVersionFlavor())
-            self.remove(trv)
-            trv = trv.copy()
+            oldTrv = self.db.getTrove(*troveCs.getOldNameVersionFlavor())
+            self.remove(oldTrv)
+            trv = oldTrv.copy()
             trv.applyChangeSet(troveCs)
         else:
+            oldTrv = None
             trv = trove.Trove(troveCs)
 
         for pathId, path, fileId, version in trv.iterFileList(capsules = True):
@@ -62,6 +71,7 @@ class SingleCapsuleOperation(CapsuleOperation):
         assert(pathId == trove.CAPSULE_PATHID)
 
         self.installs.append((troveCs, (pathId, path, fileId)))
+        return (oldTrv, trv)
 
     def remove(self, trv):
         self.removes.append(trv)
@@ -108,11 +118,12 @@ class MetaCapsuleOperations(CapsuleOperation):
                 __import__(module)
             self.capsuleClasses[kind] = \
                 getattr(sys.modules[module], klass)(self.root, self.db,
-                                                    self.changeSet)
+                                                    self.changeSet,
+                                                    self.fsJob)
 
         return self.capsuleClasses[kind]
 
-    def install(self, troveCs):
+    def install(self, flags, troveCs):
         absTroveInfo = troveCs.getFrozenTroveInfo()
         capsuleInfo = trove.TroveInfo.find(trove._TROVEINFO_TAG_CAPSULE,
                                              absTroveInfo)
@@ -120,7 +131,7 @@ class MetaCapsuleOperations(CapsuleOperation):
             return False
 
         capsule = self.getCapsule(capsuleInfo.type())
-        capsule.install(troveCs)
+        capsule.install(flags, troveCs)
 
         return True
 
@@ -132,3 +143,10 @@ class MetaCapsuleOperations(CapsuleOperation):
         capsule = self.getCapsule(cType)
         capsule.remove(trove)
         return True
+
+    def getErrors(self):
+        e = []
+        for capsule in self.capsuleClasses.values():
+            e += capsule.getErrors()
+
+        return e

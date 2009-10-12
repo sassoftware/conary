@@ -704,7 +704,7 @@ class FilesystemJob:
                            newCompatClass = newCompatClass)
 
     def getErrorList(self):
-	return self.errors
+	return self.errors + self.capsules.getErrors()
 
     def iterNewTroveList(self):
 	return iter(self.newTroves)
@@ -1684,7 +1684,8 @@ class FilesystemJob:
 	self.tagUpdates = {}
 	self.tagRemoves = {}
         self.linkGroups = {}
-        self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet)
+        self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
+                                                       self)
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db
@@ -1730,7 +1731,7 @@ class FilesystemJob:
         troveList = []
 
 	for troveCs in changeSet.iterNewTroveList():
-            if self.capsules.install(troveCs):
+            if self.capsules.install(flags, troveCs):
                 continue
 
             old = troveCs.getOldVersion()
