@@ -161,6 +161,11 @@ class RpmHeader(object):
                 # packagepolicy.py:2465
                 if binprefixre.match(dep):
                     depset.addDep(deps.FileDependencies, deps.Dependency(dep))
+            elif dep.startswith('rpmlib'):
+                # this is of the form rpmlib(Something). We just want the
+                # Something
+                depset.addDep(deps.RpmLibDependencies,
+                              deps.Dependency(dep.split('(')[1].split(')')[0]))
             else:
                 # convert anything inside () to a flag
                 flags = flagre.findall(dep)
@@ -307,7 +312,7 @@ def getRpmLibProvidesSet(rpm):
     """
     depset = deps.DependencySet()
     for prov in rpm.ds.Rpmlib():
-        dep = deps.parseDep('rpm: '+prov.N())
+        dep = deps.parseDep('rpmlib: '+prov.N().split('(')[1].split(')')[0])
         depset.union(dep)
     return depset
 

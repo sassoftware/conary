@@ -35,7 +35,8 @@ DEP_CLASS_RUBY          = 13
 DEP_CLASS_PHP           = 14
 DEP_CLASS_TARGET_IS     = 15
 DEP_CLASS_RPM           = 16
-DEP_CLASS_SENTINEL      = 17
+DEP_CLASS_RPMLIB        = 17
+DEP_CLASS_SENTINEL      = 18
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -771,6 +772,15 @@ class RpmDependencies(DependencyClass):
     flagFormat = "WORD"
     depFormat = "IDENT"
 _registerDepClass(RpmDependencies)
+
+class RpmLibDependencies(DependencyClass):
+
+    tag = DEP_CLASS_RPMLIB
+    tagName = "rpmlib"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(RpmLibDependencies)
 
 def UnknownDependencyFactory(intTag):
     # Factory for unknown classes
