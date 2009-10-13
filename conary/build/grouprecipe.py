@@ -3038,7 +3038,6 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
     def _getHashConflicts(group, troveCache):
         # Get troveTup and pathHashes for all components that are
         # byDefault True.
-        #import epdb;epdb.st()
         isColl = trove.troveIsCollection
         neededInfo = [ (x[0], troveCache.getPathHashes(x[0]))
                        for x in group.iterTroveListInfo()
