@@ -71,8 +71,9 @@ class DependencySolver(object):
 
         ineligible = set()
 
+        from conary.deps import deps
         check = self.db.getDepStateClass(uJob.getTroveSource(),
-                                         findOrdering = split)
+           findOrdering = split, ignoreDepClasses = self.cfg.ignoreDependencies)
 
         (result, cannotResolve, keepList, ineligible) = \
                         self.checkDeps(uJob, jobSet, troveSource,

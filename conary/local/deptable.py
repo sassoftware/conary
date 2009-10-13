@@ -29,9 +29,13 @@ DEP_REASON_COLLECTION = 5
 NO_FLAG_MAGIC = '-*none*-'
 
 class DependencyWorkTables:
-    def __init__(self, db, cu, removeTables = False):
+    def __init__(self, db, cu, removeTables = False, ignoreDepClasses = None):
         self.db = db
         self.cu = cu
+        if ignoreDepClasses is None:
+            self.ignoreDepClasses = set()
+        else:
+            self.ignoreDepClasses = ignoreDepClasses
 
         schema.resetTable(self.cu, "DepCheck")
         schema.resetTable(self.cu, "RemovedTroveIds")
@@ -262,8 +266,8 @@ class DependencyWorkTables:
         JOIN Provides ON RemovedTroveIds.troveId = Provides.instanceId
         JOIN Requires ON Provides.depId = Requires.depId
         JOIN Dependencies ON Dependencies.depId = Requires.depId
-        WHERE Dependencies.class != ? AND RemovedTroveIds.rowId > ?
-        """, deps.AbiDependency.tag, max)
+        WHERE NOT Dependencies.class IN (%s) AND RemovedTroveIds.rowId > ?
+        """% ",".join('"%d"' % x.tag for x in self.ignoreDepClasses), max)
 
     def removeTrove(self, (name, version, flavor), nodeId):
         if flavor is None or flavor.isEmpty():
@@ -999,7 +1003,6 @@ class DependencyChecker:
         # indexing depList. depList is a list of (troveNum, depClass, dep)
         # tuples. Like for depNum, negative troveNum values mean the
         # dependency was part of a new trove.
-        ignoreDepClasses = set((deps.AbiDependency,))
         for job in jobSet:
             if job[2][0] is None:
                 nodeId = self._addJob(job)
@@ -1015,7 +1018,7 @@ class DependencyChecker:
                 # which this trove both provides and requires conary 1.0.11
                 # and later remove these from troves at build time
                 requires = requires - provides
-                for depClass in ignoreDepClasses:
+                for depClass in self.ignoreDepClasses:
                     requires.removeDepsByClass(depClass)
 
                 newRequires = self._findNewDependencies(newNodeId, requires,
@@ -1178,7 +1181,8 @@ class DependencyChecker:
     def __del__(self):
         self.done()
 
-    def __init__(self, db, troveSource, findOrdering = True):
+    def __init__(self, db, troveSource, findOrdering = True,
+                 ignoreDepClasses = set()):
         self.g = graph.DirectedGraph()
         # adding None to the front prevents us from using nodeId's of 0, which
         # would be a problem since we use negative nodeIds in the SQL
@@ -1196,8 +1200,10 @@ class DependencyChecker:
         self.satisfied = set()
         self.providesToNodeId = {}
         self.requiresToNodeId = {}
+        self.ignoreDepClasses = ignoreDepClasses
+
         self.workTables = DependencyWorkTables(self.db, self.cu,
-                                               removeTables = True)
+               removeTables = True, ignoreDepClasses = self.ignoreDepClasses)
 
         # this begins a transaction. we do this explicitly to keep from
         # grabbing any exclusive locks (when the python binding autostarts

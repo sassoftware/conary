@@ -1171,7 +1171,8 @@ class UpdateJob:
 
 class DepCheckState:
 
-    def __init__(self, db, troveSource, findOrdering = True):
+    def __init__(self, db, troveSource, findOrdering = True,
+                 ignoreDepClasses = []):
         """
         @param troveSource: Trove source troves in the job are
                             available from
@@ -1180,10 +1181,14 @@ class DepCheckState:
                              returned which preserves dependency
                              closure at each step.
         @type findOrdering: boolean
+        @param ignoreDepClasses: List of dependency classes which should
+        not be enforced.
+        @type ignoreDepClasses: list of deps.Depenendency
         """
 
         self.setTroveSource(troveSource)
         self.db = db
+        self.ignoreDepClasses = ignoreDepClasses
         self.jobSet = set()
         self.checker = None
         self.findOrdering = findOrdering
@@ -1203,7 +1208,8 @@ class DepCheckState:
     def setup(self):
         if self.checker is None:
             self.checker = self.db.dependencyChecker(self.troveSource,
-                                        findOrdering = self.findOrdering)
+                                    findOrdering = self.findOrdering,
+                                    ignoreDepClasses = self.ignoreDepClasses)
 
     def setJobs(self, newJobSet):
         newJobSet = set(newJobSet)
@@ -1634,9 +1640,18 @@ class Database(SqlDbRepository):
 
         return resultDict
 
-    def getDepStateClass(self, troveSource, findOrdering = True):
+    def getDepStateClass(self, troveSource, findOrdering = True,
+                         ignoreDepClasses = set() ):
+        """
+        Return dependency state class which can be used for dependency checks
+        against this repository. For parameter list and return
+        value see DepCheckState class.
+        """
+        # the set() here makes sure we pass sets down even if we get lists
+        # in
         return DepCheckState(self.db, troveSource,
-                             findOrdering = findOrdering)
+                             findOrdering = findOrdering,
+                             ignoreDepClasses = set(ignoreDepClasses))
 
     def getFileContents(self, l):
         # look for config files in the datastore first, then look for other

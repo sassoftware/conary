@@ -1423,9 +1423,11 @@ order by
 	self.addVersionCache = {}
 	self.flavorsNeeded = {}
 
-    def dependencyChecker(self, troveSource, findOrdering = True):
+    def dependencyChecker(self, troveSource, findOrdering = True,
+                          ignoreDepClasses = set()):
         return deptable.DependencyChecker(self.db, troveSource,
-                                          findOrdering = findOrdering)
+                                          findOrdering = findOrdering,
+                                          ignoreDepClasses = ignoreDepClasses)
 
     def pathIsOwned(self, path):
 	for instanceId in self.troveFiles.iterPath(path):
