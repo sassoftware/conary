@@ -32,14 +32,14 @@ import traceback
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory
+from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory, capsulerecipe
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
-from conary.lib import debugger, log, logger, sha1helper, util
+from conary.lib import debugger, log, logger, sha1helper, util, magic
 from conary.local import database
-from conary.repository import changeset, errors
+from conary.repository import changeset, errors, filecontents
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
 
@@ -47,7 +47,7 @@ CookError = builderrors.CookError
 RecipeFileError = builderrors.RecipeFileError
 
 # -------------------- private below this line -------------------------
-def _createComponent(repos, bldPkg, newVersion, ident):
+def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
@@ -56,12 +56,27 @@ def _createComponent(repos, bldPkg, newVersion, ident):
     p.setRequires(bldPkg.requires - bldPkg.provides)
     p.setProvides(bldPkg.provides)
 
+    size = 0
+
+    # add the capsule
+    if capsuleInfo:
+        capsulePath = capsuleInfo[1]
+        m = magic.magic(capsulePath)
+        fileObj = files.FileFromFilesystem(capsulePath,
+                                           trove.CAPSULE_PATHID)
+        p.addRpmCapsule(os.path.basename(capsulePath),
+                          newVersion, fileObj.fileId(),
+                          (m.contents['name'], m.contents['version'],
+                           m.contents['release'], m.contents['arch'],
+                           m.contents['epoch']))
+        fileMap[fileObj.pathId()] = (fileObj, capsulePath,
+                                     os.path.basename(capsulePath))
+        size += fileObj.contents.size()
+
     linkGroups = {}
     for pathList in bldPkg.linkGroups.itervalues():
         linkGroupId = sha1helper.sha1String("\n".join(pathList))
         linkGroups.update({}.fromkeys(pathList, linkGroupId))
-
-    size = 0
 
     for (path, (realPath, f)) in bldPkg.iteritems():
         if isinstance(f, files.RegularFile):
@@ -383,6 +398,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     sources all be from the repository.
     @rtype: list of strings
     """
+
     if not groupOptions:
         groupCookOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
@@ -482,7 +498,8 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
             assert False, 'Factory recipe types should not get this far'
 
         if type in (recipe.RECIPE_TYPE_INFO,
-                      recipe.RECIPE_TYPE_PACKAGE):
+                    recipe.RECIPE_TYPE_PACKAGE,
+                    recipe.RECIPE_TYPE_CAPSULE):
             ret = cookPackageObject(repos, db, cfg, loader,
                                 sourceVersion, 
                                 prep = prep, macros = macros,
@@ -1203,15 +1220,23 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
                 # is generally useful mainly when cooking into repo, where
                 # restart is not allowed
                 recipeObj.doProcess('TESTSUITE', logFile = output)
-            recipeObj.doProcess('DESTDIR_PREPARATION', logFile = output)
-            recipeObj.doProcess('DESTDIR_MODIFICATION', logFile = output)
+
+            if recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE:
+                recipeObj.doProcess('DESTDIR_PREPARATION', logFile = output)
+                recipeObj.doProcess('DESTDIR_MODIFICATION', logFile = output)
+
             # cannot restart after the beginning of policy.PACKAGE_CREATION
             bldInfo.stop()
             use.track(False)
+
             recipeObj.doProcess('PACKAGE_CREATION', logFile = output)
             _initializeOldMetadata(repos, recipeObj, logFile = output)
+
             recipeObj.doProcess('PACKAGE_MODIFICATION', logFile = output)
-            recipeObj.doProcess('ENFORCEMENT', logFile = output)
+            # FIXME: capsules may need some enforcement policy for buildRequires
+            if recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE:
+                recipeObj.doProcess('ENFORCEMENT', logFile = output)
+
             recipeObj.doProcess('ERROR_REPORTING', logFile = output)
             logBuild and logFile.popDescriptor('policy')
         finally:
@@ -1220,8 +1245,9 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
         grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
-        if (not bldList or
-            sum(len(x) for x in bldList) <= recipeObj._autoCreatedFileCount):
+        if (recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE and
+            (not bldList or
+             sum(len(x) for x in bldList) <= recipeObj._autoCreatedFileCount)):
             # no components in packages, or no explicit files in components
             log.error('No files were found to add to package %s'
                       %recipeClass.name)
@@ -1306,6 +1332,7 @@ def _initializeOldMetadata(repos, recipeObj, logFile):
         # Nothing to do
         return
     flavor = pkgs[0].flavor.copy()
+
     pkgTroves = dict((x, _SimpleTrove(x, None, flavor))
                       for x in recipeObj.packages)
     # Now add references to components
@@ -1366,12 +1393,15 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
     # itself
     grpMap = {}
     fileIdsPathMap = {}
+
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
+
         # Extract file prefixes and file ids
         for (path, (realPath, f)) in buildPkg.iteritems():
             fileIdsPathMap[path] = f.fileId()
+
         if main not in grpMap:
             trv = grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             trv.setSize(0)
@@ -1402,6 +1432,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
     built = []
     packageList = []
     perviousQuery = {}
+
     for buildPkg in bldList:
         # bldList only contains components
         compName = buildPkg.getName()
@@ -1409,7 +1440,8 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         assert(comp)
         grp = grpMap[main]
 
-	(p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen)
+        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen,
+                                recipeObj._getCapsule(buildPkg.getName()))
 
 	built.append((compName, p.getVersion().asString(), p.getFlavor()))
 
@@ -1464,7 +1496,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     troveList = [x[1] for x in packageList] + grpMap.values()
     _doCopyForwardMetadata(troveList, recipeObj)
+
     changeSet = changeset.CreateFromFilesystem(packageList)
+
     for packageName in grpMap:
         changeSet.addPrimaryTrove(packageName, targetVersion, flavor)
 
@@ -1929,7 +1963,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @param macros: set of macros for the build
     @type macros: dict
     """
-    buildList = []
     changeSetFile = None
     targetLabel = None
 
@@ -1948,13 +1981,13 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.allowUnknownFlags(allowUnknownFlags)
     loaderDict = {}
+
     for flavor in flavorList:
         use.clearLocalFlags()
         if flavor is not None:
             buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
         else:
             buildFlavor = cfg.buildFlavor
-
 
         if ((name.endswith('.recipe') and os.path.isfile(name))
                     or isinstance(item, ConaryState)):

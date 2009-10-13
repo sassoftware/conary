@@ -353,13 +353,15 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     # don't download sources for groups or filesets
     if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
-            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
+            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP or
+            recipeClass.getType() == recipe.RECIPE_TYPE_CAPSULE):
         lcache = lookaside.RepositoryCache(repos, cfg=cfg)
         srcdirs = [ cwd,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
-            if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+            if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
+                recipeClass.getType() == recipe.RECIPE_TYPE_CAPSULE):
                 recipeObj = recipeClass(cfg, lcache, srcdirs,
                                         lightInstance=True)
             elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:

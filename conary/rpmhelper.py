@@ -40,7 +40,7 @@ POSTUN          = 1026
 OLDFILENAMES    = 1027
 FILEMODES       = 1030
 FILERDEVS       = 1033
-FILEFLAGS       = 1037 # bitmask; (1<<0 => config)
+FILEFLAGS       = 1037 # bitmask: RPMFILE_* are bitmasks to interpret
 FILEUSERNAME    = 1039
 FILEGROUPNAME   = 1040
 SOURCERPM       = 1044

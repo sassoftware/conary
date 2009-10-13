@@ -18,33 +18,42 @@ from conary.lib import util
 class Manifest:
 
     def __init__(self, package, recipe):
-
         self.recipe = recipe
+        self.package = package
+        if package is not None:
+            self.prepareManifestFile()
+
+    def prepareManifestFile(self, package=None):
+        # separate from __init__ for the sake of delayed instantiation
+        # where package is derived from data not available at __init__ time
+        if package is None:
+            package = self.package
+        
         self.manifestsDir = '%s/%s/_MANIFESTS_' \
-            % (util.normpath(recipe.cfg.buildPath), recipe.name)
+            % (util.normpath(self.recipe.cfg.buildPath), self.recipe.name)
 
         component = None
 
         if ':' in package:
             (package, component) = package.split(':')
         if package:
-            recipe.packages[package] = True
+            self.recipe.packages[package] = True
 
         i = 0
         while True:
             manifestName = '%s.%d' % (package, i)
-            if manifestName not in recipe.manifests:
+            if manifestName not in self.recipe.manifests:
                 break
             i += 1
 
         self.name = manifestName
         self.manifestFile = '%s/%s.manifest' % (self.manifestsDir, manifestName)
-        recipe.manifests.add(manifestName)
+        self.recipe.manifests.add(manifestName)
 
         if component:
-            recipe.ComponentSpec(component, self.load)
+            self.recipe.ComponentSpec(component, self.load)
         if package:
-            recipe.PackageSpec(package, self.load)
+            self.recipe.PackageSpec(package, self.load)
 
     def walk(self, init=True):
 
@@ -99,6 +108,11 @@ class ExplicitManifest(Manifest):
     def __init__(self, package, recipe, paths = []):
         self.manifestPaths = set(paths)
         Manifest.__init__(self, package, recipe)
+
+    def recordRelativePaths(self, paths):
+        if not isinstance(paths, (list, tuple, set)):
+            paths = [paths]
+        self.manifestPaths.update(paths)
 
     def recordPaths(self, paths):
         if not isinstance(paths, (list, tuple, set)):

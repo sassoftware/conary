@@ -26,8 +26,7 @@ import stat
 import sys
 
 from conary import files, trove
-from conary.build import buildpackage, filter, policy
-from conary.build import tags, use
+from conary.build import buildpackage, filter, policy, recipe, tags, use
 from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
@@ -232,12 +231,18 @@ class Config(policy.Policy):
             return
         fullpath = self.macros.destdir + filename
         if os.path.isfile(fullpath) and util.isregular(fullpath):
+            if self._fileIsBinary(fullpath):
+                self.error("binary file '%s' is marked as config" % \
+                        filename)
             self._markConfig(filename, fullpath)
 
-    def _file_is_binary(self, fn):
+    def _fileIsBinary(self, fn, maxsize=None):
+        limit = os.stat(fn)[stat.ST_SIZE]
+        if maxsize is not None and limit > maxsize:
+            return True
+
         f = codecs.open(fn, 'r', 'utf-8')
         try:
-            limit = os.stat(fn)[stat.ST_SIZE]
             while f.tell() < limit:
                 try:
                     # if a file is not utf-8 or has null bytes, we'll consider
@@ -250,6 +255,27 @@ class Config(policy.Policy):
             f.close()
         return False
 
+    def _addTrailingNewline(self, filename, fullpath):
+        # FIXME: This exists only for stability; there is no longer
+        # any need to add trailing newlines to config files.  This
+        # also violates the rule that no files are modified after
+        # destdir modification has been completed.
+        self.warn("adding trailing newline to config file '%s'" % \
+                filename)
+        mode = os.lstat(fullpath)[stat.ST_MODE]
+        oldmode = None
+        if mode & 0600 != 0600:
+            # need to be able to read and write the file to fix it
+            oldmode = mode
+            os.chmod(fullpath, mode|0600)
+
+        f = open(fullpath, 'a')
+        f.seek(0, 2)
+        f.write('\n')
+        f.close()
+        if oldmode is not None:
+            os.chmod(fullpath, oldmode)
+
     def _markConfig(self, filename, fullpath):
         self.info(filename)
         f = file(fullpath)
@@ -260,25 +286,7 @@ class Config(policy.Policy):
             lastchar = f.read(1)
             f.close()
             if lastchar != '\n':
-                if self._file_is_binary(fullpath):
-                    self.error("binary file '%s' is marked as config" % \
-                            filename)
-                else:
-                    self.warn("adding trailing newline to config file '%s'" % \
-                            filename)
-                    mode = os.lstat(fullpath)[stat.ST_MODE]
-                    oldmode = None
-                    if mode & 0600 != 0600:
-                        # need to be able to read and write the file to fix it
-                        oldmode = mode
-                        os.chmod(fullpath, mode|0600)
-
-                    f = open(fullpath, "a")
-                    f.seek(0, 2)
-                    f.write('\n')
-                    f.close()
-                    if oldmode is not None:
-                        os.chmod(fullpath, oldmode)
+                self._addTrailingNewline(filename, fullpath)
 
         f.close()
         self.recipe.ComponentSpec(_config=filename)
@@ -543,6 +551,7 @@ class PackageSpec(_filterSpec):
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
             newTrove = args[0] % self.recipe.macros
+
             self.recipe.packages[newTrove] = True
         _filterSpec.updateArgs(self, *args, **keywords)
 
@@ -1078,7 +1087,7 @@ class LinkType(policy.Policy):
     )
     def do(self):
         for component in self.recipe.autopkg.getComponents():
-            for path in component.hardlinks:
+            for path in sorted(component.hardlinkMap.keys()):
                 if self.recipe.autopkg.pathMap[path].flags.isConfig():
                     self.error("Config file %s has illegal hard links", path)
             for path in component.badhardlinks:
@@ -1148,6 +1157,8 @@ class LinkCount(policy.Policy):
         # first whether this is useful; it may not be.
 
     def do(self):
+        if self.recipe.getType() == recipe.RECIPE_TYPE_CAPSULE:
+            return
         filters = [(x, filter.Filter(x, self.macros)) for x in self.excepts]
         for component in self.recipe.autopkg.getComponents():
             for inode in component.linkGroups:
@@ -1242,6 +1253,10 @@ class ExcludeDirectories(policy.Policy):
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
     def doFile(self, path):
+        # temporarily do nothing for capsules, we might do something later
+        if self.recipe._getCapsulePathForFile(path):
+            return
+
 	fullpath = self.recipe.macros.destdir + os.sep + path
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
@@ -1427,13 +1442,15 @@ class Ownership(_UserGroup):
 
 	if bestOwner != pkgOwner:
 	    pkgfile.inode.owner.set(bestOwner)
-        if bestOwner and bestOwner not in self.systemusers:
-            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
 	if bestGroup != pkgGroup:
 	    pkgfile.inode.group.set(bestGroup)
-	if bestGroup and bestGroup not in self.systemgroups:
-            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
+        # capsules implement their own user/group handling outside of deps
+        if not self.recipe._getCapsulePathForFile(path):
+            if bestOwner and bestOwner not in self.systemusers:
+                self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
+            if bestGroup and bestGroup not in self.systemgroups:
+                self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
 class _Utilize(_UserGroup):
     """
@@ -1507,8 +1524,9 @@ class UtilizeUser(_Utilize):
     'sshd' although the file is not owned by the 'sshd' user.
     """
     def _markItem(self, path, user):
-        self.info('user %s: %s' % (user, path))
-        self.setUserGroupDep(path, user, deps.UserInfoDependencies)
+        if not self.recipe._getCapsulePathForFile(path):
+            self.info('user %s: %s' % (user, path))
+            self.setUserGroupDep(path, user, deps.UserInfoDependencies)
 
 
 class UtilizeGroup(_Utilize):
@@ -1543,8 +1561,9 @@ class UtilizeGroup(_Utilize):
     definition 'users' although the file is not owned by the 'users' group.
     """
     def _markItem(self, path, group):
-        self.info('group %s: %s' % (group, path))
-        self.setUserGroupDep(path, group, deps.GroupInfoDependencies)
+        if not self.recipe._getCapsulePathForFile(path):
+            self.info('group %s: %s' % (group, path))
+            self.setUserGroupDep(path, group, deps.GroupInfoDependencies)
 
 
 class ComponentRequires(policy.Policy):
@@ -4168,6 +4187,8 @@ class ProcessUserInfoPackage(_ProcessInfoPackage):
             'SHELL', 'SUPPLEMENTAL', 'PASSWORD']
 
     def parseInfoFile(self, path):
+        if self.recipe._getCapsulePathForFile(path):
+            return {}
         data = _ProcessInfoPackage.parseInfoFile(self, path)
         if data:
             supplemental = data.get('SUPPLEMENTAL')
