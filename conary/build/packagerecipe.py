@@ -597,7 +597,6 @@ class AbstractPackageRecipe(Recipe):
 # For compatibility with older modules. epydoc doesn't document classes
 # starting with _, see CNY-1848
 _AbstractPackageRecipe = AbstractPackageRecipe
-
 class SourcePackageRecipe(AbstractPackageRecipe):
     internalAbstractBaseClass = 1
     def __init__(self, *args, **kwargs):

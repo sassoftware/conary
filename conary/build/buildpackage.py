@@ -92,7 +92,7 @@ class BuildComponent(dict):
                 l.append(path)
                 self.linkGroups[inode] = l
                 # add to list to check for config files later
-                self.hardlinks.append(path)
+                self.hardlinkMap[path] = l
             else:
                 if not isinstance(f, files.Directory):
                     # no hardlinks allowed for special files other than dirs
@@ -152,7 +152,8 @@ class BuildComponent(dict):
         return self.recipe.suppmap
 
     def __init__(self, name, recipe):
-	self.name = name
+        self.name = name
+
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
         self.provides.addDep(deps.TroveDependencies, deps.Dependency(name))
@@ -160,7 +161,7 @@ class BuildComponent(dict):
         self.linkGroups = {}
         self.requiresMap = {}
         self.providesMap = {}
-        self.hardlinks = []
+        self.hardlinkMap = {}
         self.badhardlinks = []
         self.recipe = recipe
 	dict.__init__(self)
@@ -181,6 +182,8 @@ class AutoBuildPackage:
 	"""
 	self.pkgFilters = pkgFilters
         self.compFilters = compFilters
+        self.recipe = recipe
+
         # dictionary of all the components
         self.components = {}
         # reverse map from the package:component combination to
@@ -272,6 +275,8 @@ class AutoBuildPackage:
         """
         l = []
         for componentName in self.components.keys():
-            if self.components[componentName].keys(): # if has files
+            if (self.components[componentName].keys() or
+                self.recipe._hasCapsulePackage(componentName)):
+                # there are files or there is a capsule
                 l.append(self.components[componentName])
         return l

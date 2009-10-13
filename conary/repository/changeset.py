@@ -1592,7 +1592,7 @@ def CreateFromFilesystem(troveList):
 	    (filecs, hash) = fileChangeSet(pathId, None, file)
 	    cs.addFile(oldFileId, newFileId, filecs)
 
-	    if hash:
+            if hash and not file.flags.isPayload():
 		cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
 			  file.flags.isConfig())

@@ -38,6 +38,7 @@ RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
 RECIPE_TYPE_FACTORY   = 6
+RECIPE_TYPE_CAPSULE   = 7
 
 class _policyUpdater:
     def __init__(self, theobject):
@@ -65,6 +66,9 @@ def isRedirectRecipe(recipeClass):
 
 def isFactoryRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_FACTORY
+
+def isCapsuleRecipe(recipeClass):
+    return recipeClass.getType() == RECIPE_TYPE_CAPSULE
 
 def loadMacros(paths):
     '''
@@ -137,6 +141,9 @@ class Recipe(object):
         self.methodDepth = 0
         self._pathTranslations = []
         self._repos = None
+        self._capsulePathMap = {}
+        self._capsules = {}
+
         # Metadata is a hash keyed on a trove name and with a list of
         # per-trove-name MetadataItem like objects (well, dictionaries)
         self._metadataItemsMap = {}
@@ -847,3 +854,23 @@ class Recipe(object):
         setattr(self, attr, list(buildReqs))
         self._recipeRequirements['%sSuper' %attr] = superBuildReqs
 
+
+    # creates a map of contained filePaths to the capsule
+    def _setPathsForCapsule(self, capsulePath, filePaths):
+        self._capsulePathMap.update((x, capsulePath) for x in filePaths)
+
+    # returns the path to the capsule that the file came from
+    def _getCapsulePathForFile(self, path):
+        return self._capsulePathMap.get(path)
+
+    # records a capsule associated with recipe
+    def _addCapsule(self, capsulePath, capsuleType,
+                              capsulePackage):
+        self._capsules[capsulePackage] = (capsuleType,capsulePath)
+
+    # returns the type and package info for a capsule
+    def _getCapsule(self, capsulePath):
+        return self._capsules.get(capsulePath)
+
+    def _hasCapsulePackage(self, capsulePackage):
+        return capsulePackage in self._capsules

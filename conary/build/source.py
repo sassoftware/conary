@@ -1,4 +1,4 @@
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -25,6 +25,7 @@ import shutil, subprocess
 import shlex
 import sys
 import tempfile
+import stat
 
 from conary.lib import debugger, digestlib, log, magic
 from conary.build import lookaside
@@ -32,7 +33,7 @@ from conary import rpmhelper
 from conary.lib import openpgpfile, util
 from conary.build import action, errors
 from conary.build.errors import RecipeFileError
-from conary.build.manifest import Manifest
+from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
 
 class _AnySource(action.RecipeAction):
@@ -100,9 +101,15 @@ class _Source(_AnySource):
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
 
-        if self.package:
-            self.package = self.package % recipe.macros
-            self.manifest = Manifest(package=self.package, recipe=recipe)
+        self.manifest = None
+
+    def _initManifest(self):
+        assert self.package
+        assert not self.manifest
+
+        self.package = self.package % self.recipe.macros
+        self.manifest = Manifest(package=self.package, recipe=self.recipe)
+        self.manifest.walk()
 
     def doPrep(self):
         if self.debug:
@@ -123,12 +130,8 @@ class _Source(_AnySource):
             self._extractFromRPM()
 
     def doAction(self):
-	self.builddir = self.recipe.macros.builddir
-        if self.package:
-            self.manifest.walk()
-	action.RecipeAction.doAction(self)
-        if self.package:
-            self.manifest.create()
+        self.builddir = self.recipe.macros.builddir
+        action.RecipeAction.doAction(self)
 
     def _addSignature(self, filename):
         sourcename=self.sourcename
@@ -495,7 +498,7 @@ class addArchive(_Source):
         but can reasonably be set to C{"control.tar"} to instead choose the
         archive containing the scripts.
         """
-	_Source.__init__(self, recipe, *args, **keywords)
+        _Source.__init__(self, recipe, *args, **keywords)
 
     def doDownload(self):
 	return self._findSource(self.httpHeaders)
@@ -524,6 +527,9 @@ class addArchive(_Source):
         f = self.doDownload()
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
+
+        if self.package:
+            self._initManifest()
 
         if self.preserveOwnership and \
            not(destDir.startswith(self.recipe.macros.destdir)):
@@ -556,7 +562,7 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group) in ownerList:
+                for (path, user, group, mode, dev, flags) in ownerList:
                     # trim off the leading / (or else path.joining it with
                     # self.dir will result in /dir//foo -> /foo.
                     path = path.lstrip('/')
@@ -730,6 +736,8 @@ class addArchive(_Source):
                     self.recipe.mainDir(oldMainDir)
             else:
                 self.recipe.mainDir(oldMainDir)
+        if self.package:
+            self.manifest.create()
         return f
 Archive = addArchive
 
@@ -1293,6 +1301,104 @@ class addSource(_Source):
 	    util.execute(self.apply %self.recipe.macros, destDir)
 Source = addSource
 
+
+class addCapsule(_Source):
+    """
+    """
+
+    def __init__(self, recipe, *args, **keywords):
+        """
+        """
+        _Source.__init__(self, recipe, *args, **keywords)
+        self.capsuleType = None
+
+    def _initManifest(self):
+        assert self.package
+        assert not self.manifest
+
+        self.package = self.package % self.recipe.macros
+        self.manifest = ExplicitManifest(package=self.package, recipe=self.recipe)
+
+    def doDownload(self):
+        f = self._findSource()
+
+        # identify the capsule type
+        m = magic.magic(f)
+        if m is None:
+            raise SourceError('unknown capsule type for file %s', f)
+        if self.capsuleType is None:
+            self.capsuleType = m.name.lower()
+
+        # here we guarantee that package contains a package:component
+        # designation.  This is required for _addComponent().
+        pname = m.contents['name']
+        if self.package is None:
+            self.package = pname + ':' + self.capsuleType
+        else:
+            p,c = self.package.split(':')
+            if not p:
+                p = pname
+            if not c:
+                c = self.capsuleType
+            self.package = '%s:%s' % (p,c)
+        return f
+
+    def do(self):
+        # make sure the user gave a valid source, and not a directory
+        if not os.path.basename(self.sourcename) and not self.contents:
+            raise SourceError('cannot specify a directory as input to '
+                '%s' % self.__class__)
+
+        # normally destDir defaults to builddir (really) but in this
+        # case it is actually macros.destdir
+        destDir = self.recipe.macros.destdir
+
+        f = self.doDownload()
+        # If we just now figured out the package:component, we need to
+        # initialize the manifest
+        self._initManifest()
+
+        # read ownership, permissions, file type, etc.
+        ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
+        pathList=[]
+        for (path, user, group, mode, dev, flags) in ownerList:
+            pathList.append(path)
+
+            # we have to anchor the filter ourselves because
+            # re.escape('/foo') -> '\\/foo'.  Since this doesn't
+            # start with '/', the filter will not be anchored.
+            # we can put the trailing $ in too, just to make sure
+            # that we only apply this ownership to an exact match
+            # (in case somehow a path has a trailing /)
+            fpath = '^%s$' %re.escape(path).replace('%', '%%')
+
+            if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
+                (major,minor) = dev.split()
+                MakeDevices(fpath, devtype, major, minor, owner, group, stat.S_IMODE(mode))
+            else:
+                if stat.S_ISFIFO(mode):
+                    MakeFIFO(fpath, stat.S_IMODE(mode))
+                else:
+                    self.recipe.setModes(stat.S_IMODE(mode),fpath)
+
+                self.recipe.Ownership(user, group, fpath)
+            if flags & (rpmhelper.RPMFILE_CONFIG |
+                        rpmhelper.RPMFILE_MISSINGOK |
+                        rpmhelper.RPMFILE_NOREPLACE):
+                self.recipe.Config(fpath)
+            if flags & rpmhelper.RPMFILE_GHOST:
+                self.recipe.InitialContents(fpath)
+                # RPM did not actually create this file; we need it for policy
+                fullpath = os.sep.join((destDir, path))
+                util.mkdirChain(os.path.dirname(fullpath))
+                file(fullpath, 'w')
+        self.manifest.recordRelativePaths(pathList)
+        self.manifest.create()
+        self.recipe._setPathsForCapsule(f, pathList)
+
+        self.recipe._addCapsule(f, self.capsuleType, self.package)
+
+
 class addAction(action.RecipeAction):
     """
     NAME
@@ -1370,12 +1476,8 @@ class addAction(action.RecipeAction):
         @keyword package: A string that specifies the package, component, or package
         and component in which to place the files added while executing this command
         """
-	action.RecipeAction.__init__(self, recipe, *args, **keywords)
-	self.action = args[0]
-
-        if self.package:
-            self.package = self.package % recipe.macros
-            self.manifest = Manifest(package=self.package, recipe=recipe)
+        action.RecipeAction.__init__(self, recipe, *args, **keywords)
+        self.action = args[0]
 
     def doDownload(self):
         return None
@@ -1386,8 +1488,9 @@ class addAction(action.RecipeAction):
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir)
         util.mkdirChain(destDir)
+
         if self.package:
-            self.manifest.walk()
+            self._initManifest()
 	util.execute(self.action %self.recipe.macros, destDir)
         if self.package:
             self.manifest.create()
@@ -2103,10 +2206,21 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     r = file(rpm, 'r')
     h = rpmhelper.readHeader(r)
 
-    # assemble the path/owner/group list
+    # The rest of this function gets information on the files stored
+    # in an RPM.  Some RPMs intentionally contain no files, and
+    # therefore have no files and no file-related data, but are
+    # still meaningful.
+    if not h.has_key(rpmhelper.FILEUSERNAME):
+        return []
+
+    # assemble the path/owner/group/etc list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
                                     h[rpmhelper.FILEUSERNAME],
-                                    h[rpmhelper.FILEGROUPNAME]))
+                                    h[rpmhelper.FILEGROUPNAME],
+                                    h[rpmhelper.FILEMODES],
+                                    h[rpmhelper.FILERDEVS],
+                                    h[rpmhelper.FILEFLAGS],
+                                    ))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
     if isinstance(uncompressed, util.LZMAFile):

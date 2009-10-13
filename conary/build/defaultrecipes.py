@@ -513,6 +513,31 @@ DerivedPackageRecipe = '''class DerivedPackageRecipe(AbstractDerivedPackageRecip
     name = 'derivedpackage'
     internalAbstractBaseClass = 1'''
 
+CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe):
+    """
+    NAME
+    ====
+
+    SYNOPSIS
+    ========
+
+    DESCRIPTION
+    ===========
+
+    EXAMPLE
+    =======
+
+    """
+    name = 'capsule'
+    internalAbstractBaseClass = 1
+    buildRequires = [
+        'bzip2:runtime',
+        'gzip:runtime',
+        'tar:runtime',
+        'cpio:runtime',
+        'patch:runtime',
+    ]'''
+
 recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'package': 'PackageRecipe',
                'buildpackage': 'BuildPackageRecipe',
@@ -524,6 +549,7 @@ recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'group': 'GroupRecipe',
                'redirect': 'RedirectRecipe',
                'fileset': 'FilesetRecipe',
+               'capsule': 'CapsuleRecipe',
                }
 
 packageNames = dict([(x[1], x[0]) for x in recipeNames.iteritems()])

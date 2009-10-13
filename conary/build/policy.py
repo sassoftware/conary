@@ -195,7 +195,9 @@ class Policy(BasePolicy):
     then only files matching a filter in it are considered to be passed
     to to the C{doFile} method.  Any exceptions, including invariants,
     are applied after C{invariantinclusions} are applied; this means
-    that all exceptions OVERRULE every type of inclusion.
+    that all exceptions OVERRULE every type of inclusion.  If
+    C{invariantinclusions} is None, then the policy applies to no
+    files by default, but will apply to specified files.
 
     @cvar invariantexceptions: subclasses may set to a list of
     exception filters that are always applied regardless of what other
@@ -380,7 +382,10 @@ class Policy(BasePolicy):
 
 	# compile the inclusions
 	self.inclusionFilters = []
-	self.compileFilters(self.invariantinclusions, self.inclusionFilters)
+        if self.invariantinclusions is None:
+            self.compileFilters([], self.inclusionFilters)
+        else:
+            self.compileFilters(self.invariantinclusions, self.inclusionFilters)
 	if not self.inclusions:
 	    # an empty list, as opposed to None, means nothing is included
 	    if isinstance(self.inclusions, (tuple, list)):
@@ -459,6 +464,10 @@ class Policy(BasePolicy):
             and filespec in self.recipe._derivedFiles
             and not self.mtimeChanged(filespec)):
             # policy has elected not to handle unchanged files
+            return False
+        if not self.inclusions and self.invariantinclusions is None:
+            # policy applies to nothing by default, and no files
+            # have been specified
             return False
         if not self.inclusionFilters:
             # empty list is '.*'
@@ -756,6 +765,7 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
     import conary.build.derivedpolicy
     import conary.build.infopolicy
     import conary.build.packagepolicy
+    import conary.build.capsulepolicy
     import conary.build.grouppolicy
     for pt in internalPolicyModules:
         m = sys.modules['conary.build.'+pt]
