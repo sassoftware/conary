@@ -150,17 +150,12 @@ class RpmHeader(object):
 
     def _getDepsetFromHeader(self, tag):
         depset = deps.DependencySet()
-        binprefixre = re.compile('/bin/|/sbin/|/usr/bin/|/usr/sbin/|/usr/libexec/')
         flagre = re.compile('\((.*?)\)')
         depnamere = re.compile('(.*?)\(.*')
 
         for dep in self.get(tag, []):
             if dep.startswith('/'):
-                # convert file deps to real Conary file deps
-                # FIXME: find a way to share this with the code at
-                # packagepolicy.py:2465
-                if binprefixre.match(dep):
-                    depset.addDep(deps.FileDependencies, deps.Dependency(dep))
+                depset.addDep(deps.FileDependencies, deps.Dependency(dep))
             elif dep.startswith('rpmlib'):
                 # this is of the form rpmlib(Something). We just want the
                 # Something
