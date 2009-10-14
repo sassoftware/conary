@@ -12,10 +12,10 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib, urlparse
+import base64, cPickle, itertools, os, tempfile, urllib, urllib2, urlparse
 
-from conary import constants, conarycfg, trove
-from conary.lib import sha1helper, tracelog, util
+from conary import constants, conarycfg, rpmhelper, trove
+from conary.lib import digestlib, sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository.netrepos import netserver, reposlog
@@ -411,13 +411,14 @@ class ChangesetFilter(BaseProxy):
 
     forceGetCsVersion = None
     forceSingleCsJob = False
+    allowCapsuleFileContents = False
 
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
         self.csCache = cache
 
     def _cvtJobEntry(self, authToken, jobEntry):
-        (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
+        (name, (old, oldFlavor), (new, newFlavor), mbsolute) = jobEntry
 
         newVer = self.toVersion(new)
 
@@ -757,7 +758,7 @@ class ChangesetFilter(BaseProxy):
             serverVersion,
             getCsVersion, wireCsVersion, neededCsVersion,
             recurse, withFiles, withFileContents, excludeAutoSource,
-            mirrorMode, infoOnly):
+            mirrorMode, infoOnly, _recursed = False):
 
         fingerprints = self._callGetChangeSetFingerprints(caller, chgSetList,
             recurse, withFiles, withFileContents, excludeAutoSource,
@@ -771,6 +772,121 @@ class ChangesetFilter(BaseProxy):
                     enumerate(itertools.izip(chgSetList, fingerprints))
                     if changeSetList[x[0]] is None ]
 
+        # If proxying for a repository, self.csCache is None, so
+        # changeSetsNeeded is equivalent to chgSetList
+        if withFileContents and not infoOnly and not _recursed:
+            if not self.allowCapsuleFileContents:
+                # Repository case. We have to verify we were not asked for
+                # file contents for capsule troves
+                # Recursive call, without file contents
+                partChangeSetList = self._getNeededChangeSets(caller, authToken,
+                    verPath, chgSetList, serverVersion,
+                    getCsVersion, wireCsVersion, neededCsVersion,
+                    recurse, withFiles, withFileContents = False,
+                    excludeAutoSource = excludeAutoSource,
+                    mirrorMode = mirrorMode, infoOnly = infoOnly)
+                for csInfo in partChangeSetList:
+                    cs = changeset.ChangeSetFromFile(csInfo.path)
+                    for tcs in cs.iterNewTroveList():
+                        if tcs.getTroveInfo().capsule.type() and \
+                                not self.cfg.serveCapsuleContents:
+                            # requested a changeset with file contents, when
+                            # the content is a capsule. Die violently
+                            raise Exception("XXX FIXME")
+            elif changeSetsNeeded:
+                assert self.csCache
+                # We only have to retrieve the items that were not cached
+                indexesNeeded = [ i for (i, _) in changeSetsNeeded ]
+                partChgSetList = [ chgSetList[i] for i in indexesNeeded ]
+                fpNeeded = [ x[1] for (_, x) in changeSetsNeeded ]
+                partChangeSetList = self._getNeededChangeSets(caller, authToken,
+                    verPath, partChgSetList, serverVersion,
+                    getCsVersion, wireCsVersion, neededCsVersion,
+                    recurse, withFiles = True, withFileContents = False,
+                    excludeAutoSource = excludeAutoSource,
+                    mirrorMode = mirrorMode, infoOnly = infoOnly)
+                # Split the capsule troves from non-capsule ones
+                capsuleJobsMap = dict()
+                nonCapsuleJobsMap = dict()
+                # This is a map from a job to its XMLRPC-safe representation
+                sanitizedJobsMap = dict()
+
+                absOldChgSetList = []
+                for csInfo in partChangeSetList:
+                    cs = changeset.ChangeSetFromFile(csInfo.path)
+                    for tcs in cs.iterNewTroveList():
+                        job = tcs.getJob()
+                        sanitizedJobsMap[job] = self.toJob(job)
+                        if tcs.getTroveInfo().capsule.type():
+                            capsuleJobsMap[job] = tcs
+                            if job[1][0]:
+                                absOldChgSetList.append(
+                                    (job[0], (None, None), job[1], True))
+                        else:
+                            nonCapsuleJobsMap[job] = tcs
+                if capsuleJobsMap:
+                    # We want to skip the changeset re-combination if there
+                    # were no capsule jobs
+
+                    # We also need to fetch the absolute changesets for the old
+                    # troves
+                    absOldCapsuleJobs = [ self.toJob(j)
+                        for j in absOldChgSetList ]
+                    # XXX some of the things in extraChgSetList may already
+                    # be in nonCapsuleJobs
+                    absOldChangeSetListCntnr = self._getNeededChangeSets(caller,
+                        authToken, verPath, absOldCapsuleJobs, serverVersion,
+                        getCsVersion, wireCsVersion, neededCsVersion,
+                        recurse = False, withFiles = withFiles,
+                        withFileContents = False,
+                        excludeAutoSource = excludeAutoSource,
+                        mirrorMode = mirrorMode, infoOnly = infoOnly,
+                        _recursed = True)
+                    absOldChangeSetMap = dict(zip(
+                        ((x[0], x[2][0], x[2][1]) for x in absOldChgSetList),
+                        (changeset.ChangeSetFromFile(x.path)
+                            for x in absOldChangeSetListCntnr)))
+
+                    nonCapsuleJobs = sorted(sanitizedJobsMap[j]
+                        for j in nonCapsuleJobsMap)
+
+                    # Call again, no recursion, since we gathered individual
+                    # troves already
+                    partChangeSetListNonCntnr = self._getNeededChangeSets(caller,
+                        authToken, verPath, nonCapsuleJobs, serverVersion,
+                        getCsVersion, wireCsVersion, neededCsVersion,
+                        recurse = False, withFiles = withFiles,
+                        withFileContents = True,
+                        excludeAutoSource = excludeAutoSource,
+                        mirrorMode = mirrorMode, infoOnly = infoOnly,
+                        _recursed = True)
+                    ncCsInfoMap = dict(zip(nonCapsuleJobs,
+                        partChangeSetListNonCntnr))
+
+                    # Reassemble changesets
+                    for idx, csInfo, fprint in zip(
+                            indexesNeeded, partChangeSetList, fpNeeded):
+                        cs = self._reassembleChangeSet(csInfo, ncCsInfoMap,
+                            absOldChangeSetMap)
+                        (fd, tmppath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                                         suffix = ".ccs-temp")
+                        f = os.fdopen(fd, "w")
+                        size = cs.appendToFile(f)
+                        f.close()
+                        csInfo.size = size
+                        csInfo.fingerprint = fprint
+
+                        # Cache the changeset
+                        csPath = self.csCache.set(
+                            (csInfo.fingerprint, csInfo.version),
+                            (csInfo, file(tmppath), size))
+                        csInfo.path = csPath
+                        os.unlink(tmppath)
+                        # save csInfo
+                        changeSetList[idx] = csInfo
+                    # At the end of this step, we have all our changesets
+                    changeSetsNeeded = []
+
         if self.callLog and changeSetsNeeded:
             self.callLog.log(None, authToken, '__createChangeSets',
                              changeSetsNeeded)
@@ -783,7 +899,10 @@ class ChangesetFilter(BaseProxy):
         else:
             # calling a server which supports both neededCsVersion and
             # returns per-job supplmental information
-            neededList = [ changeSetsNeeded ]
+            if changeSetsNeeded:
+                neededList = [ changeSetsNeeded ]
+            else:
+                neededList = []
 
         # List of (url, csInfoList)
 
@@ -887,11 +1006,201 @@ class ChangesetFilter(BaseProxy):
 
         inF.close()
 
+    def toJob(self, job):
+        """
+        Safe representation of job, that can be sent over XML-RPC
+        """
+        return (job[0],
+            (job[1][0] and self.fromVersion(job[1][0]) or 0,
+             self.fromFlavor(job[1][1])),
+            (job[2][0] and self.fromVersion(job[2][0]) or 0,
+             self.fromFlavor(job[2][1])),
+            bool(job[3]))
+
+    def _reassembleChangeSet(self, csInfo, nonCapsuleCsInfoMap,
+            absOldChangeSetMap):
+        newCs = changeset.ChangeSetFromFile(csInfo.path)
+        # We need to restore primaryTroveList in the end
+        primaryTroveList = newCs.primaryTroveList.copy()
+        csfiles = changeset.files
+        getFrozenFileFlags = csfiles.frozenFileFlags
+        for trvCs in newCs.iterNewTroveList():
+            job = trvCs.getJob()
+            sjob = self.toJob(job)
+            fileList = trvCs.getNewFileList()
+            if not trvCs.getTroveInfo().capsule.type():
+                # This is a non-capsule trove changeset. Merge the
+                # corresponding changeset we previously retrieved withContents
+                csff = changeset.ChangeSetFromFile(
+                    nonCapsuleCsInfoMap[sjob].path)
+                newCs.merge(csff)
+                continue
+
+            # This trove changeset is a capsule
+            contType = changeset.ChangedFileTypes.file
+            if not trvCs.getNewVersion():
+                # we don't care about deletes
+                continue
+
+            # We need to add the file contents to the existing changeset
+
+            # Even if it's a relative changeset, we need to add the config
+            # files
+            if trvCs.getOldVersion():
+                oldTrv = trvCs.getOldNameVersionFlavor()
+                oldChangeset = absOldChangeSetMap[oldTrv]
+                oldTrvCs = oldChangeset.getNewTroveVersion(*oldTrv)
+                oldTrove = trove.Trove(oldTrvCs)
+            else:
+                oldChangeset = None
+                oldTrvCs = None
+                oldTrove = None
+
+            ccs = changeset.ChangeSet()
+            capsuleSha1 = None
+            for pathId, path, fileId, fileVersion in itertools.chain(
+                                        trvCs.getNewFileList(),
+                                        trvCs.getChangedFileList()):
+                if not fileId:
+                    # This can only happen on renames, which we don't
+                    # quite support anyway
+                    continue
+
+                if pathId == trove.CAPSULE_PATHID:
+                    capsuleSha1 = self._addCapsuleFileToChangeset(ccs,
+                        oldChangeset, oldTrove, newCs,
+                        trvCs.getTroveInfo().capsule.rpm,
+                        (pathId, fileId))
+                    continue
+
+                configFileSha1 = False
+                if not oldChangeset:
+                    fileStream = newCs.getFileChange(None, fileId)
+                    if not getFrozenFileFlags(fileStream).isConfig():
+                        continue
+                    configFileSha1 = \
+                        csfiles.frozenFileContentInfo(fileStream).sha1()
+                    assert(not getFrozenFileFlags(fileStream).isPayload())
+                else:
+                    # Relative changeset. We need to figure out the sha1 of
+                    # the config file, but if it came in as a diff, we need
+                    # the old version too.
+                    # For relative changesets, the path is None
+                    if path is None:
+                        trv = oldTrove.copy()
+                        trv.applyChangeSet(trvCs)
+                        path = trv.getFile(pathId)[0]
+
+                    fileObj = self._getFileObject(pathId, fileId, oldTrove,
+                        oldChangeset, newCs)
+
+                    if not fileObj.flags.isConfig():
+                        # Normally we should not have non-capsule and
+                        # non-config files in a capsule-based trove.
+                        continue
+                    configFileSha1 = fileObj.contents.sha1()
+                    assert not fileObj.flags.isPayload()
+
+                # Normally we should have fetched the capsule prior to the
+                # config file
+                assert capsuleSha1 is not None
+
+                dl = self.CapsuleDownloader(self.cfg.capsuleServerUrl)
+                rpmKey = self._getCapsuleKey(trvCs.getTroveInfo().capsule.rpm)
+                rpmContents = dl.downloadCapsuleFile(rpmKey, capsuleSha1,
+                    path, configFileSha1)
+
+                contType = changeset.ChangedFileTypes.file
+                ccs.addFileContents(pathId, fileId, contType,
+                                    rpmContents, cfgFile = True)
+
+            newCs.merge(ccs)
+        # All this merging messed up the primary trove list
+        newCs.primaryTroveList.thaw("")
+        newCs.primaryTroveList.extend(primaryTroveList)
+        return newCs
+
+    @classmethod
+    def _getFileObject(cls, pathId, fileId, oldTrove, oldChangeset, newChangeset):
+        csfiles = changeset.files
+        if not oldChangeset:
+            fileStream = newChangeset.getFileChange(None, fileId)
+            return csfiles.ThawFile(fileStream, pathId)
+        oldFileId = oldTrove.getFile(pathId)[1]
+        fileDiff = newChangeset.getFileChange(oldFileId, fileId)
+        if not csfiles.fileStreamIsDiff(fileDiff):
+            return csfiles.ThawFile(fileDiff, pathId)
+
+        oldFileStream = oldChangeset.getFileChange(None, oldFileId)
+        fileObj = csfiles.ThawFile(oldFileStream, pathId)
+        fileObj.twm(fileDiff, fileObj)
+        return fileObj
+
+    def _addCapsuleFileToChangeset(self, destChangeset,
+            oldChangeset, oldTrove, newChangeset, rpmData, (pathId, fileId)):
+        csfiles = changeset.files
+        csfilecontents = changeset.filecontents
+        contType = changeset.ChangedFileTypes.file
+        fileObj = self._getFileObject(pathId, fileId, oldTrove, oldChangeset,
+            newChangeset)
+        rpmSha1 = fileObj.contents.sha1()
+
+        dl = self.CapsuleDownloader(self.cfg.capsuleServerUrl)
+        rpmKey = self._getCapsuleKey(rpmData)
+        rpmContents = dl.downloadCapsule(rpmKey, rpmSha1)
+        destChangeset.addFileContents(pathId, fileId, contType,
+                            rpmContents, cfgFile = False)
+        return rpmSha1
+
+    @classmethod
+    def _getCapsuleKey(cls, rpmData):
+        return (rpmData.name(), rpmData.epoch(), rpmData.version(),
+            rpmData.release(), rpmData.arch())
+
+    class CapsuleDownloader(object):
+        def __init__(self, url):
+            self.url = url
+
+        def downloadCapsule(self, capsuleKey, sha1sum):
+            url = self.getCapsuleDownloadUrl(capsuleKey, sha1sum)
+            return self.download(url, sha1sum)
+
+        def downloadCapsuleFile(self, capsuleKey, capsuleSha1sum, fileName, fileSha1sum):
+            url = self.getCapsuleDownloadUrl(capsuleKey, capsuleSha1sum)
+            url = "%s/%s/%s" % (url, self.quote(fileName), self._sha1(fileSha1sum))
+            return self.download(url, fileSha1sum)
+
+        def getCapsuleDownloadUrl(self, capsuleKey, sha1sum):
+            filename = self.quote(rpmhelper.NEVRA.filename(*capsuleKey[:5]))
+            url = "%s/%s/%s" % (self.url, filename, self._sha1(sha1sum))
+            return url
+
+        @classmethod
+        def download(cls, url, sha1sum):
+            digest = digestlib.sha1()
+            req = urllib.urlopen(url)
+            out = util.BoundedStringIO()
+            util.copyfileobj(req, out, digest = digest)
+            if digest.hexdigest() != cls._sha1(sha1sum):
+                raise Exception("XXX FIXME")
+            out.seek(0)
+            return changeset.filecontents.FromFile(out)
+
+        @classmethod
+        def quote(cls, string):
+            return urllib.quote(string, safe = "")
+
+        @classmethod
+        def _sha1(cls, sha1sum):
+            if len(sha1sum) == 20:
+                return sha1helper.sha1ToString(sha1sum)
+            return sha1sum
 
 class SimpleRepositoryFilter(ChangesetFilter):
 
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
     forceSingleCsJob = False
+    allowCapsuleFileContents = False
 
     def __init__(self, cfg, basicUrl, repos):
         if cfg.changesetCacheDir:
@@ -908,6 +1217,7 @@ class ProxyRepositoryServer(ChangesetFilter):
 
     SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
     forceSingleCsJob = False
+    allowCapsuleFileContents = True
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)

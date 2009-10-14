@@ -415,7 +415,13 @@ if SSL:
                 # drain any remaining data on this request
                 # This avoids the problem seen with the keepalive code sending
                 # extra bytes after all the request has been sent.
-                if not request.recv(8096):
+                try:
+                    if not request.recv(8096):
+                        break
+                except SSL.SSLError, e:
+                    if e.args[0] != 'unexpected eof':
+                        raise
+                    # Client closed connection too
                     break
             request.set_shutdown(SSL.SSL_RECEIVED_SHUTDOWN |
                                  SSL.SSL_SENT_SHUTDOWN)

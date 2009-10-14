@@ -372,3 +372,31 @@ def UncompressedRpmPayload(fileIn):
     seekToData(fileIn)
     uncompressed = decompressor(fileIn)
     return uncompressed
+
+class NEVRA(object):
+    _re = re.compile("^(.*)-([^-]*)-([^-]*)\.([^.]*)$")
+    @classmethod
+    def parse(cls, filename):
+        """
+        Given an rpm filename like name-version-release.arch.rpm or
+        name-epoch:version-release-arch.rpm (or the previous without .rpm), return
+        (name, epoch, version, release, arch)
+        """
+        if filename.endswith('.rpm'):
+            filename = filename[:-4]
+        m = cls._re.match(filename)
+        if not m:
+            return None
+        n, v, r, a = m.groups()
+        if ':' not in v:
+            return n, None, v, r, a
+        e, v = v.split(':', 1)
+        e = int(e)
+        return n, e, v, r, a
+
+    @classmethod
+    def filename(cls, name, epoch, version, release, arch):
+        if epoch is not None:
+            version = "%s:%s" % (epoch, version)
+        return "%s-%s-%s.%s.rpm" % (name, version, release, arch)
+
