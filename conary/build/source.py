@@ -1265,6 +1265,8 @@ class addSource(_Source):
         return f
 
     def do(self):
+        if self.package:
+            self._initManifest()
         # make sure the user gave a valid source, and not a directory
         if not os.path.basename(self.sourcename) and not self.contents:
             raise SourceError('cannot specify a directory as input to '
@@ -1299,6 +1301,9 @@ class addSource(_Source):
             os.chmod(destFile, self.mode)
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
+        if self.package:
+            self.manifest.create()
+
 Source = addSource
 
 
