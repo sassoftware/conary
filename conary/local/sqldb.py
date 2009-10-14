@@ -1044,9 +1044,10 @@ order by
              existingVersion, existingFlavor,
              addedInstanceId, addedPathId, addedTroveName, addedVersion,
              addedFlavor) in cu:
-            if existingPathId in sharedFiles.get((existingTroveName,
-                                versions.VersionFromString(existingVersion),
-                                deps.deps.parseDep(existingFlavor)), set()):
+            if existingPathId in sharedFiles.get(
+                       (existingTroveName,
+                        versions.VersionFromString(existingVersion),
+                        deps.deps.ThawDependencySet(existingFlavor)), set()):
                 continue
 
             if replaceFiles:
