@@ -2283,6 +2283,10 @@ class Remove(BuildAction):
     C{r.Remove()} on a directory will remove both the contents of the
     directory I{and} the directory.
 
+    B{allowNoMatch} : (False) Specifying this keyword as True when using
+    C{r.Remove()} will allow C{r.Remove()} to succeed even if no files
+    are matched and therefore no action is taken.
+
     EXAMPLES
     ========
 
