@@ -35,6 +35,7 @@ from conary.build import action, errors
 from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
+from conary.build.build import MakeFIFO
 
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
@@ -1366,9 +1367,9 @@ class addCapsule(_Source):
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
         pathList=[]
-        for (path, user, group, mode, dev, flags) in ownerList:
+        for (path, user, group, mode, rdev, flags) in ownerList:
             pathList.append(path)
-
+            
             # we have to anchor the filter ourselves because
             # re.escape('/foo') -> '\\/foo'.  Since this doesn't
             # start with '/', the filter will not be anchored.
@@ -1377,9 +1378,16 @@ class addCapsule(_Source):
             # (in case somehow a path has a trailing /)
             fpath = '^%s$' %re.escape(path).replace('%', '%%')
 
-            if stat.S_ISBLK(mode) or stat.S_ISCHR(mode):
-                (major,minor) = dev.split()
-                MakeDevices(fpath, devtype, major, minor, owner, group, stat.S_IMODE(mode))
+            devtype = None
+            if stat.S_ISBLK(mode):
+                devtype = 'b'
+            elif stat.S_ISCHR(mode):
+                devtype = 'c'
+
+            if devtype:
+                minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
+                major = (rdev >> 8) & 0xfff
+                self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
             else:
                 if stat.S_ISFIFO(mode):
                     MakeFIFO(fpath, stat.S_IMODE(mode))
