@@ -954,6 +954,8 @@ class ChangesetFilter(BaseProxy):
                 csInfo.size = newSize
                 csInfo.version = iterV
 
+                cachable = (csInfo.fingerprint and self.csCache)
+
                 if not cachable:
                     # we're not caching; erase the old version
                     os.unlink(csPath)
