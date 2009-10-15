@@ -10,6 +10,9 @@ Changes in @NEW@:
       intended. (CNY-3231)
     * rpm2cpio now correctly handles rpm packages compressed with xz.
       (CNY-3234)
+    * Unpacking an RPM with addArchive or addCapsule now functions
+      correctly even if the CPIO archive in the RPM contains a
+      non-traversable directory. (CNY-3244)
 
   o New Features
     * The xz compression file format is now supported for decompressing

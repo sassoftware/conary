@@ -1215,14 +1215,14 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
             log.info('Processing %s', recipeClass.name)
             logBuild and logFile.pushDescriptor('policy')
             output = logBuild and logFile or sys.stdout
-            if not resume:
+            if not resume and recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE:
                 # test suite policy does not work well with restart, and
                 # is generally useful mainly when cooking into repo, where
                 # restart is not allowed
                 recipeObj.doProcess('TESTSUITE', logFile = output)
 
+            recipeObj.doProcess('DESTDIR_PREPARATION', logFile = output)
             if recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE:
-                recipeObj.doProcess('DESTDIR_PREPARATION', logFile = output)
                 recipeObj.doProcess('DESTDIR_MODIFICATION', logFile = output)
 
             # cannot restart after the beginning of policy.PACKAGE_CREATION

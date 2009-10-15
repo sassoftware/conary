@@ -2197,17 +2197,6 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     assert targetfile or directory
     if not directory:
 	directory = os.path.dirname(targetfile)
-    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
-    if targetfile:
-        if os.path.exists(targetfile):
-            os.remove(targetfile)
-	filename = os.path.basename(targetfile)
-	cpioArgs.append(filename)
-	errorMessage = 'extracting %s from RPM %s' %(
-	    filename, os.path.basename(rpm))
-    else:
-	errorMessage = 'extracting RPM %s' %os.path.basename(rpm)
-
     r = file(rpm, 'r')
     h = rpmhelper.readHeader(r)
 
@@ -2218,6 +2207,17 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     if not h.has_key(rpmhelper.FILEUSERNAME):
         return []
 
+    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
+    if targetfile:
+        if os.path.exists(targetfile):
+            os.remove(targetfile)
+        filename = os.path.basename(targetfile)
+        cpioArgs.append(filename)
+        errorMessage = 'extracting %s from RPM %s' %(
+            filename, os.path.basename(rpm))
+    else:
+        errorMessage = 'extracting RPM %s' %os.path.basename(rpm)
+
     # assemble the path/owner/group/etc list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
                                     h[rpmhelper.FILEUSERNAME],
@@ -2226,6 +2226,15 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     ))
+
+    # cpio does not know how to work around unwriteable directories,
+    # so create all directories ahead of time with reasonable
+    # permissions (we get permissions from the RPM header anyway, and
+    # cpio will reset the permissions to what it thinks are right
+    # but will in the meantime succeed in creating the files).
+    dirNames = [x[0] for x in ownerList if stat.S_ISDIR(x[3])]
+    for dirName in dirNames:
+        util.mkdirChain(os.sep.join((directory, dirName)))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
     if isinstance(uncompressed, util.LZMAFile):
