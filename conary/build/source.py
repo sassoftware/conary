@@ -1387,16 +1387,20 @@ class addCapsule(_Source):
                     self.recipe.setModes(stat.S_IMODE(mode),fpath)
 
                 self.recipe.Ownership(user, group, fpath)
-            if flags & (rpmhelper.RPMFILE_CONFIG |
-                        rpmhelper.RPMFILE_MISSINGOK |
-                        rpmhelper.RPMFILE_NOREPLACE):
-                self.recipe.Config(fpath)
-            if flags & rpmhelper.RPMFILE_GHOST:
-                self.recipe.InitialContents(fpath)
-                # RPM did not actually create this file; we need it for policy
+            if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
-                util.mkdirChain(os.path.dirname(fullpath))
-                file(fullpath, 'w')
+                util.mkdirChain(fullpath)
+            else:
+                if flags & (rpmhelper.RPMFILE_CONFIG |
+                            rpmhelper.RPMFILE_MISSINGOK |
+                            rpmhelper.RPMFILE_NOREPLACE):
+                    self.recipe.Config(fpath)
+                if flags & rpmhelper.RPMFILE_GHOST:
+                    self.recipe.InitialContents(fpath)
+                    # RPM did not actually create this file; we need it for policy
+                    fullpath = os.sep.join((destDir, path))
+                    util.mkdirChain(os.path.dirname(fullpath))
+                    file(fullpath, 'w')
         self.manifest.recordRelativePaths(pathList)
         self.manifest.create()
         self.recipe._setPathsForCapsule(f, pathList)
