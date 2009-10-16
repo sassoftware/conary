@@ -1081,22 +1081,13 @@ class ChangesetFilter(BaseProxy):
                 configFileSha1 = False
                 if not oldChangeset:
                     fileStream = newCs.getFileChange(None, fileId)
-                    flags = getFrozenFileFlags(fileStream) 
-                    if not flags.isConfig():
-                        continue
-                    # If it's a symlink, we won't try to fetch it
-                    if isinstance(csfiles.ThawFile(fileStream, pathId),
-                            csfiles.SymbolicLink):
-                        continue
-                    configFileSha1 = \
-                        csfiles.frozenFileContentInfo(fileStream).sha1()
-                    assert(not flags.isPayload())
+                    fileObj = csfiles.ThawFile(fileStream, pathId)
                 else:
                     # Relative changeset. We need to figure out the sha1 of
                     # the config file, but if it came in as a diff, we need
                     # the old version too.
-                    # For relative changesets, the path is None
                     if path is None:
+                        # relative changeset, so grab path from the new trove
                         trv = oldTrove.copy()
                         trv.applyChangeSet(trvCs)
                         path = trv.getFile(pathId)[0]
@@ -1104,11 +1095,11 @@ class ChangesetFilter(BaseProxy):
                     fileObj = self._getFileObject(pathId, fileId, oldTrove,
                         oldChangeset, newCs)
 
-                    if not fileObj.flags.isConfig() or isinstance(fileObj,
-                            csfiles.SymbolicLink):
-                        continue
-                    configFileSha1 = fileObj.contents.sha1()
-                    assert not fileObj.flags.isPayload()
+                if not fileObj.flags.isConfig() or isinstance(fileObj,
+                        csfiles.SymbolicLink):
+                    continue
+                configFileSha1 = fileObj.contents.sha1()
+                assert not fileObj.flags.isPayload()
 
                 # Normally we should have fetched the capsule prior to the
                 # config file
