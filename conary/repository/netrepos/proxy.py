@@ -1060,9 +1060,12 @@ class ChangesetFilter(BaseProxy):
 
             ccs = changeset.ChangeSet()
             capsuleSha1 = None
+            # It is important to walk the changed file list first, to catch
+            # the capsule file. Otherwise, we may have new files that would
+            # invalidate the assumption that we always get the capsule first
             for pathId, path, fileId, fileVersion in itertools.chain(
-                                        trvCs.getNewFileList(),
-                                        trvCs.getChangedFileList()):
+                                        trvCs.getChangedFileList(),
+                                        trvCs.getNewFileList()):
                 if not fileId:
                     # This can only happen on renames, which we don't
                     # quite support anyway
@@ -1078,11 +1081,16 @@ class ChangesetFilter(BaseProxy):
                 configFileSha1 = False
                 if not oldChangeset:
                     fileStream = newCs.getFileChange(None, fileId)
-                    if not getFrozenFileFlags(fileStream).isConfig():
+                    flags = getFrozenFileFlags(fileStream) 
+                    if not flags.isConfig():
+                        continue
+                    # If it's a symlink, we won't try to fetch it
+                    if isinstance(csfiles.ThawFile(fileStream, pathId),
+                            csfiles.SymbolicLink):
                         continue
                     configFileSha1 = \
                         csfiles.frozenFileContentInfo(fileStream).sha1()
-                    assert(not getFrozenFileFlags(fileStream).isPayload())
+                    assert(not flags.isPayload())
                 else:
                     # Relative changeset. We need to figure out the sha1 of
                     # the config file, but if it came in as a diff, we need
@@ -1096,9 +1104,8 @@ class ChangesetFilter(BaseProxy):
                     fileObj = self._getFileObject(pathId, fileId, oldTrove,
                         oldChangeset, newCs)
 
-                    if not fileObj.flags.isConfig():
-                        # Normally we should not have non-capsule and
-                        # non-config files in a capsule-based trove.
+                    if not fileObj.flags.isConfig() or isinstance(fileObj,
+                            csfiles.SymbolicLink):
                         continue
                     configFileSha1 = fileObj.contents.sha1()
                     assert not fileObj.flags.isPayload()
@@ -1125,12 +1132,17 @@ class ChangesetFilter(BaseProxy):
     @classmethod
     def _getFileObject(cls, pathId, fileId, oldTrove, oldChangeset, newChangeset):
         csfiles = changeset.files
-        if not oldChangeset:
+        if not oldChangeset or not oldTrove.hasFile(pathId):
+            # This should catch two cases:
+            # * an absolute changeset
+            # * a relative changeset with a file addition (old changeset
+            #   present but pathId not part of the old trove)
             fileStream = newChangeset.getFileChange(None, fileId)
             return csfiles.ThawFile(fileStream, pathId)
         oldFileId = oldTrove.getFile(pathId)[1]
         fileDiff = newChangeset.getFileChange(oldFileId, fileId)
         if not csfiles.fileStreamIsDiff(fileDiff):
+            # Absolute stream in a relative changeset.
             return csfiles.ThawFile(fileDiff, pathId)
 
         oldFileStream = oldChangeset.getFileChange(None, oldFileId)
