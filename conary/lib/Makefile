@@ -13,7 +13,7 @@
 #
 
 python_files=$(wildcard *.py)
-python_modules=elfmodule.so miscmodule.so cstreamsmodule.so SHA256_nonstandardmodule.so
+python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 elfmodule_objs=elf.o
@@ -40,21 +40,21 @@ all: $(python_modules) $(wrapper_libs)
 elf.o: elf.c
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
-elfmodule.so: $(elfmodule_objs)
+elf.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< $(libelf)
 
 SHA256.o: SHA256_nonstandard.c
 	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
 
-SHA256_nonstandardmodule.so: $(sha256module_objs)
+SHA256_nonstandard.so: $(sha256module_objs)
 	$(CC) -pthread -shared -o $@ $< 
 
-miscmodule.so: $(miscmodule_objs)
+misc.so: $(miscmodule_objs)
 	$(CC) -shared -lcrypto -lz -lresolv -o $@ $<
 
 $(cstreamsmodule_objs): cstreams.h
 
-cstreamsmodule.so: $(cstreamsmodule_objs)
+cstreams.so: $(cstreamsmodule_objs)
 	$(CC) -shared -o $@ $^
 
 filename_wrapper.so: filename_wrapper.c
