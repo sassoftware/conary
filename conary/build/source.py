@@ -563,7 +563,7 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group, mode, dev, flags) in ownerList:
+                for (path, user, group, mode, size, dev, flags) in ownerList:
                     # trim off the leading / (or else path.joining it with
                     # self.dir will result in /dir//foo -> /foo.
                     path = path.lstrip('/')
@@ -1367,7 +1367,7 @@ class addCapsule(_Source):
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
         pathList=[]
-        for (path, user, group, mode, rdev, flags) in ownerList:
+        for (path, user, group, mode, size, rdev, flags) in ownerList:
             pathList.append(path)
             
             # we have to anchor the filter ourselves because
@@ -1402,7 +1402,10 @@ class addCapsule(_Source):
                 if flags & (rpmhelper.RPMFILE_CONFIG |
                             rpmhelper.RPMFILE_MISSINGOK |
                             rpmhelper.RPMFILE_NOREPLACE):
-                    self.recipe.Config(fpath)
+                    if size:
+                        self.recipe.Config(fpath)
+                    else:
+                        self.recipe.InitialContents(fpath)
                 if flags & rpmhelper.RPMFILE_GHOST:
                     self.recipe.InitialContents(fpath)
                     # RPM did not actually create this file; we need it for policy
@@ -2235,6 +2238,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILEUSERNAME],
                                     h[rpmhelper.FILEGROUPNAME],
                                     h[rpmhelper.FILEMODES],
+                                    h[rpmhelper.FILESIZES],
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     ))
