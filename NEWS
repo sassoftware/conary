@@ -4,6 +4,8 @@ Changes in @NEW@:
       intended. (CNY-3231)
     * rpm2cpio now correctly handles rpm packages compressed with xz.
       (CNY-3234)
+    * When running an external entitlement generator, use /dev/null for
+      stdin instead of closing the file descriptor
 
 Changes in 2.0.50:
   o Bug Fixes:
