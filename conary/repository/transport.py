@@ -327,6 +327,15 @@ class URLOpener(urllib.FancyURLopener):
         # localhost as well
         if destHost in self.localhosts and proxyHost not in self.localhosts:
             return True
+
+        no_proxy = os.environ.get('no_proxy', '') or os.environ.get('NO_PROXY', '')
+        # '*' is special case for always bypass
+        if no_proxy == '*':
+            return True
+        # check if the host ends with any of the DNS suffixes
+        for name in no_proxy.split(','):
+            if name and destHost.endswith(name):
+                return True
         return False
 
     def createConnection(self, url, ssl=False, withProxy=False):

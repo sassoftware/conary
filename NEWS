@@ -16,6 +16,8 @@ Changes in @NEW@:
     * Conary now allows identical files to be shared during installs
       and updates. Both troves own the shared files, and they must be
       updated at the same time when the shared files change.
+    * Conary now honors the no_proxy environment variable to allow
+      direct connections to specific hosts and domains. (CNY-3246)
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
