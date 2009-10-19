@@ -31,6 +31,8 @@ Changes in @NEW@:
     * Unpacking an RPM with addArchive or addCapsule now functions
       correctly even if the CPIO archive in the RPM contains a
       non-traversable directory. (CNY-3244)
+    * When running an external entitlement generator, use /dev/null for
+      stdin instead of closing the file descriptor
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access

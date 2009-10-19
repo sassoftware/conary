@@ -897,11 +897,13 @@ def loadEntitlementFromProgram(fullPath, serverName):
     stdErrRead, stdErrWrite = os.pipe()
     childPid = os.fork()
     if not childPid:
+        nullFd = os.open("/dev/null", os.O_RDONLY)
         try:
             try:
                 os.close(readFd)
-                # close stdin
-                os.close(0)
+                # switch stdin to /dev/null
+                os.dup2(nullFd, 0)
+                os.close(nullFd)
 
                 # both error and stderr are redirected  - the entitlement
                 # should be on stdout, and error info should be 
