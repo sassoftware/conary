@@ -304,7 +304,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         If recurse is not set, it yields one result per troveList entry.
 
         @param excludeCapsuleContents: If True, troves which include capsules
-        have all of their content excluded fomr the changeset no matter how
+        have all of their content excluded from the changeset no matter how
         withFileContents is set.
 	"""
 	cs = changeset.ChangeSet()
