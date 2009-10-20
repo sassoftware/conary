@@ -59,7 +59,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                          rpm.RPMPROB_FILTER_REPLACEOLDFILES |
                          rpm.RPMPROB_FILTER_OLDPACKAGE)
 
-        for troveCs, (pathId, path, fileId) in self.installs:
+        for troveCs, (pathId, path, fileId, sha1) in self.installs:
             localPath = fileDict[(pathId, fileId)]
             fd = os.open(localPath, os.O_RDONLY)
             hdr = ts.hdrFromFdno(fd)

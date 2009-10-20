@@ -14,8 +14,8 @@
 
 import os, tempfile, sys
 
-from conary import trove
-from conary.lib import util
+from conary import files, trove
+from conary.lib import digestlib, util
 
 class CapsuleOperation(object):
 
@@ -70,7 +70,21 @@ class SingleCapsuleOperation(CapsuleOperation):
 
         assert(pathId == trove.CAPSULE_PATHID)
 
-        self.installs.append((troveCs, (pathId, path, fileId)))
+        # is the capsule new or changed?
+        changedFileInfos = [ x for x in troveCs.getChangedFileList()
+                                if x[0] == trove.CAPSULE_PATHID ]
+        if changedFileInfos:
+            oldFileId = oldTrv.getFile(pathId)[1]
+            oldFileObjs = self.db.getFileStream(oldFileId)
+            fileObj = files.ThawFile(oldFileObjs, pathId)
+            fileChange = self.changeSet.getFileChange(oldFileId, fileId)
+            fileObj.twm(fileChange, fileObj)
+            sha1 = fileObj.contents.sha1()
+        else:
+            fileStream = self.changeSet.getFileChange(None, fileId)
+            sha1 = files.frozenFileContentInfo(fileStream).sha1()
+
+        self.installs.append((troveCs, (pathId, path, fileId, sha1)))
         return (oldTrv, trv)
 
     def remove(self, trv):
@@ -89,14 +103,19 @@ class MetaCapsuleOperations(CapsuleOperation):
         fileDict = {}
         for kind, obj in sorted(self.capsuleClasses.items()):
             fileDict.update(
-                dict(((x[0], x[2]), x[1]) for x in obj._filesNeeded()))
+                dict(((x[0], x[2], x[3]), x[1]) for x in obj._filesNeeded()))
 
         try:
-            for ((pathId, fileId), path) in sorted(fileDict.items()):
+            for ((pathId, fileId, sha1), path) in sorted(fileDict.items()):
                 tmpfd, tmpname = tempfile.mkstemp(prefix = path,
                                                   suffix = '.conary')
                 fObj = self.changeSet.getFileContents(pathId, fileId)[1].get()
-                util.copyfileobj(fObj, os.fdopen(tmpfd, "w"))
+                d = digestlib.sha1()
+                util.copyfileobj(fObj, os.fdopen(tmpfd, "w"), digest = d)
+                actualSha1 = d.digest()
+                if actualSha1 != sha1:
+                    raise files.Sha1Exception(path)
+
                 # tmpfd is closed when the file object created by os.fdopen
                 # disappears
                 fileDict[(pathId, fileId)] = tmpname
