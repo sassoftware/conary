@@ -140,6 +140,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.readOnlyRepository = cfg.readOnlyRepository
         self.serializeCommits = cfg.serializeCommits
         self.paranoidCommits = cfg.paranoidCommits
+        self.excludeCapsuleContents = cfg.excludeCapsuleContents
 
         self.__delDB = False
         self.log = tracelog.getLog(None)
@@ -1499,6 +1500,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                          recurse = recurse,
                                          withFiles = withFiles,
                                          withFileContents = withFileContents,
+                                         excludeCapsuleContents =
+                                                self.excludeCapsuleContents,
                                          excludeAutoSource = excludeAutoSource,
                                          roleIds = roleIds):
             (newCs, trovesNeeded, filesNeeded, removedTroves) = ret
@@ -1566,7 +1569,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # iterator.
             jobDict = dict.fromkeys(jobs)
             jobOrder = jobDict.keys()
-            for result in self.repos.createChangeSet(jobOrder, **kwargs):
+            for result in self.repos.createChangeSet(jobOrder,
+                         excludeCapsuleContents = self.excludeCapsuleContents,
+                         **kwargs):
                 job = jobOrder.pop(0)
                 jobDict[job] = result
 
@@ -1980,7 +1985,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
 	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden,
-                                   serialize = self.serializeCommits)
+                                   serialize = self.serializeCommits,
+                                   excludeCapsuleContents =
+                                        self.excludeCapsuleContents)
 
 	if not self.commitAction:
 	    return True
@@ -3420,6 +3427,7 @@ class ServerConfig(ConfigFile):
     entitlementCheckURL     = CfgString
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
+    excludeCapsuleContents  = (CfgBool, False)
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)

@@ -18,6 +18,7 @@ Changes in @NEW@:
       updated at the same time when the shared files change.
     * Conary now honors the no_proxy environment variable to allow
       direct connections to specific hosts and domains. (CNY-3246)
+    * Added excludeCapsuleContents config option for servers
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single

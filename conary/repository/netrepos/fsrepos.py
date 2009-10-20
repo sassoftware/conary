@@ -194,13 +194,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 yield fileObj
 
     def addFileVersion(self, troveInfo, pathId, path, fileId,
-                       fileVersion, fileStream = None):
+                       fileVersion, fileStream = None, withContents = True):
         troveInfo.addFile(pathId, path, fileId, fileVersion,
-                          fileStream = fileStream)
+                          fileStream = fileStream, withContents = withContents)
 
     ###
 
-    def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False):
+    def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False,
+                        excludeCapsuleContents = False):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -222,7 +223,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                    resetTimestamps = not mirror,
                                    callback=callback,
                                    mirror = mirror,
-                                   hidden = hidden)
+                                   hidden = hidden,
+                                   excludeCapsuleContents =
+                                        excludeCapsuleContents)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
@@ -285,10 +288,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def createChangeSet(self, origTroveList, recurse = True,
                         withFiles = True, withFileContents = True,
+                        excludeCapsuleContents = False,
                         excludeAutoSource = False,
                         mirrorMode = False, roleIds = None):
 	"""
-	troveList is a list of (troveName, flavor, oldVersion, newVersion,
+	@param troveList: a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
 
 	if oldVersion == None and absolute == 0, then the trove is assumed
@@ -298,6 +302,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         if recurse is set, this yields one result for the entire troveList.
         If recurse is not set, it yields one result per troveList entry.
+
+        @param excludeCapsuleContents: If True, troves which include capsules
+        have all of their content excluded fomr the changeset no matter how
+        withFileContents is set.
 	"""
 	cs = changeset.ChangeSet()
         externalTroveList = []
@@ -455,6 +463,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		cs.addFile(oldFileId, newFileId, filecs)
 
+                if (excludeCapsuleContents and new.troveInfo.capsule.type and
+                               new.troveInfo.capsule.type()):
+                    continue
                 if not withFileContents or (excludeAutoSource and
                    newFile.flags.isAutoSource()) or newFile.flags.isPayload():
                     continue

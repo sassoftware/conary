@@ -59,14 +59,14 @@ class LocalRepVersionTable(versiontable.VersionTable):
 
 class TroveAdder:
 
-    def addStream(self, fileId, fileStream = None):
+    def addStream(self, fileId, fileStream = None, withContents = True):
         existing = self.newStreamsByFileId.get(fileId)
         if existing and existing[1]:
             # we have the stream for this fileId already. we don't need
             # it again
             return
 
-        if fileStream:
+        if fileStream and withContents:
             sha1 = None
 
             if (not files.frozenFileFlags(fileStream).isPayload() and
@@ -81,7 +81,7 @@ class TroveAdder:
                                            self.cu.binary(sha1))
 
     def addFile(self, pathId, path, fileId, fileVersion,
-                fileStream = None):
+                fileStream = None, withContents = True):
         dirname, basename = os.path.split(path)
 
         pathChanged = 1
@@ -109,7 +109,8 @@ class TroveAdder:
         if not versionChanged:
             fileStream = None
 
-        self.addStream(fileId, fileStream = fileStream)
+        self.addStream(fileId, fileStream = fileStream,
+                       withContents = withContents)
 
     def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap):
         self.troveStore = troveStore

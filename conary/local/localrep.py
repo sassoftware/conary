@@ -45,7 +45,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
                                           oldTroveSpec = oldTroveSpec))
 
     def addFileVersion(self, troveId, pathId, path, fileId,
-                       newVersion, fileStream = None):
+                       newVersion, fileStream = None,
+                       withContents = True):
         self.repos.addFileVersion(troveId[1], pathId, path, fileId, newVersion,
                                   fileStream = fileStream)
 
