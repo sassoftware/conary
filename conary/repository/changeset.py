@@ -856,6 +856,32 @@ class ChangeSet(streams.StreamSet):
         self.newTroves.thaw("")
         self.oldTroves.thaw("")
 
+    def removeCommitted(self, repos):
+        """
+        Walk a changeset and remove and items which are already in the
+        repositories. Returns a changeset which will commit without causing
+        duplicate trove errors. If everything in the changeset has already
+        been committed, return False. If there are items left for commit,
+        return True.
+
+        @param cs: Changeset to filter
+        @type cs: repository.changeset.ChangeSet
+        @rtype: repository.changeset.ChangeSet or None
+        """
+        newTroveInfoList = [ x.getNewNameVersionFlavor() for x in
+                                self.iterNewTroveList() if x.getNewVersion()
+                                is not None ]
+        present = repos.hasTroves(newTroveInfoList)
+
+        for (newTroveInfo, isPresent) in present.iteritems():
+            if isPresent:
+                self.delNewTrove(*newTroveInfo)
+
+        if self.newTroves:
+            return True
+
+        return False
+
     def _sendInfo(self):
         new = self.newTroves.freeze()
         old = self.oldTroves.freeze()

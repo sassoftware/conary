@@ -19,6 +19,8 @@ Changes in @NEW@:
     * Conary now honors the no_proxy environment variable to allow
       direct connections to specific hosts and domains. (CNY-3246)
     * Added excludeCapsuleContents config option for servers
+    * Added ChangeSet.removeCommitted() to filter already-committed
+      troves from a changeset
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
