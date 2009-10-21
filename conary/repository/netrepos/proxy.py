@@ -1183,7 +1183,10 @@ class ChangesetFilter(BaseProxy):
         @classmethod
         def download(cls, url, sha1sum):
             digest = digestlib.sha1()
-            req = urllib.urlopen(url)
+            try:
+                req = urllib2.urlopen(url)
+            except urllib2.HTTPError, e:
+                raise Exception("XXX FIXME")
             out = util.BoundedStringIO()
             util.copyfileobj(req, out, digest = digest)
             if digest.hexdigest() != cls._sha1(sha1sum):
@@ -1193,7 +1196,8 @@ class ChangesetFilter(BaseProxy):
 
         @classmethod
         def quote(cls, string):
-            return urllib.quote(string, safe = "")
+            # We need to quote twice, restlib unquotes the URL the first time
+            return netclient.quote(netclient.quote(string))
 
         @classmethod
         def _sha1(cls, sha1sum):
