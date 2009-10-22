@@ -792,7 +792,8 @@ class ChangesetFilter(BaseProxy):
                             # requested a changeset with file contents, when
                             # the content is a capsule. Die violently
                             raise Exception("XXX FIXME")
-            elif not self.isRepositoryFilter and changeSetsNeeded:
+            elif (not self.isRepositoryFilter and changeSetsNeeded and
+                    self.cfg.capsuleServerUrl):
                 assert self.csCache
                 # We only have to retrieve the items that were not cached
                 indexesNeeded = [ i for (i, _) in changeSetsNeeded ]
