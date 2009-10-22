@@ -70,6 +70,8 @@ Changes in @NEW@:
       be mapped directly to a native Conary dependency.
     * Colons in dependency flags are now escaped as \: to allow deterministic
       thawing.
+    * If xml.etree.ElementTree is available use that instead of
+      elementree.ElementTree for CIL dependency parsing.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added

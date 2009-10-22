@@ -32,9 +32,12 @@ from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
 
 try:
-    from elementtree import ElementTree
+    from xml.etree import ElementTree
 except ImportError:
-    ElementTree = None
+    try:
+        from elementtree import ElementTree
+    except ImportError:
+        ElementTree = None
 
 
 # Helper class
