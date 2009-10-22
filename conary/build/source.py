@@ -2227,7 +2227,27 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     if not h.has_key(rpmhelper.FILEUSERNAME):
         return []
 
-    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
+    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet', '-f']
+
+    # tell cpio to skip directories; we let cpio create those automatically
+    # rather than based on the cpio to make sure they aren't made with funny
+    # permissions. worst bit is that we have to use DIR, ./DIR, and /DIR
+    # because RPM is inconsistent with how it names things in the cpio ball
+    #for dirName in h[rpmhelper.DIRNAMES]:
+        #util.mkdirChain(directory + dirName)
+
+    for (path, mode) in itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                       h[rpmhelper.FILEMODES]):
+        if (stat.S_ISDIR(mode) or stat.S_ISBLK(mode) or
+                stat.S_ISCHR(mode)):
+            if stat.S_ISDIR(mode):
+                util.mkdirChain(directory + path)
+            cpioArgs.append(path)
+            cpioArgs.append('.' + path)
+            cpioArgs.append(path[1:])
+
+    open("/tmp/foo2", "w").write(str(cpioArgs))
+
     if targetfile:
         if os.path.exists(targetfile):
             os.remove(targetfile)
@@ -2247,15 +2267,6 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     ))
-
-    # cpio does not know how to work around unwriteable directories,
-    # so create all directories ahead of time with reasonable
-    # permissions (we get permissions from the RPM header anyway, and
-    # cpio will reset the permissions to what it thinks are right
-    # but will in the meantime succeed in creating the files).
-    dirNames = [x[0] for x in ownerList if stat.S_ISDIR(x[3])]
-    for dirName in dirNames:
-        util.mkdirChain(os.sep.join((directory, dirName)))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
     if isinstance(uncompressed, util.LZMAFile):
