@@ -3438,7 +3438,6 @@ class ServerConfig(ConfigFile):
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
     serverName              = CfgLineList(CfgString, listType = GlobListType)
-    serveCapsuleContents    = (CfgBool, True)
     staticPath              = (CfgPath, '/conary-static')
     serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')

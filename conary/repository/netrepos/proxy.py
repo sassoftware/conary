@@ -411,7 +411,7 @@ class ChangesetFilter(BaseProxy):
 
     forceGetCsVersion = None
     forceSingleCsJob = False
-    allowCapsuleFileContents = False
+    isRepositoryFilter = True
 
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
@@ -775,7 +775,7 @@ class ChangesetFilter(BaseProxy):
         # If proxying for a repository, self.csCache is None, so
         # changeSetsNeeded is equivalent to chgSetList
         if withFileContents and not infoOnly and not _recursed:
-            if not self.allowCapsuleFileContents:
+            if self.isRepositoryFilter and self.cfg.excludeCapsuleContents:
                 # Repository case. We have to verify we were not asked for
                 # file contents for capsule troves
                 # Recursive call, without file contents
@@ -788,12 +788,11 @@ class ChangesetFilter(BaseProxy):
                 for csInfo in partChangeSetList:
                     cs = changeset.ChangeSetFromFile(csInfo.path)
                     for tcs in cs.iterNewTroveList():
-                        if tcs.getTroveInfo().capsule.type() and \
-                                not self.cfg.serveCapsuleContents:
+                        if tcs.getTroveInfo().capsule.type():
                             # requested a changeset with file contents, when
                             # the content is a capsule. Die violently
                             raise Exception("XXX FIXME")
-            elif changeSetsNeeded:
+            elif not self.isRepositoryFilter and changeSetsNeeded:
                 assert self.csCache
                 # We only have to retrieve the items that were not cached
                 indexesNeeded = [ i for (i, _) in changeSetsNeeded ]
@@ -1209,7 +1208,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
 
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
     forceSingleCsJob = False
-    allowCapsuleFileContents = False
+    isRepositoryFilter = True
 
     def __init__(self, cfg, basicUrl, repos):
         if cfg.changesetCacheDir:
@@ -1226,7 +1225,7 @@ class ProxyRepositoryServer(ChangesetFilter):
 
     SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
     forceSingleCsJob = False
-    allowCapsuleFileContents = True
+    isRepositoryFilter = False
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)
