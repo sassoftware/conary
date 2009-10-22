@@ -43,7 +43,9 @@ Changes in @NEW@:
       stdin instead of closing the file descriptor.
     * Added logging to several source actions to ensure that some output
       is provided to make debugging build failures easier.
-    * Call lstat() instead of stat() to deal with circular links (CNY-3251)
+    * Call lstat() instead of stat() to deal with circular links. (CNY-3251)
+    * Bootstrapping python dependencies now uses python source intead
+      of a version-specific compiled python file.
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access

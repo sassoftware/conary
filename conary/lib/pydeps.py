@@ -152,8 +152,9 @@ class moduleFinderProxy:
         ldLibraryPath[0:0] = [destdir+libdir, libdir]
         ldLibraryPath = ':'.join(ldLibraryPath)
         environment['LD_LIBRARY_PATH'] = ldLibraryPath
+        scriptFile = __file__.replace('.pyc', '.py').replace('.pyo', '.py')
         self.proxyProcess = subprocess.Popen(
-            (pythonPath, __file__),
+            (pythonPath, scriptFile),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             env=environment,
