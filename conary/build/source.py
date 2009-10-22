@@ -551,6 +551,7 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
+        log.info('unpacking archive %s' %os.path.basename(f))
 	if f.endswith(".zip") or f.endswith(".xpi") or f.endswith(".jar") or f.endswith(".war"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
@@ -1269,9 +1270,11 @@ class addSource(_Source):
         if self.package:
             self._initManifest()
         # make sure the user gave a valid source, and not a directory
-        if not os.path.basename(self.sourcename) and not self.contents:
+        baseFileName = os.path.basename(self.sourcename)
+        if not baseFileName and not self.contents:
             raise SourceError('cannot specify a directory as input to '
                 'addSource')
+        log.info('adding source file %s' %baseFileName)
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
@@ -1351,9 +1354,11 @@ class addCapsule(_Source):
 
     def do(self):
         # make sure the user gave a valid source, and not a directory
-        if not os.path.basename(self.sourcename) and not self.contents:
+        baseFileName = os.path.basename(self.sourcename)
+        if not baseFileName and not self.contents:
             raise SourceError('cannot specify a directory as input to '
                 '%s' % self.__class__)
+        log.info('adding capsule %s' %baseFileName)
 
         # normally destDir defaults to builddir (really) but in this
         # case it is actually macros.destdir

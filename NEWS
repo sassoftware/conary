@@ -18,9 +18,9 @@ Changes in @NEW@:
       updated at the same time when the shared files change.
     * Conary now honors the no_proxy environment variable to allow
       direct connections to specific hosts and domains. (CNY-3246)
-    * Added excludeCapsuleContents config option for servers
+    * Added excludeCapsuleContents config option for servers.
     * Added ChangeSet.removeCommitted() to filter already-committed
-      troves from a changeset
+      troves from a changeset.
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
@@ -37,7 +37,9 @@ Changes in @NEW@:
       correctly even if the CPIO archive in the RPM contains a
       non-traversable directory. (CNY-3244)
     * When running an external entitlement generator, use /dev/null for
-      stdin instead of closing the file descriptor
+      stdin instead of closing the file descriptor.
+    * Added logging to several source actions to ensure that some output
+      is provided to make debugging build failures easier.
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
