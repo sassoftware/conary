@@ -21,6 +21,9 @@ Changes in @NEW@:
     * Added excludeCapsuleContents config option for servers.
     * Added ChangeSet.removeCommitted() to filter already-committed
       troves from a changeset.
+    * The bootstrap python module dependency discovery proxy now
+      provides additional useful informational messages to aid
+      debugging.
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
