@@ -1498,7 +1498,7 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     }
     outFd = -1;
 
-    rc = stat(targetPath, &sb);
+    rc = lstat(targetPath, &sb);
     if (rc && errno != ENOENT) {
         PyErr_SetFromErrno(PyExc_OSError);
         goto onerror;

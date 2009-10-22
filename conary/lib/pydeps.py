@@ -209,19 +209,31 @@ def main():
         type, path = data.split('\0', 1)
         if type == 'script':
             inspector = finder.run_script
+            sys.stderr.write('pydeps inspecting %s (%s)\n' %(path, type))
+            sys.stderr.flush()
         elif type == 'file':
             inspector = finder.load_file
+            sys.stderr.write('pydeps inspecting %s (%s)\n' %(path, type))
+            sys.stderr.flush()
         elif type == 'init':
             destdir, sysPath = path.split('\0', 1)
             sysPath = sysPath.split('\0')
             # set sys.path in order to find modules outside the bootstrap
             sys.path = sysPath
+            sys.stderr.write('pydeps bootstrap proxy initializing: '
+                             'sys.path %r\n' %sysPath)
+            sys.stderr.flush()
             finder = DirBasedModuleFinder(destdir, sysPath)
             putData(sys.stdout, 'READY')
             continue
         elif type == 'exit':
+            sys.stderr.write('dep proxy closing\n')
+            sys.stderr.flush()
             os._exit(0)
         else:
+            sys.stderr.write('dep proxy terminating:unknown type %s (%s)\n'
+                             %(type, path))
+            sys.stderr.flush()
             os._exit(2)
 
         if not path:

@@ -551,6 +551,7 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
+        log.info('unpacking archive %s' %os.path.basename(f))
 	if f.endswith(".zip") or f.endswith(".xpi") or f.endswith(".jar") or f.endswith(".war"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
@@ -1269,9 +1270,11 @@ class addSource(_Source):
         if self.package:
             self._initManifest()
         # make sure the user gave a valid source, and not a directory
-        if not os.path.basename(self.sourcename) and not self.contents:
+        baseFileName = os.path.basename(self.sourcename)
+        if not baseFileName and not self.contents:
             raise SourceError('cannot specify a directory as input to '
                 'addSource')
+        log.info('adding source file %s' %baseFileName)
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
@@ -1351,9 +1354,11 @@ class addCapsule(_Source):
 
     def do(self):
         # make sure the user gave a valid source, and not a directory
-        if not os.path.basename(self.sourcename) and not self.contents:
+        baseFileName = os.path.basename(self.sourcename)
+        if not baseFileName and not self.contents:
             raise SourceError('cannot specify a directory as input to '
                 '%s' % self.__class__)
+        log.info('adding capsule %s' %baseFileName)
 
         # normally destDir defaults to builddir (really) but in this
         # case it is actually macros.destdir
@@ -2222,7 +2227,27 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     if not h.has_key(rpmhelper.FILEUSERNAME):
         return []
 
-    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
+    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet', '-f']
+
+    # tell cpio to skip directories; we let cpio create those automatically
+    # rather than based on the cpio to make sure they aren't made with funny
+    # permissions. worst bit is that we have to use DIR, ./DIR, and /DIR
+    # because RPM is inconsistent with how it names things in the cpio ball
+    #for dirName in h[rpmhelper.DIRNAMES]:
+        #util.mkdirChain(directory + dirName)
+
+    for (path, mode) in itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                       h[rpmhelper.FILEMODES]):
+        if (stat.S_ISDIR(mode) or stat.S_ISBLK(mode) or
+                stat.S_ISCHR(mode)):
+            if stat.S_ISDIR(mode):
+                util.mkdirChain(directory + path)
+            cpioArgs.append(path)
+            cpioArgs.append('.' + path)
+            cpioArgs.append(path[1:])
+
+    open("/tmp/foo2", "w").write(str(cpioArgs))
+
     if targetfile:
         if os.path.exists(targetfile):
             os.remove(targetfile)
@@ -2242,15 +2267,6 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     ))
-
-    # cpio does not know how to work around unwriteable directories,
-    # so create all directories ahead of time with reasonable
-    # permissions (we get permissions from the RPM header anyway, and
-    # cpio will reset the permissions to what it thinks are right
-    # but will in the meantime succeed in creating the files).
-    dirNames = [x[0] for x in ownerList if stat.S_ISDIR(x[3])]
-    for dirName in dirNames:
-        util.mkdirChain(os.sep.join((directory, dirName)))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
     if isinstance(uncompressed, util.LZMAFile):
