@@ -2233,8 +2233,6 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     # rather than based on the cpio to make sure they aren't made with funny
     # permissions. worst bit is that we have to use DIR, ./DIR, and /DIR
     # because RPM is inconsistent with how it names things in the cpio ball
-    #for dirName in h[rpmhelper.DIRNAMES]:
-        #util.mkdirChain(directory + dirName)
 
     for (path, mode) in itertools.izip(h[rpmhelper.OLDFILENAMES],
                                        h[rpmhelper.FILEMODES]):
@@ -2245,8 +2243,6 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
             cpioArgs.append(path)
             cpioArgs.append('.' + path)
             cpioArgs.append(path[1:])
-
-    open("/tmp/foo2", "w").write(str(cpioArgs))
 
     if targetfile:
         if os.path.exists(targetfile):
