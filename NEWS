@@ -80,6 +80,7 @@ Changes in @NEW@:
       thawing.
     * If xml.etree.ElementTree is available use that instead of
       elementree.ElementTree for CIL dependency parsing.
+    * The LDFLAGS setting is now honored when linking binaries.
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added

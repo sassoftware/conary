@@ -41,25 +41,25 @@ elf.o: elf.c
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
 elf.so: $(elfmodule_objs)
-	$(CC) -shared -o $@ $< $(libelf)
+	$(CC) $(LDFLAGS) -shared -o $@ $< $(libelf)
 
 SHA256.o: SHA256_nonstandard.c
 	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
 
 SHA256_nonstandard.so: $(sha256module_objs)
-	$(CC) -pthread -shared -o $@ $< 
+	$(CC) $(LDFLAGS) -pthread -shared -o $@ $< 
 
 misc.so: $(miscmodule_objs)
-	$(CC) -shared -lcrypto -lz -lresolv -o $@ $<
+	$(CC) $(LDFLAGS) -shared -lcrypto -lz -lresolv -o $@ $<
 
 $(cstreamsmodule_objs): cstreams.h
 
 cstreams.so: $(cstreamsmodule_objs)
-	$(CC) -shared -o $@ $^
+	$(CC) $(LDFLAGS) -shared -o $@ $^
 
 filename_wrapper.so: filename_wrapper.c
 	$(CC) -Wall -fPIC -rdynamic -c filename_wrapper.c
-	$(CC) -shared -rdynamic -o filename_wrapper.so filename_wrapper.o -lc -ldl
+	$(CC) $(LDFLAGS) -shared -rdynamic -o filename_wrapper.so filename_wrapper.o -lc -ldl
 
 install: pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
