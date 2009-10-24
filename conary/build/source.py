@@ -1372,16 +1372,15 @@ class addCapsule(_Source):
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
         pathList=[]
+
         for (path, user, group, mode, size, rdev, flags) in ownerList:
             pathList.append(path)
-            
-            # we have to anchor the filter ourselves because
-            # re.escape('/foo') -> '\\/foo'.  Since this doesn't
+
             # start with '/', the filter will not be anchored.
             # we can put the trailing $ in too, just to make sure
             # that we only apply this ownership to an exact match
             # (in case somehow a path has a trailing /)
-            fpath = '^%s$' %re.escape(path).replace('%', '%%')
+            regexpath = '^%s$' %re.escape(path).replace('%', '%%')
 
             devtype = None
             if stat.S_ISBLK(mode):
@@ -1395,11 +1394,11 @@ class addCapsule(_Source):
                 self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
             else:
                 if stat.S_ISFIFO(mode):
-                    MakeFIFO(fpath, stat.S_IMODE(mode))
+                    MakeFIFO(path, stat.S_IMODE(mode))
                 else:
-                    self.recipe.setModes(stat.S_IMODE(mode),fpath)
+                    self.recipe.setModes(stat.S_IMODE(mode),path)
 
-                self.recipe.Ownership(user, group, fpath)
+                self.recipe.Ownership(user, group, regexpath)
             if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
                 util.mkdirChain(fullpath)
@@ -1408,11 +1407,11 @@ class addCapsule(_Source):
                             rpmhelper.RPMFILE_MISSINGOK |
                             rpmhelper.RPMFILE_NOREPLACE):
                     if size:
-                        self.recipe.Config(fpath)
+                        self.recipe.Config(path)
                     else:
-                        self.recipe.InitialContents(fpath)
+                        self.recipe.InitialContents(path)
                 if flags & rpmhelper.RPMFILE_GHOST:
-                    self.recipe.InitialContents(fpath)
+                    self.recipe.InitialContents(path)
                     # RPM did not actually create this file; we need it for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
