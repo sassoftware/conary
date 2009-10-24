@@ -1376,6 +1376,8 @@ class addCapsule(_Source):
         for (path, user, group, mode, size, rdev, flags) in ownerList:
             pathList.append(path)
 
+            # we have to anchor the filter ourselves because
+            # re.escape('/foo') -> '\\/foo'.  Since this doesn't
             # start with '/', the filter will not be anchored.
             # we can put the trailing $ in too, just to make sure
             # that we only apply this ownership to an exact match
@@ -1402,6 +1404,7 @@ class addCapsule(_Source):
             if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
                 util.mkdirChain(fullpath)
+                self.recipe.ExcludeDirectories(exceptions=path)
             else:
                 if flags & (rpmhelper.RPMFILE_CONFIG |
                             rpmhelper.RPMFILE_MISSINGOK |
@@ -2226,22 +2229,25 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     if not h.has_key(rpmhelper.FILEUSERNAME):
         return []
 
-    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet', '-f']
+    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
 
     # tell cpio to skip directories; we let cpio create those automatically
     # rather than based on the cpio to make sure they aren't made with funny
     # permissions. worst bit is that we have to use DIR, ./DIR, and /DIR
     # because RPM is inconsistent with how it names things in the cpio ball
 
+    cpioSkipArgs = ['-f']
     for (path, mode) in itertools.izip(h[rpmhelper.OLDFILENAMES],
                                        h[rpmhelper.FILEMODES]):
         if (stat.S_ISDIR(mode) or stat.S_ISBLK(mode) or
                 stat.S_ISCHR(mode)):
             if stat.S_ISDIR(mode):
                 util.mkdirChain(directory + path)
-            cpioArgs.append(path)
-            cpioArgs.append('.' + path)
-            cpioArgs.append(path[1:])
+            cpioSkipArgs.append(path)
+            cpioSkipArgs.append('.' + path)
+            cpioSkipArgs.append(path[1:])
+    if len(cpioSkipArgs) > 1:
+        cpioArgs.extend(cpioSkipArgs)
 
     if targetfile:
         if os.path.exists(targetfile):
