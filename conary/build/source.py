@@ -35,7 +35,6 @@ from conary.build import action, errors
 from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
-from conary.build.build import MakeFIFO
 
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
@@ -1395,10 +1394,7 @@ class addCapsule(_Source):
                 major = (rdev >> 8) & 0xfff
                 self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
             else:
-                if stat.S_ISFIFO(mode):
-                    MakeFIFO(path, stat.S_IMODE(mode))
-                else:
-                    self.recipe.setModes(stat.S_IMODE(mode),path)
+                self.recipe.setModes(stat.S_IMODE(mode), path)
 
                 self.recipe.Ownership(user, group, regexpath)
             if stat.S_ISDIR(mode):
