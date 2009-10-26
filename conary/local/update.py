@@ -118,7 +118,7 @@ class FilesystemJob:
             self.restores[target] = (fileObj.pathId(), fileObj,
                                      contentsOverride, msg, troveInfo, fileId)
             if fileObj.hasContents:
-                self.restoreSize += fileObj.contents.size()
+                self.addToRestoreSize(fileObj.contents.size())
 
             for tag in fileObj.tags:
                 l = self.tagUpdates.setdefault(tag, [])
@@ -1639,6 +1639,12 @@ class FilesystemJob:
                                      oldFile, diff, fileExists )
 
         return pathsMoved
+
+    def addToRestoreSize(self, size):
+        self.restoreSize += size
+
+    def getRestoreSize(self):
+        return self.restoreSize
 
     def __init__(self, db, changeSet, fsTroveDict, root,
                  callback = None, flags = None, removeHints = {},

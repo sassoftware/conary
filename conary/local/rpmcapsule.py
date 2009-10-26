@@ -69,8 +69,6 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                          rpm.RPMPROB_FILTER_REPLACEOLDFILES |
                          rpm.RPMPROB_FILTER_OLDPACKAGE)
 
-        totalSize = 0
-
         for troveCs, (pathId, path, fileId, sha1) in self.installs:
             localPath = fileDict[(pathId, fileId)]
             fd = os.open(localPath, os.O_RDONLY)
@@ -80,9 +78,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             hasTransaction = True
 
             if rpm.RPMTAG_LONGARCHIVESIZE in hdr.keys():
-                totalSize += hdr[rpm.RPMTAG_LONGARCHIVESIZE]
+                thisSize = hdr[rpm.RPMTAG_LONGARCHIVESIZE]
             else:
-                totalSize += hdr[rpm.RPMTAG_ARCHIVESIZE]
+                thisSize = hdr[rpm.RPMTAG_ARCHIVESIZE]
+
+            self.fsJob.addToRestoreSize(thisSize)
 
         removeList = []
         for trv in self.removes:
@@ -94,7 +94,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         ts.check()
         ts.order()
-        cb = Callback(self.callback, totalSize)
+        cb = Callback(self.callback, self.fsJob.getRestoreSize())
         probs = ts.run(cb, '')
         if probs:
             raise ValueError(str(probs))
