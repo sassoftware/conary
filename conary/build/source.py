@@ -1402,19 +1402,19 @@ class addCapsule(_Source):
                 util.mkdirChain(fullpath)
                 self.recipe.ExcludeDirectories(exceptions=path)
             else:
-                if flags & (rpmhelper.RPMFILE_CONFIG |
-                            rpmhelper.RPMFILE_MISSINGOK |
-                            rpmhelper.RPMFILE_NOREPLACE):
-                    if size:
-                        self.recipe.Config(path)
-                    else:
-                        self.recipe.InitialContents(path)
                 if flags & rpmhelper.RPMFILE_GHOST:
                     self.recipe.InitialContents(path)
                     # RPM did not actually create this file; we need it for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
                     file(fullpath, 'w')
+                elif flags & (rpmhelper.RPMFILE_CONFIG |
+                            rpmhelper.RPMFILE_MISSINGOK |
+                            rpmhelper.RPMFILE_NOREPLACE):
+                    if size:
+                        self.recipe.Config(path)
+                    else:
+                        self.recipe.InitialContents(path)
         self.manifest.recordRelativePaths(pathList)
         self.manifest.create()
         self.recipe._setPathsForCapsule(f, pathList)
