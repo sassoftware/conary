@@ -126,8 +126,10 @@ class Payload(policy.Policy):
     def doFile(self, filename):
         f = self.recipe.autopkg.pathMap[filename]
 
-        # every regular file is payload if it is not a config file, not an initialContents file and is inside a capsule
-        if self.recipe._getCapsulePathForFile(filename) and isinstance(f, files.RegularFile) and not f.flags.isConfig() and not f.flags.isInitialContents():
+        # every regular file is payload if it is not a config file,
+        # not an empty initialContents file and is inside a capsule
+        if self.recipe._getCapsulePathForFile(filename) and isinstance(f, files.RegularFile) \
+                and not f.flags.isConfig() and not ( f.flags.isInitialContents() and not f.contents.size() ):
             f.flags.isPayload(True)
 
 
