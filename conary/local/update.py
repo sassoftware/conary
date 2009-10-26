@@ -1685,7 +1685,7 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
         self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
-                                                       self)
+                                                       callback, self)
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db

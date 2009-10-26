@@ -25,8 +25,11 @@ def rpmkey(hdr):
 
 class Callback:
 
-    def __init__(self):
+    def __init__(self, callback, totalSize):
         self.fdnos = {}
+        self.callback = callback
+        self.totalSize = totalSize
+        self.lastAmount = 0
 
     def __call__(self, what, amount, total, mydata, wibble):
         if what == rpm.RPMCALLBACK_TRANS_START:
@@ -35,12 +38,19 @@ class Callback:
             hdr, path = mydata
             fd = os.open(path, os.O_RDONLY)
             self.fdnos[rpmkey(hdr)] = fd
+            self.lastAmount = 0
             return fd
         elif what == rpm.RPMCALLBACK_INST_CLOSE_FILE:
             hdr, path = mydata
             os.close(self.fdnos[rpmkey(hdr)])
+            del self.fdnos[rpmkey(hdr)]
         elif what == rpm.RPMCALLBACK_INST_PROGRESS:
-            pass
+            self.callback.restoreFiles(amount - self.lastAmount,
+                                       self.totalSize)
+            self.lastAmount = amount
+
+    def __del__(self):
+        assert(not self.fdnos)
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
@@ -59,6 +69,8 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                          rpm.RPMPROB_FILTER_REPLACEOLDFILES |
                          rpm.RPMPROB_FILTER_OLDPACKAGE)
 
+        totalSize = 0
+
         for troveCs, (pathId, path, fileId, sha1) in self.installs:
             localPath = fileDict[(pathId, fileId)]
             fd = os.open(localPath, os.O_RDONLY)
@@ -66,6 +78,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             os.close(fd)
             ts.addInstall(hdr, (hdr, localPath), "i")
             hasTransaction = True
+
+            if rpm.RPMTAG_LONGARCHIVESIZE in hdr.keys():
+                totalSize += hdr[rpm.RPMTAG_LONGARCHIVESIZE]
+            else:
+                totalSize += hdr[rpm.RPMTAG_ARCHIVESIZE]
 
         removeList = []
         for trv in self.removes:
@@ -77,7 +94,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         ts.check()
         ts.order()
-        cb = Callback()
+        cb = Callback(self.callback, totalSize)
         probs = ts.run(cb, '')
         if probs:
             raise ValueError(str(probs))

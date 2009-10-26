@@ -19,11 +19,12 @@ from conary.lib import digestlib, util
 
 class CapsuleOperation(object):
 
-    def __init__(self, root, db, changeSet, fsJob):
+    def __init__(self, root, db, changeSet, callback, fsJob):
         self.root = root
         self.db = db
         self.changeSet = changeSet
         self.fsJob = fsJob
+        self.callback = callback
         self.errors = []
 
     def apply(self, root):
@@ -138,6 +139,7 @@ class MetaCapsuleOperations(CapsuleOperation):
             self.capsuleClasses[kind] = \
                 getattr(sys.modules[module], klass)(self.root, self.db,
                                                     self.changeSet,
+                                                    self.callback,
                                                     self.fsJob)
 
         return self.capsuleClasses[kind]
