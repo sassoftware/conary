@@ -563,7 +563,7 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group, mode, size, dev, flags) in ownerList:
+                for (path, user, group, mode, size, dev, flags, vflags) in ownerList:
                     # trim off the leading / (or else path.joining it with
                     # self.dir will result in /dir//foo -> /foo.
                     path = path.lstrip('/')
@@ -1372,7 +1372,7 @@ class addCapsule(_Source):
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
         pathList=[]
 
-        for (path, user, group, mode, size, rdev, flags) in ownerList:
+        for (path, user, group, mode, size, rdev, flags, vflags) in ownerList:
             pathList.append(path)
 
             # we have to anchor the filter ourselves because
@@ -1415,6 +1415,14 @@ class addCapsule(_Source):
                         self.recipe.Config(path)
                     else:
                         self.recipe.InitialContents(path)
+                elif vflags:
+                    # CNY-3254: improve verification mapping; %doc are regular
+                    if ((stat.S_ISLNK(mode) and
+                         not vflags & rpmhelper.RPMVERIFY_LINKTO) or
+                        (stat.S_ISREG(mode) and
+                         not vflags & rpmhelper.RPMVERIFY_FILEDIGEST)):
+                        self.recipe.InitialContents(path)
+
         self.manifest.recordRelativePaths(pathList)
         self.manifest.create()
         self.recipe._setPathsForCapsule(f, pathList)
@@ -2263,6 +2271,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILESIZES],
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
+                                    h[rpmhelper.FILEVERIFYFLAGS],
                                     ))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)

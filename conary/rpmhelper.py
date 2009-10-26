@@ -46,6 +46,7 @@ FILEFLAGS       = 1037 # bitmask: RPMFILE_* are bitmasks to interpret
 FILEUSERNAME    = 1039
 FILEGROUPNAME   = 1040
 SOURCERPM       = 1044
+FILEVERIFYFLAGS = 1045 # bitmask: RPMVERIFY_* are bitmasks to interpret
 PROVIDENAME     = 1047
 REQUIRENAME     = 1049
 RPMVERSION      = 1064
@@ -63,6 +64,7 @@ PAYLOADCOMPRESSOR = 1125
 SIG_SHA1        = 269
 SIG_SIZE        = 1000
 
+# FILEFLAGS bitmask elements:
 RPMFILE_NONE       = 0
 RPMFILE_CONFIG     = (1 <<  0)
 RPMFILE_DOC        = (1 <<  1)
@@ -77,6 +79,21 @@ RPMFILE_EXCLUDE    = (1 <<  9)
 RPMFILE_UNPATCHED  = (1 <<  10)
 RPMFILE_PUBKEY     = (1 <<  11)
 RPMFILE_POLICY     = (1 <<  12)
+
+# FILEVERIFYFLAGS bitmask elements:
+RPMVERIFY_NONE       = 0
+RPMVERIFY_MD5        = (1 << 0)
+RPMVERIFY_FILEDIGEST = (1 << 0)
+RPMVERIFY_FILESIZE   = (1 << 1)
+RPMVERIFY_LINKTO     = (1 << 2)
+RPMVERIFY_USER       = (1 << 3)
+RPMVERIFY_GROUP      = (1 << 4)
+RPMVERIFY_MTIME      = (1 << 5)
+RPMVERIFY_MODE       = (1 << 6)
+RPMVERIFY_RDEV       = (1 << 7)
+RPMVERIFY_CAPS       = (1 << 8)
+RPMVERIFY_CONTEXTS   = (1 << 15)
+
 
 def seekToData(f):
     """
