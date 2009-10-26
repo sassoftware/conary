@@ -33,19 +33,26 @@ class Callback:
         self.lastAmount = 0
 
     def flushRpmLog(self):
-        if os.fstat(self.logFd).st_size != os.lseek(self.logFd, 0, os.SEEK_CUR):
-            data = os.read(self.logFd, 5000)
-            lines = data.split('\n')
-            for line in lines:
-                line.strip()
-                if not line:
-                    continue
+        s = os.read(self.logFd, 50000)
+        data = ''
+        while s:
+            data += s
+            s = os.read(self.logFd, 50000)
 
-                if line.startswith('error:'):
-                    line = line[6:].strip()
-                    self.callback.error(line)
-                else:
-                    self.callback.warning(line)
+        lines = data.split('\n')
+        for line in lines:
+            line.strip()
+            if not line:
+                continue
+
+            if line.startswith('error:'):
+                line = line[6:].strip()
+                self.callback.error(line)
+            elif line.startswith('warning:'):
+                line = line[8:].strip()
+                self.callback.warning(line)
+            else:
+                self.callback.warning(line)
 
     def __call__(self, what, amount, total, mydata, wibble):
         self.flushRpmLog()
@@ -54,7 +61,7 @@ class Callback:
             pass
         elif what == rpm.RPMCALLBACK_INST_OPEN_FILE:
             hdr, path = mydata
-            fd = os.open(path, os.O_RDONLY)
+            fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
             self.fdnos[rpmkey(hdr)] = fd
             self.lastAmount = 0
             return fd
