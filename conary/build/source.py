@@ -1417,10 +1417,8 @@ class addCapsule(_Source):
                         self.recipe.InitialContents(path)
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
-                    if ((stat.S_ISLNK(mode) and
-                         not vflags & rpmhelper.RPMVERIFY_LINKTO) or
-                        (stat.S_ISREG(mode) and
-                         not vflags & rpmhelper.RPMVERIFY_FILEDIGEST)):
+                    if (stat.S_ISREG(mode) and
+                        not vflags & rpmhelper.RPMVERIFY_FILEDIGEST):
                         self.recipe.InitialContents(path)
 
         self.manifest.recordRelativePaths(pathList)
