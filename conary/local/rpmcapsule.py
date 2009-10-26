@@ -12,7 +12,7 @@
 # full details.
 #
 
-import itertools, rpm, os, pwd, stat
+import itertools, rpm, os, pwd, stat, tempfile
 
 from conary import files
 from conary.lib import util
@@ -25,13 +25,31 @@ def rpmkey(hdr):
 
 class Callback:
 
-    def __init__(self, callback, totalSize):
+    def __init__(self, callback, totalSize, logFd):
         self.fdnos = {}
         self.callback = callback
         self.totalSize = totalSize
+        self.logFd = logFd
         self.lastAmount = 0
 
+    def flushRpmLog(self):
+        if os.fstat(self.logFd).st_size != os.lseek(self.logFd, 0, os.SEEK_CUR):
+            data = os.read(self.logFd, 5000)
+            lines = data.split('\n')
+            for line in lines:
+                line.strip()
+                if not line:
+                    continue
+
+                if line.startswith('error:'):
+                    line = line[6:].strip()
+                    self.callback.error(line)
+                else:
+                    self.callback.warning(line)
+
     def __call__(self, what, amount, total, mydata, wibble):
+        self.flushRpmLog()
+
         if what == rpm.RPMCALLBACK_TRANS_START:
             pass
         elif what == rpm.RPMCALLBACK_INST_OPEN_FILE:
@@ -51,6 +69,7 @@ class Callback:
 
     def __del__(self):
         assert(not self.fdnos)
+        self.flushRpmLog()
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
@@ -94,8 +113,24 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         ts.check()
         ts.order()
-        cb = Callback(self.callback, self.fsJob.getRestoreSize())
+
+        # redirect RPM messages into a temporary file; we harvest them from
+        # there and send them on to the callback via the rpm callback
+        tmpfd, tmpPath = tempfile.mkstemp()
+        writeFile = os.fdopen(tmpfd, "w+")
+        readFile = os.open(tmpPath, os.O_RDONLY)
+
+        rpm.setLogFile(writeFile)
+
+        cb = Callback(self.callback, self.fsJob.getRestoreSize(), readFile)
         probs = ts.run(cb, '')
+
+        # flush the RPM log
+        del cb
+
+        writeFile.close()
+        os.close(readFile)
+
         if probs:
             raise ValueError(str(probs))
 
