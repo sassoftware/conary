@@ -1400,10 +1400,10 @@ class addCapsule(_Source):
             if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
                 util.mkdirChain(fullpath)
-                self.recipe.ExcludeDirectories(exceptions=path)
+                self.recipe.ExcludeDirectories(exceptions=regexpath)
             else:
                 if flags & rpmhelper.RPMFILE_GHOST:
-                    self.recipe.InitialContents(path)
+                    self.recipe.InitialContents(regexpath)
                     # RPM did not actually create this file; we need it for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
@@ -1412,14 +1412,14 @@ class addCapsule(_Source):
                             rpmhelper.RPMFILE_MISSINGOK |
                             rpmhelper.RPMFILE_NOREPLACE):
                     if size:
-                        self.recipe.Config(path)
+                        self.recipe.Config(regexpath)
                     else:
-                        self.recipe.InitialContents(path)
+                        self.recipe.InitialContents(regexpath)
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
                     if (stat.S_ISREG(mode) and
                         not vflags & rpmhelper.RPMVERIFY_FILEDIGEST):
-                        self.recipe.InitialContents(path)
+                        self.recipe.InitialContents(regexpath)
 
         self.manifest.recordRelativePaths(pathList)
         self.manifest.create()
