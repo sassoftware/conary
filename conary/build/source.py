@@ -1380,8 +1380,6 @@ class addCapsule(_Source):
         for (path, user, group, mode, size, rdev, flags, vflags) in ownerList:
             totalPathList.append(path)
 
-            self.recipe.setModes(stat.S_IMODE(mode), path)
-
             devtype = None
             if stat.S_ISBLK(mode):
                 devtype = 'b'
@@ -1391,18 +1389,20 @@ class addCapsule(_Source):
                 minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
                 major = (rdev >> 8) & 0xfff
                 self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
-            elif user is not 'root' and group is not 'root':
-                k = user + ' ' + group
-                d = Ownership.setdefault(k,[])
-                d.append(re.escape(path).replace('%', '%%'))
+            else:
+                self.recipe.setModes(stat.S_IMODE(mode), path)
+                if user is not 'root' and group is not 'root':
+                    k = user + ' ' + group
+                    d = Ownership.setdefault(k,[])
+                    d.append(path)
 
             if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
                 util.mkdirChain(fullpath)
-                ExcludeDirectories.append( re.escape(path).replace('%', '%%') )
+                ExcludeDirectories.append( path )
             else:
                 if flags & rpmhelper.RPMFILE_GHOST:
-                    InitialContents.append( re.escape(path).replace('%', '%%') )
+                    InitialContents.append( path )
                     # RPM did not actually create this file; we need it for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
@@ -1411,30 +1411,37 @@ class addCapsule(_Source):
                             rpmhelper.RPMFILE_MISSINGOK |
                             rpmhelper.RPMFILE_NOREPLACE):
                     if size:
-                        Config.append( re.escape(path).replace('%', '%%') )
+                        Config.append( path )
                     else:
-                        InitialContents.append( re.escape(path).replace('%', '%%') )
+                        InitialContents.append( path )
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
                     if (stat.S_ISREG(mode) and
                         not vflags & rpmhelper.RPMVERIFY_FILEDIGEST):
-                        InitialContents.append( re.escape(path).replace('%', '%%') )
+                        InitialContents.append( path )
+
+        def buildRegexString( pathList ):
+            regex = '^(?:' + re.escape(pathList[0]).replace('%', '%%')
+            for path in pathList[1:]:
+                regex = regex + '|' + re.escape(path).replace('%', '%%')
+            regex = regex + ')$'
+            return regex
 
         for key, rePathList in Ownership.items():
             user,group = key.split()
-            regex = '^(?:'+'|'.join(rePathList)+')$'
+            regex = buildRegexString( rePathList )
             self.recipe.Ownership(user,group,regex)
 
         if len(ExcludeDirectories):
-            regex = '^(?:'+'|'.join(ExcludeDirectories)+')$'
+            regex = buildRegexString( ExcludeDirectories )
             self.recipe.ExcludeDirectories(exceptions=regex)
 
         if len(InitialContents):
-            regex = '^(?:'+'|'.join(InitialContents)+')$'
+            regex = buildRegexString( InitialContents )
             self.recipe.InitialContents(regex)
 
         if len(Config):
-            regex = '^(?:'+'|'.join(Config)+')$'
+            regex = buildRegexString( Config )
             self.recipe.Config(regex)
 
         self.manifest.recordRelativePaths(totalPathList)
