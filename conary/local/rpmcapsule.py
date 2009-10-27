@@ -103,7 +103,8 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             ts.addInstall(hdr, (hdr, localPath), "i")
             hasTransaction = True
 
-            if rpm.RPMTAG_LONGARCHIVESIZE in hdr.keys():
+            if (rpm.__dict__.has_key('RPMTAG_LONGARCHIVESIZE') and
+                rpm.RPMTAG_LONGARCHIVESIZE in hdr.keys()):
                 thisSize = hdr[rpm.RPMTAG_LONGARCHIVESIZE]
             else:
                 thisSize = hdr[rpm.RPMTAG_ARCHIVESIZE]
