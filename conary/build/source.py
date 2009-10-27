@@ -1370,40 +1370,39 @@ class addCapsule(_Source):
 
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
-        pathList=[]
+
+        totalPathList=[]
+        Ownership  = {}
+        ExcludeDirectories = [] 
+        InitialContents = []
+        Config = []
 
         for (path, user, group, mode, size, rdev, flags, vflags) in ownerList:
-            pathList.append(path)
+            totalPathList.append(path)
 
-            # we have to anchor the filter ourselves because
-            # re.escape('/foo') -> '\\/foo'.  Since this doesn't
-            # start with '/', the filter will not be anchored.
-            # we can put the trailing $ in too, just to make sure
-            # that we only apply this ownership to an exact match
-            # (in case somehow a path has a trailing /)
-            regexpath = '^%s$' %re.escape(path).replace('%', '%%')
+            self.recipe.setModes(stat.S_IMODE(mode), path)
 
             devtype = None
             if stat.S_ISBLK(mode):
                 devtype = 'b'
             elif stat.S_ISCHR(mode):
                 devtype = 'c'
-
             if devtype:
                 minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
                 major = (rdev >> 8) & 0xfff
                 self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
-            else:
-                self.recipe.setModes(stat.S_IMODE(mode), path)
+            elif user is not 'root' and group is not 'root':
+                k = user + ' ' + group
+                d = Ownership.setdefault(k,[])
+                d.append(re.escape(path).replace('%', '%%'))
 
-                self.recipe.Ownership(user, group, regexpath)
             if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
                 util.mkdirChain(fullpath)
-                self.recipe.ExcludeDirectories(exceptions=regexpath)
+                ExcludeDirectories.append( re.escape(path).replace('%', '%%') )
             else:
                 if flags & rpmhelper.RPMFILE_GHOST:
-                    self.recipe.InitialContents(regexpath)
+                    InitialContents.append( re.escape(path).replace('%', '%%') )
                     # RPM did not actually create this file; we need it for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
@@ -1412,18 +1411,35 @@ class addCapsule(_Source):
                             rpmhelper.RPMFILE_MISSINGOK |
                             rpmhelper.RPMFILE_NOREPLACE):
                     if size:
-                        self.recipe.Config(regexpath)
+                        Config.append( re.escape(path).replace('%', '%%') )
                     else:
-                        self.recipe.InitialContents(regexpath)
+                        InitialContents.append( re.escape(path).replace('%', '%%') )
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
                     if (stat.S_ISREG(mode) and
                         not vflags & rpmhelper.RPMVERIFY_FILEDIGEST):
-                        self.recipe.InitialContents(regexpath)
+                        InitialContents.append( re.escape(path).replace('%', '%%') )
 
-        self.manifest.recordRelativePaths(pathList)
+        for key, rePathList in Ownership.items():
+            user,group = key.split()
+            regex = '^(?:'+'|'.join(rePathList)+')$'
+            self.recipe.Ownership(user,group,regex)
+
+        if len(ExcludeDirectories):
+            regex = '^(?:'+'|'.join(ExcludeDirectories)+')$'
+            self.recipe.ExcludeDirectories(exceptions=regex)
+
+        if len(InitialContents):
+            regex = '^(?:'+'|'.join(InitialContents)+')$'
+            self.recipe.InitialContents(regex)
+
+        if len(Config):
+            regex = '^(?:'+'|'.join(Config)+')$'
+            self.recipe.Config(regex)
+
+        self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
-        self.recipe._setPathsForCapsule(f, pathList)
+        self.recipe._setPathsForCapsule(f, totalPathList)
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
 
