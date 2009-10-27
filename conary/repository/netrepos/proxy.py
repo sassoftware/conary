@@ -230,6 +230,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.basicUrl = basicUrl
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
+        util.mkdirChain(self.tmpPath)
         self.proxies = conarycfg.getProxyFromConfig(cfg)
         self.repositoryVersionCache = RepositoryVersionCache()
 
@@ -791,7 +792,10 @@ class ChangesetFilter(BaseProxy):
                         if tcs.getTroveInfo().capsule.type():
                             # requested a changeset with file contents, when
                             # the content is a capsule. Die violently
-                            raise Exception("XXX FIXME")
+                            raise errors.CapsuleServingDenied(
+                                "Request for contents for a changeset "
+                                "based on capsules, from repository denying "
+                                "such operation")
             elif (not self.isRepositoryFilter and changeSetsNeeded and
                     self.cfg.capsuleServerUrl):
                 assert self.csCache
@@ -1060,12 +1064,11 @@ class ChangesetFilter(BaseProxy):
 
             ccs = changeset.ChangeSet()
             capsuleSha1 = None
-            # It is important to walk the changed file list first, to catch
-            # the capsule file. Otherwise, we may have new files that would
-            # invalidate the assumption that we always get the capsule first
-            for pathId, path, fileId, fileVersion in itertools.chain(
+            # Sorting the files by path id will ensure we always get the
+            # capsule first.
+            for pathId, path, fileId, fileVersion in sorted(itertools.chain(
                                         trvCs.getChangedFileList(),
-                                        trvCs.getNewFileList()):
+                                        trvCs.getNewFileList())):
                 if not fileId:
                     # This can only happen on renames, which we don't
                     # quite support anyway
@@ -1192,7 +1195,11 @@ class ChangesetFilter(BaseProxy):
             if digest.hexdigest() != cls._sha1(sha1sum):
                 raise Exception("XXX FIXME")
             out.seek(0)
-            return changeset.filecontents.FromFile(out)
+            return cls.fromFile(out)
+
+        @classmethod
+        def fromFile(cls, stream):
+            return changeset.filecontents.FromFile(stream)
 
         @classmethod
         def quote(cls, string):

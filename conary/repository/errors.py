@@ -449,6 +449,10 @@ class PathsNotFound(RepositoryError):
         return self.pathList
 
 
+class CapsuleServingDenied(RepositoryError):
+    def __str__(self):
+        return ''.join(self.args)
+
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that
 # class back to the client.  The str() value of the exception will
