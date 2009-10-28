@@ -1391,7 +1391,7 @@ class addCapsule(_Source):
                 self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
             else:
                 self.recipe.setModes(stat.S_IMODE(mode), path)
-                if user is not 'root' and group is not 'root':
+                if user != 'root' and group != 'root':
                     k = user + ' ' + group
                     d = Ownership.setdefault(k,[])
                     d.append(path)
