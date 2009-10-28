@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+# -*- mode: python -*-
+#
+# Copyright (c) 2009 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import itertools, os, sys
+from optparse import OptionParser
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+from conary import conarycfg, conaryclient, trove
+
+cfg = conarycfg.ConaryConfiguration()
+cfg.readFiles()
+
+def configCallback(option, opt, val, parser):
+    cfg.configLine(val)
+
+def configFileCallback(option, opt, val, parser):
+    cfg.readFile(val)
+
+parser = OptionParser(usage = "usage: mkcompetecs <out.ccs> [troveSpecs]+")
+parser.add_option('', '--config-file', type = "string", action = "callback",
+                  callback = configFileCallback,
+                  help = "configuration file to load after the defaults")
+parser.add_option('', '--config', action = "callback", type = "string",
+                  callback = configCallback,
+                  help = "configuration statement")
+(options, args) = parser.parse_args()
+if len(args) < 2:
+    parser.print_help()
+    sys.exit(1)
+
+outFile = args.pop(0)
+cb = conaryclient.callbacks.ChangesetCallback()
+
+cl = conaryclient.ConaryClient(cfg = cfg)
+repos = cl.getRepos()
+
+troveSpecs = [ conaryclient.cmdline.parseTroveSpec(x) for x in args ]
+
+trvInfoDict = repos.findTroves([], troveSpecs)
+trvInfoList = list(itertools.chain(*trvInfoDict.values()))
+job = [ (x[0], (None, None), (x[1], x[2]), True) for x in trvInfoList ]
+cs = repos.createChangeSet(job, recurse = False, callback = cb)
+
+# we don't just use recurse because we want troves which are byDefault False
+trvInfoSet = set()
+for trvCs in cs.iterNewTroveList():
+    trv = trove.Trove(trvCs)
+    trvInfoSet.update(list(trv.iterTroveList(strongRefs = True,
+                                             weakRefs = True)))
+
+
+job = [ (x[0], (None, None), (x[1], x[2]), True) for x in trvInfoSet ]
+
+newCs = repos.createChangeSet(job, recurse = False, callback = cb)
+cs.merge(newCs)
+cs.writeToFile(outFile)
