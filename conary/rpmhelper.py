@@ -19,10 +19,12 @@ Contains functions to assist in dealing with rpm files.
 import gzip
 
 import itertools, struct, re
+from conary.lib import digestlib, openpgpfile
 from conary.lib.sha1helper import *
 from conary.deps import deps
 from conary.lib import util
 
+_GENERAL_TAG_BASE = 1000
 NAME            = 1000
 VERSION         = 1001
 RELEASE         = 1002
@@ -61,8 +63,15 @@ DIRNAMES        = 1118
 PAYLOADFORMAT     = 1124
 PAYLOADCOMPRESSOR = 1125
 
+SIG_BASE        = 256
 SIG_SHA1        = 269
-SIG_SIZE        = 1000
+
+# Given that there is overlap between signature tag headers and general tag
+# headers, we offset the signature ones by some amount
+_SIGHEADER_TAG_BASE = 16384
+SIG_SIZE        = _SIGHEADER_TAG_BASE + 1000 # Header + Payload size
+SIG_MD5         = _SIGHEADER_TAG_BASE + 1004 # MD5SUM of header + payload
+SIG_GPG         = _SIGHEADER_TAG_BASE + 1005
 
 # FILEFLAGS bitmask elements:
 RPMFILE_NONE       = 0
@@ -104,37 +113,11 @@ def seekToData(f):
     @type f: file
     @rtype: None
     """
-    lead = f.read(96)
-    leadMagic = struct.unpack("!i", lead[0:4])[0]
+    # Read the header, that should position the file pointer to the proper
+    # location
+    readHeader(f)
 
-    if (leadMagic & 0xffffffffl) != 0xedabeedbl: 
-	raise IOError, "file is not an RPM"
-
-    # signature block
-    sigs = f.read(16)
-    (mag1, mag2, mag3, ver, reserved, entries, size) = \
-	struct.unpack("!BBBBiii", sigs)
-
-    if mag1 != 0x8e or mag2 != 0xad or mag3 != 0xe8  or ver != 01:
-	raise IOError, "bad magic for signature block"
-
-    f.seek(size + entries * 16, 1)
-
-    place = f.tell()
-    if place % 8:
-	f.seek(8 - (place % 8), 1)
-
-    # headers
-    sigs = f.read(16)
-    (mag1, mag2, mag3, ver, reserved, entries, size) = \
-	struct.unpack("!BBBBiii", sigs)
-
-    if mag1 != 0x8e or mag2 != 0xad or mag3 != 0xe8  or ver != 01:
-	raise IOError, "bad magic for header"
-
-    f.seek(size + entries * 16, 1)
-
-class RpmHeader(object):
+class _RpmHeader(object):
     __slots__ = ['entries', 'data', 'isSource']
     _tagListValues = set([
         DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME])
@@ -227,13 +210,13 @@ class RpmHeader(object):
 
         (dataType, offset, count) = self.entries[tag]
 
+        if dataType in (1, 7):
+            # RPM_CHAR_TYPE, RPM_BIN_TYPE
+            return self.data[offset:offset + count]
+
         items = []
         while count:
-            if dataType == 1:
-                # RPM_CHAR_TYPE
-                items.append(self.data[offset])
-                offset += 1
-            elif dataType == 2:
+            if dataType == 2:
                 # RPM_INT8_TYPE
                 items.append(struct.unpack("B", self.data[offset])[0])
                 offset += 1
@@ -275,6 +258,7 @@ class RpmHeader(object):
         self.isSource = isSource
         self.entries = {}
         self.data = f.read(size)
+        assert len(self.data) == size
 
         if sha1 is not None:
             computedSha1 = sha1ToString(sha1String(intro + entryTable +
@@ -289,11 +273,76 @@ class RpmHeader(object):
             self.entries[tag] = (dataType, offset, count)
 
         if sigBlock:
-            place = f.tell()
-            if place % 8:
-                f.seek(8 - (place % 8), 1)
+            # We need to align to an 8-byte boundary.
+            # So far we read the intro (which is 16 bytes) and the entry table
+            # (which is a multiple of 16 bytes). So we only have to worry
+            # about the actual header data not being aligned.
+            alignment = size % 8
+            if alignment:
+                f.read(8 - alignment)
 
-def readHeader(f):
+class RpmHeader(object):
+    """
+    Header structure. An RPM package has:
+    * intro
+    * signature header
+    * general header
+    * payload
+    """
+
+    _guard = object()
+    __slots__ = ['_sigHeader', '_genHeader', 'isSource']
+
+    def __init__(self, f, checkSize = True):
+        self._sigHeader = None
+        self._genHeader = None
+        self.isSource = False
+
+        self._sigHeader = readSignatureHeader(f)
+        sha1 = self._sigHeader.get(SIG_SHA1 - _SIGHEADER_TAG_BASE, None)
+        if checkSize:
+            headerPlusPayloadSize = self.getHeaderPlusPayloadSize()
+            if headerPlusPayloadSize is not None:
+                totalSize = os.fstat(f.fileno()).st_size
+                pos = f.tell()
+                if headerPlusPayloadSize != (totalSize - pos):
+                    raise IOError, "file size does not match size specified by header"
+        # if we insist, we could also verify SIG_MD5
+        self.isSource = self._sigHeader.isSource
+        self._genHeader = _RpmHeader(f, sha1 = sha1, isSource = self.isSource)
+
+    def getHeaderPlusPayloadSize(self):
+        size = self._sigHeader.get(SIG_SIZE - _SIGHEADER_TAG_BASE, None)
+        if size is None:
+            return None
+        return size[0]
+
+    def get(self, tag, default = _guard):
+        if tag > _SIGHEADER_TAG_BASE:
+            return self._sigHeader.get(tag - _SIGHEADER_TAG_BASE,
+                default = default)
+        if tag < _GENERAL_TAG_BASE:
+            return self._sigHeader.get(tag, default = default)
+        return self._genHeader.get(tag, default = default)
+
+    def has_key(self, tag):
+        val = self.get(tag)
+        return (val is not self._guard)
+    __contains__ = has_key
+
+    def __getitem__(self, tag):
+        val = self.get(tag)
+        if val is self._guard:
+            raise AttributeError(tag)
+        return val
+
+    def __getattr__(self, name):
+        return getattr(self._genHeader, name)
+
+def readHeader(f, checkSize = True):
+    return RpmHeader(f, checkSize = checkSize)
+
+def readSignatureHeader(f):
     lead = f.read(96)
     leadMagic = struct.unpack("!i", lead[0:4])[0]
 
@@ -302,18 +351,58 @@ def readHeader(f):
 
     isSource = (struct.unpack('!H', lead[6:8])[0] == 1)
 
-    sigs = RpmHeader(f, isSource = isSource, sigBlock = True)
-    sha1 = sigs.get(SIG_SHA1, None)
+    sigs = _RpmHeader(f, isSource = isSource, sigBlock = True)
+    return sigs
 
-    if SIG_SIZE in sigs:
-        size = sigs[SIG_SIZE][0]
-        totalSize = os.fstat(f.fileno()).st_size
-        pos = f.tell()
-        if size != (totalSize - pos):
-            raise IOError, "file size does not match size specified by header"
+def verifySignatures(f, pgpKeyCache = None):
+    """
+    Given an extended file, compute signatures
+    """
+    f.seek(0)
+    h = readHeader(f)
 
-    return RpmHeader(f, sha1 = sha1, isSource = isSource)
+    # Cheap test first: verify MD5 sig
+    sigmd5 = h.get(SIG_MD5, None)
+    if sigmd5 is not None:
+        f.seek(0)
+        readSignatureHeader(f)
 
+        # verify md5 digest
+        md5 = digestlib.md5()
+        util.copyfileobj(f, NullWriter(), digest = md5)
+        if md5.digest() != sigmd5:
+            raise MD5SignatureError()
+
+    # Don't bother if no gpg signature was present
+    sigString = h.get(SIG_GPG, None)
+    if sigString is None:
+        return
+    # Skip to immutable header region
+    f.seek(0)
+    readSignatureHeader(f)
+    sig = openpgpfile.readSignature(sigString)
+    # signature verification assumes a seekable stream and will seek to the
+    # beginning; use a SeekableNestedFile
+    size = h.getHeaderPlusPayloadSize()
+    if size is None:
+        size = os.fstat(f.fileno()).st_size
+    if hasattr(f, 'pread'):
+        extFile = f
+    elif hasattr(f, 'name'):
+        extFile = util.ExtendedFile(f.name, buffering = False)
+    else:
+        # worst case scenario, we slurp everything in memory
+        extFile = util.ExtendedStringIO(f.read())
+    sf = util.SeekableNestedFile(extFile, start = f.tell(), size = size)
+    key = pgpKeyCache.getPublicKey(sig.getSignerKeyId())
+    try:
+        sig.verifyDocument(key.getCryptoKey(), sf)
+    except openpgpfile.SignatureError:
+        raise PGPSignatureError
+
+class NullWriter(object):
+    def write(self, data):
+        pass
 
 def getRpmLibProvidesSet(rpm):
     """
@@ -338,6 +427,15 @@ class UnknownPayloadFormat(BaseError):
 
 class UnknownCompressionType(BaseError):
     "The payload format is not supported"
+
+class SignatureVerificationError(BaseError):
+    "Signature verification error"
+
+class MD5SignatureError(SignatureVerificationError):
+    "MD5 signature failed to verify"
+
+class PGPSignatureError(SignatureVerificationError):
+    "PGP signature failed to verify"
 
 def extractRpmPayload(fileIn, fileOut):
     """
