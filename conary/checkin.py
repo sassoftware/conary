@@ -2169,7 +2169,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+    if not recipeClass.getType() in (recipe.RECIPE_TYPE_PACKAGE, recipe.RECIPE_TYPE_CAPSULE):
         raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter, cfg=cfg)
