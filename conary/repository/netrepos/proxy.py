@@ -1134,6 +1134,10 @@ class ChangesetFilter(BaseProxy):
             fileStream = newChangeset.getFileChange(None, fileId)
             return csfiles.ThawFile(fileStream, pathId)
         oldFileId = oldTrove.getFile(pathId)[1]
+        if oldFileId == fileId:
+            # File is completely unchanged between versions.
+            fileStream = oldChangeset.getFileChange(None, fileId)
+            return csfiles.ThawFile(fileStream, pathId)
         fileDiff = newChangeset.getFileChange(oldFileId, fileId)
         if not csfiles.fileStreamIsDiff(fileDiff):
             # Absolute stream in a relative changeset.
