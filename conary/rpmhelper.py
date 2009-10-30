@@ -18,8 +18,9 @@ Contains functions to assist in dealing with rpm files.
 
 import gzip
 
-import itertools, struct, re, os
-from conary.lib import digestlib, openpgpfile, sha1helper
+import itertools, struct, re
+from conary.lib import digestlib, openpgpfile
+from conary.lib.sha1helper import *
 from conary.deps import deps
 from conary.lib import util
 
@@ -261,8 +262,8 @@ class _RpmHeader(object):
         assert len(self.data) == size
 
         if sha1 is not None:
-            computedSha1 = sha1helper.sha1ToString(
-                sha1helper.sha1String(intro + entryTable + self.data))
+            computedSha1 = sha1ToString(sha1String(intro + entryTable +
+                                                   self.data))
             if computedSha1 != sha1:
                 raise IOError, "bad header sha1"
 
@@ -293,7 +294,7 @@ class RpmHeader(object):
     _guard = object()
     __slots__ = ['_sigHeader', '_genHeader', 'isSource']
 
-    def __init__(self, f, checkSize = True):
+    def __init__(self, f, checkSize = True,  ignoreSize=False):
         self._sigHeader = None
         self._genHeader = None
         self.isSource = False
@@ -302,15 +303,9 @@ class RpmHeader(object):
         sha1 = self._sigHeader.get(SIG_SHA1 - _SIGHEADER_TAG_BASE, None)
         if checkSize:
             headerPlusPayloadSize = self.getHeaderPlusPayloadSize()
-            if headerPlusPayloadSize is not None:
+            if headerPlusPayloadSize is not None and ignoreSize == False:
+                totalSize = os.fstat(f.fileno()).st_size
                 pos = f.tell()
-                if hasattr(f, 'fileno'):
-                    totalSize = os.fstat(f.fileno()).st_size
-                else:
-                    f.seek(0, 2)
-                    totalSize = f.tell()
-                    f.seek(pos, 0)
-
                 if headerPlusPayloadSize != (totalSize - pos):
                     raise IOError, "file size does not match size specified by header"
         # if we insist, we could also verify SIG_MD5
@@ -345,8 +340,8 @@ class RpmHeader(object):
     def __getattr__(self, name):
         return getattr(self._genHeader, name)
 
-def readHeader(f, checkSize = True):
-    return RpmHeader(f, checkSize = checkSize)
+def readHeader(f, checkSize = True, ignoreSize=False):
+    return RpmHeader(f, checkSize = checkSize, ignoreSize = ignoreSize)
 
 def readSignatureHeader(f):
     lead = f.read(96)
@@ -360,7 +355,7 @@ def readSignatureHeader(f):
     sigs = _RpmHeader(f, isSource = isSource, sigBlock = True)
     return sigs
 
-def verifySignatures(f, validKeys = None):
+def verifySignatures(f, pgpKeyCache = None):
     """
     Given an extended file, compute signatures
     """
@@ -377,14 +372,9 @@ def verifySignatures(f, validKeys = None):
         md5 = digestlib.md5()
         util.copyfileobj(f, NullWriter(), digest = md5)
         if md5.digest() != sigmd5:
-            raise MD5SignatureError(
-                "The MD5 digest fails to verify: expected %s, got %s" %
-                    (sha1helper.md5ToString(sigmd5), md5.hexdigest()))
+            raise MD5SignatureError()
 
-    # Don't bother if no gpg signature was present, or no valid keys were
-    # presented
-    if validKeys is None:
-        return
+    # Don't bother if no gpg signature was present
     sigString = h.get(SIG_GPG, None)
     if sigString is None:
         return
@@ -392,25 +382,11 @@ def verifySignatures(f, validKeys = None):
     f.seek(0)
     readSignatureHeader(f)
     sig = openpgpfile.readSignature(sigString)
-
-    keyId = sig.getSignerKeyId()
-    matchingKeys = [ x for x in validKeys if x.hasKeyId(keyId) ]
-    if not matchingKeys:
-        raise PGPSignatureError("Signature generated with key %s does "
-              "not match valid keys %s" % 
-              (keyId, ', '.join(x.getKeyId() for x in validKeys)))
-
-    key = matchingKeys[0]
-
     # signature verification assumes a seekable stream and will seek to the
     # beginning; use a SeekableNestedFile
     size = h.getHeaderPlusPayloadSize()
     if size is None:
-        pos = f.tell()
-        f.seek(0, 2)
-        size = f.tell()
-        f.seek(pos, 0)
-    snf = None
+        size = os.fstat(f.fileno()).st_size
     if hasattr(f, 'pread'):
         extFile = f
     elif hasattr(f, 'name'):
@@ -418,11 +394,10 @@ def verifySignatures(f, validKeys = None):
     else:
         # worst case scenario, we slurp everything in memory
         extFile = util.ExtendedStringIO(f.read())
-        snf = extFile
-    if snf is None:
-        snf = util.SeekableNestedFile(extFile, start = f.tell(), size = size)
+    sf = util.SeekableNestedFile(extFile, start = f.tell(), size = size)
+    key = pgpKeyCache.getPublicKey(sig.getSignerKeyId())
     try:
-        sig.verifyDocument(key.getCryptoKey(), snf)
+        sig.verifyDocument(key.getCryptoKey(), sf)
     except openpgpfile.SignatureError:
         raise PGPSignatureError
 
