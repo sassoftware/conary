@@ -294,7 +294,7 @@ class RpmHeader(object):
     _guard = object()
     __slots__ = ['_sigHeader', '_genHeader', 'isSource']
 
-    def __init__(self, f, checkSize = True,  fileIsStream=False):
+    def __init__(self, f, checkSize = True,  ignoreSize=False):
         self._sigHeader = None
         self._genHeader = None
         self.isSource = False
@@ -303,7 +303,7 @@ class RpmHeader(object):
         sha1 = self._sigHeader.get(SIG_SHA1 - _SIGHEADER_TAG_BASE, None)
         if checkSize:
             headerPlusPayloadSize = self.getHeaderPlusPayloadSize()
-            if headerPlusPayloadSize is not None and fileIsStream == False:
+            if headerPlusPayloadSize is not None and ignoreSize == False:
                 totalSize = os.fstat(f.fileno()).st_size
                 pos = f.tell()
                 if headerPlusPayloadSize != (totalSize - pos):
@@ -340,8 +340,8 @@ class RpmHeader(object):
     def __getattr__(self, name):
         return getattr(self._genHeader, name)
 
-def readHeader(f, checkSize = True, fileIsStream=False):
-    return RpmHeader(f, checkSize = checkSize, fileIsStream = fileIsStream)
+def readHeader(f, checkSize = True, ignoreSize=False):
+    return RpmHeader(f, checkSize = checkSize, ignoreSize = ignoreSize)
 
 def readSignatureHeader(f):
     lead = f.read(96)
