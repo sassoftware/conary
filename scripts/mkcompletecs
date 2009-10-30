@@ -26,6 +26,8 @@ if os.path.dirname(sys.argv[0]) != ".":
 else:
     fullPath = os.getcwd()
 
+sys.path.insert(0, os.path.dirname(fullPath))
+
 from conary import conarycfg, conaryclient, trove
 
 cfg = conarycfg.ConaryConfiguration()

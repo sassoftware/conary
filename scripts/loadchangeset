@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+# -*- mode: python -*-
+#
+# Copyright (c) 2009 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import itertools, os, sys
+from optparse import OptionParser
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg, conaryclient, dbstore
+from conary.local import schema as depSchema
+from conary.server import schema
+from conary.repository import changeset
+from conary.repository.netrepos import fsrepos, trovestore
+
+parser = OptionParser(usage = "usage: mksnapshot dbdriver dbpath contentsPath [changeset]+")
+(options, args) = parser.parse_args()
+if len(args) < 4:
+    parser.print_help()
+    sys.exit(1)
+
+db = dbstore.connect(args[1], driver = args[0])
+db.loadSchema()
+if db.tables:
+    print "The database must be empty."
+    sys.exit(1)
+
+schema.loadSchema(db)
+schema.setupTempTables(db)
+depSchema.setupTempDepTables(db)
+
+csList = [ changeset.ChangeSetFromFile(x) for x in args[3:] ]
+serverSet = set()
+for cs in csList:
+    serverSet.update([ x.getNewVersion().trailingLabel().getHost()
+                            for x in cs.iterNewTroveList() ])
+
+ts = trovestore.TroveStore(db)
+repos = fsrepos.FilesystemRepository(serverSet, ts, [ args[2] ], {})
+
+cfg = conarycfg.ConaryConfiguration()
+cfg.readFiles()
+cl = conaryclient.ConaryClient(cfg = cfg)
+netRepos = cl.getRepos()
+
+for serverName in serverSet:
+    keyList = netRepos.getNewPGPKeys(serverName, -1)
+    for key in keyList:
+        ts.keyTable.addNewKey(None, key)
+
+for csPath in args[3:]:
+    repos.commitChangeSet(cs, mirror = True)
+    db.commit()
