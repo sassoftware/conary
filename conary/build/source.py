@@ -1450,6 +1450,22 @@ class addCapsule(_Source):
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
 
+    def checkSignature(self, filepath):
+        if self.keyid:
+            key = self._getPublicKey()
+            validKeys = [ key ]
+        else:
+            validKeys = None
+
+        rpmFileObj = util.ExtendedFile(filepath, buffering = False)
+
+        try:
+            rpmhelper.verifySignatures(rpmFileObj, validKeys)
+        except rpmhelper.SignatureVerificationError, e:
+            raise SourceError, str(e)
+
+        log.info('GPG signature for %s is OK', os.path.basename(filepath))
+
 
 class addAction(action.RecipeAction):
     """

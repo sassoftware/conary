@@ -46,6 +46,8 @@ Changes in @NEW@:
     * Call lstat() instead of stat() to deal with circular links. (CNY-3251)
     * Bootstrapping python dependencies now uses python source intead
       of a version-specific compiled python file.
+    * The addCapsule source action properly verifies GPG keys when a keyid
+      argument is supplied. (CNY-3258)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access

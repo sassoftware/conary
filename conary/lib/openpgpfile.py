@@ -2219,6 +2219,13 @@ class PGP_Key(PGP_BaseKeySig):
                 return True
         return self.getKeyFingerprint().endswith(keyId)
 
+    def hasKeyId(self, keyId):
+        keyId = keyId.upper()
+        if self.version == 3:
+            if self.getKeyId().endswith(keyId):
+                return True
+        return self.getKeyFingerprint().endswith(keyId)
+
     def getCreatedTimestamp(self):
         self.parse()
         return self.createdTimestamp
