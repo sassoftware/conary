@@ -798,9 +798,7 @@ class PGP_Message(object):
     def iterByKeyId(self, keyId):
         """Iterate over the keys with this key ID"""
         for pkt in self.iterKeys():
-            if pkt.getKeyFingerprint().endswith(keyId.upper()):
-                yield pkt
-            if pkt.version == 3 and pkt.getKeyId().endswith(keyId.upper()):
+            if pkt.hasKeyId(keyId):
                 yield pkt
 
     def getKeyByKeyId(self, keyId):
@@ -2213,6 +2211,13 @@ class PGP_Key(PGP_BaseKeySig):
             self.getKeyFingerprint()
             return self._keyId[1]
         return self.getKeyFingerprint()[-16:]
+
+    def hasKeyId(self, keyId):
+        keyId = keyId.upper()
+        if self.version == 3:
+            if self.getKeyId().endswith(keyId):
+                return True
+        return self.getKeyFingerprint().endswith(keyId)
 
     def getCreatedTimestamp(self):
         self.parse()
