@@ -123,7 +123,8 @@ class _RpmHeader(object):
         DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME])
 
     def has_key(self, tag):
-        return self.entries.has_key(tag)
+        # __getitem__ assumes OLDFILENAMES is always present
+        return self.entries.has_key(tag) or tag == OLDFILENAMES
     __contains__ = has_key
 
     def paths(self):
