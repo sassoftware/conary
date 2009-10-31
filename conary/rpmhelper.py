@@ -119,7 +119,9 @@ def seekToData(f):
 class _RpmHeader(object):
     __slots__ = ['entries', 'data', 'isSource']
     _tagListValues = set([
-        DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME])
+        DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME,
+        FILESIZES, FILEMODES, FILERDEVS, FILELINKTOS, FILEFLAGS,
+        FILEVERIFYFLAGS, ])
 
     def has_key(self, tag):
         # __getitem__ assumes OLDFILENAMES is always present
