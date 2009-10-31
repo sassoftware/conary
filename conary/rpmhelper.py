@@ -123,7 +123,8 @@ class _RpmHeader(object):
 
     def has_key(self, tag):
         # __getitem__ assumes OLDFILENAMES is always present
-        return self.entries.has_key(tag) or tag == OLDFILENAMES
+        return self.entries.has_key(tag) or tag == OLDFILENAMES or \
+            tag in self._tagListValues
     __contains__ = has_key
 
     def paths(self):
@@ -299,7 +300,7 @@ class RpmHeader(object):
         self.isSource = False
 
         self._sigHeader = readSignatureHeader(f)
-        sha1 = self._sigHeader.get(SIG_SHA1 - _SIGHEADER_TAG_BASE, None)
+        sha1 = self._sigHeader.get(SIG_SHA1, None)
         if checkSize:
             headerPlusPayloadSize = self.getHeaderPlusPayloadSize()
             if headerPlusPayloadSize is not None:
