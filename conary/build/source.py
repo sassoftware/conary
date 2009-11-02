@@ -1391,7 +1391,7 @@ class addCapsule(_Source):
                 self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
             else:
                 self.recipe.setModes(stat.S_IMODE(mode), path)
-                if user != 'root' and group != 'root':
+                if user != 'root' or group != 'root':
                     k = user + ' ' + group
                     d = Ownership.setdefault(k,[])
                     d.append(path)
@@ -1403,7 +1403,8 @@ class addCapsule(_Source):
             else:
                 if flags & rpmhelper.RPMFILE_GHOST:
                     InitialContents.append( path )
-                    # RPM did not actually create this file; we need it for policy
+                    # RPM did not actually create this file
+                    # we need it for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
                     file(fullpath, 'w')
