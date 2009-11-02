@@ -32,6 +32,7 @@ from conary.server import schema
 class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, repos, cs, *args, **kw):
         self.mirror = kw.get('mirror', False)
+        self.requireSigs = kw.pop('requireSigs', False)
 
         repos.troveStore.addTroveSetStart()
         ChangeSetJob.__init__(self, repos, cs, *args, **kw)
@@ -63,16 +64,22 @@ class FilesystemChangeSetJob(ChangeSetJob):
         if callback.keyCache is None:
             callback.keyCache = openpgpkey.getKeyCache()
         for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
-            pubKey = callback.keyCache.getPublicKey(fingerprint)
-            if pubKey.isRevoked():
-                raise openpgpfile.IncompatibleKey('Key %s is revoked'
-                                                  %pubKey.getFingerprint())
-            expirationTime = pubKey.getTimestamp()
-            if expirationTime and expirationTime < timestamp:
-                raise openpgpfile.IncompatibleKey('Key %s is expired'
-                                                  %pubKey.getFingerprint())
+            try:
+                pubKey = callback.keyCache.getPublicKey(fingerprint)
+                if pubKey.isRevoked():
+                    raise openpgpfile.IncompatibleKey('Key %s is revoked'
+                                                      %pubKey.getFingerprint())
+                expirationTime = pubKey.getTimestamp()
+                if expirationTime and expirationTime < timestamp:
+                    raise openpgpfile.IncompatibleKey('Key %s is expired'
+                                                      %pubKey.getFingerprint())
+            except openpgpfile.KeyNotFound:
+                # missing keys could be okay; that depends on the threshold
+                # we've set. it's the callbacks problem in any case.
+                pass
+
         res = ChangeSetJob.checkTroveSignatures(self, trv, callback)
-        if len(res[1]):
+        if len(res[1]) and self.requireSigs:
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
 
@@ -225,7 +232,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                    mirror = mirror,
                                    hidden = hidden,
                                    excludeCapsuleContents =
-                                        excludeCapsuleContents)
+                                        excludeCapsuleContents,
+                                   requireSigs = self.requireSigs)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()

@@ -48,6 +48,8 @@ Changes in @NEW@:
       of a version-specific compiled python file.
     * The addCapsule source action properly verifies GPG keys when a keyid
       argument is supplied. (CNY-3258)
+    * Commiting signed troves to repositories without signatures no longer
+      causes repository tracebacks.
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
