@@ -563,7 +563,7 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group, mode, size, dev, flags, vflags) in ownerList:
+                for (path, user, group, mode, size, dev, flags, vflags, digest) in ownerList:
                     # trim off the leading / (or else path.joining it with
                     # self.dir will result in /dir//foo -> /foo.
                     path = path.lstrip('/')
@@ -1372,13 +1372,15 @@ class addCapsule(_Source):
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
 
         totalPathList=[]
+        totalPathData=[]
         Ownership  = {}
         ExcludeDirectories = [] 
         InitialContents = []
         Config = []
 
-        for (path, user, group, mode, size, rdev, flags, vflags) in ownerList:
+        for (path, user, group, mode, size, rdev, flags, vflags, digest) in ownerList:
             totalPathList.append(path)
+            totalPathData.append((path, user, group, mode, digest))
 
             devtype = None
             if stat.S_ISBLK(mode):
@@ -1447,7 +1449,7 @@ class addCapsule(_Source):
 
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
-        self.recipe._setPathsForCapsule(f, totalPathList)
+        self.recipe._setPathInfoForCapsule(f, totalPathData)
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
 
@@ -2310,6 +2312,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     h[rpmhelper.FILEVERIFYFLAGS],
+                                    h[rpmhelper.FILEDIGESTS],
                                     ))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)

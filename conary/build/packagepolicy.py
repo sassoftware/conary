@@ -607,7 +607,14 @@ class PackageSpec(_filterSpec):
     def doFile(self, path):
 	# now walk the tree -- all policy classes after this require
 	# that the initial tree is built
-        self.autopkg.addFile(path, self.destdir + path)
+        realPath = self.destdir + path
+        if self.recipe._getCapsulePathsForFile(path):
+            # For capsules, the direct capsule map takes precedence
+            for componentName in self.recipe._iterCapsulePackageNamesForFile(
+                    path):
+                self.autopkg.addFile(path, realPath, componentName)
+        else:
+            self.autopkg.addFile(path, realPath)
 
     def postProcess(self):
         # flag all config files
@@ -1257,7 +1264,7 @@ class ExcludeDirectories(policy.Policy):
 
     def doFile(self, path):
         # temporarily do nothing for capsules, we might do something later
-        if self.recipe._getCapsulePathForFile(path):
+        if self.recipe._getCapsulePathsForFile(path):
             return
 
 	fullpath = self.recipe.macros.destdir + os.sep + path
@@ -1449,7 +1456,7 @@ class Ownership(_UserGroup):
 	    pkgfile.inode.group.set(bestGroup)
 
         # capsules implement their own user/group handling outside of deps
-        if not self.recipe._getCapsulePathForFile(path):
+        if not self.recipe._getCapsulePathsForFile(path):
             if bestOwner and bestOwner not in self.systemusers:
                 self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
             if bestGroup and bestGroup not in self.systemgroups:
@@ -1527,7 +1534,7 @@ class UtilizeUser(_Utilize):
     'sshd' although the file is not owned by the 'sshd' user.
     """
     def _markItem(self, path, user):
-        if not self.recipe._getCapsulePathForFile(path):
+        if not self.recipe._getCapsulePathsForFile(path):
             self.info('user %s: %s' % (user, path))
             self.setUserGroupDep(path, user, deps.UserInfoDependencies)
 
@@ -1564,7 +1571,7 @@ class UtilizeGroup(_Utilize):
     definition 'users' although the file is not owned by the 'users' group.
     """
     def _markItem(self, path, group):
-        if not self.recipe._getCapsulePathForFile(path):
+        if not self.recipe._getCapsulePathsForFile(path):
             self.info('group %s: %s' % (group, path))
             self.setUserGroupDep(path, group, deps.GroupInfoDependencies)
 
@@ -4190,7 +4197,7 @@ class ProcessUserInfoPackage(_ProcessInfoPackage):
             'SHELL', 'SUPPLEMENTAL', 'PASSWORD']
 
     def parseInfoFile(self, path):
-        if self.recipe._getCapsulePathForFile(path):
+        if self.recipe._getCapsulePathsForFile(path):
             return {}
         data = _ProcessInfoPackage.parseInfoFile(self, path)
         if data:

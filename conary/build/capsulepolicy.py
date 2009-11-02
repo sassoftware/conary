@@ -128,7 +128,7 @@ class Payload(policy.Policy):
 
         # every regular file is payload if it is not a config file,
         # not an empty initialContents file and is inside a capsule
-        if self.recipe._getCapsulePathForFile(filename) and isinstance(f, files.RegularFile) \
+        if self.recipe._getCapsulePathsForFile(filename) and isinstance(f, files.RegularFile) \
                 and not f.flags.isConfig() and not ( f.flags.isInitialContents() and not f.contents.size() ):
             f.flags.isPayload(True)
 

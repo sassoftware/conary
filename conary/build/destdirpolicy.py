@@ -409,6 +409,6 @@ class FixDirModes(policy.Policy):
     def doFile(self, path):
         fullpath = self.macros.destdir + path
 	mode = os.lstat(fullpath)[stat.ST_MODE]
-        if not self.recipe._getCapsulePathForFile(path):
+        if not self.recipe._getCapsulePathsForFile(path):
             self.recipe.setModes(mode, path)
 	os.chmod(fullpath, mode | 0700)

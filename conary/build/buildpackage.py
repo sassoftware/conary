@@ -230,7 +230,7 @@ class AutoBuildPackage:
         f.contents.size.set(size)
         f.contents.sha1.set(sha1)
 
-    def addFile(self, path, realPath):
+    def addFile(self, path, realPath, componentName=None):
         """
         Add a path to the correct BuildComponent instance by matching
         the file name against the package and component filters
@@ -239,7 +239,10 @@ class AutoBuildPackage:
         @type path: str
         @rtype: None
         """
-        pkg = self.findComponent(path)
+        if componentName is not None:
+            pkg = self.components[componentName]
+        else:
+            pkg = self.findComponent(path)
         self.pathMap[path] = pkg.addFile(path, realPath)
 
     def delFile(self, path):

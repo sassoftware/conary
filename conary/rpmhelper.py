@@ -23,6 +23,7 @@ from conary.lib import digestlib, openpgpfile, sha1helper
 from conary.deps import deps
 from conary.lib import util
 
+# Note that all per-file tags must be listed in _RpmHeader:_tagListValues
 _GENERAL_TAG_BASE = 1000
 NAME            = 1000
 VERSION         = 1001
@@ -42,6 +43,7 @@ OLDFILENAMES    = 1027
 FILESIZES       = 1028
 FILEMODES       = 1030
 FILERDEVS       = 1033
+FILEDIGESTS     = 1035 # AKA FILEMD5S
 FILELINKTOS     = 1036
 FILEFLAGS       = 1037 # bitmask: RPMFILE_* are bitmasks to interpret
 FILEUSERNAME    = 1039
@@ -121,7 +123,7 @@ class _RpmHeader(object):
     _tagListValues = set([
         DIRNAMES, BASENAMES, DIRINDEXES, FILEUSERNAME, FILEGROUPNAME,
         FILESIZES, FILEMODES, FILERDEVS, FILELINKTOS, FILEFLAGS,
-        FILEVERIFYFLAGS, ])
+        FILEVERIFYFLAGS, FILEDIGESTS])
 
     def has_key(self, tag):
         # __getitem__ assumes OLDFILENAMES is always present
