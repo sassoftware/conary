@@ -45,7 +45,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 67 + 1)
+SERVER_VERSIONS = range(36, 68 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -2014,6 +2014,110 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             sys.stderr.flush()
 
 	return True
+
+    @accessReadOnly
+    def getFileContentsCapsuleInfo(self, authToken, clientVersion, fileList):
+        self.log(2, "fileList", fileList)
+
+        # We use _getFileStreams here for the permission checks.
+        fileIdGen = (self.toFileId(x[0]) for x in fileList)
+        fileIdMap =  self._getFileContentsCapsuleInfo(authToken, fileIdGen)
+        result = [ ]
+        for ent in fileList:
+            fileId = ent[0]
+            result.append(fileIdMap.get(fileId, ''))
+        return result
+
+    def _getFileContentsCapsuleInfo(self, authToken, fileIdGen):
+        self.log(3)
+        cu = self.db.cursor()
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            return {}
+        schema.resetTable(cu, 'tmpFileId')
+
+        # we need to make sure we don't look up the same fileId multiple
+        # times to avoid asking the sql server to do busy work
+        fileIdMap = {}
+        i = 0               # protect against empty fileIdGen
+        for i, fileId in enumerate(fileIdGen):
+            fileIdMap.setdefault(fileId, []).append(i)
+        uniqIdList = fileIdMap.keys()
+
+        # use the list of uniqified fileIds to look up streams in the repo
+        def _iterIdList(uniqIdList):
+            for i, fileId in enumerate(uniqIdList):
+                yield ((i, cu.binary(fileId)))
+        self.db.bulkload("tmpFileId",
+            ((i, cu.binary(fileId)) for (i, fileId) in enumerate(uniqIdList)),
+            ["itemId", "fileId"], start_transaction=False)
+        self.db.analyze("tmpFileId")
+        q = """
+        SELECT DISTINCT tmpFileId.itemId, TroveFiles.instanceId,
+            TroveInfo.data,
+            Dirnames.dirname,
+            Basenames.basename,
+            FileStreams.sha1
+        FROM tmpFileId
+        JOIN FileStreams ON (tmpFileId.fileId = FileStreams.fileId)
+        JOIN TroveFiles ON (FileStreams.streamId = TroveFiles.streamId)
+        JOIN Instances ON (TroveFiles.instanceId = Instances.instanceId)
+        JOIN UserGroupInstancesCache ON
+            (Instances.instanceId = UserGroupInstancesCache.instanceId)
+        JOIN TroveInfo ON (Instances.instanceId = TroveInfo.instanceId)
+        JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
+        JOIN Dirnames ON (FilePaths.dirnameId = Dirnames.dirnameId)
+        JOIN Basenames ON (FilePaths.basenameId = Basenames.basenameId)
+        WHERE FileStreams.stream IS NOT NULL
+          AND UserGroupInstancesCache.userGroupId IN (%(roleids)s)
+        AND TroveInfo.infoType = ?
+        """ % { 'roleids' : ", ".join("%d" % x for x in roleIds) }
+        cu.execute(q, trove._TROVEINFO_TAG_CAPSULE)
+        fileIdContainerList = []
+        instanceIds = set()
+        for (i, instanceId, data, dirname, basename, fileSha1) in cu:
+            fileId = uniqIdList[i]
+            trvContainer = trove.TroveContainer()
+            trvContainer.thaw(data)
+            instanceIds.add(instanceId)
+            if dirname:
+                filePath = util.joinPaths(dirname, basename)
+            else:
+                filePath= basename
+            fileIdContainerList.append((fileId, trvContainer,
+                filePath, fileSha1, instanceId))
+        instanceIds = sorted(instanceIds)
+
+        # We now have to look up the capsule that is part of this instance,
+        # since we need its sha1
+        schema.resetTable(cu, 'tmpInstanceId')
+        self.db.bulkload("tmpInstanceId", enumerate(instanceIds),
+                         ["idx", "instanceId"], start_transaction=False)
+        self.db.analyze("tmpInstanceId")
+        q = """
+        SELECT DISTINCT tmpInstanceId.idx, FileStreams.sha1
+        FROM tmpInstanceId
+        JOIN TroveFiles ON (tmpInstanceId.instanceId = TroveFiles.instanceId)
+        JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
+        JOIN FileStreams ON (TroveFiles.streamId = FileStreams.streamId)
+        WHERE FilePaths.pathId = ?
+        """
+        cu.execute(q, trove.CAPSULE_PATHID)
+        instanceIds = dict((instanceIds[i], sha1) for (i, sha1) in cu)
+        fileIdMapWithResults = {}
+        for fileId, trvContainer, filePath, fileSha1, instanceId in fileIdContainerList:
+            capsuleSha1 = instanceIds.get(instanceId)
+            epoch = trvContainer.rpm.epoch()
+            if epoch is None:
+                epoch = ''
+            capsuleKey = (trvContainer.rpm.name(), epoch,
+                trvContainer.rpm.version(), trvContainer.rpm.release(),
+                trvContainer.rpm.arch())
+            fileInfo =  (trvContainer.type(), capsuleKey,
+                capsuleSha1, filePath, fileSha1 or '')
+            fileIdMapWithResults[self.fromFileId(fileId)] = fileInfo
+        return fileIdMapWithResults
 
     # retrieve the raw streams for a fileId list passed in as a generator
     def _getFileStreams(self, authToken, fileIdGen):

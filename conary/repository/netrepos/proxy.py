@@ -1177,10 +1177,21 @@ class ChangesetFilter(BaseProxy):
             url = self.getCapsuleDownloadUrl(capsuleKey, sha1sum)
             return self.download(url, sha1sum)
 
-        def downloadCapsuleFile(self, capsuleKey, capsuleSha1sum, fileName, fileSha1sum):
+        def downloadCapsuleFile(self, capsuleKey, capsuleSha1sum,
+                fileName, fileSha1sum):
+            if capsuleSha1sum == fileSha1sum:
+                # Troves do contain the capsule too, it's legitimate to
+                # request it; however, we can fall back to downloadCapsule for
+                # it
+                return self.downloadCapsule(capsuleKey, capsuleSha1sum)
             url = self.getCapsuleDownloadUrl(capsuleKey, capsuleSha1sum)
             url = "%s/%s/%s" % (url, self.quote(fileName), self._sha1(fileSha1sum))
             return self.download(url, fileSha1sum)
+
+        def downloadCapsuleFiles(self, capsuleKey, capsuleSha1sum, fileList):
+            return [ self.downloadCapsuleFile(capsuleKey, capsuleSha1sum,
+                fileName, fileSha1sum)
+                    for (fileName, fileSha1sum) in fileList ]
 
         def getCapsuleDownloadUrl(self, capsuleKey, sha1sum):
             filename = self.quote(rpmhelper.NEVRA.filename(*capsuleKey[:5]))
@@ -1216,6 +1227,23 @@ class ChangesetFilter(BaseProxy):
                 return sha1helper.sha1ToString(sha1sum)
             return sha1sum
 
+    def _getFileContentsCapsuleInfo(self, caller, clientVersion, neededFiles):
+        fcCapsuleInfoList = caller.getFileContentsCapsuleInfo(clientVersion,
+            neededFiles)
+        ret = []
+        for fcCapsuleInfo in fcCapsuleInfoList:
+            if fcCapsuleInfo == '':
+                ret.append(None)
+                continue
+            capsuleType, capsuleKey, capsuleSha1, fileKey, fileSha1 = \
+                                                        fcCapsuleInfo[:5]
+            n, e, v, r, a = capsuleKey[:5]
+            if e == '':
+                e = None
+            ret.append((capsuleType, (n, e, v, r, a), capsuleSha1,
+                fileKey, fileSha1))
+        return ret
+
 class SimpleRepositoryFilter(ChangesetFilter):
 
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
@@ -1232,6 +1260,22 @@ class SimpleRepositoryFilter(ChangesetFilter):
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
         self.repos = repos
         self.callFactory = RepositoryCallFactory(repos, self.log)
+
+    def getFileContents(self, caller, authToken, clientVersion, fileList,
+                        authCheckOnly = False):
+        if self.cfg.excludeCapsuleContents:
+            # Are any of the requested files capsule related?
+            fcInfoList = self._getFileContentsCapsuleInfo(caller,
+                clientVersion, fileList)
+            fcInfoList = [ x for x in fcInfoList if x is not None ]
+            if fcInfoList:
+                raise errors.CapsuleServingDenied(
+                    "Request for contents for a file belonging to a capsule, "
+                    "based on capsules, from repository denying such operation")
+
+        return caller.getFileContents(clientVersion, fileList,
+            authCheckOnly = authCheckOnly)
+
 
 class ProxyRepositoryServer(ChangesetFilter):
 
@@ -1374,6 +1418,37 @@ class ProxyRepositoryServer(ChangesetFilter):
             caller.getFileContents(clientVersion, hasFiles, True)
 
         if neededFiles:
+            fcCapsuleInfoList = self._getFileContentsCapsuleInfo(caller,
+                clientVersion, neededFiles)
+            # Use the indexer to pull down contents
+            newNeededFiles = []
+            indexerContent = dict()
+            for (encFileId, encVersion), fcCapsuleInfo in zip(
+                    neededFiles, fcCapsuleInfoList):
+                if fcCapsuleInfo is None:
+                    newNeededFiles.append((encFileId, encVersion))
+                    continue
+                capsuleType, capsuleKey, capsuleSha1, filePath, fileSha1 = \
+                    fcCapsuleInfo
+                # We will group files by capsule, so we can efficiently
+                # extract all files in a single pass
+                indexerContent.setdefault(
+                    (capsuleType, capsuleKey, capsuleSha1), []).append(
+                    ((filePath, fileSha1), (encFileId, encVersion)))
+
+            if indexerContent:
+                dl = self.CapsuleDownloader(self.cfg.capsuleServerUrl)
+                for (capsuleType, capsuleKey, capsuleSha1), valList in \
+                        indexerContent.items():
+                    fileInfoList = [ x[0] for x in valList ]
+                    fileObjs = dl.downloadCapsuleFiles(capsuleKey, capsuleSha1,
+                        fileInfoList)
+                    for fileObj, ((filePath, fileSha1),
+                            (encFileId, encVersion)) in zip(fileObjs, valList):
+                        self._cacheFileContents(encFileId, fileObj.f)
+            neededFiles = newNeededFiles
+
+        if neededFiles:
             # now get the contents we don't have cached
             (url, sizes) = caller.getFileContents(
                     clientVersion, neededFiles, False)
@@ -1399,11 +1474,8 @@ class ProxyRepositoryServer(ChangesetFilter):
             # contents sha1
             for (encFileId, envVersion), size in itertools.izip(neededFiles,
                                                                 sizes):
-                fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
                 nestedF = util.SeekableNestedFile(dest, size, start)
-                self.contents.addFile(nestedF, fileId + '-c',
-                                      precompressed = True,
-                                      integrityCheck = False)
+                self._cacheFileContents(encFileId, nestedF)
                 totalSize -= size
                 start += size
 
@@ -1443,6 +1515,23 @@ class ProxyRepositoryServer(ChangesetFilter):
             return (url, sizeList)
         finally:
             os.close(fd)
+
+    def _getFileContentsCapsuleInfo(self, caller, clientVersion, neededFiles):
+        # If proxy is not configured to talk to a capsule indexer, don't
+        # bother checking for additional information
+        if not self.cfg.capsuleServerUrl:
+            return [ None ] * len(neededFiles)
+        return ChangesetFilter._getFileContentsCapsuleInfo(self,
+            caller, clientVersion, neededFiles)
+
+    def _cacheFileContents(self, encFileId, fileObj):
+        # We skip the integrity check here because (1) the hash we're using
+        # has '-c' applied and (2) the hash is a fileId sha1, not a file
+        # contents sha1
+        fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
+        self.contents.addFile(fileObj, fileId + '-c',
+                                      precompressed = True,
+                                      integrityCheck = False)
 
 class ChangesetCache(object):
     __slots__ = ['dataStore']
