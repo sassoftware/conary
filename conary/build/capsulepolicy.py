@@ -54,10 +54,6 @@ class Config(packagepolicy.Config):
 
     def doFile(self, filename):
         m = self.recipe.magic[filename]
-        if m and m.name not in ('script', 'ltwrapper'):
-            # Assume that files recognized by magic that are not
-            # specifically text files are binary
-            return
 
         fullpath = self.macros.destdir + filename
         hardlinkMap = self.recipe.autopkg.findComponent(filename).hardlinkMap
