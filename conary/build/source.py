@@ -563,7 +563,7 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group, mode, size, dev, flags, vflags, digest) in ownerList:
+                for (path, user, group, _, _, _, _, _, _, _) in ownerList:
                     # trim off the leading / (or else path.joining it with
                     # self.dir will result in /dir//foo -> /foo.
                     path = path.lstrip('/')
@@ -1381,7 +1381,8 @@ class addCapsule(_Source):
         Config = []
 
         for (path, user, group, mode, size, 
-             rdev, flags, vflags, filelinktos, digest) in ownerList:
+             rdev, flags, vflags, digest, filelinktos) in ownerList:
+
 
             totalPathList.append(path)
             totalPathData.append((path, user, group, mode, digest))
@@ -2331,8 +2332,8 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     h[rpmhelper.FILEVERIFYFLAGS],
-                                    h[rpmhelper.FILELINKTOS],
                                     h[rpmhelper.FILEDIGESTS],
+                                    h[rpmhelper.FILELINKTOS],
                                     ))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
