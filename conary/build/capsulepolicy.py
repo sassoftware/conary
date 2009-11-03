@@ -53,8 +53,6 @@ class Config(packagepolicy.Config):
     )
 
     def doFile(self, filename):
-        m = self.recipe.magic[filename]
-
         fullpath = self.macros.destdir + filename
         hardlinkMap = self.recipe.autopkg.findComponent(filename).hardlinkMap
 
