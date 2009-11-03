@@ -1378,7 +1378,9 @@ class addCapsule(_Source):
         InitialContents = []
         Config = []
 
-        for (path, user, group, mode, size, rdev, flags, vflags, digest) in ownerList:
+        for (path, user, group, mode, size, 
+             rdev, flags, vflags, filelinktos, digest) in ownerList:
+
             totalPathList.append(path)
             totalPathData.append((path, user, group, mode, digest))
 
@@ -1390,7 +1392,8 @@ class addCapsule(_Source):
             if devtype:
                 minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
                 major = (rdev >> 8) & 0xfff
-                self.recipe.MakeDevices(path, devtype, major, minor, user, group, stat.S_IMODE(mode))
+                self.recipe.MakeDevices(path, devtype, major, minor, 
+                                        user, group, stat.S_IMODE(mode))
             else:
                 self.recipe.setModes(stat.S_IMODE(mode), path)
                 if user != 'root' or group != 'root':
@@ -1405,22 +1408,34 @@ class addCapsule(_Source):
             else:
                 if flags & rpmhelper.RPMFILE_GHOST:
                     InitialContents.append( path )
-                    # RPM did not actually create this file
-                    # we need it for policy
+                    # RPM does not actually create Ghost files but
+                    # we need them for policy
                     fullpath = os.sep.join((destDir, path))
                     util.mkdirChain(os.path.dirname(fullpath))
-                    file(fullpath, 'w')
+                    if stat.S_ISREG(mode):
+                        file(fullpath, 'w')
+                    elif stat.S_ISLNK(mode):
+                        if not filelinktos:
+                            raise SourceError, "Ghost Symlink in RPM is invalid"
+                        os.symlink( filelinktos, fullpath )
+                    elif stat.S_ISFIFO(mode):
+                        os.mkfifo(fullpath)
+                    else:
+                        raise SourceError, \
+                            "Unknown Ghost Filetype defined in RPM"
                 elif flags & (rpmhelper.RPMFILE_CONFIG |
-                            rpmhelper.RPMFILE_MISSINGOK |
-                            rpmhelper.RPMFILE_NOREPLACE):
+                              rpmhelper.RPMFILE_MISSINGOK |
+                              rpmhelper.RPMFILE_NOREPLACE):
                     if size:
                         Config.append( path )
                     else:
                         InitialContents.append( path )
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
-                    if (stat.S_ISREG(mode) and
-                        not vflags & rpmhelper.RPMVERIFY_FILEDIGEST):
+                    if (stat.S_ISREG(mode) and \
+                            not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) or \
+                            (stat.S_ISLNK(mode) and \
+                             not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
                         InitialContents.append( path )
 
         def buildRegexString( pathList ):
@@ -2312,6 +2327,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILERDEVS],
                                     h[rpmhelper.FILEFLAGS],
                                     h[rpmhelper.FILEVERIFYFLAGS],
+                                    h[rpmhelper.FILELINKTOS],
                                     h[rpmhelper.FILEDIGESTS],
                                     ))
 

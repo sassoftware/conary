@@ -87,7 +87,7 @@ class InitialContents(packagepolicy.InitialContents):
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
         recipe = self.recipe
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
+        if not os.path.isdir(fullpath) or os.path.islink(fullpath):
             f = recipe.autopkg.pathMap[filename]
             # config wins; initialContents is only for verify in capsules
             if not f.flags.isConfig():
