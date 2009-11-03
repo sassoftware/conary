@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 67 + 1)
+CLIENT_VERSIONS = range(36, 68 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2480,6 +2480,42 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 contents[i] = fObj
 
         return contents
+
+    def getFileContentsCapsuleInfo(self, fileList):
+        capsuleInfo = [ None ] * len(fileList)
+        byServer = {}
+
+        for i, item in enumerate(fileList):
+            # we try to get the file from the trove which originally contained
+            # it since we know that server has the contents; other servers may
+            # not
+            (fileId, fileVersion) = item[0:2]
+            server = fileVersion.getHost()
+            l = byServer.setdefault(server, [])
+            l.append((i, (fileId, fileVersion)))
+
+        for server, itemList in byServer.iteritems():
+            fileList = [ (self.fromFileId(x[1][0]),
+                          self.fromVersion(x[1][1])) for x in itemList ]
+
+            infoList = self.c[server].getFileContentsCapsuleInfo(fileList)
+
+            for (i, item), fObj in itertools.izip(itemList, infoList):
+                capsuleInfo[i] = self._capsuleInfoFromData(fObj)
+
+        return capsuleInfo
+
+    @classmethod
+    def _capsuleInfoFromData(cls, data):
+        # Convert '' back to None
+        if data == '':
+            return None
+        capsuleType, capsuleKey, capsuleSha1, fileName, fileSha1 = \
+            data[:5]
+        n, e, v, r, a = capsuleKey[:5]
+        if e == '':
+            e = None
+        return (capsuleType, (n, e, v, r, a), capsuleSha1, fileName, fileSha1)
 
     def getPackageBranchPathIds(self, sourceName, branch, dirnames = [], fileIds=None):
         """
