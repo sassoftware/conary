@@ -31,6 +31,7 @@ class Callback:
         self.totalSize = totalSize
         self.logFd = logFd
         self.lastAmount = 0
+        self.rootFd = os.open("/", os.O_RDONLY)
 
     def flushRpmLog(self):
         s = os.read(self.logFd, 50000)
@@ -40,19 +41,38 @@ class Callback:
             s = os.read(self.logFd, 50000)
 
         lines = data.split('\n')
-        for line in lines:
-            line.strip()
-            if not line:
-                continue
+        if not lines:
+            return
 
-            if line.startswith('error:'):
-                line = line[6:].strip()
-                self.callback.error(line)
-            elif line.startswith('warning:'):
-                line = line[8:].strip()
-                self.callback.warning(line)
-            else:
-                self.callback.warning(line)
+        # We're in RPM's chroot jail. We'll break out of it so that
+        # the callbacks work as expected, but we need to restore both
+        # the chroot and the cwd.
+        thisRoot = os.open("/", os.O_RDONLY)
+        thisDir = os.open(".", os.O_RDONLY)
+
+        try:
+            os.fchdir(self.rootFd)
+            os.chroot(".")
+
+            for line in lines:
+                line.strip()
+                if not line:
+                    continue
+
+                if line.startswith('error:'):
+                    line = line[6:].strip()
+                    self.callback.error(line)
+                elif line.startswith('warning:'):
+                    line = line[8:].strip()
+                    self.callback.warning(line)
+                else:
+                    self.callback.warning(line)
+        finally:
+            os.fchdir(thisRoot)
+            os.close(thisRoot)
+            os.chroot(".")
+            os.fchdir(thisDir)
+            os.close(thisDir)
 
     def __call__(self, what, amount, total, mydata, wibble):
         self.flushRpmLog()
@@ -77,6 +97,7 @@ class Callback:
     def __del__(self):
         assert(not self.fdnos)
         self.flushRpmLog()
+        os.close(self.rootFd)
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
