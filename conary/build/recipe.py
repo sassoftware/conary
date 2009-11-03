@@ -856,16 +856,19 @@ class Recipe(object):
         self._recipeRequirements['%sSuper' %attr] = superBuildReqs
 
 
+    def _validatePathInfoForCapsule(self, fileData, ignorePaths=set()):
+        for fileName, fileDatum in [(x[0], x[1:]) for x in fileData
+                                    if x[0] not in ignorePaths and
+                                       x[0] in self._capsuleDataMap]:
+            oldDatum = self._capsuleDataMap[fileName]
+            if oldDatum != fileDatum:
+                self.reportErrors(
+                    'file %s added twice with conflicting contents:'
+                    ' %s:%s 0%0o %s != %s:%s 0%0o %s',
+                    *((fileName,)+oldDatum+fileDatum))
+
     # creates a map of contained filePaths to the capsule
     def _setPathInfoForCapsule(self, capsulePath, fileData):
-        for fileName, fileDatum in [(x[0], x[1:]) for x in fileData]:
-            if fileName in self._capsuleDataMap:
-                oldDatum = self._capsuleDataMap[fileName]
-                if oldDatum != fileDatum:
-                    self.reportErrors(
-                        'file %s added twice with conflicting contents:'
-                        ' %s:%s 0%0o %s != %s:%s 0%0o %s',
-                        *((fileName,)+oldDatum+fileDatum))
         self._capsuleDataMap.update(((x[0], x[1:5]) for x in fileData))
         for path in [x[0] for x in fileData]:
             l = self._capsulePathMap.setdefault(path, [])

@@ -1464,6 +1464,7 @@ class addCapsule(_Source):
 
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
+        self.recipe._validatePathInfoForCapsule(totalPathData, set())
         self.recipe._setPathInfoForCapsule(f, totalPathData)
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
