@@ -1313,6 +1313,8 @@ Source = addSource
 class addCapsule(_Source):
     """
     """
+    keywords = {'ignoreConflictingPaths': set(),
+               }
 
     def __init__(self, recipe, *args, **keywords):
         """
@@ -1464,7 +1466,8 @@ class addCapsule(_Source):
 
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
-        self.recipe._validatePathInfoForCapsule(totalPathData, set())
+        self.recipe._validatePathInfoForCapsule(totalPathData,
+            self.ignoreConflictingPaths)
         self.recipe._setPathInfoForCapsule(f, totalPathData)
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
