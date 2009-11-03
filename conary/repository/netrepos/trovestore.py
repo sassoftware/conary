@@ -471,7 +471,7 @@ class TroveStore:
         where pathChanged = 1 and not exists (
             select 1 from Basenames as b where b.basename = tnf.basename ) """)
         cu.execute(""" insert into FilePaths (pathId, dirnameId, basenameId)
-        select tnf.pathId, d.dirnameId, b.basenameId
+        select distinct tnf.pathId, d.dirnameId, b.basenameId
         from tmpNewFiles as tnf
         join Dirnames as d on tnf.dirname = d.dirname
         join Basenames as b on tnf.basename = b.basename
