@@ -1400,8 +1400,7 @@ class addCapsule(_Source):
             else:
                 self.recipe.setModes(stat.S_IMODE(mode), path)
                 if user != 'root' or group != 'root':
-                    k = user + ' ' + group
-                    d = Ownership.setdefault(k,[])
+                    d = Ownership.setdefault((user, group),[])
                     d.append(path)
 
             if stat.S_ISDIR(mode):
@@ -1441,28 +1440,25 @@ class addCapsule(_Source):
                              not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
                         InitialContents.append( path )
 
-        def buildRegexString( pathList ):
-            regex = '^(?:' + re.escape(pathList[0]).replace('%', '%%')
-            for path in pathList[1:]:
-                regex = regex + '|' + re.escape(path).replace('%', '%%')
-            regex = regex + ')$'
-            return regex
+        def buildRegexString(pathList):
+            return '^(?:' +  '|'.join(
+                re.escape(x).replace('%', '%%') for x in pathList) + ')$'
 
         for key, rePathList in Ownership.items():
-            user,group = key.split()
-            regex = buildRegexString( rePathList )
-            self.recipe.Ownership(user,group,regex)
+            user, group = key
+            regex = buildRegexString(rePathList)
+            self.recipe.Ownership(user, group, regex)
 
         if len(ExcludeDirectories):
-            regex = buildRegexString( ExcludeDirectories )
+            regex = buildRegexString(ExcludeDirectories)
             self.recipe.ExcludeDirectories(exceptions=regex)
 
         if len(InitialContents):
-            regex = buildRegexString( InitialContents )
+            regex = buildRegexString(InitialContents)
             self.recipe.InitialContents(regex)
 
         if len(Config):
-            regex = buildRegexString( Config )
+            regex = buildRegexString(Config)
             self.recipe.Config(regex)
 
         self.manifest.recordRelativePaths(totalPathList)
