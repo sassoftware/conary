@@ -867,34 +867,38 @@ class Recipe(object):
                     ' %s:%s 0%0o %s != %s:%s 0%0o %s',
                     *((fileName,)+oldDatum+fileDatum))
 
-    # creates a map of contained filePaths to the capsule
     def _setPathInfoForCapsule(self, capsulePath, fileData):
+        '''creates a map of contained filePaths to the capsule'''
         self._capsuleDataMap.update(((x[0], x[1:5]) for x in fileData))
         for path in [x[0] for x in fileData]:
             l = self._capsulePathMap.setdefault(path, [])
             l.append(capsulePath)
 
-    # returns a list of package:component names associated with a path
-    def _iterCapsulePackageNamesForFile(self, path):
-        for capsulePath in self._getCapsulePathsForFile(path):
-            yield self._getCapsulePackage(capsulePath)
-
-    # returns list of paths to capsule files from which this path came
     def _getCapsulePathsForFile(self, path):
+        '''returns list of paths to capsule files from which this path came'''
         return self._capsulePathMap.get(path)
 
-    # records a capsule associated with recipe
     def _addCapsule(self, capsulePath, capsuleType, capsulePackage):
+        '''records a capsule associated with recipe'''
         self._capsules[capsulePackage] = (capsuleType, capsulePath)
         self._capsulePackageMap[capsulePath] = capsulePackage
 
-    # returns the capsule package:component associated with a capsule path
     def _getCapsulePackage(self, capsulePath):
+        '''returns the capsule package:component associated with a capsule path'''
         return self._capsulePackageMap.get(capsulePath)
 
-    # returns the type and path to file for a capsule
     def _getCapsule(self, capsulePackage):
+        '''returns the type and path to file for a capsule'''
         return self._capsules.get(capsulePackage)
 
     def _hasCapsulePackage(self, capsulePackage):
         return capsulePackage in self._capsules
+
+    def _iterCapsulePaths(self):
+        '''
+        yields a (filePath, capsulePath, 'package:component') tuple
+        for each file in each capsule that has been added
+        '''
+        for filePath, capsuleList in self._capsulePathMap.iteritems():
+            for capsulePath in capsuleList:
+                yield filePath, capsulePath, self._getCapsulePackage(capsulePath)

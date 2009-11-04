@@ -258,12 +258,15 @@ class AutoBuildPackage:
 	del self.pathMap[path]
 
     def addDevice(self, path, devtype, major, minor,
-                  owner='root', group='root', perms=0660):
+                  owner='root', group='root', perms=0660, package=None):
         """
         Add a device to the correct BuildComponent instance by matching
         the file name against the package and component filters
         """
-        pkg = self.findComponent(path, mode=perms)
+        if package is not None:
+            pkg = self.components[package]
+        else:
+            pkg = self.findComponent(path, mode=perms)
         f = pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 	self.pathMap[path] = f
 	self.componentMap[path] = pkg

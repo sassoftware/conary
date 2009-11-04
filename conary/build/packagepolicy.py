@@ -604,16 +604,21 @@ class PackageSpec(_filterSpec):
 	    self.pkgFilters, self.compFilters, recipe)
         self.autopkg = recipe.autopkg
 
+    def do(self):
+        # Walk capsule contents ignored by doFile
+        for filePath, capsulePath, componentName in self.recipe._iterCapsulePaths():
+            realPath = self.destdir + filePath
+            if util.exists(realPath):
+                # Files that do not exist on the filesystem (devices)
+                # are handled separately
+                self.autopkg.addFile(filePath, realPath, componentName)
+        # Walk normal files
+        _filterSpec.do(self)
+        
     def doFile(self, path):
-	# now walk the tree -- all policy classes after this require
-	# that the initial tree is built
-        realPath = self.destdir + path
-        if self.recipe._getCapsulePathsForFile(path):
-            # For capsules, the direct capsule map takes precedence
-            for componentName in self.recipe._iterCapsulePackageNamesForFile(
-                    path):
-                self.autopkg.addFile(path, realPath, componentName)
-        else:
+	# all policy classes after this require that the initial tree is built
+        if not self.recipe._getCapsulePathsForFile(path):
+            realPath = self.destdir + path
             self.autopkg.addFile(path, realPath)
 
     def postProcess(self):
