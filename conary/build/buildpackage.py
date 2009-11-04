@@ -241,6 +241,7 @@ class AutoBuildPackage:
         """
         if componentName is not None:
             pkg = self.components[componentName]
+            self.componentMap[path] = pkg
         else:
             pkg = self.findComponent(path)
         self.pathMap[path] = pkg.addFile(path, realPath)
