@@ -60,7 +60,9 @@ class Config(packagepolicy.Config):
             not self._fileIsBinary(fullpath, maxsize=20*1024) and
             not filename in hardlinkMap):
             self.info(filename)
-            self.recipe.autopkg.pathMap[filename].flags.isConfig(True)
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                f = pkg.getFile(filename)
+                f.flags.isConfig(True)
         else:
             # RPM config files are handled more like initialcontents,
             # so for for files that conary can't be sure it can display
@@ -82,10 +84,15 @@ class InitialContents(packagepolicy.InitialContents):
 	fullpath = self.macros.destdir + filename
         recipe = self.recipe
         if not os.path.isdir(fullpath) or os.path.islink(fullpath):
-            f = recipe.autopkg.pathMap[filename]
-            # config wins; initialContents is only for verify in capsules
-            if not f.flags.isConfig():
-                self.info(filename)
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                f = pkg.getFile(filename)
+                # config wins; initialContents is only for verify in capsules
+                if f.flags.isConfig():
+                    return
+            # OK, not set to config:
+            self.info(filename)
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                f = pkg.getFile(filename)
                 f.flags.isInitialContents(True)
 
 
@@ -98,11 +105,42 @@ class Transient(packagepolicy.Transient):
 	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
             recipe = self.recipe
-            f = recipe.autopkg.pathMap[filename]
-            # config or initialContents wins in capsule packages
-            if not (f.flags.isConfig() or f.flags.isInitialContents()):
-                self.info(filename)
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                f = pkg.getFile(filename)
+                # config or initialContents wins in capsule packages
+                if f.flags.isConfig() or f.flags.isInitialContents():
+                    return
+            self.info(filename)
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                f = pkg.getFile(filename)
                 f.flags.isTransient(True)
+
+
+class setModes(packagepolicy.setModes):
+    # descends from packagepolicy.setModes to honor varying modes
+    # between different capsules sharing a path
+    def do(self):
+        for filename, package, _, _, mode in self.recipe._iterCapsulePathData():
+            mode = stat.S_IMODE(mode)
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                if pkg.getName() == package:
+                    f = pkg.getFile(filename)
+                    f.inode.perms.set(mode)
+        # For any other paths, fall through to superclass
+        packagepolicy.setModes.do(self)
+
+class Ownership(packagepolicy.Ownership):
+    # descends from packagepolicy.Ownership to honor varying Ownership
+    # between different capsules sharing a path
+    def do(self):
+        for filename, package, user, group, _ in self.recipe._iterCapsulePathData():
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                if pkg.getName() == package:
+                    f = pkg.getFile(filename)
+                    f.inode.owner.set(user)
+                    f.inode.group.set(group)
+        # For any other paths, fall through to superclass
+        packagepolicy.Ownership.do(self)
 
 
 class Payload(policy.Policy):
@@ -118,13 +156,17 @@ class Payload(policy.Policy):
     )
 
     def doFile(self, filename):
-        f = self.recipe.autopkg.pathMap[filename]
 
         # every regular file is payload if it is not a config file,
         # not an empty initialContents file and is inside a capsule
-        if self.recipe._getCapsulePathsForFile(filename) and isinstance(f, files.RegularFile) \
-                and not f.flags.isConfig() and not ( f.flags.isInitialContents() and not f.contents.size() ):
-            f.flags.isPayload(True)
+        if self.recipe._getCapsulePathsForFile(filename):
+            for pkg in self.recipe.autopkg.findComponents(filename):
+                f = pkg.getFile(filename)
+                if (isinstance(f, files.RegularFile)
+                    and not f.flags.isConfig()
+                    and not (f.flags.isInitialContents()
+                             and not f.contents.size())):
+                    f.flags.isPayload(True)
 
 
 class RPMProvides(policy.Policy):

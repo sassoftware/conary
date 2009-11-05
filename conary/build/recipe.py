@@ -860,16 +860,20 @@ class Recipe(object):
         for fileName, fileDatum in [(x[0], x[1:]) for x in fileData
                                     if x[0] not in ignorePaths and
                                        x[0] in self._capsuleDataMap]:
-            oldDatum = self._capsuleDataMap[fileName]
+            oldDatum, _ = self._capsuleDataMap[fileName][-1]
             if oldDatum != fileDatum:
                 self.reportErrors(
-                    'file %s added twice with conflicting contents:'
+                    'file %s added with conflicting contents:'
                     ' %s:%s 0%0o %s != %s:%s 0%0o %s',
                     *((fileName,)+oldDatum+fileDatum))
 
-    def _setPathInfoForCapsule(self, capsulePath, fileData):
+    def _setPathInfoForCapsule(self, capsulePath, fileData, packageName):
         '''creates a map of contained filePaths to the capsule'''
-        self._capsuleDataMap.update(((x[0], x[1:5]) for x in fileData))
+        for fileDatum in fileData:
+            fileName = fileDatum[0]
+            fileInfo = fileDatum[1:5]
+            l = self._capsuleDataMap.setdefault(fileName, [])
+            l.append((fileInfo, packageName))
         for path in [x[0] for x in fileData]:
             l = self._capsulePathMap.setdefault(path, [])
             l.append(capsulePath)
@@ -902,3 +906,13 @@ class Recipe(object):
         for filePath, capsuleList in self._capsulePathMap.iteritems():
             for capsulePath in capsuleList:
                 yield filePath, capsulePath, self._getCapsulePackage(capsulePath)
+
+    def _iterCapsulePathData(self):
+        '''
+        yields a (filePath, package, user, group, mode) tuple
+        for each file in each capsule that has been added
+        '''
+        for fileName, fileData in self._capsuleDataMap.iteritems():
+            for fileDatum in fileData:
+                fileInfo, package = fileDatum
+                yield fileName, package, fileInfo[0], fileInfo[1], fileInfo[2]

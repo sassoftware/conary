@@ -989,7 +989,7 @@ class MakeDevices(policy.Policy):
     EXAMPLES
     ========
 
-    C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666})}
+    C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666, package=':dev'})}
 
     Creates the device node C{/dev/tty}, as type 'c' (character, as opposed to
     type 'b', or block) with a major number of '5', minor number of '0',
@@ -1010,27 +1010,33 @@ class MakeDevices(policy.Policy):
 	"""
 	MakeDevices(path, devtype, major, minor, owner, group, mode=0400)
 	"""
-	if args:
+        if args:
             args = list(args)
-            if 'mode' in keywords:
-                args.append(keywords.pop('mode'))
-	    l = len(args)
-	    # mode is optional, all other arguments must be there
-	    assert((l > 5) and (l < 8))
-	    if l == 6:
-		args.append(0400)
-            args[0] = args[0] % self.recipe.macros
-	    self.devices.append(args)
-	policy.Policy.updateArgs(self, **keywords)
+            l = len(args)
+            if not ((l > 5) and (l < 9)):
+                self.recipe.error('MakeDevices: incorrect arguments: %r %r'
+                    %(args, keywords))
+            mode = keywords.pop('mode', None)
+            package = keywords.pop('package', None)
+            if l > 6 and mode is None:
+                mode = args[6]
+            if mode is None:
+                mode = 0400
+            if l > 7 and package is None:
+                package = args[7]
+            self.devices.append(
+                (args[0:6], {'perms': mode, 'package': package}))
+        policy.Policy.updateArgs(self, **keywords)
 
     def do(self):
-        for device in self.devices:
+        for device, kwargs in self.devices:
             r = self.recipe
-            r.autopkg.addDevice(*device)
             filename = device[0]
             owner = device[4]
             group = device[5]
             r.Ownership(owner, group, filename)
+            device[0] = device[0] % r.macros
+            r.autopkg.addDevice(*device, **kwargs)
 
 
 class setModes(policy.Policy):
@@ -1059,6 +1065,8 @@ class setModes(policy.Policy):
 	policy.Policy.updateArgs(self, **keywords)
 
     def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
 	if path in self.fixmodes:
 	    mode = self.fixmodes[path]
 	    # set explicitly, do not warn
@@ -1445,6 +1453,9 @@ class Ownership(_UserGroup):
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+
 	pkgfile = self.recipe.autopkg.pathMap[path]
         pkgOwner = pkgfile.inode.owner()
         pkgGroup = pkgfile.inode.group()
@@ -1460,12 +1471,10 @@ class Ownership(_UserGroup):
 	if bestGroup != pkgGroup:
 	    pkgfile.inode.group.set(bestGroup)
 
-        # capsules implement their own user/group handling outside of deps
-        if not self.recipe._getCapsulePathsForFile(path):
-            if bestOwner and bestOwner not in self.systemusers:
-                self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
-            if bestGroup and bestGroup not in self.systemgroups:
-                self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
+        if bestOwner and bestOwner not in self.systemusers:
+            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
+        if bestGroup and bestGroup not in self.systemgroups:
+            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
 class _Utilize(_UserGroup):
     """

@@ -1396,12 +1396,8 @@ class addCapsule(_Source):
                 minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
                 major = (rdev >> 8) & 0xfff
                 self.recipe.MakeDevices(path, devtype, major, minor, 
-                                        user, group, stat.S_IMODE(mode))
-            else:
-                self.recipe.setModes(stat.S_IMODE(mode), path)
-                if user != 'root' or group != 'root':
-                    d = Ownership.setdefault((user, group),[])
-                    d.append(path)
+                                        user, group, mode=stat.S_IMODE(mode),
+                                        package=self.package)
 
             if stat.S_ISDIR(mode):
                 fullpath = os.sep.join((destDir, path))
@@ -1409,7 +1405,7 @@ class addCapsule(_Source):
                 ExcludeDirectories.append( path )
             else:
                 if flags & rpmhelper.RPMFILE_GHOST:
-                    InitialContents.append( path )
+                    InitialContents.append(path)
                     # RPM does not actually create Ghost files but
                     # we need them for policy
                     fullpath = os.sep.join((destDir, path))
@@ -1418,20 +1414,19 @@ class addCapsule(_Source):
                         file(fullpath, 'w')
                     elif stat.S_ISLNK(mode):
                         if not filelinktos:
-                            raise SourceError, "Ghost Symlink in RPM is invalid"
-                        os.symlink( filelinktos, fullpath )
+                            raise SourceError, 'Ghost Symlink in RPM has no target'
+                        os.symlink(filelinktos, fullpath)
                     elif stat.S_ISFIFO(mode):
                         os.mkfifo(fullpath)
                     else:
-                        raise SourceError, \
-                            "Unknown Ghost Filetype defined in RPM"
+                        raise SourceError, 'Unknown Ghost Filetype defined in RPM'
                 elif flags & (rpmhelper.RPMFILE_CONFIG |
                               rpmhelper.RPMFILE_MISSINGOK |
                               rpmhelper.RPMFILE_NOREPLACE):
                     if size:
-                        Config.append( path )
+                        Config.append(path)
                     else:
-                        InitialContents.append( path )
+                        InitialContents.append(path)
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
                     if (stat.S_ISREG(mode) and \
@@ -1443,11 +1438,6 @@ class addCapsule(_Source):
         def buildRegexString(pathList):
             return '^(?:' +  '|'.join(
                 re.escape(x).replace('%', '%%') for x in pathList) + ')$'
-
-        for key, rePathList in Ownership.items():
-            user, group = key
-            regex = buildRegexString(rePathList)
-            self.recipe.Ownership(user, group, regex)
 
         if len(ExcludeDirectories):
             regex = buildRegexString(ExcludeDirectories)
@@ -1465,7 +1455,7 @@ class addCapsule(_Source):
         self.manifest.create()
         self.recipe._validatePathInfoForCapsule(totalPathData,
             self.ignoreConflictingPaths)
-        self.recipe._setPathInfoForCapsule(f, totalPathData)
+        self.recipe._setPathInfoForCapsule(f, totalPathData, self.package)
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
 
