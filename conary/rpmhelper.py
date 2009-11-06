@@ -159,6 +159,7 @@ class _RpmHeader(object):
         depset = deps.DependencySet()
         flagre = re.compile('\((.*?)\)')
         depnamere = re.compile('(.*?)\(.*')
+        packageName = self.get(NAME, '')
 
         for dep in self.get(tag, []):
             if dep.startswith('/'):
@@ -168,7 +169,10 @@ class _RpmHeader(object):
                 # Something
                 depset.addDep(deps.RpmLibDependencies,
                               deps.Dependency(dep.split('(')[1].split(')')[0]))
-            else:
+            elif '(' in dep and ('.so' in dep.split('(')[0] or
+                                 dep.startswith(packageName)) and not (
+                    dep.startswith('perl(') or dep.startswith('config(')):
+                # assume it is a shlib or package name;
                 # convert anything inside () to a flag
                 flags = flagre.findall(dep)
                 if flags:
@@ -183,6 +187,10 @@ class _RpmHeader(object):
                 else:
                     flags = []
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, flags))
+            else:
+                # replace any () with [] because () are special to Conary
+                dep = dep.replace('(', '[').replace(')', ']')
+                depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 
     def getDeps(self):
