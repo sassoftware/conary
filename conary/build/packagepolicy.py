@@ -1850,7 +1850,7 @@ class _dependency(policy.Policy):
         if pythonPath not in self.pythonVersionCache:
             pyVerCmd = util.popen(
                 r"""%s %s -Ec 'import sys;"""
-                 """ print "%%d.%%d" %%sys.version_info[0:2]'"""
+                 """ print("%%d.%%d" %%sys.version_info[0:2])'"""
                  %(ldLibraryPath, pythonPath))
             self.pythonVersionCache[pythonPath] = pyVerCmd.read().strip()
             try:
@@ -1862,7 +1862,7 @@ class _dependency(policy.Policy):
     def _getPythonSysPath(self, pythonPath, destdir, libdir):
         ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         pySysPathCmd = util.popen(
-                r"""%s %s -Ec 'import sys; print "\0".join(sys.path)'"""
+                r"""%s %s -Ec 'import sys; print("\0".join(sys.path))'"""
                 %(ldLibraryPath, pythonPath))
         sysPath = [x.strip() for x in pySysPathCmd.read().split('\0') if x]
         try:
