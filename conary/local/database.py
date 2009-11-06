@@ -1817,7 +1817,7 @@ class Database(SqlDbRepository):
                     continue
 
                 if self.db.pathIsOwned(relativePath):
-                    keep[os.path.dirname(path)] = True
+                    keep[os.path.dirname(relativePath)] = True
                     continue
 
                 opJournal.tryCleanupDir(self.root + relativePath)
