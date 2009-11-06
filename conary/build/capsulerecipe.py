@@ -11,7 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.build import defaultrecipes
+
+import inspect
+
+from conary.build import action, defaultrecipes
 
 from conary.build.recipe import RECIPE_TYPE_CAPSULE
 from conary.build.packagerecipe import BaseRequiresRecipe, AbstractPackageRecipe
@@ -20,13 +23,19 @@ class AbstractCapsuleRecipe(AbstractPackageRecipe):
     internalAbstractBaseClass = 1
     internalPolicyModules = ( 'packagepolicy', 'capsulepolicy' )
     _recipeType = RECIPE_TYPE_CAPSULE
+
     def __init__(self, *args, **kwargs):
         klass = self._getParentClass('AbstractPackageRecipe')
         klass.__init__(self, *args, **kwargs)
 
-        from conary.build import source
-        self._addSourceAction('source.addCapsule', source.addCapsule)
-        self._addSourceAction('source.addSource', source.addSource)
+        from conary.build import build
+        for name, item in build.__dict__.items():
+            if inspect.isclass(item) and issubclass(item, action.Action):
+                self._addBuildAction(name, item)
+
+    def loadSourceActions(self):
+        self._loadSourceActions(lambda item: item._packageAction is True)
+
 
 
 exec defaultrecipes.CapsuleRecipe
