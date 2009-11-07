@@ -278,3 +278,22 @@ class RPMRequires(policy.Policy):
                         if userReqs:
                             comp[1].requires.union(userReqs)
 
+class PureCapsuleComponents(policy.Policy):
+    """
+    FIXME: Write docs
+    """
+    bucket = policy.PACKAGE_MODIFICATION
+
+    def do(self):
+        for comp in self.recipe.autopkg.components.items():
+            compHasCapsule = bool(self.recipe._hasCapsulePackage(comp[0]))
+            error = False
+            for path in comp[1]:
+                inCapsule = bool(self.recipe._getCapsulePathsForFile(path))
+                if (compHasCapsule ^ inCapsule):
+                    error = True;
+                    break
+            if error:
+                self.error("Component %s contains both "
+                           "capsule and non-capsule files" % comp[0] )
+
