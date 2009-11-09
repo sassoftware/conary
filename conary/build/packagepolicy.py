@@ -3299,7 +3299,8 @@ class Requires(_addInfo, _dependency):
         # now check for automatic dependencies besides ELF
         if f.inode.perms() & 0111 and m and m.name == 'script':
             interp = m.contents['interpreter']
-            if len(interp.strip()) and self._checkInclusion(interp, path):
+            if interp.strip().startswith('/') and self._checkInclusion(interp,
+                                                                       path):
                 # no interpreter string warning is in BadInterpreterPaths
                 if not (os.path.exists(interp) or
                         os.path.exists(macros.destdir+interp)):
