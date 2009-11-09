@@ -169,8 +169,7 @@ class _RpmHeader(object):
                 # Something
                 depset.addDep(deps.RpmLibDependencies,
                               deps.Dependency(dep.split('(')[1].split(')')[0]))
-            elif '(' in dep and ('.so' in dep.split('(')[0] or
-                                 dep.startswith(packageName)) and not (
+            elif '(' in dep and '.so' in dep.split('(')[0] and not (
                     dep.startswith('perl(') or dep.startswith('config(')):
                 # assume it is a shlib or package name;
                 # convert anything inside () to a flag
