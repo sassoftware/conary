@@ -427,6 +427,9 @@ class _AbstractQueryCommand(ConaryCommand):
             'buildreqs'     : (VERBOSE_HELP,
                                'Display troves used to satisfy buildreqs'
                                ' of this trove'),
+            'capsules'      : (VERBOSE_HELP,
+                               'Display only encapsulated packages in file '
+                               'lists'),
             'deps'          : 'Display trove dependencies',
             'file-deps'     : 'Display dependencies for individual files',
             'file-flavors'  : (VERBOSE_HELP,
@@ -467,6 +470,7 @@ class _AbstractQueryCommand(ConaryCommand):
         ConaryCommand.addParameters(self, argDef)
 
         d = {}
+        d["capsules"] = NO_PARAM
         d["ids"] = NO_PARAM
         d["ls"] = NO_PARAM
         d["lsl"] = NO_PARAM
@@ -520,7 +524,7 @@ class QueryCommand(_AbstractQueryCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kw = {}
-        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
                 ('file-flavors', 'fileFlavors'), 
@@ -634,7 +638,7 @@ class RepQueryCommand(_AbstractQueryCommand):
 
         kw = {}
         kw['filesToShow'] = []
-        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('build-log', 'showBuildLog'),
                 ('file-deps', 'fileDeps'), 
@@ -778,7 +782,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
         from conary.repository import changeset
         kw = {}
         # FIXME: organize
-        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
                 ('file-flavors', 'fileFlavors'), 

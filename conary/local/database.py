@@ -1466,11 +1466,15 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
-			 pristine = False):
-	return self.db.iterFilesInTrove(troveName, version, flavor,
-                                        sortByPath = sortByPath, 
-                                        withFiles = withFiles,
-                                        pristine = pristine)
+                         pristine = False, capsules = False):
+        for x in self.db.iterFilesInTrove(troveName, version, flavor,
+                                          sortByPath = sortByPath,
+                                          withFiles = withFiles,
+                                          pristine = pristine):
+            if capsules and x[0] == trove.CAPSULE_PATHID:
+                yield x
+            elif not capsules and x[0] != trove.CAPSULE_PATHID:
+                yield x
 
     def iterFilesWithTag(self, tag):
 	return self.db.iterFilesWithTag(tag)
@@ -1583,10 +1587,12 @@ class Database(SqlDbRepository):
     ROLLBACK_PHASE_LOCAL = update.ROLLBACK_PHASE_LOCAL
 
     def iterFilesInTrove(self, troveName, version, flavor,
-                         sortByPath = False, withFiles = False):
+                         sortByPath = False, withFiles = False,
+                         capsules = True):
 	return SqlDbRepository.iterFilesInTrove(self, troveName, version,
 			flavor, sortByPath = sortByPath,
-			withFiles = withFiles, pristine = False)
+			withFiles = withFiles, pristine = False,
+                        capsules = capsules)
 
     def iterTrovesByPath(self, path):
 	return [ x for x in self.db.iterFindByPath(path) ]

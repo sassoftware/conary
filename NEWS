@@ -26,6 +26,9 @@ Changes in @NEW@:
       debugging.
     * Conary proxies are responsible for reassembling the content for
       changesets containing capsules. (CNY-3228, CNY-3259)
+    * --capsules command line option modifies showchangeset, repquery,
+      and query commands to display file information for capsules instead
+      of for installed files
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single

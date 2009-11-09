@@ -1104,7 +1104,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             troveNames.add(name)
         return iter(troveNames)
 
-    def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
+    def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False,
+                         capsules = False):
         try:
             cs = self.troveCsMap[n,v,f]
         except KeyError:
@@ -1114,6 +1115,11 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         fileList = trvCs.getNewFileList()
         if not fileList:    
             return
+
+        if capsules:
+            fileList = [ x for x in fileList if x[0] == trove.CAPSULE_PATHID ]
+        else:
+            fileList = [ x for x in fileList if x[0] != trove.CAPSULE_PATHID ]
 
         if not withFiles:
             if sortByPath:

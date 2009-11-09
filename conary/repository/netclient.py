@@ -998,7 +998,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                          for y in x[1]]) for x in itertools.izip(pathList, l) ])
  
     def iterFilesInTrove(self, troveName, version, flavor,
-                         sortByPath = False, withFiles = False):
+                         sortByPath = False, withFiles = False,
+                         capsules = False):
         # XXX this code should most likely go away, and anything that
         # uses it should be written to use other functions
         l = [(troveName, (None, None), (version, flavor), True)]
