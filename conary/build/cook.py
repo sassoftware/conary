@@ -1233,9 +1233,7 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
             _initializeOldMetadata(repos, recipeObj, logFile = output)
 
             recipeObj.doProcess('PACKAGE_MODIFICATION', logFile = output)
-            # FIXME: capsules may need some enforcement policy for buildRequires
-            if recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE:
-                recipeObj.doProcess('ENFORCEMENT', logFile = output)
+            recipeObj.doProcess('ENFORCEMENT', logFile = output)
 
             recipeObj.doProcess('ERROR_REPORTING', logFile = output)
             logBuild and logFile.popDescriptor('policy')

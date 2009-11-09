@@ -282,7 +282,7 @@ class PureCapsuleComponents(policy.Policy):
     """
     FIXME: Write docs
     """
-    bucket = policy.PACKAGE_MODIFICATION
+    bucket = policy.ENFORCEMENT
 
     def do(self):
         for comp in self.recipe.autopkg.components.items():
@@ -296,4 +296,3 @@ class PureCapsuleComponents(policy.Policy):
             if error:
                 self.error("Component %s contains both "
                            "capsule and non-capsule files" % comp[0] )
-
