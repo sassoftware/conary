@@ -1924,6 +1924,8 @@ class Database(SqlDbRepository):
 
             if not hasChanges: continue
 
+            # contents for this aren't in a capsule
+            localTrove.troveInfo.capsule.reset()
             # this is a rollback so the diff is backwards
             trvCs = localTrove.diff(origTrove)[0]
             cs.newTrove(trvCs)

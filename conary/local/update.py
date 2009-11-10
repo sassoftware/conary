@@ -2050,6 +2050,9 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 				      changeset.ChangedFileTypes.file,
 				      newCont, f.flags.isConfig())
 
+    # local changes don't use capsules to store information
+    newTrove.troveInfo.capsule.reset()
+
     # compute new signatures -- the old ones are invalid because of
     # the version change
     newTrove.invalidateDigests()
