@@ -4031,10 +4031,9 @@ class Flavor(policy.Policy):
 
 
     def postProcess(self):
-	componentMap = self.recipe.autopkg.componentMap
         # all troves need to share the same flavor so that we can
         # distinguish them later
-        for pkg in componentMap.values():
+        for pkg in self.recipe.autopkg.components.values():
             pkg.flavor.union(self.packageFlavor)
 
     def hasLibInPath(self, path):
@@ -4051,10 +4050,10 @@ class Flavor(policy.Policy):
         return False
 
     def doFile(self, path):
-	componentMap = self.recipe.autopkg.componentMap
-	if path not in componentMap:
-	    return
-	pkg = componentMap[path]
+	autopkg = self.recipe.autopkg
+	pkg = autopkg.findComponent(path)
+        if pkg is None:
+            return
 	f = pkg.getFile(path)
         m = self.recipe.magic[path]
         if m and m.name == 'ELF' and 'isnset' in m.contents:
@@ -4085,8 +4084,13 @@ class Flavor(policy.Policy):
         # the package - instead the package will have the flavor that
         # it was cooked with.  This is to avoid unnecessary or extra files
         # causing the entire package from being flavored inappropriately.
-        # Such flavoring requires a bunch of Flaovr exclusions to fix.
-        f.flavor.set(flv)
+        # Such flavoring requires a bunch of Flavor exclusions to fix.
+        # Note that we need to set all shared paths between containers
+        # to share flavors and ensure that fileIds are the same
+        for pkg in autopkg.findComponents(path):
+            f = pkg.getFile(path)
+            f.flavor.set(flv)
+
         # get the Arch.* dependencies
         flv.union(self.archFlavor)
         if isnset in self.allowableIsnSets:
