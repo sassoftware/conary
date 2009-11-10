@@ -1016,7 +1016,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # in the same order as iterFileList() to reuse code.
         if sortByPath:
             pathDict = {}
-            for pathId, path, fileId, version in t.iterFileList():
+            for pathId, path, fileId, version in t.iterFileList(
+                                capsules = capsules, members = not capsules):
                 pathDict[path] = (pathId, fileId, version)
             paths = pathDict.keys()
             paths.sort()
@@ -1026,7 +1027,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     yield (pathId, path, fileId, version)
             generator = rearrange(paths, pathDict)
         else:
-            generator = t.iterFileList()
+            generator = t.iterFileList(capsules = capsules,
+                                       members = not capsules)
         for pathId, path, fileId, version in generator:
             if withFiles:
                 fileStream = files.ThawFile(cs.getFileChange(None, fileId),
