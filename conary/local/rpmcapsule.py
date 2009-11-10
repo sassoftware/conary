@@ -283,3 +283,19 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                 "restoring %s from RPM",
                                 restoreFile = False,
                                 fileId = fileId)
+
+    def remove(self, trv):
+        SingleCapsuleOperation.remove(self, trv)
+
+        # make sure everything was erased which should have been; RPM's
+        # shared file handling means it may not erase things which we think
+        # ought to be
+        for trv in self.removes:
+            for pathId, path, fileId, version in trv.iterFileList():
+                fullPath = self.root + path
+                if not os.path.exists(fullPath):
+                    continue
+                fileObj = files.FileFromFilesystem(fullPath, pathId)
+                self.fsJob._remove(fileObj, path, fullPath,
+                                   'removing rpm owned file %s',
+                                   ignoreMissing = True)

@@ -124,11 +124,12 @@ class FilesystemJob:
                 l = self.tagUpdates.setdefault(tag, [])
                 l.append(target)
 
-    def _remove(self, fileObj, relativePath, target, msg):
+    def _remove(self, fileObj, relativePath, target, msg,
+                ignoreMissing = False):
 	if isinstance(fileObj, files.Directory):
             self.directorySet.setdefault(relativePath, 0)
 	else:
-	    self.removes[target] = (relativePath, fileObj, msg)
+	    self.removes[target] = (relativePath, fileObj, msg, ignoreMissing)
 
             # track removals from each directory
             if relativePath:
@@ -339,14 +340,16 @@ class FilesystemJob:
         paths.sort()
         paths.reverse()
         for fileNum, target in enumerate(paths):
-            (relativePath, fileObj, msg) = self.removes[target]
+            (relativePath, fileObj, msg, ignoreMissing) = self.removes[target]
             self.callback.removeFiles(fileNum + 1, len(paths))
 
             # don't worry about files which don't exist
             try:
                 info = os.lstat(target)
             except OSError, e:
-                if e.errno == errno.ENOENT:
+                if ignoreMissing:
+                    pass
+                elif e.errno == errno.ENOENT:
                     self.callback.warning("%s has already been removed",
                                           target[rootLen:])
                 else:
