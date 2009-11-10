@@ -969,7 +969,7 @@ _TROVECAPSULE_RPM_RELEASE     = 2
 _TROVECAPSULE_RPM_ARCH        = 3
 _TROVECAPSULE_RPM_EPOCH       = 4
 
-class TroveContainerRpm(streams.StreamSet):
+class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_RPM_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
@@ -979,12 +979,23 @@ class TroveContainerRpm(streams.StreamSet):
         _TROVECAPSULE_RPM_EPOCH   : (DYNAMIC, streams.IntStream,    'epoch' ),
     }
 
-class TroveContainer(streams.StreamSet):
+    def reset(self):
+        self.name.set(None)
+        self.version.set(None)
+        self.release.set(None)
+        self.arch.set(None)
+        self.epoch.set(None)
+
+class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
-        _TROVECAPSULE_RPM      : (SMALL, TroveContainerRpm,    'rpm'  ),
+        _TROVECAPSULE_RPM      : (SMALL, TroveCapsule,         'rpm'  ),
     }
+
+    def reset(self):
+        self.type.set(None)
+        self.rpm.reset()
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -1085,7 +1096,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_PKGCREATORDATA: (DYNAMIC, streams.StringStream,'pkgCreatorData'),
         _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
         _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,    'clonedFromList' ),
-        _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveContainer,       'capsule' ),
+        _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,         'capsule' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -3625,7 +3636,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
             return TroveInfo.find(_TROVEINFO_TAG_PATH_HASHES,
                                   self.troveInfoDiff())
 
-        return NOne
+        return None
 
 class TroveChangeSet(AbstractTroveChangeSet):
 
