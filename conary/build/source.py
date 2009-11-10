@@ -1311,13 +1311,110 @@ Source = addSource
 
 
 class addCapsule(_Source):
+
     """
+    NAME
+    ====
+
+    B{C{r.addCapsule()}} - Add an encapsulated file
+
+    SYNOPSIS
+    ========
+    C{r.addCapsule(I{capsulename}, [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{mode}=,] [I{package}=,] [I{sourceDir}=,] I{ignoreConflictingPaths}=])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addCapsule()} class adds an encapsulated file to the package.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addCapsule}:
+
+    B{dir} : The directory in which to store the file, relative to the build
+    directory. An absolute C{dir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{dir} value will be considered
+    relative to C{%(builddir)s}. Defaults to storing file directly in the
+    build directory.
+
+    B{keyid} : Using the C{keyid} keyword indicates the eight-digit
+    GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
+    source code archive signature should be sought, and checked.
+    If you provide the C{keyid} keyword, C{r.addCapsule} will
+    search for a file named I{sourcename}C{.{sig,sign,asc}}, and
+    ensure it is signed with the appropriate GPG key. A missing signature
+    results in a warning; a failed signature check is fatal.
+
+    B{mode}: If set, provides the mode to set on the file.
+
+    B{httpHeaders} : A dictionary containing a list of headers to send with
+    the http request to download the source archive.  For example, you could
+    set Authorization credentials, fudge a Cookie, or, if direct links are
+    not allowed for some reason (e.g. a click through EULA), a Referer can
+    be provided.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command. If not specified,
+    the default componentname is C{:rpm}. Previously-specified C{PackageSpec}
+    or C{ComponentSpec} lines will override the package specification, since
+    all package and component specifications are considered in strict order as
+    provided by the recipe
+
+    B{sourceDir} : Instructs C{r.addCapsule} to look in the directory
+    specified by C{sourceDir} for the file to install.
+    An absolute C{sourceDir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{sourceDir} value will be
+    considered relative to C{%(builddir)s}.
+
+    B{ignoreConflictingPaths} : A list of paths in which C{r.addCapsule} will
+    not check files for conflicting contents.
+
+    EXAMPLES
+    ========
+
+    The following examples demonstrate invocations of C{r.addCapsule}
+    from within a recipe:
+
+    C{r.addCapsule('foo.rpm')}
+
+    The example above is a typical, simple invocation of C{r.addCapsule()}
+    which adds the file C{foo.rpm} as a capsule file and creates the C{:rpm}
+    component
     """
+
     keywords = {'ignoreConflictingPaths': set(),
                }
 
     def __init__(self, recipe, *args, **keywords):
         """
+        @param recipe: The recipe object currently being built is provided
+        automatically by the PackageRecipe object. Passing in C{recipe} from
+        within a recipe is unnecessary.
+        @keyword dir: The directory in which to store the file, relative to
+        the build directory. An absolute C{dir} value will be considered
+        relative to C{%(destdir)s}, whereas a relative C{dir} value will be
+        considered relative to C{%(builddir)s}. Defaults to storing file
+        directly in the build directory.
+        @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
+        Privacy Guard (GPG) key ID, without leading C{0x} for the source code
+        archive signature should be sought, and checked. If you provide the
+        C{keyid} keyword, C{r.addCapsule} will search for a file named
+        I{sourcename}C{.{sig,sign,asc}}, and ensure it is signed with the
+        appropriate GPG key. A missing signature results in a warning; a
+        failed signature check is fatal.
+        @keyword mode: If set, provides the mode to set on the file.
+        @keyword httpHeaders: A dictionary containing headers to add to an http
+        request when downloading the source code archive.
+        @keyword package: A string that specifies the package, component, or
+        package and component in which to place the files added while executing
+        this command
+        @keyword sourceDir: A directory in which C{r.addCapsule} will search
+        for files.
+        @keyword ignoreConflictingPaths: A list of paths that will not be
+        checked for conflicting file contents
         """
         _Source.__init__(self, recipe, *args, **keywords)
         self.capsuleType = None
