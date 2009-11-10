@@ -531,16 +531,34 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
     """
     NAME
     ====
+    B{C{CapsuleRecipe}} - Build Capsule packages
 
     SYNOPSIS
     ========
 
+    C{CapsuleRecipe} is used to create a package that contains an unmodified,
+    foreign package.
+
     DESCRIPTION
     ===========
 
+    The C{CapsuleRecipe} class provides an interface to create a capsule 
+    package.  A capsule package encapsulates an unmodified, foreign package that
+    is created by another packaging system.  Currently only RPM is supported.
+    When a capsule package is installed or updated, the actual install or update
+    is done by Conary calling the other packaging system.
+
     EXAMPLE
     =======
+    A sample class that uses CapsuleRecipe to create a Conary capsule package
+    containing a single RPM
 
+        class ExamplePackage(CapsuleRecipe):
+            name = 'example'
+            version = '1.0'
+
+            def setup(r):
+                r.addCapsule('foo.rpm')
     """
     name = 'capsule'
     internalAbstractBaseClass = 1

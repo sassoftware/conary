@@ -12,7 +12,8 @@
 # full details.
 #
 """
-FIXME: write doc string
+Module used to override and augment packagepolicy specifically for Capsule
+Recipes
 """
 import codecs
 import imp
@@ -145,7 +146,9 @@ class Ownership(packagepolicy.Ownership):
 
 class Payload(policy.Policy):
     """
-    FIXME: write docs
+    This policy is used to mark files which have their contents stored  inside
+    a capsule rather than in the trove.
+    Do not call it directly; it is for internal use only.
     """
     bucket = policy.PACKAGE_CREATION
     filetree = policy.PACKAGE
@@ -171,7 +174,37 @@ class Payload(policy.Policy):
 
 class RPMProvides(policy.Policy):
     """
-    FIXME: Write docs
+    NAME
+    ====
+
+    B{C{r.RPMProvides()}} - Creates dependency provision for an RPM capsule
+
+    SYNOPSIS
+    ========
+
+    C{r.RPMProvides([I{provision}, I{package} | I{package:component})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.RPMProvides()} policy marks an rpm capsule as providing certain
+    features or characteristics, and can be called to explicitly provide things
+    that cannot be automatically discovered and are not provided by the RPM
+    header.
+
+    A C{I{provision}} may be C{'file'} to mark an RPM capsule as providing its
+    filename, or a dependency type.  You can create a file, rpm, soname or
+    ABI C{I{provision}} manually; all other types are only automatically
+    discovered.  Provisions that begin with C{file} are files, those that
+    start with C{rpm:} are RPMs, those that start with C{soname:} are sonames,
+    and those that start with C{abi:} are ABIs.  Other prefixes are reserved.
+
+    EXAMPLES
+    ========
+
+    C{r.RPMProvides('soname: libperl.so', 'foo')}
+
+    C{r.RPMProvides('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -226,16 +259,47 @@ class RPMProvides(policy.Policy):
 
 class RPMRequires(policy.Policy):
     """
-    FIXME: Write docs
+    NAME
+    ====
+
+    B{C{r.RPMRequires()}} - Creates dependency requirement for an RPM capsule
+
+    SYNOPSIS
+    ========
+
+    C{r.RPMRequires([I{requirement}, I{package} | I{package:component})}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.RPMRequires()} policy marks an rpm capsule as requiring certain
+    features or characteristics, and can be called to explicitly provide things
+    that cannot be automatically discovered and are not provided by the RPM
+    header.
+
+    A C{I{requirement}} may be C{'file'} to mark an RPM capsule as requiring its
+    filename, or a dependency type.  You can create a file, rpm, soname or
+    ABI C{I{requirement}} manually; all other types are only automatically
+    discovered.  Requirements that begin with C{file} are files, those that
+    start with C{rpm:} are RPMs, those that start with C{soname:} are sonames,
+    and those that start with C{abi:} are ABIs.  Other prefixes are reserved.
+
+    EXAMPLES
+    ========
+
+    C{r.RPMRequires('soname: libperl.so', 'foo')}
+
+    C{r.RPMRequires('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
     """
+
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
-    )
+        )
 
     keywords = {
         'requirements': {}
-    }
+        }
 
     requirementRe = re.compile('(.*?):(.*?)\((.*?)\)')
 
@@ -280,7 +344,9 @@ class RPMRequires(policy.Policy):
 
 class PureCapsuleComponents(policy.Policy):
     """
-    FIXME: Write docs
+    This policy is used to ensure that if a component contains a capsule that
+    it only contains files defined within that capsule.
+    Do not call it directly; it is for internal use only.
     """
     bucket = policy.ENFORCEMENT
 
