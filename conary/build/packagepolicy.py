@@ -800,11 +800,13 @@ class TagDescription(policy.Policy):
 
     invariantsubtrees = [ '%(tagdescriptiondir)s/' ]
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+	fullpath = self.macros.destdir + path
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.info('conary tag file: %s', file)
-	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
+            self.info('conary tag file: %s', path)
+	    self.recipe.autopkg.pathMap[path].tags.set("tagdescription")
 
 
 class TagHandler(policy.Policy):
@@ -837,11 +839,13 @@ class TagHandler(policy.Policy):
     )
     invariantsubtrees = [ '%(taghandlerdir)s/' ]
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+	fullpath = self.macros.destdir + path
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.info('conary tag handler: %s', file)
-	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
+            self.info('conary tag handler: %s', path)
+	    self.recipe.autopkg.pathMap[path].tags.set("taghandler")
 
 
 class TagSpec(_addInfo):
@@ -921,6 +925,9 @@ class TagSpec(_addInfo):
                         self.suggestBuildRequires.add(troveName)
 
     def runInfo(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            # capsules do not participate in the tag protocol
+            return
         excludedTags = {}
         for tag in self.included:
 	    for filt in self.included[tag]:
