@@ -58,6 +58,10 @@ Changes in @NEW@:
     * Repositories no longer store duplicate file path information when
       a path is committed for the first time by a job which references it
       multiple times
+    * Replacing a symlink with a regular file would create the regular file
+      as the target of the symlink instead of replacing the symlink.
+    * Local rollbacks would not restore file contents when the file was
+      replaced by a non-regular file (such as a symlink)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access

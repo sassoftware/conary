@@ -647,8 +647,9 @@ class ChangeSet(streams.StreamSet):
                         rollback.addFileContents(pathId, curFileId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
-		elif origFile.hasContents and newFile.hasContents and \
-                            origFile.contents.sha1() != newFile.contents.sha1():
+		elif ((origFile.hasContents != newFile.hasContents) or
+                      (origFile.hasContents and newFile.hasContents and
+                         origFile.contents.sha1() != newFile.contents.sha1())):
 		    # this file changed, so we need the contents
 		    fullPath = db.root + curPath
                     try:
