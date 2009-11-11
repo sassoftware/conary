@@ -592,7 +592,11 @@ class RegularFile(File):
                     f.close()
                     actualSha1 = d.digest()
 
-                    if os.path.isdir(target):
+                    # would be nice if util could do this w/ a single
+                    # system call, but exists is better than an exception
+                    # when the file doesn't already exist
+                    if (os.path.exists(target) and
+                            stat.S_ISDIR(os.lstat(target).st_mode)):
                         os.rmdir(target)
                     os.rename(tmpname, target)
                 except:
