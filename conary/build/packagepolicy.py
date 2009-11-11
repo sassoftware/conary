@@ -3669,7 +3669,7 @@ class Requires(_addInfo, _dependency):
         # Try to match depNames against all current packages
         # Use the last value in depNames as the fault value
         assert depNames, "No dependencies passed"
-        for pkg in pkgFiles:
+        for pkg, _ in pkgFiles:
             if depPath in pkg:
                 fileProvides = pkg[depPath][1].provides()
 
