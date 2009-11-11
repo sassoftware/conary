@@ -17,8 +17,12 @@ Contains functions to assist in dealing with rpm files.
 """
 
 import gzip
-
-import itertools, struct, re, os
+import itertools
+import os
+import re
+import struct
+import subprocess
+import tempfile
 from conary.lib import digestlib, openpgpfile, sha1helper
 from conary.deps import deps
 from conary.lib import util
@@ -487,6 +491,42 @@ def extractRpmPayload(fileIn, fileOut):
         if not buf:
             break
         fileOut.write(buf)
+
+def extractFilesFromCpio(fileIn, fileList, tmpDir = '/tmp'):
+    """
+    Returns a list of open files parallel to fileList
+    """
+    # Trim ./ and / from left
+    fileList = [ os.path.normpath(x).lstrip('/') for x in fileList ]
+    filePatterns = fileList[:]
+    filePatterns.extend('/' + x for x in fileList)
+    filePatterns.extend('./' + x for x in fileList)
+
+    # Create temporary directory
+    util.mkdirChain(tmpDir)
+    tmpDir = tempfile.mkdtemp(dir = tmpDir, prefix = 'payload-')
+    try:
+        cmd = ["/bin/cpio", "-iumd"] + filePatterns
+
+        p = subprocess.Popen(cmd, stdin = subprocess.PIPE, cwd = tmpDir,
+            stderr = file(os.devnull, "w"))
+        util.copyfileobj(fileIn, p.stdin)
+        p.stdin.close()
+        p.wait()
+
+        # Reassemble results
+        results = []
+        for cleanPath in fileList:
+            abspath = util.joinPaths(tmpDir, cleanPath)
+            if not os.path.exists(abspath) or (
+                    os.path.isfile(abspath) and os.path.islink(abspath)):
+                fileObj = None
+            else:
+                fileObj = file(abspath)
+            results.append(fileObj)
+    finally:
+        util.rmtree(tmpDir)
+    return results
 
 def UncompressedRpmPayload(fileIn):
     """
