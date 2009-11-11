@@ -961,7 +961,7 @@ class Version(VersionSequence):
                 item = iter.next()
         except StopIteration:
             if (trailing.sourceCount.shadowCount() < self.shadowLength()
-                and not trailing.buildCount.shadowCount()):
+                and trailing.buildCount.shadowCount() < self.shadowLength()):
                 # this is a direct shadow of a binary trove -- it hasn't
                 # been touched on the shadow
                 return True
