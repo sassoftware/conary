@@ -2074,18 +2074,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         AND TroveInfo.infoType = ?
         """ % { 'roleids' : ", ".join("%d" % x for x in roleIds) }
         cu.execute(q, trove._TROVEINFO_TAG_CAPSULE)
-        fileIdContainerList = []
+        fileIdCapsuleList = []
         instanceIds = set()
         for (i, instanceId, data, dirname, basename, fileSha1) in cu:
             fileId = uniqIdList[i]
-            trvContainer = trove.TroveContainer()
-            trvContainer.thaw(data)
+            trvCapsule = trove.TroveCapsule()
+            trvCapsule.thaw(data)
             instanceIds.add(instanceId)
             if dirname:
                 filePath = util.joinPaths(dirname, basename)
             else:
                 filePath= basename
-            fileIdContainerList.append((fileId, trvContainer,
+            fileIdCapsuleList.append((fileId, trvCapsule,
                 filePath, fileSha1, instanceId))
         instanceIds = sorted(instanceIds)
 
@@ -2106,15 +2106,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute(q, trove.CAPSULE_PATHID)
         instanceIds = dict((instanceIds[i], sha1) for (i, sha1) in cu)
         fileIdMapWithResults = {}
-        for fileId, trvContainer, filePath, fileSha1, instanceId in fileIdContainerList:
+        for fileId, trvCapsule, filePath, fileSha1, instanceId in fileIdCapsuleList:
             capsuleSha1 = instanceIds.get(instanceId)
-            epoch = trvContainer.rpm.epoch()
+            epoch = trvCapsule.rpm.epoch()
             if epoch is None:
                 epoch = ''
-            capsuleKey = (trvContainer.rpm.name(), epoch,
-                trvContainer.rpm.version(), trvContainer.rpm.release(),
-                trvContainer.rpm.arch())
-            fileInfo =  (trvContainer.type(), capsuleKey,
+            capsuleKey = (trvCapsule.rpm.name(), epoch,
+                trvCapsule.rpm.version(), trvCapsule.rpm.release(),
+                trvCapsule.rpm.arch())
+            fileInfo =  (trvCapsule.type(), capsuleKey,
                 capsuleSha1, filePath, fileSha1 or '')
             fileIdMapWithResults[self.fromFileId(fileId)] = fileInfo
         return fileIdMapWithResults
