@@ -2040,7 +2040,7 @@ class Database(SqlDbRepository):
             fsTroveDict[fsTrove.getNameVersionFlavor()] = fsTrove
 
 	if rollbackPhase is None:
-            reposRollback = cs.makeRollback(dbCache, configFiles = True,
+            reposRollback = cs.makeRollback(dbCache,
                        redirectionRollbacks = (not commitFlags.localRollbacks))
             flags.merge = True
         else:

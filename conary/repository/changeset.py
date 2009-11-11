@@ -462,10 +462,7 @@ class ChangeSet(streams.StreamSet):
 	    os.unlink(outFileName)
 	    raise
 
-    # if availableFiles is set, this includes the contents that it can
-    # find, but doesn't worry about files which it can't find
-    def makeRollback(self, db, configFiles = False, 
-                     redirectionRollbacks = True):
+    def makeRollback(self, db, redirectionRollbacks = True):
 	assert(not self.absolute)
 
         rollback = ChangeSet()
