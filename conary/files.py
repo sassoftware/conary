@@ -559,10 +559,12 @@ class RegularFile(File):
 		util.mkdirChain(path)
 
             if inFd is not None:
-                tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
-                os.close(tmpfd)
-                destName = os.path.basename(destTarget)
-
+                if keepTempfile:
+                    tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
+                    os.close(tmpfd)
+                    destName = os.path.basename(destTarget)
+                else:
+                    destName, destTarget = name, target
                 actualSha1 = util.sha1Uncompress((inFd, inStart, inSize),
                                                  path, destName, destTarget)
                 if keepTempfile:
@@ -570,10 +572,6 @@ class RegularFile(File):
                     # sure we get through the next if branch.
                     inFd = None
                     src = file(destTarget)
-                else:
-                    os.rename(destTarget, target)
-                    destTarget = target
-
             elif keepTempfile:
                 tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
                 f = os.fdopen(tmpfd, 'w')
