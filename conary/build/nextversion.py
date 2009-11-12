@@ -104,8 +104,7 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
     for pkgName in pkgNames:
         if pkgName in query:
             for version in query[pkgName]:
-                if (not version.isBranchedBinary()
-                    and version.getSourceVersion().trailingRevision() ==
+                if (version.getSourceVersion().trailingRevision() ==
                             sourceVersion.trailingRevision()
                     and version.trailingLabel() ==
                             sourceVersion.trailingLabel()):
