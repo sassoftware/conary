@@ -18,101 +18,98 @@
 import itertools, os, sys
 from optparse import OptionParser
 
-if os.path.dirname(sys.argv[0]) != ".":
-    if sys.argv[0][0] == "/":
-        fullPath = os.path.dirname(sys.argv[0])
-    else:
-        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
-else:
-    fullPath = os.getcwd()
-
+fullPath = os.path.abspath(os.path.dirname(sys.argv[0]))
 sys.path.insert(0, os.path.dirname(fullPath))
 
 from conary import conarycfg, conaryclient, trove
 
-cfg = conarycfg.ConaryConfiguration()
-cfg.readFiles()
+def main(args):
+    cfg = conarycfg.ConaryConfiguration(True)
 
-def configCallback(option, opt, val, parser):
-    cfg.configLine(val)
+    def configCallback(option, opt, val, parser):
+        cfg.configLine(val)
 
-def configFileCallback(option, opt, val, parser):
-    cfg.readFile(val)
+    def configFileCallback(option, opt, val, parser):
+        cfg.readFile(val)
 
-parser = OptionParser(usage = "usage: mkcompetecs <out.ccs> [troveSpecs]+")
-parser.add_option('', '--config-file', type = "string", action = "callback",
-                  callback = configFileCallback,
-                  help = "configuration file to load after the defaults")
-parser.add_option('', '--config', action = "callback", type = "string",
-                  callback = configCallback,
-                  help = "configuration statement")
-(options, args) = parser.parse_args()
-if len(args) < 2:
-    parser.print_help()
-    sys.exit(1)
+    parser = OptionParser(usage="usage: %prog <out.ccs> [troveSpecs]+")
+    parser.add_option('', '--config-file', type = "string", action = "callback",
+                      callback = configFileCallback,
+                      help = "configuration file to load after the defaults")
+    parser.add_option('', '--config', action = "callback", type = "string",
+                      callback = configCallback,
+                      help = "configuration statement")
+    options, args = parser.parse_args(args)
+    if len(args) < 2:
+        parser.error("Not enough arguments")
+    outFile = args.pop(0)
+    changeSpecs = conaryclient.cmdline.parseChangeList(args)
 
-outFile = args.pop(0)
-cb = conaryclient.callbacks.ChangesetCallback()
+    cb = conaryclient.callbacks.ChangesetCallback()
+    cl = conaryclient.ConaryClient(cfg = cfg)
+    repos = cl.getRepos()
 
-cl = conaryclient.ConaryClient(cfg = cfg)
-repos = cl.getRepos()
+    troveSpecs = []
+    jobSummaries = []
+    for name, (oldVer, oldFlav), (newVer, newFlav), _ in changeSpecs:
+        newSpec = name, newVer, newFlav
+        troveSpecs.append(newSpec)
+        if oldVer:
+            oldSpec = name, oldVer, oldFlav
+            troveSpecs.append(oldSpec)
+            jobSummaries.append((oldSpec, newSpec))
+        else:
+            jobSummaries.append((None, newSpec))
 
-troveSpecs = []
-jobSummaries = []
-for arg in args:
-    items = arg.split('--')
-    firstSpec = conaryclient.cmdline.parseTroveSpec(items[0])
-    troveSpecs.append(firstSpec)
-    if len(items) > 1:
-        newVer = "%s=%s" % (firstSpec[0], items[1])
-        if firstSpec[2]:
-            newVer += '[%s]' % firstSpec[2]
+    trvInfoDict = repos.findTroves([], troveSpecs)
 
-        secondSpec = conaryclient.cmdline.parseTroveSpec(newVer)
-        troveSpecs.append(secondSpec)
-        jobSummaries.append((firstSpec, secondSpec))
-    else:
-        jobSummaries.append((None, firstSpec))
+    masterJob = []
+    for jobSummary in jobSummaries:
+        new = sorted(trvInfoDict[jobSummary[1]])[-1]
+        if jobSummary[0]:
+            old = sorted(trvInfoDict[jobSummary[0]])[-1]
+            masterJob.append( (old[0], old[1:], new[1:], False) )
+        else:
+            masterJob.append( (new[0], (None, None), new[1:], True) )
 
-trvInfoDict = repos.findTroves([], troveSpecs)
+    createCompleteChangeSet(repos, masterJob, outFile, cb)
 
-masterJob = []
-for jobSummary in jobSummaries:
-    new = trvInfoDict[jobSummary[1]][0]
-    if jobSummary[0]:
-        old = trvInfoDict[jobSummary[0]][0]
-        masterJob.append( (old[0], old[1:], new[1:], False) )
-    else:
-        masterJob.append( (new[0], (None, None), new[1:], True) )
 
-trvInfoList = list(itertools.chain(*trvInfoDict.values()))
+def createCompleteChangeSet(repos, masterJob, filename=None, callback=None):
+    # this picks random version/flavor; we don't care what those are particularly
+    # anyway
+    oldSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
+    newSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
 
-# this picks random version/flavor; we don't care what those are particularly
-# anyway
-oldSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
-newSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
+    # we don't just use recursive changesets because we need troves which are
+    # byDefault False
+    job = ([ (x[0], (None, None), x[1], True) for x in
+                 masterJob if x[1][0] is not None ] +
+           [ (x[0], (None, None), x[2], True) for x in masterJob ])
+    cs = repos.createChangeSet(job, recurse=False, callback=callback)
+    for (name, oldInfo, newInfo, relative) in masterJob:
+        if oldInfo[0]:
+            oldTrv = trove.Trove(cs.getNewTroveVersion(name, oldInfo[0],
+                                                       oldInfo[1]))
+            for info in oldTrv.iterTroveList(strongRefs = True,
+                                             weakRefs = True):
+                oldSet.addTrove(presentOkay = True, *info)
 
-# we don't just use recursive changesets because we need troves which are
-# byDefault False
-job = ([ (x[0], (None, None), x[1], True) for x in
-             masterJob if x[1][0] is not None ] +
-       [ (x[0], (None, None), x[2], True) for x in masterJob ])
-cs = repos.createChangeSet(job, recurse = False, callback = cb)
-for (name, oldInfo, newInfo, relative) in masterJob:
-    if oldInfo[0]:
-        oldTrv = trove.Trove(cs.getNewTroveVersion(name, oldInfo[0],
-                                                   oldInfo[1]))
-        for info in oldTrv.iterTroveList(strongRefs = True,
+        newTrv = trove.Trove(cs.getNewTroveVersion(name, newInfo[0],
+                                                   newInfo[1]))
+        for info in newTrv.iterTroveList(strongRefs = True,
                                          weakRefs = True):
-            oldSet.addTrove(presentOkay = True, *info)
+            newSet.addTrove(presentOkay = True, *info)
 
-    newTrv = trove.Trove(cs.getNewTroveVersion(name, newInfo[0],
-                                               newInfo[1]))
-    for info in newTrv.iterTroveList(strongRefs = True,
-                                     weakRefs = True):
-        newSet.addTrove(presentOkay = True, *info)
+    masterJob += newSet.diff(oldSet, False)[2]
 
-masterJob += newSet.diff(oldSet, False)[2]
+    if filename:
+        return repos.createChangeSetFile(masterJob, filename, recurse=False,
+                callback=callback)
+    else:
+        return repos.createChangeSetFile(masterJob, recurse=False,
+                callback=callback)
 
-newCs = repos.createChangeSetFile(masterJob, outFile, recurse = False,
-                                  callback = cb)
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
