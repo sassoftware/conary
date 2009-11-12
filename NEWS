@@ -29,6 +29,9 @@ Changes in @NEW@:
     * --capsules command line option modifies showchangeset, repquery,
       and query commands to display file information for capsules instead
       of for installed files
+    * A new Conary proxy setting, injectCapsuleContentServers, controls
+      changeset content injection for proxies talking only to hosts in
+      this list. (CNY-3261)
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single

@@ -14,7 +14,7 @@
 
 import base64, cPickle, itertools, os, tempfile, urllib, urllib2, urlparse
 
-from conary import constants, conarycfg, rpmhelper, trove
+from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
@@ -800,9 +800,11 @@ class ChangesetFilter(BaseProxy):
                     self.cfg.capsuleServerUrl):
                 assert self.csCache
                 # We only have to retrieve the items that were not cached
-                indexesNeeded = [ i for (i, _) in changeSetsNeeded ]
+                csWithInjection, csNoInjection = self._splitChangeSetInjection(
+                    changeSetsNeeded)
+                indexesNeeded = [ i for (i, _) in csWithInjection ]
                 partChgSetList = [ chgSetList[i] for i in indexesNeeded ]
-                fpNeeded = [ x[1] for (_, x) in changeSetsNeeded ]
+                fpNeeded = [ x[1] for (_, x) in csWithInjection ]
                 partChangeSetList = self._getNeededChangeSets(caller, authToken,
                     verPath, partChgSetList, serverVersion,
                     getCsVersion, wireCsVersion, neededCsVersion,
@@ -889,7 +891,9 @@ class ChangesetFilter(BaseProxy):
                         # save csInfo
                         changeSetList[idx] = csInfo
                     # At the end of this step, we have all our changesets
-                    changeSetsNeeded = []
+                    # that require injection, leave behind only the ones with
+                    # no injection
+                    changeSetsNeeded = csNoInjection
 
         if self.callLog and changeSetsNeeded:
             self.callLog.log(None, authToken, '__createChangeSets',
@@ -974,6 +978,27 @@ class ChangesetFilter(BaseProxy):
             csInfo.path = csPath
 
         return changeSetList
+
+    def _splitChangeSetInjection(self, changeSetsNeeded):
+        # As of Conary 2.2, the client will separate changesets based
+        # on the hostname portion of the label, and will not collapse
+        # multiple jobs if they go to the same host (via a repository
+        # map).
+
+        # We only do content injection for troves on these servers
+        injectCapsuleContentServers = set(self.cfg.injectCapsuleContentServers)
+
+        csWithInjection = []
+        csNoInjection = []
+        for i, trvJobTup in changeSetsNeeded:
+            newVerStr = trvJobTup[0][2][0]
+            if newVerStr:
+                newVer = versions.VersionFromString(newVerStr)
+                if newVer.trailingLabel().getHost() in injectCapsuleContentServers:
+                    csWithInjection.append((i, trvJobTup))
+                    continue
+            csNoInjection.append((i, trvJobTup))
+        return csWithInjection, csNoInjection
 
     def _cacheChangeSet(self, url, neededHere, csInfoList, changeSetList):
         try:
