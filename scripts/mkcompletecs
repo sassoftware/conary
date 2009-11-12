@@ -107,7 +107,7 @@ def createCompleteChangeSet(repos, masterJob, filename=None, callback=None):
         return repos.createChangeSetFile(masterJob, filename, recurse=False,
                 callback=callback)
     else:
-        return repos.createChangeSetFile(masterJob, recurse=False,
+        return repos.createChangeSet(masterJob, recurse=False,
                 callback=callback)
 
 
