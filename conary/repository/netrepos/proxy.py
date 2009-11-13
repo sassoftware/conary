@@ -776,27 +776,7 @@ class ChangesetFilter(BaseProxy):
         # If proxying for a repository, self.csCache is None, so
         # changeSetsNeeded is equivalent to chgSetList
         if withFileContents and not infoOnly and not _recursed:
-            if self.isRepositoryFilter and self.cfg.excludeCapsuleContents:
-                # Repository case. We have to verify we were not asked for
-                # file contents for capsule troves
-                # Recursive call, without file contents
-                partChangeSetList = self._getNeededChangeSets(caller, authToken,
-                    verPath, chgSetList, serverVersion,
-                    getCsVersion, wireCsVersion, neededCsVersion,
-                    recurse, withFiles, withFileContents = False,
-                    excludeAutoSource = excludeAutoSource,
-                    mirrorMode = mirrorMode, infoOnly = infoOnly)
-                for csInfo in partChangeSetList:
-                    cs = changeset.ChangeSetFromFile(csInfo.path)
-                    for tcs in cs.iterNewTroveList():
-                        if tcs.getTroveInfo().capsule.type():
-                            # requested a changeset with file contents, when
-                            # the content is a capsule. Die violently
-                            raise errors.CapsuleServingDenied(
-                                "Request for contents for a changeset "
-                                "based on capsules, from repository denying "
-                                "such operation")
-            elif (not self.isRepositoryFilter and changeSetsNeeded and
+            if (not self.isRepositoryFilter and changeSetsNeeded and
                     self.cfg.capsuleServerUrl):
                 assert self.csCache
                 # We only have to retrieve the items that were not cached
