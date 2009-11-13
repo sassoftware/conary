@@ -36,6 +36,8 @@ Changes in @NEW@:
       files, and so will not raise OverflowError for manifests with
       many files on platforms with a restricted regular expression
       code size. (CNY-3282)
+    * The python dependency finder client has been modified to resolve
+      incompatibilities on the client side with python 2.3. (CNY-3285)
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
