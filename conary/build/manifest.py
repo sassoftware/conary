@@ -15,6 +15,16 @@
 import os, re
 from conary.lib import util
 
+class PathSet(set):
+    '''
+    This class implements an interface sufficiently similar to a regular
+    expression object to use for the manifest, but looks up strings in
+    a set of matches rather than compiling a regular expression.
+    '''
+    def match(self, string):
+        return string in self
+    search = match
+
 class Manifest:
 
     def __init__(self, package, recipe):
@@ -92,14 +102,8 @@ class Manifest:
         return path
 
     def load(self):
-
-        fileList = [ re.escape(self.translatePath(x[:-1])) \
-                     for x in open(self.manifestFile).readlines() ]
-
-        regexp = '^(?:'+'|'.join(fileList)+')$'
-        regexp = re.compile(regexp)
-
-        return regexp
+        return PathSet(self.translatePath(x[:-1])
+                       for x in open(self.manifestFile).readlines())
 
 class ExplicitManifest(Manifest):
     """This class is used when an exact effect on destdir is known.
