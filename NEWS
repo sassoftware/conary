@@ -71,6 +71,8 @@ Changes in @NEW@:
       as the target of the symlink instead of replacing the symlink.
     * Local rollbacks would not restore file contents when the file was
       replaced by a non-regular file (such as a symlink)
+    * Cooks will no longer block indefinitely if a subprocess forks and
+      does not exit.  (CNY-3284)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
