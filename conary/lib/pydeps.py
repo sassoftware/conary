@@ -19,7 +19,9 @@ from modulefinder import READ_MODE
 import struct
 import sys
 
-if not hasattr(__builtins__, 'set'):
+try:
+    set
+except NameError:
     # set() was introduced in python 2.4
     from sets import Set as set
 
