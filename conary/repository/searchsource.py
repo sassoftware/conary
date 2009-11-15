@@ -372,7 +372,7 @@ def createSearchPathFromStrings(searchPath):
         Creates a list of items that can be passed into createSearchSource.
 
         Valid items in the searchPath include:
-            1. troveSpec (foo=:devel)
+            1. troveSpec (foo=:devel) or list of trovespecs
             2. string for label (conary.rpath.com@rpl:devel)
             3. label objects or list of label objects.
     """
@@ -388,6 +388,9 @@ def createSearchPathFromStrings(searchPath):
         elif isinstance(item, versions.Label):
             labelList.append(item)
             continue
+        elif isinstance(item, (list, tuple)):
+            # recurse
+            item = list(itertools.chain(*createSearchPathFromStrings(item)))
         elif isinstance(item, str):
             if '=' in item:
                 # only troveSpecs have = in them
@@ -417,12 +420,8 @@ def createSearchPathFromStrings(searchPath):
 def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
                                        db=None, fallBackToRepos=True):
     """
-        Creates a list of items that can be passed into createSearchSource.
-
-        Valid items in the searchPath include:
-            1. troveSpec (foo=:devel)
-            2. string for label (conary.rpath.com@rpl:devel)
-            3. label objects or list of label objects.
+    Create a search source stack from a list of search path elements. See
+    L{createSearchPathFromStrings} for the elements allowed.
     """
     try:
         strings = searchPath
