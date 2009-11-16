@@ -1206,6 +1206,9 @@ class CompilePython(BuildCommand):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe.
+    B{pythonInterpreter} : (None) If set, must be a string that specifies an 
+    absolute path to an alternative python interpreter to be used to compile
+    the python source.
 
     EXAMPLES
     ========
@@ -1216,15 +1219,19 @@ class CompilePython(BuildCommand):
     the absolute path defined by C{%(varmmdir)s}.
     """
     _actionPathBuildRequires = set(['python'])
+
+    keywords = { 'pythonInterpreter' : 'python' }
+
     template = (
-	"""python -c 'from compileall import *; compile_dir("""
+	"""%%(pythonInterpreter)s -c 'from compileall import *; compile_dir("""
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'; """
-	"""python -O -c 'from compileall import *; compile_dir("""
+	"""%%(pythonInterpreter)s -O -c 'from compileall import *; compile_dir("""
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'"""
     )
 
     def do(self, macros):
 	macros = macros.copy()
+        macros['pythonInterpreter'] = self.pythonInterpreter
 	destdir = macros['destdir']
 	destlen = len(destdir)
 	for arg in self.arglist:
@@ -1237,7 +1244,6 @@ class CompilePython(BuildCommand):
 	    for directory in util.braceGlob(destdir+arg):
 		macros['dir'] = directory[destlen:]
 		util.execute(self.command %macros)
-
 
 class PythonSetup(BuildCommand):
     """
