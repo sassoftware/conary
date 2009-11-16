@@ -192,30 +192,25 @@ class RPMProvides(policy.Policy):
     that cannot be automatically discovered and are not provided by the RPM
     header.
 
-    A C{I{provision}} may be C{'file'} to mark an RPM capsule as providing its
-    filename, or a dependency type.  You can create a file, rpm, soname or
-    ABI C{I{provision}} manually; all other types are only automatically
-    discovered.  Provisions that begin with C{file} are files, those that
-    start with C{rpm:} are RPMs, those that start with C{soname:} are sonames,
-    and those that start with C{abi:} are ABIs.  Other prefixes are reserved.
+    A C{I{provision}} can only specify an rpm provision in the form of I{rpm:
+    dependency(FLAG1...)}
 
     EXAMPLES
     ========
-
-    C{r.RPMProvides('soname: libperl.so', 'foo')}
 
     C{r.RPMProvides('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Provides', policy.REQUIRED_PRIOR),
     )
 
     keywords = {
         'provisions': {}
     }
 
-    provisionRe = re.compile('(.*?):(.*?)\((.*?)\)')
+    provisionRe = re.compile('(.+?):([^()]+)\(?([^()]*)\)?')
 
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
@@ -227,14 +222,21 @@ class RPMProvides(policy.Policy):
                 self.provisions[name] = deps.DependencySet()
 
             reMatch = self.provisionRe.match(args[0])
+            if not reMatch or len(reMatch.groups()) != 3:
+                return
 
-            depClass = reMatch.group(1).strip()
+            depClass = reMatch.group(1).strip().lower()
+            if depClass != 'rpm' and depClass != 'rpmlib':
+                raise policy.PolicyError, "RPMProvides cannot be used to " \
+                    "provide the non-rpm dependency: '%s'" % args[0]
             dep = reMatch.group(2).strip()
             flags = reMatch.group(3).strip().split()
-            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags if x ]
+            flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in flags if x]
 
+            if not self.provisions.get(name):
+                self.provisions[name] = deps.DependencySet()
             self.provisions[name].addDep(
-                deps.dependencyClassesByName[depClass.lower()],
+                deps.dependencyClassesByName[depClass],
                 deps.Dependency(dep, flags))
             policy.Policy.updateArgs(self, **keywords)
 
@@ -243,19 +245,16 @@ class RPMProvides(policy.Policy):
         for comp in self.recipe.autopkg.components.items():
             capsule =  self.recipe._getCapsule(comp[0])
 
-            if capsule:
-                if capsule[0] == 'rpm':
-                    path = capsule[1]
-                    h = rpmhelper.readHeader(file(path))
+            if capsule and capsule[0] == 'rpm':
+                path = capsule[1]
+                h = rpmhelper.readHeader(file(path))
+                prov = h._getDepsetFromHeader(rpmhelper.PROVIDENAME)
+                comp[1].provides.union(prov)
 
-                    prov = h._getDepsetFromHeader(rpmhelper.PROVIDENAME)
-                    comp[1].provides.union(prov)
-
-                    if self.provisions:
-                        userProvs = self.provisions.get(comp[0])
-                        if userProvs:
-                            comp[1].provides.union(userProvs)
-
+                if self.provisions:
+                    userProvs = self.provisions.get(comp[0])
+                    if userProvs:
+                        comp[1].provides.union(userProvs)
 
 class RPMRequires(policy.Policy):
     """
@@ -277,17 +276,11 @@ class RPMRequires(policy.Policy):
     that cannot be automatically discovered and are not provided by the RPM
     header.
 
-    A C{I{requirement}} may be C{'file'} to mark an RPM capsule as requiring its
-    filename, or a dependency type.  You can create a file, rpm, soname or
-    ABI C{I{requirement}} manually; all other types are only automatically
-    discovered.  Requirements that begin with C{file} are files, those that
-    start with C{rpm:} are RPMs, those that start with C{soname:} are sonames,
-    and those that start with C{abi:} are ABIs.  Other prefixes are reserved.
+    A C{I{requirement}} can only specify an rpm requirement in the form of 
+    I{rpm: dependency(FLAG1...)}
 
     EXAMPLES
     ========
-
-    C{r.RPMRequires('soname: libperl.so', 'foo')}
 
     C{r.RPMRequires('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
     """
@@ -295,13 +288,16 @@ class RPMRequires(policy.Policy):
     bucket = policy.PACKAGE_CREATION
     requires = (
         ('PackageSpec', policy.REQUIRED_PRIOR),
+        ('Requires', policy.REQUIRED_PRIOR),
+        ('RPMProvides', policy.REQUIRED_PRIOR),
         )
 
     keywords = {
         'requirements': {}
         }
 
-    requirementRe = re.compile('(.*?):(.*?)\((.*?)\)')
+    requirementRe = re.compile('(.+?):([^()]+)\(?([^()]*)\)?')
+    rpmStringRe = re.compile('(.*?)\[(.*?)\]')
 
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
@@ -309,18 +305,22 @@ class RPMRequires(policy.Policy):
             if ':' not in name:
                 name = name + ':rpm'
 
-            if not self.requirements.get(name):
-                self.requirements[name] = deps.DependencySet()
-
             reMatch = self.requirementRe.match(args[0])
+            if not reMatch or len(reMatch.groups()) != 3:
+                return
 
-            depClass = reMatch.group(1).strip()
+            depClass = reMatch.group(1).strip().lower()
+            if depClass != 'rpm' and depClass != 'rpmlib':
+                raise policy.PolicyError, "RPMRequires cannot be used to " \
+                    "provide the non-rpm dependency: '%s'" % args[0]
             dep = reMatch.group(2).strip()
             flags = reMatch.group(3).strip().split()
-            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags if x ]
+            flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in flags if x]
 
+            if not self.requirements.get(name):
+                self.requirements[name] = deps.DependencySet()
             self.requirements[name].addDep(
-                deps.dependencyClassesByName[depClass.lower()],
+                deps.dependencyClassesByName[depClass],
                 deps.Dependency(dep, flags))
             policy.Policy.updateArgs(self, **keywords)
 
@@ -329,18 +329,60 @@ class RPMRequires(policy.Policy):
         for comp in self.recipe.autopkg.components.items():
             capsule =  self.recipe._getCapsule(comp[0])
 
-            if capsule:
-                if capsule[0] == 'rpm':
-                    path = capsule[1]
-                    h = rpmhelper.readHeader(file(path))
+            if capsule and capsule[0] == 'rpm':
+                #import epdb; epdb.st()
 
-                    req = h._getDepsetFromHeader(rpmhelper.REQUIRENAME)
-                    comp[1].requires.union(req)
+                path = capsule[1]
+                h = rpmhelper.readHeader(file(path))
+                rReqs = h._getDepsetFromHeader(rpmhelper.REQUIRENAME)
+                rProv = h._getDepsetFromHeader(rpmhelper.PROVIDENAME)
+                # integrate user specified requirements
+                if self.requirements:
+                    userReqs = self.requirements.get(comp[0])
+                    if userReqs:
+                        rReqs.union(userReqs)
 
-                    if self.requirements:
-                        userReqs = self.requirements.get(comp[0])
-                        if userReqs:
-                            comp[1].requires.union(userReqs)
+                # remove rpm provisions from the requirements
+                rReqs = rReqs.difference(rProv)
+
+                # cull duplicate rpm reqs that have a standard conary
+                # representations
+                # currently we only handle perl and sonames
+                culledReqs = deps.DependencySet()
+                cnyReqs = comp[1].requires
+                cnyProv = comp[1].provides
+                if rReqs.hasDepClass(deps.RpmDependencies):
+                    soDeps = deps.DependencySet()
+                    for d in list(cnyReqs.iterDepsByClass(\
+                            deps.SonameDependencies))+list(\
+                        cnyProv.iterDepsByClass(deps.SonameDependencies)):
+                        l = d.name.split('/')
+                        dmod = deps.Dependency(l[1])
+                        dmod.flags = d.flags
+                        soDeps.addDep(deps.SonameDependencies,dmod)
+
+                    for r in list(rReqs.iterDepsByClass(deps.RpmDependencies)):
+                        if '[' in r.name:
+                            reMatch = self.rpmStringRe.match(r.name)
+                            if reMatch and reMatch.groups():
+                                rpmClass = reMatch.group(1)
+                                rpmFlags = reMatch.group(2).strip()
+                            if rpmClass == 'perl' and rpmFlags:
+                                ds = deps.DependencySet()
+                                dep = deps.Dependency(rpmFlags)
+                                ds.addDep(deps.PerlDependencies, dep)
+                                if cnyReqs.satisfies(ds) or \
+                                        cnyProv.satisfies(ds):
+                                    culledReqs.addDep(
+                                        deps.RpmDependencies,r)
+                        if '.so' in r.name:
+                            ds = deps.DependencySet()
+                            dep = deps.Dependency(r.name)
+                            ds.addDep(deps.SonameDependencies, dep)
+                            if soDeps.satisfies(ds):
+                                culledReqs.addDep(deps.RpmDependencies,r)
+                rReqs = rReqs.difference(culledReqs)
+                cnyReqs.union(rReqs)
 
 class PureCapsuleComponents(policy.Policy):
     """
