@@ -31,7 +31,7 @@ from conary.lib import debugger, digestlib, log, magic
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
-from conary.build import action, errors
+from conary.build import action, errors, filter
 from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
@@ -525,6 +525,7 @@ class addArchive(_Source):
 
     def do(self):
         f = self.doDownload()
+        Ownership  = {}
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
 
@@ -564,19 +565,13 @@ class addArchive(_Source):
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
                 for (path, user, group, _, _, _, _, _, _, _) in ownerList:
-                    # trim off the leading / (or else path.joining it with
-                    # self.dir will result in /dir//foo -> /foo.
-                    path = path.lstrip('/')
-                    # FIXME: this should be refactored to remove duplicate
-                    # code below
-                    path = util.normpath(os.path.join(self.dir, path))
-                    # we have to anchor the filter ourselves because
-                    # re.escape('/foo') -> '\\/foo'.  Since this doesn't
-                    # start with '/', the filter will not be anchored.
-                    # we can put the trailing $ in too, just to make sure
-                    # that we only apply this ownership to an exact match
-                    # (in case somehow a path has a trailing /)
-                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path).replace('%', '%%'))
+                    if user != 'root' or group != 'root':
+                        # trim off the leading / (or else path.joining it with
+                        # self.dir will result in /dir//foo -> /foo.
+                        path = path.lstrip('/')
+                        path = util.normpath(os.path.join(self.dir, path))
+                        d = Ownership.setdefault((user, group),[])
+                        d.append(path)
         elif f.endswith(".iso"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
@@ -700,10 +695,10 @@ class addArchive(_Source):
 
             if ownerParser and self.preserveOwnership:
                 for (path, user, group) in ownerParser(output):
-                    # FIXME: this should be refactored to remove duplicate
-                    # code above
-                    path = util.normpath(os.path.join(self.dir, path))
-                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path).replace('%', '%%'))
+                    if user != 'root' or group != 'root':
+                        path = util.normpath(os.path.join(self.dir, path))
+                        d = Ownership.setdefault((user, group),[])
+                        d.append(path)
 
         if guessMainDir:
             bd = self.builddir
@@ -739,6 +734,11 @@ class addArchive(_Source):
                 self.recipe.mainDir(oldMainDir)
         if self.package:
             self.manifest.create()
+
+        for key, pathList in Ownership.items():
+            user, group = key
+            self.recipe.Ownership(user, group, filter.PathSet(pathList))
+
         return f
 Archive = addArchive
 
@@ -1472,7 +1472,6 @@ class addCapsule(_Source):
 
         totalPathList=[]
         totalPathData=[]
-        Ownership  = {}
         ExcludeDirectories = [] 
         InitialContents = []
         Config = []
@@ -1532,21 +1531,15 @@ class addCapsule(_Source):
                              not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
                         InitialContents.append( path )
 
-        def buildRegexString(pathList):
-            return '^(?:' +  '|'.join(
-                re.escape(x).replace('%', '%%') for x in pathList) + ')$'
-
         if len(ExcludeDirectories):
-            regex = buildRegexString(ExcludeDirectories)
-            self.recipe.ExcludeDirectories(exceptions=regex)
+            self.recipe.ExcludeDirectories(exceptions=filter.PathSet(
+                ExcludeDirectories))
 
         if len(InitialContents):
-            regex = buildRegexString(InitialContents)
-            self.recipe.InitialContents(regex)
+            self.recipe.InitialContents(filter.PathSet(InitialContents))
 
         if len(Config):
-            regex = buildRegexString(Config)
-            self.recipe.Config(regex)
+            self.recipe.Config(filter.PathSet(Config))
 
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()

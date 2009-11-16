@@ -95,13 +95,15 @@ class BasePolicy(action.RecipeAction):
         if exceptions:
             if not self.exceptions:
                 self.exceptions = []
-            if type(exceptions) in (list, tuple):
+            if type(exceptions) in (list, tuple, set):
                 self.exceptions.extend(exceptions)
                 if not allowUnusedFilters:
-                    self.unusedFilters['exceptions'].update(exceptions)
+                    for item in exceptions:
+                        if not callable(item):
+                            self.unusedFilters['exceptions'].add(item)
             else:
                 self.exceptions.append(exceptions)
-                if not allowUnusedFilters:
+                if not allowUnusedFilters and not callable(exceptions):
                     self.unusedFilters['exceptions'].add(exceptions)
         subtrees = keywords.pop('subtrees', None)
         if subtrees:
@@ -117,19 +119,23 @@ class BasePolicy(action.RecipeAction):
             self.inclusions = []
 
         if inclusions:
-            if type(inclusions) == list:
+            if isinstance(inclusions, (tuple, list, set)):
                 self.inclusions.extend(inclusions)
                 if not allowUnusedFilters:
-                    self.unusedFilters['inclusions'].update(inclusions)
+                    for item in inclusions:
+                        if not callable(item):
+                            self.unusedFilters['inclusions'].add(item)
             else:
                 self.inclusions.append(inclusions)
-                if not allowUnusedFilters:
+                if not allowUnusedFilters and not callable(inclusions):
                     self.unusedFilters['inclusions'].add(inclusions)
 
         if args:
             self.inclusions.extend(args)
             if not allowUnusedFilters:
-                self.unusedFilters['inclusions'].update(args)
+                for item in args:
+                    if not callable(item):
+                        self.unusedFilters['inclusions'].add(item)
 
         self.addArgs(**keywords)
 
@@ -300,10 +306,11 @@ class Policy(BasePolicy):
             'rootdir': self.rootdir,
         }
         macros = self.macros
-	if type(expression) in (str, types.FunctionType):
+        if isinstance(expression, (str, types.FunctionType)) or callable(
+                expression):
             return (expression, macros), kwargs
 
-	if type(expression) is not list:
+        if not isinstance(expression, list):
 	    expression = list(expression)
 
         # this normally happens when code at a higher level
@@ -474,23 +481,26 @@ class Policy(BasePolicy):
             return True
         res = False
         for f in self.inclusionFilters:
-            # we can't short circuit. we must discard all valid inclusions.
-            # it's possible that an invariant inclusion will match before
+            # We can't short circuit. We must discard all valid inclusions
+            # that are specified by regular expressions.
+            # It's possible that an invariant inclusion will match before
             # an explicit inclusion, and we need to distinguish between
-            # "filter was unused because no paths matched", and
-            # "filter was unused because it's redundant". erroring on the
-            # second case is actually more confusing than helpful.
+            # "filter was unused because no paths matched" and
+            # "filter was unused because it's redundant", because erroring
+            # on the second case is confusing rather than helpful.
             if f.match(filespec):
-                self.unusedFilters['inclusions'].discard(f.regexp)
+                if hasattr(f, 'regexp'):
+                    self.unusedFilters['inclusions'].discard(f.regexp)
                 res = True
         return res
 
     def policyException(self, filespec):
         res = False
         for f in self.exceptionFilters:
-            # we can't short circuit. we must discard all valid exceptions.
+            # We can't short circuit. We must discard all valid exceptions.
             if f.match(filespec):
-                self.unusedFilters['exceptions'].discard(f.regexp)
+                if hasattr(f, 'regexp'):
+                    self.unusedFilters['exceptions'].discard(f.regexp)
                 res = True
         return res
 

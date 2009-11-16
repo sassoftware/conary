@@ -17,8 +17,13 @@ import imp
 import modulefinder
 from modulefinder import READ_MODE
 import struct
-import subprocess
 import sys
+
+try:
+    set
+except NameError:
+    # set() was introduced in python 2.4
+    from sets import Set as set
 
 if __name__ != "__main__":
     # We may not be able to find these when being run as a program
@@ -142,6 +147,8 @@ def putData(outFile, data):
 
 class moduleFinderProxy:
     def __init__(self, pythonPath, destdir, libdir, sysPath, error):
+        # this object is always instantiated in python 2.4 or later context
+        import subprocess
         self.error = error
         environment = os.environ.copy()
         ldLibraryPath = os.getenv('LD_LIBRARY_PATH')

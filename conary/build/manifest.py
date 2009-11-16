@@ -14,6 +14,7 @@
 
 import os, re
 from conary.lib import util
+from conary.build.filter import PathSet
 
 class Manifest:
 
@@ -92,14 +93,8 @@ class Manifest:
         return path
 
     def load(self):
-
-        fileList = [ re.escape(self.translatePath(x[:-1])) \
-                     for x in open(self.manifestFile).readlines() ]
-
-        regexp = '^(?:'+'|'.join(fileList)+')$'
-        regexp = re.compile(regexp)
-
-        return regexp
+        return PathSet(self.translatePath(x[:-1])
+                       for x in open(self.manifestFile).readlines())
 
 class ExplicitManifest(Manifest):
     """This class is used when an exact effect on destdir is known.

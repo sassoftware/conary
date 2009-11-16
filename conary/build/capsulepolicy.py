@@ -79,6 +79,7 @@ class InitialContents(packagepolicy.InitialContents):
     invariantexceptions = [ ]
 
     def updateArgs(self, *args, **keywords):
+        # override packagepolicy.InitialContents to avoid invoking Config
         policy.Policy.updateArgs(self, *args, **keywords)
 
     def doFile(self, filename):

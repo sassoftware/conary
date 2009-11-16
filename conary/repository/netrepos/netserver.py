@@ -3529,9 +3529,10 @@ class ServerConfig(ConfigFile):
     deadlockRetry           = (CfgInt, 5)
     entitlement             = CfgEntitlement
     entitlementCheckURL     = CfgString
+    excludeCapsuleContents  = (CfgBool, False)
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
-    excludeCapsuleContents  = (CfgBool, False)
+    injectCapsuleContentServers = CfgList(CfgString)
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)

@@ -29,6 +29,16 @@ Changes in @NEW@:
     * --capsules command line option modifies showchangeset, repquery,
       and query commands to display file information for capsules instead
       of for installed files
+    * A new Conary proxy setting, injectCapsuleContentServers, controls
+      changeset content injection for proxies talking only to hosts in
+      this list. (CNY-3261)
+    * Conary no longer uses regular expressions to represent manifest
+      files and other internally-generated lists of files matched by
+      policy, and so will not raise OverflowError for manifests with
+      many files, or from policy generated from source objects, on
+      platforms with a restricted regular expression code size. (CNY-3282)
+    * The python dependency finder client has been modified to resolve
+      incompatibilities on the client side with python 2.3. (CNY-3285)
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
@@ -62,6 +72,8 @@ Changes in @NEW@:
       as the target of the symlink instead of replacing the symlink.
     * Local rollbacks would not restore file contents when the file was
       replaced by a non-regular file (such as a symlink)
+    * Cooks will no longer block indefinitely if a subprocess forks and
+      does not exit.  (CNY-3284)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
