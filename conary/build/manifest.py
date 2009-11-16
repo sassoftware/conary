@@ -14,16 +14,7 @@
 
 import os, re
 from conary.lib import util
-
-class PathSet(set):
-    '''
-    This class implements an interface sufficiently similar to a regular
-    expression object to use for the manifest, but looks up strings in
-    a set of matches rather than compiling a regular expression.
-    '''
-    def match(self, string):
-        return string in self
-    search = match
+from conary.build.filter import PathSet
 
 class Manifest:
 

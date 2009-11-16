@@ -33,9 +33,10 @@ Changes in @NEW@:
       changeset content injection for proxies talking only to hosts in
       this list. (CNY-3261)
     * Conary no longer uses regular expressions to represent manifest
-      files, and so will not raise OverflowError for manifests with
-      many files on platforms with a restricted regular expression
-      code size. (CNY-3282)
+      files and other internally-generated lists of files matched by
+      policy, and so will not raise OverflowError for manifests with
+      many files, or from policy generated from source objects, on
+      platforms with a restricted regular expression code size. (CNY-3282)
     * The python dependency finder client has been modified to resolve
       incompatibilities on the client side with python 2.3. (CNY-3285)
 
