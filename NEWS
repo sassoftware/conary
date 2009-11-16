@@ -116,6 +116,8 @@ Changes in @NEW@:
       component. (CNY-3195)
     * The imageGroup flag in group recipes now implies
       checkOnlyByDefaultDeps=False. (CNY-3195)
+    * Group search paths may now contain lists or tuples of troves to be
+      considered as a single "bucket". (CNY-3286)
 
 Changes in 2.0.50:
   o Bug Fixes:
