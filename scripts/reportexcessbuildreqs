@@ -76,6 +76,7 @@ def main(argv):
     xmlNamespace = 'http://www.rpath.com/permanent/log-v1.xsd'
     outputMap = {}
 
+    excessCount = 0
     for k in logfileMap:
         pkgName = k[0]
         flavor = str(k[1])
@@ -103,10 +104,13 @@ def main(argv):
         screqs = getMessage('excessSuperclassBuildRequires')
         if screqs:
             currMap['excessSuperclassBuildRequires']=frozenset(screqs.split())
+            excessCount += len(currMap['excessSuperclassBuildRequires'])
         reqs = getMessage('excessBuildRequires')
         if reqs:
             currMap['excessBuildRequires']=frozenset(reqs.split())
-
+            excessCount += len(currMap['excessBuildRequires'])
+    print >> sys.stderr, "A total of %i excess requirements reported" \
+        % excessCount
     print >> sys.stderr, "Outputting Results to Stdout:"
     print repr(outputMap)
 
