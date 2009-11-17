@@ -74,6 +74,8 @@ Changes in @NEW@:
       replaced by a non-regular file (such as a symlink)
     * Cooks will no longer block indefinitely if a subprocess forks and
       does not exit.  (CNY-3284)
+    * When startGroup is called flags will now be properly copied from the
+      parent group. (CNY-3287)
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access

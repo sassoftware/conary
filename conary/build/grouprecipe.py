@@ -1392,6 +1392,8 @@ class _GroupRecipe(_BaseGroupRecipe):
         if groupName is None:
             groupName = self._getDefaultGroup().name
 
+        self.setDefaultGroup(groupName)
+
         origGroup = self._getGroup(groupName)
         if byDefault is None:
             byDefault = origGroup.byDefault
