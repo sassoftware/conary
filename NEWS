@@ -76,6 +76,7 @@ Changes in @NEW@:
       does not exit.  (CNY-3284)
     * When startGroup is called flags will now be properly copied from the
       parent group. (CNY-3287)
+    * Replacing a symlink which was part of a loop could cause a traceback
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
