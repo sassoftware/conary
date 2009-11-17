@@ -331,8 +331,6 @@ class RPMRequires(policy.Policy):
             capsule =  self.recipe._getCapsule(comp[0])
 
             if capsule and capsule[0] == 'rpm':
-                #import epdb; epdb.st()
-
                 path = capsule[1]
                 h = rpmhelper.readHeader(file(path))
                 rReqs = h._getDepsetFromHeader(rpmhelper.REQUIRENAME)
