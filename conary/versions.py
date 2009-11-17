@@ -1404,7 +1404,7 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     v = stringVersionCache.get(ver, None)
     if v is None:
         v = _VersionFromString(ver, defaultBranch)
-    stringVersionCache[ver] = v
+        stringVersionCache[ver] = v
     v.cached = True
     return v
 
