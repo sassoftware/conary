@@ -39,6 +39,7 @@ Changes in @NEW@:
       platforms with a restricted regular expression code size. (CNY-3282)
     * The python dependency finder client has been modified to resolve
       incompatibilities on the client side with python 2.3. (CNY-3285)
+    * Conary can now read cpio archives directly. (CNY-3280)
 
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a single
