@@ -21,16 +21,9 @@ from conary.versions import Label
 # build log and reports any excess build requirements. 
 
 def main(argv):
-    installLabel = 'rhel.rpath.com@rpath:rhel-5-bootstrap'
-    repositoryMap = {
-    'rhel.rpath.com':'http://rhel.eng.rpath.com/conary/'}
+    installLabel = argv[1]
+    repositoryMap = eval(argv[2])
     cfg = conarycfg.ConaryConfiguration()
-    if len(argv) > 1:
-        installLabel = argv[1]
-    if len(argv) > 2:
-        repositoryMap = eval(argv[2])
-    print >> sys.stderr, "InstallLabel is:", installLabel
-    print >> sys.stderr, "RepositoryMap is:", repositoryMap
     cfg.installLabelPath = [installLabel]
     cfg.repositoryMap = repositoryMap
     client = conaryclient.ConaryClient(cfg)
@@ -68,7 +61,9 @@ def main(argv):
     print >> sys.stderr, "Parsing XML files"
     logfileMap = {}
     for l in zip(logfileInfoList,fcs):
-        xmlFile = StringIO(bz2.decompress(l[1].get().read()))
+        # we strip all 0x08 chars because they are wrong and make the parser
+        # angry
+        xmlFile = StringIO(bz2.decompress(l[1].get().read()).replace('\x08',''))
         logfileMap[l[0]] = xmlFile
 
     xpathStr = '/p:log/p:record[p:descriptor="cook.build.policy.'\
@@ -111,10 +106,14 @@ def main(argv):
             excessCount += len(currMap['excessBuildRequires'])
     print >> sys.stderr, "A total of %i excess requirements reported" \
         % excessCount
-    print >> sys.stderr, "Outputting Results to Stdout:"
-    print repr(outputMap)
+    return outputMap
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    outputMap = main(sys.argv)
 
+    if outputMap:
+        print >> sys.stderr, "Outputting Results to Stdout"
+        print repr(outputMap)
+        sys.exit()
 
+    sys.exit("The outputMap was empty!")
