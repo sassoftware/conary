@@ -76,8 +76,7 @@ def main(argv):
         pkgName = k[0]
         flavor = str(k[1])
         outputMap.setdefault(pkgName,{})
-        outputMap[pkgName].setdefault(flavor,{})
-        currMap = outputMap[pkgName][flavor]
+        currMap = outputMap[pkgName]
 
         try:
             tree = etree.parse(logfileMap[k])
@@ -98,11 +97,19 @@ def main(argv):
 
         screqs = getMessage('excessSuperclassBuildRequires')
         if screqs:
-            currMap['excessSuperclassBuildRequires']=frozenset(screqs.split())
+            if 'excessSuperclassBuildRequires' in currMap:
+                currMap['excessSuperclassBuildRequires'] &= \
+                    frozenset(screqs.split())
+            else:
+                currMap['excessSuperclassBuildRequires']= \
+                    frozenset(screqs.split())
             excessCount += len(currMap['excessSuperclassBuildRequires'])
         reqs = getMessage('excessBuildRequires')
         if reqs:
-            currMap['excessBuildRequires']=frozenset(reqs.split())
+            if 'excessBuildRequires' in currMap:
+                currMap['excessBuildRequires']&=frozenset(reqs.split())
+            else:
+                currMap['excessBuildRequires']=frozenset(reqs.split())
             excessCount += len(currMap['excessBuildRequires'])
     print >> sys.stderr, "A total of %i excess requirements reported" \
         % excessCount
