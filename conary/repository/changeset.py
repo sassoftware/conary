@@ -554,12 +554,17 @@ class ChangeSet(streams.StreamSet):
 		# we'll gather from the filesystem *as long as they have
 		# not changed*. If they have changed, they'll show up as
 		# members of the local branch, and their contents will be
-		# saved as part of that change set.
+		# saved as part of that change set. we don't rely on
+                # the contents staying in the datastore; we cache them
+                # instead
 		if origFile.flags.isConfig():
 		    cont = filecontents.FromDataStore(db.contentsStore, 
 						      origFile.contents.sha1())
                     rollback.addFileContents(pathId, origFileId,
-					     ChangedFileTypes.file, cont, 1)
+                                             ChangedFileTypes.file,
+                                             filecontents.FromString(
+                                                cont.get().read()),
+                                             1)
 		else:
 		    fullPath = db.root + path
 
