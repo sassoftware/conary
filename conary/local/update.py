@@ -302,17 +302,14 @@ class FilesystemJob:
             return False
         return True
 
-
-    def _applyCapsules(self):
-        filePaths = {}              # indexed by (fileId, pathId, path)
-        removeList = []
-        self.capsules.apply()
-
-    def apply(self, journal = None, opJournal = None):
+    def apply(self, journal = None, opJournal = None, justDatabase = False):
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
 
-        self._applyCapsules()
+        self.capsules.apply(justDatabase = justDatabase)
+
+        if justDatabase:
+            return
 
         if not opJournal:
             opJournal = NoopJobJournal()

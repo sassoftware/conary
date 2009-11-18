@@ -102,13 +102,17 @@ class Callback:
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
-    def apply(self, fileDict):
+    def apply(self, fileDict, justDatabase = False):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
         rpmList = []
 
         ts = rpm.TransactionSet(self.root, rpm._RPMVSF_NOSIGNATURES)
+
+        if justDatabase:
+            ts.setFlags(rpm.RPMTRANS_FLAG_JUSTDB)
+
         # we use a pretty heavy hammer
         ts.setProbFilter(rpm.RPMPROB_FILTER_IGNOREOS        |
                          rpm.RPMPROB_FILTER_IGNOREARCH      |

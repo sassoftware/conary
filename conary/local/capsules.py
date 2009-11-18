@@ -27,7 +27,7 @@ class CapsuleOperation(object):
         self.callback = callback
         self.errors = []
 
-    def apply(self, root):
+    def apply(self, justDatabase = False):
         raise NotImplementedException
 
     def install(self, troveCs):
@@ -52,7 +52,7 @@ class SingleCapsuleOperation(CapsuleOperation):
     def _filesNeeded(self):
         return [ x[1] for x in self.installs ]
 
-    def apply(self):
+    def apply(self, justDatabase = False):
         raise NotImplementedError
 
     def install(self, flags, troveCs):
@@ -100,7 +100,7 @@ class MetaCapsuleOperations(CapsuleOperation):
         CapsuleOperation.__init__(self, *args, **kwargs)
         self.capsuleClasses = {}
 
-    def apply(self):
+    def apply(self, justDatabase = False):
         fileDict = {}
         for kind, obj in sorted(self.capsuleClasses.items()):
             fileDict.update(
@@ -122,7 +122,7 @@ class MetaCapsuleOperations(CapsuleOperation):
                 fileDict[(pathId, fileId)] = tmpname
 
             for kind, obj in sorted(self.capsuleClasses.items()):
-                obj.apply(fileDict)
+                obj.apply(fileDict, justDatabase = justDatabase)
         finally:
             for tmpPath in fileDict.values():
                 try:

@@ -1828,8 +1828,8 @@ class Database(SqlDbRepository):
 
                 opJournal.tryCleanupDir(self.root + relativePath)
 
-        if not commitFlags.justDatabase:
-            fsJob.apply(journal, opJournal = opJournal)
+        fsJob.apply(journal, opJournal = opJournal,
+                    justDatabase = commitFlags.justDatabase)
 
         if (updateDatabase and not localChanges):
             for (name, version, flavor) in fsJob.getOldTroveList():

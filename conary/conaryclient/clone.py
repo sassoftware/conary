@@ -1286,12 +1286,13 @@ class CloneChooser(object):
     def getTargetBranch(self, version):
         sourceLabel = version.trailingLabel()
         sourceBranch = version.branch()
-        if sourceBranch in self.targetMap:
-            target = self.targetMap[sourceBranch]
-        elif sourceLabel in self.targetMap:
-            target = self.targetMap[sourceLabel]
-        else:
+
+        target = self.targetMap.get(sourceBranch, None)
+        if target is None:
+            target = self.targetMap.get(sourceLabel, None)
+        if target is None:
             target = self.targetMap.get(None, None)
+
         if target is None:
             return None
 

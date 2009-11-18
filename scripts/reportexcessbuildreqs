@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+# -*- mode: python -*-
+import os
+import sys
+import bz2
+
+from lxml import etree
+from StringIO import StringIO
+
+from conary import conarycfg
+from conary import conaryclient
+from conary import updatecmd
+from conary import versions
+from conary.deps import deps
+from conary.lib import util
+from conary.local import database
+from conary.repository import netclient
+from conary.versions import Label
+
+# pulls all the debuginfo components from a given install label, parses the
+# build log and reports any excess build requirements. 
+
+def main(argv):
+    installLabel = argv[1]
+    repositoryMap = eval(argv[2])
+    cfg = conarycfg.ConaryConfiguration()
+    cfg.installLabelPath = [installLabel]
+    cfg.repositoryMap = repositoryMap
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+
+    print >> sys.stderr, "Fetching trove list"
+    troveList = [(x,installLabel,None)
+                  for x in repos.troveNames(Label(installLabel))
+                  if x.endswith(':debuginfo')]
+
+    troveDict = repos.findTroves(None, troveList)
+
+    requestList = []
+    for key in troveDict:
+        value = troveDict.get(key);
+        if not value:
+            continue
+        maxVersion = max(x[1] for x in value)
+        value = sorted(x for x in value if x[1] == maxVersion)
+        requestList.extend(value);
+
+    trvList = repos.getTroves(requestList)
+    logfileReqList = []
+    logfileInfoList = []
+    print >> sys.stderr, "Building debuginfo trove list"
+    for trv in trvList:
+        for logfile in [ x for x in trv.iterFileList()
+                         if x[1].endswith('-xml.bz2')]:
+            logfileReqList.append(logfile[2:])
+            logfileInfoList.append((trv.getName().split(':')[0],trv.flavor()))
+
+    print >> sys.stderr, "Fetching %i Files" % len(logfileReqList)
+    fcs = repos.getFileContents(logfileReqList)
+
+    print >> sys.stderr, "Parsing XML files"
+    logfileMap = {}
+    for l in zip(logfileInfoList,fcs):
+        # we strip all 0x08 chars because they are wrong and make the parser
+        # angry
+        xmlFile = StringIO(bz2.decompress(l[1].get().read()).replace('\x08',''))
+        logfileMap[l[0]] = xmlFile
+
+    xpathStr = '/p:log/p:record[p:descriptor="cook.build.policy.'\
+        'ERROR_REPORTING.reportExcessBuildRequires.%s"]'
+    xmlNamespace = 'http://www.rpath.com/permanent/log-v1.xsd'
+    outputMap = {}
+
+    excessCount = 0
+    for k in logfileMap:
+        pkgName = k[0]
+        flavor = str(k[1])
+        outputMap.setdefault(pkgName,{})
+        outputMap[pkgName].setdefault(flavor,{})
+        currMap = outputMap[pkgName][flavor]
+
+        try:
+            tree = etree.parse(logfileMap[k])
+        except etree.XMLSyntaxError:
+            print >> sys.stderr, "XML Syntax Error: skipping package[flavor]: "\
+                "%s[%s]" % (pkgName, flavor)
+
+        def getMessage(name):
+            parent = tree.xpath(
+                xpathStr % name,
+                namespaces={'p' : xmlNamespace})
+            if parent:
+                element = parent[0].xpath('./p:message', namespaces={
+                        'p' : xmlNamespace})
+                assert len(element)==1
+                return element[0].text
+            return None
+
+        screqs = getMessage('excessSuperclassBuildRequires')
+        if screqs:
+            currMap['excessSuperclassBuildRequires']=frozenset(screqs.split())
+            excessCount += len(currMap['excessSuperclassBuildRequires'])
+        reqs = getMessage('excessBuildRequires')
+        if reqs:
+            currMap['excessBuildRequires']=frozenset(reqs.split())
+            excessCount += len(currMap['excessBuildRequires'])
+    print >> sys.stderr, "A total of %i excess requirements reported" \
+        % excessCount
+    return outputMap
+
+if __name__ == "__main__":
+    outputMap = main(sys.argv)
+
+    if outputMap:
+        print >> sys.stderr, "Outputting Results to Stdout"
+        print repr(outputMap)
+        sys.exit()
+
+    sys.exit("The outputMap was empty!")

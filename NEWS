@@ -39,6 +39,7 @@ Changes in @NEW@:
       platforms with a restricted regular expression code size. (CNY-3282)
     * The python dependency finder client has been modified to resolve
       incompatibilities on the client side with python 2.3. (CNY-3285)
+    * Conary can now read cpio archives directly. (CNY-3280)
     * The Conary repository now provides a method for obtaining commit
       progress updates. "conary commit" now provides progress
       output. (CNY-3290)
@@ -77,6 +78,9 @@ Changes in @NEW@:
       replaced by a non-regular file (such as a symlink)
     * Cooks will no longer block indefinitely if a subprocess forks and
       does not exit.  (CNY-3284)
+    * When startGroup is called flags will now be properly copied from the
+      parent group. (CNY-3287)
+    * Replacing a symlink which was part of a loop could cause a traceback
 
   o Internal Changes:
     * Repository internal getfile function now avoids and database access
