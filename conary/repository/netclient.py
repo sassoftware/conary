@@ -52,7 +52,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 68 + 1)
+CLIENT_VERSIONS = range(36, 69 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -2963,9 +2963,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                      'a newer repository server.')
 
         if server.getProtocolVersion() >= 38:
-            url = server.prepareChangeSet(jobs, mirror)
+            rc = server.prepareChangeSet(jobs, mirror)
         else:
-            url = server.prepareChangeSet()
+            rc = server.prepareChangeSet()
+        if server.getProtocolVersion() >= 69:
+            url, hasStatus = rc
+        else:
+            url = rc
+            hasStatus = False
 
         if server.getProtocolVersion() <= 42:
             (outFd, tmpName) = util.mkstemp()
@@ -3009,15 +3014,45 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if autoUnlink:
                 os.unlink(fName)
 
+        if hasStatus and callback:
+            # build up a function with access to local server, url, and
+            # callback variables that will get the progress updates
+            def abortCheck():
+                try:
+                    try:
+                        # first we have to unset the abort check
+                        # or we'll end up in an infinite loop...
+                        server.setAbortCheck(None)
+                        rc = server.getCommitProgress(url)
+                        # getCommitProgress returns a tuple of
+                        # callback function name, arg1, arg2, ...
+                        # or False if there is no info available
+                        if rc:
+                            if hasattr(callback, rc[0]):
+                                getattr(callback, rc[0])(*rc[1:])
+                            else:
+                                callback.csMsg('unhandled progress update from server: %s' % (' '.join(str(x) for x in rc)))
+                    except:
+                        # avoid crashing out the commit process just
+                        # from progress reporting
+                        pass
+                finally:
+                    server.setAbortCheck(abortCheck)
+                return False
+            server.setAbortCheck(abortCheck)
+
         # avoid sending the mirror and hidden argumentsunless we have to.
         # this helps preserve backwards compatibility with old
         # servers.
-        if hidden:
-            server.commitChangeSet(url, mirror, hidden)
-        elif mirror:
-            server.commitChangeSet(url, mirror)
-        else:
-            server.commitChangeSet(url)
+        try:
+            if hidden:
+                server.commitChangeSet(url, mirror, hidden)
+            elif mirror:
+                server.commitChangeSet(url, mirror)
+            else:
+                server.commitChangeSet(url)
+        finally:
+            server.setAbortCheck(None)
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                 proxies = None, chunked=False):

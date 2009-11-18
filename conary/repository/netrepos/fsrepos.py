@@ -14,9 +14,12 @@
 
 # implements a db-based repository
 
+import cPickle
 import errno
-import traceback
+import os
 import sys
+import tempfile
+import traceback
 
 from conary import files, trove, callbacks
 from conary.deps import deps
@@ -82,6 +85,24 @@ class FilesystemChangeSetJob(ChangeSetJob):
         if len(res[1]) and self.requireSigs:
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
+
+class UpdateCallback(callbacks.UpdateCallback):
+    def __init__(self, statusPath, trustThreshold, keyCache):
+        self.path = statusPath
+        self.tmpDir = os.path.dirname(statusPath)
+        callbacks.UpdateCallback.__init__(self, trustThreshold, keyCache)
+
+    def creatingDatabaseTransaction(self, troveNum, troveCount):
+        if self.path:
+            # make the new status dump in a temp location
+            # for atomicity
+            (fd, path) = tempfile.mkstemp(dir = self.tmpDir,
+                                          suffix = '.commit-status')
+            args = ('creatingDatabaseTransaction', troveNum, troveCount)
+            buf = cPickle.dumps(args)
+            os.write(fd, buf)
+            os.close(fd)
+            os.rename(path, self.path)
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -208,7 +229,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     ###
 
     def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False,
-                        excludeCapsuleContents = False):
+                        excludeCapsuleContents = False, callback = None,
+                        statusPath = None):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
@@ -221,9 +243,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             threshold = openpgpfile.TRUST_FULL
         else:
             threshold = openpgpfile.TRUST_UNTRUSTED
-        # Callback for signature verification
-        callback = callbacks.UpdateCallback(trustThreshold=threshold,
-                            keyCache=self.troveStore.keyTable.keyCache)
+        # Callback for signature verification and progress
+        callback = UpdateCallback(statusPath=statusPath,
+                                  trustThreshold=threshold,
+                                  keyCache=self.troveStore.keyTable.keyCache)
         try:
             # reset time stamps only if we're not mirroring.
             FilesystemChangeSetJob(self, cs, self.serverNameList,

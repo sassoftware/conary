@@ -12,15 +12,16 @@
 # full details.
 #
 
+import base64
+import cPickle
+import fnmatch
+import itertools
 import os
 import re
 import sys
+import tempfile
 import time
 import types
-import base64
-import fnmatch
-import tempfile
-import itertools
 
 from conary import files, trove, versions, streams
 from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
@@ -45,7 +46,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 68 + 1)
+SERVER_VERSIONS = range(36, 69 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -118,7 +119,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                           'for changesetCacheDir' %cfg.tmpDir,
                           DeprecationWarning)
             cfg.configLine('changesetCacheDir %s/cscache' %cfg.tmpDir)
-
+        # this is a bit of a hack to determine if we're running
+        # as a standalone server or not without having to touch
+        # rMake code
+        self.standalone = hasattr(cfg, 'port')
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
@@ -1893,7 +1897,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # this needs to match up exactly with the parsing of the url we do
         # in commitChangeSet.
-        return self.urlBase() + "?%s" % fileName[:-3]
+        csPath = self.urlBase() + "?%s" % fileName[:-3]
+        # for client versions >= 69, we also return a bool to signify
+        # if the client should use the getCommitProgress() call
+        if clientVersion >= 69:
+            return csPath, not self.standalone
+        return csPath
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
@@ -1916,8 +1925,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 'server is "%s".'
                 %(url, base))
 	# +1 strips off the ? from the query url
-	fileName = url[len(base) + 1:] + "-in"
+        fileName = url[len(base) + 1:] + '-in'
 	path = "%s/%s" % (self.tmpPath, fileName)
+        statusPath = path + '-status'
         self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
         attempt = 1
         while True:
@@ -1931,8 +1941,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # need to catch the DatabaseLocked errors here and retry
             # the commit ourselves
             try:
-                ret = self._commitChangeSet(authToken, cs, mirror=mirror,
-                                            hidden=hidden)
+                ret = self._commitChangeSet(authToken, cs,
+                                            mirror=mirror, hidden=hidden,
+                                            statusPath=statusPath)
             except sqlerrors.DatabaseLocked, e:
                 # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d: %s", attempt, str(e.args))
@@ -1955,7 +1966,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.RepositoryLocked()
         raise
 
-    def _commitChangeSet(self, authToken, cs, mirror = False, hidden = False):
+    def _commitChangeSet(self, authToken, cs, mirror = False,
+                         hidden = False, statusPath = None):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
         verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
@@ -1984,10 +1996,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden,
+	self.repos.commitChangeSet(cs, mirror = mirror,
+                                   hidden = hidden,
                                    serialize = self.serializeCommits,
                                    excludeCapsuleContents =
-                                        self.excludeCapsuleContents)
+                                       self.excludeCapsuleContents,
+                                   statusPath=statusPath)
 
 	if not self.commitAction:
 	    return True
@@ -2014,6 +2028,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             sys.stderr.flush()
 
 	return True
+
+    @accessReadOnly
+    def getCommitProgress(self, authToken, clientVersion, url):
+        base = util.normurl(self.urlBase())
+        url = util.normurl(url)
+        if not url.startswith(base):
+            raise errors.RepositoryError(
+                'The changeset that is being committed was not '
+                'uploaded to a URL on this server.  The url is "%s", this '
+                'server is "%s".'
+                %(url, base))
+        # +1 strips off the ? from the query url
+        fileName = url[len(base) + 1:] + "-in-status"
+        path = "%s/%s" % (self.tmpPath, fileName)
+        try:
+            buf = file(path).read()
+            return cPickle.loads(buf)
+        except IOError:
+            return False
 
     @accessReadOnly
     def getFileContentsCapsuleInfo(self, authToken, clientVersion, fileList):
