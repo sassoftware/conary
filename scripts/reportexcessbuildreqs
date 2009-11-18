@@ -49,6 +49,7 @@ def main(argv):
     logfileReqList = []
     logfileInfoList = []
     print >> sys.stderr, "Building debuginfo trove list"
+    #for trv in trvList:
     for trv in trvList:
         for logfile in [ x for x in trv.iterFileList()
                          if x[1].endswith('-xml.bz2')]:
@@ -71,12 +72,9 @@ def main(argv):
     xmlNamespace = 'http://www.rpath.com/permanent/log-v1.xsd'
     outputMap = {}
 
-    excessCount = 0
     for k in logfileMap:
         pkgName = k[0]
         flavor = str(k[1])
-        outputMap.setdefault(pkgName,{})
-        currMap = outputMap[pkgName]
 
         try:
             tree = etree.parse(logfileMap[k])
@@ -95,25 +93,33 @@ def main(argv):
                 return element[0].text
             return None
 
-        screqs = getMessage('excessSuperclassBuildRequires')
-        if screqs:
-            if 'excessSuperclassBuildRequires' in currMap:
-                currMap['excessSuperclassBuildRequires'] &= \
-                    frozenset(screqs.split())
-            else:
-                currMap['excessSuperclassBuildRequires']= \
-                    frozenset(screqs.split())
-            excessCount += len(currMap['excessSuperclassBuildRequires'])
         reqs = getMessage('excessBuildRequires')
-        if reqs:
-            if 'excessBuildRequires' in currMap:
-                currMap['excessBuildRequires']&=frozenset(reqs.split())
+        if reqs!=None:
+            if pkgName in outputMap:
+                outputMap[pkgName]&=set(reqs.strip().split())
             else:
-                currMap['excessBuildRequires']=frozenset(reqs.split())
-            excessCount += len(currMap['excessBuildRequires'])
-    print >> sys.stderr, "A total of %i excess requirements reported" \
-        % excessCount
-    return outputMap
+                outputMap[pkgName]=set(reqs.strip().split())
+        else:
+            pass
+            #print >> sys.stderr, "%s[%s] had no excessBuildRequires entry" \
+            #    % (pkgName,flavor)
+    try:
+        print >> sys.stderr, "Merging duplicate entries"
+        x = {}
+        for e in outputMap:
+            xkey = frozenset(outputMap[e])
+            if not xkey:
+                continue
+            if xkey in x:
+                x[xkey].append(e)
+            else:
+                x[xkey] = [e,]
+        retMap = {}
+        retMap.update([ (frozenset(e[1]),e[0]) for e in x.items()])
+    except:
+        print >> sys.stderr, "!We had an exception while merging!"
+        retMap = outputMap
+    return retMap
 
 if __name__ == "__main__":
     outputMap = main(sys.argv)
