@@ -471,7 +471,7 @@ class NetworkAuthorization:
             return False
         cu = self.db.cursor()
         try:
-            groupIds = self.getAuthRoles(cu, authToken, allowAnonymous=False)
+            groupIds = self.getAuthRoles(cu, authToken)
         except errors.InsufficientPermission:
             return False
         if len(groupIds) < 1:
