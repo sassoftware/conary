@@ -15,60 +15,189 @@
 #
 #
 
-import itertools, os, sys
+import errno
+import itertools
+import os
+import pgsql
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
 from optparse import OptionParser
 
-if os.path.dirname(sys.argv[0]) != ".":
-    if sys.argv[0][0] == "/":
-        fullPath = os.path.dirname(sys.argv[0])
-    else:
-        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
-else:
-    fullPath = os.getcwd()
-
+fullPath = os.path.abspath(os.path.dirname(sys.argv[0]))
 sys.path.insert(0, os.path.dirname(fullPath))
 
 from conary import conarycfg, conaryclient, dbstore
+from conary.lib.util import rmtree
 from conary.local import schema as depSchema
+from conary.server import migrate
 from conary.server import schema
+from conary.trove import Trove
 from conary.repository import changeset
 from conary.repository.netrepos import fsrepos, trovestore
 
-parser = OptionParser(usage = "usage: mksnapshot dbdriver dbpath contentsPath [changeset]+")
-(options, args) = parser.parse_args()
-if len(args) < 4:
-    parser.print_help()
-    sys.exit(1)
 
-db = dbstore.connect(args[1], driver = args[0])
-db.loadSchema()
-if db.tables:
-    print "The database must be empty."
-    sys.exit(1)
+def loadChangeSets(db, contentsPath, csList):
+    serverSet = set()
+    keyIds = set()
+    for changeSet in csList:
+        for trvCs in changeSet.iterNewTroveList():
+            trv = Trove(trvCs)
+            host = trv.getVersion().getHost()
+            serverSet.add(host)
+            for _, sig in trv.troveInfo.sigs.digitalSigs.iterAll():
+                keyIds.add((host, sig.fingerprint()))
+    # TODO: fetch keys. nothing is signed at this point, though.
+    assert not keyIds
 
-schema.loadSchema(db)
-schema.setupTempTables(db)
-depSchema.setupTempDepTables(db)
+    ts = trovestore.TroveStore(db)
+    repos = fsrepos.FilesystemRepository(serverSet, ts, [ contentsPath ], {})
 
-csList = [ changeset.ChangeSetFromFile(x) for x in args[3:] ]
-serverSet = set()
-for cs in csList:
-    serverSet.update([ x.getNewVersion().trailingLabel().getHost()
-                            for x in cs.iterNewTroveList() ])
+    cfg = conarycfg.ConaryConfiguration(True)
+    cl = conaryclient.ConaryClient(cfg = cfg)
+    netRepos = cl.getRepos()
 
-ts = trovestore.TroveStore(db)
-repos = fsrepos.FilesystemRepository(serverSet, ts, [ args[2] ], {})
+    for cs in csList:
+        repos.commitChangeSet(cs, mirror=True, excludeCapsuleContents=True)
 
-cfg = conarycfg.ConaryConfiguration()
-cfg.readFiles()
-cl = conaryclient.ConaryClient(cfg = cfg)
-netRepos = cl.getRepos()
 
-for serverName in serverSet:
-    keyList = netRepos.getNewPGPKeys(serverName, -1)
-    for key in keyList:
-        ts.keyTable.addNewKey(None, key)
+class Postgres(object):
+    def __init__(self, path):
+        self.path = path
+        self.pid = None
+        self.port = 5431
 
-for csPath in args[3:]:
-    repos.commitChangeSet(cs, mirror = True)
-    db.commit()
+    def connect(self, dbName):
+        if not self.check():
+            raise RuntimeError("postmaster is dead")
+        start = time.time()
+        while True:
+            try:
+                return dbstore.connect('rbuilder@localhost:%s/%s'
+                        % (self.port, dbName), 'postgresql')
+            except pgsql.DatabaseError, err:
+                msg = err.args[0]
+                if ('the database system is starting up' in msg
+                        or 'Connection refused' in msg):
+                    if time.time() - start > 15:
+                        self.kill()
+                        raise RuntimeError("Database did not start")
+                    time.sleep(0.1)
+                    continue
+                raise
+
+    def _create(self):
+        proc = subprocess.Popen(
+                "initdb -D '%s' -E utf8 --locale=C -U rbuilder" % (self.path,),
+                shell=True, stdout=sys.stderr)
+        proc.wait()
+
+    def start(self):
+        self._create()
+        self.pid = os.fork()
+        if not self.pid:
+            try:
+                try:
+                    os.execl('/usr/bin/postgres', 'postgres',
+                            '-D', self.path, # data directory
+                            '-F', # turn fsync off
+                            '-p', str(self.port), # port
+                            '-N', '10', # max connections
+                            '--checkpoint_segments=16', # fewer checkpoints
+                            '--checkpoint_warning=0', # quit crying
+                            )
+                except:
+                    traceback.print_exc()
+            finally:
+                os._exit(70)
+
+    def check(self):
+        if not self.pid:
+            return False
+        pid, status = os.waitpid(self.pid, os.WNOHANG)
+        if pid:
+            self.pid = None
+            return False
+        else:
+            return True
+
+    def kill(self):
+        if not self.pid:
+            return
+        try:
+            pgsql.closeall()
+        except:
+            pass
+        os.kill(self.pid, signal.SIGINT)
+        os.waitpid(self.pid, 0)
+        self.pid = None
+
+
+def main(args):
+    parser = OptionParser("%prog [changeset]+")
+    options, args = parser.parse_args(args)
+    if not args:
+        parser.error("At least one changeset is required")
+
+    csList = [ changeset.ChangeSetFromFile(x) for x in args ]
+
+    server = db = None
+    workDir = tempfile.mkdtemp(prefix='preload-')
+    try:
+        server = Postgres(workDir + '/psql')
+        server.start()
+
+        master = server.connect('postgres')
+        mcu = master.cursor()
+        mcu.execute("CREATE DATABASE preload")
+        master.close()
+
+        db = server.connect('preload')
+        db.tables = {}
+        cu = db.cursor()
+        cu.execute("CREATE LANGUAGE plpgsql")
+
+        # Things go much faster when inserts are done in the same transaction
+        # as the table creation, so prevent conary from crippling itself with a
+        # premature commit.
+        db.transaction()
+        db.transaction = lambda: db.cursor()
+        commit, db.commit = db.commit, lambda: None
+
+        db.loadSchema()
+        schema.createSchema(db, commit=False)
+        setVer = migrate.majorMinor(schema.VERSION)
+        db.setVersion(setVer)
+
+        schema.setupTempTables(db)
+        depSchema.setupTempDepTables(db, skipCommit=True)
+
+        os.mkdir(workDir + '/contents')
+        loadChangeSets(db, workDir + '/contents', csList)
+
+        commit()
+        db.close()
+        db = None
+
+        dumpPath = workDir + '/database.pgtar'
+        os.system("pg_dump -U rbuilder -p %s -F tar -f '%s' preload"
+                % (server.port, dumpPath,))
+
+        os.system("tar -C '%s' -c --remove-files contents database.pgtar" % (workDir,))
+
+    finally:
+        if db:
+            db.close()
+        if server:
+            server.kill()
+        rmtree(workDir)
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        print

@@ -23,6 +23,9 @@ sys.path.insert(0, os.path.dirname(fullPath))
 
 from conary import conarycfg, conaryclient, trove
 
+NO_VF = None, None
+
+
 def main(args):
     cfg = conarycfg.ConaryConfiguration(True)
 
@@ -33,12 +36,13 @@ def main(args):
         cfg.readFile(val)
 
     parser = OptionParser(usage="usage: %prog <out.ccs> [troveSpecs]+")
-    parser.add_option('', '--config-file', type = "string", action = "callback",
+    parser.add_option('--config-file', type = "string", action = "callback",
                       callback = configFileCallback,
                       help = "configuration file to load after the defaults")
-    parser.add_option('', '--config', action = "callback", type = "string",
+    parser.add_option('--config', action = "callback", type = "string",
                       callback = configCallback,
                       help = "configuration statement")
+    parser.add_option('--skip-debuginfo', action='store_true')
     options, args = parser.parse_args(args)
     if len(args) < 2:
         parser.error("Not enough arguments")
@@ -70,44 +74,58 @@ def main(args):
             old = sorted(trvInfoDict[jobSummary[0]])[-1]
             masterJob.append( (old[0], old[1:], new[1:], False) )
         else:
-            masterJob.append( (new[0], (None, None), new[1:], True) )
+            masterJob.append( (new[0], NO_VF, new[1:], True) )
 
-    createCompleteChangeSet(repos, masterJob, outFile, cb)
+    skipComponents = set()
+    if options.skip_debuginfo:
+        skipComponents.add('debuginfo')
+
+    createCompleteChangeSet(repos, masterJob, outFile, cb, skipComponents)
 
 
-def createCompleteChangeSet(repos, masterJob, filename=None, callback=None):
-    # this picks random version/flavor; we don't care what those are particularly
-    # anyway
+def createCompleteChangeSet(repos, masterJob, filename=None, callback=None,
+        skipComponents=()):
+
+    # Create fake troves to stuff the old and new subtroves into. We will then
+    # diff the fake troves to figure out which relative changesets to generate.
     oldSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
     newSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
 
-    # we don't just use recursive changesets because we need troves which are
-    # byDefault False
-    job = ([ (x[0], (None, None), x[1], True) for x in
-                 masterJob if x[1][0] is not None ] +
-           [ (x[0], (None, None), x[2], True) for x in masterJob ])
-    cs = repos.createChangeSet(job, recurse=False, callback=callback)
-    for (name, oldInfo, newInfo, relative) in masterJob:
-        if oldInfo[0]:
-            oldTrv = trove.Trove(cs.getNewTroveVersion(name, oldInfo[0],
-                                                       oldInfo[1]))
-            for info in oldTrv.iterTroveList(strongRefs = True,
-                                             weakRefs = True):
+    subTrovesJob = []
+    for name, oldVF, newVF, _ in masterJob:
+        if oldVF[0]:
+            subTrovesJob.append( (name, NO_VF, oldVF, True) )
+        subTrovesJob.append( (name, NO_VF, newVF, True) )
+    cs = repos.createChangeSet(subTrovesJob, recurse=False, callback=callback,
+            withFiles=False)
+
+    for name, oldVF, newVF, _ in masterJob:
+        if oldVF[0]:
+            oldTrv = trove.Trove(cs.getNewTroveVersion(name, *oldVF),
+                    skipIntegrityChecks=True)
+            for info in oldTrv.iterTroveList(strongRefs=True, weakRefs=True):
                 oldSet.addTrove(presentOkay = True, *info)
 
-        newTrv = trove.Trove(cs.getNewTroveVersion(name, newInfo[0],
-                                                   newInfo[1]))
-        for info in newTrv.iterTroveList(strongRefs = True,
-                                         weakRefs = True):
+        newTrv = trove.Trove(cs.getNewTroveVersion(name, *newVF),
+                skipIntegrityChecks=True)
+        for info in newTrv.iterTroveList(strongRefs=True, weakRefs=True):
             newSet.addTrove(presentOkay = True, *info)
 
     masterJob += newSet.diff(oldSet, False)[2]
+    finalJob = set()
+    for name, oldVF, newVF, absolute in masterJob:
+        if ':' in name and name.split(':')[1] in skipComponents:
+            continue
+        if oldVF == NO_VF:
+            absolute = True
+        finalJob.add( (name, oldVF, newVF, absolute) )
+    finalJob = sorted(finalJob)
 
     if filename:
-        return repos.createChangeSetFile(masterJob, filename, recurse=False,
+        return repos.createChangeSetFile(finalJob, filename, recurse=False,
                 callback=callback)
     else:
-        return repos.createChangeSet(masterJob, recurse=False,
+        return repos.createChangeSet(finalJob, recurse=False,
                 callback=callback)
 
 
