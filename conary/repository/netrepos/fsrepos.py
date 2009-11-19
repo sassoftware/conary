@@ -89,7 +89,8 @@ class FilesystemChangeSetJob(ChangeSetJob):
 class UpdateCallback(callbacks.UpdateCallback):
     def __init__(self, statusPath, trustThreshold, keyCache):
         self.path = statusPath
-        self.tmpDir = os.path.dirname(statusPath)
+        if statusPath:
+            self.tmpDir = os.path.dirname(statusPath)
         callbacks.UpdateCallback.__init__(self, trustThreshold, keyCache)
 
     def creatingDatabaseTransaction(self, troveNum, troveCount):
