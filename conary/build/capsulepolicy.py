@@ -203,7 +203,6 @@ class RPMProvides(policy.Policy):
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
-        ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Provides', policy.REQUIRED_PRIOR),
     )
 
@@ -288,7 +287,6 @@ class RPMRequires(policy.Policy):
 
     bucket = policy.PACKAGE_CREATION
     requires = (
-        ('PackageSpec', policy.REQUIRED_PRIOR),
         ('Requires', policy.REQUIRED_PRIOR),
         ('RPMProvides', policy.REQUIRED_PRIOR),
         )
