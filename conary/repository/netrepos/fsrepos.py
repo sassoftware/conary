@@ -245,9 +245,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         else:
             threshold = openpgpfile.TRUST_UNTRUSTED
         # Callback for signature verification and progress
-        callback = UpdateCallback(statusPath=statusPath,
-                                  trustThreshold=threshold,
-                                  keyCache=self.troveStore.keyTable.keyCache)
+        if statusPath:
+            assert not callback
+            callback = UpdateCallback(statusPath=statusPath,
+                    trustThreshold=threshold,
+                    keyCache=self.troveStore.keyTable.keyCache)
         try:
             # reset time stamps only if we're not mirroring.
             FilesystemChangeSetJob(self, cs, self.serverNameList,
