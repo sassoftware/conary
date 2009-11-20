@@ -33,6 +33,7 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary import conarycfg, conaryclient, dbstore
 from conary.lib.util import rmtree
 from conary.local import schema as depSchema
+from conary.updatecmd import UpdateCallback
 from conary.server import migrate
 from conary.server import schema
 from conary.trove import Trove
@@ -40,16 +41,18 @@ from conary.repository import changeset
 from conary.repository.netrepos import fsrepos, trovestore
 
 
-def loadChangeSets(db, contentsPath, csList):
+def loadChangeSet(db, contentsPath, changeSet):
     serverSet = set()
     keyIds = set()
-    for changeSet in csList:
-        for trvCs in changeSet.iterNewTroveList():
-            trv = Trove(trvCs)
-            host = trv.getVersion().getHost()
-            serverSet.add(host)
-            for _, sig in trv.troveInfo.sigs.digitalSigs.iterAll():
-                keyIds.add((host, sig.fingerprint()))
+    print >> sys.stderr, "Inspecting changeset"
+    for trvCs in changeSet.iterNewTroveList():
+        serverSet.add(trvCs.getNewVersion().getHost())
+        continue # XXX
+        trv = Trove(trvCs)
+        host = trv.getVersion().getHost()
+        serverSet.add(host)
+        for _, sig in trv.troveInfo.sigs.digitalSigs.iterAll():
+            keyIds.add((host, sig.fingerprint()))
     # TODO: fetch keys. nothing is signed at this point, though.
     assert not keyIds
 
@@ -60,8 +63,11 @@ def loadChangeSets(db, contentsPath, csList):
     cl = conaryclient.ConaryClient(cfg = cfg)
     netRepos = cl.getRepos()
 
-    for cs in csList:
-        repos.commitChangeSet(cs, mirror=True, excludeCapsuleContents=True)
+    callback = UpdateCallback()
+    callback.out = sys.stderr
+    print >> sys.stderr, "Committing"
+    repos.commitChangeSet(changeSet, mirror=True, excludeCapsuleContents=True, callback=callback)
+    print >> sys.stderr
 
 
 class Postgres(object):
@@ -142,8 +148,14 @@ def main(args):
     if not args:
         parser.error("At least one changeset is required")
 
-    csList = [ changeset.ChangeSetFromFile(x) for x in args ]
+    masterCs = changeset.ReadOnlyChangeSet()
+    for csName in args:
+        print >> sys.stderr, "Reading file", csName
+        changeSet = changeset.ChangeSetFromFile(csName)
+        print >> sys.stderr, " Merging"
+        masterCs.merge(changeSet)
 
+    print >> sys.stderr, "Starting database"
     server = db = None
     workDir = tempfile.mkdtemp(prefix='preload-')
     try:
@@ -160,32 +172,23 @@ def main(args):
         cu = db.cursor()
         cu.execute("CREATE LANGUAGE plpgsql")
 
-        # Things go much faster when inserts are done in the same transaction
-        # as the table creation, so prevent conary from crippling itself with a
-        # premature commit.
-        db.transaction()
-        db.transaction = lambda: db.cursor()
-        commit, db.commit = db.commit, lambda: None
-
-        db.loadSchema()
-        schema.createSchema(db, commit=False)
-        setVer = migrate.majorMinor(schema.VERSION)
-        db.setVersion(setVer)
-
+        print >> sys.stderr, "Creating schema"
+        schema.loadSchema(db)
         schema.setupTempTables(db)
-        depSchema.setupTempDepTables(db, skipCommit=True)
+        depSchema.setupTempDepTables(db)
 
         os.mkdir(workDir + '/contents')
-        loadChangeSets(db, workDir + '/contents', csList)
+        loadChangeSet(db, workDir + '/contents', masterCs)
 
-        commit()
-        db.close()
-        db = None
+        print >> sys.stderr, "Checkpointing"
+        cu.execute("CHECKPOINT")
 
+        print >> sys.stderr, "Dumping database"
         dumpPath = workDir + '/database.pgtar'
         os.system("pg_dump -U rbuilder -p %s -F tar -f '%s' preload"
                 % (server.port, dumpPath,))
 
+        print >> sys.stderr, "Creating tarball"
         os.system("tar -C '%s' -c --remove-files contents database.pgtar" % (workDir,))
 
     finally:
