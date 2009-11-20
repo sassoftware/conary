@@ -517,7 +517,8 @@ class ChangeSetJob:
                 allowIncomplete = True
 
 	    newFileMap = newTrove.applyChangeSet(csTrove,
-                                                 allowIncomplete=allowIncomplete)
+                                     needNewFileMap=True,
+                                     allowIncomplete=allowIncomplete)
             skipContents = (excludeCapsuleContents and
                               newTrove.troveInfo.capsule.type and
                               newTrove.troveInfo.capsule.type())

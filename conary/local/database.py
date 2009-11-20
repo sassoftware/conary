@@ -1958,9 +1958,8 @@ class Database(SqlDbRepository):
                 pathIdList.add(pathId)
                 localCs.newFile(pathId, path, fileId, version)
 
-            changedList = localCs.getChangedFileList()
-            l = [ x for x in localCs.getChangedFileList() if
-                    x[0] not in pathIdList ]
+            changedList = localCs.getChangedFileList(raw = True)
+            l = [ x for x in changedList if x[0] not in pathIdList ]
             del changedList[:]
             changedList.extend(l)
 

@@ -116,6 +116,8 @@ Changes in @NEW@:
     * If xml.etree.ElementTree is available use that instead of
       elementree.ElementTree for CIL dependency parsing.
     * The LDFLAGS setting is now honored when linking binaries.
+    * Trove and TroveChangeSet objects now represent paths as
+      directory/basename pairs
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added
