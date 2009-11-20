@@ -60,7 +60,6 @@ class SingleCapsuleOperation(CapsuleOperation):
             oldTrv = self.db.getTrove(*troveCs.getOldNameVersionFlavor())
             self.remove(oldTrv)
             trv = oldTrv.copy()
-            import epdb;epdb.st('f')
             trv.applyChangeSet(troveCs)
         else:
             oldTrv = None

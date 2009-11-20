@@ -119,12 +119,12 @@ class ChangeSetFileDict(dict, streams.InfoStream):
             i, ( frzFile, ) = misc.unpack("!SI", i, data)
             info = FileInfo(frzFile)
 
+            newFileId = info.newFileId()
             oldFileId = info.oldFileId()
             if oldFileId == "":
-                oldFileId = None
-
-            newFileId = info.newFileId()
-            self[(oldFileId, newFileId)] = info.csInfo()
+                self[newFileId] = info.csInfo()
+            else:
+                self[(oldFileId, newFileId)] = info.csInfo()
 
     def __init__(self, data = None):
 	if data:
