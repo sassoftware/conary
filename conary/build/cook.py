@@ -53,6 +53,8 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
     # troves don't require things that are provided by themeselves - it 
     # just creates more work for no benefit.
+    # NOTE: This is already done in packagepolicy.RemoveSelfProvidedRequires
+    # but is left here just to be safe.
     p.setRequires(bldPkg.requires - bldPkg.provides)
     p.setProvides(bldPkg.provides)
 
