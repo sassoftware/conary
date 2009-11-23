@@ -3994,10 +3994,10 @@ class _basePluggableRequires(Requires):
         """Override in subclasses"""
         pass
 
-class RemoveSelfProvidedRequires(policy.Policy):
+class RemoveSelfProvidedRequireshg(policy.Policy):
     """
-    This policy is used to remove package requirements when they are provided
-    by the package itself.
+    This policy is used to remove component requirements when they are provided
+    by the component itself.
     Do not call it directly; it is for internal use only.
     """
     bucket = policy.PACKAGE_CREATION
