@@ -3994,6 +3994,24 @@ class _basePluggableRequires(Requires):
         """Override in subclasses"""
         pass
 
+class RemoveSelfProvidedRequires(policy.Policy):
+    """
+    This policy is used to remove package requirements when they are provided
+    by the package itself.
+    Do not call it directly; it is for internal use only.
+    """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('Requires', policy.REQUIRED_PRIOR),
+    )
+
+    def do(self):
+        if use.Use.bootstrap._get():
+            return
+
+        for comp in self.recipe.autopkg.getComponents():
+            comp.requires -= comp.provides
+
 class Flavor(policy.Policy):
     """
     NAME

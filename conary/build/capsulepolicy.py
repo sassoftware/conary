@@ -276,7 +276,7 @@ class RPMRequires(policy.Policy):
     that cannot be automatically discovered and are not provided by the RPM
     header.
 
-    A C{I{requirement}} can only specify an rpm requirement in the form of 
+    A C{I{requirement}} can only specify an rpm requirement in the form of
     I{rpm: dependency(FLAG1...)}
 
     EXAMPLES
@@ -289,6 +289,7 @@ class RPMRequires(policy.Policy):
     requires = (
         ('Requires', policy.REQUIRED_PRIOR),
         ('RPMProvides', policy.REQUIRED_PRIOR),
+        ('RemoveSelfProvidedRequires', policy.REQUIRED_SUBSEQUENT),
         )
 
     keywords = {
@@ -401,3 +402,4 @@ class PureCapsuleComponents(policy.Policy):
             if error:
                 self.error("Component %s contains both "
                            "capsule and non-capsule files" % comp[0] )
+
