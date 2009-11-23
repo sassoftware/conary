@@ -3994,7 +3994,7 @@ class _basePluggableRequires(Requires):
         """Override in subclasses"""
         pass
 
-class RemoveSelfProvidedRequireshg(policy.Policy):
+class RemoveSelfProvidedRequiresh(policy.Policy):
     """
     This policy is used to remove component requirements when they are provided
     by the component itself.
