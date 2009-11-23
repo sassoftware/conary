@@ -36,10 +36,11 @@ class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, repos, cs, *args, **kw):
         self.mirror = kw.get('mirror', False)
         self.requireSigs = kw.pop('requireSigs', False)
+        self.callback = kw.get('callback', False)
 
         repos.troveStore.addTroveSetStart()
         ChangeSetJob.__init__(self, repos, cs, *args, **kw)
-        repos.troveStore.addTroveSetDone()
+        repos.troveStore.addTroveSetDone(self.callback)
 
     def _containsFileContents(self, sha1iter):
         return self.repos.troveStore.hasFileContents(sha1iter)
@@ -93,17 +94,22 @@ class UpdateCallback(callbacks.UpdateCallback):
             self.tmpDir = os.path.dirname(statusPath)
         callbacks.UpdateCallback.__init__(self, trustThreshold, keyCache)
 
-    def creatingDatabaseTransaction(self, troveNum, troveCount):
+    def _dumpStatus(self, *args):
         if self.path:
             # make the new status dump in a temp location
             # for atomicity
             (fd, path) = tempfile.mkstemp(dir = self.tmpDir,
                                           suffix = '.commit-status')
-            args = ('creatingDatabaseTransaction', troveNum, troveCount)
             buf = cPickle.dumps(args)
             os.write(fd, buf)
             os.close(fd)
             os.rename(path, self.path)
+
+    def creatingDatabaseTransaction(self, *args):
+        self._dumpStatus('creatingDatabaseTransaction', *args)
+
+    def updatingDatabase(self, *args):
+        self._dumpStatus('updatingDatabase', *args)
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 

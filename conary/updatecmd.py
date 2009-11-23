@@ -256,6 +256,14 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateMsg("Creating database transaction (%d of %d)" %
 		      (troveNum, troveCount))
 
+    def updatingDatabase(self, step, stepNum, stepCount):
+        if step == 'latest':
+            self.updateMsg('Updating list of latest components: (%d of %d)' %
+                           (stepNum, stepCount))
+        else:
+            self.updateMsg('Updating database: (%d of %d)' %
+                           (stepNum, stepCount))
+
     def runningPreTagHandlers(self):
         """
         @see: callbacks.UpdateCallback.runningPreTagHandlers

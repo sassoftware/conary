@@ -15,7 +15,7 @@
 import os
 import itertools
 
-from conary import files, metadata, trove, versions, changelog
+from conary import files, metadata, trove, versions, changelog, callbacks
 from conary.deps import deps
 from conary.lib import util, tracelog
 from conary.local import deptable
@@ -793,7 +793,9 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewLatest')
         self.depAdder = deptable.BulkDependencyLoader(self.db, cu)
 
-    def addTroveSetDone(self):
+    def addTroveSetDone(self, callback=None):
+        if not callback:
+            callback = callbacks.UpdateCallback()
         cu = self.db.cursor()
         self._mergeIncludedTroves(cu)
         self._mergeTroveNewFiles(cu)
@@ -852,6 +854,7 @@ class TroveStore:
             (ugi.instanceId IS NOT NULL AND tmpNewTroves.hidden = 0)
         """ % d
         #import epdb;epdb.st()
+        callback.updatingDatabase('latest', 1, 5)
         cu.execute(sql1)
 
         # LATEST_TYPE_PRESENT -- this is the same as LATEST_TYPE_ANY, but
@@ -891,6 +894,7 @@ class TroveStore:
                  tmpNewTroves.hidden = 0 AND
                  ugi.instanceId IS NOT NULL)
         """ % d
+        callback.updatingDatabase('latest', 2, 5)
         cu.execute(sql2)
 
         # LATEST_TYPE_NORMAL -- this is the same as LATEST_TYPE_PRESENT, but
@@ -908,8 +912,10 @@ class TroveStore:
                 (Instances.troveType != %(TROVE_TYPE_REDIRECT)d OR
                  Instances.isPresent = %(INSTANCE_PRESENT_HIDDEN)d)
         """ % d
+        callback.updatingDatabase('latest', 3, 5)
         cu.execute(sql3)
 
+        callback.updatingDatabase('latest', 4, 5)
         if self.db.driver == 'postgresql':
             cu.execute("DELETE FROM LatestCache USING tmpNewTroves WHERE"
                         "   LatestCache.itemId = tmpNewTroves.itemId AND "
@@ -923,6 +929,7 @@ class TroveStore:
                            "itemId = ? AND branchId = ? AND "
                            "flavorId = ?", i, b, f)
 
+        callback.updatingDatabase('latest', 5, 5)
         cu.execute("""
                 INSERT INTO LatestCache(userGroupId, itemId, branchId,
                                         flavorId, versionId, latestType)

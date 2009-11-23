@@ -267,6 +267,18 @@ class UpdateCallback(ChangesetCallback):
         """
         pass
 
+    def updatingDatabase(self, step, stepNum, stepCount):
+        """
+        Called during long database updates
+        @param step: a string that represents the operation
+        @type step: string
+        @param stepNum: the number of the step being performed (starts at 1)
+        @type stepNum: integer
+        @param stepCount: the total number of steps.
+        @type stepCount: integer
+        @return: None
+        """
+
     def restoreFiles(self, size, totalSize):
         """
         Called right before writing a file to the file system.
