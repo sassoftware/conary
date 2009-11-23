@@ -277,7 +277,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 self.send_error(500)
                 from conary.lib import formattrace
                 excType, excValue, excTb = sys.exc_info()
-                formattrace.formatTrace(excType, excValue, excTb)
+                formattrace.formatTrace(excType, excValue, excTb,
+                    withLocals = False)
                 return None
             logMe(3, "returned from", method)
 
