@@ -94,8 +94,12 @@ class TroveTuple(streams.StreamSet):
 
         return cmp(first, second)
 
+    def asTuple(self):
+        return self.name(), self.version(), self.flavor()
+
     def __hash__(self):
-        return hash((self.name(), self.version(), self.flavor()))
+        return hash(self.asTuple())
+
 
 class TroveTupleList(streams.StreamCollection):
     streamDict = { 1 : TroveTuple }
