@@ -258,7 +258,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     def updatingDatabase(self, step, stepNum, stepCount):
         if step == 'latest':
-            self.updateMsg('Updating list of latest components: (%d of %d)' %
+            self.updateMsg('Updating list of latest versions: (%d of %d)' %
                            (stepNum, stepCount))
         else:
             self.updateMsg('Updating database: (%d of %d)' %

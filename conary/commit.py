@@ -16,7 +16,7 @@ import tempfile
 
 from conary import conaryclient
 from conary import versions
-from conary import updatecmd
+from conary import cvc
 from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
@@ -25,7 +25,7 @@ from conary.repository import filecontainer
 def doCommit(cfg, changeSetFile, targetLabel):
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
-    callback = updatecmd.UpdateCallback()
+    callback = cvc.CheckinCallback()
 
     try:
 	cs = changeset.ChangeSetFromFile(changeSetFile)
