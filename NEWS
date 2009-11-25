@@ -118,6 +118,8 @@ Changes in @NEW@:
     * The LDFLAGS setting is now honored when linking binaries.
     * Trove and TroveChangeSet objects now represent paths as
       directory/basename pairs
+    * Changeset dict of absolute file object changes are now indexed more
+      efficiently
 
   o Build Changes:
     * When cooking groups where checkOnlyByDefaultDeps is set to False added

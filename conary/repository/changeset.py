@@ -113,18 +113,48 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 
 	return "".join(fileList)
 
+    def __getitem__(self, item):
+        if item[0] is None:
+            item = item[1]
+        return dict.__getitem__(self, item)
+
+    def get(self, item, default):
+        if item[0] is None:
+            item = item[1]
+        return dict.get(self, item, default)
+
+    def __setitem__(self, item, val):
+        if item[0] is None:
+            item = item[1]
+        return dict.__setitem__(self, item, val)
+
+    def __hasitem__(self):
+        if item[0] is None:
+            item = item[1]
+        return dict.__hasitem__(self, item)
+
+    def iteritems(self):
+        for item in dict.iteritems(self):
+            if isinstance(item[0], tuple):
+                yield item
+            else:
+                yield (None, item[0]), item[1]
+
+    def items(self):
+        return list(self.iteritems())
+
     def thaw(self ,data):
 	i = 0
 	while i < len(data):
             i, ( frzFile, ) = misc.unpack("!SI", i, data)
             info = FileInfo(frzFile)
 
+            newFileId = info.newFileId()
             oldFileId = info.oldFileId()
             if oldFileId == "":
-                oldFileId = None
-
-            newFileId = info.newFileId()
-            self[(oldFileId, newFileId)] = info.csInfo()
+                self[newFileId] = info.csInfo()
+            else:
+                self[(oldFileId, newFileId)] = info.csInfo()
 
     def __init__(self, data = None):
 	if data:
