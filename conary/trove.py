@@ -3156,7 +3156,10 @@ class ReferencedFileList(list, streams.InfoStream):
                 dirName = intern(dirName)
                 baseName = intern(baseName)
 
-            if not fileId: fileId = None
+            if not fileId:
+                fileId = None
+            else:
+                fileId = intern(fileId)
 
             if verStr == lastVerStr:
                 version = lastVer

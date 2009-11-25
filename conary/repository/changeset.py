@@ -152,9 +152,9 @@ class ChangeSetFileDict(dict, streams.InfoStream):
             newFileId = info.newFileId()
             oldFileId = info.oldFileId()
             if oldFileId == "":
-                self[newFileId] = info.csInfo()
+                self[intern(newFileId)] = info.csInfo()
             else:
-                self[(oldFileId, newFileId)] = info.csInfo()
+                self[(intern(oldFileId), intern(newFileId))] = info.csInfo()
 
     def __init__(self, data = None):
 	if data:
