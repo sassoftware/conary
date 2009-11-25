@@ -169,7 +169,14 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             raise ValueError(str(probs))
 
     def install(self, flags, troveCs):
-        (oldTrv, trv) = SingleCapsuleOperation.install(self, flags, troveCs)
+        rc = SingleCapsuleOperation.install(self, flags, troveCs)
+        if rc is None:
+            # parent class thinks we should just ignore this troveCs; I'm
+            # not going to argue with it (it's probably because the capsule
+            # hasn't changed
+            return None
+
+        (oldTrv, trv) = rc
         trvInfo = troveCs.getNewNameVersionFlavor()
         oldTrvInfo = troveCs.getOldNameVersionFlavor()
 

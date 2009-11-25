@@ -58,12 +58,17 @@ class SingleCapsuleOperation(CapsuleOperation):
     def install(self, flags, troveCs):
         if troveCs.getOldVersion():
             oldTrv = self.db.getTrove(*troveCs.getOldNameVersionFlavor())
-            self.remove(oldTrv)
             trv = oldTrv.copy()
             trv.applyChangeSet(troveCs)
         else:
             oldTrv = None
             trv = trove.Trove(troveCs)
+
+        if oldTrv and oldTrv.troveInfo.capsule == trv.troveInfo.capsule:
+            # the capsule hasn't changed, so don't reinstall it
+            return None
+        elif oldTrv:
+            self.remove(oldTrv)
 
         for pathId, path, fileId, version in trv.iterFileList(capsules = True):
             # there should only be one...
