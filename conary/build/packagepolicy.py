@@ -2147,7 +2147,7 @@ class _dependency(policy.Policy):
         db = self._getDb()
         troveNames = [ x.getName() for x in db.iterTrovesByPath(path) ]
         if not troveNames:
-            talk = {True: self.error, False: self.warn}[unmanagedError]
+            talk = {True: self.error, False: self.warn}[bool(unmanagedError)]
             talk('%s file %s not managed by conary' %(fileType, path))
             return None
         troveName = troveNames[0]
