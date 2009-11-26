@@ -186,7 +186,7 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
         url = util.normurl(self.c[newLabel]._server.basicUrl) + "?" + base
 
         self.c[newLabel].commitChangeSet(url, mirror = mirror,
-                                         hidden = hidden, callback=callback)
+                                         hidden = hidden)
 
     def commitChangeSetFile(self, fName, mirror = False, callback = None,
                             hidden = False):
