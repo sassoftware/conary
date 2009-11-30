@@ -45,6 +45,15 @@ Changes in @NEW@:
       progress updates. "conary commit" now provides progress
       output. (CNY-3290)
 
+  o Build Changes:
+    * When cooking groups where checkOnlyByDefaultDeps is set to False,
+      added dependencies will now inherit the byDefault setting of the
+      depending component. (CNY-3195)
+    * The imageGroup flag in group recipes now implies
+      checkOnlyByDefaultDeps=False. (CNY-3195)
+    * Group search paths may now contain lists or tuples of troves to be
+      considered as a single "bucket". (CNY-3286)
+
   o Bug Fixes:
     * In-core changesets could be merged into a ReadOnlyChangeSet a
       single time. After multiple merges, reset() will no longer reset
@@ -124,15 +133,6 @@ Changes in @NEW@:
       directory/basename pairs.
     * Changeset dict of absolute file object changes are now indexed more
       efficiently.
-
-  o Build Changes:
-    * When cooking groups where checkOnlyByDefaultDeps is set to False,
-      added dependencies will now inherit the byDefault setting of the
-      depending component. (CNY-3195)
-    * The imageGroup flag in group recipes now implies
-      checkOnlyByDefaultDeps=False. (CNY-3195)
-    * Group search paths may now contain lists or tuples of troves to be
-      considered as a single "bucket". (CNY-3286)
 
 Changes in 2.0.50:
   o Bug Fixes:
