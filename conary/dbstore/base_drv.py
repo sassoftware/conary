@@ -499,6 +499,14 @@ class BaseDatabase:
         cu.execute(sql)
         return True
 
+    def disableTableConstraints(self, tableName):
+        class ConstraintEnableClass:
+
+            def enable(self):
+                pass
+
+        return ConstraintEnableClass()
+
     # easy access to the schema state
     def loadSchema(self):
         assert(self.dbh)

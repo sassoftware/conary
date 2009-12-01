@@ -258,14 +258,27 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False,
                         excludeCapsuleContents = False, callback = None,
                         statusPath = None):
+        # when we add troves (no removals) we disable constraints on
+        # the TroveFiles table; it speeds up large commits massively on
+        # postgres
+        enableConstraints = True
+
 	# let's make sure commiting this change set is a sane thing to attempt
-	for pkg in cs.iterNewTroveList():
-	    v = pkg.getNewVersion()
+        for trvCs in cs.iterNewTroveList():
+            if trvCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                enableConstraints = False
+
+            v = trvCs.getNewVersion()
             if v.isOnLocalHost():
                 label = v.branch().label()
 		raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
         self.troveStore.begin(serialize)
+
+        if enableConstraints:
+            enableConstraints = self.troveStore.db.disableTableConstraints(
+                                            'TroveFiles')
+
         if self.requireSigs:
             threshold = openpgpfile.TRUST_FULL
         else:
@@ -305,6 +318,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                     trv = self.getTrove(withFiles = True, *newTuple)
                     assert(trv.verifyDigests())
+
+            if enableConstraints:
+                enableConstraints.enable()
 
             self.troveStore.commit()
 

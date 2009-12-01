@@ -134,6 +134,13 @@ Changes in @NEW@:
       directory/basename pairs.
     * Changeset dict of absolute file object changes are now indexed more
       efficiently.
+    * Disable TroveFiles constraints during commits when nothing is
+      being erased
+    * StreamCollection classes can now choose to ignore the skipSet when
+      freezing for a performance boost
+    * Dirnames/basenames are added as a single operation at the beginning
+      of a repository commit to make the ids available for the files
+      build removing the need for large, complex joins later.
 
 Changes in 2.0.50:
   o Bug Fixes:
