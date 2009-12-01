@@ -23,9 +23,8 @@ import re
 import struct
 import subprocess
 import tempfile
-from conary.lib import digestlib, openpgpfile, sha1helper
+from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util
 from conary.deps import deps
-from conary.lib import util
 
 # Note that all per-file tags must be listed in _RpmHeader:_tagListValues
 _GENERAL_TAG_BASE = 1000
@@ -492,40 +491,60 @@ def extractRpmPayload(fileIn, fileOut):
             break
         fileOut.write(buf)
 
+def _normpath(path):
+    return util.normpath(path).lstrip('/')
+
 def extractFilesFromCpio(fileIn, fileList, tmpDir = '/tmp'):
     """
     Returns a list of open files parallel to fileList
+    Hardlinked files will share contents, so make sure you seek() back to the
+    beginning before you read.
     """
-    # Trim ./ and / from left
-    fileList = [ os.path.normpath(x).lstrip('/') for x in fileList ]
-    filePatterns = fileList[:]
-    filePatterns.extend('/' + x for x in fileList)
-    filePatterns.extend('./' + x for x in fileList)
+    # Map device/inode to catch hardlinks
+    inodeMap = {}
+    # Map the path in fileList to header and device/inode
+    fileNameMap = dict((_normpath(x), x) for x in fileList)
+    fileNameInodeMap = {}
 
-    # Create temporary directory
-    util.mkdirChain(tmpDir)
-    tmpDir = tempfile.mkdtemp(dir = tmpDir, prefix = 'payload-')
-    try:
-        cmd = ["/bin/cpio", "-iumd"] + filePatterns
+    # Empty files will be shared to avoid consuming fd
+    EmptyFile = tempfile.TemporaryFile(dir = tmpDir, prefix = 'tmppayload-')
 
-        p = subprocess.Popen(cmd, stdin = subprocess.PIPE, cwd = tmpDir,
-            stderr = file(os.devnull, "w"))
-        util.copyfileobj(fileIn, p.stdin)
-        p.stdin.close()
-        p.wait()
+    cpioObj = cpiostream.CpioStream(fileIn)
+    for entry in cpioObj:
+        if entry.header.mode & 0170000 != 0100000:
+            # Not a regular file
+            continue
+        fileName = _normpath(entry.filename)
+        devmajor = entry.header.devmajor
+        devminor = entry.header.devminor
+        inode = entry.header.inode
 
-        # Reassemble results
-        results = []
-        for cleanPath in fileList:
-            abspath = util.joinPaths(tmpDir, cleanPath)
-            if not os.path.exists(abspath) or (
-                    os.path.isfile(abspath) and os.path.islink(abspath)):
-                fileObj = None
-            else:
-                fileObj = file(abspath)
-            results.append(fileObj)
-    finally:
-        util.rmtree(tmpDir)
+        key = (devmajor, devminor, inode)
+
+        # This file may not be the one we're looking for, but it may be the
+        # one that provides the contents for hardlinked files we care about
+        if fileName not in fileNameMap and key not in inodeMap:
+            continue
+
+        if entry.header.filesize == 0:
+            fobj = EmptyFile
+        else:
+            fobj = tempfile.TemporaryFile(dir = tmpDir, prefix = 'tmppayload-')
+            util.copyfileobj(entry.payload, fobj)
+            fobj.seek(0)
+        inodeMap[key] = fobj
+        # in case we'll ever want to use the information from the cpio header
+        # entry to restore file permissions, we should also save the header
+        # here
+        fileNameInodeMap[fileName] = key
+
+    # Now compose the return
+    retMap = dict((y, x) for (x, y) in fileNameMap.items())
+    results = []
+    for suppliedFileName in fileList:
+        normFileName = retMap.get(suppliedFileName)
+        key = fileNameInodeMap.get(normFileName)
+        results.append(inodeMap.get(key))
     return results
 
 def UncompressedRpmPayload(fileIn):
