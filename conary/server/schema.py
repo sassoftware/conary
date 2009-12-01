@@ -1062,14 +1062,28 @@ def setupTempTables(db):
         db.createIndex("tmpNewStreams", "tmpNewStreamssFileIdx", "fileId",
                        check = False)
 
+    if "tmpNewPaths" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpNewPaths(
+            path        %(PATHTYPE)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpNewPaths"] = True
+
+    if "tmpNewBasenames" not in db.tempTables:
+        cu.execute("""
+        CREATE TEMPORARY TABLE tmpNewBasenames(
+            dir         %(PATHTYPE)s
+        ) %(TABLEOPTS)s""" % db.keywords)
+        db.tempTables["tmpNewDirs"] = True
+
     if "tmpNewFiles" not in db.tempTables:
         cu.execute("""
         CREATE TEMPORARY TABLE tmpNewFiles(
             pathId      %(BINARY16)s,
             versionId   INTEGER,
             fileId      %(BINARY20)s,
-            dirname     %(PATHTYPE)s,
-            basename    %(PATHTYPE)s,
+            dirNameId   INTEGER,
+            baseNameId  INTEGER,
             pathChanged INTEGER,
             instanceId  INTEGER
         ) %(TABLEOPTS)s""" % db.keywords)
@@ -1081,10 +1095,6 @@ def setupTempTables(db):
         db.createIndex("tmpNewFiles", "tmpNewFilesFileIdx", "fileId",
                        check = False)
         db.createIndex("tmpNewFiles", "tmpNewFilesVersionIdx", "versionId",
-                       check = False)
-        db.createIndex("tmpNewFiles", "tmpNewFilesDirnameIdx", "dirname",
-                       check = False)
-        db.createIndex("tmpNewFiles", "tmpNewFilesBasenameIdx", "basename",
                        check = False)
     if "tmpNewRedirects" not in db.tempTables:
         cu.execute("""

@@ -90,7 +90,8 @@ class TroveAdder:
 
         self.newFilesInsertList.append((self.cu.binary(pathId), versionId,
                                         self.cu.binary(fileId),
-                                        dirname, basename,
+                                        self.dirMap[dirname],
+                                        self.baseMap[basename],
                                         pathChanged))
 
         changeInfo = self.changeMap.get(pathId, None)
@@ -112,7 +113,8 @@ class TroveAdder:
         self.addStream(fileId, fileStream = fileStream,
                        withContents = withContents)
 
-    def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap):
+    def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap,
+                 dirMap, baseMap):
         self.troveStore = troveStore
         self.cu = cu
         self.trv = trv
@@ -122,6 +124,8 @@ class TroveAdder:
         self.newStreamsByFileId = dict()
         self.newSet = newSet
         self.changeMap = changeMap
+        self.dirMap = dirMap
+        self.baseMap = baseMap
 
 # we need to call this from the schema migration as well, which is why
 # we extracted it from the TroveStore class
@@ -317,7 +321,8 @@ class TroveStore:
         cu = self.db.cursor()
         changeMap = dict((x[0], x) for x in trvCs.getChangedFileList())
         newSet = set(x[0] for x in trvCs.getNewFileList())
-        return TroveAdder(self, cu, trv, trvCs, hidden, newSet, changeMap)
+        return TroveAdder(self, cu, trv, trvCs, hidden, newSet, changeMap,
+                          self.dirMap, self.baseMap)
 
     # walk the trove and insert any missing flavors we need into the Flavors table
     def _addTroveNewFlavors(self, cu, trv):
@@ -444,53 +449,26 @@ class TroveStore:
         LEFT JOIN FileStreams AS FS USING(fileId)
         WHERE FS.fileId IS NULL
         """)
-        # need to keep a list of new dirnames we're inserting
-        cu.execute(""" select distinct tnf.dirname from tmpNewFiles as tnf
-        where pathChanged = 1 and not exists (
-            select 1 from Dirnames as d where d.dirname = tnf.dirname )""")
-        newDirnames = cu.fetchall()
-        self.db.bulkload("Dirnames", newDirnames, ["dirname"])
-        # now get the new dirnames for which we have not computed prefixes yet
-        cu.execute(""" select distinct tnf.dirname from tmpNewFiles as tnf
-        where pathChanged = 1 and not exists (
-            select 1 from Dirnames as d
-            join Prefixes as p using(dirnameId)
-            where d.dirname = tnf.dirname
-        ) """)
-        newDirnames = cu.fetchall()        
 
-        schema.resetTable(cu, "tmpPaths")
-        self.db.bulkload("tmpPaths", newDirnames, ["path"])
-        cu.execute("select dirnameId, dirname from Dirnames "
-                   "join tmpPaths on dirname = path ")
-        addPrefixesFromList(self.db, cu.fetchall())
-
-        # done with processing the Prefixes for new Dirnames
-        cu.execute(""" insert into Basenames(basename)
-        select distinct tnf.basename from tmpNewFiles as tnf
-        where pathChanged = 1 and not exists (
-            select 1 from Basenames as b where b.basename = tnf.basename ) """)
-        cu.execute(""" insert into FilePaths (pathId, dirnameId, basenameId)
-        select distinct tnf.pathId, d.dirnameId, b.basenameId
-        from tmpNewFiles as tnf
-        join Dirnames as d on tnf.dirname = d.dirname
-        join Basenames as b on tnf.basename = b.basename
-        where pathChanged = 1 and not exists (
-            select 1 from FilePaths as fp
-            where fp.pathId = tnf.pathId
-              and fp.dirnameId = d.dirnameId
-              and fp.basenameId = b.basenameId ) """)
+        cu.execute("""INSERT INTO FilePaths(pathId, dirnameId, basenameId)
+                        SELECT tnf.pathId, tnf.dirnameId, tnf.basenameId
+                        FROM tmpNewFiles AS tnf
+                        LEFT OUTER JOIN FilePaths AS fp ON
+                            fp.pathId = tnf.pathId and
+                            fp.dirnameId = tnf.dirnameId and
+                            fp.basenameId = tnf.basenameId
+                        WHERE
+                            tnf.pathChanged = 1 AND
+                            fp.pathId IS NULL""")
 
         # create the TroveFiles links for this trove's files.
         cu.execute(""" insert into TroveFiles (instanceId, streamId, versionId, filePathId)
         select tnf.instanceId, fs.streamId, tnf.versionId, fp.filePathId
         from tmpNewFiles as tnf
-        join Dirnames as d on tnf.dirname = d.dirname
-        join Basenames as b on tnf.basename = b.basename
         join FilePaths as fp on
-            tnf.pathId = fp.pathId and
-            fp.dirnameId = d.dirnameId and
-            fp.basenameId = b.basenameId
+            fp.pathId = tnf.pathId and
+            fp.dirnameId = tnf.dirnameId and
+            fp.basenameId = tnf.basenameId
         join FileStreams as fs on tnf.fileId = fs.fileId
         """)
 
@@ -686,9 +664,8 @@ class TroveStore:
             self.db.bulkload("tmpNewFiles",
                     [ x + (troveInstanceId,) for x in newFilesInsertList ],
                     [ "pathId", "versionId", "fileId",
-                      "dirname", "basename", "pathChanged",
+                      "dirnameId", "basenameId", "pathChanged",
                       "instanceId" ])
-            #self.db.analyze("tmpNewFiles")
 
         if len(newStreamsByFileId):
             self.db.bulkload("tmpNewStreams", newStreamsByFileId.values(),
@@ -784,7 +761,7 @@ class TroveStore:
             LEFT JOIN Flavors ON tmpNewRedirects.flavor = Flavors.flavor
             """ % troveInstanceId)
 
-    def addTroveSetStart(self):
+    def addTroveSetStart(self, oldTroveInfoList, dirNames, baseNames):
         cu = self.db.cursor()
         schema.resetTable(cu, 'tmpTroves')
         schema.resetTable(cu, 'tmpNewFiles')
@@ -793,7 +770,85 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewLatest')
         self.depAdder = deptable.BulkDependencyLoader(self.db, cu)
 
+        schema.resetTable(cu, 'tmpNewPaths')
+        l = [(cu.binary(x),) for x in dirNames]
+        self.db.bulkload("tmpNewPaths", l, [ "path" ])
+        cu.execute("""
+            INSERT INTO Dirnames (dirName)
+                SELECT path FROM tmpNewPaths
+                    LEFT OUTER JOIN Dirnames ON
+                        Dirnames.dirName = tmpNewPaths.path
+                    WHERE Dirnames.dirNameId IS NULL
+        """)
+        cu.execute("""
+                SELECT Dirnames.dirName, Dirnames.dirNameId FROM
+                    tmpNewPaths JOIN Dirnames ON
+                        Dirnames.dirName = tmpNewPaths.path
+        """)
+        self.dirMap = dict((cu.frombinary(x[0]), x[1]) for x in cu)
+
+        schema.resetTable(cu, 'tmpNewPaths')
+        l = [(cu.binary(x),) for x in baseNames]
+        self.db.bulkload("tmpNewPaths", l, [ "path" ])
+        cu.execute("""
+            INSERT INTO Basenames (baseName)
+                SELECT path FROM tmpNewPaths
+                    LEFT OUTER JOIN Basenames ON
+                        Basenames.baseName = tmpNewPaths.path
+                    WHERE Basenames.baseNameId IS NULL
+        """)
+        cu.execute("""
+                SELECT Basenames.baseName, Basenames.baseNameId FROM
+                    tmpNewPaths JOIN Basenames ON
+                        Basenames.baseName = tmpNewPaths.path
+        """)
+        self.baseMap = dict((cu.frombinary(x[0]), x[1]) for x in cu)
+
+        schema.resetTable(cu, 'tmpNVF')
+        self.db.bulkload("tmpNVF",
+            [ (x[0], str(x[1]), x[2].freeze()) for x in oldTroveInfoList ],
+            [ "name", "version", "flavor" ])
+
+        cu.execute("""
+            SELECT DISTINCT baseName, baseNameId FROM tmpNVF
+                JOIN Items ON
+                    tmpNVF.name = Items.item
+                JOIN Versions ON
+                    tmpNVF.version = Versions.version
+                JOIN Flavors ON
+                    tmpNVF.flavor = Flavors.flavor
+                JOIN Instances ON
+                    Items.itemId = Instances.itemId AND
+                    Versions.versionId = Instances.versionId AND
+                    Flavors.flavorId = Instances.flavorId
+                JOIN TroveFiles USING (instanceId)
+                JOIN FilePaths USING (filePathId)
+                JOIN BaseNames USING (baseNameId)
+        """)
+        self.baseMap.update(dict((cu.frombinary(x[0]), x[1]) for x in cu))
+
+        cu.execute("""
+            SELECT DISTINCT dirName, dirNameId FROM tmpNVF
+                JOIN Items ON
+                    tmpNVF.name = Items.item
+                JOIN Versions ON
+                    tmpNVF.version = Versions.version
+                JOIN Flavors ON
+                    tmpNVF.flavor = Flavors.flavor
+                JOIN Instances ON
+                    Items.itemId = Instances.itemId AND
+                    Versions.versionId = Instances.versionId AND
+                    Flavors.flavorId = Instances.flavorId
+                JOIN TroveFiles USING (instanceId)
+                JOIN FilePaths USING (filePathId)
+                JOIN DirNames USING (dirNameId)
+        """)
+        self.dirMap.update(dict((cu.frombinary(x[0]), x[1]) for x in cu))
+
     def addTroveSetDone(self, callback=None):
+        self.dirMap = None
+        self.baseMap = None
+
         if not callback:
             callback = callbacks.UpdateCallback()
         cu = self.db.cursor()

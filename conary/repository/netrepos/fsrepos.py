@@ -16,6 +16,7 @@
 
 import cPickle
 import errno
+import itertools
 import os
 import sys
 import tempfile
@@ -38,9 +39,28 @@ class FilesystemChangeSetJob(ChangeSetJob):
         self.requireSigs = kw.pop('requireSigs', False)
         self.callback = kw.get('callback', False)
 
-        repos.troveStore.addTroveSetStart()
+        self.addTroveSetStart(repos, cs)
         ChangeSetJob.__init__(self, repos, cs, *args, **kw)
         repos.troveStore.addTroveSetDone(self.callback)
+
+    def addTroveSetStart(self, repos, cs):
+        newDirNames = set()
+        newBaseNames = set()
+        oldTroves = []
+        for i, csTrove in enumerate(cs.iterNewTroveList()):
+            if csTrove.getOldVersion():
+                oldTroves.append(csTrove.getOldNameVersionFlavor())
+
+            for fileInfo in itertools.chain(
+                                csTrove.getNewFileList(raw = True),
+                                csTrove.getChangedFileList(raw = True)):
+                if fileInfo[1] is None:
+                    continue
+
+                newDirNames.add(fileInfo[1])
+                newBaseNames.add(fileInfo[2])
+
+        repos.troveStore.addTroveSetStart(oldTroves, newDirNames, newBaseNames)
 
     def _containsFileContents(self, sha1iter):
         return self.repos.troveStore.hasFileContents(sha1iter)
