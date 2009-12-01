@@ -451,7 +451,8 @@ class TroveStore:
         """)
 
         cu.execute("""INSERT INTO FilePaths(pathId, dirnameId, basenameId)
-                        SELECT tnf.pathId, tnf.dirnameId, tnf.basenameId
+                        SELECT DISTINCT tnf.pathId, tnf.dirnameId,
+                                        tnf.basenameId
                         FROM tmpNewFiles AS tnf
                         LEFT OUTER JOIN FilePaths AS fp ON
                             fp.pathId = tnf.pathId and
