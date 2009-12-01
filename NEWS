@@ -5,7 +5,7 @@ Changes in @NEW@:
       is included in this release. (CNY-3217)
     * Added ignoreDependencies configuration option, which allows users
       to specify certain dependency classes which should be ignored
-      during installs. The defaults is "abi rpmlib".
+      during installs. The default is "abi rpmlib".
     * The xz compression file format is now supported for decompressing
       sources. (CNY-3207)
     * The changemail.py repository commit action module now takes an
@@ -55,9 +55,10 @@ Changes in @NEW@:
       considered as a single "bucket". (CNY-3286)
 
   o Bug Fixes:
-    * In-core changesets could be merged into a ReadOnlyChangeSet a
-      single time. After multiple merges, reset() will no longer reset
-      the underlying in-core changeset.
+    * In-core changesets previously could be merged only once into a
+      ReadOnlyChangeSet.  After multiple merges, reset() previously
+      failed to reset the underlying in-core changeset.  This has been
+      fixed.
     * Conary no longer exits with an unhandled KeyError exception if
       an unknown dependency type is encountered in the local database.
       (CNY-3232)
