@@ -212,7 +212,7 @@ class Database(BaseDatabase):
         assert (self.dbh)
         return self.iterCursorClass(self.dbh)
 
-    def disableTableConstraints(self, tableName):
+    def DISABLE_disableTableConstraints(self, tableName):
         class ConstraintEnableClass:
 
             def __init__(self, cu, tableName, oldVals):
