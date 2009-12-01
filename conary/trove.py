@@ -103,6 +103,7 @@ class TroveTuple(streams.StreamSet):
 
 class TroveTupleList(streams.StreamCollection):
     streamDict = { 1 : TroveTuple }
+    ignoreSkipSet = True
 
     def add(self, name, version, flavor):
         dep = TroveTuple()
@@ -119,6 +120,7 @@ class TroveTupleList(streams.StreamCollection):
 
 class VersionListStream(streams.OrderedStreamCollection):
     streamDict = { 1 : StringVersionStream }
+    ignoreSkipSet = True
 
     def append(self, ver):
         v = streams.StringVersionStream()
@@ -201,6 +203,7 @@ class SingleTroveRedirect(streams.StreamSet):
 
 class TroveRedirectList(streams.StreamCollection):
     streamDict = { 1 : SingleTroveRedirect }
+    ignoreSkipSet = True
 
     def add(self, name, branch, flavor):
         dep = SingleTroveRedirect()
