@@ -1074,7 +1074,7 @@ def setupTempTables(db):
         CREATE TEMPORARY TABLE tmpNewBasenames(
             dir         %(PATHTYPE)s
         ) %(TABLEOPTS)s""" % db.keywords)
-        db.tempTables["tmpNewDirs"] = True
+        db.tempTables["tmpNewBasenames"] = True
 
     if "tmpNewFiles" not in db.tempTables:
         cu.execute("""
