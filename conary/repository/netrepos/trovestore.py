@@ -774,6 +774,8 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewPaths')
         l = [(cu.binary(x),) for x in dirNames]
         self.db.bulkload("tmpNewPaths", l, [ "path" ])
+        cu.execute("SELECT MAX (dirNameId) FROM Dirnames")
+        max = cu.next()[0]
         cu.execute("""
             INSERT INTO Dirnames (dirName)
                 SELECT path FROM tmpNewPaths
@@ -781,6 +783,10 @@ class TroveStore:
                         Dirnames.dirName = tmpNewPaths.path
                     WHERE Dirnames.dirNameId IS NULL
         """)
+        cu.execute("SELECT dirNameId, dirName FROM Dirnames "
+                   "WHERE dirNameId > ?", max)
+        addPrefixesFromList(self.db, [ (x[0], x[1]) for x in cu ])
+
         cu.execute("""
                 SELECT Dirnames.dirName, Dirnames.dirNameId FROM
                     tmpNewPaths JOIN Dirnames ON
