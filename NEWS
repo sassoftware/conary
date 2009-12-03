@@ -1,8 +1,8 @@
-Changes in @NEW@:
+Changes in 2.1.0:
   o New Features
     * Conary now allows packages to be installed using foreign package
       managers via wrapped content called capsules. RPM capsule support
-      is included in this release. (CNY-3217)
+      is included in this release. (CNY-3217, CNY-3213)
     * Added ignoreDependencies configuration option, which allows users
       to specify certain dependency classes which should be ignored
       during installs. The default is "abi rpmlib".
