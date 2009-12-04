@@ -7,7 +7,7 @@ but random access is not allowed."""
 # copied from the standard Python libary from 2.6.4 and patched with
 # http://bugs.python.org/issue1675951. The readline() implementation
 # included there does not work properly. Conary only needs readlines(),
-# and never includes a byte limit so we implement a quick replacementa
+# and never includes a byte limit so we implement a quick replacement
 
 import struct, sys, time
 import zlib
@@ -504,7 +504,12 @@ class GzipFile:
         return L
 
     def readlines(self, sizehint=0):
-        return [ x+'\n' for x in self.read().split('\n')[:-1] ]
+        lines = self.read().split('\n')
+        lastline = []
+        # handle the case where there is no trailing newline
+        if lines[-1] != '':
+            lastline = [lines.pop()]
+        return [ x+'\n' for x in lines[:-1] ] + lastline
 
     def writelines(self, L):
         for line in L:
