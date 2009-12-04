@@ -17,11 +17,10 @@ Contains functions to assist in dealing with deb files.
 """
 
 import os
-import gzip
 import rfc822
 import tarfile
 
-from conary.lib import ar
+from conary.lib import ar, fixedgzip as gzip
 
 #{ Constants
 NAME = 1

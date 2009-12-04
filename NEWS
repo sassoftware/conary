@@ -1,4 +1,10 @@
-Changes in @NEWS@:
+Changes in @NEW@:
+  o New Features
+    * A modified version of the Python gzip library has been added to
+      Conary. The new version has been tested to be 3% faster than the
+      standard library version for a small sized update. It also does
+      not seek within the compressed data, which will enable streaming
+      decompression for future uses. (CNY-3301)
 
 Changes in 2.1.0:
   o New Features

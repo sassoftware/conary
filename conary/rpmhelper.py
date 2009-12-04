@@ -16,14 +16,13 @@
 Contains functions to assist in dealing with rpm files.
 """
 
-import gzip
 import itertools
 import os
 import re
 import struct
 import subprocess
 import tempfile
-from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util
+from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util, fixedgzip as gzip
 from conary.deps import deps
 
 # Note that all per-file tags must be listed in _RpmHeader:_tagListValues

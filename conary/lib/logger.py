@@ -15,7 +15,6 @@ import base64
 import bz2
 import errno
 import fcntl
-import gzip
 import os
 import pty
 import re
@@ -29,7 +28,7 @@ import time
 import tty
 from xml.sax import saxutils
 from conary.errors import ConaryError
-
+from conary.lib import fixedgzip as gzip
 
 BUFFER=1024*4096
 

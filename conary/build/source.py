@@ -18,7 +18,6 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import itertools
-import gzip
 import os
 import re
 import shutil, subprocess
@@ -27,7 +26,7 @@ import sys
 import tempfile
 import stat
 
-from conary.lib import debugger, digestlib, log, magic
+from conary.lib import debugger, digestlib, log, magic, fixedgzip as gzip
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util

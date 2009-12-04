@@ -12,7 +12,6 @@
 # full details.
 #
 
-import gzip
 import zlib
 try:
     from cStringIO import StringIO
@@ -20,7 +19,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary.repository import errors, repository, datastore
-from conary.lib import digestlib
+from conary.lib import digestlib, fixedgzip as gzip
 from conary.local import schema
 from conary import files
 
