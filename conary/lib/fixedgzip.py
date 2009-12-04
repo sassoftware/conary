@@ -9,7 +9,7 @@ but random access is not allowed."""
 # included there does not work properly. Conary only needs readlines(),
 # and never includes a byte limit so we implement a quick replacement
 
-import struct, sys, time
+import struct, sys, time, StringIO
 import zlib
 import __builtin__
 
@@ -504,12 +504,7 @@ class GzipFile:
         return L
 
     def readlines(self, sizehint=0):
-        lines = self.read().split('\n')
-        lastline = []
-        # handle the case where there is no trailing newline
-        if lines[-1] != '':
-            lastline = [lines.pop()]
-        return [ x+'\n' for x in lines[:-1] ] + lastline
+        return StringIO.StringIO(self.read()).readlines()
 
     def writelines(self, L):
         for line in L:
