@@ -97,8 +97,11 @@ class DebianPackageHeader(object):
             raise Error("Unable to find control archive")
         arFile = arr[0]
 
-        gf = gzip.GzipFile(fileobj=arFile.data)
-        tf = tarfile.TarFile(fileobj=gf)
+        try:
+            gf = gzip.GzipFile(fileobj=arFile.data)
+            tf = tarfile.TarFile(fileobj=gf)
+        except IOError, e:
+            raise Error("control.tar.gz is not readable: %s" %str(e))
         # Look for a 'control' file
         arr = [ x for x in tf if os.path.basename(x.name) == 'control' ]
         if not arr:
