@@ -2006,8 +2006,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.commitAction:
 	    return True
 
+        userName = authToken[0]
+        if not isinstance(userName, basestring):
+            userName = 'unknown'
+
         d = { 'reppath' : self.urlBase(urlName = False),
-              'user' : authToken[0], }
+              'user' : userName,
+              }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
         try:
