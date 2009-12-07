@@ -208,6 +208,12 @@ class Database(BaseDatabase):
         self.closed = False
         return True
 
+    def close_fork(self):
+        if hasattr(self.dbh, 'close_fork'):
+            self.dbh.close_fork()
+            self.dbh = None
+        self.close()
+
     def itercursor(self):
         assert (self.dbh)
         return self.iterCursorClass(self.dbh)

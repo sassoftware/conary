@@ -7,6 +7,10 @@ Changes in @NEW@:
       decompression for future uses. (CNY-3301)
     * Added repair command as an experimental features (CNY-1800)
 
+  o Internal Changes:
+    * Database connection objects now have a close_fork() method that
+      closes the connection without notifying the server.
+
 Changes in 2.1.0:
   o New Features
     * Conary now allows packages to be installed using foreign package
