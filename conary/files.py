@@ -42,6 +42,9 @@ _FILE_FLAG_AUTOSOURCE = 1 << 6
 # files which are payload -- not directly represented. config files cannot
 # be payload,
 _FILE_FLAG_PAYLOAD = 1 << 7
+# files which are allowed to be missing -- right now this flag may be
+# set but it is not used outside of builds
+_FILE_FLAG_MISSINGOKAY = 1 << 8
 
 FILE_STREAM_CONTENTS        = 1
 FILE_STREAM_DEVICE	    = 2
@@ -221,6 +224,9 @@ class FlagsStream(streams.IntStream):
 
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
+
+    def isMissingOkay(self, set = None):
+        return self._isFlag(_FILE_FLAG_MISSINGOKAY, set)
 
     def isPayload(self, set = None):
         result = self._isFlag(_FILE_FLAG_PAYLOAD, set)
