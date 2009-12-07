@@ -5,9 +5,7 @@ but random access is not allowed."""
 
 # based on Andrew Kuchling's minigzip.py distributed with the zlib module
 # copied from the standard Python libary from 2.6.4 and patched with
-# http://bugs.python.org/issue1675951. The readline() implementation
-# included there does not work properly. Conary only needs readlines(),
-# and never includes a byte limit so we implement a quick replacement
+# http://bugs.python.org/issue1675951.
 
 import struct, sys, time, StringIO
 import zlib
@@ -432,64 +430,38 @@ class GzipFile:
                 self.read(1024)
             self.read(count % 1024)
 
-    def _broken_new_readline(self, size=-1):
-       if self._new_member:
-           self._read_gzip_header(self.fileobj)
-           self._new_member = False
+    def readline(self, size=-1):
+        if self._new_member:
+            self._read_gzip_header(self.fileobj)
+            self._new_member = False
 
-       scansize = 0
-       buffpos = 0
-       while True:
-           for idx in range(buffpos, len(self.buffer)):
-               if idx == 0:
-                   scansize -= self.pos
-                   pos = self.buffer[idx].find('\n', self.pos)
-               else:
-                   pos = self.buffer[idx].find('\n')
-               if pos != -1:
-                   if size>=0 and scansize+pos+1>size:
-                       return self.read(size)
-                   return self.read(scansize+pos+1)
-               scansize += len(self.buffer[idx])
-               if size >= 0 and scansize > size:
-                   return self.read(size)
-           buffpos = len(self.buffer)
-           eof = self._read(1024)
-           if eof:
-               return self.read(scansize)
+        scansize = 0
+        buffpos = 0
+        # handle the case when the gzipped file is small
+        # and the first read was via this readline() call.
+        # read in some data...
+        if len(self.buffer) == 0:
+            self._read(1024)
+        while True:
+            for idx in range(buffpos, len(self.buffer)):
+                if idx == 0:
+                    scansize -= self.pos
+                    pos = self.buffer[idx].find('\n', self.pos)
+                else:
+                    pos = self.buffer[idx].find('\n')
+                if pos != -1:
+                    if size>=0 and scansize+pos+1>size:
+                        return self.read(size)
+                    return self.read(scansize+pos+1)
+                scansize += len(self.buffer[idx])
+                if size >= 0 and scansize > size:
+                    return self.read(size)
+            buffpos = len(self.buffer)
+            eof = self._read(1024)
+            if eof:
+                return self.read(scansize)
 
-    def _broken_readline(self, size=-1):
-        if size < 0:
-            size = sys.maxint
-            readsize = self.min_readsize
-        else:
-            readsize = size
-        bufs = []
-        while size != 0:
-            c = self.read(readsize)
-            i = c.find('\n')
-
-            # We set i=size to break out of the loop under two
-            # conditions: 1) there's no newline, and the chunk is
-            # larger than size, or 2) there is a newline, but the
-            # resulting line would be longer than 'size'.
-            if (size <= i) or (i == -1 and len(c) > size):
-                i = size - 1
-
-            if i >= 0 or c == '':
-                bufs.append(c[:i + 1])    # Add portion of last chunk
-                self._unread(c[i + 1:])   # Push back rest of chunk
-                break
-
-            # Append chunk to list, decrease 'size',
-            bufs.append(c)
-            size = size - len(c)
-            readsize = min(size, readsize * 2)
-        if readsize > self.min_readsize:
-            self.min_readsize = min(readsize, self.min_readsize * 2, 512)
-        return ''.join(bufs) # Return resulting line
-
-    def _broken_readlines(self, sizehint=0):
+    def readlines(self, sizehint=0):
         # Negative numbers result in reading all the lines
         if sizehint <= 0:
             sizehint = sys.maxint
@@ -502,9 +474,6 @@ class GzipFile:
             sizehint = sizehint - len(line)
 
         return L
-
-    def readlines(self, sizehint=0):
-        return StringIO.StringIO(self.read()).readlines()
 
     def writelines(self, L):
         for line in L:
