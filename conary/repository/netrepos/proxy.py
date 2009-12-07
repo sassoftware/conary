@@ -1104,7 +1104,7 @@ class ChangesetFilter(BaseProxy):
                         oldChangeset, newCs)
 
                 if not fileObj.flags.isConfig() or isinstance(fileObj,
-                        csfiles.SymbolicLink):
+                        (csfiles.SymbolicLink, csfiles.Directory)):
                     continue
                 configFileSha1 = fileObj.contents.sha1()
                 assert not fileObj.flags.isPayload()
