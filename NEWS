@@ -9,6 +9,9 @@ Changes in @NEW@:
 
   o Bug Fixes:
     * Changeset reassembly for capsules ignores directories. (CNY-3305)
+    * Encapsulated symbolic links are represented as having the mode
+      that will exist on the filesystem, even if that varies from the
+      mode recorded in the capsule. (CNY-3304)
 
   o Internal Changes:
     * Database connection objects now have a close_fork() method that
