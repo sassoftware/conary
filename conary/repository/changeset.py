@@ -23,7 +23,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from conary import files, streams, trove, versions
+from conary import files, rpmhelper, streams, trove, versions
 from conary.lib import enum, log, misc, patch, sha1helper, util, api, fixedgzip as gzip
 from conary.repository import filecontainer, filecontents, errors
 
@@ -365,24 +365,35 @@ class ChangeSet(streams.StreamSet):
 
     def getFileContents(self, pathId, fileId, compressed = False):
         key = makeKey(pathId, fileId)
-	if self.fileContents.has_key(key):
-	    cont = self.fileContents[key]
-	else:
-	    cont = self.configCache[key]
-
-        if compressed and cont[2]:
-            # we have compressed contents, and we've been asked for compressed
-            # contnets
-            pass
+        if self.fileContents.has_key(key):
+            (tag, contentObj, isCompressed) = self.fileContents[key]
         else:
-            # ensure we have uncompressed contents, and we're being asked for
-            # uncompressed contents
-            assert(not compressed)
-            assert(not cont[2])
+            (tag, contentObj, isCompressed) = self.configCache[key]
 
-        cont = cont[:2]
+        if compressed and isCompressed:
+            # we have compressed contents, and we've been asked for compressed
+            # contents
+            pass
+        elif not compressed and not isCompressed:
+            # we have uncompressed contents, and we've asked for uncompressed
+            # contents
+            pass
+        elif compressed and not isCompressed:
+            # we have uncompressed contents, but have been asked for compressed
+            # contents
+            f = util.BoundedStringIO()
+            compressor = gzip.GzipFile(None, "w", fileobj = f)
+            util.copyfileobj(contentObj.get(), compressor)
+            compressor.close()
+            f.seek(0)
+            contentObj = filecontents.FromFile(f, compressed = True)
+        else:
+            # we have compressed contents, but have been asked for uncompressed
+            assert(0)
+            uncompressor = gzip.GzipFile(None, "r", fileobj = contentObj.get())
+            contentObj = filecontents.FromFile(uncompressed)
 
-	return cont
+        return (tag, contentObj)
 
     def addFile(self, oldFileId, newFileId, csInfo):
         self.files[(oldFileId, newFileId)] = csInfo
@@ -491,10 +502,16 @@ class ChangeSet(streams.StreamSet):
 	    os.unlink(outFileName)
 	    raise
 
-    def makeRollback(self, db, redirectionRollbacks = True):
+    def makeRollback(self, db, redirectionRollbacks = True, repos = None):
 	assert(not self.absolute)
 
         rollback = ChangeSet()
+
+        # if we need old contents for a file we can get them from the
+        # filesystem or the local database (for config files). if the
+        # original contents aren't available, we make a note of that
+        # in this list and handle it later on
+        hldrContents = []
 
 	for troveCs in self.iterNewTroveList():
 	    if not troveCs.getOldVersion():
@@ -606,17 +623,13 @@ class ChangeSet(streams.StreamSet):
                         fsFile = None
 
 		    if fsFile and fsFile.contents == origFile.contents:
-			cont = filecontents.FromFilesystem(fullPath)
-                        contType = ChangedFileTypes.file
-		    else:
-			# a file which was removed in this changeset is
-			# missing from the files; we need to to put an
-			# empty file in here so we can apply the rollback
-			cont = filecontents.FromString("")
-                        contType = ChangedFileTypes.hldr
+                        rollback.addFileContents(pathId, origFileId,
+                                 ChangedFileTypes.file,
+                                 filecontents.FromFilesystem(fullPath), 0)
+                    else:
+                        hldrContents.append((trv, pathId, origFileId,
+                                             version, 0))
 
-		    rollback.addFileContents(pathId, origFileId, contType,
-                                             cont, 0)
 
 	    for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
 		if not trv.hasFile(pathId):
@@ -698,21 +711,21 @@ class ChangeSet(streams.StreamSet):
                         else:
                             raise
 
+                    isConfig = (origFile.flags.isConfig() or
+                                newFile.flags.isConfig())
+
                     if (isinstance(fsFile, files.RegularFile) and
                         fsFile.contents.sha1() == origFile.contents.sha1()):
 			# the contents in the file system are right
-			cont = filecontents.FromFilesystem(fullPath)
-                        contType = ChangedFileTypes.file
-		    else:
-			# the contents in the file system are wrong; insert
-			# a placeholder and let the local change set worry
-			# about getting this right
-			cont = filecontents.FromString("")
-                        contType = ChangedFileTypes.hldr
-
-                    rollback.addFileContents(pathId, curFileId, contType, cont,
-					     origFile.flags.isConfig() or
-					     newFile.flags.isConfig())
+                        rollback.addFileContents(pathId, curFileId,
+                                         ChangedFileTypes.file,
+                                         filecontents.FromFilesystem(fullPath),
+                                         isConfig)
+                    else:
+                        # the contents in the file system are wrong; add
+                        # it to the list of things to deal with a bit later
+                        hldrContents.append((trv, pathId, curFileId, curVersion,
+                                             isConfig))
 
 	    rollback.newTrove(invertedTrove)
 
@@ -756,17 +769,69 @@ class ChangeSet(streams.StreamSet):
 		    if fsFile and fsFile.hasContents and \
 			    fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
-			cont = filecontents.FromFilesystem(fullPath)
                         contType = ChangedFileTypes.file
-		    else:
-			# the contents in the file system are wrong; insert
-			# a placeholder and let the local change set worry
-			# about getting this right
-			cont = filecontents.FromString("")
-                        contType = ChangedFileTypes.hldr
+                        rollback.addFileContents(pathId, fileId,
+                                        ChangedFileTypes.file,
+                                        filecontents.FromFilesystem(fullPath),
+                                        fileObj.flags.isConfig())
+                    else:
+                        # the contents in the file system are wrong; we'll
+                        # deal with this a bit later
+                        hldrContents.append((trv, pathId, fileId, fileVersion,
+                                             fileObj.flags.isConfig()))
 
-                    rollback.addFileContents(pathId, fileId, contType, cont,
-					     fileObj.flags.isConfig())
+        if not repos:
+            # we don't have a repository object, so we have to handle missing
+            # file contents the best we can (which is through a hldr content
+            # type stub)
+            cont = filecontents.FromString("")
+            for trv, pathId, fileId, version, isConfig in hldrContents:
+                rollback.addFileContents(pathId, fileId, ChangedFileTypes.hldr,
+                                         cont, isConfig)
+        else:
+            # we have a repository, so we can get the contents for missing
+            # contents
+
+            # start off by looking for things which have capsules
+            contentsNeeded = []
+            capsContentsNeeded = {}
+            for (trv, pathId, fileId, version, isConfig) in hldrContents:
+                if (trv.troveInfo.capsule and
+                      trv.troveInfo.capsule.type() ==
+                            trove._TROVECAPSULE_TYPE_RPM):
+                    caps = trv.iterFileList(members = False, capsules = True)
+                    for capsPathId, capsPath, capsFileId, capsVersion in caps:
+                        if (capsFileId, capsVersion) not in capsContentsNeeded:
+                            t = (capsFileId, capsVersion)
+                            l = capsContentsNeeded.get(t, None)
+                            if l is None:
+                                l = []
+                                capsContentsNeeded[t] = l
+
+                            path = trv.getFile(pathId)[0]
+                            l.append((path, pathId, fileId, isConfig))
+                else:
+                    contentsNeeded.append((fileId, version))
+
+            allFileContents = repos.getFileContents(
+                    contentsNeeded + sorted(capsContentsNeeded.keys()))
+            for (trv, pathId, fileId, version, isConfig), fileContents in \
+                            itertools.izip(hldrContents, allFileContents):
+                rollback.addFileContents(pathId, fileId, ChangedFileTypes.file,
+                                         fileContents, isConfig)
+
+            for ((fileId, version), l), fileContents in itertools.izip(
+                        sorted(capsContentsNeeded.iteritems()),
+                        allFileContents[len(contentsNeeded):]):
+                payload = rpmhelper.UncompressedRpmPayload(fileContents.get())
+                filePaths = [ x[0] for x in l ]
+                fileObjs = rpmhelper.extractFilesFromCpio(payload, filePaths)
+                for (path, pathId, fileId, isConfig), f in \
+                        itertools.izip(l, fileObjs):
+                    rollback.addFileContents(pathId, fileId,
+                                             ChangedFileTypes.file,
+                                             filecontents.FromFile(f),
+                                             isConfig)
 
 	return rollback
 

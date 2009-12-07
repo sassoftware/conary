@@ -5,6 +5,7 @@ Changes in @NEW@:
       standard library version for a small sized update. It also does
       not seek within the compressed data, which will enable streaming
       decompression for future uses. (CNY-3301)
+    * Added repair command as an experimental features (CNY-1800)
 
 Changes in 2.1.0:
   o New Features

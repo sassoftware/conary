@@ -156,6 +156,11 @@ class MetaCapsuleOperations(CapsuleOperation):
         if not capsuleInfo or not capsuleInfo.type():
             return False
 
+        if (troveCs.getOldVersion() and troveCs.getOldVersion().onLocalLabel()):
+            # diff between a capsule and local label is represented
+            # as a conary
+            return False
+
         capsule = self.getCapsule(capsuleInfo.type())
         capsule.install(flags, troveCs)
 

@@ -102,6 +102,28 @@ the component that now contains \fI/foo/blah\fP instead of
 as a new file.) The \fBremove\fP command can also be invoked as \fBrm\fP.
 
 .TP
+.B repair \fI<trove>[=version]*\fP
+Conary examines all of the files currently owned by the specifid troves and
+ensures that there contents and attributes match those expected by the troves.
+Any inconsistencies are resolved by updating the filesystem.  No rollback is
+created for this operation, so it is not possible to undo its affects. Files
+which have had their ownership revoked from the trove are unaffected; see the
+\fBrestore\fR command for how to peform a similiar operation in such a case.
+
+Please note that this command is currently considered \fBexperimental\fR
+and likely has bugs. 
+
+.TP
+.B restore \fI<trove>[=version]*\fP
+Conary can take ownership of a file away from a trove for a number of
+reasons, such as the \fBremove\fR command or during installation when
+flags such as \fI-\-replace\-files\fR. This command restores ownership of
+all files to the specified troves. It also restores the contents and
+attributes of those files to those specified by the troves. The changes
+made are placed on the rollback stack. See the \fBrepair\fR command, as
+it may be what you really want.
+
+.TP
 .B revert
 Conary uses a journal file when writing files to the filesystem to allow
 it to recover from failures. In the case of a catastrophic failure, this

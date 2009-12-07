@@ -1691,7 +1691,8 @@ class Database(SqlDbRepository):
     def _doCommit(self, uJob, cs, commitFlags, opJournal, tagSet,
                   reposRollback, localRollback, rollbackPhase, fsJob,
                   updateDatabase, callback, tagScript, dbCache,
-                  autoPinList, flags, journal, directoryCandidates):
+                  autoPinList, flags, journal, directoryCandidates,
+                  storeRollback = True):
         if not (commitFlags.justDatabase or commitFlags.test):
             # run preremove scripts before updating the database, otherwise
             # the file lists which get sent to them are incorrect. skipping
@@ -1763,7 +1764,7 @@ class Database(SqlDbRepository):
         # we have to do this before files get removed from the database,
         # which is a bit unfortunate since this rollback isn't actually
         # valid until a bit later, but that's why we jounral
-        if (rollbackPhase is None) and not commitFlags.test:
+        if (rollbackPhase is None) and not commitFlags.test and storeRollback:
             rollback = uJob.getRollback()
             rollbackScripts = None
             if rollback is None:
@@ -1974,7 +1975,8 @@ class Database(SqlDbRepository):
 			journal = None,
                         callback = UpdateCallback(),
                         removeHints = {}, autoPinList = RegularExpressionList(),
-                        deferredScripts = None, commitFlags = None):
+                        deferredScripts = None, commitFlags = None,
+                        repair = False):
 	assert(not cs.isAbsolute())
 
         if commitFlags is None:
@@ -1989,6 +1991,9 @@ class Database(SqlDbRepository):
         if rollbackPhase:
             flags.missingFilesOkay = True
             flags.ignoreInitialContents = True
+
+        if repair:
+            flags.ignoreMissingFiles = True
 
         self.db.begin()
 
@@ -2102,7 +2107,7 @@ class Database(SqlDbRepository):
                             opJournal, tagSet, reposRollback, localRollback,
                             rollbackPhase, fsJob, updateDatabase, callback,
                             tagScript, dbCache, autoPinList, flags, journal,
-                            directoryCandidates)
+                            directoryCandidates, storeRollback = not repair)
             except Exception, e:
                 if not issubclass(e.__class__, ConaryError):
                     callback.error("a critical error occured -- reverting "
@@ -2276,6 +2281,38 @@ class Database(SqlDbRepository):
 
         uJob = UpdateJob(self)
         self.commitChangeSet(restoreCs, uJob, callback = UpdateCallback())
+
+    def repairTroves(self, repos, origTroveInfoList):
+        # we don't care about collections here
+        troveInfoList = [ x for x in self._expandCollections(origTroveInfoList)
+                             if not trove.troveIsCollection(x[0]) ]
+        pristineTroves = self.db.getTroves(troveInfoList, pristine = True)
+        localTroves = self.db.getTroves(troveInfoList, pristine = False)
+
+        troveList = []
+        flags = update.UpdateFlags(ignoreMissingFiles = True)
+        for (localTrv, pristineTrv) in itertools.izip(localTroves,
+                                                      pristineTroves):
+            if localTrv is None:
+                # it's okay to have some bits not installed
+                continue
+
+            localVer = pristineTrv.getVersion().createShadow(
+                                                        versions.LocalLabel())
+            troveList.append( (localTrv, pristineTrv, localVer, flags) )
+
+        cs, changedTroveList = update.buildLocalChanges(self, troveList,
+                                        root = self.root)
+        for (changed, trv) in changedTroveList:
+            if not changed:
+                cs.delNewTrove(*trv.getNameVersionFlavor())
+
+        repairCs = cs.makeRollback(self, redirectionRollbacks = False,
+                                   repos = repos)
+
+        uJob = UpdateJob(self)
+        self.commitChangeSet(repairCs, uJob, callback = UpdateCallback(),
+                             repair = True)
 
     def commitLock(self, acquire):
         if not acquire:

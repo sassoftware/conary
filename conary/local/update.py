@@ -55,7 +55,7 @@ class UpdateFlags(util.Flags):
     __slots__ = [ 'merge', 'ignoreUGids', 'missingFilesOkay',
                   'ignoreInitialContents', 'replaceManagedFiles',
                   'replaceUnmanagedFiles', 'replaceModifiedFiles',
-                  'replaceModifiedConfigFiles' ]
+                  'replaceModifiedConfigFiles', 'ignoreMissingFiles' ]
 
 class LastRestored(object):
 
@@ -911,6 +911,11 @@ class FilesystemJob:
             isSrcTrove = False
             self.isSourceTrove = False
 
+        if troveCs.getOldVersion():
+            oldOnLocalLabel = troveCs.getOldVersion().onLocalLabel()
+        else:
+            oldOnLocalLabel = False
+
         if rootFixup[-1] != '/':
             rootFixup += '/'
 
@@ -1205,6 +1210,19 @@ class FilesystemJob:
                 # get the baseFile which was originally installed
                 (baseFilePath, baseFileId, baseFileVersion) = \
                         baseTrove.getFile(pathId)
+
+                if oldOnLocalLabel:
+                    # we have a changeset which is relative to what is actually
+                    # installed, not what the repository specified. to apply
+                    # this properly, we need to apply it against the files
+                    # which are on the local system
+                    fsBaseFile = files.FileFromFilesystem(rootFixup + fsPath,
+                                                          pathId)
+                    _mergeFileChanges(fsBaseFile, baseFile)
+                    baseFile = fsBaseFile
+                    del fsBaseFile
+                    baseFileId = baseFile.fileId()
+
                 assert(baseFile.fileId() == baseFileId)
 
                 # now assemble what the file is supposed to look like on head
@@ -1404,8 +1422,13 @@ class FilesystemJob:
 			 headFileContents) = changeSet.getFileContents(
                                                 pathId, headFileId)
 
-			baseLineF = repos.getFileContents([ (baseFileId,
-					baseTrove.getFile(pathId)[2]) ])[0].get()
+                        if oldOnLocalLabel:
+                            # we're applying a change to the local file, not
+                            # the repository one
+                            baseLineF = open(realPath, "r")
+                        else:
+                            baseLineF = repos.getFileContents([ (baseFileId,
+                                    baseTrove.getFile(pathId)[2]) ])[0].get()
 
 			baseLines = baseLineF.readlines()
 			del baseLineF
@@ -1912,7 +1935,9 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 		    % util.normpath(path))
                 return None
 
-            if e.errno == errno.ENOENT and not flags.missingFilesOkay:
+            if e.errno == errno.ENOENT and flags.ignoreMissingFiles:
+                pass
+            elif e.errno == errno.ENOENT and not flags.missingFilesOkay:
                 callback.warning(
                     "%s is missing (use remove if this is intentional)" 
                     % util.normpath(path))
@@ -1923,27 +1948,13 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             newTrove.removeFile(pathId)
             continue
 
-        f.flags.set(srcFile.flags())
-
-	if isSrcTrove:
-	    f.flags.isSource(set = True)
-            f.flags.isAutoSource(set = isAutoSource)
-
-        # the link group doesn't change due to local mods
-        if srcFile.hasContents and f.hasContents:
-            f.linkGroup.set(srcFile.linkGroup())
-
-        # these values are not picked up from the local system
-        if hasattr(f, 'requires') and hasattr(srcFile, 'requires'):
-            f.requires.set(srcFile.requires())
-        if hasattr(f, 'provides') and hasattr(srcFile, 'provides'):
-            f.provides.set(srcFile.provides())
-        if srcFile.hasContents and f.hasContents:
-            f.flavor.set(srcFile.flavor())
-        f.tags = srcFile.tags.copy()
+        _mergeFileChanges(f, srcFile)
 
         if isSrcTrove:
+            f.flags.isSource(set = True)
+            f.flags.isAutoSource(set = isAutoSource)
             f.flags.isConfig(set = curTrove.fileIsConfig(pathId))
+
 
 	if not f.eq(srcFile, ignoreOwnerGroup = flags.ignoreUGids):
             newFileId = f.fileId()
@@ -2805,3 +2816,18 @@ def runTroveScript(job, script, tagScript, tmpDir, root, callback,
 
     return rc
 
+def _mergeFileChanges(f, srcFile):
+    f.flags.set(srcFile.flags())
+
+    # the link group doesn't change due to local mods
+    if srcFile.hasContents and f.hasContents:
+        f.linkGroup.set(srcFile.linkGroup())
+
+    # these values are not picked up from the local system
+    if hasattr(f, 'requires') and hasattr(srcFile, 'requires'):
+        f.requires.set(srcFile.requires())
+    if hasattr(f, 'provides') and hasattr(srcFile, 'provides'):
+        f.provides.set(srcFile.provides())
+    if srcFile.hasContents and f.hasContents:
+        f.flavor.set(srcFile.flavor())
+    f.tags = srcFile.tags.copy()

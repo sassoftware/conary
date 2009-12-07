@@ -318,14 +318,12 @@ class RpmHeader(object):
             headerPlusPayloadSize = self.getHeaderPlusPayloadSize()
             if headerPlusPayloadSize is not None:
                 pos = f.tell()
-                if hasattr(f, 'fileno'):
+                try:
                     totalSize = os.fstat(f.fileno()).st_size
-                else:
-                    f.seek(0, 2)
-                    totalSize = f.tell()
-                    f.seek(pos, 0)
+                except AttributeError:
+                    totalSize = None
 
-                if headerPlusPayloadSize != (totalSize - pos):
+                if totalSize and headerPlusPayloadSize < (totalSize - pos):
                     raise IOError, "file size does not match size specified by header"
         # if we insist, we could also verify SIG_MD5
         self.isSource = self._sigHeader.isSource
@@ -566,19 +564,20 @@ def UncompressedRpmPayload(fileIn):
     else:
         compression = 'gzip'
 
-    if compression == 'gzip':
-        decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
-    elif compression == 'bzip2':
-        decompressor = lambda fobj: util.BZ2File(fobj)
-    elif compression in ['lzma', 'xz']:
-        decompressor = lambda fobj: util.LZMAFile(fobj)
-    else:
-        raise UnknownCompressionType(compression)
-
     # rewind the file to let seekToData do its job
     fileIn.seek(0)
     seekToData(fileIn)
-    uncompressed = decompressor(fileIn)
+
+    if compression == 'gzip':
+        uncompressed = gzip.GzipFile(fileobj=fileIn, mode = "r")
+        #uncompressed._new_member = False
+    elif compression == 'bzip2':
+        uncompressed = util.BZ2File(fileIn)
+    elif compression in ['lzma', 'xz']:
+        uncompressed = util.LZMAFile(fileIn)
+    else:
+        raise UnknownCompressionType(compression)
+
     return uncompressed
 
 class NEVRA(object):
