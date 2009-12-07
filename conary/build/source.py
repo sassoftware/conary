@@ -1480,6 +1480,9 @@ class addCapsule(_Source):
 
 
             totalPathList.append(path)
+            # CNY-3304: some RPM versions allow impossible modes on symlinks
+            if stat.S_ISLNK(mode):
+                mode |= 0777
             totalPathData.append((path, user, group, mode, digest))
 
             devtype = None
