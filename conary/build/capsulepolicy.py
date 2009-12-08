@@ -118,6 +118,38 @@ class Transient(packagepolicy.Transient):
                 f.flags.isTransient(True)
 
 
+class MissingOkay(policy.Policy):
+    """
+    NAME
+    ====
+
+    B{C{r.MissingOkay()}} - Mark as "missing Okay" only capsule-provided files
+    so marked in their respective capsule.
+
+    DESCRIPTION
+    ===========
+
+    This policy should not be called from recipes.
+    """
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+    bucket = policy.PACKAGE_CREATION
+    filetree = policy.PACKAGE
+    processUnmodified = True
+    invariantinclusions = None
+    invariantexceptions = [ ]
+
+    def doFile(self, filename):
+        if not self.recipe._getCapsulePathsForFile(filename):
+            # applies only to encapsulated files
+            return
+        self.info(filename)
+        for pkg in self.recipe.autopkg.findComponents(filename):
+            f = pkg.getFile(filename)
+            f.flags.isMissingOkay(True)
+
+
 class setModes(packagepolicy.setModes):
     # descends from packagepolicy.setModes to honor varying modes
     # between different capsules sharing a path; also to set mtime

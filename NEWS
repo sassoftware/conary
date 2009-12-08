@@ -5,7 +5,14 @@ Changes in @NEW@:
       standard library version for a small sized update. It also does
       not seek within the compressed data, which will enable streaming
       decompression for future uses. (CNY-3301)
-    * Added repair command as an experimental features (CNY-1800)
+    * Added repair command as an experimental feature. (CNY-1800)
+    * Files marked as "missingok" in encapsulated RPMs now have that
+      status represented by a "MissingOkay" flag on the corresponding
+      Conary file object. (CNY-3306)
+    * Files from encapsulated RPMs now have the mtime from the
+      RPM recorded in troveInfo.  The mtime of last change is
+      still used to calculate fileIds, preserving knowledge of
+      when meaningful file information has changed. (CNY-3307)
 
   o Bug Fixes:
     * Changeset reassembly for capsules ignores directories. (CNY-3305)

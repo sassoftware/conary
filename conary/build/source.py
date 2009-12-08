@@ -1474,6 +1474,7 @@ class addCapsule(_Source):
         ExcludeDirectories = [] 
         InitialContents = []
         Config = []
+        MissingOkay = []
 
         for (path, user, group, mode, size, 
              rdev, flags, vflags, digest, filelinktos, mtime) in ownerList:
@@ -1533,6 +1534,9 @@ class addCapsule(_Source):
                              not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
                         InitialContents.append( path )
 
+                if flags & rpmhelper.RPMFILE_MISSINGOK:
+                    MissingOkay.append(path)
+
         if len(ExcludeDirectories):
             self.recipe.ExcludeDirectories(exceptions=filter.PathSet(
                 ExcludeDirectories))
@@ -1542,6 +1546,9 @@ class addCapsule(_Source):
 
         if len(Config):
             self.recipe.Config(filter.PathSet(Config))
+
+        if len(MissingOkay):
+            self.recipe.MissingOkay(filter.PathSet(MissingOkay))
 
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
