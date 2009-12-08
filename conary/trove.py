@@ -100,6 +100,28 @@ class TroveTuple(streams.StreamSet):
     def __hash__(self):
         return hash(self.asTuple())
 
+class TroveMtimes(list, streams.InfoStream):
+
+    def thaw(self, frz):
+        del self[:]
+        count = len(frz) / 4
+        self.extend(struct.unpack("!" + ("I" * count), frz))
+
+    def freeze(self, skipSet = None):
+        count = len(self)
+        return struct.pack("!" + ("I" * count), *self)
+
+    def diff(self, other):
+        # absolute diff. gross but easy
+        return self.freeze()
+
+    def twm(self, diff, base):
+        assert(self == base)
+        self.thaw(diff)
+
+    def __init__(self, frz = None):
+        if frz:
+            self.thaw(frz)
 
 class TroveTupleList(streams.StreamCollection):
     streamDict = { 1 : TroveTuple }
@@ -963,7 +985,8 @@ _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
 _TROVEINFO_TAG_CAPSULE        = 28
-_TROVEINFO_TAG_LAST           = 28
+_TROVEINFO_TAG_MTIMES         = 29
+_TROVEINFO_TAG_LAST           = 29
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1101,9 +1124,10 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_FACTORY       : (DYNAMIC, streams.StringStream, 'factory' ),
         _TROVEINFO_TAG_SEARCH_PATH   : (DYNAMIC, SearchPath,          'searchPath'),
         _TROVEINFO_TAG_PKGCREATORDATA: (DYNAMIC, streams.StringStream,'pkgCreatorData'),
-        _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
-        _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,    'clonedFromList' ),
-        _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,         'capsule' ),
+        _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,        'derivedFrom' ),
+        _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,   'clonedFromList' ),
+        _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
+        _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)

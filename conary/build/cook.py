@@ -80,6 +80,7 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         linkGroupId = sha1helper.sha1String("\n".join(pathList))
         linkGroups.update({}.fromkeys(pathList, linkGroupId))
 
+    troveMtimes = {}
     for (path, (realPath, f)) in bldPkg.iteritems():
         if isinstance(f, files.RegularFile):
             flavor = f.flavor.deps
@@ -112,10 +113,16 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
                 # otherwise use the new version
 		p.addFile(f.pathId(), path, newVersion, fileId)
 
+        troveMtimes[f.pathId()] = f.inode.mtime()
+
         fileMap[f.pathId()] = (f, realPath, path)
 
         if f.hasContents:
             size += f.contents.size()
+
+    if capsuleInfo:
+        p.troveInfo.mtimes.extend([ x[1] for x in
+                                        sorted(troveMtimes.items()) ])
 
     p.setSize(size)
     p.computePathHashes()
