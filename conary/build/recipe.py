@@ -864,14 +864,14 @@ class Recipe(object):
             if oldDatum != fileDatum:
                 self.reportErrors(
                     'file %s added with conflicting contents:'
-                    ' %s:%s 0%0o %s != %s:%s 0%0o %s',
+                    ' %s:%s 0%0o %s %d != %s:%s 0%0o %s %d',
                     *((fileName,)+oldDatum+fileDatum))
 
     def _setPathInfoForCapsule(self, capsulePath, fileData, packageName):
         '''creates a map of contained filePaths to the capsule'''
         for fileDatum in fileData:
             fileName = fileDatum[0]
-            fileInfo = fileDatum[1:5]
+            fileInfo = fileDatum[1:6]
             l = self._capsuleDataMap.setdefault(fileName, [])
             l.append((fileInfo, packageName))
         for path in [x[0] for x in fileData]:
@@ -909,10 +909,10 @@ class Recipe(object):
 
     def _iterCapsulePathData(self):
         '''
-        yields a (filePath, package, user, group, mode) tuple
+        yields a (filePath, package, user, group, mode, mtime) tuple
         for each file in each capsule that has been added
         '''
         for fileName, fileData in self._capsuleDataMap.iteritems():
             for fileDatum in fileData:
                 fileInfo, package = fileDatum
-                yield fileName, package, fileInfo[0], fileInfo[1], fileInfo[2]
+                yield fileName, package, fileInfo[0], fileInfo[1], fileInfo[2], fileInfo[4]

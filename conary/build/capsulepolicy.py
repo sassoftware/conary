@@ -120,14 +120,17 @@ class Transient(packagepolicy.Transient):
 
 class setModes(packagepolicy.setModes):
     # descends from packagepolicy.setModes to honor varying modes
-    # between different capsules sharing a path
+    # between different capsules sharing a path; also to set mtime
+    # on capsules
     def do(self):
-        for filename, package, _, _, mode in self.recipe._iterCapsulePathData():
+        for filename, package, _, _, mode, mtime in self.recipe._iterCapsulePathData():
             mode = stat.S_IMODE(mode)
             for pkg in self.recipe.autopkg.findComponents(filename):
                 if pkg.getName() == package:
                     f = pkg.getFile(filename)
                     f.inode.perms.set(mode)
+                    if f.inode.mtime() != mtime:
+                        f.inode.mtime.set(mtime)
         # For any other paths, fall through to superclass
         packagepolicy.setModes.do(self)
 
@@ -135,7 +138,7 @@ class Ownership(packagepolicy.Ownership):
     # descends from packagepolicy.Ownership to honor varying Ownership
     # between different capsules sharing a path
     def do(self):
-        for filename, package, user, group, _ in self.recipe._iterCapsulePathData():
+        for filename, package, user, group, _, _ in self.recipe._iterCapsulePathData():
             for pkg in self.recipe.autopkg.findComponents(filename):
                 if pkg.getName() == package:
                     f = pkg.getFile(filename)

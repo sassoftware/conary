@@ -563,7 +563,7 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group, _, _, _, _, _, _, _) in ownerList:
+                for (path, user, group, _, _, _, _, _, _, _, _) in ownerList:
                     if user != 'root' or group != 'root':
                         # trim off the leading / (or else path.joining it with
                         # self.dir will result in /dir//foo -> /foo.
@@ -1476,14 +1476,14 @@ class addCapsule(_Source):
         Config = []
 
         for (path, user, group, mode, size, 
-             rdev, flags, vflags, digest, filelinktos) in ownerList:
+             rdev, flags, vflags, digest, filelinktos, mtime) in ownerList:
 
 
             totalPathList.append(path)
             # CNY-3304: some RPM versions allow impossible modes on symlinks
             if stat.S_ISLNK(mode):
                 mode |= 0777
-            totalPathData.append((path, user, group, mode, digest))
+            totalPathData.append((path, user, group, mode, digest, mtime))
 
             devtype = None
             if stat.S_ISBLK(mode):
@@ -2412,6 +2412,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
                                     h[rpmhelper.FILEVERIFYFLAGS],
                                     h[rpmhelper.FILEDIGESTS],
                                     h[rpmhelper.FILELINKTOS],
+                                    h[rpmhelper.FILEMTIMES],
                                     ))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
