@@ -19,6 +19,8 @@ Changes in @NEW@:
     * Encapsulated symbolic links are represented as having the mode
       that will exist on the filesystem, even if that varies from the
       mode recorded in the capsule. (CNY-3304)
+    * getTroveLeavesByPath() didn't return leaves; it returned the most
+      recent trove which includes that path
 
   o Internal Changes:
     * Database connection objects now have a close_fork() method that

@@ -2439,6 +2439,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not roleIds:
             return {}
 
+        if all:
+            latestClause = ''
+        else:
+            latestClause ="""JOIN LatestCache on
+            Nodes.itemId = LatestCache.itemId and
+            Nodes.versionId = LatestCache.versionId and
+            Instances.flavorId = LatestCache.flavorId and
+            ugi.userGroupId = LatestCache.userGroupId"""
+
         schema.resetTable(cu, 'tmpFilePaths')
         for row, path in enumerate(pathList):
             dirname, basename = os.path.split(path)
@@ -2467,6 +2476,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN Labels on LabelMap.labelId = Labels.labelId
         JOIN UserGroupInstancesCache as ugi on
             Instances.instanceId = ugi.instanceId
+        %s
         JOIN Items on Instances.itemId = Items.itemId
         JOIN Versions on Instances.versionId = Versions.versionId
         JOIN Flavors on Instances.flavorId = Flavors.flavorId
@@ -2474,7 +2484,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
           AND Instances.isPresent = %d
           AND Labels.label = ?
         ORDER BY Nodes.finalTimestamp DESC
-        """ % (",".join("%d" % x for x in roleIds),
+        """ % (latestClause, ",".join("%d" % x for x in roleIds),
                instances.INSTANCE_PRESENT_NORMAL)
         cu.execute(query, label)
 
