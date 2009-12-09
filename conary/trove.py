@@ -119,6 +119,9 @@ class TroveMtimes(list, streams.InfoStream):
         assert(self == base)
         self.thaw(diff)
 
+    def __eq__(self, other, skipSet = None):
+        return list.__eq__(self, other)
+
     def __init__(self, frz = None):
         if frz:
             self.thaw(frz)
