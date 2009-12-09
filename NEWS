@@ -6,6 +6,8 @@ Changes in @NEW@:
       (CNY-3234)
     * When running an external entitlement generator, use /dev/null for
       stdin instead of closing the file descriptor
+    * getTroveLeavesByPath() didn't return leaves; it returned the most
+      recent trove which includes that path
 
 Changes in 2.0.50:
   o Bug Fixes:
