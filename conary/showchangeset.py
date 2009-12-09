@@ -43,7 +43,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                      # file options
                      ls = False, lsl = False, ids = False, sha1s = False,
                      tags = False, fileDeps = False, fileVersions = False,
-                     fileFlavors = False,
+                     fileFlavors = False, capsules = False,
                      # collection options
                      showTroves = False, recurse = None, showAllTroves = False,
                      weakRefs = False, showTroveFlags = False,
@@ -94,7 +94,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                              )
         dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
                             fileDeps=fileDeps, fileVersions=fileVersions,
-                            fileFlavors=fileFlavors)
+                            fileFlavors=fileFlavors, capsules=capsules)
 
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:

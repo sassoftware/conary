@@ -208,9 +208,43 @@ class Database(BaseDatabase):
         self.closed = False
         return True
 
+    def close_fork(self):
+        if hasattr(self.dbh, 'close_fork'):
+            self.dbh.close_fork()
+            self.dbh = None
+        self.close()
+
     def itercursor(self):
         assert (self.dbh)
         return self.iterCursorClass(self.dbh)
+
+    def DISABLE_disableTableConstraints(self, tableName):
+        class ConstraintEnableClass:
+
+            def __init__(self, cu, tableName, oldVals):
+                self.cu = cu
+                self.tableName = tableName
+                self.oldVals = oldVals
+
+            def enable(self):
+                for (oid, val) in self.oldVals:
+                    cu.execute("update pg_trigger SET tgenabled='%s' "
+                               "WHERE oid=%d" % (val, oid))
+
+        cu = self.dbh.cursor()
+        tableName = tableName.lower()
+
+        cu.execute("SELECT pg_trigger.oid, pg_trigger.tgenabled FROM pg_class "
+                   "    JOIN pg_trigger ON (pg_trigger.tgrelid = pg_class.oid)"
+                   "    WHERE relname='%s' AND "
+                   "    pg_trigger.tgisconstraint=True" % tableName)
+        oldVals = [ tuple(x) for x in cu ]
+        if oldVals:
+            cu.execute("UPDATE pg_trigger SET tgenabled='D' WHERE "
+                       "pg_trigger.oid IN (%s)"
+                        % ",".join("%d" % x[0] for x in oldVals ))
+
+        return ConstraintEnableClass(cu, tableName, oldVals)
 
     def loadSchema(self):
         BaseDatabase.loadSchema(self)

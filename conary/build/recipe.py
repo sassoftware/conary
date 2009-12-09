@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -38,6 +38,7 @@ RECIPE_TYPE_GROUP     = 3
 RECIPE_TYPE_INFO      = 4
 RECIPE_TYPE_REDIRECT  = 5
 RECIPE_TYPE_FACTORY   = 6
+RECIPE_TYPE_CAPSULE   = 7
 
 class _policyUpdater:
     def __init__(self, theobject):
@@ -65,6 +66,9 @@ def isRedirectRecipe(recipeClass):
 
 def isFactoryRecipe(recipeClass):
     return recipeClass.getType() == RECIPE_TYPE_FACTORY
+
+def isCapsuleRecipe(recipeClass):
+    return recipeClass.getType() == RECIPE_TYPE_CAPSULE
 
 def loadMacros(paths):
     '''
@@ -137,6 +141,11 @@ class Recipe(object):
         self.methodDepth = 0
         self._pathTranslations = []
         self._repos = None
+        self._capsulePathMap = {}
+        self._capsulePackageMap = {}
+        self._capsuleDataMap = {}
+        self._capsules = {}
+
         # Metadata is a hash keyed on a trove name and with a list of
         # per-trove-name MetadataItem like objects (well, dictionaries)
         self._metadataItemsMap = {}
@@ -684,8 +693,7 @@ class Recipe(object):
                         "%s" % (sysroot, '\n'.join(sorted(missingCrossReqs))))
             if raiseError:
                 log.error(err)
-                raise RecipeDependencyError(
-                                            'unresolved build dependencies')
+                raise RecipeDependencyError('unresolved build dependencies')
             else:
                 log.warning(err)
         self.buildReqMap = reqMap
@@ -847,3 +855,64 @@ class Recipe(object):
         setattr(self, attr, list(buildReqs))
         self._recipeRequirements['%sSuper' %attr] = superBuildReqs
 
+
+    def _validatePathInfoForCapsule(self, fileData, ignorePaths=set()):
+        for fileName, fileDatum in [(x[0], x[1:]) for x in fileData
+                                    if x[0] not in ignorePaths and
+                                       x[0] in self._capsuleDataMap]:
+            oldDatum, _ = self._capsuleDataMap[fileName][-1]
+            if oldDatum != fileDatum:
+                self.reportErrors(
+                    'file %s added with conflicting contents:'
+                    ' %s:%s 0%0o %s %d != %s:%s 0%0o %s %d',
+                    *((fileName,)+oldDatum+fileDatum))
+
+    def _setPathInfoForCapsule(self, capsulePath, fileData, packageName):
+        '''creates a map of contained filePaths to the capsule'''
+        for fileDatum in fileData:
+            fileName = fileDatum[0]
+            fileInfo = fileDatum[1:6]
+            l = self._capsuleDataMap.setdefault(fileName, [])
+            l.append((fileInfo, packageName))
+        for path in [x[0] for x in fileData]:
+            l = self._capsulePathMap.setdefault(path, [])
+            l.append(capsulePath)
+
+    def _getCapsulePathsForFile(self, path):
+        '''returns list of paths to capsule files from which this path came'''
+        return self._capsulePathMap.get(path)
+
+    def _addCapsule(self, capsulePath, capsuleType, capsulePackage):
+        '''records a capsule associated with recipe'''
+        self._capsules[capsulePackage] = (capsuleType, capsulePath)
+        self._capsulePackageMap[capsulePath] = capsulePackage
+
+    def _getCapsulePackage(self, capsulePath):
+        '''returns the capsule package:component associated with a capsule path'''
+        return self._capsulePackageMap.get(capsulePath)
+
+    def _getCapsule(self, capsulePackage):
+        '''returns the type and path to file for a capsule'''
+        return self._capsules.get(capsulePackage)
+
+    def _hasCapsulePackage(self, capsulePackage):
+        return capsulePackage in self._capsules
+
+    def _iterCapsulePaths(self):
+        '''
+        yields a (filePath, capsulePath, 'package:component') tuple
+        for each file in each capsule that has been added
+        '''
+        for filePath, capsuleList in self._capsulePathMap.iteritems():
+            for capsulePath in capsuleList:
+                yield filePath, capsulePath, self._getCapsulePackage(capsulePath)
+
+    def _iterCapsulePathData(self):
+        '''
+        yields a (filePath, package, user, group, mode, mtime) tuple
+        for each file in each capsule that has been added
+        '''
+        for fileName, fileData in self._capsuleDataMap.iteritems():
+            for fileDatum in fileData:
+                fileInfo, package = fileDatum
+                yield fileName, package, fileInfo[0], fileInfo[1], fileInfo[2], fileInfo[4]

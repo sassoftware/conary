@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -409,5 +409,6 @@ class FixDirModes(policy.Policy):
     def doFile(self, path):
         fullpath = self.macros.destdir + path
 	mode = os.lstat(fullpath)[stat.ST_MODE]
-	self.recipe.setModes(mode, path)
+        if not self.recipe._getCapsulePathsForFile(path):
+            self.recipe.setModes(mode, path)
 	os.chmod(fullpath, mode | 0700)

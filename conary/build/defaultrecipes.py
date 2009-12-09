@@ -1,3 +1,17 @@
+#
+# Copyright (c) 2009 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
 BaseRequiresRecipe = '''
 class BaseRequiresRecipe(Recipe):
     """
@@ -513,6 +527,49 @@ DerivedPackageRecipe = '''class DerivedPackageRecipe(AbstractDerivedPackageRecip
     name = 'derivedpackage'
     internalAbstractBaseClass = 1'''
 
+CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe):
+    """
+    NAME
+    ====
+    B{C{CapsuleRecipe}} - Build Capsule packages
+
+    SYNOPSIS
+    ========
+
+    C{CapsuleRecipe} is used to create a package that contains an unmodified,
+    foreign package.
+
+    DESCRIPTION
+    ===========
+
+    The C{CapsuleRecipe} class provides an interface to create a capsule 
+    package.  A capsule package encapsulates an unmodified, foreign package that
+    is created by another packaging system.  Currently only RPM is supported.
+    When a capsule package is installed or updated, the actual install or update
+    is done by Conary calling the other packaging system.
+
+    EXAMPLE
+    =======
+    A sample class that uses CapsuleRecipe to create a Conary capsule package
+    containing a single RPM
+
+        class ExamplePackage(CapsuleRecipe):
+            name = 'example'
+            version = '1.0'
+
+            def setup(r):
+                r.addCapsule('foo.rpm')
+    """
+    name = 'capsule'
+    internalAbstractBaseClass = 1
+    buildRequires = [
+        'bzip2:runtime',
+        'gzip:runtime',
+        'tar:runtime',
+        'cpio:runtime',
+        'patch:runtime',
+    ]'''
+
 recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'package': 'PackageRecipe',
                'buildpackage': 'BuildPackageRecipe',
@@ -524,6 +581,7 @@ recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'group': 'GroupRecipe',
                'redirect': 'RedirectRecipe',
                'fileset': 'FilesetRecipe',
+               'capsule': 'CapsuleRecipe',
                }
 
 packageNames = dict([(x[1], x[0]) for x in recipeNames.iteritems()])

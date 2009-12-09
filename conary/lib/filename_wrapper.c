@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2008 rPath, Inc.
+ * Copyright (c) 2005-2009 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -496,3 +496,4 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
     return real_freopen(pathname, mode, stream);
 }
 
+/* vim: set sts=4 sw=4 expandtab : */

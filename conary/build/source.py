@@ -1,4 +1,4 @@
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,21 +18,21 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import itertools
-import gzip
 import os
 import re
 import shutil, subprocess
 import shlex
 import sys
 import tempfile
+import stat
 
-from conary.lib import debugger, digestlib, log, magic
+from conary.lib import debugger, digestlib, log, magic, fixedgzip as gzip
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
-from conary.build import action, errors
+from conary.build import action, errors, filter
 from conary.build.errors import RecipeFileError
-from conary.build.manifest import Manifest
+from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
 
 class _AnySource(action.RecipeAction):
@@ -40,7 +40,11 @@ class _AnySource(action.RecipeAction):
         pass
     # marks classes which have source files which need committing
 
-DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'zip')
+# This provides the set (and order) in which the suffix is guessed
+# Logically, .tar.xz ought to go first because it is smallest, but we
+# should wait until it is more prevalent before moving it to the front
+# of the list; we should also look for instances of .txz
+DEFAULT_SUFFIXES =  ('tar.bz2', 'tar.gz', 'tbz2', 'tgz', 'tar.xz', 'zip')
 
 class _Source(_AnySource):
     keywords = {'rpm': '',
@@ -96,9 +100,15 @@ class _Source(_AnySource):
         recipe.sourceMap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
 
-        if self.package:
-            self.package = self.package % recipe.macros
-            self.manifest = Manifest(package=self.package, recipe=recipe)
+        self.manifest = None
+
+    def _initManifest(self):
+        assert self.package
+        assert not self.manifest
+
+        self.package = self.package % self.recipe.macros
+        self.manifest = Manifest(package=self.package, recipe=self.recipe)
+        self.manifest.walk()
 
     def doPrep(self):
         if self.debug:
@@ -119,12 +129,8 @@ class _Source(_AnySource):
             self._extractFromRPM()
 
     def doAction(self):
-	self.builddir = self.recipe.macros.builddir
-        if self.package:
-            self.manifest.walk()
-	action.RecipeAction.doAction(self)
-        if self.package:
-            self.manifest.create()
+        self.builddir = self.recipe.macros.builddir
+        action.RecipeAction.doAction(self)
 
     def _addSignature(self, filename):
         sourcename=self.sourcename
@@ -491,7 +497,7 @@ class addArchive(_Source):
         but can reasonably be set to C{"control.tar"} to instead choose the
         archive containing the scripts.
         """
-	_Source.__init__(self, recipe, *args, **keywords)
+        _Source.__init__(self, recipe, *args, **keywords)
 
     def doDownload(self):
 	return self._findSource(self.httpHeaders)
@@ -518,8 +524,12 @@ class addArchive(_Source):
 
     def do(self):
         f = self.doDownload()
+        Ownership  = {}
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                         defaultDir=self.builddir)
+
+        if self.package:
+            self._initManifest()
 
         if self.preserveOwnership and \
            not(destDir.startswith(self.recipe.macros.destdir)):
@@ -540,6 +550,7 @@ class addArchive(_Source):
 
         util.mkdirChain(destDir)
 
+        log.info('unpacking archive %s' %os.path.basename(f))
 	if f.endswith(".zip") or f.endswith(".xpi") or f.endswith(".jar") or f.endswith(".war"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for xpi or zip archives')
@@ -552,20 +563,14 @@ class addArchive(_Source):
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
             if self.preserveOwnership:
-                for (path, user, group) in ownerList:
-                    # trim off the leading / (or else path.joining it with
-                    # self.dir will result in /dir//foo -> /foo.
-                    path = path.lstrip('/')
-                    # FIXME: this should be refactored to remove duplicate
-                    # code below
-                    path = util.normpath(os.path.join(self.dir, path))
-                    # we have to anchor the filter ourselves because
-                    # re.escape('/foo') -> '\\/foo'.  Since this doesn't
-                    # start with '/', the filter will not be anchored.
-                    # we can put the trailing $ in too, just to make sure
-                    # that we only apply this ownership to an exact match
-                    # (in case somehow a path has a trailing /)
-                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path).replace('%', '%%'))
+                for (path, user, group, _, _, _, _, _, _, _, _) in ownerList:
+                    if user != 'root' or group != 'root':
+                        # trim off the leading / (or else path.joining it with
+                        # self.dir will result in /dir//foo -> /foo.
+                        path = path.lstrip('/')
+                        path = util.normpath(os.path.join(self.dir, path))
+                        d = Ownership.setdefault((user, group),[])
+                        d.append(path)
         elif f.endswith(".iso"):
             if self.preserveOwnership:
                 raise SourceError('cannot preserveOwnership for iso images')
@@ -609,6 +614,9 @@ class addArchive(_Source):
                 elif debData.endswith('.bz2'):
                     _uncompress = "bzip2 -d -c"
                     actionPathBuildRequires.append('bzip2')
+                elif debData.endswith('.xz'):
+                    _uncompress = "xz -d -c"
+                    actionPathBuildRequires.append('xz')
                 else:
                     # data.tar?  Alternatively, yet another
                     # compressed format that we need to add
@@ -619,14 +627,17 @@ class addArchive(_Source):
             if isinstance(m, magic.bzip) or f.endswith("bz2"):
                 _uncompress = "bzip2 -d -c"
                 actionPathBuildRequires.append('bzip2')
+            if isinstance(m, magic.xz) or f.endswith('xz'):
+                _uncompress = 'xz -d -c'
+                actionPathBuildRequires.append('xz')
             elif isinstance(m, magic.gzip) or f.endswith("gz") \
                    or f.endswith(".Z"):
                 _uncompress = "gzip -d -c"
                 actionPathBuildRequires.append('gzip')
 
             # There are things we know we know...
-            _tarSuffix  = ["tar", "tgz", "tbz2", "taZ",
-                           "tar.gz", "tar.bz2", "tar.Z"]
+            _tarSuffix  = ['tar', 'tgz', 'tbz2', 'txz', 'taZ',
+                           'tar.gz', 'tar.bz2', '.tar.xz', 'tar.Z']
             _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
 
             if True in [f.endswith(x) for x in _tarSuffix]:
@@ -683,10 +694,10 @@ class addArchive(_Source):
 
             if ownerParser and self.preserveOwnership:
                 for (path, user, group) in ownerParser(output):
-                    # FIXME: this should be refactored to remove duplicate
-                    # code above
-                    path = util.normpath(os.path.join(self.dir, path))
-                    self.recipe.Ownership(user, group, '^%s$' %re.escape(path).replace('%', '%%'))
+                    if user != 'root' or group != 'root':
+                        path = util.normpath(os.path.join(self.dir, path))
+                        d = Ownership.setdefault((user, group),[])
+                        d.append(path)
 
         if guessMainDir:
             bd = self.builddir
@@ -720,6 +731,13 @@ class addArchive(_Source):
                     self.recipe.mainDir(oldMainDir)
             else:
                 self.recipe.mainDir(oldMainDir)
+        if self.package:
+            self.manifest.create()
+
+        for key, pathList in Ownership.items():
+            user, group = key
+            self.recipe.Ownership(user, group, filter.PathSet(pathList))
+
         return f
 Archive = addArchive
 
@@ -1024,6 +1042,8 @@ class addPatch(_Source):
 	    provides = "zcat"
 	elif self.sourcename.endswith(".bz2"):
 	    provides = "bzcat"
+	elif self.sourcename.endswith(".xz"):
+	    provides = "xzcat"
         self._addActionPathBuildRequires([provides])
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
@@ -1245,10 +1265,14 @@ class addSource(_Source):
         return f
 
     def do(self):
+        if self.package:
+            self._initManifest()
         # make sure the user gave a valid source, and not a directory
-        if not os.path.basename(self.sourcename) and not self.contents:
+        baseFileName = os.path.basename(self.sourcename)
+        if not baseFileName and not self.contents:
             raise SourceError('cannot specify a directory as input to '
                 'addSource')
+        log.info('adding source file %s' %baseFileName)
 
         defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
@@ -1279,7 +1303,277 @@ class addSource(_Source):
             os.chmod(destFile, self.mode)
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
+        if self.package:
+            self.manifest.create()
+
 Source = addSource
+
+
+class addCapsule(_Source):
+
+    """
+    NAME
+    ====
+
+    B{C{r.addCapsule()}} - Add an encapsulated file
+
+    SYNOPSIS
+    ========
+    C{r.addCapsule(I{capsulename}, [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{mode}=,] [I{package}=,] [I{sourceDir}=,] I{ignoreConflictingPaths}=])}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.addCapsule()} class adds an encapsulated file to the package.
+
+    KEYWORDS
+    ========
+
+    The following keywords are recognized by C{r.addCapsule}:
+
+    B{dir} : The directory in which to store the file, relative to the build
+    directory. An absolute C{dir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{dir} value will be considered
+    relative to C{%(builddir)s}. Defaults to storing file directly in the
+    build directory.
+
+    B{keyid} : Using the C{keyid} keyword indicates the eight-digit
+    GNU Privacy Guard (GPG) key ID, without leading C{0x} for the
+    source code archive signature should be sought, and checked.
+    If you provide the C{keyid} keyword, C{r.addCapsule} will
+    search for a file named I{sourcename}C{.{sig,sign,asc}}, and
+    ensure it is signed with the appropriate GPG key. A missing signature
+    results in a warning; a failed signature check is fatal.
+
+    B{mode}: If set, provides the mode to set on the file.
+
+    B{httpHeaders} : A dictionary containing a list of headers to send with
+    the http request to download the source archive.  For example, you could
+    set Authorization credentials, fudge a Cookie, or, if direct links are
+    not allowed for some reason (e.g. a click through EULA), a Referer can
+    be provided.
+
+    B{package} : (None) If set, must be a string that specifies the package
+    (C{package='packagename'}), component (C{package=':componentname'}), or
+    package and component (C{package='packagename:componentname'}) in which
+    to place the files added while executing this command. If not specified,
+    the default componentname is C{:rpm}. Previously-specified C{PackageSpec}
+    or C{ComponentSpec} lines will override the package specification, since
+    all package and component specifications are considered in strict order as
+    provided by the recipe
+
+    B{sourceDir} : Instructs C{r.addCapsule} to look in the directory
+    specified by C{sourceDir} for the file to install.
+    An absolute C{sourceDir} value will be considered relative to
+    C{%(destdir)s}, whereas a relative C{sourceDir} value will be
+    considered relative to C{%(builddir)s}.
+
+    B{ignoreConflictingPaths} : A list of paths in which C{r.addCapsule} will
+    not check files for conflicting contents.
+
+    EXAMPLES
+    ========
+
+    The following examples demonstrate invocations of C{r.addCapsule}
+    from within a recipe:
+
+    C{r.addCapsule('foo.rpm')}
+
+    The example above is a typical, simple invocation of C{r.addCapsule()}
+    which adds the file C{foo.rpm} as a capsule file and creates the C{:rpm}
+    component
+    """
+
+    keywords = {'ignoreConflictingPaths': set(),
+               }
+
+    def __init__(self, recipe, *args, **keywords):
+        """
+        @param recipe: The recipe object currently being built is provided
+        automatically by the PackageRecipe object. Passing in C{recipe} from
+        within a recipe is unnecessary.
+        @keyword dir: The directory in which to store the file, relative to
+        the build directory. An absolute C{dir} value will be considered
+        relative to C{%(destdir)s}, whereas a relative C{dir} value will be
+        considered relative to C{%(builddir)s}. Defaults to storing file
+        directly in the build directory.
+        @keyword keyid: Using the C{keyid} keyword indicates the eight-digit GNU
+        Privacy Guard (GPG) key ID, without leading C{0x} for the source code
+        archive signature should be sought, and checked. If you provide the
+        C{keyid} keyword, C{r.addCapsule} will search for a file named
+        I{sourcename}C{.{sig,sign,asc}}, and ensure it is signed with the
+        appropriate GPG key. A missing signature results in a warning; a
+        failed signature check is fatal.
+        @keyword mode: If set, provides the mode to set on the file.
+        @keyword httpHeaders: A dictionary containing headers to add to an http
+        request when downloading the source code archive.
+        @keyword package: A string that specifies the package, component, or
+        package and component in which to place the files added while executing
+        this command
+        @keyword sourceDir: A directory in which C{r.addCapsule} will search
+        for files.
+        @keyword ignoreConflictingPaths: A list of paths that will not be
+        checked for conflicting file contents
+        """
+        _Source.__init__(self, recipe, *args, **keywords)
+        self.capsuleType = None
+
+    def _initManifest(self):
+        assert self.package
+        assert not self.manifest
+
+        self.package = self.package % self.recipe.macros
+        self.manifest = ExplicitManifest(package=self.package, recipe=self.recipe)
+
+    def doDownload(self):
+        f = self._findSource()
+
+        # identify the capsule type
+        m = magic.magic(f)
+        if m is None:
+            raise SourceError('unknown capsule type for file %s', f)
+        if self.capsuleType is None:
+            self.capsuleType = m.name.lower()
+
+        # here we guarantee that package contains a package:component
+        # designation.  This is required for _addComponent().
+        pname = m.contents['name']
+        if self.package is None:
+            self.package = pname + ':' + self.capsuleType
+        else:
+            p,c = self.package.split(':')
+            if not p:
+                p = pname
+            if not c:
+                c = self.capsuleType
+            self.package = '%s:%s' % (p,c)
+        return f
+
+    def do(self):
+        # make sure the user gave a valid source, and not a directory
+        baseFileName = os.path.basename(self.sourcename)
+        if not baseFileName and not self.contents:
+            raise SourceError('cannot specify a directory as input to '
+                '%s' % self.__class__)
+        log.info('adding capsule %s' %baseFileName)
+
+        # normally destDir defaults to builddir (really) but in this
+        # case it is actually macros.destdir
+        destDir = self.recipe.macros.destdir
+
+        f = self.doDownload()
+        # If we just now figured out the package:component, we need to
+        # initialize the manifest
+        self._initManifest()
+
+        # read ownership, permissions, file type, etc.
+        ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
+
+        totalPathList=[]
+        totalPathData=[]
+        ExcludeDirectories = [] 
+        InitialContents = []
+        Config = []
+        MissingOkay = []
+
+        for (path, user, group, mode, size, 
+             rdev, flags, vflags, digest, filelinktos, mtime) in ownerList:
+
+
+            totalPathList.append(path)
+            # CNY-3304: some RPM versions allow impossible modes on symlinks
+            if stat.S_ISLNK(mode):
+                mode |= 0777
+            totalPathData.append((path, user, group, mode, digest, mtime))
+
+            devtype = None
+            if stat.S_ISBLK(mode):
+                devtype = 'b'
+            elif stat.S_ISCHR(mode):
+                devtype = 'c'
+            if devtype:
+                minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
+                major = (rdev >> 8) & 0xfff
+                self.recipe.MakeDevices(path, devtype, major, minor, 
+                                        user, group, mode=stat.S_IMODE(mode),
+                                        package=self.package)
+
+            if stat.S_ISDIR(mode):
+                fullpath = os.sep.join((destDir, path))
+                util.mkdirChain(fullpath)
+                ExcludeDirectories.append( path )
+            else:
+                if flags & rpmhelper.RPMFILE_GHOST:
+                    InitialContents.append(path)
+                    # RPM does not actually create Ghost files but
+                    # we need them for policy
+                    fullpath = os.sep.join((destDir, path))
+                    util.mkdirChain(os.path.dirname(fullpath))
+                    if stat.S_ISREG(mode):
+                        file(fullpath, 'w')
+                    elif stat.S_ISLNK(mode):
+                        if not filelinktos:
+                            raise SourceError, 'Ghost Symlink in RPM has no target'
+                        os.symlink(filelinktos, fullpath)
+                    elif stat.S_ISFIFO(mode):
+                        os.mkfifo(fullpath)
+                    else:
+                        raise SourceError, 'Unknown Ghost Filetype defined in RPM'
+                elif flags & (rpmhelper.RPMFILE_CONFIG |
+                              rpmhelper.RPMFILE_MISSINGOK |
+                              rpmhelper.RPMFILE_NOREPLACE):
+                    if size:
+                        Config.append(path)
+                    else:
+                        InitialContents.append(path)
+                elif vflags:
+                    # CNY-3254: improve verification mapping; %doc are regular
+                    if (stat.S_ISREG(mode) and \
+                            not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) or \
+                            (stat.S_ISLNK(mode) and \
+                             not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
+                        InitialContents.append( path )
+
+                if flags & rpmhelper.RPMFILE_MISSINGOK:
+                    MissingOkay.append(path)
+
+        if len(ExcludeDirectories):
+            self.recipe.ExcludeDirectories(exceptions=filter.PathSet(
+                ExcludeDirectories))
+
+        if len(InitialContents):
+            self.recipe.InitialContents(filter.PathSet(InitialContents))
+
+        if len(Config):
+            self.recipe.Config(filter.PathSet(Config))
+
+        if len(MissingOkay):
+            self.recipe.MissingOkay(filter.PathSet(MissingOkay))
+
+        self.manifest.recordRelativePaths(totalPathList)
+        self.manifest.create()
+        self.recipe._validatePathInfoForCapsule(totalPathData,
+            self.ignoreConflictingPaths)
+        self.recipe._setPathInfoForCapsule(f, totalPathData, self.package)
+
+        self.recipe._addCapsule(f, self.capsuleType, self.package)
+
+    def checkSignature(self, filepath):
+        if self.keyid:
+            key = self._getPublicKey()
+            validKeys = [ key ]
+        else:
+            validKeys = None
+
+        rpmFileObj = util.ExtendedFile(filepath, buffering = False)
+
+        try:
+            rpmhelper.verifySignatures(rpmFileObj, validKeys)
+        except rpmhelper.SignatureVerificationError, e:
+            raise SourceError, str(e)
+
+        log.info('GPG signature for %s is OK', os.path.basename(filepath))
+
 
 class addAction(action.RecipeAction):
     """
@@ -1358,12 +1652,8 @@ class addAction(action.RecipeAction):
         @keyword package: A string that specifies the package, component, or package
         and component in which to place the files added while executing this command
         """
-	action.RecipeAction.__init__(self, recipe, *args, **keywords)
-	self.action = args[0]
-
-        if self.package:
-            self.package = self.package % recipe.macros
-            self.manifest = Manifest(package=self.package, recipe=recipe)
+        action.RecipeAction.__init__(self, recipe, *args, **keywords)
+        self.action = args[0]
 
     def doDownload(self):
         return None
@@ -1374,8 +1664,9 @@ class addAction(action.RecipeAction):
         destDir = action._expandOnePath(self.dir, self.recipe.macros,
                                                   defaultDir)
         util.mkdirChain(destDir)
+
         if self.package:
-            self.manifest.walk()
+            self._initManifest()
 	util.execute(self.action %self.recipe.macros, destDir)
         if self.package:
             self.manifest.create()
@@ -2077,24 +2368,59 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     assert targetfile or directory
     if not directory:
 	directory = os.path.dirname(targetfile)
-    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
-    if targetfile:
-        if os.path.exists(targetfile):
-            os.remove(targetfile)
-	filename = os.path.basename(targetfile)
-	cpioArgs.append(filename)
-	errorMessage = 'extracting %s from RPM %s' %(
-	    filename, os.path.basename(rpm))
-    else:
-	errorMessage = 'extracting RPM %s' %os.path.basename(rpm)
-
     r = file(rpm, 'r')
     h = rpmhelper.readHeader(r)
 
-    # assemble the path/owner/group list
+    # The rest of this function gets information on the files stored
+    # in an RPM.  Some RPMs intentionally contain no files, and
+    # therefore have no files and no file-related data, but are
+    # still meaningful.
+    if not h.has_key(rpmhelper.FILEUSERNAME):
+        return []
+
+    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
+
+    # tell cpio to skip directories; we let cpio create those automatically
+    # rather than based on the cpio to make sure they aren't made with funny
+    # permissions. worst bit is that we have to use DIR, ./DIR, and /DIR
+    # because RPM is inconsistent with how it names things in the cpio ball
+
+    cpioSkipArgs = ['-f']
+    for (path, mode) in itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                       h[rpmhelper.FILEMODES]):
+        if (stat.S_ISDIR(mode) or stat.S_ISBLK(mode) or
+                stat.S_ISCHR(mode)):
+            if stat.S_ISDIR(mode):
+                util.mkdirChain(directory + path)
+            cpioSkipArgs.append(path)
+            cpioSkipArgs.append('.' + path)
+            cpioSkipArgs.append(path[1:])
+    if len(cpioSkipArgs) > 1:
+        cpioArgs.extend(cpioSkipArgs)
+
+    if targetfile:
+        if os.path.exists(targetfile):
+            os.remove(targetfile)
+        filename = os.path.basename(targetfile)
+        cpioArgs.append(filename)
+        errorMessage = 'extracting %s from RPM %s' %(
+            filename, os.path.basename(rpm))
+    else:
+        errorMessage = 'extracting RPM %s' %os.path.basename(rpm)
+
+    # assemble the path/owner/group/etc list
     ownerList = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
                                     h[rpmhelper.FILEUSERNAME],
-                                    h[rpmhelper.FILEGROUPNAME]))
+                                    h[rpmhelper.FILEGROUPNAME],
+                                    h[rpmhelper.FILEMODES],
+                                    h[rpmhelper.FILESIZES],
+                                    h[rpmhelper.FILERDEVS],
+                                    h[rpmhelper.FILEFLAGS],
+                                    h[rpmhelper.FILEVERIFYFLAGS],
+                                    h[rpmhelper.FILEDIGESTS],
+                                    h[rpmhelper.FILELINKTOS],
+                                    h[rpmhelper.FILEMTIMES],
+                                    ))
 
     uncompressed = rpmhelper.UncompressedRpmPayload(r)
     if isinstance(uncompressed, util.LZMAFile):

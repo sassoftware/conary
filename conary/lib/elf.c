@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2004-2005,2007 rPath, Inc.
+ * Copyright (c) 2004-2005, 2007, 2009 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -24,6 +24,9 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/wait.h>
+
+#include "pycompat.h"
+
 
 static PyObject * ElfError;
 
@@ -376,6 +379,77 @@ static PyObject * stripped(PyObject *self, PyObject *args) {
     return Py_False;
 }
 
+static int isPrelinked(Elf * elf) {
+    Elf_Scn * sect = NULL;
+    GElf_Shdr shdr;
+    Elf_Data * data = NULL;
+
+    while ((sect = elf_nextscn(elf, sect))) {
+	if (!gelf_getshdr(sect, &shdr)) {
+	    PyErr_SetString(ElfError, "error getting section header!");
+	    return -1;
+	}
+
+	/* skip any section that isn't DYNAMIC */
+	if (shdr.sh_type != SHT_DYNAMIC) {
+	    continue;
+	}
+
+	while ((data = elf_getdata(sect, data)) != NULL) {
+	    int entries = data->d_size / shdr.sh_entsize;
+	    int i;
+	    for (i = 0; i < entries; i++) {
+		GElf_Dyn dyn;
+		gelf_getdyn(data, i, &dyn);
+		if (dyn.d_tag == DT_GNU_PRELINKED || dyn.d_tag == DT_GNU_LIBLIST) {
+		    return 1;
+		}
+	    }
+	}
+    }
+    return 0;
+}
+
+
+static PyObject * prelinked(PyObject *self, PyObject *args) {
+    char * fileName;
+    int fd;
+    Elf * elf;
+    int rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    lseek(fd, 0, 0);
+
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    rc = isPrelinked(elf);
+    elf_end(elf);
+    close(fd);
+
+    if (rc == -1) {
+	return NULL;
+    } else if (rc) {
+	Py_INCREF(Py_True);
+	return Py_True;
+    }
+
+    Py_INCREF(Py_False);
+    return Py_False;
+}
+
+
 static int doHasDebug(Elf * elf) {
     Elf_Scn * sect = NULL;
     GElf_Ehdr ehdr;
@@ -499,7 +573,7 @@ static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
 	if (NULL == err)
 	    return PyErr_NoMemory();
 	read(p[0], err, len);
-	rc = PyString_FromStringAndSize(err, len);
+        rc = PYBYTES_FromStringAndSize(err, len);
 	free(err);
     } else {
 	/* child exited with a 0 return code, no unresolved symbols */
@@ -559,7 +633,7 @@ static PyObject *doGetSectionSymbols(Elf * elf, GElf_Word sh_type,
                  (GELF_ST_TYPE(sym.st_info) != STT_FUNC))
                 continue;
             name = elf_strptr(elf, shdr.sh_link, sym.st_name);
-            PyList_Append(rlist, PyString_FromString(name));
+            PyList_Append(rlist, PYBYTES_FromString(name));
         }
     }
     return rlist;
@@ -621,7 +695,7 @@ static PyObject *doGetRPATH(Elf * elf) {
 	}
     }
     if (NULL != runpath)
-	return PyString_FromString(runpath);
+	return PYBYTES_FromString(runpath);
     else {
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -726,6 +800,8 @@ static PyMethodDef ElfMethods[] = {
 	"inspect an ELF file for dependency information" },
     { "stripped", stripped, METH_VARARGS, 
 	"returns whether or not an ELF file has been stripped" },
+    { "prelinked", prelinked, METH_VARARGS, 
+	"returns whether or not an ELF file has been prelinked" },
     { "hasDebug", hasDebug, METH_VARARGS, 
 	"returns whether or not an ELF file has debugging info" },
     { "hasUnresolvedSymbols", hasUnresolvedSymbols, METH_VARARGS,
@@ -740,16 +816,29 @@ static PyMethodDef ElfMethods[] = {
 };
 
 
+#define MODULE_DOCSTR "provides access to elf shared library dependencies"
+
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef ElfModule = {
+    PyModuleDef_HEAD_INIT,
+    "elf",
+    MODULE_DOCSTR,
+    -1,
+    ElfMethods
+};
+#endif
+
+
 #define ADD_CONST(name) \
 PyModule_AddObject(m, #name, PyLong_FromLong(name));
 
-PyMODINIT_FUNC
-initelf(void)
+PYMODULE_INIT(elf)
 {
     PyObject* m;
 
-    m = Py_InitModule3("elf", ElfMethods, 
-                       "provides access to elf shared library dependencies");
+    m = PYMODULE_CREATE("elf", ElfMethods, MODULE_DOCSTR, &ElfModule);
+    if (m == NULL)
+        PYMODULE_RETURN(NULL);
 
     ElfError = PyErr_NewException("elf.error", PyExc_Exception, NULL);
     PyModule_AddObject(m, "error", ElfError);
@@ -762,4 +851,7 @@ initelf(void)
 
     elf_version(EV_CURRENT);
 
+    PYMODULE_RETURN(m);
 }
+
+/* vim: set sts=4 sw=4 expandtab : */

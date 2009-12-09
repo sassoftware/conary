@@ -17,8 +17,13 @@ import imp
 import modulefinder
 from modulefinder import READ_MODE
 import struct
-import subprocess
 import sys
+
+try:
+    set
+except NameError:
+    # set() was introduced in python 2.4
+    from sets import Set as set
 
 if __name__ != "__main__":
     # We may not be able to find these when being run as a program
@@ -142,6 +147,8 @@ def putData(outFile, data):
 
 class moduleFinderProxy:
     def __init__(self, pythonPath, destdir, libdir, sysPath, error):
+        # this object is always instantiated in python 2.4 or later context
+        import subprocess
         self.error = error
         environment = os.environ.copy()
         ldLibraryPath = os.getenv('LD_LIBRARY_PATH')
@@ -152,8 +159,9 @@ class moduleFinderProxy:
         ldLibraryPath[0:0] = [destdir+libdir, libdir]
         ldLibraryPath = ':'.join(ldLibraryPath)
         environment['LD_LIBRARY_PATH'] = ldLibraryPath
+        scriptFile = __file__.replace('.pyc', '.py').replace('.pyo', '.py')
         self.proxyProcess = subprocess.Popen(
-            (pythonPath, __file__),
+            (pythonPath, scriptFile),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             env=environment,
@@ -209,19 +217,31 @@ def main():
         type, path = data.split('\0', 1)
         if type == 'script':
             inspector = finder.run_script
+            sys.stderr.write('pydeps inspecting %s (%s)\n' %(path, type))
+            sys.stderr.flush()
         elif type == 'file':
             inspector = finder.load_file
+            sys.stderr.write('pydeps inspecting %s (%s)\n' %(path, type))
+            sys.stderr.flush()
         elif type == 'init':
             destdir, sysPath = path.split('\0', 1)
             sysPath = sysPath.split('\0')
             # set sys.path in order to find modules outside the bootstrap
             sys.path = sysPath
+            sys.stderr.write('pydeps bootstrap proxy initializing: '
+                             'sys.path %r\n' %sysPath)
+            sys.stderr.flush()
             finder = DirBasedModuleFinder(destdir, sysPath)
             putData(sys.stdout, 'READY')
             continue
         elif type == 'exit':
+            sys.stderr.write('dep proxy closing\n')
+            sys.stderr.flush()
             os._exit(0)
         else:
+            sys.stderr.write('dep proxy terminating:unknown type %s (%s)\n'
+                             %(type, path))
+            sys.stderr.flush()
             os._exit(2)
 
         if not path:

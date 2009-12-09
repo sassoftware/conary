@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -327,6 +327,20 @@ class URLOpener(urllib.FancyURLopener):
         # localhost as well
         if destHost in self.localhosts and proxyHost not in self.localhosts:
             return True
+
+        # From python 2.6's urllib (lynx also seems to obey NO_PROXY)
+        no_proxy = os.environ.get('no_proxy', '') or os.environ.get('NO_PROXY', '')
+        # '*' is special case for always bypass
+        if no_proxy == '*':
+            return True
+        # check if the host ends with any of the DNS suffixes
+        for name in no_proxy.split(','):
+            # urllib does not handle the case where the separator is ", ", the
+            # way the example in the following URL shows no_proxy to be set
+            # http://lynx.isc.org/lynx2.8.5/lynx2-8-5/lynx_help/keystrokes/environments.html
+            name = name.strip()
+            if name and destHost.endswith(name):
+                return True
         return False
 
     def createConnection(self, url, ssl=False, withProxy=False):

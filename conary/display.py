@@ -417,8 +417,10 @@ class DisplayConfig:
 
     def setFileDisplay(self, ls = False, lsl = False, ids = False, 
                        sha1s = False, tags = False, fileDeps = False,
-                       fileVersions = False, fileFlavors = False):
+                       fileVersions = False, fileFlavors = False,
+                       capsules = False):
         ls = ls or lsl
+        self.capsules = capsules
         self.ls = ls or lsl
         self.lsl = lsl
         self.ids = ids
@@ -512,6 +514,9 @@ class DisplayConfig:
 
     def getPristine(self):
         return True
+
+    def getOnlyCapsules(self):
+        return self.capsules
 
     def shouldGetFileContents(self, pathId, path, fileId, version, file):
         if (self.showBuildLog and 'buildlog' in file.tags):
@@ -833,7 +838,8 @@ class TroveFormatter(TroveTupFormatter):
 
         iter = troveSource.iterFilesInTrove(n, v, f,
                                             sortByPath = True,
-                                            withFiles = needFiles)
+                                            withFiles = needFiles,
+                                            capsules = dcfg.getOnlyCapsules())
         
         if dcfg.needFileContents():
             if not needFiles:

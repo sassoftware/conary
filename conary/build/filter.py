@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -136,3 +136,23 @@ class Filter:
 	    return 1
 
 	return 0
+
+
+class PathSet(set):
+    '''
+    This class implements an interface sufficiently similar to
+    a regular expression object to use for filters, but looks up
+    strings in a set of matches rather than compiling a regular
+    expression.  This is used when the matches are generated from
+    specific files in the filesystem, and is not made directly
+    available in recipes.  It will be generally faster than using
+    a regular expression, and some versions of python are built
+    with limitations on the complexity of regular expressions that
+    raise OverflowError for regular expressions of complexity seen
+    in real packages.
+    '''
+    def match(self, string):
+        return string in self
+    search = match
+    def __call__(self):
+        return self

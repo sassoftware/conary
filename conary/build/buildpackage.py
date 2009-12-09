@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -92,7 +92,7 @@ class BuildComponent(dict):
                 l.append(path)
                 self.linkGroups[inode] = l
                 # add to list to check for config files later
-                self.hardlinks.append(path)
+                self.hardlinkMap[path] = l
             else:
                 if not isinstance(f, files.Directory):
                     # no hardlinks allowed for special files other than dirs
@@ -152,7 +152,8 @@ class BuildComponent(dict):
         return self.recipe.suppmap
 
     def __init__(self, name, recipe):
-	self.name = name
+        self.name = name
+
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
         self.provides.addDep(deps.TroveDependencies, deps.Dependency(name))
@@ -160,7 +161,7 @@ class BuildComponent(dict):
         self.linkGroups = {}
         self.requiresMap = {}
         self.providesMap = {}
-        self.hardlinks = []
+        self.hardlinkMap = {}
         self.badhardlinks = []
         self.recipe = recipe
 	dict.__init__(self)
@@ -181,6 +182,8 @@ class AutoBuildPackage:
 	"""
 	self.pkgFilters = pkgFilters
         self.compFilters = compFilters
+        self.recipe = recipe
+
         # dictionary of all the components
         self.components = {}
         # reverse map from the package:component combination to
@@ -198,6 +201,8 @@ class AutoBuildPackage:
 	self.pathMap = {}
 	# dictionary from pathnames to packages
 	self.componentMap = {}
+        # dictionary from pathnames to lists of packages (capsules)
+        self.pathComponentMap = {}
 
     def _getname(self, pkgname, compname):
         return ':'.join((pkgname, compname))
@@ -215,29 +220,56 @@ class AutoBuildPackage:
 			self.componentMap[path] = self.packageMap[main][comp]
                         return self.componentMap[path]
         return None
+
+    def findComponents(self, path, mode=None):
+        """
+	Return the BuildComponents that match the path.
+	"""
+        if path in self.pathComponentMap:
+            return self.pathComponentMap[path]
+        pkg = self.findComponent(path, mode)
+        if pkg is not None:
+            return [pkg]
+
+        return None
     
     def updateFileContents(self, path, realPath):
         """
         Update contents information, including sha1 and contents
         """
         f = self.pathMap[path]
+        assert(len(self.pathComponentMap[path]) == 1) # not payload
         assert(f.hasContents and isinstance(f, files.RegularFile))
         sha1 = sha1helper.sha1FileBin(realPath)
         size = os.lstat(realPath).st_size
         f.contents.size.set(size)
         f.contents.sha1.set(sha1)
 
-    def addFile(self, path, realPath):
+    def addFile(self, path, realPath, componentName=None):
         """
         Add a path to the correct BuildComponent instance by matching
-        the file name against the package and component filters
+        the file name against the package and component filters, or
+        to the named component.
 
         @param path: path to add to the BuildComponent
         @type path: str
+        @param componentName: optional name of component to use instead of
+        looking up the name
+        @type componentName: str
         @rtype: None
         """
-        pkg = self.findComponent(path)
-        self.pathMap[path] = pkg.addFile(path, realPath)
+        if componentName is not None:
+            pkg = self.components[componentName]
+            self.componentMap[path] = pkg
+        else:
+            pkg = self.findComponent(path)
+        fileObj = pkg.addFile(path, realPath)
+        self._addPackageMaps(path, fileObj, pkg)
+
+    def _addPackageMaps(self, path, fileObj, pkg):
+        self.pathMap[path] = fileObj
+        l = self.pathComponentMap.setdefault(path, [])
+        l.append(pkg)
 
     def delFile(self, path):
         """
@@ -247,20 +279,24 @@ class AutoBuildPackage:
         @type path: str
         @rtype: None
         """
+        assert(len(self.pathComponentMap[path]) == 1) # not payload
 	del self.componentMap[path][path]
 	del self.componentMap[path]
 	del self.pathMap[path]
 
     def addDevice(self, path, devtype, major, minor,
-                  owner='root', group='root', perms=0660):
+                  owner='root', group='root', perms=0660, package=None):
         """
         Add a device to the correct BuildComponent instance by matching
         the file name against the package and component filters
         """
-        pkg = self.findComponent(path, mode=perms)
+        if package is not None:
+            pkg = self.components[package]
+        else:
+            pkg = self.findComponent(path, mode=perms)
         f = pkg.addDevice(path, devtype, major, minor, owner, group, perms)
-	self.pathMap[path] = f
 	self.componentMap[path] = pkg
+        self._addPackageMaps(path, f, pkg)
 
     def getComponents(self):
         """
@@ -272,6 +308,8 @@ class AutoBuildPackage:
         """
         l = []
         for componentName in self.components.keys():
-            if self.components[componentName].keys(): # if has files
+            if (self.components[componentName].keys() or
+                self.recipe._hasCapsulePackage(componentName)):
+                # there are files or there is a capsule
                 l.append(self.components[componentName])
         return l

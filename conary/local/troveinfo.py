@@ -1,4 +1,4 @@
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -36,6 +36,7 @@ class TroveInfoTable:
         # anywhere
         assert(trove.troveInfo.completeFixup() is None)
         c = ':' in n and not n.endswith(':source')
+        newInfo = []
         for (tag, (size, streamType, name)) in trove.troveInfo.streamDict.iteritems():
             frz = trove.troveInfo.__getattribute__(name).freeze()
             if frz:
@@ -45,13 +46,14 @@ class TroveInfoTable:
                 if c and (tag == 4 or tag == 5):
                     raise RuntimeError('attempted to add build requires '
                                        'trove info for a component: %s' %n)
-                cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
-                           "VALUES (?, ?, ?)", (idNum, tag, cu.binary(frz)))
+                newInfo.append((idNum, tag, cu.binary(frz)))
 
         frz = trove.troveInfo.freeze(freezeKnown = False, freezeUnknown = True)
         if frz:
-            cu.execute("INSERT INTO TroveInfo (instanceId, infoType, data) "
-                       "VALUES (?, ?, ?)", (idNum, -1, cu.binary(frz)))
+            newInfo.append((idNum, -1, cu.binary(frz)))
+
+        self.db.bulkload("TroveInfo", newInfo,
+                         [ 'instanceId', 'infoType', 'data'] )
 
 
     def getInfo(self, cu, trove, idNum):

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -26,16 +26,18 @@ import stat
 import sys
 
 from conary import files, trove
-from conary.build import buildpackage, filter, policy
-from conary.build import tags, use
+from conary.build import buildpackage, filter, policy, recipe, tags, use
 from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
 
 try:
-    from elementtree import ElementTree
+    from xml.etree import ElementTree
 except ImportError:
-    ElementTree = None
+    try:
+        from elementtree import ElementTree
+    except ImportError:
+        ElementTree = None
 
 
 # Helper class
@@ -232,12 +234,18 @@ class Config(policy.Policy):
             return
         fullpath = self.macros.destdir + filename
         if os.path.isfile(fullpath) and util.isregular(fullpath):
+            if self._fileIsBinary(fullpath):
+                self.error("binary file '%s' is marked as config" % \
+                        filename)
             self._markConfig(filename, fullpath)
 
-    def _file_is_binary(self, fn):
+    def _fileIsBinary(self, fn, maxsize=None):
+        limit = os.stat(fn)[stat.ST_SIZE]
+        if maxsize is not None and limit > maxsize:
+            return True
+
         f = codecs.open(fn, 'r', 'utf-8')
         try:
-            limit = os.stat(fn)[stat.ST_SIZE]
             while f.tell() < limit:
                 try:
                     # if a file is not utf-8 or has null bytes, we'll consider
@@ -250,6 +258,27 @@ class Config(policy.Policy):
             f.close()
         return False
 
+    def _addTrailingNewline(self, filename, fullpath):
+        # FIXME: This exists only for stability; there is no longer
+        # any need to add trailing newlines to config files.  This
+        # also violates the rule that no files are modified after
+        # destdir modification has been completed.
+        self.warn("adding trailing newline to config file '%s'" % \
+                filename)
+        mode = os.lstat(fullpath)[stat.ST_MODE]
+        oldmode = None
+        if mode & 0600 != 0600:
+            # need to be able to read and write the file to fix it
+            oldmode = mode
+            os.chmod(fullpath, mode|0600)
+
+        f = open(fullpath, 'a')
+        f.seek(0, 2)
+        f.write('\n')
+        f.close()
+        if oldmode is not None:
+            os.chmod(fullpath, oldmode)
+
     def _markConfig(self, filename, fullpath):
         self.info(filename)
         f = file(fullpath)
@@ -260,25 +289,7 @@ class Config(policy.Policy):
             lastchar = f.read(1)
             f.close()
             if lastchar != '\n':
-                if self._file_is_binary(fullpath):
-                    self.error("binary file '%s' is marked as config" % \
-                            filename)
-                else:
-                    self.warn("adding trailing newline to config file '%s'" % \
-                            filename)
-                    mode = os.lstat(fullpath)[stat.ST_MODE]
-                    oldmode = None
-                    if mode & 0600 != 0600:
-                        # need to be able to read and write the file to fix it
-                        oldmode = mode
-                        os.chmod(fullpath, mode|0600)
-
-                    f = open(fullpath, "a")
-                    f.seek(0, 2)
-                    f.write('\n')
-                    f.close()
-                    if oldmode is not None:
-                        os.chmod(fullpath, oldmode)
+                self._addTrailingNewline(filename, fullpath)
 
         f.close()
         self.recipe.ComponentSpec(_config=filename)
@@ -543,6 +554,7 @@ class PackageSpec(_filterSpec):
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
             newTrove = args[0] % self.recipe.macros
+
             self.recipe.packages[newTrove] = True
         _filterSpec.updateArgs(self, *args, **keywords)
 
@@ -592,10 +604,22 @@ class PackageSpec(_filterSpec):
 	    self.pkgFilters, self.compFilters, recipe)
         self.autopkg = recipe.autopkg
 
+    def do(self):
+        # Walk capsule contents ignored by doFile
+        for filePath, capsulePath, componentName in self.recipe._iterCapsulePaths():
+            realPath = self.destdir + filePath
+            if util.exists(realPath):
+                # Files that do not exist on the filesystem (devices)
+                # are handled separately
+                self.autopkg.addFile(filePath, realPath, componentName)
+        # Walk normal files
+        _filterSpec.do(self)
+        
     def doFile(self, path):
-	# now walk the tree -- all policy classes after this require
-	# that the initial tree is built
-        self.autopkg.addFile(path, self.destdir + path)
+	# all policy classes after this require that the initial tree is built
+        if not self.recipe._getCapsulePathsForFile(path):
+            realPath = self.destdir + path
+            self.autopkg.addFile(path, realPath)
 
     def postProcess(self):
         # flag all config files
@@ -776,11 +800,13 @@ class TagDescription(policy.Policy):
 
     invariantsubtrees = [ '%(tagdescriptiondir)s/' ]
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+	fullpath = self.macros.destdir + path
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.info('conary tag file: %s', file)
-	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
+            self.info('conary tag file: %s', path)
+	    self.recipe.autopkg.pathMap[path].tags.set("tagdescription")
 
 
 class TagHandler(policy.Policy):
@@ -813,11 +839,13 @@ class TagHandler(policy.Policy):
     )
     invariantsubtrees = [ '%(taghandlerdir)s/' ]
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+	fullpath = self.macros.destdir + path
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.info('conary tag handler: %s', file)
-	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
+            self.info('conary tag handler: %s', path)
+	    self.recipe.autopkg.pathMap[path].tags.set("taghandler")
 
 
 class TagSpec(_addInfo):
@@ -897,6 +925,9 @@ class TagSpec(_addInfo):
                         self.suggestBuildRequires.add(troveName)
 
     def runInfo(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            # capsules do not participate in the tag protocol
+            return
         excludedTags = {}
         for tag in self.included:
 	    for filt in self.included[tag]:
@@ -965,7 +996,7 @@ class MakeDevices(policy.Policy):
     EXAMPLES
     ========
 
-    C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666})}
+    C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666, package=':dev'})}
 
     Creates the device node C{/dev/tty}, as type 'c' (character, as opposed to
     type 'b', or block) with a major number of '5', minor number of '0',
@@ -986,27 +1017,33 @@ class MakeDevices(policy.Policy):
 	"""
 	MakeDevices(path, devtype, major, minor, owner, group, mode=0400)
 	"""
-	if args:
+        if args:
             args = list(args)
-            if 'mode' in keywords:
-                args.append(keywords.pop('mode'))
-	    l = len(args)
-	    # mode is optional, all other arguments must be there
-	    assert((l > 5) and (l < 8))
-	    if l == 6:
-		args.append(0400)
-            args[0] = args[0] % self.recipe.macros
-	    self.devices.append(args)
-	policy.Policy.updateArgs(self, **keywords)
+            l = len(args)
+            if not ((l > 5) and (l < 9)):
+                self.recipe.error('MakeDevices: incorrect arguments: %r %r'
+                    %(args, keywords))
+            mode = keywords.pop('mode', None)
+            package = keywords.pop('package', None)
+            if l > 6 and mode is None:
+                mode = args[6]
+            if mode is None:
+                mode = 0400
+            if l > 7 and package is None:
+                package = args[7]
+            self.devices.append(
+                (args[0:6], {'perms': mode, 'package': package}))
+        policy.Policy.updateArgs(self, **keywords)
 
     def do(self):
-        for device in self.devices:
+        for device, kwargs in self.devices:
             r = self.recipe
-            r.autopkg.addDevice(*device)
             filename = device[0]
             owner = device[4]
             group = device[5]
             r.Ownership(owner, group, filename)
+            device[0] = device[0] % r.macros
+            r.autopkg.addDevice(*device, **kwargs)
 
 
 class setModes(policy.Policy):
@@ -1035,6 +1072,8 @@ class setModes(policy.Policy):
 	policy.Policy.updateArgs(self, **keywords)
 
     def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
 	if path in self.fixmodes:
 	    mode = self.fixmodes[path]
 	    # set explicitly, do not warn
@@ -1078,7 +1117,7 @@ class LinkType(policy.Policy):
     )
     def do(self):
         for component in self.recipe.autopkg.getComponents():
-            for path in component.hardlinks:
+            for path in sorted(component.hardlinkMap.keys()):
                 if self.recipe.autopkg.pathMap[path].flags.isConfig():
                     self.error("Config file %s has illegal hard links", path)
             for path in component.badhardlinks:
@@ -1148,6 +1187,8 @@ class LinkCount(policy.Policy):
         # first whether this is useful; it may not be.
 
     def do(self):
+        if self.recipe.getType() == recipe.RECIPE_TYPE_CAPSULE:
+            return
         filters = [(x, filter.Filter(x, self.macros)) for x in self.excepts]
         for component in self.recipe.autopkg.getComponents():
             for inode in component.linkGroups:
@@ -1242,6 +1283,10 @@ class ExcludeDirectories(policy.Policy):
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
     def doFile(self, path):
+        # temporarily do nothing for capsules, we might do something later
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+
 	fullpath = self.recipe.macros.destdir + os.sep + path
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
@@ -1415,6 +1460,9 @@ class Ownership(_UserGroup):
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return
+
 	pkgfile = self.recipe.autopkg.pathMap[path]
         pkgOwner = pkgfile.inode.owner()
         pkgGroup = pkgfile.inode.group()
@@ -1427,13 +1475,13 @@ class Ownership(_UserGroup):
 
 	if bestOwner != pkgOwner:
 	    pkgfile.inode.owner.set(bestOwner)
-        if bestOwner and bestOwner not in self.systemusers:
-            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
 	if bestGroup != pkgGroup:
 	    pkgfile.inode.group.set(bestGroup)
-	if bestGroup and bestGroup not in self.systemgroups:
-            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
+        if bestOwner and bestOwner not in self.systemusers:
+            self.setUserGroupDep(path, bestOwner, deps.UserInfoDependencies)
+        if bestGroup and bestGroup not in self.systemgroups:
+            self.setUserGroupDep(path, bestGroup, deps.GroupInfoDependencies)
 
 class _Utilize(_UserGroup):
     """
@@ -1507,8 +1555,9 @@ class UtilizeUser(_Utilize):
     'sshd' although the file is not owned by the 'sshd' user.
     """
     def _markItem(self, path, user):
-        self.info('user %s: %s' % (user, path))
-        self.setUserGroupDep(path, user, deps.UserInfoDependencies)
+        if not self.recipe._getCapsulePathsForFile(path):
+            self.info('user %s: %s' % (user, path))
+            self.setUserGroupDep(path, user, deps.UserInfoDependencies)
 
 
 class UtilizeGroup(_Utilize):
@@ -1543,8 +1592,9 @@ class UtilizeGroup(_Utilize):
     definition 'users' although the file is not owned by the 'users' group.
     """
     def _markItem(self, path, group):
-        self.info('group %s: %s' % (group, path))
-        self.setUserGroupDep(path, group, deps.GroupInfoDependencies)
+        if not self.recipe._getCapsulePathsForFile(path):
+            self.info('group %s: %s' % (group, path))
+            self.setUserGroupDep(path, group, deps.GroupInfoDependencies)
 
 
 class ComponentRequires(policy.Policy):
@@ -1807,7 +1857,7 @@ class _dependency(policy.Policy):
         if pythonPath not in self.pythonVersionCache:
             pyVerCmd = util.popen(
                 r"""%s %s -Ec 'import sys;"""
-                 """ print "%%d.%%d" %%sys.version_info[0:2]'"""
+                 """ print("%%d.%%d" %%sys.version_info[0:2])'"""
                  %(ldLibraryPath, pythonPath))
             self.pythonVersionCache[pythonPath] = pyVerCmd.read().strip()
             try:
@@ -1819,7 +1869,7 @@ class _dependency(policy.Policy):
     def _getPythonSysPath(self, pythonPath, destdir, libdir):
         ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         pySysPathCmd = util.popen(
-                r"""%s %s -Ec 'import sys; print "\0".join(sys.path)'"""
+                r"""%s %s -Ec 'import sys; print("\0".join(sys.path))'"""
                 %(ldLibraryPath, pythonPath))
         sysPath = [x.strip() for x in pySysPathCmd.read().split('\0') if x]
         try:
@@ -2044,7 +2094,7 @@ class _dependency(policy.Policy):
 
             depSet.addDep(curClass, dep)
 
-            # This loops has to happen later so that the soname
+            # This loop has to happen late so that the soname
             # flag merging from multiple flag instances has happened
             if nameMap:
                 for soDep in depSet.iterDepsByClass(deps.SonameDependencies):
@@ -2097,7 +2147,7 @@ class _dependency(policy.Policy):
         db = self._getDb()
         troveNames = [ x.getName() for x in db.iterTrovesByPath(path) ]
         if not troveNames:
-            talk = {True: self.error, False: self.warn}[unmanagedError]
+            talk = {True: self.error, False: self.warn}[bool(unmanagedError)]
             talk('%s file %s not managed by conary' %(fileType, path))
             return None
         troveName = troveNames[0]
@@ -2488,11 +2538,10 @@ class Provides(_dependency):
 
 
     def doFile(self, path):
-        componentMap = self.recipe.autopkg.componentMap
-        if path not in componentMap:
+        pkgs = self.recipe.autopkg.findComponents(path)
+        if not pkgs:
             return
-        pkg = componentMap[path]
-        f = pkg.getFile(path)
+        pkgFiles = [(x, x.getFile(path)) for x in pkgs]
         macros = self.recipe.macros
         m = self.recipe.magic[path]
 
@@ -2504,7 +2553,7 @@ class Provides(_dependency):
             mode = os.lstat(fullpath)[stat.ST_MODE]
 
         # First, add in the manual provisions
-        self.addExplicitProvides(path, fullpath, pkg, macros, m, f)
+        self.addExplicitProvides(path, fullpath, pkgFiles, macros, m)
 
         # Next, discover all automatically-discoverable provisions
         if os.path.exists(fullpath):
@@ -2512,80 +2561,82 @@ class Provides(_dependency):
                 and m.contents['Type'] != elf.ET_EXEC
                 and not [ x for x in self.noProvDirs if path.startswith(x) ]):
                 # we do not add elf provides for programs that won't be linked to
-                self._ELFAddProvide(path, m, pkg, basedir=dirpath)
+                self._ELFAddProvide(path, m, pkgFiles, basedir=dirpath)
             if dirpath in self.sonameSubtrees:
                 # only export filename as soname if is shlib
                 sm, finalpath = self._symlinkMagic(path, fullpath, macros, m)
                 if sm and self._isELF(sm, 'abi') and sm.contents['Type'] != elf.ET_EXEC:
                     # add the filename as a soname provision (CNY-699)
                     # note: no provides necessary
-                    self._ELFAddProvide(path, sm, pkg, soname=basepath, basedir=dirpath)
+                    self._ELFAddProvide(path, sm, pkgFiles, soname=basepath, basedir=dirpath)
 
             if self._isPythonModuleCandidate(path):
-                self._addPythonProvides(path, m, pkg, macros)
+                self._addPythonProvides(path, m, pkgFiles, macros)
 
             rubyProv = self._isRubyModule(path, macros, fullpath)
             if rubyProv:
-                self._addRubyProvides(path, m, pkg, macros, rubyProv)
+                self._addRubyProvides(path, m, pkgFiles, macros, rubyProv)
 
             elif self._isCIL(m):
-                self._addCILProvides(path, m, pkg, macros)
+                self._addCILProvides(path, m, pkgFiles, macros)
 
             elif self.CILPolicyRE.match(path):
-                self._addCILPolicyProvides(path, pkg, macros)
+                self._addCILPolicyProvides(path, pkgFiles, macros)
 
             elif self._isJava(m, 'provides'):
                 # Cache the internal provides
                 if not hasattr(self.recipe, '_internalJavaDepMap'):
                     self.recipe._internalJavaDepMap = None
-                self._addJavaProvides(path, m, pkg)
+                self._addJavaProvides(path, m, pkgFiles)
 
             elif self._isPerlModule(path):
-                self._addPerlProvides(path, m, pkg)
+                self._addPerlProvides(path, m, pkgFiles)
 
-        self.addPathDeps(path, dirpath, pkg, f)
-        self.whiteOut(path, pkg)
-        self.unionDeps(path, pkg, f)
+        self.addPathDeps(path, dirpath, pkgFiles)
+        self.whiteOut(path, pkgFiles)
+        self.unionDeps(path, pkgFiles)
 
-    def whiteOut(self, path, pkg):
+    def whiteOut(self, path, pkgFiles):
         # remove intentionally discarded provides
-        if self.exceptDeps and path in pkg.providesMap:
-            depSet = deps.DependencySet()
-            for depClass, dep in pkg.providesMap[path].iterDeps():
-                for filt, exceptRe in self.exceptDeps:
-                    if filt.match(path):
-                        matchName = '%s: %s' %(depClass.tagName, str(dep))
-                        if exceptRe.match(matchName):
-                            # found one to not copy
-                            dep = None
-                            break
-                if dep is not None:
-                    depSet.addDep(depClass, dep)
-            pkg.providesMap[path] = depSet
+        for pkg, f in pkgFiles:
+            if self.exceptDeps and path in pkg.providesMap:
+                depSet = deps.DependencySet()
+                for depClass, dep in pkg.providesMap[path].iterDeps():
+                    for filt, exceptRe in self.exceptDeps:
+                        if filt.match(path):
+                            matchName = '%s: %s' %(depClass.tagName, str(dep))
+                            if exceptRe.match(matchName):
+                                # found one to not copy
+                                dep = None
+                                break
+                    if dep is not None:
+                        depSet.addDep(depClass, dep)
+                pkg.providesMap[path] = depSet
 
-    def addExplicitProvides(self, path, fullpath, pkg, macros, m, f):
+    def addExplicitProvides(self, path, fullpath, pkgFiles, macros, m):
         for (filter, provision) in self.fileFilters:
             if filter.match(path):
-                self._markProvides(path, fullpath, provision, pkg, macros, m, f)
+                self._markProvides(path, fullpath, provision, pkgFiles, macros, m)
 
-    def addPathDeps(self, path, dirpath, pkg, f):
+    def addPathDeps(self, path, dirpath, pkgFiles):
         # Because paths can change, individual files do not provide their
         # paths.  However, within a trove, a file does provide its name.
         # Furthermore, non-regular files can be path dependency targets
         # Therefore, we have to handle this case a bit differently.
-        if dirpath in self.binDirs and not isinstance(f, files.Directory):
-            # CNY-930: automatically export paths in bindirs
-            # CNY-1721: but not directories in bindirs
-            f.flags.isPathDependencyTarget(True)
+        for pkg, f  in pkgFiles:
+            if dirpath in self.binDirs and not isinstance(f, files.Directory):
+                # CNY-930: automatically export paths in bindirs
+                # CNY-1721: but not directories in bindirs
+                f.flags.isPathDependencyTarget(True)
 
-        if f.flags.isPathDependencyTarget():
-            pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
+            if f.flags.isPathDependencyTarget():
+                pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
 
-    def unionDeps(self, path, pkg, f):
-        if path not in pkg.providesMap:
-            return
-        f.provides.set(pkg.providesMap[path])
-        pkg.provides.union(f.provides())
+    def unionDeps(self, path, pkgFiles):
+        for pkg, f in pkgFiles:
+            if path in pkg.providesMap:
+                f.provides.set(pkg.providesMap[path])
+                pkg.provides.union(f.provides())
 
 
 
@@ -2596,7 +2647,7 @@ class Provides(_dependency):
             # we need to synthesize some provides information
             return [('soname', soname, ())]
 
-    def _ELFAddProvide(self, path, m, pkg, soname=None, soflags=None, basedir=None):
+    def _ELFAddProvide(self, path, m, pkgFiles, soname=None, soflags=None, basedir=None):
         if basedir is None:
             basedir = os.path.dirname(path)
         if basedir in self.sonameSubtrees:
@@ -2610,11 +2661,12 @@ class Provides(_dependency):
             basedir = ''.join(x for x in basedir if self.legalCharsRE.match(x))
 
         elfinfo = self._getELFinfo(m, os.path.basename(path))
-        self._addDepSetToMap(path, pkg.providesMap,
-            self._createELFDepSet(m, elfinfo,
-                                  recipe=self.recipe, basedir=basedir,
-                                  soname=soname, soflags=soflags,
-                                  path=path))
+        depSet = self._createELFDepSet(m, elfinfo,
+                                       recipe=self.recipe, basedir=basedir,
+                                       soname=soname, soflags=soflags,
+                                       path=path)
+        for pkg, _ in pkgFiles:
+            self._addDepSetToMap(path, pkg.providesMap, depSet)
 
 
     def _getPythonProvidesSysPath(self, path):
@@ -2683,7 +2735,7 @@ class Provides(_dependency):
             self.recipe.macros, self.recipe)
         self.perlIncPath.sort(key=len, reverse=True)
 
-    def _addPythonProvides(self, path, m, pkg, macros):
+    def _addPythonProvides(self, path, m, pkgFiles, macros):
 
         if not self._isPythonModuleCandidate(path):
             return
@@ -2739,13 +2791,15 @@ class Provides(_dependency):
         flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
         for dpath in depPaths:
             dep = deps.Dependency(dpath, flags)
-            self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
+            for pkg, _ in pkgFiles:
+                self._addDepToMap(path, pkg.providesMap, deps.PythonDependencies, dep)
 
-    def _addOneCILProvide(self, pkg, path, name, ver):
-        self._addDepToMap(path, pkg.providesMap, deps.CILDependencies,
-                deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
+    def _addOneCILProvide(self, pkgFiles, path, name, ver):
+        for pkg, _ in pkgFiles:
+            self._addDepToMap(path, pkg.providesMap, deps.CILDependencies,
+                    deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
 
-    def _addCILPolicyProvides(self, path, pkg, macros):
+    def _addCILPolicyProvides(self, path, pkgFiles, macros):
         if ElementTree is None:
             return
         try:
@@ -2755,14 +2809,14 @@ class Provides(_dependency):
             root = tree.getroot()
             identity, redirect = root.find('runtime/%(urn)sassemblyBinding/%(urn)sdependentAssembly' % keys).getchildren()
             assembly = identity.get('name')
-            self._addOneCILProvide(pkg, path, assembly,
+            self._addOneCILProvide(pkgFiles, path, assembly,
                 redirect.get('oldVersion'))
             self.recipe.Requires(_CILPolicyProvides={
                 path: (assembly, redirect.get('newVersion'))})
         except:
             return
 
-    def _addCILProvides(self, path, m, pkg, macros):
+    def _addCILProvides(self, path, m, pkgFiles, macros):
         if not m or m.name != 'CIL':
             return
         fullpath = macros.destdir + path
@@ -2783,7 +2837,7 @@ class Provides(_dependency):
         # monodis did not give us any info
         if not name or not ver:
             return
-        self._addOneCILProvide(pkg, path, name, ver)
+        self._addOneCILProvide(pkgFiles, path, name, ver)
 
     def _isRubyModule(self, path, macros, fullpath):
         if not util.isregular(fullpath) or os.path.islink(fullpath):
@@ -2808,13 +2862,14 @@ class Provides(_dependency):
                     return path[len(pathElement)+1:].rsplit('.', 1)[0]
         return False
 
-    def _addRubyProvides(self, path, m, pkg, macros, prov):
+    def _addRubyProvides(self, path, m, pkgFiles, macros, prov):
         flags = self._getRubyFlagsFromPath(path, self.rubyVersion)
         flags = [(x, deps.FLAG_SENSE_REQUIRED) for x in sorted(list(flags))]
-        self._addDepToMap(path, pkg.providesMap, 
-            deps.RubyDependencies, deps.Dependency(prov, flags))
+        dep = deps.Dependency(prov, flags)
+        for pkg, _ in pkgFiles:
+            self._addDepToMap(path, pkg.providesMap, deps.RubyDependencies, dep)
 
-    def _addJavaProvides(self, path, m, pkg):
+    def _addJavaProvides(self, path, m, pkgFiles):
         if 'provides' not in m.contents or not m.contents['provides']:
             return
         if not hasattr(self.recipe, '_reqExceptDeps'):
@@ -2926,11 +2981,12 @@ class Provides(_dependency):
         provs = set(fprov for fpath, (fprov, freqs) in fileDeps.iteritems()
                         if fprov is not None)
         for prov in provs:
-            self._addDepToMap(path, pkg.providesMap,
-                deps.JavaDependencies, deps.Dependency(prov, []))
+            dep = deps.Dependency(prov, [])
+            for pkg, _ in pkgFiles:
+                self._addDepToMap(path, pkg.providesMap, deps.JavaDependencies, dep)
 
 
-    def _addPerlProvides(self, path, m, pkg):
+    def _addPerlProvides(self, path, m, pkgFiles):
         # do not call perl to get @INC unless we have something to do for perl
         self._fetchPerlIncPath()
 
@@ -2954,13 +3010,15 @@ class Provides(_dependency):
 
         # foo/bar/baz.pm -> foo::bar::baz
         prov = '::'.join(depPath.split('/')).rsplit('.', 1)[0]
-        self._addDepToMap(path, pkg.providesMap, deps.PerlDependencies,
-            deps.Dependency(prov, []))
+        dep = deps.Dependency(prov, [])
+        for pkg, _ in pkgFiles:
+            self._addDepToMap(path, pkg.providesMap, deps.PerlDependencies, dep)
 
-    def _markProvides(self, path, fullpath, provision, pkg, macros, m, f):
+    def _markProvides(self, path, fullpath, provision, pkgFiles, macros, m):
         if provision.startswith("file"):
             # can't actually specify what to provide, just that it provides...
-            f.flags.isPathDependencyTarget(True)
+            for _, f in pkgFiles:
+                f.flags.isPathDependencyTarget(True)
 
         elif provision.startswith("abi:"):
             abistring = provision[4:].strip()
@@ -2968,8 +3026,9 @@ class Provides(_dependency):
             abi = abistring[:op]
             flags = abistring[op+1:-1].split()
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
-            self._addDepToMap(path, pkg.providesMap, deps.AbiDependency,
-                deps.Dependency(abi, flags))
+            dep = deps.Dependency(abi, flags)
+            for pkg, _ in pkgFiles:
+                self._addDepToMap(path, pkg.providesMap, deps.AbiDependency, dep)
 
         elif provision.startswith("soname:"):
             sm, finalpath = self._symlinkMagic(path, fullpath, macros, m)
@@ -2987,7 +3046,7 @@ class Provides(_dependency):
                 basedir = None
                 if '/' in soname:
                     basedir, soname = soname.rsplit('/', 1)
-                self._ELFAddProvide(path, sm, pkg, soname=soname, soflags=soflags,
+                self._ELFAddProvide(path, sm, pkgFiles, soname=soname, soflags=soflags,
                                     basedir=basedir)
         else:
             self.error('Provides %s for file %s does not start with one of'
@@ -3230,11 +3289,12 @@ class Requires(_addInfo, _dependency):
         self._delPythonRequiresModuleFinder()
 
     def doFile(self, path):
-	componentMap = self.recipe.autopkg.componentMap
-	if path not in componentMap:
-	    return
-	pkg = componentMap[path]
-	f = pkg.getFile(path)
+        pkgs = self.recipe.autopkg.findComponents(path)
+        if not pkgs:
+            return
+        pkgFiles = [(x, x.getFile(path)) for x in pkgs]
+        # this file object used only for tests, not for doing packaging
+        f = pkgFiles[0][1]
         macros = self.recipe.macros
         fullpath = macros.destdir + path
         m = self.recipe.magic[path]
@@ -3245,18 +3305,19 @@ class Requires(_addInfo, _dependency):
                 # only add requirements for architectures
                 # that we are actually building for (this may include
                 # major and minor architectures)
-                self._addELFRequirements(path, m, pkg)
+                self._addELFRequirements(path, m, pkgFiles)
 
         # now go through explicit requirements
 	for info in self.included:
 	    for filt in self.included[info]:
 		if filt.match(path):
-                    self._markManualRequirement(info, path, pkg, m)
+                    self._markManualRequirement(info, path, pkgFiles, m)
 
         # now check for automatic dependencies besides ELF
         if f.inode.perms() & 0111 and m and m.name == 'script':
             interp = m.contents['interpreter']
-            if len(interp.strip()) and self._checkInclusion(interp, path):
+            if interp.strip().startswith('/') and self._checkInclusion(interp,
+                                                                       path):
                 # no interpreter string warning is in BadInterpreterPaths
                 if not (os.path.exists(interp) or
                         os.path.exists(macros.destdir+interp)):
@@ -3268,20 +3329,20 @@ class Requires(_addInfo, _dependency):
                     # if there has been an exception to
                     # NormalizeInterpreterPaths, then it is a
                     # real dependency on the env binary
-                self._addRequirement(path, interp, [], pkg,
+                self._addRequirement(path, interp, [], pkgFiles,
                                      deps.FileDependencies)
 
         if (f.inode.perms() & 0111 and m and m.name == 'script' and
             os.path.basename(m.contents['interpreter']).startswith('python')):
-            self._addPythonRequirements(path, fullpath, pkg, script=True)
+            self._addPythonRequirements(path, fullpath, pkgFiles, script=True)
         elif self._isPython(path):
-            self._addPythonRequirements(path, fullpath, pkg, script=False)
+            self._addPythonRequirements(path, fullpath, pkgFiles, script=False)
 
         if (f.inode.perms() & 0111 and m and m.name == 'script' and
             os.path.basename(m.contents['interpreter']).startswith('ruby')):
-            self._addRubyRequirements(path, fullpath, pkg, script=True)
+            self._addRubyRequirements(path, fullpath, pkgFiles, script=True)
         elif '/ruby/' in path:
-            self._addRubyRequirements(path, fullpath, pkg, script=False)
+            self._addRubyRequirements(path, fullpath, pkgFiles, script=False)
 
         if self._isCIL(m):
             if not self.monodisPath:
@@ -3295,16 +3356,16 @@ class Requires(_addInfo, _dependency):
                     ver = line.split('=')[1]
                 elif 'Name=' in line:
                     name = line.split('=')[1]
-                    self._addRequirement(path, name, [ver], pkg,
+                    self._addRequirement(path, name, [ver], pkgFiles,
                                          deps.CILDependencies)
             p.close()
 
         elif self.CILPolicyRE.match(path):
             name, ver = self._CILPolicyProvides[path]
-            self._addRequirement(path, name, [ver], pkg, deps.CILDependencies)
+            self._addRequirement(path, name, [ver], pkgFiles, deps.CILDependencies)
 
         if self._isJava(m, 'requires'):
-            self._addJavaRequirements(path, m, pkg)
+            self._addJavaRequirements(path, m, pkgFiles)
 
         db = self._getDb()
         if self._isPerl(path, m, f):
@@ -3312,15 +3373,15 @@ class Requires(_addInfo, _dependency):
             for req in perlReqs:
                 thisReq = deps.parseDep('perl: ' + req)
                 if db.getTrovesWithProvides([thisReq]) or [
-                        x for x in self.recipe.autopkg.components.values()
+                        x for x in self.recipe.autopkg.getComponents()
                         if x.provides.satisfies(thisReq)]:
-                    self._addRequirement(path, req, [], pkg,
+                    self._addRequirement(path, req, [], pkgFiles,
                                          deps.PerlDependencies)
 
-        self.whiteOut(path, pkg)
-        self.unionDeps(path, pkg, f)
+        self.whiteOut(path, pkgFiles)
+        self.unionDeps(path, pkgFiles)
 
-    def _addJavaRequirements(self, path, m, pkg):
+    def _addJavaRequirements(self, path, m, pkgFiles):
         if not hasattr(self.recipe, '_internalJavaDepMap'):
             self.recipe._internalJavaDepMap = {}
         fileDeps = self.recipe._internalJavaDepMap.get(path, {})
@@ -3329,35 +3390,36 @@ class Requires(_addInfo, _dependency):
             if freq is not None:
                 reqs.update(freq)
         for req in reqs:
-            self._addRequirement(path, req, [], pkg,
+            self._addRequirement(path, req, [], pkgFiles,
                                  deps.JavaDependencies)
 
 
-    def whiteOut(self, path, pkg):
+    def whiteOut(self, path, pkgFiles):
         # remove intentionally discarded dependencies
-        if self.exceptDeps and path in pkg.requiresMap:
-            depSet = deps.DependencySet()
-            for depClass, dep in pkg.requiresMap[path].iterDeps():
-                for filt, exceptRe in self.exceptDeps:
-                    if filt.match(path):
-                        matchName = '%s: %s' %(depClass.tagName, str(dep))
-                        if exceptRe.match(matchName):
-                            # found one to not copy
-                            dep = None
-                            break
-                if dep is not None:
-                    depSet.addDep(depClass, dep)
-            pkg.requiresMap[path] = depSet
+        for pkg, _ in pkgFiles:
+            if self.exceptDeps and path in pkg.requiresMap:
+                depSet = deps.DependencySet()
+                for depClass, dep in pkg.requiresMap[path].iterDeps():
+                    for filt, exceptRe in self.exceptDeps:
+                        if filt.match(path):
+                            matchName = '%s: %s' %(depClass.tagName, str(dep))
+                            if exceptRe.match(matchName):
+                                # found one to not copy
+                                dep = None
+                                break
+                    if dep is not None:
+                        depSet.addDep(depClass, dep)
+                pkg.requiresMap[path] = depSet
 
-    def unionDeps(self, path, pkg, f):
+    def unionDeps(self, path, pkgFiles):
         # finally, package the dependencies up
-        if path not in pkg.requiresMap:
-            return
-        # files should not require items they provide directly. CNY-2177
-        f.requires.set(pkg.requiresMap[path] - f.provides())
-        pkg.requires.union(f.requires())
+        for pkg, f in pkgFiles:
+            if path in pkg.requiresMap:
+                # files should not require items they provide directly. CNY-2177
+                f.requires.set(pkg.requiresMap[path] - f.provides())
+                pkg.requires.union(f.requires())
 
-    def _addELFRequirements(self, path, m, pkg):
+    def _addELFRequirements(self, path, m, pkgFiles):
         """
         Add ELF and abi dependencies, including paths when not shlibs
         """
@@ -3413,11 +3475,12 @@ class Requires(_addInfo, _dependency):
         if m and 'RPATH' in m.contents and m.contents['RPATH']:
             rpathList += _canonicalRPATH(m.contents['RPATH'])
 
-        self._addDepSetToMap(path, pkg.requiresMap,
-            self._createELFDepSet(m, m.contents['requires'],
-                libPathMap=self._privateDepMap,
-                getRPATH=_findSonameInRpath,
-                path=path))
+        depSet = self._createELFDepSet(m, m.contents['requires'],
+                                       libPathMap=self._privateDepMap,
+                                       getRPATH=_findSonameInRpath,
+                                       path=path)
+        for pkg, _ in pkgFiles:
+            self._addDepSetToMap(path, pkg.requiresMap, depSet)
 
 
     def _getPythonRequiresSysPath(self, pathName):
@@ -3516,7 +3579,7 @@ class Requires(_addInfo, _dependency):
                 finder.close()
 
 
-    def _addPythonRequirements(self, path, fullpath, pkg, script=False):
+    def _addPythonRequirements(self, path, fullpath, pkgFiles, script=False):
         destdir = self.recipe.macros.destdir
         destDirLen = len(destdir)
         
@@ -3590,8 +3653,8 @@ class Requires(_addInfo, _dependency):
                 cands = [ depPath[:-9] + '.so', depPath ]
                 cands = [ self._normalizePythonDep(x) for x in cands ]
                 if absPath:
-                    depName = self._checkPackagePythonDeps(pkg, absPath, cands,
-                                                          flags)
+                    depName = self._checkPackagePythonDeps(pkgFiles, absPath,
+                                                           cands, flags)
                 else:
                     depName = self._checkSystemPythonDeps(cands, flags)
             else:
@@ -3599,28 +3662,30 @@ class Requires(_addInfo, _dependency):
                 if depName == '__future__':
                     continue
 
-            self._addRequirement(path, depName, flags, pkg,
+            self._addRequirement(path, depName, flags, pkgFiles,
                                  deps.PythonDependencies)
 
-    def _checkPackagePythonDeps(self, pkg, depPath, depNames, flags):
-        # Try to match depNames against the current package
+    def _checkPackagePythonDeps(self, pkgFiles, depPath, depNames, flags):
+        # Try to match depNames against all current packages
         # Use the last value in depNames as the fault value
         assert depNames, "No dependencies passed"
-        if depPath not in pkg:
-            return depNames[-1]
-        fileProvides = pkg[depPath][1].provides()
+        for pkg, _ in pkgFiles:
+            if depPath in pkg:
+                fileProvides = pkg[depPath][1].provides()
 
-        if flags:
-            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+                if flags:
+                    flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 
-        # Walk the depNames list in order, pick the first dependency
-        # available.
-        for dp in depNames:
-            depSet = deps.DependencySet()
-            depSet.addDep(deps.PythonDependencies, deps.Dependency(dp, flags))
-            if fileProvides.intersection(depSet):
-                # this dep is provided
-                return dp
+                # Walk the depNames list in order, pick the first dependency
+                # available.
+                for dp in depNames:
+                    depSet = deps.DependencySet()
+                    depSet.addDep(deps.PythonDependencies,
+                                  deps.Dependency(dp, flags))
+                    if fileProvides.intersection(depSet):
+                        # this dep is provided
+                        return dp
+
         # If we got here, the file doesn't provide this dep. Return the last
         # candidate and hope for the best
         return depNames[-1]
@@ -3644,7 +3709,7 @@ class Requires(_addInfo, _dependency):
         depName = depName.replace('.__init__', '')
         return depName
 
-    def _addRubyRequirements(self, path, fullpath, pkg, script=False):
+    def _addRubyRequirements(self, path, fullpath, pkgFiles, script=False):
         macros = self.recipe.macros
         destdir = macros.destdir
         destDirLen = len(destdir)
@@ -3720,7 +3785,7 @@ class Requires(_addInfo, _dependency):
             else:
                 depPath = depEntryPath
             flags = self._getRubyFlagsFromPath(depPath, self.rubyVersion)
-            self._addRequirement(path, depEntry, flags, pkg,
+            self._addRequirement(path, depEntry, flags, pkgFiles,
                                  deps.RubyDependencies)
 
     def _fetchPerl(self):
@@ -3804,7 +3869,7 @@ class Requires(_addInfo, _dependency):
 
         return reqlist
 
-    def _markManualRequirement(self, info, path, pkg, m):
+    def _markManualRequirement(self, info, path, pkgFiles, m):
         flags = []
         if self._checkInclusion(info, path):
             if info[0] == '/':
@@ -3835,7 +3900,7 @@ class Requires(_addInfo, _dependency):
                     self.error('package dependency %s not allowed', info)
                     return
                 depClass = deps.TroveDependencies
-            self._addRequirement(path, info, flags, pkg, depClass)
+            self._addRequirement(path, info, flags, pkgFiles, depClass)
 
     def _checkInclusion(self, info, path):
         if info in self.excluded:
@@ -3848,7 +3913,7 @@ class Requires(_addInfo, _dependency):
                     return False
         return True
 
-    def _addRequirement(self, path, info, flags, pkg, depClass):
+    def _addRequirement(self, path, info, flags, pkgFiles, depClass):
         if depClass == deps.FileDependencies:
             pathMap = self.recipe.autopkg.pathMap
             componentMap = self.recipe.autopkg.componentMap
@@ -3860,10 +3925,7 @@ class Requires(_addInfo, _dependency):
                            ' provided; use'
                            " r.Provides('file', '%s')", path, info, info)
                 return
-        if path not in pkg.requiresMap:
-            # BuildPackage only fills in requiresMap for ELF files; we may
-            # need to create a few more DependencySets.
-            pkg.requiresMap[path] = deps.DependencySet()
+
         # in some cases, we get literal "(flags)" from the recipe
         if '(' in info:
             flagindex = info.index('(')
@@ -3871,7 +3933,12 @@ class Requires(_addInfo, _dependency):
             info = info.split('(')[0]
         if flags:
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
-        pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
+
+        for pkg, _ in pkgFiles:
+            # we may need to create a few more DependencySets.
+            if path not in pkg.requiresMap:
+                pkg.requiresMap[path] = deps.DependencySet()
+            pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
 class _basePluggableRequires(Requires):
     """
@@ -3911,22 +3978,39 @@ class _basePluggableRequires(Requires):
         return self.recipe._policyMap['Requires']._addClassName(*args, **kwargs)
 
     def doFile(self, path):
-        componentMap = self.recipe.autopkg.componentMap
-        if path not in componentMap:
+        pkgs = self.recipe.autopkg.findComponents(path)
+        if not pkgs:
             return
-        pkg = componentMap[path]
-        f = pkg.getFile(path)
+        pkgFiles = [(x, x.getFile(path)) for x in pkgs]
         macros = self.recipe.macros
         fullpath = macros.destdir + path
 
-        self.addPluggableRequirements(path, fullpath, pkg, macros)
+        self.addPluggableRequirements(path, fullpath, pkgFiles, macros)
 
-        self.whiteOut(path, pkg)
-        self.unionDeps(path, pkg, f)
+        self.whiteOut(path, pkgFiles)
+        self.unionDeps(path, pkgFiles)
 
-    def addPluggableRequirements(self, path, fullpath, pkg, macros):
+    def addPluggableRequirements(self, path, fullpath, pkgFiles, macros):
         """Override in subclasses"""
         pass
+
+class RemoveSelfProvidedRequires(policy.Policy):
+    """
+    This policy is used to remove component requirements when they are provided
+    by the component itself.
+    Do not call it directly; it is for internal use only.
+    """
+    bucket = policy.PACKAGE_CREATION
+    requires = (
+        ('Requires', policy.REQUIRED_PRIOR),
+    )
+
+    def do(self):
+        if use.Use.bootstrap._get():
+            return
+
+        for comp in self.recipe.autopkg.getComponents():
+            comp.requires -= comp.provides
 
 class Flavor(policy.Policy):
     """
@@ -3987,10 +4071,9 @@ class Flavor(policy.Policy):
 
 
     def postProcess(self):
-	componentMap = self.recipe.autopkg.componentMap
         # all troves need to share the same flavor so that we can
         # distinguish them later
-        for pkg in componentMap.values():
+        for pkg in self.recipe.autopkg.components.values():
             pkg.flavor.union(self.packageFlavor)
 
     def hasLibInPath(self, path):
@@ -4007,10 +4090,10 @@ class Flavor(policy.Policy):
         return False
 
     def doFile(self, path):
-	componentMap = self.recipe.autopkg.componentMap
-	if path not in componentMap:
-	    return
-	pkg = componentMap[path]
+	autopkg = self.recipe.autopkg
+	pkg = autopkg.findComponent(path)
+        if pkg is None:
+            return
 	f = pkg.getFile(path)
         m = self.recipe.magic[path]
         if m and m.name == 'ELF' and 'isnset' in m.contents:
@@ -4041,8 +4124,13 @@ class Flavor(policy.Policy):
         # the package - instead the package will have the flavor that
         # it was cooked with.  This is to avoid unnecessary or extra files
         # causing the entire package from being flavored inappropriately.
-        # Such flavoring requires a bunch of Flaovr exclusions to fix.
-        f.flavor.set(flv)
+        # Such flavoring requires a bunch of Flavor exclusions to fix.
+        # Note that we need to set all shared paths between containers
+        # to share flavors and ensure that fileIds are the same
+        for pkg in autopkg.findComponents(path):
+            f = pkg.getFile(path)
+            f.flavor.set(flv)
+
         # get the Arch.* dependencies
         flv.union(self.archFlavor)
         if isnset in self.allowableIsnSets:
@@ -4168,6 +4256,8 @@ class ProcessUserInfoPackage(_ProcessInfoPackage):
             'SHELL', 'SUPPLEMENTAL', 'PASSWORD']
 
     def parseInfoFile(self, path):
+        if self.recipe._getCapsulePathsForFile(path):
+            return {}
         data = _ProcessInfoPackage.parseInfoFile(self, path)
         if data:
             supplemental = data.get('SUPPLEMENTAL')

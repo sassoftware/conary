@@ -310,6 +310,40 @@ class RemoveCommand(ConaryCommand):
         log.syslog.commandComplete()
 _register(RemoveCommand)
 
+class RepairCommand(ConaryCommand):
+    commands = ['repair']
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+    help = ('Undo local changes to files owned by troves (EXPERIMENTAL)')
+    commandGroup = 'System Modification'
+    hidden = True
+    ignoreConfigErrors = True
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        if len(otherArgs) < 3: return self.usage()
+        if argSet: return self.usage()
+
+        client = conaryclient.ConaryClient(cfg)
+        db = client.db
+        log.syslog.command()
+
+        troveList = []
+        for item in otherArgs[2:]:
+            name, ver, flv = updatecmd.parseTroveSpec(item)
+            troves = client.db.findTrove(None, (name, ver, flv))
+            troveList += troves
+
+        try:
+            db.repairTroves(client.getRepos(), troveList)
+        except conary.errors.DatabaseError, e:
+            log.error(str(e))
+            return 1
+        except OSError, e:
+            log.error("cannot remove %s: %s" % (fullPath, e.strerror))
+            return 1
+
+        log.syslog.commandComplete()
+_register(RepairCommand)
+
 class RestoreCommand(ConaryCommand):
     commands = ['restore']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
@@ -427,6 +461,9 @@ class _AbstractQueryCommand(ConaryCommand):
             'buildreqs'     : (VERBOSE_HELP,
                                'Display troves used to satisfy buildreqs'
                                ' of this trove'),
+            'capsules'      : (VERBOSE_HELP,
+                               'Display only encapsulated packages in file '
+                               'lists'),
             'deps'          : 'Display trove dependencies',
             'file-deps'     : 'Display dependencies for individual files',
             'file-flavors'  : (VERBOSE_HELP,
@@ -467,6 +504,7 @@ class _AbstractQueryCommand(ConaryCommand):
         ConaryCommand.addParameters(self, argDef)
 
         d = {}
+        d["capsules"] = NO_PARAM
         d["ids"] = NO_PARAM
         d["ls"] = NO_PARAM
         d["lsl"] = NO_PARAM
@@ -520,7 +558,7 @@ class QueryCommand(_AbstractQueryCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kw = {}
-        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
                 ('file-flavors', 'fileFlavors'), 
@@ -634,7 +672,7 @@ class RepQueryCommand(_AbstractQueryCommand):
 
         kw = {}
         kw['filesToShow'] = []
-        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('build-log', 'showBuildLog'),
                 ('file-deps', 'fileDeps'), 
@@ -778,7 +816,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
         from conary.repository import changeset
         kw = {}
         # FIXME: organize
-        for opt in ('ls', 'lsl', 'ids', 'sha1s', 'tags',
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
                 ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
                 ('file-deps', 'fileDeps'), 
                 ('file-flavors', 'fileFlavors'), 

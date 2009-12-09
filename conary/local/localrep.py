@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,7 +12,6 @@
 # full details.
 #
 
-import gzip
 import zlib
 try:
     from cStringIO import StringIO
@@ -20,7 +19,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary.repository import errors, repository, datastore
-from conary.lib import digestlib
+from conary.lib import digestlib, fixedgzip as gzip
 from conary.local import schema
 from conary import files
 
@@ -44,13 +43,11 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	return (info, self.repos.addTrove(trove, pin = pin,
                                           oldTroveSpec = oldTroveSpec))
 
-    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, 
-                       newVersion, fileStream = None):
-        isPresent = not self.pathRemovedCheck(troveId[0], pathId)
-        self.repos.addFileVersion(troveId[1], pathId, fileObj, path,
-                                  fileId, newVersion,
-                                  fileStream = fileStream,
-                                  isPresent = isPresent)
+    def addFileVersion(self, troveId, pathId, path, fileId,
+                       newVersion, fileStream = None,
+                       withContents = True):
+        self.repos.addFileVersion(troveId[1], pathId, path, fileId, newVersion,
+                                  fileStream = fileStream)
 
     def addTroveDone(self, troveId, mirror=False):
         assert(not mirror), "This code pathway can not be used for mirroring"
@@ -115,13 +112,12 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         self.oldFile(pathId, fileId, sha1)
 
-    # If retargetLocal is set, then localCs is for A->A.local whlie
-    # origJob is A->B, so localCs needs to be changed to be B->B.local.
-    # Otherwise, we're applying a rollback and origJob is B->A and
-    # localCs is A->A.local, so it doesn't need retargeting.
-    def __init__(self, repos, cs, callback, autoPinList, 
-                 allowIncomplete = False, pathRemovedCheck = None,
-                 replaceFiles = False):
+    def iterDbRemovals(self):
+        return self.replacedFiles.iteritems()
+
+    def __init__(self, repos, cs, callback, autoPinList,
+                 allowIncomplete = False, replaceFiles = False,
+                 userReplaced = None, sharedFiles = {}):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -130,7 +126,6 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	self.oldFiles = []
         self.trovesAdded = []
         self.autoPinList = autoPinList
-        self.pathRemovedCheck = pathRemovedCheck
 
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
                                          allowIncomplete=allowIncomplete)
@@ -141,8 +136,13 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         for (pathId, fileVersion, sha1) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)
 
+        if userReplaced:
+            self.repos.db.db.markUserReplacedFiles(userReplaced)
+
         # this raises an exception if this install would create conflicts
-        self.repos.db.db.checkPathConflicts(self.trovesAdded, replaceFiles)
+        self.replacedFiles = self.repos.db.db.checkPathConflicts(
+                                    self.trovesAdded, replaceFiles,
+                                    sharedFiles)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:

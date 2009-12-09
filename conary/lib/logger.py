@@ -15,7 +15,6 @@ import base64
 import bz2
 import errno
 import fcntl
-import gzip
 import os
 import pty
 import re
@@ -29,7 +28,7 @@ import time
 import tty
 from xml.sax import saxutils
 from conary.errors import ConaryError
-
+from conary.lib import fixedgzip as gzip
 
 BUFFER=1024*4096
 
@@ -795,8 +794,30 @@ class Logger:
         except AttributeError:
             # stdin might not even have an isatty method
             pass
-        # wait for child logging process to die
-        os.waitpid(self.loggerPid, 0)
+
+        # Wait for child logging process to die.  Send successively ruder
+        # signals if it does not do so within a reasonable time.  The primary
+        # reason that it would not die immediately is that a process has forked
+        # while holding the TTY file descriptor, and thus the logger is still
+        # polling it for output.
+        signals = [signal.SIGTERM, signal.SIGKILL]
+        while signals:
+            start = time.time()
+            while time.time() - start < 10:
+                pid, status = os.waitpid(self.loggerPid, os.WNOHANG)
+                if pid:
+                    break
+                time.sleep(0.1)
+            else:
+                # Child process did not die.
+                signum = signals.pop(0)
+                os.kill(self.loggerPid, signum)
+                continue
+            break
+        else:
+            # Last signal was a KILL, so wait indefinitely.
+            os.waitpid(self.loggerPid, 0)
+
 
 class _ChildLogger:
     def __init__(self, ptyFd, lexer, controlTerminal, withStdin):

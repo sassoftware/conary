@@ -1,13 +1,172 @@
 Changes in @NEW@:
+  o New Features
+    * A modified version of the Python gzip library has been added to
+      Conary. The new version has been tested to be 3% faster than the
+      standard library version for a small sized update. It also does
+      not seek within the compressed data, which will enable streaming
+      decompression for future uses. (CNY-3301)
+    * Added repair command as an experimental feature. (CNY-1800)
+    * Files marked as "missingok" in encapsulated RPMs now have that
+      status represented by a "MissingOkay" flag on the corresponding
+      Conary file object. (CNY-3306)
+    * Files from encapsulated RPMs now have the mtime from the
+      RPM recorded in troveInfo.  The mtime of last change is
+      still used to calculate fileIds, preserving knowledge of
+      when meaningful file information has changed. (CNY-3307)
+
   o Bug Fixes:
+    * Changeset reassembly for capsules ignores directories. (CNY-3305)
+    * Encapsulated symbolic links are represented as having the mode
+      that will exist on the filesystem, even if that varies from the
+      mode recorded in the capsule. (CNY-3304)
+    * getTroveLeavesByPath() didn't return leaves; it returned the most
+      recent trove which includes that path
+
+  o Internal Changes:
+    * Database connection objects now have a close_fork() method that
+      closes the connection without notifying the server.
+
+Changes in 2.1.0:
+  o New Features
+    * Conary now allows packages to be installed using foreign package
+      managers via wrapped content called capsules. RPM capsule support
+      is included in this release. (CNY-3217, CNY-3213)
+    * Added ignoreDependencies configuration option, which allows users
+      to specify certain dependency classes which should be ignored
+      during installs. The default is "abi rpmlib".
+    * The xz compression file format is now supported for decompressing
+      sources. (CNY-3207)
+    * The changemail.py repository commit action module now takes an
+      optional --maxsize argument and truncates changemail messages
+      to fit. (CNY-3205)
+    * The Run build action now does path-based build requirement
+      discovery like most build actions. (CNY-3222)
+    * Conary now allows identical files to be shared during installs
+      and updates. Both troves own the shared files, and they must be
+      updated at the same time when the shared files change.
+    * Conary now honors the no_proxy environment variable to allow
+      direct connections to specific hosts and domains. (CNY-3246)
+    * Added excludeCapsuleContents config option for servers.
+    * Added ChangeSet.removeCommitted() to filter already-committed
+      troves from a changeset.
+    * The bootstrap python module dependency discovery proxy now
+      provides additional useful informational messages to aid
+      debugging.
+    * Conary proxies are responsible for reassembling the content for
+      changesets containing capsules. (CNY-3228, CNY-3259)
+    * The --capsules command line option modifies showchangeset,
+      repquery, and query commands to display file information for
+      capsules instead of for installed files.
+    * A new Conary proxy setting, injectCapsuleContentServers, controls
+      changeset content injection for proxies talking only to hosts in
+      this list. (CNY-3261)
+    * Conary no longer uses regular expressions to represent manifest
+      files and other internally-generated lists of files matched by
+      policy, and so will not raise OverflowError for manifests with
+      many files, or from policy generated from source objects, on
+      platforms with a restricted regular expression code size.
+      (CNY-3282)
+    * The python dependency finder client has been modified to resolve
+      incompatibilities on the client side with python 2.3. (CNY-3285)
+    * Conary can now read cpio archives directly. (CNY-3280)
+    * The Conary repository now provides a method for obtaining commit
+      progress updates. "conary commit" now provides progress
+      output. (CNY-3290)
+
+  o Build Changes:
+    * When cooking groups where checkOnlyByDefaultDeps is set to False,
+      added dependencies will now inherit the byDefault setting of the
+      depending component. (CNY-3195)
+    * The imageGroup flag in group recipes now implies
+      checkOnlyByDefaultDeps=False. (CNY-3195)
+    * Group search paths may now contain lists or tuples of troves to be
+      considered as a single "bucket". (CNY-3286)
+
+  o Bug Fixes:
+    * In-core changesets previously could be merged only once into a
+      ReadOnlyChangeSet.  After multiple merges, reset() previously
+      failed to reset the underlying in-core changeset.  This has been
+      fixed.
+    * Conary no longer exits with an unhandled KeyError exception if
+      an unknown dependency type is encountered in the local database.
+      (CNY-3232)
     * Decompression with xz is preferred over unlzma, as CNY-3194
       intended. (CNY-3231)
     * rpm2cpio now correctly handles rpm packages compressed with xz.
       (CNY-3234)
+    * Unpacking an RPM with addArchive or addCapsule now functions
+      correctly even if the CPIO archive in the RPM contains a
+      non-traversable directory. (CNY-3244)
     * When running an external entitlement generator, use /dev/null for
-      stdin instead of closing the file descriptor
-    * getTroveLeavesByPath() didn't return leaves; it returned the most
-      recent trove which includes that path
+      stdin instead of closing the file descriptor.
+    * Added logging to several source actions to ensure that some output
+      is provided to make debugging build failures easier.
+    * Call lstat() instead of stat() to deal with circular links.
+      (CNY-3251)
+    * Bootstrapping python dependencies now uses python source intead
+      of a version-specific compiled python file.
+    * The addCapsule source action properly verifies GPG keys when a
+      keyid argument is supplied. (CNY-3258)
+    * Commiting signed troves to repositories without signatures no
+      longer causes repository tracebacks.
+    * Repositories no longer store duplicate file path information when
+      a path is committed for the first time by a job which references
+      it multiple times.
+    * Replacing a symlink with a regular file no longer creates the
+      regular file as the target of the symlink.
+    * Local rollbacks properly restore file contents when the file was
+      replaced by a non-regular file (such as a symlink)
+    * Cooks will no longer block indefinitely if a subprocess forks and
+      does not exit. (CNY-3284)
+    * When startGroup is called, flags will now be properly copied from
+      the parent group. (CNY-3287)
+    * Replacing a symlink which was part of a loop no longer causes a
+      traceback.
+
+  o Internal Changes:
+    * A repository's internal getfile function now avoids any database
+      access when no files have been requested.
+    * Loading troveinfo data uses bulk operations, speeding up
+      repository commits.
+    * Committing changesets now iterates over troves the changeset is
+      relative to, rather than getting them one at a time, significantly
+      reducing the number of sql calls.
+    * Conary now uses a single call when validating that file objects
+      exist in the repository during a commit.
+    * Repository commits now handle file paths and file streams
+      separately, in order to reduce the size of the temporary tables
+      and the commit path.
+    * The number of SQL calls used to create the flavors needed by a
+      repository commit has been dramatically reduced.
+    * No-operation SQL calls during repository commits when no redirects
+      are being commited were eliminated.
+    * Repository commits now merge all dependencies from the temporary
+      tables into the final tables at once rather than once per trove.
+    * Repository commits now update permission tables for all new troves
+      at once.
+    * Updates to latest tables are now done for all troves at once, and
+      are based on the current latest entries and the new trove. Formerly
+      they were done one at a time based on everything in the repository
+      (through a view).
+    * The rpmhelper.Header object can now produce dependency sets that
+      represent what an RPM requires and provides.
+    * A new RPM dependency class has been added. This class is used
+      to represent dependencies expressed in RPM packages that cannot
+      be mapped directly to a native Conary dependency.
+    * Colons in dependency flags are now escaped as \: to allow
+      deterministic thawing.
+    * CIL dependency parsing uses xml.etree.ElementTree, if available,
+      instead of elementree.ElementTree.
+    * The LDFLAGS setting is now honored when linking binaries.
+    * Trove and TroveChangeSet objects now represent paths as
+      directory/basename pairs.
+    * Changeset dict of absolute file object changes are now indexed more
+      efficiently.
+    * StreamCollection classes can now choose to ignore the skipSet when
+      freezing for a performance boost
+    * Dirnames/basenames are added as a single operation at the beginning
+      of a repository commit to make the ids available for the files
+      build removing the need for large, complex joins later.
 
 Changes in 2.0.50:
   o Bug Fixes:

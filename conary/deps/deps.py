@@ -34,7 +34,9 @@ DEP_CLASS_PERL          = 12
 DEP_CLASS_RUBY          = 13
 DEP_CLASS_PHP           = 14
 DEP_CLASS_TARGET_IS     = 15
-DEP_CLASS_SENTINEL      = 16
+DEP_CLASS_RPM           = 16
+DEP_CLASS_RPMLIB        = 17
+DEP_CLASS_SENTINEL      = 18
 
 DEP_CLASS_NO_FLAGS      = 0
 DEP_CLASS_HAS_FLAGS     = 1
@@ -73,7 +75,11 @@ senseReverseMap = {}
 for key, val in senseMap.iteritems():
     senseReverseMap[val] = key
 
-dependencyClasses = {}
+class DependencyClassRegistry(dict):
+    def __getitem__(self, key):
+        return self.get(key, UnknownDependencyFactory(key))
+
+dependencyClasses = DependencyClassRegistry()
 dependencyClassesByName = {}
 
 def _registerDepClass(classObj):
@@ -342,6 +348,8 @@ class DependencyClass(object):
 
     depFormat = 'WORD'
     flagFormat = 'WORD'
+    WORD = '(?:[.0-9A-Za-z_+-]+)'
+    IDENT = '(?:[0-9A-Za-z_-]+)'
     flags = DEP_CLASS_NO_FLAGS
 
     depNameSignificant = True
@@ -364,8 +372,8 @@ class DependencyClass(object):
         if not class_.allowParseDep:
             return
 
-        d = dict(flagFormat=class_.flagFormat,
-                 depFormat=class_.depFormat)
+        d = dict(flagFormat=class_.flagFormat, depFormat=class_.depFormat,
+                 WORD=class_.WORD, IDENT=class_.IDENT)
 
         # zero or more space-separated flags 
         flagFmt = '(?:\( *(%(flagFormat)s?(?: +%(flagFormat)s)*) *\))?' 
@@ -376,8 +384,8 @@ class DependencyClass(object):
         # sonames.  May need to be larger some day, and probably 
         # could be more restrictive for some groups.  Should not contain
         # /, as that's used as a special char in many dep classes.
-        regexp = regexp.replace('WORD', '(?:[.0-9A-Za-z_+-]+)')
-        regexp = regexp.replace('IDENT', '(?:[0-9A-Za-z_-]+)')
+        regexp = regexp.replace('WORD', d['WORD'])
+        regexp = regexp.replace('IDENT',d['IDENT'])
         class_.regexpStr = regexp
         class_.regexp = re.compile(regexp)
 
@@ -752,6 +760,28 @@ class UseDependency(DependencyClass):
     depNameSignificant = False
 _registerDepClass(UseDependency)
 
+class RpmDependencies(DependencyClass):
+
+    tag = DEP_CLASS_RPM
+    tagName = "rpm"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+    WORD = '(?:[:.0-9A-Za-z_+-]+)'          # allow colons in flags
+    IDENT = '(?:[][.0-9A-Za-z_-]+)'          # allow [] in dep names
+    flagFormat = "WORD"
+    depFormat = "IDENT"
+_registerDepClass(RpmDependencies)
+
+class RpmLibDependencies(DependencyClass):
+
+    tag = DEP_CLASS_RPMLIB
+    tagName = "rpmlib"
+    justOne = False
+    depClass = Dependency
+    flags = DEP_CLASS_OPT_FLAGS
+_registerDepClass(RpmLibDependencies)
+
 def UnknownDependencyFactory(intTag):
     # Factory for unknown classes
     class _UnknownDependency(DependencyClass):
@@ -857,10 +887,7 @@ class DependencySet(object):
         depSetSplit = misc.depSetSplit
         while i < len(frz):
             (i, tag, frozen) = depSetSplit(i, frz)
-            if tag in dependencyClasses:
-                depClass = dependencyClasses[tag]
-            else:
-                depClass = UnknownDependencyFactory(tag)
+            depClass = dependencyClasses[tag]
             a(depClass, depClass.thawDependency(frozen))
 
     def copy(self):

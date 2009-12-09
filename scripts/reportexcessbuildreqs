@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+# -*- mode: python -*-
+#
+# Copyright (c) 2009 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+import os
+import sys
+import bz2
+
+from lxml import etree
+from StringIO import StringIO
+
+from conary import conarycfg
+from conary import conaryclient
+from conary import updatecmd
+from conary import versions
+from conary.deps import deps
+from conary.lib import util
+from conary.local import database
+from conary.repository import netclient
+from conary.versions import Label
+
+# pulls all the debuginfo components from a given install label, parses the
+# build log and reports any excess build requirements. 
+
+def main(argv):
+    installLabel = argv[1]
+    repositoryMap = eval(argv[2])
+    cfg = conarycfg.ConaryConfiguration()
+    cfg.installLabelPath = [installLabel]
+    cfg.repositoryMap = repositoryMap
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+
+    print >> sys.stderr, "Fetching trove list"
+    troveList = [(x,installLabel,None)
+                  for x in repos.troveNames(Label(installLabel))
+                  if x.endswith(':debuginfo')]
+
+    troveDict = repos.findTroves(None, troveList)
+
+    requestList = []
+    for key in troveDict:
+        value = troveDict.get(key);
+        if not value:
+            continue
+        maxVersion = max(x[1] for x in value)
+        value = sorted(x for x in value if x[1] == maxVersion)
+        requestList.extend(value);
+
+    trvList = repos.getTroves(requestList)
+    logfileReqList = []
+    logfileInfoList = []
+    print >> sys.stderr, "Building debuginfo trove list"
+    #for trv in trvList:
+    for trv in trvList:
+        for logfile in [ x for x in trv.iterFileList()
+                         if x[1].endswith('-xml.bz2')]:
+            logfileReqList.append(logfile[2:])
+            logfileInfoList.append((trv.getName().split(':')[0],trv.flavor()))
+
+    print >> sys.stderr, "Fetching %i Files" % len(logfileReqList)
+    fcs = repos.getFileContents(logfileReqList)
+
+    print >> sys.stderr, "Parsing XML files"
+    logfileMap = {}
+    for l in zip(logfileInfoList,fcs):
+        # we strip all 0x08 chars because they are wrong and make the parser
+        # angry
+        xmlFile = StringIO(bz2.decompress(l[1].get().read()).replace('\x08',''))
+        logfileMap[l[0]] = xmlFile
+
+    xpathStr = '/p:log/p:record[p:descriptor="cook.build.policy.'\
+        'ERROR_REPORTING.reportExcessBuildRequires.%s"]'
+    xmlNamespace = 'http://www.rpath.com/permanent/log-v1.xsd'
+    outputMap = {}
+
+    for k in logfileMap:
+        pkgName = k[0]
+        flavor = str(k[1])
+
+        try:
+            tree = etree.parse(logfileMap[k])
+        except etree.XMLSyntaxError:
+            print >> sys.stderr, "XML Syntax Error: skipping package[flavor]: "\
+                "%s[%s]" % (pkgName, flavor)
+
+        def getMessage(name):
+            parent = tree.xpath(
+                xpathStr % name,
+                namespaces={'p' : xmlNamespace})
+            if parent:
+                element = parent[0].xpath('./p:message', namespaces={
+                        'p' : xmlNamespace})
+                assert len(element)==1
+                return element[0].text
+            return None
+
+        reqs = getMessage('excessBuildRequires')
+        if reqs!=None:
+            if pkgName in outputMap:
+                outputMap[pkgName]&=set(reqs.strip().split())
+            else:
+                outputMap[pkgName]=set(reqs.strip().split())
+        else:
+            pass
+            #print >> sys.stderr, "%s[%s] had no excessBuildRequires entry" \
+            #    % (pkgName,flavor)
+    try:
+        print >> sys.stderr, "Merging duplicate entries"
+        x = {}
+        for e in outputMap:
+            xkey = frozenset(outputMap[e])
+            if not xkey:
+                continue
+            if xkey in x:
+                x[xkey].append(e)
+            else:
+                x[xkey] = [e,]
+        retMap = {}
+        retMap.update([ (frozenset(e[1]),e[0]) for e in x.items()])
+    except:
+        print >> sys.stderr, "!We had an exception while merging!"
+        retMap = outputMap
+    return retMap
+
+if __name__ == "__main__":
+    outputMap = main(sys.argv)
+
+    if outputMap:
+        print >> sys.stderr, "Outputting Results to Stdout"
+        print repr(outputMap)
+        sys.exit()
+
+    sys.exit("The outputMap was empty!")

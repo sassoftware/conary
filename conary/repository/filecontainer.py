@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -66,11 +66,10 @@ This code is careful not to depend on the file pointer at all for reading
 (via pread). The file pointer is used while creating file containers.
 """
 
-import gzip
 import struct
 
 import conary.errors
-from conary.lib import util
+from conary.lib import util, fixedgzip as gzip
 from conary.repository import filecontents
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"

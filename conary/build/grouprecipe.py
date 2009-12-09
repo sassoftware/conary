@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -135,7 +135,7 @@ class _GroupRecipe(_BaseGroupRecipe):
     depCheck = False
     autoResolve = None
     imageGroup = True
-    checkOnlyByDefaultDeps = True
+    checkOnlyByDefaultDeps = None
     checkPathConflicts = True
     requireLatest = True
 
@@ -189,6 +189,9 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         if self.autoResolve is None:
             self.autoResolve = self.imageGroup
+        if self.checkOnlyByDefaultDeps is None:
+            self.checkOnlyByDefaultDeps = not self.imageGroup
+
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,
                          checkOnlyByDefaultDeps = self.checkOnlyByDefaultDeps,
@@ -1389,6 +1392,8 @@ class _GroupRecipe(_BaseGroupRecipe):
         if groupName is None:
             groupName = self._getDefaultGroup().name
 
+        self.setDefaultGroup(groupName)
+
         origGroup = self._getGroup(groupName)
         if byDefault is None:
             byDefault = origGroup.byDefault
@@ -1442,7 +1447,9 @@ class _GroupRecipe(_BaseGroupRecipe):
         with 'group-'.
 
         B{imageGroup} : (False) Designate that this group is a image group.
-        Image Group policies will be executed separately on this group.
+        Image Group policies will be executed separately on this group. Image
+        groups are forced to be dep closed for both byDefault False and
+        byDefault True troves.
 
         EXAMPLES
         ========
@@ -1764,7 +1771,7 @@ class SingleGroup(object):
         return self.size
 
     def setCompatibilityClass(self, theClass):
-        if type(theClass) is not int:
+        if not isinstance(theClass, (int, long)):
             raise RecipeFileError('group compatibility classes must be '
                                   'integers')
 
@@ -2909,74 +2916,100 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     # set up a conaryclient to do the dep solving
     client = conaryclient.ConaryClient(cfg)
 
-    if group.checkOnlyByDefaultDeps:
-        troveList = group.iterDefaultTroveList()
-    else:
-        troveList = group.iterTroveList()
-    
-    # build a list of the troves that we're checking so far
-    troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList
-                if not ((n,v,f) in cache and cache.isRedirect((n,v,f)))]
+    def findDeps(troveList, byDefault=True, resolved=None):
+        # Handle no byDefault=True troves
+        if len(troveList) == 0:
+            return []
 
-    # there's nothing worse than seeing a bunch of nice group debugging
-    # information and then having your screen filled up with all 
-    # of the update code's debug mess.
-    resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
-    if resetVerbosity:
-        log.setVerbosity(log.DEBUG)
-    oldRepos = client.getRepos()
-    client.setRepos(TroveCacheWrapper(cache))
-    try:
-        updJob = client.newUpdateJob()
-        suggMap = client.prepareUpdateJob(updJob, troves, recurse = False,
-                                          resolveDeps = True,
-                                          test = True,
-                                          checkPathConflicts=False,
-                                          split = False,
-                                 resolveSource=resolveSource.getResolveMethod())
-    finally:
-        client.setRepos(oldRepos)
+        if resolved is None:
+            resolved = []
 
-    if resetVerbosity:
-        log.setVerbosity(log.LOWLEVEL)
+        # build a list of the troves that we're checking so far
+        troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList
+                    if not ((n,v,f) in cache and cache.isRedirect((n,v,f)))]
 
-    neededTups = []
-    byDefault = group.getByDefault()
-    for troveTup, needs in suggMap.iteritems():
-        if cfg.fullVersions:
-            verStr = troveTup[1]
-        else:
-            verStr = troveTup[1].trailingRevision()
+        # there's nothing worse than seeing a bunch of nice group debugging
+        # information and then having your screen filled up with all 
+        # of the update code's debug mess.
+        resetVerbosity = (log.getVerbosity() == log.LOWLEVEL)
+        if resetVerbosity:
+            log.setVerbosity(log.DEBUG)
+        oldRepos = client.getRepos()
+        client.setRepos(TroveCacheWrapper(cache))
+        try:
+            updJob = client.newUpdateJob()
+            suggMap = client.prepareUpdateJob(updJob, troves, recurse = False,
+                                              resolveDeps = True,
+                                              test = True,
+                                              checkPathConflicts=False,
+                                              split = False,
+                                     resolveSource=resolveSource.getResolveMethod())
+        finally:
+            client.setRepos(oldRepos)
 
-        if cfg.fullFlavors:
-            flavorStr = '[%s]' % troveTup[2]
-        else:
-            flavorStr = ''
+        if resetVerbosity:
+            log.setVerbosity(log.LOWLEVEL)
 
-        log.info("%s=%s%s resolves deps by including:" % (troveTup[0], verStr,
-                                                          flavorStr))
-
-        for provTroveTup in needs:
+        neededTups = []
+        for troveTup, needs in suggMap.iteritems():
             if cfg.fullVersions:
-                verStr = provTroveTup[1]
+                verStr = troveTup[1]
             else:
-                verStr = provTroveTup[1].trailingRevision()
+                verStr = troveTup[1].trailingRevision()
 
             if cfg.fullFlavors:
-                flavorStr = '[%s]' % provTroveTup[2]
+                flavorStr = '[%s]' % troveTup[2]
             else:
                 flavorStr = ''
 
-            log.info("\t%s=%s%s" % (provTroveTup[0], verStr, flavorStr))
-            explicit = True # always include this trove immediately
-                            # in the package, even if it used to be included
-                            # implicitly through a sub-package.
+            log.info("%s=%s%s resolves deps by including:" % (troveTup[0], verStr,
+                                                              flavorStr))
 
-            group.addTrove(provTroveTup, explicit, True, [],
-                           reason=(ADD_REASON_DEP, (troveTup, provTroveTup)))
-            neededTups.append(provTroveTup)
+            for provTroveTup in needs:
+                # Don't include a trove as both byDefault=True and
+                # byDefault=False.
+                if provTroveTup in resolved:
+                    continue
 
-    cache.cacheTroves(neededTups)
+                if cfg.fullVersions:
+                    verStr = provTroveTup[1]
+                else:
+                    verStr = provTroveTup[1].trailingRevision()
+
+                if cfg.fullFlavors:
+                    flavorStr = '[%s]' % provTroveTup[2]
+                else:
+                    flavorStr = ''
+
+                log.info("\t%s=%s%s [%s]" % (provTroveTup[0], verStr, flavorStr,
+                         byDefault and 'byDefault' or 'not byDefault'))
+                explicit = True # always include this trove immediately
+                                # in the package, even if it used to be included
+                                # implicitly through a sub-package.
+
+                group.addTrove(provTroveTup, explicit, byDefault, [],
+                               reason=(ADD_REASON_DEP, (troveTup, provTroveTup)))
+                neededTups.append(provTroveTup)
+
+        cache.cacheTroves(neededTups)
+        return neededTups
+
+    # Resolve all byDefault=True troves and add there deps
+    # as byDefault=True.
+    defaultTroves = set(group.iterDefaultTroveList())
+    newTroves = findDeps(defaultTroves, byDefault=True)
+
+    if group.checkOnlyByDefaultDeps == False:
+        # Get full list of troves to dep resolve and current list of
+        # byDefault=True troves.
+        allTroves = set(group.iterTroveList())
+        resolvedTroves = set(group.iterDefaultTroveList())
+
+        # Resolve deps of all troves adding any new troves as
+        # byDefault=False.
+        newNewTroves = findDeps(allTroves, byDefault=False,
+                                resolved=resolvedTroves)
+
     callback.done()
 
 def checkGroupDependencies(group, cfg, cache, callback):
@@ -2997,7 +3030,9 @@ def checkGroupDependencies(group, cfg, cache, callback):
     client = conaryclient.ConaryClient(cfg)
 
     checker = client.db.getDepStateClass(TroveCacheWrapper(cache),
-                                         findOrdering = False)
+                    findOrdering = False,
+                    ignoreDepClasses = [ deps.AbiDependency,
+                                         deps.RpmLibDependencies ])
     depResult = checker.depCheck(jobSet)
     failedDeps = depResult.unsatisfiedList
     callback.done()
@@ -3005,43 +3040,66 @@ def checkGroupDependencies(group, cfg, cache, callback):
 
 def calcSizeAndCheckHashes(group, troveCache, callback):
     def _getHashConflicts(group, troveCache):
-        # afaict, this is just going to be slow no matter what I do.
-        # I try to at least not have to iterate through any lists more
-        # than once.
-        allPathHashes = {}
-
+        # Get troveTup and pathHashes for all components that are
+        # byDefault True.
         isColl = trove.troveIsCollection
-        neededInfo = [x for x in group.iterTroveListInfo() \
-                                if (x[1] or x[2]) and not isColl(x[0][0]) ]
+        neededInfo = [ (x[0], troveCache.getPathHashes(x[0]))
+                       for x in group.iterTroveListInfo()
+                            if x[2] and not isColl(x[0][0]) ]
 
-
-        for (troveTup, explicit, byDefault, components, requireLatest) \
-                in neededInfo:
-            if not byDefault:
-                continue
-            pathHashes = troveCache.getPathHashes(troveTup)
+        # Get set of conflicting pathHashes
+        allPaths = set()
+        conflictPaths = set()
+        for troveTup, pathHashes in neededInfo:
             if pathHashes is None:
                 continue
-            for pathHash in pathHashes:
-                allPathHashes.setdefault(pathHash, []).append(troveTup)
+            conflictPaths.update(pathHashes & allPaths)
+            allPaths.update(pathHashes)
 
-        conflicts = set(tuple(x) for x in allPathHashes.itervalues() if len(x) > 1)
-        # we've got the sets of conflicting troves, now
-        # determine the set of conflicting files
+        # Find all troves that have conflicting pathHashes
+        conflictLists = {}
+        for troveTup, pathHashes in neededInfo:
+            if pathHashes is None:
+                continue
+            for pathHash in conflictPaths & pathHashes:
+                conflictLists.setdefault(pathHash, set()).add(troveTup)
+
+        # We've got the sets of conflicting troves, now
+        # determine the set of conflicting files.
         trovesWithFiles = {}
-
         conflictsWithFiles = []
-        for conflictSet in conflicts:
+        for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
+            # Find troves to cache
             needed = [ x for x in conflictSet if x not in trovesWithFiles ]
             troves = troveCache.repos.getTroves(needed, withFiles=True)
             trovesWithFiles.update(dict(izip(needed, troves)))
-            conflicting = set(x[1] for x \
-                              in trovesWithFiles[conflictSet[0]].iterFileList())
-            for tup in conflictSet[1:]:
-                conflicting &= set(x[1] for x in \
-                                trovesWithFiles[tup].iterFileList())
 
-            conflictsWithFiles.append((conflictSet, conflicting))
+            # Build set of paths which conflicts across these troves
+            conflictingPaths = None
+            for tup in conflictSet:
+                newPaths = set( x[1] for x
+                          in trovesWithFiles[tup].iterFileList())
+                if conflictingPaths is None:
+                    conflictingPaths = newPaths
+                else:
+                    conflictingPaths &= newPaths
+
+            # If all of the troves share the same fileId for a path,
+            # it's not actually conflicting. This is expensive because
+            # we can't look up a path in a trove, just pathIds.
+            paths = []
+            for path in conflictingPaths:
+                fileIds = set()
+                for tup in conflictSet:
+                    fileIds |= set( x[2]
+                                for x in trovesWithFiles[tup].iterFileList()
+                                        if x[1] == path)
+
+                if len(fileIds) > 1:
+                    paths.append(path)
+
+            if paths:
+                conflictsWithFiles.append((conflictSet, paths))
 
         return conflictsWithFiles
 

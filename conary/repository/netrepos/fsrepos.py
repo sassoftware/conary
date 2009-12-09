@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,9 +14,13 @@
 
 # implements a db-based repository
 
+import cPickle
 import errno
-import traceback
+import itertools
+import os
 import sys
+import tempfile
+import traceback
 
 from conary import files, trove, callbacks
 from conary.deps import deps
@@ -32,10 +36,31 @@ from conary.server import schema
 class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, repos, cs, *args, **kw):
         self.mirror = kw.get('mirror', False)
+        self.requireSigs = kw.pop('requireSigs', False)
+        self.callback = kw.get('callback', False)
 
-        repos.troveStore.addTroveSetStart()
+        self.addTroveSetStart(repos, cs)
         ChangeSetJob.__init__(self, repos, cs, *args, **kw)
-        repos.troveStore.addTroveSetDone()
+        repos.troveStore.addTroveSetDone(self.callback)
+
+    def addTroveSetStart(self, repos, cs):
+        newDirNames = set()
+        newBaseNames = set()
+        oldTroves = []
+        for i, csTrove in enumerate(cs.iterNewTroveList()):
+            if csTrove.getOldVersion():
+                oldTroves.append(csTrove.getOldNameVersionFlavor())
+
+            for fileInfo in itertools.chain(
+                                csTrove.getNewFileList(raw = True),
+                                csTrove.getChangedFileList(raw = True)):
+                if fileInfo[1] is None:
+                    continue
+
+                newDirNames.add(fileInfo[1])
+                newBaseNames.add(fileInfo[2])
+
+        repos.troveStore.addTroveSetStart(oldTroves, newDirNames, newBaseNames)
 
     def _containsFileContents(self, sha1iter):
         return self.repos.troveStore.hasFileContents(sha1iter)
@@ -63,18 +88,48 @@ class FilesystemChangeSetJob(ChangeSetJob):
         if callback.keyCache is None:
             callback.keyCache = openpgpkey.getKeyCache()
         for fingerprint, timestamp, sig in trv.troveInfo.sigs.digitalSigs.iter():
-            pubKey = callback.keyCache.getPublicKey(fingerprint)
-            if pubKey.isRevoked():
-                raise openpgpfile.IncompatibleKey('Key %s is revoked'
-                                                  %pubKey.getFingerprint())
-            expirationTime = pubKey.getTimestamp()
-            if expirationTime and expirationTime < timestamp:
-                raise openpgpfile.IncompatibleKey('Key %s is expired'
-                                                  %pubKey.getFingerprint())
+            try:
+                pubKey = callback.keyCache.getPublicKey(fingerprint)
+                if pubKey.isRevoked():
+                    raise openpgpfile.IncompatibleKey('Key %s is revoked'
+                                                      %pubKey.getFingerprint())
+                expirationTime = pubKey.getTimestamp()
+                if expirationTime and expirationTime < timestamp:
+                    raise openpgpfile.IncompatibleKey('Key %s is expired'
+                                                      %pubKey.getFingerprint())
+            except openpgpfile.KeyNotFound:
+                # missing keys could be okay; that depends on the threshold
+                # we've set. it's the callbacks problem in any case.
+                pass
+
         res = ChangeSetJob.checkTroveSignatures(self, trv, callback)
-        if len(res[1]):
+        if len(res[1]) and self.requireSigs:
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
+
+class UpdateCallback(callbacks.UpdateCallback):
+    def __init__(self, statusPath, trustThreshold, keyCache):
+        self.path = statusPath
+        if statusPath:
+            self.tmpDir = os.path.dirname(statusPath)
+        callbacks.UpdateCallback.__init__(self, trustThreshold, keyCache)
+
+    def _dumpStatus(self, *args):
+        if self.path:
+            # make the new status dump in a temp location
+            # for atomicity
+            (fd, path) = tempfile.mkstemp(dir = self.tmpDir,
+                                          suffix = '.commit-status')
+            buf = cPickle.dumps(args)
+            os.write(fd, buf)
+            os.close(fd)
+            os.rename(path, self.path)
+
+    def creatingDatabaseTransaction(self, *args):
+        self._dumpStatus('creatingDatabaseTransaction', *args)
+
+    def updatingDatabase(self, *args):
+        self._dumpStatus('updatingDatabase', *args)
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -126,6 +181,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return self.troveStore.getTrove(
             pkgName, version, flavor, withFiles = withFiles,
             hidden = hidden)
+
+    def iterTroves(self, troveList, withFiles = True, hidden = False):
+        return self.troveStore.iterTroves(troveList, withFiles = withFiles,
+                                          hidden = hidden)
 
     def getParentTroves(self, troveList):
         return self.troveStore.getParentTroves(troveList)
@@ -189,36 +248,57 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                 yield fileObj
 
-    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId,
-                       fileVersion, fileStream = None):
-	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId,
-                                fileVersion, fileStream = fileStream)
+    def addFileVersion(self, troveInfo, pathId, path, fileId,
+                       fileVersion, fileStream = None, withContents = True):
+        troveInfo.addFile(pathId, path, fileId, fileVersion,
+                          fileStream = fileStream, withContents = withContents)
 
     ###
 
-    def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False):
+    def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False,
+                        excludeCapsuleContents = False, callback = None,
+                        statusPath = None):
+        # when we add troves (no removals) we disable constraints on
+        # the TroveFiles table; it speeds up large commits massively on
+        # postgres
+        enableConstraints = True
+
 	# let's make sure commiting this change set is a sane thing to attempt
-	for pkg in cs.iterNewTroveList():
-	    v = pkg.getNewVersion()
+        for trvCs in cs.iterNewTroveList():
+            if trvCs.troveType() == trove.TROVE_TYPE_REMOVED:
+                enableConstraints = False
+
+            v = trvCs.getNewVersion()
             if v.isOnLocalHost():
                 label = v.branch().label()
 		raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
         self.troveStore.begin(serialize)
+
+        if enableConstraints:
+            enableConstraints = self.troveStore.db.disableTableConstraints(
+                                            'TroveFiles')
+
         if self.requireSigs:
             threshold = openpgpfile.TRUST_FULL
         else:
             threshold = openpgpfile.TRUST_UNTRUSTED
-        # Callback for signature verification
-        callback = callbacks.UpdateCallback(trustThreshold=threshold,
-                            keyCache=self.troveStore.keyTable.keyCache)
+        # Callback for signature verification and progress
+        if statusPath:
+            assert not callback
+            callback = UpdateCallback(statusPath=statusPath,
+                    trustThreshold=threshold,
+                    keyCache=self.troveStore.keyTable.keyCache)
         try:
             # reset time stamps only if we're not mirroring.
             FilesystemChangeSetJob(self, cs, self.serverNameList,
                                    resetTimestamps = not mirror,
                                    callback=callback,
                                    mirror = mirror,
-                                   hidden = hidden)
+                                   hidden = hidden,
+                                   excludeCapsuleContents =
+                                        excludeCapsuleContents,
+                                   requireSigs = self.requireSigs)
         except openpgpfile.KeyNotFound:
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
@@ -238,6 +318,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                     trv = self.getTrove(withFiles = True, *newTuple)
                     assert(trv.verifyDigests())
+
+            if enableConstraints:
+                enableConstraints.enable()
 
             self.troveStore.commit()
 
@@ -281,10 +364,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def createChangeSet(self, origTroveList, recurse = True,
                         withFiles = True, withFileContents = True,
+                        excludeCapsuleContents = False,
                         excludeAutoSource = False,
                         mirrorMode = False, roleIds = None):
 	"""
-	troveList is a list of (troveName, flavor, oldVersion, newVersion,
+	@param troveList: a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
 
 	if oldVersion == None and absolute == 0, then the trove is assumed
@@ -294,6 +378,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         if recurse is set, this yields one result for the entire troveList.
         If recurse is not set, it yields one result per troveList entry.
+
+        @param excludeCapsuleContents: If True, troves which include capsules
+        have all of their content excluded from the changeset no matter how
+        withFileContents is set.
 	"""
 	cs = changeset.ChangeSet()
         externalTroveList = []
@@ -451,8 +539,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		cs.addFile(oldFileId, newFileId, filecs)
 
+                if (excludeCapsuleContents and new.troveInfo.capsule.type and
+                               new.troveInfo.capsule.type()):
+                    continue
                 if not withFileContents or (excludeAutoSource and
-                   newFile.flags.isAutoSource()):
+                   newFile.flags.isAutoSource()) or newFile.flags.isPayload():
                     continue
 
 		# this test catches files which have changed from not

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -248,6 +248,10 @@ class Run(BuildCommand):
 
     def do(self, macros):
 	macros = macros.copy()
+        # blank initial macros for determining requirements (CNY-3222)
+        macros.envcmd = ''
+        macros.cdcmd = ''
+        self._addActionPathBuildRequires([self.command % macros])
 
         envStr = ''
         if self.wrapdir:
@@ -1202,6 +1206,9 @@ class CompilePython(BuildCommand):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe.
+    B{pythonInterpreter} : (None) If set, must be a string that specifies an 
+    absolute path to an alternative python interpreter to be used to compile
+    the python source.
 
     EXAMPLES
     ========
@@ -1212,15 +1219,19 @@ class CompilePython(BuildCommand):
     the absolute path defined by C{%(varmmdir)s}.
     """
     _actionPathBuildRequires = set(['python'])
+
+    keywords = { 'pythonInterpreter' : 'python' }
+
     template = (
-	"""python -c 'from compileall import *; compile_dir("""
+	"""%%(pythonInterpreter)s -c 'from compileall import *; compile_dir("""
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'; """
-	"""python -O -c 'from compileall import *; compile_dir("""
+	"""%%(pythonInterpreter)s -O -c 'from compileall import *; compile_dir("""
 	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'"""
     )
 
     def do(self, macros):
 	macros = macros.copy()
+        macros['pythonInterpreter'] = self.pythonInterpreter
 	destdir = macros['destdir']
 	destlen = len(destdir)
 	for arg in self.arglist:
@@ -1233,7 +1244,6 @@ class CompilePython(BuildCommand):
 	    for directory in util.braceGlob(destdir+arg):
 		macros['dir'] = directory[destlen:]
 		util.execute(self.command %macros)
-
 
 class PythonSetup(BuildCommand):
     """
@@ -1777,7 +1787,7 @@ class SetModes(_FileAction):
 	self.paths = args[:split]
 	self.mode = args[split]
 	# raise error while we can still tell what is wrong...
-	if type(self.mode) is not int:
+        if not isinstance(self.mode, (int, long)):
 	    self.init_error(TypeError, 'mode %s is not integer' % str(self.mode))
 
     def do(self, macros):
@@ -2278,6 +2288,10 @@ class Remove(BuildAction):
     B{recursive} : (False) Specifying this keyword as True when using
     C{r.Remove()} on a directory will remove both the contents of the
     directory I{and} the directory.
+
+    B{allowNoMatch} : (False) Specifying this keyword as True when using
+    C{r.Remove()} will allow C{r.Remove()} to succeed even if no files
+    are matched and therefore no action is taken.
 
     EXAMPLES
     ========

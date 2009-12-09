@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+# -*- mode: python -*-
+#
+# Copyright (c) 2009 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import itertools, os, sys
+from optparse import OptionParser
+
+fullPath = os.path.abspath(os.path.dirname(sys.argv[0]))
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg, conaryclient, trove
+
+NO_VF = None, None
+
+
+def main(args):
+    cfg = conarycfg.ConaryConfiguration(True)
+
+    def configCallback(option, opt, val, parser):
+        cfg.configLine(val)
+
+    def configFileCallback(option, opt, val, parser):
+        cfg.readFile(val)
+
+    parser = OptionParser(usage="usage: %prog <out.ccs> [troveSpecs]+")
+    parser.add_option('--config-file', type = "string", action = "callback",
+                      callback = configFileCallback,
+                      help = "configuration file to load after the defaults")
+    parser.add_option('--config', action = "callback", type = "string",
+                      callback = configCallback,
+                      help = "configuration statement")
+    parser.add_option('--skip-debuginfo', action='store_true')
+    options, args = parser.parse_args(args)
+    if len(args) < 2:
+        parser.error("Not enough arguments")
+    outFile = args.pop(0)
+    changeSpecs = conaryclient.cmdline.parseChangeList(args)
+
+    cb = conaryclient.callbacks.ChangesetCallback()
+    cl = conaryclient.ConaryClient(cfg = cfg)
+    repos = cl.getRepos()
+
+    troveSpecs = []
+    jobSummaries = []
+    for name, (oldVer, oldFlav), (newVer, newFlav), _ in changeSpecs:
+        newSpec = name, newVer, newFlav
+        troveSpecs.append(newSpec)
+        if oldVer:
+            oldSpec = name, oldVer, oldFlav
+            troveSpecs.append(oldSpec)
+            jobSummaries.append((oldSpec, newSpec))
+        else:
+            jobSummaries.append((None, newSpec))
+
+    trvInfoDict = repos.findTroves([], troveSpecs)
+
+    masterJob = []
+    for jobSummary in jobSummaries:
+        new = sorted(trvInfoDict[jobSummary[1]])[-1]
+        if jobSummary[0]:
+            old = sorted(trvInfoDict[jobSummary[0]])[-1]
+            masterJob.append( (old[0], old[1:], new[1:], False) )
+        else:
+            masterJob.append( (new[0], NO_VF, new[1:], True) )
+
+    skipComponents = set()
+    if options.skip_debuginfo:
+        skipComponents.add('debuginfo')
+
+    createCompleteChangeSet(repos, masterJob, outFile, cb, skipComponents)
+
+
+def createCompleteChangeSet(repos, masterJob, filename=None, callback=None,
+        skipComponents=()):
+
+    # Create fake troves to stuff the old and new subtroves into. We will then
+    # diff the fake troves to figure out which relative changesets to generate.
+    oldSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
+    newSet = trove.Trove('@list', masterJob[0][2][0], masterJob[0][2][1])
+
+    subTrovesJob = []
+    for name, oldVF, newVF, _ in masterJob:
+        if oldVF[0]:
+            subTrovesJob.append( (name, NO_VF, oldVF, True) )
+        subTrovesJob.append( (name, NO_VF, newVF, True) )
+    cs = repos.createChangeSet(subTrovesJob, recurse=False, callback=callback,
+            withFiles=False)
+
+    for name, oldVF, newVF, _ in masterJob:
+        if oldVF[0]:
+            oldTrv = trove.Trove(cs.getNewTroveVersion(name, *oldVF),
+                    skipIntegrityChecks=True)
+            for info in oldTrv.iterTroveList(strongRefs=True, weakRefs=True):
+                oldSet.addTrove(presentOkay = True, *info)
+
+        newTrv = trove.Trove(cs.getNewTroveVersion(name, *newVF),
+                skipIntegrityChecks=True)
+        for info in newTrv.iterTroveList(strongRefs=True, weakRefs=True):
+            newSet.addTrove(presentOkay = True, *info)
+
+    masterJob += newSet.diff(oldSet, False)[2]
+    finalJob = set()
+    for name, oldVF, newVF, absolute in masterJob:
+        if ':' in name and name.split(':')[1] in skipComponents:
+            continue
+        if oldVF == NO_VF:
+            absolute = True
+        finalJob.add( (name, oldVF, newVF, absolute) )
+    finalJob = sorted(finalJob)
+
+    if filename:
+        return repos.createChangeSetFile(finalJob, filename, recurse=False,
+                callback=callback)
+    else:
+        return repos.createChangeSet(finalJob, recurse=False,
+                callback=callback)
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,7 +18,6 @@ import stat
 import string
 import xml.dom.minidom
 import zipfile
-import gzip as gzip_module
 import bz2
 
 from conary import rpmhelper
@@ -26,6 +25,7 @@ from conary.lib import debhelper
 from conary.lib import elf
 from conary.lib import javadeps
 from conary.lib import util
+from conary.lib import fixedgzip as gzip_module
 
 class Magic(object):
     __slots__ = ['path', 'basedir', 'contents', 'name']
@@ -97,6 +97,15 @@ class bzip(Magic):
 	self.contents['compression'] = buffer[3]
 
 class tar_bz2(bzip, tar):
+    def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
+        bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
+        tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
+
+class xz(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+
+class tar_xz(bzip, tar):
     def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
         bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
         tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
@@ -312,6 +321,9 @@ def magic(path, basedir=''):
             # bz2 raises IOError instead of any module specific errors
             pass
         return bzip(path, basedir, b)
+    elif len(b) > 6 and b[0:6] == "\xFD\x37\x7A\x58\x5A\x00":
+        # http://tukaani.org/xz/xz-file-format.txt
+        return xz(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":

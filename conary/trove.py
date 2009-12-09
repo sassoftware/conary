@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -39,6 +39,9 @@ TROVE_VERSION=10
 # the difference between 10 and 11 is that the REMOVED type appeared, 
 # and we allow group redirects; 11 is used *only* for those situations
 TROVE_VERSION_1_1=11
+
+# files with this magic pathId are capsules
+CAPSULE_PATHID = '\0' * 16
 
 @api.developerApi
 def troveIsCollection(troveName):
@@ -91,11 +94,41 @@ class TroveTuple(streams.StreamSet):
 
         return cmp(first, second)
 
+    def asTuple(self):
+        return self.name(), self.version(), self.flavor()
+
     def __hash__(self):
-        return hash((self.name(), self.version(), self.flavor()))
+        return hash(self.asTuple())
+
+class TroveMtimes(list, streams.InfoStream):
+
+    def thaw(self, frz):
+        del self[:]
+        count = len(frz) / 4
+        self.extend(struct.unpack("!" + ("I" * count), frz))
+
+    def freeze(self, skipSet = None):
+        count = len(self)
+        return struct.pack("!" + ("I" * count), *self)
+
+    def diff(self, other):
+        # absolute diff. gross but easy
+        return self.freeze()
+
+    def twm(self, diff, base):
+        assert(self == base)
+        self.thaw(diff)
+
+    def __eq__(self, other, skipSet = None):
+        return list.__eq__(self, other)
+
+    def __init__(self, frz = None):
+        if frz:
+            self.thaw(frz)
 
 class TroveTupleList(streams.StreamCollection):
     streamDict = { 1 : TroveTuple }
+    ignoreSkipSet = True
 
     def add(self, name, version, flavor):
         dep = TroveTuple()
@@ -112,6 +145,7 @@ class TroveTupleList(streams.StreamCollection):
 
 class VersionListStream(streams.OrderedStreamCollection):
     streamDict = { 1 : StringVersionStream }
+    ignoreSkipSet = True
 
     def append(self, ver):
         v = streams.StringVersionStream()
@@ -194,6 +228,7 @@ class SingleTroveRedirect(streams.StreamSet):
 
 class TroveRedirectList(streams.StreamCollection):
     streamDict = { 1 : SingleTroveRedirect }
+    ignoreSkipSet = True
 
     def add(self, name, branch, flavor):
         dep = SingleTroveRedirect()
@@ -952,7 +987,48 @@ _TROVEINFO_TAG_SEARCH_PATH    = 24
 _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
-_TROVEINFO_TAG_LAST           = 27
+_TROVEINFO_TAG_CAPSULE        = 28
+_TROVEINFO_TAG_MTIMES         = 29
+_TROVEINFO_TAG_LAST           = 29
+
+_TROVECAPSULE_TYPE            = 0
+_TROVECAPSULE_RPM             = 1
+_TROVECAPSULE_TYPE_CONARY     = ''
+_TROVECAPSULE_TYPE_RPM        = 'rpm'
+
+_TROVECAPSULE_RPM_NAME        = 0
+_TROVECAPSULE_RPM_VERSION     = 1
+_TROVECAPSULE_RPM_RELEASE     = 2
+_TROVECAPSULE_RPM_ARCH        = 3
+_TROVECAPSULE_RPM_EPOCH       = 4
+
+class TroveCapsule(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_RPM_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_RPM_VERSION : (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_RPM_RELEASE : (DYNAMIC, streams.StringStream, 'release' ),
+        _TROVECAPSULE_RPM_ARCH    : (DYNAMIC, streams.StringStream, 'arch' ),
+        _TROVECAPSULE_RPM_EPOCH   : (DYNAMIC, streams.IntStream,    'epoch' ),
+    }
+
+    def reset(self):
+        self.name.set(None)
+        self.version.set(None)
+        self.release.set(None)
+        self.arch.set(None)
+        self.epoch.set(None)
+
+class TroveCapsule(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
+        _TROVECAPSULE_RPM      : (SMALL, TroveCapsule,         'rpm'  ),
+    }
+
+    def reset(self):
+        self.type.set(None)
+        self.rpm.reset()
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -1051,8 +1127,10 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_FACTORY       : (DYNAMIC, streams.StringStream, 'factory' ),
         _TROVEINFO_TAG_SEARCH_PATH   : (DYNAMIC, SearchPath,          'searchPath'),
         _TROVEINFO_TAG_PKGCREATORDATA: (DYNAMIC, streams.StringStream,'pkgCreatorData'),
-        _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,         'derivedFrom' ),
-        _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,    'clonedFromList' ),
+        _TROVEINFO_TAG_DERIVEDFROM   : (DYNAMIC, LoadedTroves,        'derivedFrom' ),
+        _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,   'clonedFromList' ),
+        _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
+        _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1143,9 +1221,10 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
         this way is a bit odd, but it's simple and well-defined.
         """
         l = []
-        for (pathId, (path, fileId, version)) in self.iteritems():
+        for (pathId, (dirName, baseName, fileId, version)) in self.iteritems():
             v = version.asString()
-            s = misc.pack("!S16S20SHSH", pathId, fileId, path, v);
+            s = misc.pack("!S16S20SHSH", pathId, fileId,
+                          os.path.join(dirName, baseName), v);
             l.append((len(s), s))
 
         l.sort()
@@ -1576,25 +1655,52 @@ class Trove(streams.StreamSet):
         return self.type()
 
     def addFile(self, pathId, path, version, fileId):
-	assert(len(pathId) == 16)
-	assert(fileId is None or len(fileId) == 20)
+        dirName, baseName = os.path.split(path)
+        self.addRawFile(pathId, dirName, baseName, version, fileId)
+
+    def addRawFile(self, pathId, dirName, baseName, version, fileId):
+        assert(len(pathId) == 16)
+        assert(fileId is None or len(fileId) == 20)
         assert(not self.type())
-	self.idMap[pathId] = (path, fileId, version)
+        self.idMap[pathId] = (dirName, baseName, fileId, version)
+
+    def addRpmCapsule(self, path, version, fileId, (name, pkgVersion,
+                      release, arch, epoch)):
+        assert(len(fileId) == 20)
+        dir, base = os.path.split(path)
+        self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
+        self.troveInfo.capsule.type.set('rpm')
+        self.troveInfo.capsule.rpm.name.set(name)
+        self.troveInfo.capsule.rpm.version.set(pkgVersion)
+        self.troveInfo.capsule.rpm.release.set(release)
+        self.troveInfo.capsule.rpm.arch.set(arch)
+        self.troveInfo.capsule.rpm.epoch.set(epoch)
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()
         self.troveInfo.dirHashes.clear()
-        for path, fileId, version in self.idMap.itervalues():
-            self.troveInfo.dirHashes.addPath(os.path.dirname(path))
-            self.troveInfo.pathHashes.addPath(path)
+        for dirName, base, fileId, version in self.idMap.itervalues():
+            self.troveInfo.dirHashes.addPath(dirName)
+            self.troveInfo.pathHashes.addPath(os.path.join(dirName, base))
 
     # pathId is the only thing that must be here; the other fields could
     # be None
     def updateFile(self, pathId, path, version, fileId):
-	(origPath, origFileId, origVersion) = self.idMap[pathId]
+        if not path:
+            dirName = None
+            baseName = None
+        else:
+            dirName, baseName = os.path.split(path)
+            dirName = dirName
+            baseName = baseName
 
-	if not path:
-	    path = origPath
+        self.updateRawFile(pathId, dirName, baseName, version, fileId)
+
+    def updateRawFile(self, pathId, dirName, baseName, version, fileId):
+	(origDir, origBase, origFileId, origVersion) = self.idMap[pathId]
+
+	if baseName is None:
+            dirName, baseName = origDir, origBase
 
 	if not version:
 	    version = origVersion
@@ -1602,29 +1708,38 @@ class Trove(streams.StreamSet):
 	if not fileId:
 	    fileId = origFileId
 	    
-	self.idMap[pathId] = (path, fileId, version)
+	self.idMap[pathId] = (dirName, baseName, fileId, version)
 
     @api.developerApi
     def removeFile(self, pathId):   
 	del self.idMap[pathId]
 
-	return self.idMap.iteritems()
+	#return self.idMap.iteritems()
 
     def removeAllFiles(self):
         self.idMap = TroveRefsFilesStream()
 
-    def iterFileList(self):
-	# don't use idMap.iteritems() here; we don't want to exposure
-	# our internal format
-	for (theId, (path, fileId, version)) in self.idMap.iteritems():
-	    yield (theId, path, fileId, version)
+    def iterFileList(self, members = None, capsules = False):
+        if members is None:
+            members = (not capsules)
+
+        if capsules and not self.troveInfo.capsule.type():
+            # We were asked for only the capsules, but this is a
+            # conary format trove. That means everything is its own
+            # capsule, so return everything
+            members = True
+
+        for (theId, (path, base, fileId, version)) in self.idMap.iteritems():
+            if ( (theId != CAPSULE_PATHID and members) or
+                 (theId == CAPSULE_PATHID and capsules) ):
+                yield (theId, os.path.join(path, base), fileId, version)
 
     def emptyFileList(self):
         return len(self.idMap) == 0
 
     def getFile(self, pathId):
         x = self.idMap[pathId]
-	return (x[0], x[1], x[2])
+	return (os.path.join(x[0], x[1]), x[2], x[3])
 
     def hasFile(self, pathId):
 	return self.idMap.has_key(pathId)
@@ -1748,7 +1863,8 @@ class Trove(streams.StreamSet):
 
     # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
     def applyChangeSet(self, trvCs, skipIntegrityChecks = False, 
-                       allowIncomplete = False, skipFiles = False):
+                       allowIncomplete = False, skipFiles = False,
+                       needNewFileMap = False):
 	"""
 	Updates the trove from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
@@ -1775,19 +1891,29 @@ class Trove(streams.StreamSet):
 	fileMap = {}
 
         if not skipFiles:
-            for (pathId, path, fileId, fileVersion) in trvCs.getNewFileList():
-                self.addFile(pathId, path, fileVersion, fileId)
-                fileMap[pathId] = self.idMap[pathId] + \
-                                    (self.name(), None, None, None)
+            for (pathId, dirName, baseName, fileId, fileVersion) in \
+                            trvCs.getNewFileList(raw = True):
+                self.addRawFile(pathId, dirName, baseName, fileVersion, fileId)
+                if needNewFileMap:
+                    fileMap[pathId] = self.idMap[pathId] + \
+                                        (self.name(), None, None, None)
 
-            for (pathId, path, fileId, fileVersion) in \
-                                                    trvCs.getChangedFileList():
-                (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
-                self.updateFile(pathId, path, fileVersion, fileId)
+            for (pathId, dirName, baseName, fileId, fileVersion) in \
+                                        trvCs.getChangedFileList(raw = True):
+                (oldDir, oldBase, oldFileId, oldVersion) = self.idMap[pathId]
+                self.updateRawFile(pathId, dirName, baseName, fileVersion,
+                                   fileId)
                 # look up the path/version in self.idMap as the ones here
                 # could be None
-                fileMap[pathId] = self.idMap[pathId] + \
-                                (self.name(), oldPath, oldFileId, oldVersion)
+                if baseName is not None:
+                    path = os.path.join(dirName, baseName)
+                else:
+                    path = None
+
+                if needNewFileMap:
+                    fileMap[pathId] = (None, fileVersion, fileId, self.name(),
+                                       os.path.join(oldDir, oldBase),
+                                       oldFileId, oldVersion)
 
             for pathId in trvCs.getOldFileList():
                 self.removeFile(pathId)
@@ -2062,20 +2188,23 @@ class Trove(streams.StreamSet):
                 chgSet.oldFile(pathId)
 
             for pathId in addedIds:
-                (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
-                filesNeeded.append((pathId, None, None, selfFileId, 
+                (selfDir, selfBase, selfFileId, selfVersion) = \
+                            self.idMap[pathId]
+                filesNeeded.append((pathId, None, None, selfFileId,
                                     selfVersion))
-                chgSet.newFile(pathId, selfPath, selfFileId, selfVersion)
+                chgSet.newFile(pathId, os.path.join(selfDir, selfBase),
+                               selfFileId, selfVersion)
 
             for pathId in sameIds.keys():
-                (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
-                (themPath, themFileId, themVersion) = themMap[pathId]
-
+                (selfDir, selfBase, selfFileId,
+                                    selfVersion) = self.idMap[pathId]
+                (themDir, themBase, themFileId,
+                                    themVersion) = themMap[pathId]
                 newPath = None
                 newVersion = None
 
-                if selfPath != themPath:
-                    newPath = selfPath
+                if selfDir != themDir or selfBase != themBase:
+                    newPath = os.path.join(selfDir, selfBase)
 
                 if selfVersion != themVersion or themFileId != selfFileId:
                     newVersion = selfVersion
@@ -3011,10 +3140,12 @@ class ReferencedFileList(list, streams.InfoStream):
     def freeze(self, skipSet = {}):
 	l = []
 
-	for (pathId, path, fileId, version) in self:
+	for (pathId, dirName, baseName, fileId, version) in self:
 	    l.append(pathId)
-	    if not path:
-		path = ""
+            if baseName is None:
+                path = ""
+            else:
+                path = os.path.join(dirName, baseName)
 
 	    l.append(struct.pack("!H", len(path)))
 	    l.append(path)
@@ -3047,8 +3178,18 @@ class ReferencedFileList(list, streams.InfoStream):
         while i < len(data):
             i, (pathId, path, fileId, verStr) = misc.unpack("!S16SHSHSH", i, 
                                                             data)
-            if not path: path = None
-            if not fileId: fileId = None
+            if not path:
+                dirName = None
+                baseName = None
+            else:
+                dirName, baseName = os.path.split(path)
+                dirName = intern(dirName)
+                baseName = intern(baseName)
+
+            if not fileId:
+                fileId = None
+            else:
+                fileId = intern(fileId)
 
             if verStr == lastVerStr:
                 version = lastVer
@@ -3059,7 +3200,8 @@ class ReferencedFileList(list, streams.InfoStream):
             else:
                 version = None
 
-	    self.append((pathId, path, fileId, version))
+            self.append((pathId, dirName, baseName, fileId,
+                         version))
 
     def __init__(self, data = None):
 	list.__init__(self)
@@ -3135,10 +3277,16 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	return self.tcsType() == _TCS_TYPE_ABSOLUTE
 
     def newFile(self, pathId, path, fileId, version):
-	self.newFiles.append((pathId, path, fileId, version))
+        dirName, baseName = os.path.split(path)
+        self.newFiles.append((pathId, dirName, baseName, fileId, version))
 
-    def getNewFileList(self):
-	return self.newFiles
+    # raw means separate dirName/baseName in the tuple
+    def getNewFileList(self, raw = False):
+        if raw:
+            return self.newFiles
+
+        return [ (x[0], os.path.join(x[1], x[2]), x[3], x[4])
+                            for x in self.newFiles]
 
     def oldFile(self, pathId):
 	self.oldFiles.append(pathId)
@@ -3268,7 +3416,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         # backwards-compatibility?
         if oldCompatibilityClass is None:
             return False
-        assert(type(oldCompatibilityClass) == int)
+        assert isinstance(oldCompatibilityClass, (int, long))
 
         thisCompatClass = self.getNewCompatibilityClass()
 
@@ -3375,10 +3523,28 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     # path and/or version can be None
     def changedFile(self, pathId, path, fileId, version):
-	self.changedFiles.append((pathId, path, fileId, version))
+        if path:
+            dirName, baseName = os.path.split(path)
+        else:
+            dirName = None
+            baseName = None
 
-    def getChangedFileList(self):
-	return self.changedFiles
+        self.changedFiles.append((pathId, dirName, baseName, fileId, version))
+
+    # raw means separate dirName/baseName in the tuple
+    def getChangedFileList(self, raw = False):
+        if raw:
+            return self.changedFiles
+
+        l = []
+        for t in self.changedFiles:
+            if t[1] is not None or t[2] is not None:
+                t = (t[0], os.path.join(t[1], t[2]), t[3], t[4])
+            else:
+                t = (t[0], None, t[3], t[4])
+            l.append(t)
+
+        return l
 
     def hasChangedFiles(self):
         return (len(self.newFiles) + len(self.changedFiles) + 
@@ -3494,7 +3660,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         for redirect in self.redirects.iter():
             print '\t-> %s=%s' % (redirect.name(), redirect.branch())
 
-	for (pathId, path, fileId, version) in self.newFiles:
+	for (pathId, path, fileId, version) in self.getNewFileList():
 	    #f.write("\tadded (%s(.*)%s)\n" % (pathId[:6], pathId[-6:]))
             change = changeSet.getFileChange(None, fileId)
             fileobj = files.ThawFile(change, pathId)
@@ -3509,7 +3675,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
                      fileobj.inode.group(), fileobj.sizeString(),
                      fileobj.timeString(), name))
 
-	for (pathId, path, fileId, version) in self.changedFiles:
+	for (pathId, path, fileId, version) in self.getChangedFileList():
 	    pathIdStr = sha1helper.md5ToString(pathId)
 	    if path:
 		f.write("\tchanged %s (%s(.*)%s)\n" % 
@@ -3572,7 +3738,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
             return TroveInfo.find(_TROVEINFO_TAG_PATH_HASHES,
                                   self.troveInfoDiff())
 
-        return NOne
+        return None
 
 class TroveChangeSet(AbstractTroveChangeSet):
 

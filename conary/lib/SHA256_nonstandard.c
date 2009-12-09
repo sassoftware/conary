@@ -35,6 +35,8 @@
 #define MODULE_NAME SHA256_nonstandard
 #define DIGEST_SIZE 32
 
+#include "pycompat.h"
+
 typedef unsigned char U8;
 #ifdef __alpha__
 typedef    unsigned int        U32;
@@ -215,7 +217,7 @@ hash_digest (const hash_state *self)
 
 	hash_copy((hash_state*)self,&temp);
 	sha_done(&temp,digest);
-	return PyString_FromStringAndSize(digest, 32);
+	return PYBYTES_FromStringAndSize((const char*)digest, 32);
 }
 
 #ifdef HAVE_CONFIG_H
@@ -237,7 +239,7 @@ typedef struct {
 	hash_state st;
 } ALGobject;
 
-staticforward PyTypeObject ALGtype;
+static PyTypeObject ALGtype;
 
 #define is_ALGobject(v) ((v)->ob_type == &ALGtype)
 
@@ -303,28 +305,35 @@ static PyObject *
 ALG_hexdigest(ALGobject *self, PyObject *args)
 {
 	PyObject *value, *retval;
-	unsigned char *raw_digest, *hex_digest;
+	U8 *raw_digest;
 	int i, j, size;
+	PYSTR_RAW *hex_digest;
 
 	if (!PyArg_ParseTuple(args, ""))
 		return NULL;
 
 	/* Get the raw (binary) digest value */
 	value = (PyObject *)hash_digest(&(self->st));
-	size = PyString_Size(value);
-	raw_digest = PyString_AsString(value);
+	size = PYBYTES_Size(value);
+	raw_digest = (U8 *)PYBYTES_AS_STRING(value);
 
 	/* Create a new string */
-	retval = PyString_FromStringAndSize(NULL, size * 2 );
-	hex_digest = PyString_AsString(retval);
+	retval = PYSTR_FromStringAndSize(NULL, size * 2);
+	if (retval == NULL) {
+		Py_DECREF(value);
+		return NULL;
+	}
+	hex_digest = PYSTR_AS_STRING(retval);
 
 	/* Make hex version of the digest */
 	for(i=j=0; i<size; i++)	
 	{
 		char c;
-		c = raw_digest[i] / 16; c = (c>9) ? c+'a'-10 : c + '0';
+		c = (raw_digest[i] >> 4) & 0xf;
+		c = (c>9) ? c+'a'-10 : c + '0';
 		hex_digest[j++] = c;
-		c = raw_digest[i] % 16; c = (c>9) ? c+'a'-10 : c + '0';
+		c = raw_digest[i] & 0xf;
+		c = (c>9) ? c+'a'-10 : c + '0';
 		hex_digest[j++] = c;
 	}	
 	Py_DECREF(value);
@@ -358,29 +367,55 @@ static PyMethodDef ALG_methods[] = {
 	{NULL,			NULL}		/* sentinel */
 };
 
+
+/* Getters */
 static PyObject *
-ALG_getattr(PyObject *self, char *name)
+ALG_get_digest_size(PyObject *self, void *closure)
 {
-	if (strcmp(name, "digest_size")==0)
-		return PyInt_FromLong(DIGEST_SIZE);
-	
-	return Py_FindMethod(ALG_methods, self, name);
+	return PyLong_FromLong(DIGEST_SIZE);
 }
 
+static PyGetSetDef ALG_getsetters[] = {
+	{"digest_size",
+		(getter)ALG_get_digest_size, NULL,
+		NULL, NULL},
+	{NULL}
+};
+
+
+/* Type definition */
 static PyTypeObject ALGtype = {
-	PyObject_HEAD_INIT(NULL)
-	0,			/*ob_size*/
-	_MODULE_STRING,			/*tp_name*/
-	sizeof(ALGobject),	/*tp_size*/
-	0,			/*tp_itemsize*/
-	/* methods */
-	ALG_dealloc, /*tp_dealloc*/
-	0,			/*tp_print*/
-	ALG_getattr, /*tp_getattr*/
-	0,			/*tp_setattr*/
-	0,			/*tp_compare*/
-	0,			/*tp_repr*/
-        0,			/*tp_as_number*/
+    PyVarObject_HEAD_INIT(NULL, 0)
+    _MODULE_STRING,     /*tp_name*/
+    sizeof(ALGobject),  /*tp_size*/
+    0,                  /*tp_itemsize*/
+    /* methods */
+    (destructor)ALG_dealloc,/*tp_dealloc*/
+    0,                  /*tp_print*/
+    0,                  /*tp_getattr*/
+    0,                  /*tp_setattr*/
+    0,                  /*tp_reserved*/
+    0,                  /*tp_repr*/
+    0,                  /*tp_as_number*/
+    0,                  /*tp_as_sequence*/
+    0,                  /*tp_as_mapping*/
+    0,                  /*tp_hash*/
+    0,                  /*tp_call*/
+    0,                  /*tp_str*/
+    0,                  /*tp_getattro*/
+    0,                  /*tp_setattro*/
+    0,                  /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT, /*tp_flags*/
+    0,                  /*tp_doc*/
+    0,                  /*tp_traverse*/
+    0,                  /*tp_clear*/
+    0,                  /*tp_richcompare*/
+    0,                  /*tp_weaklistoffset*/
+    0,                  /*tp_iter*/
+    0,                  /*tp_iternext*/
+    ALG_methods,        /* tp_methods */
+    NULL,               /* tp_members */
+    ALG_getsetters,     /* tp_getset */
 };
 
 
@@ -432,25 +467,43 @@ static struct PyMethodDef ALG_functions[] = {
 /* Initialize this module. */
 
 #if PYTHON_API_VERSION < 1011
-#define PyModule_AddIntConstant(m,n,v) {PyObject *o=PyInt_FromLong(v); \
+#define PyModule_AddIntConstant(m,n,v) {PyObject *o=PyLong_FromLong(v); \
            if (o!=NULL) \
              {PyDict_SetItemString(PyModule_GetDict(m),n,o); Py_DECREF(o);}}
 #endif
 
-void
-_MODULE_NAME (void)
+#define _MODULE_DOCSTR "nonstandard implementation of SHA256 algorithm"
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef ALGmodule = {
+    PyModuleDef_HEAD_INIT,
+    _MODULE_STRING,
+    _MODULE_DOCSTR,
+    -1,
+    ALG_functions
+};
+#endif
+
+
+PYMODULE_INIT(MODULE_NAME)
 {
 	PyObject *m;
 
-	ALGtype.ob_type = &PyType_Type;
-	m = Py_InitModule("SHA256_nonstandard", ALG_functions);
+        ALGtype.tp_new = PyType_GenericNew;
+        if (PyType_Ready(&ALGtype) < 0)
+            PYMODULE_RETURN(NULL);
+
+        m = PYMODULE_CREATE(_MODULE_STRING, ALG_functions, _MODULE_DOCSTR,
+                &ALGmodule);
+        if (m == NULL)
+            PYMODULE_RETURN(NULL);
+
+        Py_INCREF(&ALGtype);
+        PyModule_AddObject(m, _MODULE_STRING, (PyObject *)&ALGtype);
 
 	/* Add some symbolic constants to the module */
 	PyModule_AddIntConstant(m, "digest_size", DIGEST_SIZE);
 
-	/* Check for errors */
-	if (PyErr_Occurred())
-		Py_FatalError("can't initialize module " 
-                              _MODULE_STRING);
+        PYMODULE_RETURN(m);
 }
 
+/* vim: set sts=4 sw=4 expandtab : */

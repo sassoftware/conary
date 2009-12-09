@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 rPath, Inc.
+ * Copyright (c) 2005-2009 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -17,10 +17,11 @@
 #include <Python.h>
 #include <netinet/in.h>
 
-#if PY_MINOR_VERSION < 5
+#if PY_VERSION_HEX < 0x02050000
 typedef int Py_ssize_t;
 #endif
 
+#include "pycompat.h"
 #include "cstreams.h"
 
 /* debugging aid */
@@ -83,6 +84,8 @@ typedef struct {
 /* ------------------------------------- */
 /* NumericStream Implementation          */
 
+static PyObject * NumericStream_Set(PyObject * self, PyObject * args);
+
 static inline PyObject * raw_IntStream_Freeze(IntStreamObject * o);
 static inline PyObject * raw_ShortStream_Freeze(ShortStreamObject * o);
 static inline PyObject * raw_ByteStream_Freeze(ByteStreamObject * o);
@@ -106,13 +109,13 @@ static PyObject * NumericStream_Call(PyObject * self, PyObject * args,
 
     if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
-        return PyInt_FromLong(o->val);
+        return PyLong_FromLong(o->val);
     } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
-        return PyInt_FromLong(o->val);
+        return PyLong_FromLong(o->val);
     } else if (STREAM_CHECK(self, BYTE_STREAM)) {
         ByteStreamObject * o = (void *) self;
-        return PyInt_FromLong(o->val);
+        return PyLong_FromLong(o->val);
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
         return PyLong_FromUnsignedLongLong(o->val);
@@ -123,7 +126,7 @@ static PyObject * NumericStream_Call(PyObject * self, PyObject * args,
 }
 
 static int NumericStream_Cmp(PyObject * self, PyObject * other) {
-    if (self->ob_type != other->ob_type) {
+    if (Py_TYPE(self) != Py_TYPE(other)) {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return -1;
     }
@@ -168,7 +171,7 @@ static PyObject * NumericStream_Diff(PyObject * self, PyObject * args) {
     if (!PyArg_ParseTuple(args, "O", &them))
         return NULL;
 
-    if (self->ob_type != them->ob_type) {
+    if (Py_TYPE(self) != Py_TYPE(them)) {
         PyErr_SetString(PyExc_ValueError, "mismatched types for diff");
         return NULL;
     }
@@ -256,10 +259,10 @@ static inline PyObject * raw_IntStream_Freeze(IntStreamObject * o) {
     char buffer[20];
 
     if (o->isNone)
-        return PyString_FromString("");
+        return PYBYTES_FromString("");
 
     memcpy(buffer, &ordered, sizeof(ordered));
-    return PyString_FromStringAndSize(buffer, sizeof(ordered));
+    return PYBYTES_FromStringAndSize(buffer, sizeof(ordered));
 }
 
 static inline PyObject * raw_ShortStream_Freeze(ShortStreamObject * o) {
@@ -267,17 +270,17 @@ static inline PyObject * raw_ShortStream_Freeze(ShortStreamObject * o) {
     char buffer[20];
 
     if (o->isNone)
-        return PyString_FromString("");
+        return PYBYTES_FromString("");
 
     memcpy(buffer, &ordered, sizeof(ordered));
-    return PyString_FromStringAndSize(buffer, sizeof(ordered));
+    return PYBYTES_FromStringAndSize(buffer, sizeof(ordered));
 }
 
 static inline PyObject * raw_ByteStream_Freeze(ByteStreamObject * o) {
     if (o->isNone)
-        return PyString_FromString("");
+        return PYBYTES_FromString("");
 
-    return (PyObject *) PyString_FromStringAndSize((const char *) &o->val, 1);
+    return (PyObject *) PYBYTES_FromStringAndSize((const char *) &o->val, 1);
 }
 
 static inline PyObject * raw_LongLongStream_Freeze(LongLongStreamObject * o) {
@@ -286,11 +289,11 @@ static inline PyObject * raw_LongLongStream_Freeze(LongLongStreamObject * o) {
     char buffer[40];
 
     if (o->isNone)
-        return PyString_FromString("");
+        return PYBYTES_FromString("");
 
     memcpy(buffer, &high, sizeof(high));
     memcpy(buffer + sizeof(high), &low, sizeof(low));
-    return PyString_FromStringAndSize(buffer, sizeof(low) * 2);
+    return PYBYTES_FromStringAndSize(buffer, sizeof(low) * 2);
 }
 
 static PyObject * NumericStream_Freeze(NumericStreamObject * self, 
@@ -303,7 +306,7 @@ static PyObject * NumericStream_Freeze(NumericStreamObject * self,
         return NULL;
 
     if (self->isNone)
-        return PyString_FromString("");
+        return PYBYTES_FromString("");
 
     if (STREAM_CHECK(self, INT_STREAM)) {
         return raw_IntStream_Freeze((IntStreamObject *) self);
@@ -332,22 +335,25 @@ static int NumericStream_Init(PyObject * self, PyObject * args,
         return -1;
     }
 
-    if (initObj && PyString_CheckExact(initObj)) {
-        char * frozen;
-        Py_ssize_t frozenLen;
+    if (initObj != NULL) {
+        if (PYBYTES_CheckExact(initObj)) {
+            char * frozen;
+            Py_ssize_t frozenLen;
 
-        PyString_AsStringAndSize(initObj, &frozen, &frozenLen);
-        if (!raw_NumericStream_Thaw(o, frozen, frozenLen))
-            return 1;
-    } else if (initObj && PyInt_Check(initObj)) {
-        NUMERICSTREAM_SET(self, PyInt_AsLong(initObj));
-    } else if (initObj && PyLong_Check(initObj) && (STREAM_CHECK(o, LONG_LONG_STREAM))) {
-        SET(o, LongLong, PyLong_AsUnsignedLongLong(initObj));
-    } else if (initObj == Py_None) {
-        o->isNone = 1;
-    } else if (initObj) {
-        PyErr_SetString(PyExc_TypeError, "invalid type for initialization");
-        return -1;
+            PYBYTES_AsStringAndSize(initObj, &frozen, &frozenLen);
+            if (!raw_NumericStream_Thaw(o, frozen, frozenLen))
+                return 1;
+        } else if (initObj == Py_None) {
+            o->isNone = 1;
+        } else {
+            /* call set() with whatever we were passed */
+            PyObject *set_args = Py_BuildValue("(O)", initObj);
+            PyObject *rv = NumericStream_Set(self, set_args);
+            Py_DECREF(set_args);
+            if (rv == NULL) {
+                return -1;
+            }
+        }
     } else {
         o->isNone = 1;
     }
@@ -356,7 +362,7 @@ static int NumericStream_Init(PyObject * self, PyObject * args,
 }
 
 static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
-    PyObject *pval;
+    PyObject *pval, *ival;
     int val;
     NumericStreamObject * o = (void *) self;
 
@@ -375,13 +381,19 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
     if (STREAM_CHECK(self, INT_STREAM)
 	|| STREAM_CHECK(self, SHORT_STREAM)
 	|| STREAM_CHECK(self, BYTE_STREAM)) {
-	PyObject *ival;
 	if (!PyNumber_Check(pval)) {
 	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
 	}
-	ival = PyNumber_Int(pval);
-	val = PyInt_AsLong(ival);
+        if (!PyLong_Check(pval)) {
+            /* convert to PyLong first */
+            ival = PyNumber_Long(pval);
+            val = PyLong_AsLong(ival);
+            Py_DECREF(ival);
+        } else {
+            /* already a PyLong */
+            val = PyLong_AsLong(pval);
+        }
 	NUMERICSTREAM_SET(self, val);
     } else if (STREAM_CHECK(self, LONG_LONG_STREAM)) {
         LongLongStreamObject * o = (void *) self;
@@ -390,11 +402,14 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
 	    PyErr_SetString(PyExc_TypeError, "invalid type");
 	    return NULL;
 	}
-	if (PyLong_Check(pval))
+        if (!PyLong_Check(pval)) {
+            /* convert to PyLong first */
+	    ival = PyNumber_Long(pval);
+	    lval = PyLong_AsUnsignedLongLong(ival);
+            Py_DECREF(ival);
+        } else {
+            /* already a PyLong */
 	    lval = PyLong_AsUnsignedLongLong(pval);
-	else {
-	    PyObject *ival = PyNumber_Int(pval);
-	    lval = PyInt_AsLong(ival);
 	}
         o->val = lval;
     } else {
@@ -498,7 +513,7 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
                           NumericStreamType))
         return NULL;
 
-    if (self->ob_type != other->ob_type) {
+    if (Py_TYPE(self) != Py_TYPE(other)) {
         PyErr_SetString(PyExc_TypeError, "stream type mistmatch");
         return NULL;
     }
@@ -634,8 +649,7 @@ static PyMethodDef NumericStreamMethods[] = {
 };
 
 PyTypeObject NumericStreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cstreams.NumericStream",       /*tp_name*/
     sizeof(NumericStreamObject),    /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -674,8 +688,7 @@ PyTypeObject NumericStreamType = {
 };
 
 PyTypeObject IntStreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cstreams.IntStream",	    /*tp_name*/
     sizeof(IntStreamObject),        /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -709,8 +722,7 @@ PyTypeObject IntStreamType = {
 };
 
 PyTypeObject ShortStreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cstreams.ShortStream",	    /*tp_name*/
     sizeof(ShortStreamObject),      /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -744,8 +756,7 @@ PyTypeObject ShortStreamType = {
 };
 
 PyTypeObject ByteStreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cstreams.ByteStream",	    /*tp_name*/
     sizeof(ByteStreamObject),      /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -779,8 +790,7 @@ PyTypeObject ByteStreamType = {
 };
 
 PyTypeObject LongLongStreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cstreams.LongLongStream",	    /*tp_name*/
     sizeof(LongLongStreamObject),      /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -820,3 +830,5 @@ void numericstreaminit(PyObject * m) {
     allStreams[BYTE_STREAM].pyType    = ByteStreamType;
     allStreams[LONG_LONG_STREAM].pyType = LongLongStreamType;
 }
+
+/* vim: set sts=4 sw=4 expandtab : */

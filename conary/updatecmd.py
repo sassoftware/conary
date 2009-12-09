@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -255,6 +255,14 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         """
         self.updateMsg("Creating database transaction (%d of %d)" %
 		      (troveNum, troveCount))
+
+    def updatingDatabase(self, step, stepNum, stepCount):
+        if step == 'latest':
+            self.updateMsg('Updating list of latest versions: (%d of %d)' %
+                           (stepNum, stepCount))
+        else:
+            self.updateMsg('Updating database: (%d of %d)' %
+                           (stepNum, stepCount))
 
     def runningPreTagHandlers(self):
         """

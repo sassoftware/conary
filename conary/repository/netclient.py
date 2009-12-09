@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,7 +13,6 @@
 #
 
 import base64
-import gzip
 import httplib
 import itertools
 import os
@@ -30,7 +29,7 @@ from conary import files
 from conary import metadata
 from conary import trove
 from conary import versions
-from conary.lib import util, api
+from conary.lib import util, api, fixedgzip as gzip
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
@@ -52,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 67 + 1)
+CLIENT_VERSIONS = range(36, 69 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -998,7 +997,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                          for y in x[1]]) for x in itertools.izip(pathList, l) ])
  
     def iterFilesInTrove(self, troveName, version, flavor,
-                         sortByPath = False, withFiles = False):
+                         sortByPath = False, withFiles = False,
+                         capsules = False):
         # XXX this code should most likely go away, and anything that
         # uses it should be written to use other functions
         l = [(troveName, (None, None), (version, flavor), True)]
@@ -1015,7 +1015,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # in the same order as iterFileList() to reuse code.
         if sortByPath:
             pathDict = {}
-            for pathId, path, fileId, version in t.iterFileList():
+            for pathId, path, fileId, version in t.iterFileList(
+                                capsules = capsules, members = not capsules):
                 pathDict[path] = (pathId, fileId, version)
             paths = pathDict.keys()
             paths.sort()
@@ -1025,7 +1026,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     yield (pathId, path, fileId, version)
             generator = rearrange(paths, pathDict)
         else:
-            generator = t.iterFileList()
+            generator = t.iterFileList(capsules = capsules,
+                                       members = not capsules)
         for pathId, path, fileId, version in generator:
             if withFiles:
                 fileStream = files.ThawFile(cs.getFileChange(None, fileId),
@@ -2038,11 +2040,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             oldFileObj) ) 
                         needItems.append( (pathId, None, oldFileObj) ) 
 
-                    fetchItems.append( (newFileId, newFileVersion, newFileObj) )
-                    needItems.append( (pathId, newFileId, newFileObj) )
-                    contentsNeeded += fetchItems
+                    if not newFileObj.flags.isPayload():
+                        fetchItems.append( (newFileId, newFileVersion, newFileObj) )
+                        contentsNeeded += fetchItems
 
-                    fileJob.extend([ needItems ])
+                        needItems.append( (pathId, newFileId, newFileObj) )
+                        fileJob.extend([ needItems ])
 
             contentList = self.getFileContents(contentsNeeded,
                                                tmpFile = outFile,
@@ -2479,6 +2482,42 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 contents[i] = fObj
 
         return contents
+
+    def getFileContentsCapsuleInfo(self, fileList):
+        capsuleInfo = [ None ] * len(fileList)
+        byServer = {}
+
+        for i, item in enumerate(fileList):
+            # we try to get the file from the trove which originally contained
+            # it since we know that server has the contents; other servers may
+            # not
+            (fileId, fileVersion) = item[0:2]
+            server = fileVersion.getHost()
+            l = byServer.setdefault(server, [])
+            l.append((i, (fileId, fileVersion)))
+
+        for server, itemList in byServer.iteritems():
+            fileList = [ (self.fromFileId(x[1][0]),
+                          self.fromVersion(x[1][1])) for x in itemList ]
+
+            infoList = self.c[server].getFileContentsCapsuleInfo(fileList)
+
+            for (i, item), fObj in itertools.izip(itemList, infoList):
+                capsuleInfo[i] = self._capsuleInfoFromData(fObj)
+
+        return capsuleInfo
+
+    @classmethod
+    def _capsuleInfoFromData(cls, data):
+        # Convert '' back to None
+        if data == '':
+            return None
+        capsuleType, capsuleKey, capsuleSha1, fileName, fileSha1 = \
+            data[:5]
+        n, e, v, r, a = capsuleKey[:5]
+        if e == '':
+            e = None
+        return (capsuleType, (n, e, v, r, a), capsuleSha1, fileName, fileSha1)
 
     def getPackageBranchPathIds(self, sourceName, branch, dirnames = [], fileIds=None):
         """
@@ -2923,9 +2962,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                      'a newer repository server.')
 
         if server.getProtocolVersion() >= 38:
-            url = server.prepareChangeSet(jobs, mirror)
+            rc = server.prepareChangeSet(jobs, mirror)
         else:
-            url = server.prepareChangeSet()
+            rc = server.prepareChangeSet()
+        if server.getProtocolVersion() >= 69:
+            url, hasStatus = rc
+        else:
+            url = rc
+            hasStatus = False
 
         if server.getProtocolVersion() <= 42:
             (outFd, tmpName) = util.mkstemp()
@@ -2969,15 +3013,45 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if autoUnlink:
                 os.unlink(fName)
 
+        if hasStatus and callback:
+            # build up a function with access to local server, url, and
+            # callback variables that will get the progress updates
+            def abortCheck():
+                try:
+                    try:
+                        # first we have to unset the abort check
+                        # or we'll end up in an infinite loop...
+                        server.setAbortCheck(None)
+                        rc = server.getCommitProgress(url)
+                        # getCommitProgress returns a tuple of
+                        # callback function name, arg1, arg2, ...
+                        # or False if there is no info available
+                        if rc:
+                            if hasattr(callback, rc[0]):
+                                getattr(callback, rc[0])(*rc[1:])
+                            else:
+                                callback.csMsg('unhandled progress update from server: %s' % (' '.join(str(x) for x in rc)))
+                    except:
+                        # avoid crashing out the commit process just
+                        # from progress reporting
+                        pass
+                finally:
+                    server.setAbortCheck(abortCheck)
+                return False
+            server.setAbortCheck(abortCheck)
+
         # avoid sending the mirror and hidden argumentsunless we have to.
         # this helps preserve backwards compatibility with old
         # servers.
-        if hidden:
-            server.commitChangeSet(url, mirror, hidden)
-        elif mirror:
-            server.commitChangeSet(url, mirror)
-        else:
-            server.commitChangeSet(url)
+        try:
+            if hidden:
+                server.commitChangeSet(url, mirror, hidden)
+            elif mirror:
+                server.commitChangeSet(url, mirror)
+            else:
+                server.commitChangeSet(url)
+        finally:
+            server.setAbortCheck(None)
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                 proxies = None, chunked=False):

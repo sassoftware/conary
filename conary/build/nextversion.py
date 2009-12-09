@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -104,8 +104,7 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
     for pkgName in pkgNames:
         if pkgName in query:
             for version in query[pkgName]:
-                if (not version.isBranchedBinary()
-                    and version.getSourceVersion().trailingRevision() ==
+                if (version.getSourceVersion().trailingRevision() ==
                             sourceVersion.trailingRevision()
                     and version.trailingLabel() ==
                             sourceVersion.trailingLabel()):

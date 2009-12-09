@@ -331,6 +331,14 @@ class BaseDatabase:
         self.dbh = None
         self.closed = True
 
+    def close_fork(self):
+        """Close the database without notifying the server.
+
+        Use this to close connections inherited from a parent process after a
+        fork without disturbing the parent's connection objects.
+        """
+        self.close()
+
     def alive(self):
         if not self.dbh:
             return False
@@ -498,6 +506,14 @@ class BaseDatabase:
         cu = self.dbh.cursor()
         cu.execute(sql)
         return True
+
+    def disableTableConstraints(self, tableName):
+        class ConstraintEnableClass:
+
+            def enable(self):
+                pass
+
+        return ConstraintEnableClass()
 
     # easy access to the schema state
     def loadSchema(self):

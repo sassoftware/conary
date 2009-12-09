@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -333,6 +333,7 @@ class ClientClone:
                 # ptr links, but it commits just fine.
 
                 if (files.frozenFileHasContents(filecs) and
+                    not files.frozenFileFlags(filecs).isPayload() and
 			(pathId, newFileId) != lastContents):
                     # this copies the contents from the old changeset to the
                     # new without recompressing
@@ -353,7 +354,7 @@ class ClientClone:
                     itertools.izip(allFileObjects, individualFilesNeeded):
                 diff, hash = changeset.fileChangeSet(pathId, None, fileObject)
                 cs.addFile(oldFileId, newFileId, diff)
-                if hash:
+                if not fileObject.flags.isPayload() and hash:
                     contentsNeeded.append(
                             ((pathId, fileObject.flags.isConfig()),
                              (newFileId, fromFileVersion)))
@@ -979,7 +980,8 @@ class ClientClone:
         else:
             needsRewriteFn = chooser.fileNeedsRewrite
 
-        for (pathId, path, fileId, version) in trv.iterFileList():
+        for (pathId, path, fileId, version) in trv.iterFileList(
+                            members = True, capsules = True):
             if needsRewriteFn(troveBranch, targetBranch, version):
                 needsNewVersions.append((pathId, path, fileId))
 
@@ -994,7 +996,7 @@ class ClientClone:
                                               withFiles = True)
                 # pathId, fileId -> fileVersion map
                 fileMap = dict(((x[0], x[2]), x[3]) for x in
-                                        oldTrv.iterFileList())
+                        oldTrv.iterFileList(members = True, capsules = True))
             else:
                 fileMap = {}
 
@@ -1284,12 +1286,13 @@ class CloneChooser(object):
     def getTargetBranch(self, version):
         sourceLabel = version.trailingLabel()
         sourceBranch = version.branch()
-        if sourceBranch in self.targetMap:
-            target = self.targetMap[sourceBranch]
-        elif sourceLabel in self.targetMap:
-            target = self.targetMap[sourceLabel]
-        else:
+
+        target = self.targetMap.get(sourceBranch, None)
+        if target is None:
+            target = self.targetMap.get(sourceLabel, None)
+        if target is None:
             target = self.targetMap.get(None, None)
+
         if target is None:
             return None
 

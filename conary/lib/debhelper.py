@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2008 rPath, Inc.
+# Copyright (c) 2008-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -17,11 +17,10 @@ Contains functions to assist in dealing with deb files.
 """
 
 import os
-import gzip
 import rfc822
 import tarfile
 
-from conary.lib import ar
+from conary.lib import ar, fixedgzip as gzip
 
 #{ Constants
 NAME = 1
@@ -98,8 +97,11 @@ class DebianPackageHeader(object):
             raise Error("Unable to find control archive")
         arFile = arr[0]
 
-        gf = gzip.GzipFile(fileobj=arFile.data)
-        tf = tarfile.TarFile(fileobj=gf)
+        try:
+            gf = gzip.GzipFile(fileobj=arFile.data)
+            tf = tarfile.TarFile(fileobj=gf)
+        except IOError, e:
+            raise Error("control.tar.gz is not readable: %s" %str(e))
         # Look for a 'control' file
         arr = [ x for x in tf if os.path.basename(x.name) == 'control' ]
         if not arr:

@@ -1,4 +1,4 @@
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -266,6 +266,18 @@ class UpdateCallback(ChangesetCallback):
         @return: None
         """
         pass
+
+    def updatingDatabase(self, step, stepNum, stepCount):
+        """
+        Called during long database updates
+        @param step: a string that represents the operation
+        @type step: string
+        @param stepNum: the number of the step being performed (starts at 1)
+        @type stepNum: integer
+        @param stepCount: the total number of steps.
+        @type stepCount: integer
+        @return: None
+        """
 
     def restoreFiles(self, size, totalSize):
         """

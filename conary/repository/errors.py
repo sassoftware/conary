@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -448,6 +448,10 @@ class PathsNotFound(RepositoryError):
     def getPathList(self):
         return self.pathList
 
+
+class CapsuleServingDenied(RepositoryError):
+    def __str__(self):
+        return ''.join(self.args)
 
 # This is a list of simple exception classes and the text string
 # that should be used to marshall an exception instance of that

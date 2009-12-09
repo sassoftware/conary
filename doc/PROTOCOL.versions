@@ -1,4 +1,13 @@
 # this file documents the wire protocol changes for conary.
+Version 69:
+  - added getCommitProgress
+  - prepareChangeset() returns a tuple of url,
+    supportsGetCommitProgress (because the call is not supported on
+    standalone repositories)
+
+Version 68:
+  - added getFileContentsCapsuleInfo 
+
 Version 67:
   - added getFileContentsFromTrove
 

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -961,7 +961,7 @@ class Version(VersionSequence):
                 item = iter.next()
         except StopIteration:
             if (trailing.sourceCount.shadowCount() < self.shadowLength()
-                and not trailing.buildCount.shadowCount()):
+                and trailing.buildCount.shadowCount() < self.shadowLength()):
                 # this is a direct shadow of a binary trove -- it hasn't
                 # been touched on the shadow
                 return True
@@ -1404,7 +1404,7 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     v = stringVersionCache.get(ver, None)
     if v is None:
         v = _VersionFromString(ver, defaultBranch)
-    stringVersionCache[ver] = v
+        stringVersionCache[ver] = v
     v.cached = True
     return v
 

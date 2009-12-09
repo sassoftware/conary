@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -95,13 +95,15 @@ class BasePolicy(action.RecipeAction):
         if exceptions:
             if not self.exceptions:
                 self.exceptions = []
-            if type(exceptions) in (list, tuple):
+            if type(exceptions) in (list, tuple, set):
                 self.exceptions.extend(exceptions)
                 if not allowUnusedFilters:
-                    self.unusedFilters['exceptions'].update(exceptions)
+                    for item in exceptions:
+                        if not callable(item):
+                            self.unusedFilters['exceptions'].add(item)
             else:
                 self.exceptions.append(exceptions)
-                if not allowUnusedFilters:
+                if not allowUnusedFilters and not callable(exceptions):
                     self.unusedFilters['exceptions'].add(exceptions)
         subtrees = keywords.pop('subtrees', None)
         if subtrees:
@@ -117,19 +119,23 @@ class BasePolicy(action.RecipeAction):
             self.inclusions = []
 
         if inclusions:
-            if type(inclusions) == list:
+            if isinstance(inclusions, (tuple, list, set)):
                 self.inclusions.extend(inclusions)
                 if not allowUnusedFilters:
-                    self.unusedFilters['inclusions'].update(inclusions)
+                    for item in inclusions:
+                        if not callable(item):
+                            self.unusedFilters['inclusions'].add(item)
             else:
                 self.inclusions.append(inclusions)
-                if not allowUnusedFilters:
+                if not allowUnusedFilters and not callable(inclusions):
                     self.unusedFilters['inclusions'].add(inclusions)
 
         if args:
             self.inclusions.extend(args)
             if not allowUnusedFilters:
-                self.unusedFilters['inclusions'].update(args)
+                for item in args:
+                    if not callable(item):
+                        self.unusedFilters['inclusions'].add(item)
 
         self.addArgs(**keywords)
 
@@ -195,7 +201,9 @@ class Policy(BasePolicy):
     then only files matching a filter in it are considered to be passed
     to to the C{doFile} method.  Any exceptions, including invariants,
     are applied after C{invariantinclusions} are applied; this means
-    that all exceptions OVERRULE every type of inclusion.
+    that all exceptions OVERRULE every type of inclusion.  If
+    C{invariantinclusions} is None, then the policy applies to no
+    files by default, but will apply to specified files.
 
     @cvar invariantexceptions: subclasses may set to a list of
     exception filters that are always applied regardless of what other
@@ -298,10 +306,11 @@ class Policy(BasePolicy):
             'rootdir': self.rootdir,
         }
         macros = self.macros
-	if type(expression) in (str, types.FunctionType):
+        if isinstance(expression, (str, types.FunctionType)) or callable(
+                expression):
             return (expression, macros), kwargs
 
-	if type(expression) is not list:
+        if not isinstance(expression, list):
 	    expression = list(expression)
 
         # this normally happens when code at a higher level
@@ -380,7 +389,10 @@ class Policy(BasePolicy):
 
 	# compile the inclusions
 	self.inclusionFilters = []
-	self.compileFilters(self.invariantinclusions, self.inclusionFilters)
+        if self.invariantinclusions is None:
+            self.compileFilters([], self.inclusionFilters)
+        else:
+            self.compileFilters(self.invariantinclusions, self.inclusionFilters)
 	if not self.inclusions:
 	    # an empty list, as opposed to None, means nothing is included
 	    if isinstance(self.inclusions, (tuple, list)):
@@ -460,28 +472,35 @@ class Policy(BasePolicy):
             and not self.mtimeChanged(filespec)):
             # policy has elected not to handle unchanged files
             return False
+        if not self.inclusions and self.invariantinclusions is None:
+            # policy applies to nothing by default, and no files
+            # have been specified
+            return False
         if not self.inclusionFilters:
             # empty list is '.*'
             return True
         res = False
         for f in self.inclusionFilters:
-            # we can't short circuit. we must discard all valid inclusions.
-            # it's possible that an invariant inclusion will match before
+            # We can't short circuit. We must discard all valid inclusions
+            # that are specified by regular expressions.
+            # It's possible that an invariant inclusion will match before
             # an explicit inclusion, and we need to distinguish between
-            # "filter was unused because no paths matched", and
-            # "filter was unused because it's redundant". erroring on the
-            # second case is actually more confusing than helpful.
+            # "filter was unused because no paths matched" and
+            # "filter was unused because it's redundant", because erroring
+            # on the second case is confusing rather than helpful.
             if f.match(filespec):
-                self.unusedFilters['inclusions'].discard(f.regexp)
+                if hasattr(f, 'regexp'):
+                    self.unusedFilters['inclusions'].discard(f.regexp)
                 res = True
         return res
 
     def policyException(self, filespec):
         res = False
         for f in self.exceptionFilters:
-            # we can't short circuit. we must discard all valid exceptions.
+            # We can't short circuit. We must discard all valid exceptions.
             if f.match(filespec):
-                self.unusedFilters['exceptions'].discard(f.regexp)
+                if hasattr(f, 'regexp'):
+                    self.unusedFilters['exceptions'].discard(f.regexp)
                 res = True
         return res
 
@@ -756,6 +775,7 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
     import conary.build.derivedpolicy
     import conary.build.infopolicy
     import conary.build.packagepolicy
+    import conary.build.capsulepolicy
     import conary.build.grouppolicy
     for pt in internalPolicyModules:
         m = sys.modules['conary.build.'+pt]

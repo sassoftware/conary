@@ -173,14 +173,14 @@ class SourceState(trove.Trove):
             f.write("factory %s\n" % self.getFactory())
 
         rc = []
-        rc.append("%d\n" % (len(self.idMap)))
+        rc.append("%d\n" % (len(list(self.iterFileList()))))
 
         rc += [ "%s %s %s %s %s\n" % (sha1helper.md5ToString(x[0]),
-                                x[1][0],
-                                sha1helper.sha1ToString(x[1][1]),
+                                x[1],
+                                sha1helper.sha1ToString(x[2]),
                                 self.fileInfo[x[0]],
-                                x[1][2].asString())
-                for x in sorted(self.idMap.iteritems()) ]
+                                x[3].asString())
+                for x in sorted(self.iterFileList()) ]
 
 	f.write("".join(rc))
 

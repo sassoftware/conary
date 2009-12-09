@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2008 rPath, Inc.
+ * Copyright (c) 2005-2009 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -17,6 +17,7 @@
 #include <Python.h>
 #include <netinet/in.h>
 
+#include "pycompat.h"
 #include "cstreams.h"
 
 /* debugging aid */
@@ -52,7 +53,7 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
     StringStreamObject * o = (void *) other;
     int len_s, len_o, cmpLen, rc;
 
-    if (s->ob_type != o->ob_type) {
+    if (Py_TYPE(s) != Py_TYPE(o)) {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return -1;
     }
@@ -64,11 +65,11 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
     else if (o->s == Py_None)
 	return 1;
 
-    len_s = PyString_GET_SIZE(s->s);
-    len_o = PyString_GET_SIZE(o->s);
+    len_s = PYBYTES_GET_SIZE(s->s);
+    len_o = PYBYTES_GET_SIZE(o->s);
     cmpLen = len_s < len_o ? len_s : len_o;
 
-    rc = memcmp(PyString_AS_STRING(s->s), PyString_AS_STRING(o->s), cmpLen);
+    rc = memcmp(PYBYTES_AS_STRING(s->s), PYBYTES_AS_STRING(o->s), cmpLen);
     /* clamp the value returned from memcmp to -1 or 1 as memcmp() can
        return any value */
     if (rc > 0)
@@ -86,7 +87,7 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
 
 static void StringStream_Dealloc(PyObject * self) {
     Py_XDECREF(((StringStreamObject *) self)->s);
-    self->ob_type->tp_free(self);
+    Py_TYPE(self)->tp_free(self);
 }
 
 static PyObject * StringStream_Diff(StringStreamObject * self, 
@@ -94,13 +95,13 @@ static PyObject * StringStream_Diff(StringStreamObject * self,
     StringStreamObject * them;
     int rc;
 
-    if (!PyArg_ParseTuple(args, "O!", self->ob_type, &them))
+    if (!PyArg_ParseTuple(args, "O!", Py_TYPE(self), &them))
         return NULL;
 
     if ((PyObject *) them == Py_None) {
 	Py_INCREF(Py_None);
 	return Py_None;
-    } else if (them->ob_type != self->ob_type) {
+    } else if (Py_TYPE(them) != Py_TYPE(self)) {
         PyErr_SetString(PyExc_TypeError, "invalid type");
         return NULL;
     }
@@ -124,8 +125,8 @@ static PyObject * StringStream_Eq(PyObject * self, PyObject * args,
     int cmp;
     PyObject * rc, * skipSet = NULL;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O", kwlist, 
-				     self->ob_type, &other, &skipSet))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O", kwlist,
+                Py_TYPE(self), &other, &skipSet))
         return NULL;
 
     /* ignore skipSet */
@@ -153,7 +154,7 @@ static PyObject * StringStream_Freeze(StringStreamObject * self,
 
 static long StringStream_Hash(PyObject * self) {
     StringStreamObject * o = (void *) self;
-    return o->s->ob_type->tp_hash(o->s);
+    return Py_TYPE(o->s)->tp_hash(o->s);
 }
 
 static int StringStream_Init(PyObject * self, PyObject * args,
@@ -168,7 +169,7 @@ static int StringStream_Init(PyObject * self, PyObject * args,
     }
 
     if (initObj) {
-	if (initObj != Py_None && initObj->ob_type != &PyString_Type) {
+	if (initObj != Py_None && !PYBYTES_Check(initObj)) {
 	    PyErr_SetString(PyExc_TypeError, "frozen value must be "
 			    "None or a string");
 	    return -1;
@@ -177,7 +178,7 @@ static int StringStream_Init(PyObject * self, PyObject * args,
 	o->s = initObj;
 	Py_INCREF(o->s);
     } else {
-	o->s = PyString_FromString("");
+	o->s = PYBYTES_FromString("");
     }
 
     return 0;
@@ -190,7 +191,7 @@ static PyObject * StringStream_Set(StringStreamObject * self,
     if (!PyArg_ParseTuple(args, "O", &o))
         return NULL;
 
-    if (o == Py_None || PyString_CheckExact(o)) {
+    if (o == Py_None || PYBYTES_CheckExact(o)) {
 	Py_INCREF(o);
 	newval = o;
     } else if (PyUnicode_CheckExact(o)) {
@@ -211,7 +212,7 @@ static PyObject * StringStream_Thaw(StringStreamObject * self,
 				    PyObject * args) {
     PyObject * o;
 
-    if (!PyArg_ParseTuple(args, "O!", &PyString_Type, &o))
+    if (!PyArg_ParseTuple(args, "O!", &PYBYTES_Type, &o))
         return NULL;
 
     Py_INCREF(o);
@@ -232,22 +233,22 @@ static PyObject * StringStream_Twm(StringStreamObject * self, PyObject * args) {
        object that's participating in the twm.
     */
     if (!PyArg_ParseTuple(args, "s#O", &diff, &diffLen, &other,
-                          self->ob_type))
+                          Py_TYPE(self)))
         return NULL;
 
     /* if we are the same as the other object, we can reset our value
        to what is coming in from the diff */
     if (!StringStream_Cmp((PyObject *) self, (PyObject *) other)) {
 	Py_DECREF(self->s);
-	self->s = PyString_FromStringAndSize(diff, diffLen);
+	self->s = PYBYTES_FromStringAndSize(diff, diffLen);
 	Py_INCREF(Py_False);
 	return Py_False;
     }
 
     /* otherwise, the only way that there is no conflict is if we are
        already set to the value that is contained in the diff */
-    if (self->s == Py_None || (PyString_GET_SIZE(self->s) != diffLen) ||
-	memcmp(PyString_AS_STRING(self->s), diff, diffLen)) {
+    if (self->s == Py_None || (PYBYTES_GET_SIZE(self->s) != diffLen) ||
+	memcmp(PYBYTES_AS_STRING(self->s), diff, diffLen)) {
 	/* conflict */
 	Py_INCREF(Py_True);
 	return Py_True;
@@ -278,8 +279,7 @@ static PyMethodDef StringStreamMethods[] = {
 };
 
 PyTypeObject StringStreamType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyVarObject_HEAD_INIT(NULL, 0)
     "cstreams.StringStream",        /*tp_name*/
     sizeof(StringStreamObject),     /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -320,3 +320,5 @@ PyTypeObject StringStreamType = {
 void stringstreaminit(PyObject * m) {
     allStreams[STRING_STREAM].pyType  = StringStreamType;
 }
+
+/* vim: set sts=4 sw=4 expandtab : */

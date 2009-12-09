@@ -12,15 +12,16 @@
 # full details.
 #
 
+import base64
+import cPickle
+import fnmatch
+import itertools
 import os
 import re
 import sys
+import tempfile
 import time
 import types
-import base64
-import fnmatch
-import tempfile
-import itertools
 
 from conary import files, trove, versions, streams
 from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
@@ -45,7 +46,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 67 + 1)
+SERVER_VERSIONS = range(36, 69 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -118,7 +119,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                           'for changesetCacheDir' %cfg.tmpDir,
                           DeprecationWarning)
             cfg.configLine('changesetCacheDir %s/cscache' %cfg.tmpDir)
-
+        # this is a bit of a hack to determine if we're running
+        # as a standalone server or not without having to touch
+        # rMake code
+        self.standalone = hasattr(cfg, 'port')
 	self.map = cfg.repositoryMap
 	self.tmpPath = cfg.tmpDir
 	self.basicUrl = basicUrl
@@ -140,6 +144,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.readOnlyRepository = cfg.readOnlyRepository
         self.serializeCommits = cfg.serializeCommits
         self.paranoidCommits = cfg.paranoidCommits
+        self.excludeCapsuleContents = cfg.excludeCapsuleContents
 
         self.__delDB = False
         self.log = tracelog.getLog(None)
@@ -1499,6 +1504,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                          recurse = recurse,
                                          withFiles = withFiles,
                                          withFileContents = withFileContents,
+                                         excludeCapsuleContents =
+                                                self.excludeCapsuleContents,
                                          excludeAutoSource = excludeAutoSource,
                                          roleIds = roleIds):
             (newCs, trovesNeeded, filesNeeded, removedTroves) = ret
@@ -1566,7 +1573,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # iterator.
             jobDict = dict.fromkeys(jobs)
             jobOrder = jobDict.keys()
-            for result in self.repos.createChangeSet(jobOrder, **kwargs):
+            for result in self.repos.createChangeSet(jobOrder,
+                         excludeCapsuleContents = self.excludeCapsuleContents,
+                         **kwargs):
                 job = jobOrder.pop(0)
                 jobDict[job] = result
 
@@ -1888,7 +1897,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # this needs to match up exactly with the parsing of the url we do
         # in commitChangeSet.
-        return self.urlBase() + "?%s" % fileName[:-3]
+        csPath = self.urlBase() + "?%s" % fileName[:-3]
+        # for client versions >= 69, we also return a bool to signify
+        # if the client should use the getCommitProgress() call
+        if clientVersion >= 69:
+            return csPath, not self.standalone
+        return csPath
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
@@ -1911,8 +1925,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 'server is "%s".'
                 %(url, base))
 	# +1 strips off the ? from the query url
-	fileName = url[len(base) + 1:] + "-in"
+        fileName = url[len(base) + 1:] + '-in'
 	path = "%s/%s" % (self.tmpPath, fileName)
+        statusPath = path + '-status'
         self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
         attempt = 1
         while True:
@@ -1926,8 +1941,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # need to catch the DatabaseLocked errors here and retry
             # the commit ourselves
             try:
-                ret = self._commitChangeSet(authToken, cs, mirror=mirror,
-                                            hidden=hidden)
+                ret = self._commitChangeSet(authToken, cs,
+                                            mirror=mirror, hidden=hidden,
+                                            statusPath=statusPath)
             except sqlerrors.DatabaseLocked, e:
                 # deadlock occurred; we rollback and try again
                 log.error("Deadlock id %d: %s", attempt, str(e.args))
@@ -1950,7 +1966,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.RepositoryLocked()
         raise
 
-    def _commitChangeSet(self, authToken, cs, mirror = False, hidden = False):
+    def _commitChangeSet(self, authToken, cs, mirror = False,
+                         hidden = False, statusPath = None):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
         verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
@@ -1979,14 +1996,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-	self.repos.commitChangeSet(cs, mirror = mirror, hidden = hidden,
-                                   serialize = self.serializeCommits)
+	self.repos.commitChangeSet(cs, mirror = mirror,
+                                   hidden = hidden,
+                                   serialize = self.serializeCommits,
+                                   excludeCapsuleContents =
+                                       self.excludeCapsuleContents,
+                                   statusPath=statusPath)
 
 	if not self.commitAction:
 	    return True
 
+        userName = authToken[0]
+        if not isinstance(userName, basestring):
+            userName = 'unknown'
+
         d = { 'reppath' : self.urlBase(urlName = False),
-              'user' : authToken[0], }
+              'user' : userName,
+              }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
         try:
@@ -2007,6 +2033,129 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             sys.stderr.flush()
 
 	return True
+
+    @accessReadOnly
+    def getCommitProgress(self, authToken, clientVersion, url):
+        base = util.normurl(self.urlBase())
+        url = util.normurl(url)
+        if not url.startswith(base):
+            raise errors.RepositoryError(
+                'The changeset that is being committed was not '
+                'uploaded to a URL on this server.  The url is "%s", this '
+                'server is "%s".'
+                %(url, base))
+        # +1 strips off the ? from the query url
+        fileName = url[len(base) + 1:] + "-in-status"
+        path = "%s/%s" % (self.tmpPath, fileName)
+        try:
+            buf = file(path).read()
+            return cPickle.loads(buf)
+        except IOError:
+            return False
+
+    @accessReadOnly
+    def getFileContentsCapsuleInfo(self, authToken, clientVersion, fileList):
+        self.log(2, "fileList", fileList)
+
+        # We use _getFileStreams here for the permission checks.
+        fileIdGen = (self.toFileId(x[0]) for x in fileList)
+        fileIdMap =  self._getFileContentsCapsuleInfo(authToken, fileIdGen)
+        result = [ ]
+        for ent in fileList:
+            fileId = ent[0]
+            result.append(fileIdMap.get(fileId, ''))
+        return result
+
+    def _getFileContentsCapsuleInfo(self, authToken, fileIdGen):
+        self.log(3)
+        cu = self.db.cursor()
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            return {}
+        schema.resetTable(cu, 'tmpFileId')
+
+        # we need to make sure we don't look up the same fileId multiple
+        # times to avoid asking the sql server to do busy work
+        fileIdMap = {}
+        i = 0               # protect against empty fileIdGen
+        for i, fileId in enumerate(fileIdGen):
+            fileIdMap.setdefault(fileId, []).append(i)
+        uniqIdList = fileIdMap.keys()
+
+        # use the list of uniqified fileIds to look up streams in the repo
+        def _iterIdList(uniqIdList):
+            for i, fileId in enumerate(uniqIdList):
+                yield ((i, cu.binary(fileId)))
+        self.db.bulkload("tmpFileId",
+            ((i, cu.binary(fileId)) for (i, fileId) in enumerate(uniqIdList)),
+            ["itemId", "fileId"], start_transaction=False)
+        self.db.analyze("tmpFileId")
+        q = """
+        SELECT DISTINCT tmpFileId.itemId, TroveFiles.instanceId,
+            TroveInfo.data,
+            Dirnames.dirname,
+            Basenames.basename,
+            FileStreams.sha1
+        FROM tmpFileId
+        JOIN FileStreams ON (tmpFileId.fileId = FileStreams.fileId)
+        JOIN TroveFiles ON (FileStreams.streamId = TroveFiles.streamId)
+        JOIN Instances ON (TroveFiles.instanceId = Instances.instanceId)
+        JOIN UserGroupInstancesCache ON
+            (Instances.instanceId = UserGroupInstancesCache.instanceId)
+        JOIN TroveInfo ON (Instances.instanceId = TroveInfo.instanceId)
+        JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
+        JOIN Dirnames ON (FilePaths.dirnameId = Dirnames.dirnameId)
+        JOIN Basenames ON (FilePaths.basenameId = Basenames.basenameId)
+        WHERE FileStreams.stream IS NOT NULL
+          AND UserGroupInstancesCache.userGroupId IN (%(roleids)s)
+        AND TroveInfo.infoType = ?
+        """ % { 'roleids' : ", ".join("%d" % x for x in roleIds) }
+        cu.execute(q, trove._TROVEINFO_TAG_CAPSULE)
+        fileIdCapsuleList = []
+        instanceIds = set()
+        for (i, instanceId, data, dirname, basename, fileSha1) in cu:
+            fileId = uniqIdList[i]
+            trvCapsule = trove.TroveCapsule()
+            trvCapsule.thaw(data)
+            instanceIds.add(instanceId)
+            if dirname:
+                filePath = util.joinPaths(dirname, basename)
+            else:
+                filePath= basename
+            fileIdCapsuleList.append((fileId, trvCapsule,
+                filePath, fileSha1, instanceId))
+        instanceIds = sorted(instanceIds)
+
+        # We now have to look up the capsule that is part of this instance,
+        # since we need its sha1
+        schema.resetTable(cu, 'tmpInstanceId')
+        self.db.bulkload("tmpInstanceId", enumerate(instanceIds),
+                         ["idx", "instanceId"], start_transaction=False)
+        self.db.analyze("tmpInstanceId")
+        q = """
+        SELECT DISTINCT tmpInstanceId.idx, FileStreams.sha1
+        FROM tmpInstanceId
+        JOIN TroveFiles ON (tmpInstanceId.instanceId = TroveFiles.instanceId)
+        JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
+        JOIN FileStreams ON (TroveFiles.streamId = FileStreams.streamId)
+        WHERE FilePaths.pathId = ?
+        """
+        cu.execute(q, trove.CAPSULE_PATHID)
+        instanceIds = dict((instanceIds[i], sha1) for (i, sha1) in cu)
+        fileIdMapWithResults = {}
+        for fileId, trvCapsule, filePath, fileSha1, instanceId in fileIdCapsuleList:
+            capsuleSha1 = instanceIds.get(instanceId)
+            epoch = trvCapsule.rpm.epoch()
+            if epoch is None:
+                epoch = ''
+            capsuleKey = (trvCapsule.rpm.name(), epoch,
+                trvCapsule.rpm.version(), trvCapsule.rpm.release(),
+                trvCapsule.rpm.arch())
+            fileInfo =  (trvCapsule.type(), capsuleKey,
+                capsuleSha1, filePath, fileSha1 or '')
+            fileIdMapWithResults[self.fromFileId(fileId)] = fileInfo
+        return fileIdMapWithResults
 
     # retrieve the raw streams for a fileId list passed in as a generator
     def _getFileStreams(self, authToken, fileIdGen):
@@ -3424,11 +3573,14 @@ class ServerConfig(ConfigFile):
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
+    capsuleServerUrl        = (CfgString, None)
     deadlockRetry           = (CfgInt, 5)
     entitlement             = CfgEntitlement
     entitlementCheckURL     = CfgString
+    excludeCapsuleContents  = (CfgBool, False)
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
+    injectCapsuleContentServers = CfgList(CfgString)
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)

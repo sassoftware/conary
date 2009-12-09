@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,7 +13,6 @@
 #
 
 import grp
-import gzip
 import os
 import pwd
 import socket
@@ -24,7 +23,7 @@ import tempfile
 import time
 
 from conary import errors, streams
-from conary.lib import util, sha1helper, log, digestlib
+from conary.lib import util, sha1helper, log, digestlib, fixedgzip as gzip
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
@@ -40,6 +39,12 @@ _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
+# files which are payload -- not directly represented. config files cannot
+# be payload,
+_FILE_FLAG_PAYLOAD = 1 << 7
+# files which are allowed to be missing -- right now this flag may be
+# set but it is not used outside of builds
+_FILE_FLAG_MISSINGOKAY = 1 << 8
 
 FILE_STREAM_CONTENTS        = 1
 FILE_STREAM_DEVICE	    = 2
@@ -199,7 +204,11 @@ class InodeStream(streams.StreamSet):
 class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
-	return self._isFlag(_FILE_FLAG_CONFIG, set)
+	result = self._isFlag(_FILE_FLAG_CONFIG, set)
+        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
+               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+
+        return result
 
     def isPathDependencyTarget(self, set = None):
 	return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
@@ -215,6 +224,15 @@ class FlagsStream(streams.IntStream):
 
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
+
+    def isMissingOkay(self, set = None):
+        return self._isFlag(_FILE_FLAG_MISSINGOKAY, set)
+
+    def isPayload(self, set = None):
+        result = self._isFlag(_FILE_FLAG_PAYLOAD, set)
+        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
+               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+        return result
 
     def _isFlag(self, flag, set):
 	if set != None:
@@ -371,6 +389,18 @@ class File(streams.StreamSet):
 	else:
 	    streams.StreamSet.__init__(self)
 
+class MissingFile(File):
+
+    """
+    This is a special file type which is missing from the system. We don't
+    know much about files which don't exist!
+    """
+    lsTag = 'm'
+
+    streamDict = {
+        FILE_STREAM_FLAGS    : (SMALL, FlagsStream, "flags"),
+        }
+
 class SymbolicLink(File):
 
     lsTag = "l"
@@ -491,7 +521,6 @@ class CharacterDevice(DeviceFile):
     lsTag = "c"
     __slots__ = []
 
-import gzip
 class RegularFile(File):
 
     streamDict = { 
@@ -511,7 +540,6 @@ class RegularFile(File):
 
     def restore(self, fileContents, root, target, journal=None, sha1 = None,
                 nameLookup=True, **kwargs):
-
         keepTempfile = kwargs.get('keepTempfile', False)
 
 	if fileContents != None:
@@ -565,7 +593,11 @@ class RegularFile(File):
                     f.close()
                     actualSha1 = d.digest()
 
-                    if os.path.isdir(target):
+                    # would be nice if util could do this w/ a single
+                    # system call, but exists is better than an exception
+                    # when the file doesn't already exist
+                    if (os.path.exists(target) and
+                            stat.S_ISDIR(os.lstat(target).st_mode)):
                         os.rmdir(target)
                     os.rename(tmpname, target)
                 except:
@@ -677,6 +709,8 @@ def ThawFile(frz, pathId):
 	return BlockDevice(pathId, streamData = frz)
     elif frz[0] == "c":
 	return CharacterDevice(pathId, streamData = frz)
+    elif frz[0] == "m":
+        return MissingFile(pathId, streamData = frz)
 
     raise AssertionError
 
@@ -744,6 +778,8 @@ def fieldsChanged(diff):
 	cl = SymbolicLink
     elif type == "p":
 	cl = NamedPipe
+    elif type == "m":
+        cl = MissingFile
     else:
 	raise AssertionError
 

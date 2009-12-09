@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2004-2008 rPath, Inc.
+ * Copyright (c) 2004-2009 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -27,6 +27,8 @@
 #include <sys/poll.h>
 #include <unistd.h>
 #include <zlib.h>
+
+#include "pycompat.h"
 
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)
@@ -109,16 +111,16 @@ static PyObject * depSetSplit(PyObject *self, PyObject *args) {
     offsetArg = PyTuple_GET_ITEM(args, 0);
     dataArg = PyTuple_GET_ITEM(args, 1);
 
-    if (!PyInt_CheckExact(offsetArg)) {
+    if (!PYINT_CheckExact(offsetArg)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be an int");
         return NULL;
-    } else if (!PyString_CheckExact(dataArg)) {
+    } else if (!PYBYTES_CheckExact(dataArg)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be a string");
         return NULL;
     }
 
-    offset = PyInt_AS_LONG(offsetArg);
-    data = PyString_AS_STRING(dataArg);
+    offset = PYINT_AS_LONG(offsetArg);
+    data = PYBYTES_AS_STRING(dataArg);
 
     dataPtr = data + offset;
     /* this while is a cheap goto for the error case */
@@ -161,15 +163,16 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
 
     dataArg = PyTuple_GET_ITEM(args, 0);
 
-    if (!PyString_CheckExact(dataArg)) {
+    if (!PYBYTES_CheckExact(dataArg)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be a string");
         return NULL;
     }
 
-    origData = PyString_AS_STRING(dataArg);
+    origData = PYBYTES_AS_STRING(dataArg);
 
     /* Copy the original string over, replace single : with a '\0' and
-       double :: with a single : */
+       double :: with a single :, and \X with X (where X is anything,
+       including backslash)  */
     endPtr = data = malloc(strlen(origData) + 1);
     chptr = origData;
     while (*chptr) {
@@ -181,6 +184,9 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
             } else {
                 *endPtr++ = '\0';
             }
+        } else if (*chptr == '\\') {
+            chptr++;
+            *endPtr++ = *chptr++;
         } else { 
             *endPtr++ = *chptr++;
         }
@@ -190,13 +196,13 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
 
     /* We're left with a '\0' separated list of name, flag1, ..., flagN. Get
        the name first. */
-    name = PyString_FromString(data);
+    name = PYBYTES_FromString(data);
     chptr = data + strlen(data) + 1;
 
     flags = PyList_New(0);
 
     while (chptr < endPtr) {
-        flag = PyString_FromString(chptr);
+        flag = PYBYTES_FromString(chptr);
         PyList_Append(flags, flag);
         Py_DECREF(flag);
         chptr += strlen(chptr) + 1;
@@ -209,17 +215,38 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
     return ret;
 }
 
-static void copyColonStr(char ** sPtr, PyObject * strObj) {
+static void escapeName(char ** sPtr, PyObject * strObj) {
     int size;
     char * s;
     char * r = *sPtr;
 
-    s = PyString_AS_STRING(strObj);
-    size = PyString_GET_SIZE(strObj);
+    /* dep names get : turned into :: */
+
+    s = PYBYTES_AS_STRING(strObj);
+    size = PYBYTES_GET_SIZE(strObj);
 
     while (size--) {
         if (*s == ':')
             *r++ = ':';
+        *r++ = *s++;
+    }
+
+    *sPtr = r;
+}
+
+static void escapeFlags(char ** sPtr, PyObject * strObj) {
+    int size;
+    char * s;
+    char * r = *sPtr;
+
+    /* Flags get : turned to \: */
+
+    s = PYBYTES_AS_STRING(strObj);
+    size = PYBYTES_GET_SIZE(strObj);
+
+    while (size--) {
+        if (*s == ':')
+            *r++ = '\\';
         *r++ = *s++;
     }
 
@@ -232,8 +259,8 @@ struct depFlag {
 };
 
 static int flagSort(const void * a, const void * b) {
-    return strcmp(PyString_AS_STRING( ((struct depFlag *) a)->flag),
-                  PyString_AS_STRING( ((struct depFlag *) b)->flag) );
+    return strcmp(PYBYTES_AS_STRING( ((struct depFlag *) a)->flag),
+                  PYBYTES_AS_STRING( ((struct depFlag *) b)->flag) );
 }
 
 static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
@@ -247,7 +274,7 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
     char * next, * result;
     struct depFlag * flags;
 
-    if (!PyString_CheckExact(nameObj)) {
+    if (!PYBYTES_CheckExact(nameObj)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be a string");
         return -1;
     }
@@ -267,30 +294,30 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
         flags[i].flag = PyTuple_GET_ITEM(itemTuple, 0);
         senseObj = PyTuple_GET_ITEM(itemTuple, 1);
 
-        if (!PyString_CheckExact(flags[i].flag)) {
+        if (!PYBYTES_CheckExact(flags[i].flag)) {
             PyErr_SetString(PyExc_TypeError, "dict keys must be strings");
             Py_DECREF(itemList);
             return -1;
         }
 
-        if (!PyInt_CheckExact(senseObj)) {
+        if (!PYINT_CheckExact(senseObj)) {
             PyErr_SetString(PyExc_TypeError, "dict values must be ints");
             Py_DECREF(itemList);
             return -1;
         }
 
-        flags[i].sense = PyInt_AS_LONG(senseObj);
-        itemSize += PyString_GET_SIZE(flags[i].flag);
+        flags[i].sense = PYINT_AS_LONG(senseObj);
+        itemSize += PYBYTES_GET_SIZE(flags[i].flag);
     }
 
     qsort(flags, itemCount, sizeof(*flags), flagSort);
 
     /* Frozen form is name:SENSEflag:SENSEflag. Worst case size for name/flag
        is * 2 due to : expansion */
-    result = malloc((PyString_GET_SIZE(nameObj) * 2) + 1 +
+    result = malloc((PYBYTES_GET_SIZE(nameObj) * 2) + 1 +
                     (itemSize * 2) + itemCount * 3);
     next = result;
-    copyColonStr(&next, nameObj);
+    escapeName(&next, nameObj);
 
     for (i = 0; i < itemCount; i++) {
         *next++ = ':';
@@ -315,7 +342,7 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
                 return -1;
         }
 
-        copyColonStr(&next, flags[i].flag);
+        escapeFlags(&next, flags[i].flag);
     }
 
     *size = next - result;
@@ -349,7 +376,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
     char * result, * next;
     char tag[12];
 
-    if (!PyInt_CheckExact(tagObj)) {
+    if (!PYINT_CheckExact(tagObj)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be an int");
         free(depList);
         return -1;
@@ -360,7 +387,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
         return -1;
     }
 
-    tagLen = sprintf(tag, "%d#", (int) PyInt_AS_LONG(tagObj));
+    tagLen = sprintf(tag, "%d#", (int) PYINT_AS_LONG(tagObj));
 
     depObjList = PyDict_Items(dict);
     depCount = PyList_GET_SIZE(depObjList);
@@ -374,13 +401,13 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
     depList = malloc(depCount * sizeof(*depList));
     for (i = 0; i < depCount; i++) {
         tuple = PyList_GET_ITEM(depObjList, i);
-        if (!PyString_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
+        if (!PYBYTES_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
             PyErr_SetString(PyExc_TypeError, "dict keys must be strings");
             Py_DECREF(depObjList);
             free(depList);
             return -1;
         }
-        depList[i].className = PyString_AS_STRING(PyTuple_GET_ITEM(tuple, 0));
+        depList[i].className = PYBYTES_AS_STRING(PyTuple_GET_ITEM(tuple, 0));
         depList[i].dep = PyTuple_GET_ITEM(tuple, 1);
     }
 
@@ -478,7 +505,7 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
     memberCount = PyList_GET_SIZE(memberList);
     if (!memberCount) {
         Py_DECREF(memberList);
-        return PyString_FromString("");
+        return PYBYTES_FromString("");
     }
 
     members = malloc(sizeof(*members) * memberCount);
@@ -487,14 +514,14 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
     for (i = 0; i < memberCount; i++) {
         tuple = PyList_GET_ITEM(memberList, i);
 
-        if (!PyInt_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
+        if (!PYINT_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
             PyErr_SetString(PyExc_TypeError, "dict keys must be ints");
             Py_DECREF(memberList);
             free(members);
             return NULL;
         }
 
-        members[i].tag = PyInt_AS_LONG(PyTuple_GET_ITEM(tuple, 0));
+        members[i].tag = PYINT_AS_LONG(PyTuple_GET_ITEM(tuple, 0));
         depClass = PyTuple_GET_ITEM(tuple, 1);
 
         if (!(tagObj = PyObject_GetAttrString(depClass, "tag"))) {
@@ -539,7 +566,7 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
     next--;
 
     free(members);
-    rc = PyString_FromStringAndSize(result, next - result);
+    rc = PYBYTES_FromStringAndSize(result, next - result);
     free(result);
     return rc;
 }
@@ -641,12 +668,12 @@ static PyObject * pack(PyObject * self, PyObject * args) {
     unsigned int fourBytes;
 
     formatArg = PyTuple_GET_ITEM(args, 0);
-    if (!PyString_CheckExact(formatArg)) {
+    if (!PYBYTES_CheckExact(formatArg)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be a string");
         return NULL;
     }
 
-    formatPtr = format = PyString_AS_STRING(formatArg);
+    formatPtr = format = PYBYTES_AS_STRING(formatArg);
 
     /* walk the format twice, first to figure out the length and the second
        to build the string */
@@ -663,7 +690,7 @@ static PyObject * pack(PyObject * self, PyObject * args) {
         switch (*formatPtr++) {
             case 'B':
                 arg = PyTuple_GET_ITEM(args, argNum++);
-                if (!PyInt_CheckExact(arg)) {
+                if (!PYINT_CheckExact(arg)) {
                     PyErr_SetString(PyExc_TypeError,
                                     "argument for B format must be an int");
                     return NULL;
@@ -673,13 +700,13 @@ static PyObject * pack(PyObject * self, PyObject * args) {
 
             case 'S':
                 arg = PyTuple_GET_ITEM(args, argNum++);
-                len = PyString_GET_SIZE(arg);
-                if (!PyString_CheckExact(arg)) {
+                len = PYBYTES_GET_SIZE(arg);
+                if (!PYBYTES_CheckExact(arg)) {
                     PyErr_SetString(PyExc_TypeError,
                                     "argument for S format must be a str");
                     return NULL;
                 }
-                s = PyString_AS_STRING(arg);
+                s = PYBYTES_AS_STRING(arg);
 
                 if (*formatPtr == 'H') {
                     strLen += 2 + len;
@@ -721,14 +748,14 @@ static PyObject * pack(PyObject * self, PyObject * args) {
         switch (*formatPtr++) {
             case 'B':
                 arg = PyTuple_GET_ITEM(args, argNum++);
-                oneByte = PyInt_AS_LONG(arg);
+                oneByte = PYINT_AS_LONG(arg);
                 result[strLen++] = oneByte;
                 break;
 
             case 'S':
                 arg = PyTuple_GET_ITEM(args, argNum++);
-                s = PyString_AS_STRING(arg);
-                len = PyString_GET_SIZE(arg);
+                s = PYBYTES_AS_STRING(arg);
+                len = PYBYTES_GET_SIZE(arg);
 
                 if (*formatPtr == 'H') {
                     twoBytes = htons(len);
@@ -762,7 +789,7 @@ static PyObject * pack(PyObject * self, PyObject * args) {
         }
     }
 
-    resultObj = PyString_FromStringAndSize(result, strLen);
+    resultObj = PYBYTES_FromStringAndSize(result, strLen);
     return resultObj;
 }
 
@@ -786,21 +813,21 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     offsetArg = PyTuple_GET_ITEM(args, 1);
     dataArg = PyTuple_GET_ITEM(args, 2);
 
-    if (!PyString_CheckExact(formatArg)) {
+    if (!PYBYTES_CheckExact(formatArg)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be a string");
         return NULL;
-    } else if (!PyInt_CheckExact(offsetArg)) {
+    } else if (!PYINT_CheckExact(offsetArg)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be an int");
         return NULL;
-    } else if (!PyString_CheckExact(dataArg)) {
+    } else if (!PYBYTES_CheckExact(dataArg)) {
         PyErr_SetString(PyExc_TypeError, "third argument must be a string");
         return NULL;
     }
 
-    format = PyString_AS_STRING(formatArg);
-    offset = PyInt_AS_LONG(offsetArg);
-    data = PyString_AS_STRING(dataArg);
-    dataLen = PyString_GET_SIZE(dataArg);
+    format = PYBYTES_AS_STRING(formatArg);
+    offset = PYINT_AS_LONG(offsetArg);
+    data = PYBYTES_AS_STRING(dataArg);
+    dataLen = PYBYTES_GET_SIZE(dataArg);
 
     formatPtr = format;
 
@@ -817,7 +844,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
         switch (*formatPtr) {
           case 'B':
             intVal = (int) *dataPtr++;
-            dataObj = PyInt_FromLong(intVal);
+            dataObj = PYINT_FromLong(intVal);
             PyList_Append(retList, dataObj);
             Py_DECREF(dataObj);
             formatPtr++;
@@ -825,7 +852,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
 
           case 'H':
             intVal = ntohs(*((short *) dataPtr));
-            dataObj = PyInt_FromLong(intVal);
+            dataObj = PYINT_FromLong(intVal);
             PyList_Append(retList, dataObj);
             Py_DECREF(dataObj);
             dataPtr += 2;
@@ -871,7 +898,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
                 return NULL;
             }
 
-            dataObj = PyString_FromStringAndSize(dataPtr, intVal);
+            dataObj = PYBYTES_FromStringAndSize(dataPtr, intVal);
             PyList_Append(retList, dataObj);
             Py_DECREF(dataObj);
             dataPtr += intVal;
@@ -908,7 +935,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
 		return NULL;
 	    }
 
-            dataObj = PyString_FromStringAndSize(dataPtr, intVal);
+            dataObj = PYBYTES_FromStringAndSize(dataPtr, intVal);
             PyList_Append(retList, dataObj);
             Py_DECREF(dataObj);
             dataPtr += intVal;
@@ -939,12 +966,12 @@ static PyObject * dynamicSize(PyObject *self, PyObject *args) {
     }
 
     sizeArg = PyTuple_GET_ITEM(args, 0);
-    if (!PyInt_CheckExact(sizeArg)) {
+    if (!PYINT_CheckExact(sizeArg)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be a string");
         return NULL;
     }
 
-    size = PyInt_AS_LONG(sizeArg);
+    size = PYINT_AS_LONG(sizeArg);
     if (size < (1 << 6)) {
 	*sizebuf = (char) size;
 	sizelen = sizeof(char);
@@ -961,7 +988,7 @@ static PyObject * dynamicSize(PyObject *self, PyObject *args) {
 			"unimplemented dynamic size");
 	return NULL;
     }
-    return PyString_FromStringAndSize(sizebuf, sizelen);
+    return PYBYTES_FromStringAndSize(sizebuf, sizelen);
 }
 
 static PyObject * py_pread(PyObject *self, PyObject *args) {
@@ -980,29 +1007,24 @@ static PyObject * py_pread(PyObject *self, PyObject *args) {
     pysize = PyTuple_GET_ITEM(args, 1);
     pyoffset = PyTuple_GET_ITEM(args, 2);
 
-    if (!PyInt_CheckExact(pyfd)) {
+    if (!PYINT_CheckExact(pyfd)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be an int");
         return NULL;
-    } else if (!PyInt_CheckExact(pysize) &&
-	       !PyLong_CheckExact(pysize)) {
+    } else if (!PYINT_CHECK_EITHER(pysize)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be an int or long");
         return NULL;
-    } else if (!PyInt_CheckExact(pyoffset) &&
-	       !PyLong_CheckExact(pyoffset)) {
+    } else if (!PYINT_CHECK_EITHER(pyoffset)) {
         PyErr_SetString(PyExc_TypeError, "third argument must be an int or long");
         return NULL;
     }
 
-    fd = PyInt_AS_LONG(pyfd);
-    size = PyLong_AsUnsignedLong(pysize);
+    fd = PYINT_AS_LONG(pyfd);
+    size = PYLONG_AS_ULL(pysize);
     if (PyErr_Occurred())
         return NULL;
 
     /* sizeof(off_t) is 8 (same as long long) */
-    if (PyInt_CheckExact(pyoffset))
-        offset = PyLong_AsUnsignedLong(pyoffset);
-    else /* A PyLong_Type to be converted to a long long */
-        offset = PyLong_AsUnsignedLongLong(pyoffset);
+    offset = PYLONG_AS_ULL(pyoffset);
     if (PyErr_Occurred())
         return NULL;
 
@@ -1020,7 +1042,7 @@ static PyObject * py_pread(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    buf = PyString_FromStringAndSize(data, rc);
+    buf = PYBYTES_FromStringAndSize(data, rc);
     free(data);
     return buf;
 }
@@ -1038,13 +1060,13 @@ static PyObject * py_massCloseFDs(PyObject *self, PyObject *args) {
     pycontcount = PyTuple_GET_ITEM(args, 1);
     pyend = PyTuple_GET_ITEM(args, 2);
 
-    if (!PyInt_CheckExact(pystart)) {
+    if (!PYINT_CheckExact(pystart)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be an int");
         return NULL;
-    } else if (!PyInt_CheckExact(pycontcount)) {
+    } else if (!PYINT_CheckExact(pycontcount)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be an int");
         return NULL;
-    } else if (!PyInt_CheckExact(pyend)) {
+    } else if (!PYINT_CheckExact(pyend)) {
         PyErr_SetString(PyExc_TypeError, "third argument must be an int");
         return NULL;
     }
@@ -1117,14 +1139,14 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
     vectors = alloca(sizeof(*vectors) * PyList_GET_SIZE(dataList));
     for (i = 0; i < PyList_GET_SIZE(dataList); i++) {
         sObj = PyList_GET_ITEM(dataList, i);
-        if (!PyString_Check(sObj)) {
+        if (!PYBYTES_Check(sObj)) {
             PyErr_SetString(PyExc_TypeError,
                             "data objects must be strings");
             return NULL;
         }
 
-        vectors[i].iov_base = PyString_AS_STRING(sObj);
-        vectors[i].iov_len = PyString_GET_SIZE(sObj);
+        vectors[i].iov_base = PYBYTES_AS_STRING(sObj);
+        vectors[i].iov_len = PYBYTES_GET_SIZE(sObj);
     }
 
     msg.msg_name = NULL;
@@ -1145,13 +1167,13 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
 
     for (i = 0; i < PyList_GET_SIZE(fdList); i++) {
         intObj = PyList_GET_ITEM(fdList, i);
-        if (!PyInt_Check(intObj)) {
+        if (!PYINT_Check(intObj)) {
             PyErr_SetString(PyExc_TypeError,
                             "integer file descriptor required");
             return NULL;
         }
 
-        sendFds[i] = PyInt_AS_LONG(intObj);
+        sendFds[i] = PYINT_AS_LONG(intObj);
     }
 
     if ((bytes = sendmsg(fd, &msg, 0)) < 0) {
@@ -1159,7 +1181,7 @@ static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    return PyInt_FromLong(bytes);
+    return PYINT_FromLong(bytes);
 }
 
 static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
@@ -1225,13 +1247,13 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
     }
 
     for (i = 0; i < fdCount; i++) {
-        PyTuple_SET_ITEM(fdTuple, i, PyInt_FromLong(recvFds[i]));
+        PyTuple_SET_ITEM(fdTuple, i, PYINT_FromLong(recvFds[i]));
     }
 
     if (fdCount) {
         rc = Py_BuildValue("s#O", vector.iov_base, bytes, fdTuple);
     } else {
-        rc = PyString_FromStringAndSize(vector.iov_base, bytes);
+        rc = PYBYTES_FromStringAndSize(vector.iov_base, bytes);
     }
     free(vector.iov_base);
 
@@ -1273,7 +1295,7 @@ static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
         if (ufds[i].revents != POLLNVAL)
             vfd++;
 
-    return PyInt_FromLong(vfd);
+    return PYINT_FromLong(vfd);
 }
 
 static PyObject * sha1Copy(PyObject *module, PyObject *args) {
@@ -1289,35 +1311,27 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     if (!PyArg_ParseTuple(args, "(iOO)O!", &inFd, &pyInStart, &pyInSize,
                           &PyList_Type, &outFdList ))
         return NULL;
-    if (!PyInt_CheckExact(pyInStart) &&
-	!PyLong_CheckExact(pyInStart)) {
+    if (!PYINT_CHECK_EITHER(pyInStart)) {
         PyErr_SetString(PyExc_TypeError, "second item in first argument must be an int or long");
         return NULL;
     }
-    if (!PyInt_CheckExact(pyInSize) &&
-	!PyLong_CheckExact(pyInSize)) {
+    if (!PYINT_CHECK_EITHER(pyInSize)) {
         PyErr_SetString(PyExc_TypeError, "third item in first argument must be an int or long");
         return NULL;
     }
 
-    if (PyInt_CheckExact(pyInStart))
-	inStart = PyLong_AsUnsignedLong(pyInStart);
-    else
-	inStart = PyLong_AsUnsignedLongLong(pyInStart);
-    if (inStart == (off_t) -1)
-	return NULL;
+    inStart = PYLONG_AS_ULL(pyInStart);
+    if (PyErr_Occurred())
+        return NULL;
 
-    if (PyInt_CheckExact(pyInSize))
-	inSize = PyLong_AsUnsignedLong(pyInSize);
-    else
-	inSize = PyLong_AsUnsignedLongLong(pyInSize);
-    if (inSize == (off_t) -1)
-	return NULL;
+    inSize = PYLONG_AS_ULL(pyInSize);
+    if (PyErr_Occurred())
+        return NULL;
 
     outFdCount = PyList_Size(outFdList);
     outFds = alloca(sizeof(*outFds) * outFdCount);
     for (i = 0; i < outFdCount; i++)
-        outFds[i] = PyInt_AS_LONG(PyList_GET_ITEM(outFdList, i));
+        outFds[i] = PYINT_AS_LONG(PyList_GET_ITEM(outFdList, i));
 
     memset(&zs, 0, sizeof(zs));
     if ((rc = inflateInit2(&zs, 31)) != Z_OK) {
@@ -1377,7 +1391,7 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 
     SHA1_Final(sha1, &sha1state);
 
-    return PyString_FromStringAndSize((char*)sha1, sizeof(sha1));
+    return PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
 }
 
 static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
@@ -1397,29 +1411,21 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
 			  &path, &baseName, &targetPath))
         goto onerror;
 
-    if (!PyInt_CheckExact(pyInStart) &&
-	!PyLong_CheckExact(pyInStart)) {
+    if (!PYINT_CHECK_EITHER(pyInStart)) {
         PyErr_SetString(PyExc_TypeError, "second item in first argument must be an int or long");
         goto onerror;
     }
-    if (!PyInt_CheckExact(pyInSize) &&
-	       !PyLong_CheckExact(pyInSize)) {
+    if (!PYINT_CHECK_EITHER(pyInSize)) {
         PyErr_SetString(PyExc_TypeError, "third item in first argument must be an int or long");
         goto onerror;
     }
 
-    if (PyInt_CheckExact(pyInStart))
-	inStart = PyLong_AsUnsignedLong(pyInStart);
-    else
-	inStart = PyLong_AsUnsignedLongLong(pyInStart);
-    if (inStart == (off_t) -1)
+    inStart = PYLONG_AS_ULL(pyInStart);
+    if (PyErr_Occurred())
         goto onerror;
 
-    if (PyInt_CheckExact(pyInSize))
-	inSize = PyLong_AsUnsignedLong(pyInSize);
-    else
-	inSize = PyLong_AsUnsignedLongLong(pyInSize);
-    if (inSize == (off_t) -1)
+    inSize = PYLONG_AS_ULL(pyInSize);
+    if (PyErr_Occurred())
         goto onerror;
 
     tmpPath = alloca(strlen(path) + strlen(baseName) + 10);
@@ -1492,8 +1498,8 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     }
     outFd = -1;
 
-    rc = stat(targetPath, &sb);
-    if (rc && errno != ENOENT) {
+    rc = lstat(targetPath, &sb);
+    if (rc && (errno != ENOENT && errno != ELOOP)) {
         PyErr_SetFromErrno(PyExc_OSError);
         goto onerror;
     } else if (!rc && S_ISDIR(sb.st_mode)) {
@@ -1508,7 +1514,7 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
         goto onerror;
     }
 
-    return PyString_FromStringAndSize((char*)sha1, sizeof(sha1));
+    return PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
 
 onerror:
     if (outFd != -1)
@@ -1538,11 +1544,24 @@ static PyObject * pyfchmod(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
-PyMODINIT_FUNC
-initmisc(void)
+
+#define MODULE_DOCSTR "miscellaneous low-level C functions for conary"
+
+#if PY_MAJOR_VERSION >= 3
+static PyModuleDef MiscModule = {
+    PyModuleDef_HEAD_INIT,
+    "misc",
+    MODULE_DOCSTR,
+    -1,
+    MiscMethods
+};
+#endif
+
+PYMODULE_INIT(misc)
 {
-    Py_InitModule3("misc", MiscMethods, 
-		   "miscelaneous low-level C functions for conary");
+    PyObject *m = PYMODULE_CREATE("misc", MiscMethods, MODULE_DOCSTR,
+            &MiscModule);
+    PYMODULE_RETURN(m);
 }
 
 

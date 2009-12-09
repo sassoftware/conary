@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -21,12 +21,11 @@ keys are assumed to be unique.
 """
 
 import errno
-import gzip
 import itertools
 import os
 import tempfile
 
-from conary.lib import misc, util
+from conary.lib import misc, util, fixedgzip as gzip
 from conary.lib import digestlib
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents

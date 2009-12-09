@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,7 +15,6 @@
 import struct
 import tempfile
 import errno
-import gzip
 import itertools
 import os
 
@@ -24,14 +23,21 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from conary import files, streams, trove, versions
-from conary.lib import enum, log, misc, patch, sha1helper, util, api
+from conary import files, rpmhelper, streams, trove, versions
+from conary.lib import enum, log, misc, patch, sha1helper, util, api, fixedgzip as gzip
 from conary.repository import filecontainer, filecontents, errors
 
-# "refr" being the same length as "file" matters
-# "ptr" is for links
+# cft is a string used by the EnumeratedType class; it's not a type itself!
+#
+# "refr" being the same length as "file" matters. it means a path to a file's
+#    contents are stored, not the file itself. it's used for repository
+#    side changesets to avoid storing contents repeatedly
+# "ptr" is for duplicate file contents in a changeset (including hardlinks)
 # "hldr" means there are no contents and the file should be skipped
-#    (used for rollbacks)
+#    (used for locally stored rollbacks when the original file contents can't
+#     be ascertained)
+# "diff" means the file is stored as a unified diff, not absolute contents
+# "file" means the file contents are stored normally
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr",
                                        "refr", "hldr")
 
@@ -106,18 +112,48 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 
 	return "".join(fileList)
 
+    def __getitem__(self, item):
+        if item[0] is None:
+            item = item[1]
+        return dict.__getitem__(self, item)
+
+    def get(self, item, default):
+        if item[0] is None:
+            item = item[1]
+        return dict.get(self, item, default)
+
+    def __setitem__(self, item, val):
+        if item[0] is None:
+            item = item[1]
+        return dict.__setitem__(self, item, val)
+
+    def __hasitem__(self):
+        if item[0] is None:
+            item = item[1]
+        return dict.__hasitem__(self, item)
+
+    def iteritems(self):
+        for item in dict.iteritems(self):
+            if isinstance(item[0], tuple):
+                yield item
+            else:
+                yield (None, item[0]), item[1]
+
+    def items(self):
+        return list(self.iteritems())
+
     def thaw(self ,data):
 	i = 0
 	while i < len(data):
             i, ( frzFile, ) = misc.unpack("!SI", i, data)
             info = FileInfo(frzFile)
 
+            newFileId = info.newFileId()
             oldFileId = info.oldFileId()
             if oldFileId == "":
-                oldFileId = None
-
-            newFileId = info.newFileId()
-            self[(oldFileId, newFileId)] = info.csInfo()
+                self[intern(newFileId)] = info.csInfo()
+            else:
+                self[(intern(oldFileId), intern(newFileId))] = info.csInfo()
 
     def __init__(self, data = None):
 	if data:
@@ -329,24 +365,35 @@ class ChangeSet(streams.StreamSet):
 
     def getFileContents(self, pathId, fileId, compressed = False):
         key = makeKey(pathId, fileId)
-	if self.fileContents.has_key(key):
-	    cont = self.fileContents[key]
-	else:
-	    cont = self.configCache[key]
-
-        if compressed and cont[2]:
-            # we have compressed contents, and we've been asked for compressed
-            # contnets
-            pass
+        if self.fileContents.has_key(key):
+            (tag, contentObj, isCompressed) = self.fileContents[key]
         else:
-            # ensure we have uncompressed contents, and we're being asked for
-            # uncompressed contents
-            assert(not compressed)
-            assert(not cont[2])
+            (tag, contentObj, isCompressed) = self.configCache[key]
 
-        cont = cont[:2]
+        if compressed and isCompressed:
+            # we have compressed contents, and we've been asked for compressed
+            # contents
+            pass
+        elif not compressed and not isCompressed:
+            # we have uncompressed contents, and we've asked for uncompressed
+            # contents
+            pass
+        elif compressed and not isCompressed:
+            # we have uncompressed contents, but have been asked for compressed
+            # contents
+            f = util.BoundedStringIO()
+            compressor = gzip.GzipFile(None, "w", fileobj = f)
+            util.copyfileobj(contentObj.get(), compressor)
+            compressor.close()
+            f.seek(0)
+            contentObj = filecontents.FromFile(f, compressed = True)
+        else:
+            # we have compressed contents, but have been asked for uncompressed
+            assert(0)
+            uncompressor = gzip.GzipFile(None, "r", fileobj = contentObj.get())
+            contentObj = filecontents.FromFile(uncompressed)
 
-	return cont
+        return (tag, contentObj)
 
     def addFile(self, oldFileId, newFileId, csInfo):
         self.files[(oldFileId, newFileId)] = csInfo
@@ -455,13 +502,16 @@ class ChangeSet(streams.StreamSet):
 	    os.unlink(outFileName)
 	    raise
 
-    # if availableFiles is set, this includes the contents that it can
-    # find, but doesn't worry about files which it can't find
-    def makeRollback(self, db, configFiles = False, 
-                     redirectionRollbacks = True):
+    def makeRollback(self, db, redirectionRollbacks = True, repos = None):
 	assert(not self.absolute)
 
         rollback = ChangeSet()
+
+        # if we need old contents for a file we can get them from the
+        # filesystem or the local database (for config files). if the
+        # original contents aren't available, we make a note of that
+        # in this list and handle it later on
+        hldrContents = []
 
 	for troveCs in self.iterNewTroveList():
 	    if not troveCs.getOldVersion():
@@ -550,12 +600,17 @@ class ChangeSet(streams.StreamSet):
 		# we'll gather from the filesystem *as long as they have
 		# not changed*. If they have changed, they'll show up as
 		# members of the local branch, and their contents will be
-		# saved as part of that change set.
+		# saved as part of that change set. we don't rely on
+                # the contents staying in the datastore; we cache them
+                # instead
 		if origFile.flags.isConfig():
 		    cont = filecontents.FromDataStore(db.contentsStore, 
 						      origFile.contents.sha1())
                     rollback.addFileContents(pathId, origFileId,
-					     ChangedFileTypes.file, cont, 1)
+                                             ChangedFileTypes.file,
+                                             filecontents.FromString(
+                                                cont.get().read()),
+                                             1)
 		else:
 		    fullPath = db.root + path
 
@@ -568,17 +623,13 @@ class ChangeSet(streams.StreamSet):
                         fsFile = None
 
 		    if fsFile and fsFile.contents == origFile.contents:
-			cont = filecontents.FromFilesystem(fullPath)
-                        contType = ChangedFileTypes.file
-		    else:
-			# a file which was removed in this changeset is
-			# missing from the files; we need to to put an
-			# empty file in here so we can apply the rollback
-			cont = filecontents.FromString("")
-                        contType = ChangedFileTypes.hldr
+                        rollback.addFileContents(pathId, origFileId,
+                                 ChangedFileTypes.file,
+                                 filecontents.FromFilesystem(fullPath), 0)
+                    else:
+                        hldrContents.append((trv, pathId, origFileId,
+                                             version, 0))
 
-		    rollback.addFileContents(pathId, origFileId, contType,
-                                             cont, 0)
 
 	    for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
 		if not trv.hasFile(pathId):
@@ -643,8 +694,9 @@ class ChangeSet(streams.StreamSet):
                         rollback.addFileContents(pathId, curFileId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
-		elif origFile.hasContents and newFile.hasContents and \
-                            origFile.contents.sha1() != newFile.contents.sha1():
+		elif ((origFile.hasContents != newFile.hasContents) or
+                      (origFile.hasContents and newFile.hasContents and
+                         origFile.contents.sha1() != newFile.contents.sha1())):
 		    # this file changed, so we need the contents
 		    fullPath = db.root + curPath
                     try:
@@ -659,21 +711,21 @@ class ChangeSet(streams.StreamSet):
                         else:
                             raise
 
+                    isConfig = (origFile.flags.isConfig() or
+                                newFile.flags.isConfig())
+
                     if (isinstance(fsFile, files.RegularFile) and
                         fsFile.contents.sha1() == origFile.contents.sha1()):
 			# the contents in the file system are right
-			cont = filecontents.FromFilesystem(fullPath)
-                        contType = ChangedFileTypes.file
-		    else:
-			# the contents in the file system are wrong; insert
-			# a placeholder and let the local change set worry
-			# about getting this right
-			cont = filecontents.FromString("")
-                        contType = ChangedFileTypes.hldr
-
-                    rollback.addFileContents(pathId, curFileId, contType, cont,
-					     origFile.flags.isConfig() or
-					     newFile.flags.isConfig())
+                        rollback.addFileContents(pathId, curFileId,
+                                         ChangedFileTypes.file,
+                                         filecontents.FromFilesystem(fullPath),
+                                         isConfig)
+                    else:
+                        # the contents in the file system are wrong; add
+                        # it to the list of things to deal with a bit later
+                        hldrContents.append((trv, pathId, curFileId, curVersion,
+                                             isConfig))
 
 	    rollback.newTrove(invertedTrove)
 
@@ -700,6 +752,9 @@ class ChangeSet(streams.StreamSet):
                     if fileObj.flags.isConfig():
                         cont = filecontents.FromDataStore(db.contentsStore,
                                     fileObj.contents.sha1())
+                        # make a copy of the contents in memory in case
+                        # the database gets changed
+                        cont = filecontents.FromString(cont.get().read())
                         rollback.addFileContents(pathId, fileId,
                                                  ChangedFileTypes.file, cont,
                                                  fileObj.flags.isConfig())
@@ -714,17 +769,69 @@ class ChangeSet(streams.StreamSet):
 		    if fsFile and fsFile.hasContents and \
 			    fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
-			cont = filecontents.FromFilesystem(fullPath)
                         contType = ChangedFileTypes.file
-		    else:
-			# the contents in the file system are wrong; insert
-			# a placeholder and let the local change set worry
-			# about getting this right
-			cont = filecontents.FromString("")
-                        contType = ChangedFileTypes.hldr
+                        rollback.addFileContents(pathId, fileId,
+                                        ChangedFileTypes.file,
+                                        filecontents.FromFilesystem(fullPath),
+                                        fileObj.flags.isConfig())
+                    else:
+                        # the contents in the file system are wrong; we'll
+                        # deal with this a bit later
+                        hldrContents.append((trv, pathId, fileId, fileVersion,
+                                             fileObj.flags.isConfig()))
 
-                    rollback.addFileContents(pathId, fileId, contType, cont,
-					     fileObj.flags.isConfig())
+        if not repos:
+            # we don't have a repository object, so we have to handle missing
+            # file contents the best we can (which is through a hldr content
+            # type stub)
+            cont = filecontents.FromString("")
+            for trv, pathId, fileId, version, isConfig in hldrContents:
+                rollback.addFileContents(pathId, fileId, ChangedFileTypes.hldr,
+                                         cont, isConfig)
+        else:
+            # we have a repository, so we can get the contents for missing
+            # contents
+
+            # start off by looking for things which have capsules
+            contentsNeeded = []
+            capsContentsNeeded = {}
+            for (trv, pathId, fileId, version, isConfig) in hldrContents:
+                if (trv.troveInfo.capsule and
+                      trv.troveInfo.capsule.type() ==
+                            trove._TROVECAPSULE_TYPE_RPM):
+                    caps = trv.iterFileList(members = False, capsules = True)
+                    for capsPathId, capsPath, capsFileId, capsVersion in caps:
+                        if (capsFileId, capsVersion) not in capsContentsNeeded:
+                            t = (capsFileId, capsVersion)
+                            l = capsContentsNeeded.get(t, None)
+                            if l is None:
+                                l = []
+                                capsContentsNeeded[t] = l
+
+                            path = trv.getFile(pathId)[0]
+                            l.append((path, pathId, fileId, isConfig))
+                else:
+                    contentsNeeded.append((fileId, version))
+
+            allFileContents = repos.getFileContents(
+                    contentsNeeded + sorted(capsContentsNeeded.keys()))
+            for (trv, pathId, fileId, version, isConfig), fileContents in \
+                            itertools.izip(hldrContents, allFileContents):
+                rollback.addFileContents(pathId, fileId, ChangedFileTypes.file,
+                                         fileContents, isConfig)
+
+            for ((fileId, version), l), fileContents in itertools.izip(
+                        sorted(capsContentsNeeded.iteritems()),
+                        allFileContents[len(contentsNeeded):]):
+                payload = rpmhelper.UncompressedRpmPayload(fileContents.get())
+                filePaths = [ x[0] for x in l ]
+                fileObjs = rpmhelper.extractFilesFromCpio(payload, filePaths)
+                for (path, pathId, fileId, isConfig), f in \
+                        itertools.izip(l, fileObjs):
+                    rollback.addFileContents(pathId, fileId,
+                                             ChangedFileTypes.file,
+                                             filecontents.FromFile(f),
+                                             isConfig)
 
 	return rollback
 
@@ -845,6 +952,32 @@ class ChangeSet(streams.StreamSet):
         self.primaryTroveList.thaw("")
         self.newTroves.thaw("")
         self.oldTroves.thaw("")
+
+    def removeCommitted(self, repos):
+        """
+        Walk a changeset and remove and items which are already in the
+        repositories. Returns a changeset which will commit without causing
+        duplicate trove errors. If everything in the changeset has already
+        been committed, return False. If there are items left for commit,
+        return True.
+
+        @param cs: Changeset to filter
+        @type cs: repository.changeset.ChangeSet
+        @rtype: repository.changeset.ChangeSet or None
+        """
+        newTroveInfoList = [ x.getNewNameVersionFlavor() for x in
+                                self.iterNewTroveList() if x.getNewVersion()
+                                is not None ]
+        present = repos.hasTroves(newTroveInfoList)
+
+        for (newTroveInfo, isPresent) in present.iteritems():
+            if isPresent:
+                self.delNewTrove(*newTroveInfo)
+
+        if self.newTroves:
+            return True
+
+        return False
 
     def _sendInfo(self):
         new = self.newTroves.freeze()
@@ -1315,6 +1448,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self._mergeConfigs(otherCs)
         self.fileContainers += otherCs.fileContainers
+        self.csfWrappers += otherCs.csfWrappers
         for entry in otherCs.fileQueue:
             util.tupleListBsearchInsert(self.fileQueue, entry, 
                                         self.fileQueueCmp)
@@ -1581,7 +1715,7 @@ def CreateFromFilesystem(troveList):
 	    (filecs, hash) = fileChangeSet(pathId, None, file)
 	    cs.addFile(oldFileId, newFileId, filecs)
 
-	    if hash:
+            if hash and not file.flags.isPayload():
 		cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
 			  file.flags.isConfig())

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -71,7 +71,8 @@ class Importer(object):
                            'SourcePackageRecipe',
                            'BaseRequiresRecipe',
                            'PackageRecipe', 'BuildPackageRecipe',
-                           'CPackageRecipe', 'AutoPackageRecipe')),
+                           'CPackageRecipe', 'AutoPackageRecipe',
+                           )),
         ('conary.build.grouprecipe', ('_BaseGroupRecipe', '_GroupRecipe',
                                       'GroupRecipe')),
         ('conary.build.filesetrecipe', ('_FilesetRecipe', 'FilesetRecipe')),
@@ -81,6 +82,8 @@ class Importer(object):
                             'DerivedPackageRecipe')),
         ('conary.build.inforecipe',  ('UserGroupInfoRecipe',
                                       'UserInfoRecipe', 'GroupInfoRecipe')),
+        ('conary.build.capsulerecipe',  ('CapsuleRecipe',
+                                      )),
         ('conary.lib', ('util',)),
         ('os',),
         ('re',),

@@ -1,4 +1,4 @@
-# Copyright (c) 2006-2008 rPath, Inc.
+# Copyright (c) 2006-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -43,6 +43,15 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
 
     def handleFileAttributes(self, trv, fileObj, path):
         self.troveFlavor -= fileObj.flavor()
+
+        # A payload file means that we are dealing with a Capsule.  This
+        # is verboten in derived recipes because it is meaningless.
+        if fileObj.flags.isPayload():
+            raise builderrors.RecipeFileError(
+                'Derived recipes cannot be used with %s, '
+                'it was created with a CapsuleRecipe.' % self.trv.name()
+                )
+
 
         # Config vs. InitialContents etc. might be change in derived pkg
         # Set defaults here, and they can be overridden with

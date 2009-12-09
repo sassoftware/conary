@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -241,6 +241,9 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def getDepsForTroveList(self, troveList):
+        raise NotImplementedError
+
+    def getCapsulesForTroveList(self, troveList):
         raise NotImplementedError
 
 # constants mostly stolen from netrepos/netserver
@@ -1101,7 +1104,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             troveNames.add(name)
         return iter(troveNames)
 
-    def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
+    def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False,
+                         capsules = False):
         try:
             cs = self.troveCsMap[n,v,f]
         except KeyError:
@@ -1111,6 +1115,11 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         fileList = trvCs.getNewFileList()
         if not fileList:    
             return
+
+        if capsules:
+            fileList = [ x for x in fileList if x[0] == trove.CAPSULE_PATHID ]
+        else:
+            fileList = [ x for x in fileList if x[0] != trove.CAPSULE_PATHID ]
 
         if not withFiles:
             if sortByPath:
@@ -1152,11 +1161,35 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         for info in troveList:
             cs = self.troveCsMap.get(info, None)
             if cs is None:
+                # this isn't supported, and raises NotimplementedException
                 return SearchableTroveSource.getDepsForTroveList(self,
                                                                  troveList)
 
             trvCs = cs.getNewTroveVersion(*info)
             retList.append((trvCs.getProvides(), trvCs.getRequires()))
+
+        return retList
+
+    def getCapsulesForTroveList(self, troveList):
+        # returns a list of trove.TroveContainer objects, or none for
+        # troves w/o any capsules
+        retList = []
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            if cs is None:
+                # this isn't supported, and raises NotimplementedException
+                return SearchableTroveSource.getCapsulesForTroveList(
+                                self, troveList)
+
+            trvCs = cs.getNewTroveVersion(*info)
+            trvInfo = trvCs.getTroveInfo()
+            # None means an old server. I'm not about to lose sleep over
+            # servers too old to understand capsules
+            if trvInfo is None:
+                retList.append(None)
+            else:
+                retList.append(trvInfo.capsule)
 
         return retList
 

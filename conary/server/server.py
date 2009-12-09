@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -275,6 +275,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 # exceptions are handled (logged) in callWrapper - send
                 # 500 code back to the client to indicate an error happened
                 self.send_error(500)
+                from conary.lib import formattrace
+                excType, excValue, excTb = sys.exc_info()
+                formattrace.formatTrace(excType, excValue, excTb,
+                    withLocals = False)
                 return None
             logMe(3, "returned from", method)
 
@@ -415,7 +419,13 @@ if SSL:
                 # drain any remaining data on this request
                 # This avoids the problem seen with the keepalive code sending
                 # extra bytes after all the request has been sent.
-                if not request.recv(8096):
+                try:
+                    if not request.recv(8096):
+                        break
+                except SSL.SSLError, e:
+                    if e.args[0] != 'unexpected eof':
+                        raise
+                    # Client closed connection too
                     break
             request.set_shutdown(SSL.SSL_RECEIVED_SHUTDOWN |
                                  SSL.SSL_SENT_SHUTDOWN)

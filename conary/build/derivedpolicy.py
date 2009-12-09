@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007 rPath, Inc.
+# Copyright (c) 2007-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -145,18 +145,20 @@ class Requires(packagepolicy.Requires):
     filetree = policy.PACKAGE
 
     def doFile(self, path):
-        pkg = self.recipe.autopkg.componentMap[path]
-        f = pkg.getFile(path)
-
+        pkgs = self.recipe.autopkg.findComponents(path)
+        if not pkgs:
+            return
+        pkgFiles = [(x, x.getFile(path)) for x in pkgs]
         m = self.recipe.magic[path]
+
         # now go through explicit requirements
         for info in self.included:
             for filt in self.included[info]:
                 if filt.match(path):
-                    self._markManualRequirement(info, path, pkg, m)
+                    self._markManualRequirement(info, path, pkgFiles, m)
 
-        self.whiteOut(path, pkg)
-        self.unionDeps(path, pkg, f)
+        self.whiteOut(path, pkgFiles)
+        self.unionDeps(path, pkgFiles)
 
 class Provides(packagepolicy.Provides):
     processUnmodified = True
@@ -167,8 +169,10 @@ class Provides(packagepolicy.Provides):
     )
 
     def doFile(self, path):
-        pkg = self.recipe.autopkg.componentMap[path]
-        f = pkg.getFile(path)
+        pkgs = self.recipe.autopkg.findComponents(path)
+        if not pkgs:
+            return
+        pkgFiles = [(x, x.getFile(path)) for x in pkgs]
 
         m = self.recipe.magic[path]
         macros = self.recipe.macros
@@ -176,9 +180,9 @@ class Provides(packagepolicy.Provides):
         fullpath = macros.destdir + path
         dirpath = os.path.dirname(path)
 
-        self.addExplicitProvides(path, fullpath, pkg, macros, m, f)
-        self.addPathDeps(path, dirpath, pkg, f)
-        self.unionDeps(path, pkg, f)
+        self.addExplicitProvides(path, fullpath, pkgFiles, macros, m)
+        self.addPathDeps(path, dirpath, pkgFiles)
+        self.unionDeps(path, pkgFiles)
 
 class ComponentRequires(packagepolicy.ComponentRequires):
     processUnmodified = True

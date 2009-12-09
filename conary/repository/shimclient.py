@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,11 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.lib import util
+from conary.lib import util, fixedgzip as gzip
 from conary.repository import calllog, changeset, filecontents, netclient
 from conary.repository.netrepos import netserver
 
-import gzip
 import os
 import tempfile
 import time

@@ -50,6 +50,8 @@ cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
 try:
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
                                             argv = sys.argv)
+    for line in argSet.pop('config', []):
+        cfg.configLine(line)
 except options.OptionError, e:
     print >> sys.stderr, e
     sys.exit(e.val)

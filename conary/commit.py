@@ -16,6 +16,7 @@ import tempfile
 
 from conary import conaryclient
 from conary import versions
+from conary import cvc
 from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
@@ -24,6 +25,7 @@ from conary.repository import filecontainer
 def doCommit(cfg, changeSetFile, targetLabel):
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
+    callback = cvc.CheckinCallback()
 
     try:
 	cs = changeset.ChangeSetFromFile(changeSetFile)
@@ -48,7 +50,7 @@ def doCommit(cfg, changeSetFile, targetLabel):
         # did the check at the top of doCommit().  We should probably
         # add commitChangeSet method that takes a fd.
         try:
-            repos.commitChangeSetFile(changeSetFile)
+            repos.commitChangeSetFile(changeSetFile, callback=callback)
         except errors.CommitError, e:
             print e
     finally:

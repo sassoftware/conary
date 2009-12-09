@@ -1,4 +1,4 @@
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -214,6 +214,18 @@ class CfgLabel(CfgType):
             return versions.Label(val)
         except versions.ParseError, e:
             raise ParseError, e
+
+class CfgDependencyClass(CfgType):
+
+    def format(self, val, displayOptions=None):
+        return val.tagName
+
+    def parseString(self, val):
+        klass = deps.dependencyClassesByName.get(val, None)
+        if klass is None:
+            raise ParseError('unknown dependency class: %s' % val)
+
+        return klass
 
 class CfgRepoMapEntry(CfgType):
 
@@ -459,6 +471,7 @@ class CfgProxy(CfgDict):
         CfgDict.__init__(self, ProxyEntry, default=default)
 
 CfgInstallLabelPath = CfgLineList(CfgLabel, listType = CfgLabelList)
+CfgDependencyClassList = CfgLineList(CfgDependencyClass)
 
 
 class CfgSearchPathItem(CfgType):
@@ -527,6 +540,8 @@ class ConaryContext(ConfigSection):
     fullFlavors           =  CfgBool
     localRollbacks        =  CfgBool
     keepRequired          =  CfgBool
+    ignoreDependencies    =  (CfgDependencyClassList,
+                              [ deps.AbiDependency, deps.RpmLibDependencies])
     installLabelPath      =  CfgInstallLabelPath
     interactive           =  (CfgBool, False)
     logFile               =  (CfgPathList, ('/var/log/conary',

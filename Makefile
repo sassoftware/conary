@@ -14,16 +14,17 @@
 
 all: subdirs
 
-export VERSION = 2.0.50
+export VERSION = 2.1.0
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
+export lib = $(shell uname -m | sed -r '/x86_64|ppc64|s390x|sparc64/{s/.*/lib64/;q};s/.*/lib/')
 export bindir = $(prefix)/bin
-export libdir = $(prefix)/lib
+export libdir = $(prefix)/$(lib)
 export libexecdir = $(prefix)/libexec
 export datadir = $(prefix)/share
 export mandir = $(datadir)/man
-export sitedir = $(libdir)/python$(PYVERSION)/site-packages/
+export sitedir = $(libdir)/python$(PYVER)/site-packages/
 export conarydir = $(sitedir)/conary
 export conarylibdir = $(libdir)/conary
 export conarylibexecdir = $(libexecdir)/conary

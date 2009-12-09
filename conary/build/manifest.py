@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2006-2008 rPath, Inc.
+# Copyright (c) 2006-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,37 +14,47 @@
 
 import os, re
 from conary.lib import util
+from conary.build.filter import PathSet
 
 class Manifest:
 
     def __init__(self, package, recipe):
-
         self.recipe = recipe
+        self.package = package
+        if package is not None:
+            self.prepareManifestFile()
+
+    def prepareManifestFile(self, package=None):
+        # separate from __init__ for the sake of delayed instantiation
+        # where package is derived from data not available at __init__ time
+        if package is None:
+            package = self.package
+        
         self.manifestsDir = '%s/%s/_MANIFESTS_' \
-            % (util.normpath(recipe.cfg.buildPath), recipe.name)
+            % (util.normpath(self.recipe.cfg.buildPath), self.recipe.name)
 
         component = None
 
         if ':' in package:
             (package, component) = package.split(':')
         if package:
-            recipe.packages[package] = True
+            self.recipe.packages[package] = True
 
         i = 0
         while True:
             manifestName = '%s.%d' % (package, i)
-            if manifestName not in recipe.manifests:
+            if manifestName not in self.recipe.manifests:
                 break
             i += 1
 
         self.name = manifestName
         self.manifestFile = '%s/%s.manifest' % (self.manifestsDir, manifestName)
-        recipe.manifests.add(manifestName)
+        self.recipe.manifests.add(manifestName)
 
         if component:
-            recipe.ComponentSpec(component, self.load)
+            self.recipe.ComponentSpec(component, self.load)
         if package:
-            recipe.PackageSpec(package, self.load)
+            self.recipe.PackageSpec(package, self.load)
 
     def walk(self, init=True):
 
@@ -83,14 +93,8 @@ class Manifest:
         return path
 
     def load(self):
-
-        fileList = [ re.escape(self.translatePath(x[:-1])) \
-                     for x in open(self.manifestFile).readlines() ]
-
-        regexp = '^(?:'+'|'.join(fileList)+')$'
-        regexp = re.compile(regexp)
-
-        return regexp
+        return PathSet(self.translatePath(x[:-1])
+                       for x in open(self.manifestFile).readlines())
 
 class ExplicitManifest(Manifest):
     """This class is used when an exact effect on destdir is known.
@@ -99,6 +103,11 @@ class ExplicitManifest(Manifest):
     def __init__(self, package, recipe, paths = []):
         self.manifestPaths = set(paths)
         Manifest.__init__(self, package, recipe)
+
+    def recordRelativePaths(self, paths):
+        if not isinstance(paths, (list, tuple, set)):
+            paths = [paths]
+        self.manifestPaths.update(paths)
 
     def recordPaths(self, paths):
         if not isinstance(paths, (list, tuple, set)):

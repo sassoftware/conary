@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2009 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -353,13 +353,15 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     # don't download sources for groups or filesets
     if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
-            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP):
+            recipeClass.getType() == recipe.RECIPE_TYPE_GROUP or
+            recipeClass.getType() == recipe.RECIPE_TYPE_CAPSULE):
         lcache = lookaside.RepositoryCache(repos, cfg=cfg)
         srcdirs = [ cwd,
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
 
         try:
-            if recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+            if (recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE or
+                recipeClass.getType() == recipe.RECIPE_TYPE_CAPSULE):
                 recipeObj = recipeClass(cfg, lcache, srcdirs,
                                         lightInstance=True)
             elif recipeClass.getType() == recipe.RECIPE_TYPE_GROUP:
@@ -2167,7 +2169,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     srcFiles = {}
 
     # don't download sources for groups or filesets
-    if not recipeClass.getType() == recipe.RECIPE_TYPE_PACKAGE:
+    if not recipeClass.getType() in (recipe.RECIPE_TYPE_PACKAGE, recipe.RECIPE_TYPE_CAPSULE):
         raise errors.CvcError('Only package recipes can have files refreshed')
 
     lcache = lookaside.RepositoryCache(repos, refreshFilter, cfg=cfg)

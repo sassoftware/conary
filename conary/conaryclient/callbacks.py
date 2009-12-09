@@ -82,6 +82,22 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
             self._message("Committing changeset "
                           "(%dKB at %dKB/sec)..." % (got/1024, self.rate/1024))
 
+    # fixme: callbacks need to be refactored
+    def creatingDatabaseTransaction(self, troveNum, troveCount):
+        """
+        @see: callbacks.UpdateCallback.creatingDatabaseTransaction
+        """
+        self._message("Creating database transaction (%d of %d)" %
+		      (troveNum, troveCount))
+
+    # fixme: callbacks need to be refactored
+    def updatingDatabase(self, step, stepNum, stepCount):
+        if step == 'latest':
+            self._message('Updating list of latest versions: (%d of %d)' %
+                          (stepNum, stepCount))
+        else:
+            self._message('Updating database: (%d of %d)' %
+                          (stepNum, stepCount))
 
     def update(self):
         t = self.csText

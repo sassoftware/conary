@@ -1,0 +1,206 @@
+#!/usr/bin/env python
+# -*- mode: python -*-
+#
+# Copyright (c) 2009 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+
+import errno
+import itertools
+import os
+import pgsql
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
+from optparse import OptionParser
+
+fullPath = os.path.abspath(os.path.dirname(sys.argv[0]))
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import conarycfg, conaryclient, dbstore
+from conary.lib.util import rmtree
+from conary.local import schema as depSchema
+from conary.updatecmd import UpdateCallback
+from conary.server import migrate
+from conary.server import schema
+from conary.trove import Trove
+from conary.repository import changeset
+from conary.repository.netrepos import fsrepos, trovestore
+
+
+def loadChangeSet(db, contentsPath, changeSet):
+    serverSet = set()
+    keyIds = set()
+    print >> sys.stderr, "Inspecting changeset"
+    for trvCs in changeSet.iterNewTroveList():
+        serverSet.add(trvCs.getNewVersion().getHost())
+        continue # XXX
+        trv = Trove(trvCs)
+        host = trv.getVersion().getHost()
+        serverSet.add(host)
+        for _, sig in trv.troveInfo.sigs.digitalSigs.iterAll():
+            keyIds.add((host, sig.fingerprint()))
+    # TODO: fetch keys. nothing is signed at this point, though.
+    assert not keyIds
+
+    ts = trovestore.TroveStore(db)
+    repos = fsrepos.FilesystemRepository(serverSet, ts, [ contentsPath ], {})
+
+    cfg = conarycfg.ConaryConfiguration(True)
+    cl = conaryclient.ConaryClient(cfg = cfg)
+    netRepos = cl.getRepos()
+
+    callback = UpdateCallback()
+    callback.out = sys.stderr
+    print >> sys.stderr, "Committing"
+    repos.commitChangeSet(changeSet, mirror=True, excludeCapsuleContents=True, callback=callback)
+    print >> sys.stderr
+
+
+class Postgres(object):
+    def __init__(self, path):
+        self.path = path
+        self.pid = None
+        self.port = 5431
+
+    def connect(self, dbName):
+        if not self.check():
+            raise RuntimeError("postmaster is dead")
+        start = time.time()
+        while True:
+            try:
+                return dbstore.connect('rbuilder@localhost:%s/%s'
+                        % (self.port, dbName), 'postgresql')
+            except pgsql.DatabaseError, err:
+                msg = err.args[0]
+                if ('the database system is starting up' in msg
+                        or 'Connection refused' in msg):
+                    if time.time() - start > 15:
+                        self.kill()
+                        raise RuntimeError("Database did not start")
+                    time.sleep(0.1)
+                    continue
+                raise
+
+    def _create(self):
+        proc = subprocess.Popen(
+                "initdb -D '%s' -E utf8 --locale=C -U rbuilder" % (self.path,),
+                shell=True, stdout=sys.stderr)
+        proc.wait()
+
+    def start(self):
+        self._create()
+        self.pid = os.fork()
+        if not self.pid:
+            try:
+                try:
+                    os.execl('/usr/bin/postgres', 'postgres',
+                            '-D', self.path, # data directory
+                            '-F', # turn fsync off
+                            '-p', str(self.port), # port
+                            '-N', '10', # max connections
+                            '--checkpoint_segments=16', # fewer checkpoints
+                            '--checkpoint_warning=0', # quit crying
+                            )
+                except:
+                    traceback.print_exc()
+            finally:
+                os._exit(70)
+
+    def check(self):
+        if not self.pid:
+            return False
+        pid, status = os.waitpid(self.pid, os.WNOHANG)
+        if pid:
+            self.pid = None
+            return False
+        else:
+            return True
+
+    def kill(self):
+        if not self.pid:
+            return
+        try:
+            pgsql.closeall()
+        except:
+            pass
+        os.kill(self.pid, signal.SIGINT)
+        os.waitpid(self.pid, 0)
+        self.pid = None
+
+
+def main(args):
+    parser = OptionParser("%prog [changeset]+")
+    options, args = parser.parse_args(args)
+    if not args:
+        parser.error("At least one changeset is required")
+
+    masterCs = changeset.ReadOnlyChangeSet()
+    for csName in args:
+        print >> sys.stderr, "Reading file", csName
+        changeSet = changeset.ChangeSetFromFile(csName)
+        print >> sys.stderr, " Merging"
+        masterCs.merge(changeSet)
+
+    print >> sys.stderr, "Starting database"
+    server = db = None
+    workDir = tempfile.mkdtemp(prefix='preload-')
+    try:
+        server = Postgres(workDir + '/psql')
+        server.start()
+
+        master = server.connect('postgres')
+        mcu = master.cursor()
+        mcu.execute("CREATE DATABASE preload")
+        master.close()
+
+        db = server.connect('preload')
+        db.tables = {}
+        cu = db.cursor()
+        cu.execute("CREATE LANGUAGE plpgsql")
+
+        print >> sys.stderr, "Creating schema"
+        schema.loadSchema(db)
+        schema.setupTempTables(db)
+        depSchema.setupTempDepTables(db)
+
+        os.mkdir(workDir + '/contents')
+        loadChangeSet(db, workDir + '/contents', masterCs)
+
+        print >> sys.stderr, "Checkpointing"
+        cu.execute("CHECKPOINT")
+
+        print >> sys.stderr, "Dumping database"
+        dumpPath = workDir + '/database.pgtar'
+        os.system("pg_dump -U rbuilder -p %s -F tar -f '%s' preload"
+                % (server.port, dumpPath,))
+
+        print >> sys.stderr, "Creating tarball"
+        os.system("tar -C '%s' -c --remove-files contents database.pgtar" % (workDir,))
+
+    finally:
+        if db:
+            db.close()
+        if server:
+            server.kill()
+        rmtree(workDir)
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        print
