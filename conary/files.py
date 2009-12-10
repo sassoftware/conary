@@ -705,7 +705,8 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
 
         undoPrelink = False
         try:
-            if f.inode.isExecutable() and elf.prelinked(path):
+            if (os.access(PRELINK_CMD[0], os.X_OK) and
+                f.inode.isExecutable() and elf.prelinked(path)):
                 undoPrelink = True
         except:
             pass
