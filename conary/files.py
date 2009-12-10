@@ -632,7 +632,7 @@ class RegularFile(File):
 	File.__init__(self, *args, **kargs)
 
 def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
-                       assumeRoot = False):
+                       assumeRoot = False, verifyExecutableSize = False):
     s = os.lstat(path)
 
     global userCache, groupCache
@@ -691,11 +691,12 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
 			   s.st_size == possibleMatch.contents.size())):
         f.flags.set(possibleMatch.flags())
         return possibleMatch
-    elif (possibleMatch and (isinstance(f, RegularFile) and
+    elif (verifyExecutableSize and
+          possibleMatch and (isinstance(f, RegularFile) and
                              isinstance(possibleMatch, RegularFile))
                         and (f.inode.isExecutable())
                         and f.inode.perms == possibleMatch.inode.perms):
-        # executable RegularFiles match even if there sizes are different
+        # executable RegularFiles match even if their sizes are different
         # as long as everything else is the same; this is to stop size
         # changes from prelink from changing fileids
         return possibleMatch

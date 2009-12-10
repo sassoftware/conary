@@ -78,7 +78,8 @@ class BuildComponent(dict):
         # skip uid/gid lookups because packagepolicy will change the
         # ownerships according to Ownership settings anyway
 	(f, linkCount, inode) = files.FileFromFilesystem(realPath, None, 
-                                        inodeInfo = True, assumeRoot = True)
+                                        inodeInfo = True, assumeRoot = True,
+                                        verifyExecutableSize = False)
 	f.inode.perms.set(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
         if (f.inode.perms() & 0400) != 0400:
