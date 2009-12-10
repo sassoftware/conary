@@ -703,7 +703,13 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
     if needsSha1:
 	f.contents = RegularFileStream()
 
-        if f.inode.isExecutable() and elf.prelinked(path):
+        undoPrelink = False
+        try:
+            if f.inode.isExecutable() and elf.prelinked(path):
+                undoPrelink = True
+        except:
+            pass
+        if undoPrelink:
             prelink = subprocess.Popen(
                     PRELINK_CMD + ("-y", path),
                     stdout = subprocess.PIPE,
