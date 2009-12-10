@@ -694,6 +694,7 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
     elif (possibleMatch and (isinstance(f, RegularFile) and
                              isinstance(possibleMatch, RegularFile))
                         and (f.inode.isExecutable())
+                        and f.inode.mtime() == possibleMatch.inode.mtime()
                         and f.inode.perms == possibleMatch.inode.perms):
         # executable RegularFiles match even if there sizes are different
         # as long as everything else is the same; this is to stop size
