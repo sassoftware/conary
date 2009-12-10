@@ -8,6 +8,7 @@ Changes in @NEW@:
       RPM recorded in troveInfo.  The mtime of last change is
       still used to calculate fileIds, preserving knowledge of
       when meaningful file information has changed. (CNY-3307)
+    * Added support in verify and update paths for prelinked binaries
 
   o Bug Fixes:
     * Changeset reassembly for capsules ignores directories. (CNY-3305)

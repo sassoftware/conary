@@ -20,11 +20,12 @@ import socket
 import stat
 import string
 import struct
+import subprocess
 import tempfile
 import time
 
 from conary import errors, streams
-from conary.lib import util, sha1helper, log, digestlib
+from conary.lib import elf, util, sha1helper, log, digestlib
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
@@ -71,6 +72,8 @@ LARGE = streams.LARGE
 DYNAMIC = streams.DYNAMIC
 
 FILE_TYPE_DIFF = '\x01'
+
+PRELINK_CMD = ("/usr/sbin/prelink",)
 
 def fileStreamIsDiff(fileStream):
     return fileStream[0] == FILE_TYPE_DIFF
@@ -183,6 +186,9 @@ class InodeStream(streams.StreamSet):
     def timeString(self, now = None):
         # We're ignoring now now
         return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(self.mtime()))
+
+    def isExecutable(self):
+        return (self.perms() & 0111) != 0
 
     def __eq__(self, other, skipSet = { 'mtime' : True }):
         return streams.StreamSet.__eq__(self, other, skipSet = skipSet)
@@ -685,11 +691,41 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
 			   s.st_size == possibleMatch.contents.size())):
         f.flags.set(possibleMatch.flags())
         return possibleMatch
+    elif (possibleMatch and (isinstance(f, RegularFile) and
+                             isinstance(possibleMatch, RegularFile))
+                        and (f.inode.isExecutable())
+                        and f.inode.perms == possibleMatch.inode.perms):
+        # executable RegularFiles match even if there sizes are different
+        # as long as everything else is the same; this is to stop size
+        # changes from prelink from changing fileids
+        return possibleMatch
 
     if needsSha1:
-	sha1 = sha1helper.sha1FileBin(path)
 	f.contents = RegularFileStream()
-	f.contents.size.set(s.st_size)
+
+        if f.inode.isExecutable() and elf.prelinked(path):
+            prelink = subprocess.Popen(
+                    PRELINK_CMD + ("-y", path),
+                    stdout = subprocess.PIPE,
+                    close_fds = True,
+                    shell = False)
+            s = ''
+            d = digestlib.sha1()
+            content = prelink.stdout.read()
+            size = 0
+            while content:
+                d.update(content)
+                s += content
+                size += len(content)
+                content = prelink.stdout.read()
+
+            prelink.wait()
+            f.contents.size.set(size)
+            sha1 = d.digest()
+        else:     
+            sha1 = sha1helper.sha1FileBin(path)
+            f.contents.size.set(s.st_size)
+
 	f.contents.sha1.set(sha1)
 
     if inodeInfo:
