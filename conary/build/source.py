@@ -1535,8 +1535,8 @@ class addCapsule(_Source):
                              not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
                         InitialContents.append( path )
 
-                if flags & rpmhelper.RPMFILE_MISSINGOK:
-                    MissingOkay.append(path)
+            if flags & rpmhelper.RPMFILE_MISSINGOK:
+                MissingOkay.append(path)
 
         if len(ExcludeDirectories):
             self.recipe.ExcludeDirectories(exceptions=filter.PathSet(
