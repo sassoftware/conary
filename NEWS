@@ -1,10 +1,5 @@
 Changes in @NEW@:
   o New Features
-    * A modified version of the Python gzip library has been added to
-      Conary. The new version has been tested to be 3% faster than the
-      standard library version for a small sized update. It also does
-      not seek within the compressed data, which will enable streaming
-      decompression for future uses. (CNY-3301)
     * Added repair command as an experimental feature. (CNY-1800)
     * Files marked as "missingok" in encapsulated RPMs now have that
       status represented by a "MissingOkay" flag on the corresponding

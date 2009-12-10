@@ -11,10 +11,11 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from conary.lib import util, fixedgzip as gzip
+from conary.lib import util
 from conary.repository import calllog, changeset, filecontents, netclient
 from conary.repository.netrepos import netserver
 
+import gzip
 import os
 import tempfile
 import time

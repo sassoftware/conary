@@ -21,11 +21,12 @@ keys are assumed to be unique.
 """
 
 import errno
+import gzip
 import itertools
 import os
 import tempfile
 
-from conary.lib import misc, util, fixedgzip as gzip
+from conary.lib import misc, util
 from conary.lib import digestlib
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents

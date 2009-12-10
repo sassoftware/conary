@@ -15,6 +15,7 @@
 import struct
 import tempfile
 import errno
+import gzip
 import itertools
 import os
 
@@ -24,7 +25,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary import files, rpmhelper, streams, trove, versions
-from conary.lib import enum, log, misc, patch, sha1helper, util, api, fixedgzip as gzip
+from conary.lib import enum, log, misc, patch, sha1helper, util, api
 from conary.repository import filecontainer, filecontents, errors
 
 # cft is a string used by the EnumeratedType class; it's not a type itself!

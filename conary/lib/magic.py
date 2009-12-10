@@ -18,6 +18,7 @@ import stat
 import string
 import xml.dom.minidom
 import zipfile
+import gzip as gzip_module
 import bz2
 
 from conary import rpmhelper
@@ -25,7 +26,6 @@ from conary.lib import debhelper
 from conary.lib import elf
 from conary.lib import javadeps
 from conary.lib import util
-from conary.lib import fixedgzip as gzip_module
 
 class Magic(object):
     __slots__ = ['path', 'basedir', 'contents', 'name']

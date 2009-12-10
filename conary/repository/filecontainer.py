@@ -66,10 +66,11 @@ This code is careful not to depend on the file pointer at all for reading
 (via pread). The file pointer is used while creating file containers.
 """
 
+import gzip
 import struct
 
 import conary.errors
-from conary.lib import util, fixedgzip as gzip
+from conary.lib import util
 from conary.repository import filecontents
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"

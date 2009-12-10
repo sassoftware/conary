@@ -13,6 +13,7 @@
 #
 
 import base64
+import gzip
 import httplib
 import itertools
 import os
@@ -29,7 +30,7 @@ from conary import files
 from conary import metadata
 from conary import trove
 from conary import versions
-from conary.lib import util, api, fixedgzip as gzip
+from conary.lib import util, api
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors

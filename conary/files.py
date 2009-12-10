@@ -13,6 +13,7 @@
 #
 
 import grp
+import gzip
 import os
 import pwd
 import socket
@@ -23,7 +24,7 @@ import tempfile
 import time
 
 from conary import errors, streams
-from conary.lib import util, sha1helper, log, digestlib, fixedgzip as gzip
+from conary.lib import util, sha1helper, log, digestlib
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
@@ -521,6 +522,7 @@ class CharacterDevice(DeviceFile):
     lsTag = "c"
     __slots__ = []
 
+import gzip
 class RegularFile(File):
 
     streamDict = { 
@@ -540,6 +542,7 @@ class RegularFile(File):
 
     def restore(self, fileContents, root, target, journal=None, sha1 = None,
                 nameLookup=True, **kwargs):
+
         keepTempfile = kwargs.get('keepTempfile', False)
 
 	if fileContents != None:
