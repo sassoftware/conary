@@ -4117,7 +4117,8 @@ def _loadRestartInfo(restartDir, updJob):
     # Nevertheless the code now ignores everything but .ccs files
 
     # Value of dictionary is includesFileContents
-    fileDict = dict((x, False) for x in os.listdir(restartDir) if x.endswith('.ccs'))
+    fileDict = dict((os.path.join(restartDir, x), False)
+        for x in os.listdir(restartDir) if x.endswith('.ccs'))
     # Add the changesets from the index file
     csIndexPath = os.path.join(restartDir, 'changesets')
     if os.path.exists(csIndexPath):
@@ -4127,6 +4128,8 @@ def _loadRestartInfo(restartDir, updJob):
             fileDict[cspath] = includesFileContents
 
     for path, includesFileContents in fileDict.iteritems():
+        # path should already be absolute, so the next line is most likely not
+        # changing path
         csFileName = os.path.join(restartDir, path)
         cs = changeset.ChangeSetFromFile(lazyFileCache.open(csFileName))
         changeSetList.append((cs, includesFileContents))
