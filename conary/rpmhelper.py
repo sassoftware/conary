@@ -16,7 +16,6 @@
 Contains functions to assist in dealing with rpm files.
 """
 
-import gzip
 import itertools
 import os
 import re
@@ -571,7 +570,7 @@ def UncompressedRpmPayload(fileIn):
     seekToData(fileIn)
 
     if compression == 'gzip':
-        uncompressed = gzip.GzipFile(fileobj=fileIn, mode = "r")
+        uncompressed = util.GzipFile(fileobj=fileIn, mode = "r")
         #uncompressed._new_member = False
     elif compression == 'bzip2':
         uncompressed = util.BZ2File(fileIn)

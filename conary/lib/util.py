@@ -16,6 +16,7 @@ import bdb
 import bz2
 import debugger
 import fcntl
+import gzip
 import errno
 import itertools
 import log
@@ -2135,3 +2136,28 @@ class Tick:
         now = time.time()
         print "tick: +%.2f %s total=%.3f" % (now-self.last, m, now-self.start)
         self.last = now
+
+class GzipFile(gzip.GzipFile):
+
+    # fix gzip implementation to not seek
+    def __init__(self, *args, **kwargs):
+        self._first = True
+        gzip.GzipFile.__init__(self, *args, **kwargs)
+
+    def _read(self, size=1024):
+        if self.fileobj is None:
+            raise EOFError, "Reached EOF"
+
+        if self._first:
+            assert(self._new_member)
+            # If the _new_member flag is set, we have to
+            # jump to the next member, if there is one.
+            self._init_read()
+            self._read_gzip_header()
+            self.decompress = zlib.decompressobj(-zlib.MAX_WBITS)
+            self._new_member = False
+            self._first = False
+        elif self._new_member:
+            raise EOFError, "Reached EOF"
+
+        return gzip.GzipFile._read(self, size = size)
