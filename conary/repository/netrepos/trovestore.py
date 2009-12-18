@@ -65,6 +65,8 @@ class TroveAdder:
             # we have the stream for this fileId already. we don't need
             # it again
             return
+        if fileId in self.fileIdSet:
+            return
 
         if fileStream and withContents:
             sha1 = None
@@ -79,6 +81,7 @@ class TroveAdder:
         self.newStreamsByFileId[fileId] = (self.cu.binary(fileId),
                                            self.cu.binary(fileStream),
                                            self.cu.binary(sha1))
+        self.fileIdSet.add(fileId)
 
     def addFile(self, pathId, path, fileId, fileVersion,
                 fileStream = None, withContents = True):
@@ -114,7 +117,7 @@ class TroveAdder:
                        withContents = withContents)
 
     def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap,
-                 dirMap, baseMap):
+                 dirMap, baseMap, fileIdSet):
         self.troveStore = troveStore
         self.cu = cu
         self.trv = trv
@@ -126,6 +129,7 @@ class TroveAdder:
         self.changeMap = changeMap
         self.dirMap = dirMap
         self.baseMap = baseMap
+        self.fileIdSet = fileIdSet
 
 # we need to call this from the schema migration as well, which is why
 # we extracted it from the TroveStore class
@@ -322,7 +326,7 @@ class TroveStore:
         changeMap = dict((x[0], x) for x in trvCs.getChangedFileList())
         newSet = set(x[0] for x in trvCs.getNewFileList())
         return TroveAdder(self, cu, trv, trvCs, hidden, newSet, changeMap,
-                          self.dirMap, self.baseMap)
+                          self.dirMap, self.baseMap, self.fileIdSet)
 
     # walk the trove and insert any missing flavors we need into the Flavors table
     def _addTroveNewFlavors(self, cu, trv):
@@ -770,6 +774,7 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewStreams')
         schema.resetTable(cu, 'tmpNewLatest')
         self.depAdder = deptable.BulkDependencyLoader(self.db, cu)
+        self.fileIdSet = set()
 
         schema.resetTable(cu, 'tmpNewPaths')
         l = [(cu.binary(x),) for x in dirNames]
@@ -855,6 +860,7 @@ class TroveStore:
     def addTroveSetDone(self, callback=None):
         self.dirMap = None
         self.baseMap = None
+        self.fileIdSet = None
 
         if not callback:
             callback = callbacks.UpdateCallback()
@@ -915,7 +921,6 @@ class TroveStore:
             lc.versionId IS NOT NULL OR
             (ugi.instanceId IS NOT NULL AND tmpNewTroves.hidden = 0)
         """ % d
-        #import epdb;epdb.st()
         callback.updatingDatabase('latest', 1, 5)
         cu.execute(sql1)
 

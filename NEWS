@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Committing relative changesets with multiple specifications for
+      a single fileId would cause a repository traceback when those
+      specifications were part of different troves. (CNY-3316)
+
 Changes in 2.1.1:
   o New Features
     * Added repair command as an experimental feature. (CNY-1800)
