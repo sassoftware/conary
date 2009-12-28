@@ -22,7 +22,7 @@ import stat
 #conary imports
 from conary.lib import magic
 from conary.lib import util
-from conary.build import policy
+from conary.build import policy, recipe
 
 class TestSuiteLinks(policy.Policy):
     """
@@ -99,6 +99,9 @@ class TestSuiteLinks(policy.Policy):
 	if fileMap is not None:
 	    self.fileMap.update(fileMap)
 	policy.Policy.updateArgs(self, *args, **keywords)
+
+    def test(self):
+        return not self.recipe.getType() == recipe.RECIPE_TYPE_CAPSULE
 
     def do(self):
 	if not self.buildTestSuite:
@@ -316,6 +319,9 @@ class TestSuiteFiles(policy.Policy):
     keywords = { 'build': None,
 		 'builddirlinks' : None}
 
+    def test(self):
+        return not self.recipe.getType() == recipe.RECIPE_TYPE_CAPSULE
+
     def do(self):
 	if self.buildTestSuite is False:
 	    return
@@ -405,6 +411,10 @@ class FixDirModes(policy.Policy):
     # and executable for the user
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
     invariantexceptions = [ ('.*', 0700) ]
+
+    def test(self):
+        # Capsule packages handle this separately
+        return not self.recipe.getType() == recipe.RECIPE_TYPE_CAPSULE
 
     def doFile(self, path):
         fullpath = self.macros.destdir + path

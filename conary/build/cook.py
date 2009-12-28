@@ -1231,8 +1231,7 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
                 recipeObj.doProcess('TESTSUITE', logFile = output)
 
             recipeObj.doProcess('DESTDIR_PREPARATION', logFile = output)
-            if recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE:
-                recipeObj.doProcess('DESTDIR_MODIFICATION', logFile = output)
+            recipeObj.doProcess('DESTDIR_MODIFICATION', logFile = output)
 
             # cannot restart after the beginning of policy.PACKAGE_CREATION
             bldInfo.stop()

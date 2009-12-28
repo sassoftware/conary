@@ -1,4 +1,10 @@
 Changes in @NEW@:
+  o New Features
+    * Conary now runs all destdir policies for capsule packages.
+      Previously, it disabled destdir policies to avoid unintentional
+      modification; now all destdir policies should take capsules
+      into account and some destdir policies are required. (CNY-3320)
+
   o Bug Fixes:
     * Committing relative changesets with multiple specifications for
       a single fileId would cause a repository traceback when those
