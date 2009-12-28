@@ -1559,6 +1559,12 @@ class addCapsule(_Source):
 
         self.recipe._addCapsule(f, self.capsuleType, self.package)
 
+        # Now store script info:
+        scriptDir = '/'.join((
+            os.path.dirname(self.recipe.macros.destdir),
+            '_CAPSULE_SCRIPTS_'))
+        _extractScriptsFromRPM(f, scriptDir)
+
     def checkSignature(self, filepath):
         if self.keyid:
             key = self._getPublicKey()
@@ -2364,6 +2370,77 @@ class addPreUpdateScript(TroveScript):
     """
 
     _scriptName = 'preUpdateScripts'
+
+def _extractScriptsFromRPM(rpm, directory):
+    r = file(rpm, 'r')
+    h = rpmhelper.readHeader(r)
+
+    baseDir = '/'.join((directory, os.path.basename(rpm), ''))
+    util.mkdirChain(baseDir[:-1])
+
+    scripts = (
+        ('prein', rpmhelper.PREIN, rpmhelper.PREINPROG),
+        ('postin', rpmhelper.POSTIN, rpmhelper.POSTINPROG),
+        ('prein', rpmhelper.PREUN, rpmhelper.PREUNPROG),
+        ('postin', rpmhelper.POSTUN, rpmhelper.POSTUNPROG),
+        ('verify', rpmhelper.VERIFYSCRIPT, rpmhelper.VERIFYSCRIPTPROG),
+    )
+    for scriptName, tag, progTag in scripts:
+        if h.has_key(tag) or h.has_key(progTag):
+            scriptFile = file('/'.join((baseDir, scriptName)), 'w')
+            if h.has_key(progTag):
+                scriptFile.write('#!%s\n' %str(h[progTag]))
+            if h.has_key(tag):
+                scriptFile.write(str(h[tag]))
+                scriptFile.write('\n')
+            scriptFile.close()
+
+    if not h.has_key(rpmhelper.TRIGGERSCRIPTS):
+        return
+
+
+    triggerTypes = {
+        rpmhelper.RPMSENSE_TRIGGERIN:     'triggerin',
+        rpmhelper.RPMSENSE_TRIGGERUN:     'triggerun',
+        rpmhelper.RPMSENSE_TRIGGERPOSTUN: 'triggerpostun',
+        rpmhelper.RPMSENSE_TRIGGERPREIN:  'triggerprein',
+    }
+    triggerMask = (rpmhelper.RPMSENSE_TRIGGERIN|
+                   rpmhelper.RPMSENSE_TRIGGERUN|
+                   rpmhelper.RPMSENSE_TRIGGERPOSTUN|
+                   rpmhelper.RPMSENSE_TRIGGERPREIN)
+    verCmpTypes = {
+        rpmhelper.RPMSENSE_LESS:    '< ',
+        rpmhelper.RPMSENSE_GREATER: '> ',
+        rpmhelper.RPMSENSE_EQUAL:   '= ',
+    }
+    verCmpMask = (rpmhelper.RPMSENSE_LESS|
+                  rpmhelper.RPMSENSE_GREATER|
+                  rpmhelper.RPMSENSE_EQUAL)
+
+    triggers = itertools.izip(h[rpmhelper.TRIGGERSCRIPTS],
+                              h[rpmhelper.TRIGGERNAME],
+                              h[rpmhelper.TRIGGERVERSION],
+                              h[rpmhelper.TRIGGERFLAGS],
+                              h[rpmhelper.TRIGGERINDEX],
+                              h[rpmhelper.TRIGGERSCRIPTPROG],
+                              )
+    for script, tname, tver, tflag, ti, tprog in triggers:
+        triggerType = tflag & triggerMask
+        triggerType = triggerTypes.get(triggerType, 'unknown')
+        scriptName = 'trigger_%s_%s_%d' %(triggerType, str(tname), ti)
+        scriptFile = file('/'.join((baseDir, scriptName)), 'w')
+        scriptFile.write('#!%s\n' %tprog)
+        scriptFile.write('TYPE="%s"\n' %triggerType)
+        scriptFile.write('ID="%d"\n' %ti)
+        scriptFile.write('NAME="%s"\n' %str(tname))
+        cmpSense = tflag & verCmpMask
+        cmpSense = verCmpTypes.get(cmpSense, '')
+        scriptFile.write('VERSIONCMP="%s%s"\n' %(cmpSense, str(tver)))
+        scriptFile.write(str(script))
+        scriptFile.write('\n')
+        scriptFile.close()
+
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     assert targetfile or directory

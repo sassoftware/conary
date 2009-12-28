@@ -4,6 +4,9 @@ Changes in @NEW@:
       Previously, it disabled destdir policies to avoid unintentional
       modification; now all destdir policies should take capsules
       into account and some destdir policies are required. (CNY-3320)
+    * Scripts from capsules are now written as files that are not
+      packaged but are available for inspection during the packaging
+      process, and policy can investigate script files. (CNY-3321)
 
   o Bug Fixes:
     * Committing relative changesets with multiple specifications for

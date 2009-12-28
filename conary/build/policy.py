@@ -46,11 +46,12 @@ CONDITIONAL_PRIOR      = ORDERED|PRIOR
 CONDITIONAL_SUBSEQUENT = ORDERED
 
 # file trees
-NO_FILES = 0 << 0
-DESTDIR  = 1 << 0
-BUILDDIR = 1 << 1
-DIR      = DESTDIR|BUILDDIR
-PACKAGE  = 1 << 2
+NO_FILES         = 0 << 0
+DESTDIR          = 1 << 0
+BUILDDIR         = 1 << 1
+PACKAGE          = 1 << 2
+CAPSULESCRIPTDIR = 1 << 3
+DIR              = DESTDIR|BUILDDIR|CAPSULESCRIPTDIR
 
 
 class BasePolicy(action.RecipeAction):
@@ -221,7 +222,9 @@ class Policy(BasePolicy):
     directory, and C{policy.PACKAGE} iterates over the packaged
     files rather than walking the destdir, which besides being
     possibly faster also applies to files that are not on the
-    filesystem (like device nodes).
+    filesystem (like device nodes).  C{policy.CAPSULESCRIPTDIR}
+    iterates over capsule script files, which are not packaged
+    as files but are made available for inspection in policies.
 
     @cvar rootdir: The root of the tree to walk for files, normally
     implied by the setting of filetree.
@@ -278,6 +281,7 @@ class Policy(BasePolicy):
             self.rootdir = {
                 DESTDIR: '%(destdir)s',
                 BUILDDIR: '%(builddir)s',
+                CAPSULESCRIPTDIR: '%(destdir)s/../_CAPSULE_SCRIPTS_',
                 PACKAGE: '',
             }[self.filetree]
 
@@ -359,7 +363,7 @@ class Policy(BasePolicy):
 	self.macros = recipe.macros
 
         if self.rootdir:
-            self.rootdir = self.rootdir % self.macros
+            self.rootdir = util.normpath(self.rootdir % self.macros)
 
         if (hasattr(recipe, '_isDerived')
             and recipe._isDerived == True
