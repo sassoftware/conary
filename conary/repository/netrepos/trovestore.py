@@ -65,8 +65,6 @@ class TroveAdder:
             # we have the stream for this fileId already. we don't need
             # it again
             return
-        if fileId in self.fileIdSet:
-            return
 
         if fileStream and withContents:
             sha1 = None
@@ -78,10 +76,12 @@ class TroveAdder:
         else:
             sha1 = None
 
+        if fileId == '7\xe7\x99\x07\xbc1\xc4\x04Ju\xc1Zj\xd7\x86\x18\x9dz\xaf\xb6':
+            import epdb;epdb.st()
+
         self.newStreamsByFileId[fileId] = (self.cu.binary(fileId),
                                            self.cu.binary(fileStream),
                                            self.cu.binary(sha1))
-        self.fileIdSet.add(fileId)
 
     def addFile(self, pathId, path, fileId, fileVersion,
                 fileStream = None, withContents = True):
@@ -117,19 +117,18 @@ class TroveAdder:
                        withContents = withContents)
 
     def __init__(self, troveStore, cu, trv, trvCs, hidden, newSet, changeMap,
-                 dirMap, baseMap, fileIdSet):
+                 dirMap, baseMap, newStreamsByFileId):
         self.troveStore = troveStore
         self.cu = cu
         self.trv = trv
         self.trvCs = trvCs
         self.hidden = hidden
         self.newFilesInsertList = []
-        self.newStreamsByFileId = dict()
+        self.newStreamsByFileId = newStreamsByFileId
         self.newSet = newSet
         self.changeMap = changeMap
         self.dirMap = dirMap
         self.baseMap = baseMap
-        self.fileIdSet = fileIdSet
 
 # we need to call this from the schema migration as well, which is why
 # we extracted it from the TroveStore class
@@ -326,7 +325,7 @@ class TroveStore:
         changeMap = dict((x[0], x) for x in trvCs.getChangedFileList())
         newSet = set(x[0] for x in trvCs.getNewFileList())
         return TroveAdder(self, cu, trv, trvCs, hidden, newSet, changeMap,
-                          self.dirMap, self.baseMap, self.fileIdSet)
+                          self.dirMap, self.baseMap, self.newStreamsByFileId)
 
     # walk the trove and insert any missing flavors we need into the Flavors table
     def _addTroveNewFlavors(self, cu, trv):
@@ -412,6 +411,10 @@ class TroveStore:
         # backends I have tried will get the optimization of a single
         # query wrong --gafton
         self.db.analyze("tmpNewFiles")
+
+        if len(self.newStreamsByFileId):
+            self.db.bulkload("tmpNewStreams", self.newStreamsByFileId.values(),
+                             [ "fileId", "stream", "sha1" ] )
         self.db.analyze("tmpNewStreams")
 
         # In the extreme case of binary shadowing this might require a
@@ -587,7 +590,6 @@ class TroveStore:
         hidden = troveInfo.hidden
 
         newFilesInsertList = troveInfo.newFilesInsertList
-        newStreamsByFileId = troveInfo.newStreamsByFileId
 
         self.log(3, trv)
 
@@ -671,10 +673,6 @@ class TroveStore:
                     [ "pathId", "versionId", "fileId",
                       "dirnameId", "basenameId", "pathChanged",
                       "instanceId" ])
-
-        if len(newStreamsByFileId):
-            self.db.bulkload("tmpNewStreams", newStreamsByFileId.values(),
-                             [ "fileId", "stream", "sha1" ] )
 
         # iterate over both strong and weak troves, and set weakFlag to
         # indicate which kind we're looking at when
@@ -774,7 +772,7 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewStreams')
         schema.resetTable(cu, 'tmpNewLatest')
         self.depAdder = deptable.BulkDependencyLoader(self.db, cu)
-        self.fileIdSet = set()
+        self.newStreamsByFileId = dict()
 
         schema.resetTable(cu, 'tmpNewPaths')
         l = [(cu.binary(x),) for x in dirNames]
@@ -860,13 +858,15 @@ class TroveStore:
     def addTroveSetDone(self, callback=None):
         self.dirMap = None
         self.baseMap = None
-        self.fileIdSet = None
 
         if not callback:
             callback = callbacks.UpdateCallback()
         cu = self.db.cursor()
+
         self._mergeIncludedTroves(cu)
         self._mergeTroveNewFiles(cu)
+
+        self.newStreamsByFileId = None
 
         self.ri.addInstanceIdSet('tmpNewTroves', 'instanceId')
         self.depAdder.done()
@@ -1426,7 +1426,6 @@ class TroveStore:
     def _cleanCache(self):
         self.versionIdCache = {}
         self.itemIdCache = {}
-        self.newStreamsByFileId = dict()
 
     def begin(self, serialize=False):
         self._cleanCache()
