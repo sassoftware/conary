@@ -834,7 +834,7 @@ class addPatch(_Source):
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
     considered relative to C{%(builddir)s}.
 
-    B{patchName} : Name of patch program to run (Default: C{patch))
+    B{patchName} : Name of patch program to run (Default: C{patch})
 
     EXAMPLES
     ========
