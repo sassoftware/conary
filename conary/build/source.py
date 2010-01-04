@@ -2381,8 +2381,8 @@ def _extractScriptsFromRPM(rpm, directory):
     scripts = (
         ('prein', rpmhelper.PREIN, rpmhelper.PREINPROG),
         ('postin', rpmhelper.POSTIN, rpmhelper.POSTINPROG),
-        ('prein', rpmhelper.PREUN, rpmhelper.PREUNPROG),
-        ('postin', rpmhelper.POSTUN, rpmhelper.POSTUNPROG),
+        ('preun', rpmhelper.PREUN, rpmhelper.PREUNPROG),
+        ('postun', rpmhelper.POSTUN, rpmhelper.POSTUNPROG),
         ('verify', rpmhelper.VERIFYSCRIPT, rpmhelper.VERIFYSCRIPTPROG),
     )
     for scriptName, tag, progTag in scripts:
