@@ -419,7 +419,8 @@ class addArchive(_Source):
     specified by C{sourceDir} for the source archive to unpack.
     An absolute C{sourceDir} value will be considered relative to
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
-    considered relative to C{%(builddir)s}.
+    considered relative to C{%(builddir)s}. Using C{sourceDir} prompts
+    Conary to ignore the lookaside cache in favor of this directory.
 
     B{debArchive} : When unpacking a dpkg .deb archive, provides the
     prefix used to select the internal archive to unpack.  Defaults to 
@@ -832,9 +833,10 @@ class addPatch(_Source):
     specified by C{sourceDir} for the patch to apply.
     An absolute C{sourceDir} value will be considered relative to
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
-    considered relative to C{%(builddir)s}.
+    considered relative to C{%(builddir)s}. Using C{sourceDir} directs
+    Conary to ignore the lookaside cache in favor of this directory.
 
-    B{patchName} : Name of patch program to run (Default: C{patch))
+    B{patchName} : Name of patch program to run (Default: C{patch})
 
     EXAMPLES
     ========
@@ -1159,7 +1161,8 @@ class addSource(_Source):
     specified by C{sourceDir} for the file to install.
     An absolute C{sourceDir} value will be considered relative to
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
-    considered relative to C{%(builddir)s}.
+    considered relative to C{%(builddir)s}. Using C{sourceDir} prompts
+    Conary to ignore the lookaside cache in favor of this directory.
 
     EXAMPLES
     ========
@@ -1367,7 +1370,8 @@ class addCapsule(_Source):
     specified by C{sourceDir} for the file to install.
     An absolute C{sourceDir} value will be considered relative to
     C{%(destdir)s}, whereas a relative C{sourceDir} value will be
-    considered relative to C{%(builddir)s}.
+    considered relative to C{%(builddir)s}. Using C{sourceDir} prompts
+    Conary to ignore the lookaside cache in favor of this directory.
 
     B{ignoreConflictingPaths} : A list of paths in which C{r.addCapsule} will
     not check files for conflicting contents.
