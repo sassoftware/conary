@@ -10,8 +10,8 @@ Changes in 2.1.2:
 
   o Bug Fixes:
     * Committing relative changesets with multiple specifications for
-      a single fileId would no longer cause a repository traceback when
-      those specifications were part of different troves. (CNY-3316)
+      a single fileId no longer causes a repository traceback when
+      those specifications are part of different troves. (CNY-3316)
 
 Changes in 2.1.1:
   o New Features
