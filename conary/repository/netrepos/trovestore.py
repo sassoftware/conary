@@ -76,9 +76,6 @@ class TroveAdder:
         else:
             sha1 = None
 
-        if fileId == '7\xe7\x99\x07\xbc1\xc4\x04Ju\xc1Zj\xd7\x86\x18\x9dz\xaf\xb6':
-            import epdb;epdb.st()
-
         self.newStreamsByFileId[fileId] = (self.cu.binary(fileId),
                                            self.cu.binary(fileStream),
                                            self.cu.binary(sha1))
