@@ -395,25 +395,31 @@ class RPMRequires(policy.Policy):
                         soDeps.addDep(deps.SonameDependencies,dmod)
 
                     for r in list(rReqs.iterDepsByClass(deps.RpmDependencies)):
-                        if '[' in r.name:
-                            reMatch = self.rpmStringRe.match(r.name)
-                            if reMatch and reMatch.groups():
-                                rpmClass = reMatch.group(1)
-                                rpmFlags = reMatch.group(2).strip()
-                            if rpmClass == 'perl' and rpmFlags:
-                                ds = deps.DependencySet()
-                                dep = deps.Dependency(rpmFlags)
-                                ds.addDep(deps.PerlDependencies, dep)
-                                if cnyReqs.satisfies(ds) or \
-                                        cnyProv.satisfies(ds):
-                                    culledReqs.addDep(
-                                        deps.RpmDependencies,r)
-                        if '.so' in r.name:
+                        reMatch = self.rpmStringRe.match(r.name)
+                        if reMatch and reMatch.groups():
+                            rpmFile = reMatch.group(1)
+                            rpmFlags = reMatch.group(2).strip()
+                        else:
+                            rpmFile = r.name
+                            rpmFlags = ''
+                        if rpmFile == 'perl' and rpmFlags:
                             ds = deps.DependencySet()
-                            dep = deps.Dependency(r.name)
+                            dep = deps.Dependency(rpmFlags)
+                            ds.addDep(deps.PerlDependencies, dep)
+                            if cnyReqs.satisfies(ds) or \
+                                    cnyProv.satisfies(ds):
+                                culledReqs.addDep(
+                                    deps.RpmDependencies,r)
+                        elif '.so' in rpmFile:
+                            ds = deps.DependencySet()
+                            flags = []
+                            if rpmFlags == '64bit':
+                                flags={ 'x86_64' : deps.FLAG_SENSE_REQUIRED} 
+                            dep = deps.Dependency(rpmFile, flags=flags)
                             ds.addDep(deps.SonameDependencies, dep)
                             if soDeps.satisfies(ds):
                                 culledReqs.addDep(deps.RpmDependencies,r)
+                                print "Culling ",r
                 rReqs = rReqs.difference(culledReqs)
                 cnyReqs.union(rReqs)
 
