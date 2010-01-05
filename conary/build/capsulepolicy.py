@@ -386,13 +386,8 @@ class RPMRequires(policy.Policy):
                 cnyProv = comp[1].provides
                 if rReqs.hasDepClass(deps.RpmDependencies):
                     soDeps = deps.DependencySet()
-                    for d in list(cnyReqs.iterDepsByClass(\
-                            deps.SonameDependencies))+list(\
-                        cnyProv.iterDepsByClass(deps.SonameDependencies)):
-                        l = d.name.split('/')
-                        dmod = deps.Dependency(l[1])
-                        dmod.flags = d.flags
-                        soDeps.addDep(deps.SonameDependencies,dmod)
+                    soDeps.addDeps(deps.SonameDependencies,list(cnyReqs.iterDepsByClass(deps.SonameDependencies))+ \
+                                      list(cnyProv.iterDepsByClass(deps.SonameDependencies)))
 
                     for r in list(rReqs.iterDepsByClass(deps.RpmDependencies)):
                         reMatch = self.rpmStringRe.match(r.name)
@@ -405,6 +400,7 @@ class RPMRequires(policy.Policy):
                         if rpmFile == 'perl' and rpmFlags:
                             ds = deps.DependencySet()
                             dep = deps.Dependency(rpmFlags)
+                            dep.flags = r.flags
                             ds.addDep(deps.PerlDependencies, dep)
                             if cnyReqs.satisfies(ds) or \
                                     cnyProv.satisfies(ds):
@@ -412,14 +408,15 @@ class RPMRequires(policy.Policy):
                                     deps.RpmDependencies,r)
                         elif '.so' in rpmFile:
                             ds = deps.DependencySet()
-                            flags = []
                             if rpmFlags == '64bit':
-                                flags={ 'x86_64' : deps.FLAG_SENSE_REQUIRED} 
-                            dep = deps.Dependency(rpmFile, flags=flags)
+                                elfPrefix = 'ELF64/'
+                            else:
+                                elfPrefix = 'ELF32/'
+                            dep = deps.Dependency(elfPrefix + rpmFile)
+                            dep.flags = r.flags
                             ds.addDep(deps.SonameDependencies, dep)
                             if soDeps.satisfies(ds):
                                 culledReqs.addDep(deps.RpmDependencies,r)
-                                print "Culling ",r
                 rReqs = rReqs.difference(culledReqs)
                 cnyReqs.union(rReqs)
 
