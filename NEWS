@@ -1,3 +1,7 @@
+Changes in @NEW@
+  o New Features
+    * Conary stores RPM obsolete data in the capsule troveinfo.
+
 Changes in 2.1.2:
   o New Features
     * Conary now runs all destdir policies for capsule packages.

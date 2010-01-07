@@ -22,6 +22,7 @@ import struct
 from conary import changelog
 from conary import errors
 from conary import files
+from conary import rpmhelper
 from conary import streams
 from conary import versions
 from conary.deps import deps
@@ -1001,6 +1002,40 @@ _TROVECAPSULE_RPM_VERSION     = 1
 _TROVECAPSULE_RPM_RELEASE     = 2
 _TROVECAPSULE_RPM_ARCH        = 3
 _TROVECAPSULE_RPM_EPOCH       = 4
+_TROVECAPSULE_RPM_OBSOLETES   = 5
+
+_RPM_OBSOLETE_NAME    = 0
+_RPM_OBSOLETE_FLAGS   = 1
+_RPM_OBSOLETE_VERSION = 2
+
+class SingleRpmObsolete(streams.StreamSet):
+
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _RPM_OBSOLETE_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
+        _RPM_OBSOLETE_FLAGS   : (DYNAMIC, streams.IntStream,    'flags' ),
+        _RPM_OBSOLETE_VERSION : (DYNAMIC, streams.StringStream, 'version' )
+    }
+
+class RpmObsoletes(streams.StreamCollection):
+    streamDict = { 1 : SingleRpmObsolete }
+
+    def addFromHeader(self, h):
+        if rpmhelper.OBSOLETENAME not in h:
+            # really, really, REALLY old RPM packages might not have
+            # OBSOLETEFLAGS or OBSOLETEVERSION. I doubt we could find one
+            # if we tried.
+            return
+
+        for (name, flags, version) in \
+                    itertools.izip(h[rpmhelper.OBSOLETENAME],
+                                   h[rpmhelper.OBSOLETEFLAGS],
+                                   h[rpmhelper.OBSOLETEVERSION]):
+            single = SingleRpmObsolete()
+            single.name.set(name)
+            single.flags.set(flags)
+            single.version.set(version)
+            self.addStream(1, single)
 
 class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -1010,6 +1045,7 @@ class TroveCapsule(streams.StreamSet):
         _TROVECAPSULE_RPM_RELEASE : (DYNAMIC, streams.StringStream, 'release' ),
         _TROVECAPSULE_RPM_ARCH    : (DYNAMIC, streams.StringStream, 'arch' ),
         _TROVECAPSULE_RPM_EPOCH   : (DYNAMIC, streams.IntStream,    'epoch' ),
+        _TROVECAPSULE_RPM_OBSOLETES:(DYNAMIC, RpmObsoletes,         'obsoletes' ),
     }
 
     def reset(self):
@@ -1664,17 +1700,20 @@ class Trove(streams.StreamSet):
         assert(not self.type())
         self.idMap[pathId] = (dirName, baseName, fileId, version)
 
-    def addRpmCapsule(self, path, version, fileId, (name, pkgVersion,
-                      release, arch, epoch)):
+    def addRpmCapsule(self, path, version, fileId, hdr):
         assert(len(fileId) == 20)
         dir, base = os.path.split(path)
         self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
         self.troveInfo.capsule.type.set('rpm')
-        self.troveInfo.capsule.rpm.name.set(name)
-        self.troveInfo.capsule.rpm.version.set(pkgVersion)
-        self.troveInfo.capsule.rpm.release.set(release)
-        self.troveInfo.capsule.rpm.arch.set(arch)
-        self.troveInfo.capsule.rpm.epoch.set(epoch)
+        self.troveInfo.capsule.rpm.name.set(hdr[rpmhelper.NAME])
+        self.troveInfo.capsule.rpm.version.set(hdr[rpmhelper.VERSION])
+        self.troveInfo.capsule.rpm.release.set(hdr[rpmhelper.RELEASE])
+        self.troveInfo.capsule.rpm.arch.set(hdr[rpmhelper.ARCH])
+        epoch = hdr.get(rpmhelper.EPOCH, [None])[0]
+        if epoch:
+            self.troveInfo.capsule.rpm.epoch.set(epoch)
+
+        self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()
