@@ -1,9 +1,14 @@
-Changes in @NEW@
-  o New Features
-    * Conary stores RPM obsolete data in the capsule troveinfo.
+Changes in 2.1.3
+  o New Features:
+    * Conary now stores RPM obsolete information as troveinfo data.
+      (CNY-3328)
+
+  o Bug Fixes:
+    * Building rpm capsules properly eliminates dependencies in the
+      RPM namespace that are also discovered by Conary. (CNY-3318)
 
 Changes in 2.1.2:
-  o New Features
+  o New Features:
     * Conary now runs all destdir policies for capsule packages.
       Previously, it disabled destdir policies to avoid unintentional
       modification; now all destdir policies should take capsules
@@ -18,7 +23,7 @@ Changes in 2.1.2:
       those specifications are part of different troves. (CNY-3316)
 
 Changes in 2.1.1:
-  o New Features
+  o New Features:
     * Added repair command as an experimental feature. (CNY-1800)
     * Files marked as "missingok" in encapsulated RPMs now have that
       status represented by a "MissingOkay" flag on the corresponding
@@ -46,7 +51,7 @@ Changes in 2.1.1:
       closes the connection without notifying the server.
 
 Changes in 2.1.0:
-  o New Features
+  o New Features:
     * Conary now allows packages to be installed using foreign package
       managers via wrapped content called capsules. RPM capsule support
       is included in this release. (CNY-3217, CNY-3213)
