@@ -1015,7 +1015,18 @@ class SingleRpmObsolete(streams.StreamSet):
         _RPM_OBSOLETE_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
         _RPM_OBSOLETE_FLAGS   : (DYNAMIC, streams.IntStream,    'flags' ),
         _RPM_OBSOLETE_VERSION : (DYNAMIC, streams.StringStream, 'version' )
+
     }
+
+    def __cmp__(self, other):
+        first = self.name()
+        second = other.name()
+
+        if first == second:
+            first = self.freeze()
+            second = other.freeze()
+
+        return cmp(first, second)
 
 class RpmObsoletes(streams.StreamCollection):
     streamDict = { 1 : SingleRpmObsolete }
