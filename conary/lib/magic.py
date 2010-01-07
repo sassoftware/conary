@@ -249,9 +249,9 @@ class RPM(Magic):
         except:
             return None
         # Convert list of objects to simple types
-        hdr = rpmhelper.readHeader(f)
+        self.hdr = rpmhelper.readHeader(f)
         for key, tagName, valType in self._tagMap:
-            val = hdr.get(tagName, None)
+            val = self.hdr.get(tagName, None)
             if isinstance(val, list):
                 if not val:
                     val = None
@@ -263,7 +263,7 @@ class RPM(Magic):
                 elif valType == str:
                     val = str(val)
             self.contents[key] = val
-        self.contents['isSource'] = hdr.isSource
+        self.contents['isSource'] = self.hdr.isSource
 
 def _javaMagic(b):
     if len(b) > 4 and b[0:4] == "\xCA\xFE\xBA\xBE":

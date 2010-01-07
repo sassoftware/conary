@@ -67,10 +67,7 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         fileObj = files.FileFromFilesystem(capsulePath,
                                            trove.CAPSULE_PATHID)
         p.addRpmCapsule(os.path.basename(capsulePath),
-                          newVersion, fileObj.fileId(),
-                          (m.contents['name'], m.contents['version'],
-                           m.contents['release'], m.contents['arch'],
-                           m.contents['epoch']))
+                          newVersion, fileObj.fileId(), m.hdr)
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
         size += fileObj.contents.size()
