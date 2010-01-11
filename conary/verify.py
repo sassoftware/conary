@@ -164,8 +164,8 @@ def _verifyTrove(trv, db, cfg, defaultMap, display = True,
             verifyList = []
 
         if allMachineChanges:
-            origTrv = db.getTrove(*thisTrv.getNameVersionFlavor(),
-                                  pristine = True)
+            origTrv = db.getTrove(pristine = True,
+                                  *thisTrv.getNameVersionFlavor())
         else:
             origTrv = thisTrv
 
