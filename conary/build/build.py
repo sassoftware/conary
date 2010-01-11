@@ -304,13 +304,16 @@ class Automake(BuildCommand):
 
     B{autoConfArgs} : (None) Arguments to the C{autoconf} program
 
-    B{autoMakeArgs} : (None) Arguments to the C{automake} program.
+    B{autoMakeArgs} : (None) Arguments to the C{automake} program
 
     B{automakeVer} : (None) Specifies C{automake} version
 
     B{m4Dir} : (None) Specifies directory for C{m4} macro processor
 
-    B{preAutoconf} : (None) Commands to be run prior to C{autoconf}
+    B{preAutoconf} : (None) Commands to be run prior to C{autoconf}.  Note that
+    this string is prepended directly to the C{autoconf} command.  If it is
+    indended to be a command which is executed prior to C{autoconf}, it should
+    end with '&&'.
 
     B{skipMissingDir} : (False) Raise an error if C{dir} does not exist,
     (by default) and if set to C{True} skip the action when C{dir} does not
