@@ -223,7 +223,7 @@ class LocalChangeSetCommand(ConaryCommand):
         outFile = otherArgs[3]
 
         db = database.Database(cfg.root, cfg.dbPath)
-        cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
+        verify.LocalChangeSetCommand(db, cfg, name, changeSePath = outFile)
 _register(LocalChangeSetCommand)
 
 
@@ -1209,6 +1209,9 @@ class VerifyCommand(ConaryCommand):
         if len(otherArgs) < 2 or argSet:
             return self.usage()
         troves = otherArgs[2:]
+        if (not all and not troves) or (all and troves):
+            return self.usage()
+
         verify.verify(troves, db, cfg, all=all, changesetPath = csPath,
                       forceHashCheck = hash)
 _register(VerifyCommand)
