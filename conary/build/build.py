@@ -1353,18 +1353,21 @@ class PythonSetup(BuildCommand):
             macros.rootdir = '%(destdir)s'
         else:
             macros.rootdir = '%(destdir)s/' + self.rootDir
-        
+
         macros.setupName = self.setupName
 
         if self.arglist:
             macros.arguments = self.arglist[0]
         else:
             macros.arguments = ''
-        if self.pythonVersion is None:
-            pythonVersion = sys.version[0:3]
-            macros.pyver = pythonVersion
-        else:
+
+        if self.pythonVersion is not None:
             pythonVersion = self.pythonVersion
+        elif 'pyver' in macros and macros.pyver is not None:
+            pythonVersion = macros.pyver
+        else:
+            pythonVersion = sys.version[0:3]
+        macros.pyver = pythonVersion
 
         # workout arguments and multilib status:
         if self.purelib is None:
