@@ -1354,7 +1354,6 @@ class _LazyFile(object):
         self._timestamp = time.time()
 
     def _release(self):
-        assert self._realFd is not None, "Cannot release file descriptor"
         self._close()
 
     def _closeCallback(self, cache):
