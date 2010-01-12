@@ -883,7 +883,6 @@ class FilesystemJob:
 	@type flags: UpdateFlags
 	"""
 
-        import epdb;epdb.st('f')
 	if baseTrove:
             assert(troveCs.getOldVersion() == baseTrove.getVersion() or
                    troveCs.getOldVersion().parentVersion() ==
