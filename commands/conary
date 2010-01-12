@@ -223,7 +223,7 @@ class LocalChangeSetCommand(ConaryCommand):
         outFile = otherArgs[3]
 
         db = database.Database(cfg.root, cfg.dbPath)
-        verify.LocalChangeSetCommand(db, cfg, name, changeSePath = outFile)
+        verify.LocalChangeSetCommand(db, cfg, name, changeSetPath = outFile)
 _register(LocalChangeSetCommand)
 
 
