@@ -12,6 +12,7 @@
 # full details.
 #
 
+import sys
 import os
 import inspect
 import itertools
@@ -472,7 +473,7 @@ class AbstractPackageRecipe(Recipe):
             # for the build system may use the target compiler.
             self.macros.buildcc = '%(bindir)s/' + self.macros.buildcc
             self.macros.buildcxx = '%(bindir)s/' + self.macros.buildcxx
-        
+
         # locate the correct config.site files
         _setSiteConfig(self.macros, self.macros.hostmajorarch,
                        self.macros.hostos, setEnviron=True)
@@ -590,6 +591,12 @@ class AbstractPackageRecipe(Recipe):
             self.buildRequires = [ x for x in self.buildRequires
                                    if x not in newCrossRequires ]
             self.crossRequires.extend(newCrossRequires)
+
+        # define by default %(pyver)s to match system's
+        # python, so that it only has to be (manually) changed
+        # if we are using a different python
+        if 'pyver' not in self.macros:
+            self.macros.pyver = sys.version[0:3]
 
         self.mainDir(self.nameVer(), explicit=False)
         self._autoCreatedFileCount = 0
