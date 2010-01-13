@@ -1338,6 +1338,7 @@ def nologUpdateSrc(repos, versionList = None, callback = None):
     fullChangeSet = repos.createChangeSet(job,
                                           excludeAutoSource = True,
                                           callback = callback)
+    callback.done()
 
     success = True
     for targetDir, state, headVersion, newBranch in updateSpecs:
@@ -1350,6 +1351,10 @@ def nologUpdateSrc(repos, versionList = None, callback = None):
 
         troveCs = changeSet.getNewTroveVersion(state.getName(),
                                                headVersion, deps.deps.Flavor())
+        if not troveCs.getOldVersion():
+            raise errors.CvcError(
+                      "Current version of this source has been removed "
+                      "from the repository can cannot be updated in place. ")
 
         l = [ x for x in changeSet.iterNewTroveList() ]
         [ changeSet.delNewTrove(x.getName(), x.getNewVersion(),
