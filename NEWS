@@ -3,7 +3,7 @@ Changes in @NEW@:
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
-    * Merged internals of localcs/verify implementations.
+    * Merged internals of localcs/verify implementation into new classes
 
 Changes in @NEW@:
   o Bug Fixes:
