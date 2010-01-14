@@ -6,6 +6,9 @@ Changes in @NEW@:
     * Corrected documentation for the Automake build action. (CNY-3329)
     * A redundant check that could trigger an assertion error in
       the lazy cache code has been removed. (CNY-3331)
+    * Unusual commit paths would cause repositorys to not store file contents
+      for contents which were part of capsules as well as part of normal
+      troves (CNY-3332).
 
 Changes in 2.1.3
   o New Features:
