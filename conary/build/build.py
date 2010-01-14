@@ -1360,13 +1360,10 @@ class PythonSetup(BuildCommand):
             macros.arguments = self.arglist[0]
         else:
             macros.arguments = ''
-
         if self.pythonVersion is not None:
             pythonVersion = self.pythonVersion
-        elif 'pyver' in macros.keys() and macros.pyver is not None:
-            pythonVersion = macros.pyver
         else:
-            pythonVersion = sys.version[0:3]
+            pythonVersion = macros.pyver
         macros.pyver = pythonVersion
 
         # workout arguments and multilib status:
