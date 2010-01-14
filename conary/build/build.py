@@ -1363,7 +1363,7 @@ class PythonSetup(BuildCommand):
 
         if self.pythonVersion is not None:
             pythonVersion = self.pythonVersion
-        elif 'pyver' in macros and macros.pyver is not None:
+        elif 'pyver' in macros.keys() and macros.pyver is not None:
             pythonVersion = macros.pyver
         else:
             pythonVersion = sys.version[0:3]
