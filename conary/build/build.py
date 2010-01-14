@@ -304,13 +304,16 @@ class Automake(BuildCommand):
 
     B{autoConfArgs} : (None) Arguments to the C{autoconf} program
 
-    B{autoMakeArgs} : (None) Arguments to the C{automake} program.
+    B{autoMakeArgs} : (None) Arguments to the C{automake} program
 
     B{automakeVer} : (None) Specifies C{automake} version
 
     B{m4Dir} : (None) Specifies directory for C{m4} macro processor
 
-    B{preAutoconf} : (None) Commands to be run prior to C{autoconf}
+    B{preAutoconf} : (None) Commands to be run prior to C{autoconf}.  Note that
+    this string is prepended directly to the C{autoconf} command.  If it is
+    indended to be a command which is executed prior to C{autoconf}, it should
+    end with '&&'.
 
     B{skipMissingDir} : (False) Raise an error if C{dir} does not exist,
     (by default) and if set to C{True} skip the action when C{dir} does not
@@ -1350,18 +1353,18 @@ class PythonSetup(BuildCommand):
             macros.rootdir = '%(destdir)s'
         else:
             macros.rootdir = '%(destdir)s/' + self.rootDir
-        
+
         macros.setupName = self.setupName
 
         if self.arglist:
             macros.arguments = self.arglist[0]
         else:
             macros.arguments = ''
-        if self.pythonVersion is None:
-            pythonVersion = sys.version[0:3]
-            macros.pyver = pythonVersion
-        else:
+        if self.pythonVersion is not None:
             pythonVersion = self.pythonVersion
+        else:
+            pythonVersion = macros.pyver
+        macros.pyver = pythonVersion
 
         # workout arguments and multilib status:
         if self.purelib is None:
