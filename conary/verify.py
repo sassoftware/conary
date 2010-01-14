@@ -103,7 +103,7 @@ class _FindLocalChanges(object):
 
             if self.allMachineChanges:
                 origTrv = self.db.getTrove(*thisTrv.getNameVersionFlavor(),
-                                      pristine = True)
+                                      **{pristine: True})
             else:
                 origTrv = thisTrv
 
