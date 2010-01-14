@@ -5,7 +5,18 @@ Changes in @NEW@:
       data if available
     * Merged internals of localcs/verify implementations.
 
-Changes in 2.1.3:
+Changes in @NEW@:
+  o Bug Fixes:
+    * PythonSetup new respects the r.macros.pyver if it is set and
+      r.macros.pyver now reflects the currently running version of
+      python if it is not set by some other means. (CNY-3325)
+    * Corrected documentation for the Automake build action. (CNY-3329)
+    * A redundant check that could trigger an assertion error in
+      the lazy cache code has been removed. (CNY-3331)
+    * Unusual commit paths would cause repositorys to not store file contents
+      for contents which were part of capsules as well as part of normal
+      troves (CNY-3332).
+
   o New Features:
     * Conary now stores RPM obsolete information as troveinfo data.
       (CNY-3328)
