@@ -596,7 +596,8 @@ class AbstractPackageRecipe(Recipe):
         # python, so that it only has to be (manually) changed
         # if we are using a different python
         if 'pyver' not in self.macros:
-            self.macros.pyver = sys.version[0:3]
+            self.macros.pyver = str(sys.version_info[0]) + '.' \
+                + str(sys.version_info[1])
 
         self.mainDir(self.nameVer(), explicit=False)
         self._autoCreatedFileCount = 0
