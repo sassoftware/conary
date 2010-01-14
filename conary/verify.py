@@ -171,6 +171,25 @@ class _FindLocalChanges(object):
 
         return cs
 
+class DiffObject(_FindLocalChanges):
+
+    def __init__(self, troveNameList, db, cfg, all = False,
+                 changesetPath = None, forceHashCheck = False,
+                 asDiff=False, repos=None):
+        if asDiff:
+            display = DISPLAY_DIFF
+        elif changesetPath:
+            display = DISPLAY_NONE
+        else:
+            display = DISPLAY_CS
+
+        verifier = _FindLocalChanges.__init__(self, db, cfg,
+                        display=display,
+                        forceHashCheck=forceHashCheck,
+                        changeSetPath=changesetPath,
+                        asDiff=asDiff, repos=repos)
+        self.run(troveNameList, all=all)
+
 class verify(DiffObject):
 
     def generateChangeSet(self, *args, **kwargs):
