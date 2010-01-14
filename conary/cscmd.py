@@ -11,14 +11,14 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import itertools
+import itertools, sys
 
 from conary import conaryclient
 from conary import versions
 from conary.conaryclient import cmdline
 from conary.lib import log
 from conary.local import update
-from conary.repository import errors
+from conary.repository import errors, trovesource
 
 def computeTroveList(client, applyList):
     # As dumb as this may sound, the same trove may be present multiple times

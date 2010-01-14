@@ -14,6 +14,8 @@
 """
 Provides the output for the "conary verify" command
 """
+import sys
+
 from conary import showchangeset, trove
 from conary import versions
 from conary import conaryclient
@@ -21,19 +23,29 @@ from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
 from conary.local import defaultmap, update
-from conary.repository import changeset
+from conary.repository import changeset, trovesource
 from conary import errors
+
+DISPLAY_NONE = 0
+DISPLAY_DIFF = 1
+DISPLAY_CS = 2
 
 class _FindLocalChanges(object):
 
     def __init__(self, db, cfg, display = True, forceHashCheck = False,
-                 changeSetPath = None, allMachineChanges = False):
+                 changeSetPath = None, allMachineChanges = False,
+                 asDiff = False, repos = None):
         self.db = db
         self.cfg = cfg
         self.display = display
         self.forceHashCheck = forceHashCheck
         self.changeSetPath = changeSetPath
         self.allMachineChanges = allMachineChanges
+        self.asDiff = asDiff
+        self.repos = repos
+
+        if asDiff:
+            self.diffTroveSource = trovesource.SourceStack(db, self.repos)
 
     def _simpleTroveList(self, troveList):
         log.info('Verifying %s' % " ".join(x[1].getName() for x in troveList))
@@ -63,11 +75,14 @@ class _FindLocalChanges(object):
             self._handleChangeSet(trovesChanged, cs)
 
     def _handleChangeSet(self, trovesChanged, cs):
-        if self.display:
+        if self.display == DISPLAY_DIFF:
+            for x in cs.gitDiff(self.diffTroveSource):
+                sys.stdout.write(x)
+        elif self.display == DISPLAY_CS:
             troveSpecs = [ '%s=%s[%s]' % x for x in trovesChanged ]
-            showchangeset.displayChangeSet(self.db, cs, troveSpecs, self.cfg,
-                                           ls=True, showChanges=True,
-                                           asJob=True)
+            showchangeset.displayChangeSet(self.db, cs, troveSpecs,
+                                           self.cfg, ls=True,
+                                           showChanges=True, asJob=True)
 
         if trovesChanged and self.finalCs:
             self.finalCs.merge(cs)
@@ -98,7 +113,7 @@ class _FindLocalChanges(object):
         self._simpleTroveList(verifyList)
 
     def generateChangeSet(self, troveNameList, all=False):
-        if self.display:
+        if self.display != DISPLAY_NONE:
             # save memory by not keeping the changeset around; this is
             # particularly useful when all=True
             self.finalCs = None
@@ -156,18 +171,10 @@ class _FindLocalChanges(object):
 
         return cs
 
-class verify(_FindLocalChanges):
-
-    def __init__(self, troveNameList, db, cfg, all = False,
-                 changesetPath = None, forceHashCheck = False):
-        verifier = _FindLocalChanges.__init__(self, db, cfg,
-                        display=(changesetPath is None),
-                        forceHashCheck=forceHashCheck,
-                        changeSetPath=changesetPath)
-        self.run(troveNameList, all=all)
+class verify(DiffObject):
 
     def generateChangeSet(self, *args, **kwargs):
-        cs = _FindLocalChanges.generateChangeSet(self, *args, **kwargs)
+        cs = DiffObject.generateChangeSet(self, *args, **kwargs)
         if cs is not None:
             # verify doesn't display changes in collections because those, by
             # definition, match the database
@@ -180,7 +187,8 @@ class verify(_FindLocalChanges):
 class LocalChangeSetCommand(_FindLocalChanges):
 
     def __init__(self, db, cfg, item, changeSetPath = None):
-        changeObj = _FindLocalChanges.__init__(self, db, cfg, display=False,
+        changeObj = _FindLocalChanges.__init__(self, db, cfg,
+                                               display=DISPLAY_NONE,
                                                allMachineChanges=True)
         cs = self.run([item])
 

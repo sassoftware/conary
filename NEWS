@@ -1,5 +1,9 @@
 Changes in @NEW@:
 
+  o New Features:
+    * Added --diff option to verify command to display local changes as
+      a git-formatted diff
+
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
