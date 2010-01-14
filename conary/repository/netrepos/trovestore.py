@@ -418,18 +418,16 @@ class TroveStore:
         # bit of of memory for larger troves, but it is preferable to
         # constant full table scans in the much more common cases
         cu.execute("""
-        SELECT tmpNewStreams.fileId, tmpNewStreams.stream
+        SELECT tmpNewStreams.fileId, tmpNewStreams.stream, tmpNewStreams.sha1
         FROM tmpNewStreams
         JOIN FileStreams USING(fileId)
         WHERE FileStreams.stream IS NULL
         AND tmpNewStreams.stream IS NOT NULL
         """)
-        for (fileId, stream) in cu.fetchall():
+        for (fileId, stream, sha1) in cu.fetchall():
             cu.execute("UPDATE FileStreams SET stream = ? WHERE fileId = ?",
                        (cu.binary(stream), cu.binary(fileId)))
-            if files.frozenFileHasContents(stream):
-                cont = files.frozenFileContentInfo(stream)
-                sha1 = cont.sha1()
+            if sha1:
                 cu.execute("UPDATE FileStreams SET sha1 = ? "
                            "WHERE fileId = ?",
                            (cu.binary(sha1), cu.binary(fileId)))

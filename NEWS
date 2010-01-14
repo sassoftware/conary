@@ -1,4 +1,12 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * PythonSetup new respects the r.macros.pyver if it is set and
+      r.macros.pyver now reflects the currently running version of
+      python if it is not set by some other means. (CNY-3325)
+    * Corrected documentation for the Automake build action. (CNY-3329)
+    * Unusual commit paths would cause repositorys to not store file contents
+      for contents which were part of capsules as well as part of normal
+      troves (CNY-3332).
 
 Changes in 2.1.4:
   o Bug Fixes:
