@@ -102,8 +102,8 @@ class _FindLocalChanges(object):
                 verifyList = []
 
             if self.allMachineChanges:
-                origTrv = self.db.getTrove(*thisTrv.getNameVersionFlavor(),
-                                      **{pristine: True})
+                origTrv = self.db.getTrove(pristine = True,
+                                           *thisTrv.getNameVersionFlavor())
             else:
                 origTrv = thisTrv
 
