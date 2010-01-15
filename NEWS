@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Unusual commit paths would cause repositorys to not store file contents
       for contents which were part of capsules as well as part of normal
       troves (CNY-3332).
+    * RPM capsules would not update properly when files stayed the same between
+      old and new versions of the RPM (CNY-3335)
 
 Changes in 2.1.4:
   o Bug Fixes:

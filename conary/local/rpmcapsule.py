@@ -189,26 +189,41 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         # or the changed files, because RPM installs all of the files.
         toRestore = []
 
+        changedByPathId = dict((x[0], x) for x in troveCs.getChangedFileList())
+
+        # things which aren't change, new, or removed are unchanged
+        unchangedByPathId = (set(x[0] for x in trv.iterFileList()) -
+                             set(changedByPathId.iterkeys()) -
+                             set(x[0] for x in troveCs.getNewFileList()) -
+                             set(troveCs.getOldFileList()))
+
         l = []
         for oldFileInfo in troveCs.getChangedFileList():
             oldFileId, oldVersion = oldTrv.getFile(oldFileInfo[0])[1:3]
             l.append((oldFileInfo[0], oldFileId, oldVersion))
 
-        oldFileObjs = self.db.getFileVersions(l)
-        oldFileObjsByPathId = dict(
+        for unchangedPathId in unchangedByPathId:
+            unchangedFileId, unchangedFileVersion = \
+                                    trv.getFile(unchangedPathId)[1:3]
+            l.append((unchangedPathId, unchangedFileId, unchangedFileVersion))
+
+        fileObjs = self.db.getFileVersions(l)
+        fileObjsByPathId = dict(
                 [ (x[0], y) for x, y in
-                    itertools.izip(l, oldFileObjs) ] )
-        changedByPathId = dict((x[0], x) for x in troveCs.getChangedFileList())
+                    itertools.izip(l, fileObjs) ] )
 
         for fileInfo in trv.iterFileList():
             pathId, path, fileId, version = fileInfo
 
             if pathId in changedByPathId:
-                fileObj = oldFileObjsByPathId[pathId]
+                fileObj = fileObjsByPathId[pathId]
                 oldFileId = oldTrv.getFile(pathId)[1]
                 fileChange = self.changeSet.getFileChange(oldFileId, fileId)
                 fileObj.twm(fileChange, fileObj)
+            elif pathId in unchangedByPathId:
+                fileObj = fileObjsByPathId[pathId]
             else:
+                # if it's not changed and it's not unchanged, it must be new
                 fileStream = self.changeSet.getFileChange(None, fileId)
                 fileObj = files.ThawFile(fileStream, pathId)
 
