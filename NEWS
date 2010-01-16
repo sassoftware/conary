@@ -1,4 +1,14 @@
 Changes in @NEW@:
+
+  o New Features:
+    * Added --diff option to verify command to display local changes as
+      a git-formatted diff
+
+  o Internal Changes
+    * Optimized StreamCollection diff and __eq__ operations to use frozen
+      data if available
+    * Merged internals of localcs/verify implementation into new classes
+
   o Bug Fixes:
     * PythonSetup new respects the r.macros.pyver if it is set and
       r.macros.pyver now reflects the currently running version of

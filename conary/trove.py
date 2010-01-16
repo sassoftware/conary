@@ -86,14 +86,8 @@ class TroveTuple(streams.StreamSet):
     }
 
     def __cmp__(self, other):
-        first = self.name()
-        second = other.name()
-
-        if first == second:
-            first = self.freeze()
-            second = other.freeze()
-
-        return cmp(first, second)
+        return cmp(self.name(), other.name()) or \
+            cmp(self.freeze(), other.freeze())
 
     def asTuple(self):
         return self.name(), self.version(), self.flavor()
@@ -162,14 +156,8 @@ class SearchPathItem(TroveTuple):
     streamDict[_SEARCH_PATH_LABEL] =  (SMALL, streams.StringStream, 'label'  )
 
     def __cmp__(self, other):
-        first = self.name()
-        second = other.name()
-
-        if first == second:
-            first = self.freeze()
-            second = other.freeze()
-
-        return cmp(first, second)
+        return cmp(self.name(), other.name()) or \
+            cmp(self.freeze(), other.freeze())
 
     def get(self):
         if self.label():
@@ -215,14 +203,8 @@ class SingleTroveRedirect(streams.StreamSet):
     }
 
     def __cmp__(self, other):
-        first = self.name()
-        second = other.name()
-
-        if first == second:
-            first = self.freeze()
-            second = other.freeze()
-
-        return cmp(first, second)
+        return cmp(self.name(), other.name()) or \
+            cmp(self.freeze(), other.freeze())
 
     def __hash__(self):
         return hash((self.name(), self.branch(), self.flavor()))
@@ -1019,14 +1001,8 @@ class SingleRpmObsolete(streams.StreamSet):
     }
 
     def __cmp__(self, other):
-        first = self.name()
-        second = other.name()
-
-        if first == second:
-            first = self.freeze()
-            second = other.freeze()
-
-        return cmp(first, second)
+        return cmp(self.name(), other.name()) or \
+            cmp(self.freeze(), other.freeze())
 
 class RpmObsoletes(streams.StreamCollection):
     streamDict = { 1 : SingleRpmObsolete }
@@ -3556,14 +3532,8 @@ class AbstractTroveChangeSet(streams.StreamSet):
                 self.isAbsolute())
 
     def __cmp__(self, other):
-        first = self.name()
-        second = other.name()
-
-        if first == second:
-            first = self.freeze()
-            second = other.freeze()
-
-        return cmp(first, second)
+        return cmp(self.name(), other.name()) or \
+            cmp(self.freeze(), other.freeze())
 
     def getOldSigs(self):
         return self.oldSigs
