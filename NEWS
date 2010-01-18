@@ -1,3 +1,9 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * A bug in the getChangeSetFingerprints call that resulted in
+      fingerprints different from those calculated by Conary proxies has
+      been corrected.
+
 Changes in 2.1.5:
   o Bug Fixes:
     * PythonSetup now respects the r.macros.pyver if it is set;

@@ -708,8 +708,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         fingerprints = {}
         for host, subCsList in byServer.iteritems():
             req = [ (x[0],
-                     (x[1][0] and self.fromVersion(x[1][0]) or '',
-                      x[1][1] and self.fromFlavor(x[1][1]) or ''),
+                     (x[1][0] and self.fromVersion(x[1][0]) or 0,
+                      x[1][1] and self.fromFlavor(x[1][1]) or 0),
                      (self.fromVersion(x[2][0]), self.fromFlavor(x[2][1])),
                      x[3]) for x in subCsList ]
             l = self.c[host].getChangeSetFingerprints(
