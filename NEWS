@@ -1,13 +1,13 @@
-Changes in @NEW@:
+Changes in 2.1.5:
   o Bug Fixes:
     * PythonSetup new respects the r.macros.pyver if it is set and
       r.macros.pyver now reflects the currently running version of
       python if it is not set by some other means. (CNY-3325)
     * The documentation for the Automake build action was corrected.
       (CNY-3329)
-    * Unusual commit paths would cause repositories to not store file
-      contents for contents which were part of capsules as well as part
-      of normal troves. (CNY-3332)
+    * A bug in unusual commit paths, that would cause repositories to
+      not store file contents for contents which were part of capsules
+      as well as part of normal troves, was fixed. (CNY-3332)
     * RPM capsules properly update when files stayed the same between
       old and new versions of the RPM. (CNY-3335)
     * Ghost symlinks shared between multiple capsules being packaged
