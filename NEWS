@@ -1,8 +1,8 @@
 Changes in 2.1.5:
   o Bug Fixes:
-    * PythonSetup new respects the r.macros.pyver if it is set and
+    * PythonSetup now respects the r.macros.pyver if it is set;
       r.macros.pyver now reflects the currently running version of
-      python if it is not set by some other means. (CNY-3325)
+      python if it is not set by other means. (CNY-3325)
     * The documentation for the Automake build action was corrected.
       (CNY-3329)
     * A bug in unusual commit paths, that would cause repositories to
