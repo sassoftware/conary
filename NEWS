@@ -1,4 +1,13 @@
 Changes in @NEW@:
+  o New Features:
+    * Added --diff option to verify command to display local changes as
+      a git-formatted diff
+
+  o Internal Changes
+    * Optimized StreamCollection diff and __eq__ operations to use frozen
+      data if available
+    * Merged internals of localcs/verify implementation into new classes
+
   o Bug Fixes:
     * A bug in the getChangeSetFingerprints call that resulted in
       fingerprints different from those calculated by Conary proxies has
