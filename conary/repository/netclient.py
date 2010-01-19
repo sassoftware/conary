@@ -1777,8 +1777,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             if totalSize == None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            assert totalSize == sum(sizes), 'exp %d got %d args %r' %(
-                sum(sizes), totalSize, args)
+            elif 'content-length' in inF.headers:
+                expectSize = long(inF.headers['content-length'])
+                if totalSize != expectSize:
+                    raise errors.RepositoryError("Changeset was truncated in "
+                            "transit (expected %d bytes, got %d bytes)" %
+                            (expectSize, totalSize))
+            elif totalSize != sum(sizes):
+                raise errors.RepositoryError("Changeset was truncated in "
+                        "transit (expected %d bytes, got %d bytes)" %
+                        (sum(sizes), totalSize))
             inF.close()
 
             for size in sizes:
