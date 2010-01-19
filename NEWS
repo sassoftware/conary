@@ -3,6 +3,9 @@ Changes in @NEW@:
     * A bug in the getChangeSetFingerprints call that resulted in
       fingerprints different from those calculated by Conary proxies has
       been corrected.
+    * Conary proxies will no longer cache changesets that were truncated
+      in transit. Additionally, clients will produce a more useful error
+      message if they download a truncated changeset. (CNY-3140)
 
 Changes in 2.1.5:
   o Bug Fixes:
