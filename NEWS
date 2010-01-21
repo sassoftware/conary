@@ -9,6 +9,8 @@ Changes in @NEW@:
       troves (CNY-3332).
     * RPM capsules would not update properly when files stayed the same between
       old and new versions of the RPM (CNY-3335)
+    * Rollbacks would fail if a file type had changed before and after the
+      relevant update had been appliend (CNY-3340)
 
 Changes in 2.1.4:
   o Bug Fixes:
