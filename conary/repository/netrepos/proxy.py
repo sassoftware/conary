@@ -1557,7 +1557,12 @@ class ChangesetCache(object):
         (fd, csTmpPath) = tempfile.mkstemp(dir = csDir,
                                            suffix = '.ccs-new')
         outF = os.fdopen(fd, "w")
-        util.copyfileobj(inF, outF, sizeLimit = sizeLimit)
+        written = util.copyfileobj(inF, outF, sizeLimit = sizeLimit)
+        if written != sizeLimit:
+            raise errors.RepositoryError("Changeset was truncated in transit "
+                    "(expected %d bytes, got %d bytes for subchangeset)" %
+                    (sizeLimit, written))
+        assert written == sizeLimit
         # closes the underlying fd opened by mkstemp
         outF.close()
 

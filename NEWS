@@ -1,16 +1,29 @@
 Changes in @NEW@:
   o Bug Fixes:
-    * PythonSetup new respects the r.macros.pyver if it is set and
-      r.macros.pyver now reflects the currently running version of
-      python if it is not set by some other means. (CNY-3325)
-    * Corrected documentation for the Automake build action. (CNY-3329)
-    * Unusual commit paths would cause repositorys to not store file contents
-      for contents which were part of capsules as well as part of normal
-      troves (CNY-3332).
-    * RPM capsules would not update properly when files stayed the same between
-      old and new versions of the RPM (CNY-3335)
+    * A bug in the getChangeSetFingerprints call that resulted in
+      fingerprints different from those calculated by Conary proxies has
+      been corrected.
+    * Conary proxies will no longer cache changesets that were truncated
+      in transit. Additionally, clients will produce a more useful error
+      message if they download a truncated changeset. (CNY-3140)
     * Rollbacks would fail if a file type had changed before and after the
       relevant update had been appliend (CNY-3340)
+
+Changes in 2.1.5:
+  o Bug Fixes:
+    * PythonSetup now respects the r.macros.pyver if it is set;
+      r.macros.pyver now reflects the currently running version of
+      python if it is not set by other means. (CNY-3325)
+    * The documentation for the Automake build action was corrected.
+      (CNY-3329)
+    * A bug in unusual commit paths, that would cause repositories to
+      not store file contents for contents which were part of capsules
+      as well as part of normal troves, was fixed. (CNY-3332)
+    * RPM capsules properly update when files stayed the same between
+      old and new versions of the RPM. (CNY-3335)
+    * Ghost symlinks shared between multiple capsules being packaged
+      together as part of the same conary source component no longer
+      cause the build to fail. (CNY-3336)
 
 Changes in 2.1.4:
   o Bug Fixes:

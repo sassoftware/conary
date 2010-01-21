@@ -1519,7 +1519,15 @@ class addCapsule(_Source):
                     elif stat.S_ISLNK(mode):
                         if not filelinktos:
                             raise SourceError, 'Ghost Symlink in RPM has no target'
-                        os.symlink(filelinktos, fullpath)
+                        if util.exists(fullpath):
+                            contents = os.readlink(fullpath)
+                            if contents != filelinktos:
+                                raise SourceError(
+                                    "Inconsistent symlink contents for %s:"
+                                    "'%s' != '%s'" % (
+                                    path, contents, filelinktos))
+                        else:
+                            os.symlink(filelinktos, fullpath)
                     elif stat.S_ISFIFO(mode):
                         os.mkfifo(fullpath)
                     else:

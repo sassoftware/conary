@@ -708,8 +708,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         fingerprints = {}
         for host, subCsList in byServer.iteritems():
             req = [ (x[0],
-                     (x[1][0] and self.fromVersion(x[1][0]) or '',
-                      x[1][1] and self.fromFlavor(x[1][1]) or ''),
+                     (x[1][0] and self.fromVersion(x[1][0]) or 0,
+                      x[1][1] and self.fromFlavor(x[1][1]) or 0),
                      (self.fromVersion(x[2][0]), self.fromFlavor(x[2][1])),
                      x[3]) for x in subCsList ]
             l = self.c[host].getChangeSetFingerprints(
@@ -1777,8 +1777,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             if totalSize == None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            assert totalSize == sum(sizes), 'exp %d got %d args %r' %(
-                sum(sizes), totalSize, args)
+            elif 'content-length' in inF.headers:
+                expectSize = long(inF.headers['content-length'])
+                if totalSize != expectSize:
+                    raise errors.RepositoryError("Changeset was truncated in "
+                            "transit (expected %d bytes, got %d bytes)" %
+                            (expectSize, totalSize))
+            elif totalSize != sum(sizes):
+                raise errors.RepositoryError("Changeset was truncated in "
+                        "transit (expected %d bytes, got %d bytes)" %
+                        (sum(sizes), totalSize))
             inF.close()
 
             for size in sizes:
