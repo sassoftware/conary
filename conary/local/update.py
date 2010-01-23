@@ -1302,8 +1302,7 @@ class FilesystemJob:
             if fsFile.hasContents and baseFile.hasContents:
                 fsFile.linkGroup.set(baseFile.linkGroup())
 
-            fsFile.flags.isConfig(headFile.flags.isConfig())
-            fsFile.flags.isSource(headFile.flags.isSource())
+            fsFile.flags.thaw(headFile.flags.freeze())
             fsFile.tags.thaw(headFile.tags.freeze())
 
             if baseFile.flags.isConfig() or headFile.flags.isConfig():
@@ -1318,9 +1317,13 @@ class FilesystemJob:
             # this forces the file to be restored, with contents
             forceUpdate = False
 
-            # handle file types changing. this is dealt with as a bit
-            # of an exception
-            if baseFile.lsTag != headFile.lsTag:
+            # if what's on disk matches what we want on disk, just go
+            # on. if it doesn't handle file types changing, which are dealt
+            # with as a bit of an exception
+            if headFile == fsFile:
+                # what's on
+                pass
+            elif baseFile.lsTag != headFile.lsTag:
                 if isinstance(baseFile, files.Directory):
                     # a directory changed to some other type of file
                     if isinstance(fsFile, files.Directory):

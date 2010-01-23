@@ -625,6 +625,7 @@ class Transport(xmlrpclib.Transport):
     # make this a class variable so that across all attempts to transport we'll only
     # spew messages once per host.
     failedHosts = set()
+    UrlOpenerFactory = XMLOpener
 
     def __init__(self, https = False, proxies = None, serverName = None,
                  extraHeaders = None, caCerts=None):
@@ -681,7 +682,7 @@ class Transport(xmlrpclib.Transport):
 
         protocol = self._protocol()
 
-        opener = XMLOpener(self.proxies, caCerts=self.caCerts)
+        opener = self.UrlOpenerFactory(self.proxies, caCerts=self.caCerts)
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 

@@ -8,13 +8,17 @@ Changes in @NEW@:
       data if available
     * Merged internals of localcs/verify implementation into new classes
 
+Changes in 2.1.6:
   o Bug Fixes:
     * A bug in the getChangeSetFingerprints call that resulted in
       fingerprints different from those calculated by Conary proxies has
       been corrected.
-    * Conary proxies will no longer cache changesets that were truncated
-      in transit. Additionally, clients will produce a more useful error
-      message if they download a truncated changeset. (CNY-3140)
+    * Rollbacks no longer fail if a file type changed before and after
+      the relevant update has been appliend. (CNY-3340)
+    * Ghost files that are part of rpm capsules are marked as being part
+      of the changeset (as opposed to being included in the capsule).
+      The proxy code that injects contents was made aware of that, to
+      avoid creating incomplete changesets. (CNY-3346)
 
 Changes in 2.1.5:
   o Bug Fixes:

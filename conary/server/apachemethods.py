@@ -243,7 +243,6 @@ def get(port, isSecure, repos, req, restHandler=None):
             totalSize = size
 
         req.content_type = "application/x-conary-change-set"
-        req.set_content_length(totalSize)
         for (path, size, isChangeset, preserveFile) in items:
             if isChangeset:
                 cs = FileContainer(util.ExtendedFile(path, buffering=False))
