@@ -18,6 +18,7 @@ from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
+from conary.repository import filecontents
 from conary.repository.netrepos import netserver, reposlog
 
 # A list of changeset versions we support
@@ -1102,6 +1103,21 @@ class ChangesetFilter(BaseProxy):
 
                     fileObj = self._getFileObject(pathId, fileId, oldTrove,
                         oldChangeset, newCs)
+
+
+                if (isinstance(fileObj, csfiles.RegularFile)
+                        and not fileObj.flags.isPayload()
+                        and fileObj.contents.size() == 0):
+
+                    # Special case: some ghost files were not properly marked
+                    # as payload files, but they are always empty so we can
+                    # fabricate the contents.
+
+                    emptyContents = filecontents.FromString('')
+                    ccs.addFileContents(pathId, fileId,
+                            changeset.ChangedFileTypes.file, emptyContents,
+                            cfgFile=False)
+                    continue
 
                 if not fileObj.flags.isConfig() or isinstance(fileObj,
                         (csfiles.SymbolicLink, csfiles.Directory)):

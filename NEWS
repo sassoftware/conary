@@ -5,6 +5,10 @@ Changes in @NEW@:
       been corrected.
     * Rollbacks would fail if a file type had changed before and after the
       relevant update had been appliend (CNY-3340)
+    * Ghost files that are part of rpm capsules are marked as being part
+      of the changeset (as opposed to being included in the capsule).
+      The proxy code that injects contents was made aware of that, to
+      avoid creating incomplete changesets. (CNY-3346)
 
 Changes in 2.1.5:
   o Bug Fixes:
