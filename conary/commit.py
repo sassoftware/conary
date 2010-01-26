@@ -14,18 +14,30 @@
 import os
 import tempfile
 
+from conary import callbacks
 from conary import conaryclient
+from conary import updatecmd
 from conary import versions
-from conary import cvc
 from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
 
+class CheckinCallback(updatecmd.UpdateCallback, callbacks.ChangesetCallback):
+    def __init__(self, cfg=None):
+        updatecmd.UpdateCallback.__init__(self, cfg)
+        callbacks.ChangesetCallback.__init__(self)
+
+    def missingFiles(self, missingFiles):
+        print "Warning: The following files are missing:"
+        for mp in missingFiles:
+            print mp[4]
+        return True
+
 def doCommit(cfg, changeSetFile, targetLabel):
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
-    callback = cvc.CheckinCallback()
+    callback = CheckinCallback()
 
     try:
 	cs = changeset.ChangeSetFromFile(changeSetFile)

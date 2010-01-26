@@ -23,7 +23,9 @@ import sys
 
 from conary import branch
 from conary import checkin
+from conary import callbacks
 from conary import command
+from conary import commit
 from conary import conarycfg
 from conary import conaryclient
 from conary import constants
@@ -43,18 +45,6 @@ from conary.lib import util
 
 if __name__ == '__main__':
     sys.excepthook = util.genExcepthook()
-
-# mix UpdateCallback and CookCallback, since we use both.
-class CheckinCallback(cook.CookCallback, updatecmd.UpdateCallback):
-    def __init__(self, cfg=None):
-        updatecmd.UpdateCallback.__init__(self, cfg)
-        cook.CookCallback.__init__(self)
-
-    def missingFiles(self, missingFiles):
-        print "Warning: The following files are missing:"
-        for mp in missingFiles:
-            print mp[4]
-        return True
 
 _commands = []
 def _register(cmd):
@@ -1011,7 +1001,7 @@ class CvcMain(command.MainHandler):
     def runCommand(self, thisCommand, cfg, argSet, args, debugAll=False):
         client = conaryclient.ConaryClient(cfg)
         repos = client.getRepos()
-        callback = CheckinCallback(cfg)
+        callback = commit.CheckinCallback(cfg)
 
         if not cfg.buildLabel and cfg.installLabelPath:
             cfg.buildLabel = cfg.installLabelPath[0]
@@ -1077,7 +1067,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None,
     if thisCommand is None:
         thisCommand = CvcMain()._supportedCommands[args[0]]
     if not callback:
-        callback = CheckinCallback(cfg)
+        callback = commit.CheckinCallback(cfg)
 
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
