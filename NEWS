@@ -2,6 +2,8 @@ Changes in @NEW@:
   o Bug Fixes:
     * CheckinCallback moved from cvc to commit in order to prevent
       conary from depending on conary-build. (CNY-3314)
+    * Zero epochs are no longer stored as NULL in the troveInfo.
+      (CNY-3350)
 
 Changes in 2.1.6:
   o Bug Fixes:

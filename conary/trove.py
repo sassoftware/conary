@@ -1721,7 +1721,7 @@ class Trove(streams.StreamSet):
         self.troveInfo.capsule.rpm.release.set(hdr[rpmhelper.RELEASE])
         self.troveInfo.capsule.rpm.arch.set(hdr[rpmhelper.ARCH])
         epoch = hdr.get(rpmhelper.EPOCH, [None])[0]
-        if epoch:
+        if epoch is not None:
             self.troveInfo.capsule.rpm.epoch.set(epoch)
 
         self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
