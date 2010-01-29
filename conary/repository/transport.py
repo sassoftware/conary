@@ -402,7 +402,7 @@ class URLOpener(urllib.FancyURLopener):
                     user_passwd, realhost = urllib.splituser(realhost)
                 if user_passwd:
                     selector = "%s://%s%s" % (urltype, realhost, rest)
-                if self.proxyBypass(host, realhost):
+                if not useConaryProxy and self.proxyBypass(host, realhost):
                     host = realhost
                     selector = rest
                 else:
