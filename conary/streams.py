@@ -460,6 +460,10 @@ class StreamCollection(InfoStream):
 
     def __eq__(self, other, skipSet = {}):
         assert(self.__class__ == other.__class__)
+
+        if self._data is not None and other._data is not None:
+            return self._data == other._data
+
         return self._items == other._items
 
     def __ne__(self, other):
@@ -522,7 +526,10 @@ class StreamCollection(InfoStream):
 
     def diff(self, other):
         assert(self.__class__ == other.__class__)
-        us = set(self.iterAll()) 
+        if self._data is not None and self._data == other._data:
+            return None
+
+        us = set(self.iterAll())
         them = set(other.iterAll())
         added = us - them
         removed = them - us

@@ -1298,11 +1298,15 @@ static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
     return PYINT_FromLong(vfd);
 }
 
+/* sha1Copy - Copy a compressed stream from one file descriptor to a list of
+ * file descriptors, and compute a SHA-1 digest of the decompressed contents.
+ */
 static PyObject * sha1Copy(PyObject *module, PyObject *args) {
-    off_t inFd, inSize, inStart, inStop, inAt;
+    off_t inFd, inSize, inStart, inStop, inAt, to_read, to_write, to_write2;
     PyObject * outFdList, *pyInStart, *pyInSize;
     int * outFds, outFdCount, i, rc, inflate_rc;
     uint8_t inBuf[1024 * 256];
+    uint8_t *inBuf_p;
     uint8_t outBuf[1024 * 256];
     SHA_CTX sha1state;
     z_stream zs;
@@ -1346,42 +1350,47 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     inflate_rc = 0;
     while (inflate_rc != Z_STREAM_END) {
         if (!zs.avail_in) {
-            zs.avail_in = MIN(sizeof(inBuf), inStop - inAt);
-            zs.next_in = inBuf;
-            rc = pread(inFd, inBuf, zs.avail_in, inAt);
-            inAt += zs.avail_in;
-            if (rc == -1) {
+            /* read */
+            to_read = MIN(sizeof(inBuf), inStop - inAt);
+            rc = pread(inFd, inBuf, to_read, inAt);
+            if (rc < 0) {
                 PyErr_SetFromErrno(PyExc_OSError);
                 return NULL;
             }
-            if (rc != zs.avail_in) {
-                PyErr_SetString(PyExc_RuntimeError, "short pread");
-                return NULL;
+            to_write = rc;
+            inAt += rc;
+
+            /* copy (still compressed) */
+            for (i = 0; i < outFdCount; i++) {
+                inBuf_p = inBuf;
+                to_write2 = to_write;
+                while (to_write2 > 0) {
+                    rc = write(outFds[i], inBuf, to_write2);
+                    if (rc < 0) {
+                        PyErr_SetFromErrno(PyExc_OSError);
+                        return NULL;
+                    }
+                    inBuf_p += rc;
+                    to_write2 -= rc;
+                }
             }
 
-            for (i = 0; i < outFdCount; i++) {
-                rc = write(outFds[i], inBuf, zs.avail_in); 
-                if (rc == -1) {
-                    PyErr_SetFromErrno(PyExc_OSError);
-                    return NULL;
-                }
-                if (rc != zs.avail_in) {
-                    PyErr_SetString(PyExc_RuntimeError, "short write");
-                    return NULL;
-                }
-            }
+            /* feed to inflate */
+            zs.avail_in = to_write;
+            zs.next_in = inBuf;
         }
 
+        /* inflate */
         zs.avail_out = sizeof(outBuf);
         zs.next_out = outBuf;
-        inflate_rc = inflate(&zs, 0);
-        if (inflate_rc < 0) {
-            PyErr_SetString(PyExc_RuntimeError, zError(rc));
+        if ((inflate_rc = inflate(&zs, 0)) < 0) {
+            PyErr_SetString(PyExc_RuntimeError, zError(inflate_rc));
             return NULL;
         }
 
-        i = sizeof(outBuf) - zs.avail_out;
-        SHA1_Update(&sha1state, outBuf, i);
+        /* digest */
+        to_write = sizeof(outBuf) - zs.avail_out;
+        SHA1_Update(&sha1state, outBuf, to_write);
     }
 
     if ((rc = inflateEnd(&zs)) != Z_OK) {
@@ -1394,13 +1403,18 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     return PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
 }
 
+
+/* sha1Uncompress - Decompress a stream from a file descriptor to a new file
+ * and simultaneously compute a SHA-1 digest of the decompressed contents.
+ */
 static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
-    int inFd, outFd = -1, i, rc, inflate_rc;
-    off_t inStop, inAt, inSize, inStart;
+    int inFd, outFd = -1, rc, inflate_rc;
+    off_t inStop, inAt, inSize, inStart, to_read, to_write;
     PyObject *pyInStart, *pyInSize;
     z_stream zs;
     uint8_t inBuf[1024 * 256];
     uint8_t outBuf[1024 * 256];
+    uint8_t *outBuf_p;
     SHA_CTX sha1state;
     uint8_t sha1[20];
     char * path, * baseName;
@@ -1450,20 +1464,22 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     inflate_rc = 0;
     while (inflate_rc != Z_STREAM_END) {
         if (!zs.avail_in) {
-            zs.avail_in = MIN(sizeof(inBuf), inStop - inAt);
-            zs.next_in = inBuf;
-            rc = pread(inFd, inBuf, zs.avail_in, inAt);
-            inAt += zs.avail_in;
-            if (rc == -1) {
+            /* read */
+            to_read = MIN(sizeof(inBuf), inStop - inAt);
+            rc = pread(inFd, inBuf, to_read, inAt);
+            if (rc < 0) {
                 PyErr_SetFromErrno(PyExc_OSError);
                 goto onerror;
-            }
-            if (rc != zs.avail_in) {
-                PyErr_SetString(PyExc_RuntimeError, "short pread");
+            } else if (rc == 0) {
+                PyErr_SetString(PyExc_RuntimeError, "short read");
                 goto onerror;
             }
+            inAt += rc;
+            zs.avail_in = rc;
+            zs.next_in = inBuf;
         }
 
+        /* inflate */
         zs.avail_out = sizeof(outBuf);
         zs.next_out = outBuf;
         inflate_rc = inflate(&zs, 0);
@@ -1472,16 +1488,20 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
             goto onerror;
         }
 
-        i = sizeof(outBuf) - zs.avail_out;
-        SHA1_Update(&sha1state, outBuf, i);
-        rc = write(outFd, outBuf, i);
-        if (rc == -1) {
-            PyErr_SetFromErrno(PyExc_OSError);
-            goto onerror;
-        }
-        if (rc != i) {
-            PyErr_SetString(PyExc_RuntimeError, "short write");
-            goto onerror;
+        /* digest */
+        to_write = sizeof(outBuf) - zs.avail_out;
+        SHA1_Update(&sha1state, outBuf, to_write);
+
+        /* copy */
+        outBuf_p = outBuf;
+        while (to_write > 0) {
+            rc = write(outFd, outBuf_p, to_write);
+            if (rc < 0) {
+                PyErr_SetFromErrno(PyExc_OSError);
+                goto onerror;
+            }
+            to_write -= rc;
+            outBuf_p += rc;
         }
     }
 
