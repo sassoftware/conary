@@ -301,7 +301,7 @@ class RPMRequires(policy.Policy):
     SYNOPSIS
     ========
 
-    C{r.RPMRequires([I{requirement}, I{package} | I{package:component})}
+    C{r.RPMRequires([I{requirement}, I{package} || I{package:component} || I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
@@ -309,10 +309,21 @@ class RPMRequires(policy.Policy):
     The C{r.RPMRequires()} policy marks an rpm capsule as requiring certain
     features or characteristics, and can be called to explicitly provide things
     that cannot be automatically discovered and are not provided by the RPM
-    header.
+    header. You can pass in exceptions that should not have automatic
+    requirement discovery done.
 
     A C{I{requirement}} can only specify an rpm requirement in the form of
     I{rpm: dependency(FLAG1...)}
+
+    For unusual cases where Conary finds a false or misleading dependency,
+    or in which you need to override a true dependency, you can specify
+    C{r.RPMRequires(exceptDeps='regexp')} to override all dependencies matching
+    a regular expression, C{r.RPMRequires(exceptDeps=('filterexp', 'regexp'))}
+    to override dependencies matching a regular expression only for files
+    matching filterexp, or
+    C{r.RPMRequires(exceptDeps=(('filterexp', 'regexp'), ...))} to specify
+    multiple overrides.
+
 
     EXAMPLES
     ========
@@ -328,11 +339,18 @@ class RPMRequires(policy.Policy):
         )
 
     keywords = {
-        'requirements': {}
+        'exceptions': {},
+        'exceptDeps' : []
         }
 
     requirementRe = re.compile('(.+?):([^()]+)\(?([^()]*)\)?')
     rpmStringRe = re.compile('(.*?)\[(.*?)\]')
+
+    def __init__(self, *args, **keywords):
+        policy.Policy.__init__(self, *args, **keywords)
+        self.excepts = set()
+        self.requirements = {}
+        self.filters = []
 
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
@@ -357,15 +375,63 @@ class RPMRequires(policy.Policy):
             self.requirements[name].addDep(
                 deps.dependencyClassesByName[depClass],
                 deps.Dependency(dep, flags))
-            policy.Policy.updateArgs(self, **keywords)
 
+        allowUnusedFilters = keywords.pop('allowUnusedFilters', False) or \
+            self.allowUnusedFilters
+
+        exceptions = keywords.pop('exceptions', None)
+        if exceptions:
+            if type(exceptions) is str:
+                self.excepts.add(exceptions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['exceptions'].add(exceptions)
+            elif type(exceptions) in (tuple, list):
+                self.excepts.update(exceptions)
+                if not allowUnusedFilters:
+                    self.unusedFilters['exceptions'].update(exceptions)
+
+        exceptDeps = keywords.pop('exceptDeps', None)
+        if exceptDeps:
+            if type(exceptDeps) is str:
+                exceptDeps = ('.*', exceptDeps)
+            assert(type(exceptDeps) == tuple)
+            if type(exceptDeps[0]) is tuple:
+                self.exceptDeps.extend(exceptDeps)
+            else:
+                self.exceptDeps.append(exceptDeps)
+
+        policy.Policy.updateArgs(self, **keywords)
+
+    def preProcess(self):
+        exceptDeps = []
+        for fE, rE in self.exceptDeps:
+            try:
+                exceptDeps.append((filter.Filter(fE, self.macros),
+                                   re.compile(rE % self.macros)))
+            except sre_constants.error, e:
+                self.error('Bad regular expression %s for file spec %s: %s',
+                           rE, fE, e)
+        self.exceptDeps=exceptDeps
 
     def do(self):
         for comp in self.recipe.autopkg.components.items():
             capsule =  self.recipe._getCapsule(comp[0])
 
             if capsule and capsule[0] == 'rpm':
+                if not self.filters:
+                    self.filters = [(x, filter.Filter(x, self.macros))
+                               for x in self.excepts]
+
                 path = capsule[1]
+
+                matchFound = False
+                for regexp, f in self.filters:
+                    if f.match(path):
+                        self.unusedFilters['exceptions'].discard(regexp)
+                        matchFound=True
+                if matchFound:
+                    continue
+
                 h = rpmhelper.readHeader(file(path))
                 rReqs = h._getDepsetFromHeader(rpmhelper.REQUIRENAME)
                 rProv = h._getDepsetFromHeader(rpmhelper.PROVIDENAME)
@@ -386,8 +452,9 @@ class RPMRequires(policy.Policy):
                 cnyProv = comp[1].provides
                 if rReqs.hasDepClass(deps.RpmDependencies):
                     soDeps = deps.DependencySet()
-                    soDeps.addDeps(deps.SonameDependencies,list(cnyReqs.iterDepsByClass(deps.SonameDependencies))+ \
-                                      list(cnyProv.iterDepsByClass(deps.SonameDependencies)))
+                    soDeps.addDeps(deps.SonameDependencies, \
+                        list(cnyReqs.iterDepsByClass(deps.SonameDependencies))+\
+                        list(cnyProv.iterDepsByClass(deps.SonameDependencies)))
 
                     for r in list(rReqs.iterDepsByClass(deps.RpmDependencies)):
                         reMatch = self.rpmStringRe.match(r.name)
@@ -418,6 +485,14 @@ class RPMRequires(policy.Policy):
                             if soDeps.satisfies(ds):
                                 culledReqs.addDep(deps.RpmDependencies,r)
                 rReqs = rReqs.difference(culledReqs)
+
+                # remove any excepted deps
+                for filt, exceptRe in self.exceptDeps:
+                    if filt.match(path):
+                        for depClass, dep in list(rReqs.iterDeps()):
+                            matchName = '%s: %s' %(depClass.tagName, str(dep))
+                            if exceptRe.match(matchName):
+                                rReqs.removeDeps(depClass, [ dep ])
                 cnyReqs.union(rReqs)
 
 class PureCapsuleComponents(policy.Policy):
