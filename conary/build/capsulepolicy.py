@@ -58,7 +58,7 @@ class Config(packagepolicy.Config):
         hardlinkMap = self.recipe.autopkg.findComponent(filename).hardlinkMap
 
         if (os.path.isfile(fullpath) and util.isregular(fullpath) and
-            not self._fileIsBinary(path, fullpath, maxsize=20*1024) and
+            not self._fileIsBinary(filename, fullpath, maxsize=20*1024) and
             not filename in hardlinkMap):
             self.info(filename)
             for pkg in self.recipe.autopkg.findComponents(filename):
