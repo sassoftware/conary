@@ -15,6 +15,7 @@
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
 """
+import codecs
 import imp
 import itertools
 import os
@@ -253,7 +254,7 @@ class Config(policy.Policy):
         f = open(fn, 'r')
         try:
             while f.tell() < limit:
-                buf = f.read(4096)
+                buf = f.read(65536)
                 if chr(0) in buf:
                     self.warn('%s: file contains NULL byte', path)
                     return True
@@ -264,23 +265,32 @@ class Config(policy.Policy):
                     foundFF = True
                 if '\n' in buf:
                     foundNL = True
-                try:
-                    buf.decode('utf-8')
-                except UnicodeDecodeError, e:
-                    # Still want to print a warning if it is not unicode;
-                    # Note that Code Page 1252 is considered a legacy
-                    # encoding on Windows
-                    self.warn('%s: %s', path, str(e))
-                    try:
-                        buf.decode('windows-1252')
-                    except UnicodeDecodeError, e:
-                        self.warn('%s: %s', path, str(e))
-                        return decodeFailIsError
         finally:
             f.close()
 
         if foundFF and not foundNL:
             self.error('%s: found 0xFF without newline', path)
+
+        utf8 = codecs.open(fn, 'r', 'utf-8')
+        win1252 = codecs.open(fn, 'r', 'windows-1252')
+        try:
+            try:
+                while utf8.tell() < limit:
+                    utf8.read(65536)
+            except UnicodeDecodeError, e:
+                # Still want to print a warning if it is not unicode;
+                # Note that Code Page 1252 is considered a legacy
+                # encoding on Windows
+                self.warn('%s: %s', path, str(e))
+                try:
+                    while win1252.tell() < limit:
+                        win1252.read(65536)
+                except UnicodeDecodeError, e:
+                    self.warn('%s: %s', path, str(e))
+                    return decodeFailIsError
+        finally:
+            utf8.close()
+            win1252.close()
 
         return False
 
