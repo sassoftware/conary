@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o New Features:
+    * Conary now allows configuration files that appear to be encoded
+      in Windows Code Page 1252 if they do not have other specific
+      characteristics of binary files. (CNY-3353)
+
   o Bug Fixes:
     * CheckinCallback moved from cvc to commit in order to prevent
       conary from depending on conary-build. (CNY-3314)

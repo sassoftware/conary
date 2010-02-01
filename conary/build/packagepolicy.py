@@ -15,7 +15,6 @@
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
 """
-import codecs
 import imp
 import itertools
 import os
@@ -234,28 +233,55 @@ class Config(policy.Policy):
             return
         fullpath = self.macros.destdir + filename
         if os.path.isfile(fullpath) and util.isregular(fullpath):
-            if self._fileIsBinary(fullpath):
+            if self._fileIsBinary(filename, fullpath):
                 self.error("binary file '%s' is marked as config" % \
                         filename)
             self._markConfig(filename, fullpath)
 
-    def _fileIsBinary(self, fn, maxsize=None):
+    def _fileIsBinary(self, path, fn, maxsize=None, decodeFailIsError=True):
         limit = os.stat(fn)[stat.ST_SIZE]
         if maxsize is not None and limit > maxsize:
+            self.warn('%s: file size %d longer than max %d',
+                path, limit, maxsize)
             return True
 
-        f = codecs.open(fn, 'r', 'utf-8')
+        # we'll consider file to be binary file if we don't find any
+        # good reason to mark it as text, or if we find a good reason
+        # to mark it as binary
+        foundFF = False
+        foundNL = False
+        f = open(fn, 'r')
         try:
             while f.tell() < limit:
-                try:
-                    # if a file is not utf-8 or has null bytes, we'll consider
-                    # it to be a binary file
-                    if chr(0) in f.read(4096):
-                        return True
-                except UnicodeDecodeError:
+                buf = f.read(4096)
+                if chr(0) in buf:
+                    self.warn('%s: file contains NULL byte', path)
                     return True
+                if '\xff\xff' in buf:
+                    self.warn('%s: file contains 0xFFFF sequence', path)
+                    return True
+                if '\xff' in buf:
+                    foundFF = True
+                if '\n' in buf:
+                    foundNL = True
+                try:
+                    buf.decode('utf-8')
+                except UnicodeDecodeError, e:
+                    # Still want to print a warning if it is not unicode;
+                    # Note that Code Page 1252 is considered a legacy
+                    # encoding on Windows
+                    self.warn('%s: %s', path, str(e))
+                    try:
+                        buf.decode('windows-1252')
+                    except UnicodeDecodeError, e:
+                        self.warn('%s: %s', path, str(e))
+                        return decodeFailIsError
         finally:
             f.close()
+
+        if foundFF and not foundNL:
+            self.error('%s: found 0xFF without newline', path)
+
         return False
 
     def _addTrailingNewline(self, filename, fullpath):
