@@ -9,6 +9,8 @@ Changes in @NEW@:
       conary from depending on conary-build. (CNY-3314)
     * Zero epochs are no longer stored as NULL in the troveInfo.
       (CNY-3350)
+    * A file descriptor leak caused by a circular dependency  in the
+      update code has been fixed. (CNY-3352)
 
 Changes in 2.1.6:
   o Bug Fixes:
