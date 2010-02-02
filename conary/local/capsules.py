@@ -16,6 +16,7 @@ import os, tempfile, sys
 
 from conary import files, trove
 from conary.lib import digestlib, util
+import weakref
 
 class CapsuleOperation(object):
 
@@ -23,7 +24,7 @@ class CapsuleOperation(object):
         self.root = root
         self.db = db
         self.changeSet = changeSet
-        self.fsJob = fsJob
+        self.fsJob = weakref.ref(fsJob)
         self.callback = callback
         self.errors = []
 
