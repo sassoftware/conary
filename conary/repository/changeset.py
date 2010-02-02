@@ -1011,6 +1011,9 @@ class ChangeSet(streams.StreamSet):
     def _makeFileGitDiff(self, troveSource, pathId,
                          (oldPath, oldFileId, oldFileVersion, oldFileObj),
                          (newPath, newFileId, newFileObj)):
+        if oldFileId == newFileId:
+            return
+
         if not oldFileObj:
             yield "diff --git a%s b%s\n" % (newPath, newPath)
             yield "new mode %o\n" % (newFileObj.statType |
@@ -1035,34 +1038,39 @@ class ChangeSet(streams.StreamSet):
         if oldPath is None:
             oldPath = '/dev/null'
 
-        if newFileObj.flags.isConfig():
-            assert(newContentsType == ChangedFileTypes.diff)
+        if newContentsType == ChangedFileTypes.diff:
             yield "--- a%s\n" % oldPath
             yield "+++ b%s\n" % newPath
             for x in newContents.get().readlines():
                 yield x
         else:
             # is the new content a text file?
-            if newFileObj.contents.size() < 1028 * 20:
+            isConfig = False
+            if newFileObj.flags.isConfig():
+                isConfig = True
+            elif newFileObj.contents.size() < 1028 * 20:
                 contents = newContents.get().read()
                 try:
                     contents.decode('utf-8')
-                    utf = True
+                    isConfig = True
                 except:
-                    utf = False
-            else:
-                utf = False
+                    isConfig = False
 
-            if utf and oldFileId and oldFileObj.hasContents:
-                oldContents = troveSource.getFileContents(
-                        [ (oldFileId, oldFileVersion) ])[0]
-                contents = oldContents.get().read()
-                try:
-                    contents.decode('utf-8')
-                except:
-                    utf = False
+                if isConfig and oldFileId and oldFileObj.hasContents:
+                    oldContents = troveSource.getFileContents(
+                            [ (oldFileId, oldFileVersion) ])[0]
+                    if oldContents is None:
+                        # contents are unavailable. assume it's binary
+                        # rather than making repository calls
+                        isConfig = False
+                    else:
+                        contents = oldContents.get().read()
+                        try:
+                            contents.decode('utf-8')
+                        except:
+                            isConfig = False
 
-            if utf:
+            if isConfig:
                 yield "--- a%s\n" % oldPath
                 yield "+++ b%s\n" % newPath
                 if oldFileId:
@@ -1111,7 +1119,7 @@ class ChangeSet(streams.StreamSet):
                                         trvCs.getChangedFileList():
                 oldPath = oldTrv.getFile(pathId)[0]
                 if fileVersion:
-                    filesNeeded.append((pathId, ) +
+                   filesNeeded.append((pathId, ) +
                                        oldTrv.getFile(pathId)[1:3] +
                                        (oldPath, ))
 
