@@ -797,6 +797,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
     commandGroup = 'Information Display'
     docs = {'all'                : 'combine many common scs flags',
             'all-troves'         : 'display not-by-default troves', 
+            'diff'               : 'show changes as a git style diff',
             'show-changes'       : ('(for relative changeset) display changes'
                                     ' that the relative changeset contains'),
             'recurse-repository' : (VERBOSE_HELP,
@@ -809,6 +810,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
         _AbstractQueryCommand.addParameters(self, argDef)
         d = {}
         argDef['Changeset Display'] = {"all":          NO_PARAM,
+                                       "diff":         NO_PARAM,
                                        "show-changes": NO_PARAM }
         argDef['Child Display']["recurse-repository"] = NO_PARAM
 
@@ -836,6 +838,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
 
 
         kw['recurse'] = argSet.pop('recurse', None)
+        kw['asDiff'] = argSet.pop('diff', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argSet['no-recurse']

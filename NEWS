@@ -1,7 +1,7 @@
 Changes in @NEW@:
   o New Features:
-    * Added --diff option to verify command to display local changes as
-      a git-formatted diff
+    * Added --diff option to verify and showchangeset commands to display
+      output as a git-formatted diff
     * Conary now allows configuration files that appear to be encoded
       in Windows Code Page 1252 if they do not have other specific
       characteristics of binary files. (CNY-3353)
