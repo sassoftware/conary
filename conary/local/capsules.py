@@ -24,10 +24,7 @@ class CapsuleOperation(object):
         self.root = root
         self.db = db
         self.changeSet = changeSet
-        if isinstance(fsJob,weakref.ProxyType):
-            self.fsJob = fsJob
-        else:
-            self.fsJob = weakref.proxy(fsJob)
+        self.fsJob = weakref.ref(fsJob)
         self.callback = callback
         self.errors = []
 
