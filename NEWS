@@ -1,15 +1,16 @@
-Changes in @NEW@:
+Changes in 2.1.7:
   o New Features:
     * Conary now allows configuration files that appear to be encoded
       in Windows Code Page 1252 if they do not have other specific
       characteristics of binary files. (CNY-3353)
 
   o Bug Fixes:
-    * CheckinCallback moved from cvc to commit in order to prevent
-      conary from depending on conary-build. (CNY-3314)
+    * CheckinCallback was moved from cvc.py to commit.py, in order to
+      prevent the conary package from depending on conary-build.
+      (CNY-3314)
     * Zero epochs are no longer stored as NULL in the troveInfo.
       (CNY-3350)
-    * A file descriptor leak caused by a circular dependency  in the
+    * A file descriptor leak caused by a circular dependency in the
       update code has been fixed. (CNY-3352)
 
 Changes in 2.1.6:
