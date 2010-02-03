@@ -1,15 +1,18 @@
-Changes in 2.1.7:
+Changes in @NEW@:
   o New Features:
     * Added --diff option to verify and showchangeset commands to display
       output as a git-formatted diff
-    * Conary now allows configuration files that appear to be encoded
-      in Windows Code Page 1252 if they do not have other specific
-      characteristics of binary files. (CNY-3353)
 
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
     * Merged internals of localcs/verify implementation into new classes
+
+Changes in 2.1.7:
+    * Conary now allows configuration files that appear to be encoded
+      in Windows Code Page 1252 if they do not have other specific
+      characteristics of binary files. (CNY-3353)
+
   o Bug Fixes:
     * CheckinCallback was moved from cvc.py to commit.py, in order to
       prevent the conary package from depending on conary-build.
