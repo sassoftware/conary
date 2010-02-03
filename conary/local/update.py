@@ -24,6 +24,7 @@ import stat
 import sys
 import tempfile
 import zlib
+import weakref
 
 from conary import errors, files, trove, versions
 from conary.build import tags
@@ -1717,7 +1718,8 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
         self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
-                                                       callback, self)
+                                                       callback,
+                                                       weakref.proxy(self))
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db

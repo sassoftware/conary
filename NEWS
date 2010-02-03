@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.7:
   o New Features:
     * Added --diff option to verify and showchangeset commands to display
       output as a git-formatted diff
@@ -11,10 +11,13 @@ Changes in @NEW@:
       data if available
     * Merged internals of localcs/verify implementation into new classes
   o Bug Fixes:
-    * CheckinCallback moved from cvc to commit in order to prevent
-      conary from depending on conary-build. (CNY-3314)
+    * CheckinCallback was moved from cvc.py to commit.py, in order to
+      prevent the conary package from depending on conary-build.
+      (CNY-3314)
     * Zero epochs are no longer stored as NULL in the troveInfo.
       (CNY-3350)
+    * A file descriptor leak caused by a circular dependency in the
+      update code has been fixed. (CNY-3352)
 
 Changes in 2.1.6:
   o Bug Fixes:
