@@ -1719,7 +1719,7 @@ class FilesystemJob:
         self.linkGroups = {}
         self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
                                                        callback,
-                                                       weakref.ref(self))
+                                                       weakref.proxy(self))
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db
