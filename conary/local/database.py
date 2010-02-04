@@ -2145,8 +2145,9 @@ class Database(SqlDbRepository):
             fsJob.runPostScripts(tagScript)
 
     def runPreScripts(self, uJob, callback, tagScript = None,
-                      isRollback = False, justDatabase = False,
-                      tmpDir = '/', jobIdx = None):
+                      justDatabase = False, tmpDir = '/', jobIdx = None,
+                      abortOnError = False):
+
         if justDatabase:
            return True
 
@@ -2158,8 +2159,6 @@ class Database(SqlDbRepository):
         for (job, script, oldCompatClass, newCompatClass, action) in \
                     itertools.chain(*actionLists):
 
-            if isRollback and action != 'preerase':
-                continue
             if uJob.wasPreScriptRun(action, job):
                 continue
             scriptId = "%s %s" % (job[0], action)
@@ -2168,9 +2167,15 @@ class Database(SqlDbRepository):
                                        scriptId = scriptId,
                                        oldCompatClass = oldCompatClass,
                                        newCompatClass = newCompatClass)
+
             uJob.recordPreScriptRun(action, job)
+
             if rc:
-                return False
+                if abortOnError:
+                    raise PreScriptError(script, rc, "Script returned with a "
+                                         "non-zero exist status." )
+                else:
+                    return False
 
         return True
 
@@ -2451,7 +2456,7 @@ class Database(SqlDbRepository):
     def _applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
                           justDatabase = False, transactionCounter = None,
-                          lazyCache = None):
+                          lazyCache = None, abortOnError = False):
         assert transactionCounter is not None, ("The transactionCounter "
             "argument is mandatory")
         if transactionCounter != self.getTransactionCounter():
@@ -2540,8 +2545,8 @@ class Database(SqlDbRepository):
 
                     self.runPreScripts(updJob, callback = callback,
                                        tagScript = tagScript,
-                                       isRollback = False,
-                                       justDatabase = justDatabase)
+                                       justDatabase = justDatabase,
+                                       abortOnError = abortOnError)
 
                     fsUpdateJob = UpdateJob(None, lazyCache = lazyCache)
                     if not reposCs.isEmpty():
@@ -2868,6 +2873,24 @@ class RollbackError(errors.ConaryError):
 
     def __str__(self):
 	return "rollback %s cannot be applied:\n%s" % (self.name, self.error)
+
+class PreScriptError(errors.ConaryError):
+
+    """Raised for exceptions related to executing pre-scripts"""
+
+    def __init__(self, script, errorCode, errorMessage=''):
+	"""
+	@param script: string represeting the path of the failed script
+        @param errorCode: the return code of the script
+        """
+	self.name = script
+        self.errorCode = errorCode
+        self.error = errorMessage
+
+    def __str__(self):
+	return "Pre-Script\n\"%s\"\nhas failed. Return Code=%s\n%s" % (self.name,
+                                                         self.errorCode,
+                                                         self.error)
 
 class RollbackOrderError(RollbackError):
 

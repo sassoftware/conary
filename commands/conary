@@ -410,9 +410,11 @@ class RollbackCommand(ConaryCommand):
 
     docs = {'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
-            'replace-files' : ('replace files on system with files from'
+            'replace-files' : ('Replace files on system with files from'
                                ' rollback if conflict'),
-            'tag-script': ('Output commands to run tag-script to PATH', 'PATH')
+            'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
+            'abort-on-error' : ('Abort the rollback if any prerollback script '
+                                'fails'),
            }
 
     def addParameters(self, argDef):
@@ -421,6 +423,7 @@ class RollbackCommand(ConaryCommand):
         argDef["replace-files"] = NO_PARAM
         argDef["info"] = NO_PARAM
         argDef["tag-script"] = ONE_PARAM
+        argDef["abort-on-error"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
@@ -431,6 +434,7 @@ class RollbackCommand(ConaryCommand):
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['showInfoOnly'] = argSet.pop('info', False)
+        kwargs['abortOnError'] = argSet.pop('abort-on-error', False)
 
         kwargs['callback'] = updatecmd.UpdateCallback(cfg)
         if argSet or len(otherArgs) != 3: return self.usage()
