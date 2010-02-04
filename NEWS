@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * Fixed bug introduced in Conary 2.1.0 which caused conary to ignore
+      ownership differences for executable files.
+
 Changes in 2.1.7:
   o New Features:
     * Conary now allows configuration files that appear to be encoded
