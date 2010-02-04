@@ -1,7 +1,7 @@
 Changes in @NEW@:
   o Bug Fixes:
     * Fixed bug introduced in Conary 2.1.0 which caused conary to ignore
-      ownership differences for executable files.
+      ownership differences for executable files. (CNY-3354)
 
 Changes in 2.1.7:
   o New Features:
