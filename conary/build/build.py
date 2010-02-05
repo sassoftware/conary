@@ -1519,19 +1519,21 @@ class _FileAction(BuildAction):
 		mode = _permmap[mode]
 	    isdir = os.path.isdir(path)
             if isDestFile:
+                # not re.escape because setModes is per-path internal-only;
+                # need to pass even if 0 in order to override previous
+                # calls to SetModes or setModes, either from the recipe
+                # directly, from a superclass, or from unpacking a
+                # derived package.
+                self.recipe.setModes(destPath,
+                    userbits=(mode & 0700),
+                    sidbits=(mode & 06000))
                 if isdir and (mode & 0700) != 0700:
                     # regardless of what permissions go into the package,
                     # we need to be able to traverse this directory as
                     # the non-root build user
                     os.chmod(path, (mode & 01777) | 0700)
-                    # not re.escape because setModes is per-path
-                    # internal-only
-                    self.recipe.setModes(mode, destPath)
                 else:
                     os.chmod(path, mode & 01777)
-                    if mode & 06000:
-                        # not re.escape, see above
-                        self.recipe.setModes(mode, destPath)
                 if isdir and mode != 0755:
                     self.recipe.ExcludeDirectories(
                         exceptions=re.escape(destPath).replace(

@@ -2,6 +2,10 @@ Changes in @NEW@:
   o Bug Fixes:
     * Fixed bug introduced in Conary 2.1.0 which caused conary to ignore
       ownership differences for executable files. (CNY-3354)
+    * When SetModes() is called twice, honor the last invocation with
+      regard to setuid and setgid, including if neither setuid nor
+      setgid is set.  Also, make it possible to override setuid and
+      setgid bits in a derived package. (CNY-3344)
 
 Changes in 2.1.7:
   o New Features:

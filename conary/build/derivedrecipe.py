@@ -10,6 +10,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+import os
+
 from conary import files
 from conary.build import defaultrecipes
 from conary.build.packagerecipe import AbstractPackageRecipe, BaseRequiresRecipe
@@ -63,15 +65,6 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
         elif fileObj.flags.isTransient():
             self.recipe.Transient(path, allowUnusedFilters = True)
 
-        # we don't restore setuid/setgid bits into the filesystem
-        if fileObj.inode.perms() & 06000 != 0:
-            self.recipe.SetModes(path, fileObj.inode.perms())
-
-        if isinstance(fileObj, files.Directory):
-            # remember to include this directory in the derived package even
-            # if it's empty
-            self.recipe.ExcludeDirectories(exceptions = path, allowUnusedFilters = True)
-
         if isinstance(fileObj, files.SymbolicLink):
             # mtime for symlinks is meaningless, we have to record the
             # target of the symlink instead
@@ -81,6 +74,33 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
 
         self.recipe._componentReqs[trv.getName()] -= fileObj.requires()
         self.recipe._componentProvs[trv.getName()] -= fileObj.requires()
+
+
+    def handleFileMode(self, trv, fileObj, path, destdir):
+        if isinstance(fileObj, files.SymbolicLink):
+            return
+
+        fullPath = '/'.join((destdir, path))
+        # Do not restore setuid/setgid bits into the filesystem.
+        # Call internal policy with path; do not use the SetModes
+        # build action because that will override anything
+        # called via setup, since setup has already been
+        # invoked.  However, SetModes as invoked from setup
+        # will call setModes after this call, which will
+        # allow modifying the mode in the derived package.
+        mode = fileObj.inode.perms()
+        os.chmod(fullPath, mode & 01777)
+        if fileObj.inode.perms() & 06000 != 0:
+            self.recipe.setModes(path, sidbits=(mode & 06000))
+
+        if isinstance(fileObj, files.Directory):
+            if (fileObj.inode.perms() & 0700) != 0700:
+                os.chmod(fullPath, (mode & 01777) | 0700)
+                self.recipe.setModes(path, userbits=(mode & 0700))
+            # remember to include this directory in the derived package even
+            # if the directory is empty
+            self.recipe.ExcludeDirectories(exceptions=path,
+                allowUnusedFilters=True)
 
     def restoreFile(self, trv, fileObj, contents, destdir, path):
         self.handleFileAttributes(trv, fileObj, path)
@@ -92,6 +112,7 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
         else:
             changeset.ChangesetExploder.restoreFile(self, trv, fileObj,
                                                     contents, destdir, path)
+            self.handleFileMode(trv, fileObj, path, destdir)
 
     def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
         self.handleFileAttributes(trv, fileObj, targetPath)
