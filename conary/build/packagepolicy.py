@@ -1084,8 +1084,14 @@ class MakeDevices(policy.Policy):
 
 class setModes(policy.Policy):
     """
-    Do not call from recipes; this is used internally by C{r.SetModes}
-    and C{r.ParseManifest}
+    Do not call from recipes; this is used internally by C{r.SetModes},
+    C{r.ParseManifest}, and unpacking derived packages.  This policy
+    modified modes relative to the mode on the file in the filesystem.
+    It adds setuid/setgid bits not otherwise set/honored on files on the
+    filesystem, and sets user r/w/x bits if they were altered for the
+    purposes of accessing the files during packaging.  Otherwise,
+    it honors the bits found on the filesystem.  It does not modify
+    bits in capsules.
     """
     bucket = policy.PACKAGE_CREATION
     processUnmodified = True
@@ -1095,30 +1101,37 @@ class setModes(policy.Policy):
         ('ExcludeDirectories', policy.CONDITIONAL_SUBSEQUENT),
     )
     def __init__(self, *args, **keywords):
-	self.fixmodes = {}
+	self.sidbits = {}
+	self.userbits = {}
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
 	"""
-	setModes(mode, path(s)...)
+	setModes(path(s), [sidbits=int], [userbits=int])
 	"""
-	if args:
-	    for path in args[1:]:
-		self.fixmodes[path] = args[0]
+        sidbits = keywords.pop('sidbits', None)
+        userbits = keywords.pop('userbits', None)
+        for path in args:
+            if sidbits is not None:
+                self.sidbits[path] = sidbits
+            if userbits is not None:
+                self.userbits[path] = userbits
+                self.recipe.WarnWriteable(
+                    exceptions=re.escape(path).replace('%', '%%'),
+                    allowUnusedFilters = True)
 	policy.Policy.updateArgs(self, **keywords)
 
     def doFile(self, path):
         if self.recipe._getCapsulePathsForFile(path):
             return
-	if path in self.fixmodes:
-	    mode = self.fixmodes[path]
-	    # set explicitly, do not warn
-	    self.recipe.WarnWriteable(
-                exceptions=re.escape(path.replace('%', '%%')),
-                allowUnusedFilters = True)
-            if mode & 06000:
-                self.info('suid/sgid: %s mode 0%o', path, mode & 07777)
-	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
+        newmode = oldmode = self.recipe.autopkg.pathMap[path].inode.perms()
+	if path in self.userbits:
+            newmode = (newmode & 077077) | self.userbits[path]
+	if path in self.sidbits and self.sidbits[path]:
+            newmode |= self.sidbits[path]
+            self.info('suid/sgid: %s mode 0%o', path, newmode & 07777)
+        if newmode != oldmode:
+            self.recipe.autopkg.pathMap[path].inode.perms.set(newmode)
 
 
 class LinkType(policy.Policy):
