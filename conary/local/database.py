@@ -2145,8 +2145,7 @@ class Database(SqlDbRepository):
             fsJob.runPostScripts(tagScript)
 
     def runPreScripts(self, uJob, callback, tagScript = None,
-                      isRollback = False, justDatabase = False,
-                      tmpDir = '/', jobIdx = None):
+                      justDatabase = False, tmpDir = '/', jobIdx = None):
         if justDatabase:
            return True
 
@@ -2158,8 +2157,6 @@ class Database(SqlDbRepository):
         for (job, script, oldCompatClass, newCompatClass, action) in \
                     itertools.chain(*actionLists):
 
-            if isRollback and action != 'preerase':
-                continue
             if uJob.wasPreScriptRun(action, job):
                 continue
             scriptId = "%s %s" % (job[0], action)
@@ -2540,7 +2537,6 @@ class Database(SqlDbRepository):
 
                     self.runPreScripts(updJob, callback = callback,
                                        tagScript = tagScript,
-                                       isRollback = False,
                                        justDatabase = justDatabase)
 
                     fsUpdateJob = UpdateJob(None, lazyCache = lazyCache)
