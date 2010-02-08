@@ -640,8 +640,11 @@ class RegularFile(File):
 	File.__init__(self, *args, **kargs)
 
 def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
-                       assumeRoot = False):
-    s = os.lstat(path)
+                       assumeRoot = False, statBuf = None):
+    if statBuf:
+        s = statBuf
+    else:
+        s = os.lstat(path)
 
     global userCache, groupCache
 

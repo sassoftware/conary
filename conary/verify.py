@@ -14,11 +14,11 @@
 """
 Provides the output for the "conary verify" command
 """
-import sys
+import os, sys
 
 from conary import showchangeset, trove
 from conary import versions
-from conary import conaryclient
+from conary import conaryclient, files
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
@@ -56,7 +56,8 @@ class _FindLocalChanges(object):
                                               root=self.cfg.root,
                                               forceSha1=self.forceHashCheck,
                                               ignoreTransient=True,
-                                              updateContainers=True)
+                                              updateContainers=True,
+                                              statCache = self.statCache)
             if not result: return
             cs = result[0]
             changed = False
@@ -87,13 +88,12 @@ class _FindLocalChanges(object):
         if trovesChanged and self.finalCs:
             self.finalCs.merge(cs)
 
-    def _recurseTrove(self, trv, duplicateFilterSet = None):
+    def _verifyTroves(self, fullTroveList):
         verifyList = []
 
-        duplicateFilterSet.add(trv.getNameVersionFlavor())
-        for thisTrv in self.db.walkTroveSet(trv):
+        for troveInfo in fullTroveList:
             if verifyList and (verifyList[-1][0].getName().split(':')[0] !=
-                               thisTrv.getName().split(':')[0]):
+                               troveInfo[0].split(':')[0]):
                 # display output as soon as we're done processing one named
                 # trove; this works because walkTroveSet is guaranteed to
                 # be depth first
@@ -101,8 +101,13 @@ class _FindLocalChanges(object):
 
                 verifyList = []
 
+            thisTrv = self.db.getTrove(pristine = False,
+                                       withFileObjects = True,
+                                       *troveInfo)
+
             if self.allMachineChanges:
                 origTrv = self.db.getTrove(pristine = True,
+                                           withFileObjects = True,
                                            *thisTrv.getNameVersionFlavor())
             else:
                 origTrv = thisTrv
@@ -150,13 +155,35 @@ class _FindLocalChanges(object):
                     else:
                         log.error("trove %s is not installed", troveName)
 
+        # we need the recursive closure of the set; self.db.walkTroveSet(trv)
+        # is surely not the most efficient thing to do, but it's easy. remember
+        # it's depth first; keeping the order depth first helps keep the
+        # output sane
+
         troves = self.db.getTroves(troveInfo, withDeps = False,
                                    withFileObjects = True, pristine = False)
-
         seen = set()
-        for trv in troves:
-            self._recurseTrove(trv, duplicateFilterSet = seen)
-            if self.finalCs:
+        fullTroveList = []
+        for topTrv in troves:
+            for nvf in self.db.walkTroveSet(topTrv, withFiles = False,
+                                                asTuple = True):
+                seen.add(nvf)
+                fullTroveList.append(nvf)
+
+        self.statCache = {}
+        for i, (path, stream) in enumerate(self.db.db.getTroveFiles(
+                                                            fullTroveList)):
+            try:
+                sb = os.lstat(path)
+            except:
+                continue
+
+            self.statCache[path] = sb
+
+        self._verifyTroves(fullTroveList)
+
+        if self.finalCs:
+            for trv in troves:
                 self.finalCs.addPrimaryTrove(
                          trv.getName(),
                          trv.getVersion().createShadow(versions.LocalLabel()),
