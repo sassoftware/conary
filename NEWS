@@ -8,6 +8,8 @@ Changes in @NEW@:
       setgid bits in a derived package. (CNY-3344)
     * Fixed a bug in Conary 2.1.0 which caused updates to fail
       because a temporary table persisted across jobs. (CNY-3339)
+    * Changed default behavior of imageGroup flag in group recipes so that
+      checkOnlyByDefaultDeps is now set to True (CNY-3356)
 
 Changes in 2.1.7:
   o New Features:
