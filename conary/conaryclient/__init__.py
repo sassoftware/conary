@@ -440,8 +440,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     @api.publicApi
     def applyRollback(self, rollbackSpec, replaceFiles = None,
             callback = None, tagScript = None, justDatabase = None,
-            transactionCounter = None, showInfoOnly = False,
-            abortOnError = False):
+            transactionCounter = None, showInfoOnly = False):
         """
         Apply a rollback.
 
@@ -469,13 +468,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         gets incremented with every change. This argument is the counter's value
         at the time the rollback was computed from the specifier. It is used to
         ensure that no uninteded rollbacks are performed, if a concurrent update
-        happens between the moment of reading the database state and the moment
-        of performing the rollback.
+        happens between the moment of reading the database state and the moment of
+        performing the rollback.
         @type transactionCounter: int
-
-        @param abortOnError: Abort the rollback if any pre-rollback scripts
-        fail.  Normally, the rollback continues even if there are pre-rollback
-        script failures.
 
         @raise UpdateError: Generic update error. Can occur if the root is not
         writeable by the user running the command.
@@ -502,7 +497,6 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
             callback = callback,
             replaceFiles = replaceFiles,
             showInfoOnly = showInfoOnly,
-            abortOnError = abortOnError,
         )
         # If any of these arguments are None, don't even pass them, the
         # defaults are going to apply

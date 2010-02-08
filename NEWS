@@ -1,8 +1,4 @@
 Changes in @NEW@:
-  o New Features:
-    * Added abort-on-error to conary rollback command which causes rollback
-      be aborted if any pre scripts fail.
-
   o Bug Fixes:
     * Fixed bug introduced in Conary 2.1.0 which caused conary to ignore
       ownership differences for executable files. (CNY-3354)
