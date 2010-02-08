@@ -10,6 +10,8 @@ Changes in @NEW@:
       regard to setuid and setgid, including if neither setuid nor
       setgid is set.  Also, make it possible to override setuid and
       setgid bits in a derived package. (CNY-3344)
+    * Fixed a bug in Conary 2.1.0 which caused updates to fail
+      because a temporary table persisted across jobs. (CNY-3339)
 
 Changes in 2.1.7:
   o New Features:
