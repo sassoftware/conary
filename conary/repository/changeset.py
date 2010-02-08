@@ -1016,6 +1016,8 @@ class ChangeSet(streams.StreamSet):
 
         if not oldFileObj:
             yield "diff --git a%s b%s\n" % (newPath, newPath)
+            yield "new user %s\n" % newFileObj.inode.owner()
+            yield "new group %s\n" % newFileObj.inode.group()
             yield "new mode %o\n" % (newFileObj.statType |
                                      newFileObj.inode.perms())
         else:
@@ -1025,6 +1027,13 @@ class ChangeSet(streams.StreamSet):
                                          oldFileObj.inode.perms())
                 yield "new mode %o\n" % (newFileObj.statType |
                                          newFileObj.inode.perms())
+            if oldFileObj.inode.owner() != newFileObj.inode.owner():
+                yield "old user %s\n" % oldFileObj.inode.owner()
+                yield "new user %s\n" % newFileObj.inode.owner()
+
+            if oldFileObj.inode.group() != newFileObj.inode.group():
+                yield "old group %s\n" % oldFileObj.inode.group()
+                yield "new group %s\n" % newFileObj.inode.group()
 
         if not newFileObj.hasContents:
             return
