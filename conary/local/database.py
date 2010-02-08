@@ -1498,10 +1498,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         troves = self.getTroves(troveList)
 
         for trove in troves:
-            for subTrove in self.walkTroveSet(trove):
-                self.db.pinTroves(subTrove.getName(),
-                                  subTrove.getVersion(),
-                                  subTrove.getFlavor(), pin = pin)
+            for troveInfo in self.walkTroveSet(trove, withFiles = False):
+                self.db.pinTroves(pin = pin, *troveInfo)
 
         if troves:
             self._updateTransactionCounter = True
