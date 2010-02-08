@@ -135,7 +135,7 @@ class _GroupRecipe(_BaseGroupRecipe):
     depCheck = False
     autoResolve = None
     imageGroup = True
-    checkOnlyByDefaultDeps = None
+    checkOnlyByDefaultDeps = True
     checkPathConflicts = True
     requireLatest = True
 
@@ -189,8 +189,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         if self.autoResolve is None:
             self.autoResolve = self.imageGroup
-        if self.checkOnlyByDefaultDeps is None:
-            self.checkOnlyByDefaultDeps = not self.imageGroup
 
         group = self.createGroup(self.name, depCheck = self.depCheck,
                          autoResolve = self.autoResolve,
@@ -1447,9 +1445,7 @@ class _GroupRecipe(_BaseGroupRecipe):
         with 'group-'.
 
         B{imageGroup} : (False) Designate that this group is a image group.
-        Image Group policies will be executed separately on this group. Image
-        groups are forced to be dep closed for both byDefault False and
-        byDefault True troves.
+        Image Group policies will be executed separately on this group.
 
         EXAMPLES
         ========
