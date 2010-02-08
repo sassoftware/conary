@@ -17,7 +17,7 @@ import itertools
 from conary import errors as conaryerrors
 from conary import files
 from conary import trove
-from conary.deps import arch
+from conary.deps import arch, deps
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
 from conary.lib import api
@@ -1953,14 +1953,19 @@ class JobSource(AbstractJobSource):
 
         newTroves = self.newTroveList.findTroves(None, newTroves, 
                                                  allowMissing=True)
-        oldTroves = self.oldTroveList.findTroves(None, oldTroves)
+        oldTroves = self.oldTroveList.findTroves(None, oldTroves,
+                                                 allowMissing=True)
 
         for (n, (oldVS, oldFS), (newVS, newFS), isAbs) in jobList:
             results = []
             if isAbs:
                 newTups = newTroves.get((n, newVS, newFS), None)
-                oldTups = oldTroves[n, None, None]
-                oldTups.append((n, None, None))
+                oldTups = oldTroves.get((n, None, None), None)
+                if oldTups is None:
+                    oldTups = []
+                    oldTroves[(n, None, None)] = oldTups
+
+                oldTups.append((n, None, deps.Flavor()))
             else:
                 oldTups = oldTroves[n, oldVS, oldFS]
 
@@ -2086,12 +2091,12 @@ class ChangeSetJobSource(JobSource):
                 fileList += [((x, None, None, None), self.OLD_F) for x in oldFiles]
 
 
-                if oldFiles or modFiles:
+                if oldVer and (newFiles or oldFiles or modFiles):
                     oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
                                                             withFiles=True)
 
                 if newFiles or modFiles:
-                    if trvCs:
+                    if oldVer:
                         newTrove = oldTrove.copy()
                         newTrove.applyChangeSet(trvCs)
                     else:
