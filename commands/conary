@@ -1189,7 +1189,9 @@ class VerifyCommand(ConaryCommand):
                            'store the verify output in the named file' ),
             'diff' : 'represent changes as a git style diff',
             'hash' : "verify file contents even if the file's inode has "
-                     "not changed" }
+                     "not changed",
+            'new-files': "look for new files which have been added to the "
+                         "system"}
     commandGroup = 'Information Display'
     ignoreConfigErrors = True
     cmdClass = verify.verify
@@ -1200,6 +1202,7 @@ class VerifyCommand(ConaryCommand):
         argDef["diff"] = NO_PARAM
         argDef["changeset"] = ONE_PARAM
         argDef["hash"] = NO_PARAM
+        argDef["new-files"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         client = conaryclient.ConaryClient(cfg)
@@ -1208,6 +1211,7 @@ class VerifyCommand(ConaryCommand):
         csPath = argSet.pop('changeset', None)
         diff = argSet.pop('diff', False)
         hash = argSet.pop('hash', False)
+        newFiles = argSet.pop('new-files', False)
 
         if len(otherArgs) < 2 or argSet:
             return self.usage()
@@ -1218,7 +1222,8 @@ class VerifyCommand(ConaryCommand):
         self.cmdClass(troves, client.getDatabase(),
                       cfg, all=all, changesetPath=csPath,
                       forceHashCheck=hash, asDiff=diff,
-                      repos=client.getRepos())
+                      repos=client.getRepos(),
+                      newFiles = newFiles)
 
 _register(VerifyCommand)
 

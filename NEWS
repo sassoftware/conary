@@ -2,6 +2,10 @@ Changes in @NEW@:
   o New Features:
     * Added --diff option to verify and showchangeset commands to display
       output as a git-formatted diff
+    * Added --new-files option to verify to include files which were added
+      to the system outside of conary package management. The
+      verifyDirsNoNewFiles configuration option was added to pare down the
+      tree conary looks through for new files.
 
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen

@@ -1163,12 +1163,15 @@ order by
                 results[slot] = instance
         return results
 
-    def getTroveFiles(self, troveList):
+    def getTroveFiles(self, troveList, onlyDirectories = False):
         instanceIds = self._lookupTroves(troveList)
         if None in instanceIds:
             raise KeyError
 
-        instanceIds = [ x for x in instanceIds if x is not None ]
+        trvByInstanceId = dict([ (instId, trvInfo) for
+                instId, trvInfo in itertools.izip(instanceIds, troveList)
+                if instId is not None ])
+        instanceIds = trvByInstanceId.keys()
 
         cu = self.db.cursor()
 
@@ -1180,13 +1183,19 @@ order by
         cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)", 
                        list(enumerate(instanceIds)), start_transaction=False)
 
-        cu.execute("""SELECT path, stream FROM getTrovesTbl JOIN
+        if onlyDirectories:
+            dirClause = "AND stream LIKE 'd%'"
+        else:
+            dirClause = ""
+
+        cu.execute("""SELECT instanceId, path, stream FROM getTrovesTbl JOIN
                         DBTroveFiles USING (instanceId)
-                        ORDER BY path""")
+                        WHERE isPresent = 1 %s
+                        ORDER BY path""" % dirClause)
 
         lastId = None
-        for p, s in cu:
-            yield p, s
+        for instanceId, path, stream in cu:
+            yield trvByInstanceId[instanceId], path, stream
 
         cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
@@ -1477,14 +1486,15 @@ order by
         CREATE TEMPORARY TABLE pathList(
             path        %(STRING)s
         )""" % self.db.keywords, start_transaction = False)
-        self.db.bulkload("pathList", [ (x,) for x in pathList ], [ "path" ])
+        self.db.bulkload("pathList", [ (x,) for x in pathList ], [ "path" ],
+                         start_transaction = False)
         cu.execute("""
             SELECT path FROM pathList JOIN DBTroveFiles USING(path) WHERE
                 DBTroveFiles.isPresent = 1
         """)
 
         pathsFound = set( x[0] for x in cu )
-        cu.execute("DROP TABLE pathList")
+        cu.execute("DROP TABLE pathList", start_transaction = False)
 
         return [ path in pathsFound for path in pathList ]
 

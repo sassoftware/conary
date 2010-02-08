@@ -14,40 +14,59 @@
 """
 Provides the output for the "conary verify" command
 """
-import os, sys
+import itertools, os, stat, sys
 
 from conary import showchangeset, trove
 from conary import versions
 from conary import conaryclient, files
 from conary.conaryclient import cmdline
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import dirset, log, sha1helper, util
 from conary.local import defaultmap, update
-from conary.repository import changeset, trovesource
+from conary.repository import changeset, filecontents, trovesource
 from conary import errors
 
 DISPLAY_NONE = 0
 DISPLAY_DIFF = 1
 DISPLAY_CS = 2
 
+NEW_FILES_NONE      = 0
+NEW_FILES_OWNED_DIR = 1
+NEW_FILES_ANY_DIR   = 2
+
 class _FindLocalChanges(object):
 
     def __init__(self, db, cfg, display = True, forceHashCheck = False,
                  changeSetPath = None, allMachineChanges = False,
-                 asDiff = False, repos = None):
+                 asDiff = False, repos = None, newFiles = NEW_FILES_NONE):
         self.db = db
         self.cfg = cfg
         self.display = display
+        self.newFiles = newFiles
         self.forceHashCheck = forceHashCheck
         self.changeSetPath = changeSetPath
         self.allMachineChanges = allMachineChanges
         self.asDiff = asDiff
         self.repos = repos
+        self.statCache = {}
 
         if asDiff:
             self.diffTroveSource = trovesource.SourceStack(db, self.repos)
 
-    def _simpleTroveList(self, troveList):
+    def _addFile(self, cs, trv, path):
+        pathId = sha1helper.md5String(path)
+        absPath = self.cfg.root + path
+        fileObj = files.FileFromFilesystem(absPath, pathId)
+        fileId = fileObj.fileId()
+        trv.addFile(pathId, path, trv.getVersion(), fileId)
+        cs.addFile(None, fileId, fileObj.freeze())
+        if fileObj.hasContents:
+            cs.addFileContents(pathId, fileId,
+                               changeset.ChangedFileTypes.file,
+                               filecontents.FromFilesystem(absPath),
+                               False)
+
+    def _simpleTroveList(self, troveList, newFilesByTrove):
         log.info('Verifying %s' % " ".join(x[1].getName() for x in troveList))
         changedTroves = set()
 
@@ -70,8 +89,21 @@ class _FindLocalChanges(object):
                             " %s " % str([ x[0].getName() for x in l ]))
             return
 
-        trovesChanged = [ x.getNameVersionFlavor() for (changed, x) in
-                            result[1] if changed ]
+        trovesChanged = []
+
+        for (dbTrv, srcTrv, newVer, flags), (changed, localTrv) in \
+                itertools.izip(troveList, result[1]):
+            if srcTrv.getNameVersionFlavor() in newFilesByTrove:
+                for path in newFilesByTrove[srcTrv.getNameVersionFlavor()]:
+                    self._addFile(cs, localTrv, path)
+
+                localTrv.computeDigests()
+                trvDiff = localTrv.diff(dbTrv, absolute = False)[0]
+                cs.newTrove(trvDiff)
+                trovesChanged.append(localTrv.getNameVersionFlavor())
+            elif changed:
+                trovesChanged.append(localTrv.getNameVersionFlavor())
+
         if trovesChanged:
             self._handleChangeSet(trovesChanged, cs)
 
@@ -88,7 +120,7 @@ class _FindLocalChanges(object):
         if trovesChanged and self.finalCs:
             self.finalCs.merge(cs)
 
-    def _verifyTroves(self, fullTroveList):
+    def _verifyTroves(self, fullTroveList, newFilesByTrove):
         verifyList = []
 
         for troveInfo in fullTroveList:
@@ -97,7 +129,7 @@ class _FindLocalChanges(object):
                 # display output as soon as we're done processing one named
                 # trove; this works because walkTroveSet is guaranteed to
                 # be depth first
-                self._simpleTroveList(verifyList)
+                self._simpleTroveList(verifyList, newFilesByTrove)
 
                 verifyList = []
 
@@ -115,7 +147,104 @@ class _FindLocalChanges(object):
             ver = thisTrv.getVersion().createShadow(versions.LocalLabel())
             verifyList.append((thisTrv, thisTrv, ver, update.UpdateFlags()))
 
-        self._simpleTroveList(verifyList)
+        self._simpleTroveList(verifyList, newFilesByTrove)
+
+    def _scanFilesystem(self, fullTroveList, dirType = NEW_FILES_OWNED_DIR):
+        dirs = list(self.db.db.getTroveFiles(fullTroveList,
+                                             onlyDirectories = True))
+        skipDirs = dirset.DirectorySet(self.cfg.verifyDirsNoNewFiles)
+        dirOwners = dirset.DirectoryDict()
+        for trvInfo, dirName, stream in dirs:
+            dirOwners[dirName] = trvInfo
+
+        newFiles = []
+
+        if dirType == NEW_FILES_ANY_DIR and '/' not in dirOwners:
+            # if / is owned, we don't need to worry about unowned paths
+            for dirName in os.listdir(self.cfg.root):
+                fullPath = os.path.join(self.cfg.root, dirName)
+                relPath = os.path.join('/', dirName)
+                if relPath not in skipDirs and relPath not in dirOwners:
+                    if (os.path.isdir(fullPath)):
+                        dirOwners[relPath] = None
+                    else:
+                        newFiles.append(relPath)
+
+        dbPaths = self.db.db.getTroveFiles(fullTroveList)
+        dirsToWalk = sorted(dirOwners.itertops())
+        fsPaths = util.walkiter(dirsToWalk, skipPathSet = skipDirs,
+                                root = self.cfg.root)
+        lastDbPath = None
+        lastFsPath = None
+
+        try:
+            for i in itertools.count(0):
+                if lastDbPath is None:
+                    trvInfo, lastDbPath, lastDbStream = dbPaths.next()
+                if lastFsPath is None:
+                    lastFsPath, lastFsStat = fsPaths.next()
+
+                if lastDbPath < lastFsPath:
+                    # in the database, but not the filesystem. that means
+                    # it's gone missing, and we don't care much
+                    lastDbPath = None
+                elif lastDbPath > lastFsPath:
+                    # it's in the filesystem, but not the database
+                    if not stat.S_ISDIR(lastFsStat.st_mode):
+                        newFiles.append(lastFsPath)
+                    lastFsPath = None
+                else:
+                    # it's in both places
+                    absPath = os.path.normpath(self.cfg.root + lastFsPath)
+                    self.statCache[absPath] = lastFsStat
+                    lastFsPath = None
+                    lastDbPath = None
+        except StopIteration:
+            pass
+
+        # we don't need this, but drain the iterator
+        [ x for x in dbPaths ]
+
+        if lastFsPath and not stat.S_ISDIR(lastFsStat.st_mode):
+            newFiles.append(lastFsPath)
+
+        for lastFsPath, lastFsStat in fsPaths:
+            if not stat.S_ISDIR(lastFsStat.st_mode):
+                newFiles.append(lastFsPath)
+
+        # newFiles is a list of files which have been locally added.
+        # filter out ones which are owned by other troves. a bit silly
+        # to do this if --all is used.
+        areOwned = self.db.db.pathsOwned(newFiles)
+        newFiles = [ path for path, isOwned in
+                        itertools.izip(newFiles, areOwned)
+                        if not isOwned ]
+
+        # now turn newFiles into a dict which maps troves being verified to the
+        # new files for that trove. byTrove[None] lists new files which no
+        # trove claims ownership of
+        byTrove = {}
+        for path in newFiles:
+            trvInfo = dirOwners.get(path, None)
+            l = byTrove.setdefault(trvInfo, [])
+            l.append(path)
+
+        return byTrove
+
+    def _addUnownedNewFiles(self, newFileList):
+        if not newFileList: return
+
+        cs = changeset.ChangeSet()
+        ver = versions.VersionFromString('/localhost@local:LOCAL/1.0-1-1').copy()
+        ver.resetTimeStamps()
+        trv = trove.Trove("@new:files", ver, deps.Flavor())
+        for path in newFileList:
+            self._addFile(cs, trv, path)
+
+        trvDiff = trv.diff(None, absolute = False)[0]
+        cs.newTrove(trvDiff)
+
+        self._handleChangeSet( [ trv.getNameVersionFlavor() ], cs)
 
     def generateChangeSet(self, troveNameList, all=False):
         if self.display != DISPLAY_NONE:
@@ -170,17 +299,16 @@ class _FindLocalChanges(object):
                 seen.add(nvf)
                 fullTroveList.append(nvf)
 
-        self.statCache = {}
-        for i, (path, stream) in enumerate(self.db.db.getTroveFiles(
-                                                            fullTroveList)):
-            try:
-                sb = os.lstat(path)
-            except:
-                continue
+        if self.newFiles:
+            newFilesByTrove = self._scanFilesystem(fullTroveList,
+                                                   dirType = self.newFiles)
+        else:
+            newFilesByTrove = {}
 
-            self.statCache[path] = sb
+        self._verifyTroves(fullTroveList, newFilesByTrove)
 
-        self._verifyTroves(fullTroveList)
+        if None in newFilesByTrove:
+            self._addUnownedNewFiles(newFilesByTrove[None])
 
         if self.finalCs:
             for trv in troves:
@@ -202,7 +330,7 @@ class DiffObject(_FindLocalChanges):
 
     def __init__(self, troveNameList, db, cfg, all = False,
                  changesetPath = None, forceHashCheck = False,
-                 asDiff=False, repos=None):
+                 asDiff=False, repos=None, newFiles = False):
         if asDiff:
             display = DISPLAY_DIFF
         elif changesetPath:
@@ -210,11 +338,17 @@ class DiffObject(_FindLocalChanges):
         else:
             display = DISPLAY_CS
 
+        if newFiles:
+            if all:
+                newFiles = NEW_FILES_ANY_DIR
+            else:
+                newFiles = NEW_FILES_OWNED_DIR
+
         verifier = _FindLocalChanges.__init__(self, db, cfg,
                         display=display,
                         forceHashCheck=forceHashCheck,
                         changeSetPath=changesetPath,
-                        asDiff=asDiff, repos=repos)
+                        asDiff=asDiff, repos=repos, newFiles=newFiles)
         self.run(troveNameList, all=all)
 
 class verify(DiffObject):
