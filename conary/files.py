@@ -255,6 +255,7 @@ class FlagsStream(streams.IntStream):
 class File(streams.StreamSet):
 
     lsTag = None
+    statType = None
     hasContents = False
     skipChmod = False
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -411,6 +412,7 @@ class MissingFile(File):
 class SymbolicLink(File):
 
     lsTag = "l"
+    statType = stat.S_IFLNK
     streamDict = {
         FILE_STREAM_TARGET :   (SMALL, streams.StringStream, "target"),
     }
@@ -435,6 +437,7 @@ class SymbolicLink(File):
 class Socket(File):
 
     lsTag = "s"
+    statType = stat.S_IFSOCK
     __slots__ = []
 
     def restore(self, fileContents, root, target, journal=None, nameLookup=True,
@@ -450,6 +453,7 @@ class Socket(File):
 class NamedPipe(File):
 
     lsTag = "p"
+    statType = stat.S_IFIFO
     __slots__ = []
 
     def restore(self, fileContents, root, target, journal=None, nameLookup=True,
@@ -463,6 +467,7 @@ class NamedPipe(File):
 class Directory(File):
 
     lsTag = "d"
+    statType = stat.S_IFDIR
     __slots__ = []
 
     def restore(self, fileContents, root, target, journal=None, nameLookup=True,
@@ -521,11 +526,13 @@ class DeviceFile(File):
 class BlockDevice(DeviceFile):
 
     lsTag = "b"
+    statType = stat.S_IFBLK
     __slots__ = []
 
 class CharacterDevice(DeviceFile):
 
     lsTag = "c"
+    statType = stat.S_IFCHR
     __slots__ = []
 
 import gzip
@@ -541,6 +548,7 @@ class RegularFile(File):
     __slots__ = ('contents', 'linkGroup')
 
     lsTag = "-"
+    statType = stat.S_IFREG
     hasContents = True
 
     def sizeString(self):

@@ -1,4 +1,14 @@
 Changes in @NEW@:
+  o New Features:
+    * Added --diff option to verify and showchangeset commands to display
+      output as a git-formatted diff
+
+  o Internal Changes
+    * Optimized StreamCollection diff and __eq__ operations to use frozen
+      data if available
+    * Merged internals of localcs/verify implementation into new classes
+
+Changes in @NEW@:
   o Bug Fixes:
     * Fixed bug introduced in Conary 2.1.0 which caused conary to ignore
       ownership differences for executable files. (CNY-3354)
@@ -8,7 +18,6 @@ Changes in @NEW@:
       setgid bits in a derived package. (CNY-3344)
 
 Changes in 2.1.7:
-  o New Features:
     * Conary now allows configuration files that appear to be encoded
       in Windows Code Page 1252 if they do not have other specific
       characteristics of binary files. (CNY-3353)
