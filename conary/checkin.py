@@ -1354,7 +1354,7 @@ def nologUpdateSrc(repos, versionList = None, callback = None):
         if not troveCs.getOldVersion():
             raise errors.CvcError(
                       "Current version of this source has been removed "
-                      "from the repository can cannot be updated in place. ")
+                      "from the repository; it cannot be updated in place. ")
 
         l = [ x for x in changeSet.iterNewTroveList() ]
         [ changeSet.delNewTrove(x.getName(), x.getNewVersion(),

@@ -223,7 +223,7 @@ class LocalChangeSetCommand(ConaryCommand):
         outFile = otherArgs[3]
 
         db = database.Database(cfg.root, cfg.dbPath)
-        cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
+        verify.LocalChangeSetCommand(db, cfg, name, changeSetPath = outFile)
 _register(LocalChangeSetCommand)
 
 
@@ -801,6 +801,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
     commandGroup = 'Information Display'
     docs = {'all'                : 'combine many common scs flags',
             'all-troves'         : 'display not-by-default troves', 
+            'diff'               : 'show changes as a git style diff',
             'show-changes'       : ('(for relative changeset) display changes'
                                     ' that the relative changeset contains'),
             'recurse-repository' : (VERBOSE_HELP,
@@ -813,6 +814,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
         _AbstractQueryCommand.addParameters(self, argDef)
         d = {}
         argDef['Changeset Display'] = {"all":          NO_PARAM,
+                                       "diff":         NO_PARAM,
                                        "show-changes": NO_PARAM }
         argDef['Child Display']["recurse-repository"] = NO_PARAM
 
@@ -840,6 +842,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
 
 
         kw['recurse'] = argSet.pop('recurse', None)
+        kw['asDiff'] = argSet.pop('diff', None)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argSet['no-recurse']
@@ -1184,39 +1187,49 @@ _register(UpdateConaryCommand)
 class VerifyCommand(ConaryCommand):
     commands = ['verify']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
-    help = 'Verify software integrity on the system'
+    help = 'Verify filesystem matches conary database'
     docs = {'all' : 'verify all troves on system',
             'changeset' : (VERBOSE_HELP,
                            'store the verify output in the named file' ),
+            'diff' : 'represent changes as a git style diff',
             'hash' : "verify file contents even if the file's inode has "
-                     "not changed" }
+                     "not changed",
+            'new-files': "look for new files which have been added to the "
+                         "system"}
     commandGroup = 'Information Display'
     ignoreConfigErrors = True
+    cmdClass = verify.verify
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
         argDef["all"] = NO_PARAM
+        argDef["diff"] = NO_PARAM
         argDef["changeset"] = ONE_PARAM
         argDef["hash"] = NO_PARAM
+        argDef["new-files"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
-        db = openDatabase(cfg.root, cfg.dbPath)
-        all = argSet.has_key('all')
-        if all: del argSet['all']
+        client = conaryclient.ConaryClient(cfg)
+
+        all = argSet.pop('all', False)
         csPath = argSet.pop('changeset', None)
-        if 'hash' in argSet:
-            hash = True
-            argSet.pop('hash')
-        else:
-            hash = False
+        diff = argSet.pop('diff', False)
+        hash = argSet.pop('hash', False)
+        newFiles = argSet.pop('new-files', False)
 
         if len(otherArgs) < 2 or argSet:
             return self.usage()
         troves = otherArgs[2:]
-        verify.verify(troves, db, cfg, all=all, changesetPath = csPath,
-                      forceHashCheck = hash)
-_register(VerifyCommand)
+        if (not all and not troves) or (all and troves):
+            return self.usage()
 
+        self.cmdClass(troves, client.getDatabase(),
+                      cfg, all=all, changesetPath=csPath,
+                      forceHashCheck=hash, asDiff=diff,
+                      repos=client.getRepos(),
+                      newFiles = newFiles)
+
+_register(VerifyCommand)
 
 class ConaryMain(command.MainHandler):
     name = 'conary'

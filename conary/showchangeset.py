@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,7 +15,7 @@
 Provides the output for the "conary showcs" command
 """
 
-import itertools
+import itertools, sys
 
 #conary
 from conary import conaryclient
@@ -35,6 +35,7 @@ def usage():
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg,
+                     asDiff = False,
                      # selection options
                      exactFlavors = False,
                      # trove options
@@ -65,7 +66,11 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
     client = conaryclient.ConaryClient(cfg)
     repos = client.getRepos()
 
-    if not asJob and not showChanges and cs.isAbsolute():
+    if asDiff:
+        troveSource = trovesource.SourceStack(client.getDatabase(), repos)
+        for x in cs.gitDiff(troveSource):
+            sys.stdout.write(x)
+    elif not asJob and not showChanges and cs.isAbsolute():
         changeSetSource = trovesource.ChangesetFilesTroveSource(None)
         changeSetSource.addChangeSet(cs)
 

@@ -12,6 +12,8 @@
 # full details.
 #
 
+import difflib
+import stat
 import struct
 import tempfile
 import errno
@@ -25,7 +27,7 @@ except ImportError:
     from StringIO import StringIO
 
 from conary import files, rpmhelper, streams, trove, versions
-from conary.lib import enum, log, misc, patch, sha1helper, util, api
+from conary.lib import base85, enum, log, misc, patch, sha1helper, util, api
 from conary.repository import filecontainer, filecontents, errors
 
 # cft is a string used by the EnumeratedType class; it's not a type itself!
@@ -1005,6 +1007,198 @@ class ChangeSet(streams.StreamSet):
         fileSet = util.SendableFileSet()
         fileSet.add(self)
         fileSet.send(sock)
+
+    def _makeFileGitDiff(self, troveSource, pathId,
+                         (oldPath, oldFileId, oldFileVersion, oldFileObj),
+                         (newPath, newFileId, newFileObj)):
+        if oldFileId == newFileId:
+            return
+
+        if not oldFileObj:
+            yield "diff --git a%s b%s\n" % (newPath, newPath)
+            yield "new user %s\n" % newFileObj.inode.owner()
+            yield "new group %s\n" % newFileObj.inode.group()
+            yield "new mode %o\n" % (newFileObj.statType |
+                                     newFileObj.inode.perms())
+        else:
+            yield "diff --git a%s b%s\n" % (oldPath, newPath)
+            if oldFileObj.inode.perms() != newFileObj.inode.perms():
+                yield "old mode %o\n" % (oldFileObj.statType |
+                                         oldFileObj.inode.perms())
+                yield "new mode %o\n" % (newFileObj.statType |
+                                         newFileObj.inode.perms())
+            if oldFileObj.inode.owner() != newFileObj.inode.owner():
+                yield "old user %s\n" % oldFileObj.inode.owner()
+                yield "new user %s\n" % newFileObj.inode.owner()
+
+            if oldFileObj.inode.group() != newFileObj.inode.group():
+                yield "old group %s\n" % oldFileObj.inode.group()
+                yield "new group %s\n" % newFileObj.inode.group()
+
+        if not newFileObj.hasContents:
+            return
+        elif (oldFileObj and oldFileObj.hasContents and
+              oldFileObj.contents.sha1() == newFileObj.contents.sha1()):
+            return
+
+        newContentsType, newContents = self.getFileContents(pathId,
+                                                            newFileId)
+
+        if oldPath is None:
+            oldPath = '/dev/null'
+
+        if newContentsType == ChangedFileTypes.diff:
+            yield "--- a%s\n" % oldPath
+            yield "+++ b%s\n" % newPath
+            for x in newContents.get().readlines():
+                yield x
+        else:
+            # is the new content a text file?
+            isConfig = False
+            if newFileObj.flags.isConfig():
+                isConfig = True
+            elif newFileObj.contents.size() < 1028 * 20:
+                contents = newContents.get().read()
+                try:
+                    contents.decode('utf-8')
+                    isConfig = True
+                except:
+                    isConfig = False
+
+                if isConfig and oldFileId and oldFileObj.hasContents:
+                    oldContents = troveSource.getFileContents(
+                            [ (oldFileId, oldFileVersion) ])[0]
+                    if oldContents is None:
+                        # contents are unavailable. assume it's binary
+                        # rather than making repository calls
+                        isConfig = False
+                    else:
+                        contents = oldContents.get().read()
+                        try:
+                            contents.decode('utf-8')
+                        except:
+                            isConfig = False
+
+            if isConfig:
+                yield "--- a%s\n" % oldPath
+                yield "+++ b%s\n" % newPath
+                if oldFileId:
+                    unified = difflib.unified_diff(
+                                 oldContents.get().readlines(),
+                                 newContents.get().readlines())
+                else:
+                    unified = difflib.unified_diff([],
+                                 newContents.get().readlines())
+                # skip ---/+++ lines
+                unified.next()
+                unified.next()
+                for x in unified:
+                    yield x
+            else:
+                yield "GIT binary patch\n"
+                yield "literal %d\n" % newFileObj.contents.size()
+                for x in base85.iterencode(newContents.get(), compress = True):
+                    yield x
+                yield '\n'
+
+    def gitDiff(self, troveSource):
+        """
+        Represent the file changes as a GIT diff. Normal files and symlinks
+        are represented; other file types (including directories) are
+        excluded. Config files are encoded as normal diffs, other files
+        are encoded using standard base85 gzipped binary encoding. No trove
+        information is included, though removed files are represented properly.
+        """
+        jobs = list(self.getJobSet())
+        oldTroves = troveSource.getTroves(
+            [ (x[0], x[1][0], x[1][1]) for x in jobs if x[1][0] is not None ])
+
+        # get the old file objects we need
+        filesNeeded = []
+        for job in jobs:
+            trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            if job[1][0] is not None:
+                oldTrv = oldTroves.pop(0)
+            else:
+                trv = None
+
+            # look at the changed files and get a list of file objects
+            # we need to have available
+            for (pathId, path, fileId, fileVersion) in \
+                                        trvCs.getChangedFileList():
+                oldPath = oldTrv.getFile(pathId)[0]
+                if fileVersion:
+                   filesNeeded.append((pathId, ) +
+                                       oldTrv.getFile(pathId)[1:3] +
+                                       (oldPath, ))
+
+            for pathId in trvCs.getOldFileList():
+                oldPath = oldTrv.getFile(pathId)[0]
+                filesNeeded.append((pathId, ) +
+                                   oldTrv.getFile(pathId)[1:3] +
+                                   (oldPath, ))
+
+        fileObjects = troveSource.getFileVersions(
+                            [ x[0:3] for x in filesNeeded ])
+
+        # now look at all of the files, new and old, to order the diff right
+        # so we don't have to go seeking all over the changeset
+        configList = []
+        normalList = []
+        removeList = []
+        for job in jobs:
+            trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
+            for (pathId, path, fileId, fileVersion) in \
+                                        trvCs.getNewFileList():
+                fileStream = self.getFileChange(None, fileId)
+                if files.frozenFileFlags(fileStream).isConfig():
+                    configList.append((pathId, fileId,
+                                      (None, None, None, None),
+                                      (path, fileId, fileStream)))
+                else:
+                    normalList.append((pathId, fileId,
+                                      (None, None, None, None),
+                                      (path, fileId, fileStream)))
+
+            for (pathId, path, fileId, fileVersion) in \
+                                        trvCs.getChangedFileList():
+                oldFileObj = fileObjects.pop(0)
+                fileObj = oldFileObj.copy()
+                oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
+                fileObj.twm(self.getFileChange(oldFileId, fileId), fileObj)
+
+                if path is None:
+                    path = oldPath
+
+                if fileObj.flags.isConfig():
+                    configList.append((pathId, fileId,
+                                      (oldPath, oldFileId, oldFileVersion,
+                                       oldFileObj),
+                                      (path, fileId, fileObj.freeze())))
+                else:
+                    normalList.append((pathId, fileId,
+                                      (oldPath, oldFileId, oldFileVersion,
+                                       oldFileObj),
+                                      (path, fileId, fileObj.freeze())))
+
+            for pathId in trvCs.getOldFileList():
+                oldFileObj = fileObjects.pop(0)
+                oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
+                yield "diff --git a%s b%s\n" % (oldPath, oldPath)
+                yield "deleted file mode %o\n" % (oldFileObj.statType |
+                                                  oldFileObj.inode.perms())
+                yield "Binary files %s and /dev/null differ\n" % oldPath
+
+        configList.sort()
+        normalList.sort()
+
+        for (pathId, fileId, oldInfo, newInfo) in \
+                        itertools.chain(configList, normalList):
+            newInfo = newInfo[0:2] + (files.ThawFile(newInfo[2], pathId),)
+            for x in self._makeFileGitDiff(troveSource, pathId,
+                        oldInfo, newInfo):
+                yield x
+
 
     def __init__(self, data = None):
 	streams.StreamSet.__init__(self, data)
