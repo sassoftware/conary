@@ -108,7 +108,7 @@ class _FilesetRecipe(Recipe):
 
         for (pattern, recurse, remap) in itemList:
             foundIt = False
-            for sub in self.repos.walkTroveSet(pkg):
+            for sub in self.repos.walkTroveSet(pkg, asTuple = False):
                 foundIt = foundIt or self.addFileFromPackage(
                                             pattern, sub, recurse, remap)
 
