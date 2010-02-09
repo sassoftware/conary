@@ -1290,8 +1290,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def getTroveContainers(self, l):
         return self.db.getTroveContainers(l)
 
-    def getTroveReferences(self, l, weakRefs = False):
-        return self.db.getTroveReferences(l, weakRefs = weakRefs)
+    def getTroveReferences(self, l, weakRefs = False, justPresent = False):
+        return self.db.getTroveReferences(l, weakRefs = weakRefs,
+                                          justPresent = justPresent)
 
     def findTroveContainers(self, names):
         return self.db.findTroveContainers(names)
@@ -1497,10 +1498,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         troves = self.getTroves(troveList)
 
         for trove in troves:
-            for subTrove in self.walkTroveSet(trove):
-                self.db.pinTroves(subTrove.getName(),
-                                  subTrove.getVersion(),
-                                  subTrove.getFlavor(), pin = pin)
+            for troveInfo in self.walkTroveSet(trove, withFiles = False):
+                self.db.pinTroves(pin = pin, *troveInfo)
 
         if troves:
             self._updateTransactionCounter = True

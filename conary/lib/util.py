@@ -2160,3 +2160,27 @@ class GzipFile(gzip.GzipFile):
             raise EOFError, "Reached EOF"
 
         return gzip.GzipFile._read(self, size = size)
+
+# yields sorted paths and their stat bufs
+def walkiter(dirNameList, skipPathSet = set(), root = '/'):
+    dirNameList.sort()
+
+    for dirName in dirNameList:
+        try:
+            entries = os.listdir(root + dirName)
+        except:
+            return
+
+        entries.sort()
+        for entry in entries:
+            fullPath = os.path.join(dirName, entry)
+            if fullPath in skipPathSet:
+                continue
+
+            sb = os.lstat(root + fullPath)
+            yield fullPath, sb
+
+            if stat.S_ISDIR(sb.st_mode):
+                for x in walkiter([fullPath], root = root,
+                                  skipPathSet = skipPathSet):
+                    yield x
