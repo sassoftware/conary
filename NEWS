@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.8:
   o Bug Fixes:
     * Added abort-on-error to conary rollback command which causes rollback
       be aborted if any pre scripts fail. (CNY-3327)
