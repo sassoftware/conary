@@ -1,3 +1,8 @@
+Changes in @NEW@:
+  o Bug Fixes:
+    * The NO_PROXY environment variable no longer applies to conary
+      proxies. (CNY-3360)
+
 Changes in 2.1.8:
   o Bug Fixes:
     * Added abort-on-error to conary rollback command which causes rollback
