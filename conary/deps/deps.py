@@ -1067,13 +1067,20 @@ class DependencySet(object):
             return self._members
         else:
             return misc.depSetFreeze(self.members);
-    __getstate__ = freeze
 
     def isEmpty(self):
         return not(self._members)
 
     def __repr__(self):
         return "ThawDep('%s')" % self.freeze()
+
+    def __getstate__(self):
+        # If this method returns a false value (like the empty string) then
+        # __setstate__ is not called, so we have to return something non-empty.
+        return (self.freeze(),)
+
+    def __setstate__(self, frozen):
+        self.thaw(frozen[0])
 
     def __init__(self, frz = None):
         if frz is not None:
@@ -1085,7 +1092,7 @@ class DependencySet(object):
         self._hash = None
 
     thaw = __init__
-    __setstate__ = __init__
+
 
 # A special class for representing Flavors
 class Flavor(DependencySet):
