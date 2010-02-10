@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.9:
   o Bug Fixes:
     * The NO_PROXY environment variable no longer applies to conary
       proxies. (CNY-3360)
