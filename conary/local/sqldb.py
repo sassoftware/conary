@@ -1165,6 +1165,42 @@ order by
                 results[slot] = instance
         return results
 
+    def getTroveFiles(self, troveList, onlyDirectories = False):
+        instanceIds = self._lookupTroves(troveList)
+        if None in instanceIds:
+            raise KeyError
+
+        trvByInstanceId = dict([ (instId, trvInfo) for
+                instId, trvInfo in itertools.izip(instanceIds, troveList)
+                if instId is not None ])
+        instanceIds = trvByInstanceId.keys()
+
+        cu = self.db.cursor()
+
+        cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
+                                idx %(PRIMARYKEY)s,
+                                instanceId INT)
+                   """ % self.db.keywords, start_transaction = False)
+
+        cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)", 
+                       list(enumerate(instanceIds)), start_transaction=False)
+
+        if onlyDirectories:
+            dirClause = "AND stream LIKE 'd%'"
+        else:
+            dirClause = ""
+
+        cu.execute("""SELECT instanceId, path, stream FROM getTrovesTbl JOIN
+                        DBTroveFiles USING (instanceId)
+                        WHERE isPresent = 1 %s
+                        ORDER BY path""" % dirClause)
+
+        lastId = None
+        for instanceId, path, stream in cu:
+            yield trvByInstanceId[instanceId], path, stream
+
+        cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
+
     def _lookupTroves(self, troveList):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
@@ -1452,14 +1488,15 @@ order by
         CREATE TEMPORARY TABLE pathList(
             path        %(STRING)s
         )""" % self.db.keywords, start_transaction = False)
-        self.db.bulkload("pathList", [ (x,) for x in pathList ], [ "path" ])
+        self.db.bulkload("pathList", [ (x,) for x in pathList ], [ "path" ],
+                         start_transaction = False)
         cu.execute("""
             SELECT path FROM pathList JOIN DBTroveFiles USING(path) WHERE
                 DBTroveFiles.isPresent = 1
         """)
 
         pathsFound = set( x[0] for x in cu )
-        cu.execute("DROP TABLE pathList")
+        cu.execute("DROP TABLE pathList", start_transaction = False)
 
         return [ path in pathsFound for path in pathList ]
 
@@ -1624,15 +1661,18 @@ order by
         """
         return self._getTroveInclusions(l, False, weakRefs = False)
 
-    def getTroveReferences(self, l, weakRefs = False):
+    def getTroveReferences(self, l, weakRefs = False, justPresent = False):
         """
         Return the troves which the troves in l include as strong references.
         If weakRefs is True, also include the troves included as weak
-        references.
+        references. If justPresent is True, only include troves present
+        in the database.
         """
-        return self._getTroveInclusions(l, True, weakRefs = weakRefs)
+        return self._getTroveInclusions(l, True, weakRefs = weakRefs,
+                                        justPresent = justPresent)
 
-    def _getTroveInclusions(self, l, included, weakRefs = False):
+    def _getTroveInclusions(self, l, included, weakRefs = False,
+                            justPresent = False):
         cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE ftc(
@@ -1654,12 +1694,17 @@ order by
         else:
             sense = ("includedId", "instanceId")
 
+        if justPresent:
+            presentFilter = "Instances.isPresent = 1 AND"
+        else:
+            presentFilter = ""
+
         if weakRefs:
             weakRefsFilter = 0
         else:
             weakRefsFilter = schema.TROVE_TROVES_WEAKREF
 
-        cu.execute("""SELECT idx, instances.troveName, Versions.version,
+        sql = """SELECT idx, instances.troveName, Versions.version,
                              Flavors.flavor, instances.timeStamps, flags
                       FROM ftc
                       JOIN Instances AS IncInst ON
@@ -1677,11 +1722,13 @@ order by
                       JOIN Flavors ON
                           Flavors.flavorId = Instances.flavorId
                       WHERE
+                          %s
                           IncVersion.version = ftc.version AND
                           (IncFlavor.flavor = ftc.flavor OR
                            (IncFlavor.flavor IS NULL AND ftc.flavor = "")) AND
                           (TroveTroves.flags & %d) == 0
-                   """ % (sense + (weakRefsFilter,)))
+                   """ % (sense + (presentFilter, weakRefsFilter))
+        cu.execute(sql)
         for (idx, name, version, flavor, ts, flags) in cu:
             ts = [ float(x) for x in ts.split(":") ]
             result[idx].append((name,

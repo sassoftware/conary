@@ -1814,7 +1814,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False,
                   ignoreTransient=False, ignoreAutoSource=False,
                   crossRepositoryDeltas = True, allowMissingFiles = False,
-                  callback=UpdateCallback()):
+                  callback=UpdateCallback(), statCache = {}):
     """
     Populates a change set against the files in the filesystem and builds
     a trove object which describes the files installed.  The return
@@ -1932,7 +1932,9 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 	try:
             f = files.FileFromFilesystem(realPath, pathId,
-                                         possibleMatch = possibleMatch)
+                                         possibleMatch = possibleMatch,
+                                         statBuf =
+                                            statCache.get(realPath, None))
 	except OSError, e:
             if isSrcTrove:
 		callback.error(
@@ -2043,7 +2045,8 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 	# be.
 	assert(srcTrove or isinstance(version, versions.NewVersion))
 
-	f = files.FileFromFilesystem(realPath, pathId)
+	f = files.FileFromFilesystem(realPath, pathId,
+                                     statBuf = statCache.get(realPath, None))
 
 	if isSrcTrove:
             f.flags.isSource(set = True)
@@ -2091,7 +2094,7 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
                       ignoreAutoSource = False, updateContainers = False,
                       crossRepositoryDeltas = True, allowMissingFiles = False,
-                      callback=UpdateCallback()):
+                      callback=UpdateCallback(), statCache = {}):
     """
     Builds a change set against a set of files currently installed and
     builds a trove object which describes the files installed.  The
@@ -2118,6 +2121,8 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
     @param updateContainers: Container troves are updated to point to the 
                              new versions of troves which have had files 
                              changed.
+    @param statCache: Dictionary mapping paths to stat buffers.
+    @type statCache: dict
     """
 
     changeSet = changeset.ChangeSet()
@@ -2132,7 +2137,8 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
                                ignoreAutoSource = ignoreAutoSource,
                                crossRepositoryDeltas = crossRepositoryDeltas,
                                allowMissingFiles = allowMissingFiles,
-                               callback = callback)
+                               callback = callback,
+                               statCache = statCache)
         if result is None:
             # an error occurred
             return None

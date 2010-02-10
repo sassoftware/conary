@@ -17,7 +17,7 @@ import itertools
 from conary import errors as conaryerrors
 from conary import files
 from conary import trove
-from conary.deps import arch
+from conary.deps import arch, deps
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
 from conary.lib import api
@@ -178,17 +178,60 @@ class AbstractTroveSource:
     def iterFilesInTrove(self, n, v, f, sortByPath=False, withFiles=False):
         raise NotImplementedError
 
-    def walkTroveSet(self, trove, ignoreMissing = True,
-                     withFiles=True):
+    def walkTroveSet(self, topTrove, ignoreMissing = True,
+                     withFiles=True, asTuple=True):
         """
-        Generator returns all of the troves included by trove, including
-        trove itself. It is a depth first search of strong refs.
+        Generator returns all of the troves included by topTrove, including
+        topTrove itself. It is a depth first search of strong refs.
+        
+        @param asTuple: If True, (name, version, flavor) tuples are returned
+        instead of Trove objects. This can be much faster.
         """
-	yield trove
-	seen = { trove.getName() : [ (trove.getVersion(),
-				      trove.getFlavor()) ] }
+        def _collect(l, tup):
+            if tup[1] is None:
+                if trove.troveIsComponent(tup[0][0]):
+                    # don't bother looking for children of components
+                    tup[1] = []
+                else:
+                    l.append(tup)
+            else:
+                for t in tup[1]:
+                    _collect(l, t)
 
-	troveList = [x for x in sorted(trove.iterTroveList(strongRefs=True))]
+        if asTuple and hasattr(self, 'getTroveReferences'):
+            assert(not withFiles)
+            seen = set()
+            all = [ topTrove.getNameVersionFlavor(), None ]
+            seen.add(topTrove.getNameVersionFlavor())
+            while True:
+                getList = []
+                _collect(getList, all)
+                if not getList:
+                    break
+
+                refs = self.getTroveReferences([ x[0] for x in getList],
+                                               justPresent = True)
+
+                for item, refList in itertools.izip(getList, refs):
+                    item[1] = []
+                    for x in refList:
+                        if x not in seen:
+                            seen.add(x)
+                            item[1].append([x, None])
+
+            stack = [ all ]
+            while stack:
+                next = stack.pop()
+                yield next[0]
+                stack += next[1]
+
+            return
+
+	yield topTrove
+	seen = { topTrove.getName() : [ (topTrove.getVersion(),
+				         topTrove.getFlavor()) ] }
+
+	troveList = [x for x in sorted(topTrove.iterTroveList(strongRefs=True))]
 
 	while troveList:
 	    (name, version, flavor) = troveList[0]
@@ -1910,14 +1953,19 @@ class JobSource(AbstractJobSource):
 
         newTroves = self.newTroveList.findTroves(None, newTroves, 
                                                  allowMissing=True)
-        oldTroves = self.oldTroveList.findTroves(None, oldTroves)
+        oldTroves = self.oldTroveList.findTroves(None, oldTroves,
+                                                 allowMissing=True)
 
         for (n, (oldVS, oldFS), (newVS, newFS), isAbs) in jobList:
             results = []
             if isAbs:
                 newTups = newTroves.get((n, newVS, newFS), None)
-                oldTups = oldTroves[n, None, None]
-                oldTups.append((n, None, None))
+                oldTups = oldTroves.get((n, None, None), None)
+                if oldTups is None:
+                    oldTups = []
+                    oldTroves[(n, None, None)] = oldTups
+
+                oldTups.append((n, None, deps.Flavor()))
             else:
                 oldTups = oldTroves[n, oldVS, oldFS]
 
@@ -2043,12 +2091,12 @@ class ChangeSetJobSource(JobSource):
                 fileList += [((x, None, None, None), self.OLD_F) for x in oldFiles]
 
 
-                if oldFiles or modFiles:
+                if oldVer and (newFiles or oldFiles or modFiles):
                     oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
                                                             withFiles=True)
 
                 if newFiles or modFiles:
-                    if trvCs:
+                    if oldVer:
                         newTrove = oldTrove.copy()
                         newTrove.applyChangeSet(trvCs)
                     else:

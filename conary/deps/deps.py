@@ -343,8 +343,7 @@ class Dependency(BaseDependency):
 
 class DependencyClass(object):
 
-    __slots__ = ( 'tag', 'members', 'depFormat', 'flagFormat', 
-                  'flags', 'allowParseDep')
+    __slots__ = ( 'members', )
 
     depFormat = 'WORD'
     flagFormat = 'WORD'
@@ -1075,6 +1074,14 @@ class DependencySet(object):
     def __repr__(self):
         return "ThawDep('%s')" % self.freeze()
 
+    def __getstate__(self):
+        # If this method returns a false value (like the empty string) then
+        # __setstate__ is not called, so we have to return something non-empty.
+        return (self.freeze(),)
+
+    def __setstate__(self, frozen):
+        self.thaw(frozen[0])
+
     def __init__(self, frz = None):
         if frz is not None:
             frz = intern(frz)
@@ -1085,6 +1092,7 @@ class DependencySet(object):
         self._hash = None
 
     thaw = __init__
+
 
 # A special class for representing Flavors
 class Flavor(DependencySet):

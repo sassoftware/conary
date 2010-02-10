@@ -1,8 +1,23 @@
+Changes in @NEW@:
+  o New Features:
+    * Added --diff option to verify and showchangeset commands to display
+      output as a git-formatted diff
+    * Added --new-files option to verify to include files which were added
+      to the system outside of conary package management. The
+      verifyDirsNoNewFiles configuration option was added to pare down the
+      tree conary looks through for new files.
+
+  o Internal Changes
+    * Optimized StreamCollection diff and __eq__ operations to use frozen
+      data if available
+    * Merged internals of localcs/verify implementation into new classes
+    * Flavor objects can now be used with the stdlib "pickle" module.
+
 Changes in 2.1.9:
   o Bug Fixes:
     * The NO_PROXY environment variable no longer applies to conary
       proxies. (CNY-3360)
-
+      
 Changes in 2.1.8:
   o Bug Fixes:
     * Added abort-on-error to conary rollback command which causes rollback
