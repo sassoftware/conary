@@ -315,7 +315,7 @@ class URLOpener(urllib.FancyURLopener):
         sslSock = socket.ssl(sock, None, None)
         return httplib.FakeSocket(sock, sslSock)
 
-    def proxyBypass(self, proxy, host):
+    def proxyBypass(self, proxy, host, useConaryProxy):
         if self.forceProxy:
             return False
         # Split the port and username/pass from proxy
@@ -327,6 +327,9 @@ class URLOpener(urllib.FancyURLopener):
         # localhost as well
         if destHost in self.localhosts and proxyHost not in self.localhosts:
             return True
+
+        if useConaryProxy:
+            return False
 
         # From python 2.6's urllib (lynx also seems to obey NO_PROXY)
         no_proxy = os.environ.get('no_proxy', '') or os.environ.get('NO_PROXY', '')
@@ -402,7 +405,7 @@ class URLOpener(urllib.FancyURLopener):
                     user_passwd, realhost = urllib.splituser(realhost)
                 if user_passwd:
                     selector = "%s://%s%s" % (urltype, realhost, rest)
-                if not useConaryProxy and self.proxyBypass(host, realhost):
+                if self.proxyBypass(host, realhost, useConaryProxy):
                     host = realhost
                     selector = rest
                 else:

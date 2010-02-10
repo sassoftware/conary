@@ -13,6 +13,10 @@ Changes in @NEW@:
     * Merged internals of localcs/verify implementation into new classes
     * Flavor objects can now be used with the stdlib "pickle" module.
 
+  o Bug Fixes:
+    * The NO_PROXY environment variable no longer applies to conary
+      proxies. (CNY-3360)
+
 Changes in 2.1.8:
   o Bug Fixes:
     * Added abort-on-error to conary rollback command which causes rollback
