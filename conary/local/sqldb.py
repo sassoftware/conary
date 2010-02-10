@@ -995,6 +995,8 @@ order by
                         DBTroveFiles.pathId = UserReplaced.pathId)
         """)
 
+        cu.execute("DROP TABLE UserReplaced")
+
     def checkPathConflicts(self, instanceIdList, replaceFiles, sharedFiles):
         cu = self.db.cursor()
         cu2 = self.db.cursor()

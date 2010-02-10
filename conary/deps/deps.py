@@ -343,8 +343,7 @@ class Dependency(BaseDependency):
 
 class DependencyClass(object):
 
-    __slots__ = ( 'tag', 'members', 'depFormat', 'flagFormat', 
-                  'flags', 'allowParseDep')
+    __slots__ = ( 'members', )
 
     depFormat = 'WORD'
     flagFormat = 'WORD'
@@ -1068,6 +1067,7 @@ class DependencySet(object):
             return self._members
         else:
             return misc.depSetFreeze(self.members);
+    __getstate__ = freeze
 
     def isEmpty(self):
         return not(self._members)
@@ -1085,6 +1085,7 @@ class DependencySet(object):
         self._hash = None
 
     thaw = __init__
+    __setstate__ = __init__
 
 # A special class for representing Flavors
 class Flavor(DependencySet):

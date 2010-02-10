@@ -11,17 +11,25 @@ Changes in @NEW@:
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
     * Merged internals of localcs/verify implementation into new classes
+    * Flavor objects can now be used with the stdlib "pickle" module.
 
-Changes in @NEW@:
+Changes in 2.1.8:
   o Bug Fixes:
+    * Added abort-on-error to conary rollback command which causes rollback
+      be aborted if any pre scripts fail. (CNY-3327)
     * Fixed bug introduced in Conary 2.1.0 which caused conary to ignore
       ownership differences for executable files. (CNY-3354)
     * When SetModes() is called twice, honor the last invocation with
       regard to setuid and setgid, including if neither setuid nor
       setgid is set.  Also, make it possible to override setuid and
       setgid bits in a derived package. (CNY-3344)
+    * Fixed a bug in Conary 2.1.0 which caused updates to fail
+      because a temporary table persisted across jobs. (CNY-3339)
+    * Changed default behavior of imageGroup flag in group recipes so that
+      checkOnlyByDefaultDeps is now set to True (CNY-3356)
 
 Changes in 2.1.7:
+  o New Features:
     * Conary now allows configuration files that appear to be encoded
       in Windows Code Page 1252 if they do not have other specific
       characteristics of binary files. (CNY-3353)
