@@ -514,7 +514,9 @@ def _updateTroves(cfg, applyList, **kwargs):
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
     migrate = kwargs.get('migrate', False)
-    forceMigrate = kwargs.pop('forceMigrate', False)
+    # even though we no longer differentiate forceMigrate, we still
+    # remove it from kwargs to avoid confusing prepareUpdateJob
+    kwargs.pop('forceMigrate', False)
     restartInfo = kwargs.get('restartInfo', None)
 
     # Initialize the critical update set
@@ -532,13 +534,6 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if not info:
         client.checkWriteableRoot()
-
-    if migrate and not info and not cfg.interactive and not forceMigrate:
-        print ('Migrate must be run with --interactive'
-               ' because it now has the potential to damage your'
-               ' system irreparably if used incorrectly.')
-        client.close()
-        return
 
     updJob = client.newUpdateJob()
 
@@ -604,12 +599,10 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if askInteractive:
         if migrate:
-            values = 'migrate', '[y/N]'
-            default = False
+            style = 'migrate'
         else:
-            values = 'update', '[Y/n]'
-            default = True
-        okay = cmdline.askYn('continue with %s? %s' % values, default=default)
+            style = 'update'
+        okay = cmdline.askYn('continue with %s? [Y/n]' % style, default=True)
         if not okay:
             updJob.close()
             client.close()

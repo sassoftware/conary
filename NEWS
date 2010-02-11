@@ -1,5 +1,7 @@
 Changes in @NEW@:
   o New Features:
+    * The "conary migrate" command no longer requires interactive
+      mode, and now defaults to yes rather than no. (CNY-3361)
     * Added --diff option to verify and showchangeset commands to display
       output as a git-formatted diff
     * Added --new-files option to verify to include files which were added
