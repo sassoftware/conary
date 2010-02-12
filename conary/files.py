@@ -41,12 +41,14 @@ _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
-# files which are payload -- not directly represented. config files cannot
-# be payload,
-_FILE_FLAG_PAYLOAD = 1 << 7
+# files whose contents are part of a capsule
+_FILE_FLAG_ENCAPSULATED_CONTENT = 1 << 7
 # files which are allowed to be missing -- right now this flag may be
 # set but it is not used outside of builds
 _FILE_FLAG_MISSINGOKAY = 1 << 8
+# files which are in a package but not in the capsule associated with the
+# package; they were added via a derivation 
+_FILE_FLAG_CAPSULE_ADDITION = 1 << 10
 
 FILE_STREAM_CONTENTS        = 1
 FILE_STREAM_DEVICE	    = 2
@@ -212,8 +214,10 @@ class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
 	result = self._isFlag(_FILE_FLAG_CONFIG, set)
-        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
-               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+        assert((self() & (_FILE_FLAG_ENCAPSULATED_CONTENT |
+                          _FILE_FLAG_CONFIG))
+               !=
+               (_FILE_FLAG_ENCAPSULATED_CONTENT | _FILE_FLAG_CONFIG))
 
         return result
 
@@ -235,11 +239,16 @@ class FlagsStream(streams.IntStream):
     def isMissingOkay(self, set = None):
         return self._isFlag(_FILE_FLAG_MISSINGOKAY, set)
 
-    def isPayload(self, set = None):
-        result = self._isFlag(_FILE_FLAG_PAYLOAD, set)
-        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
-               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+    def isEncapsulatedContent(self, set = None):
+        result = self._isFlag(_FILE_FLAG_ENCAPSULATED_CONTENT, set)
+        assert((self() & (_FILE_FLAG_ENCAPSULATED_CONTENT |
+                          _FILE_FLAG_CONFIG))
+               !=
+               (_FILE_FLAG_ENCAPSULATED_CONTENT | _FILE_FLAG_CONFIG))
         return result
+
+    def isCapsuleAddition(self, set = None):
+        return self._isFlag(_FILE_FLAG_CAPSULE_ADDITION, set)
 
     def _isFlag(self, flag, set):
 	if set != None:
