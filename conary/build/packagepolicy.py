@@ -2959,10 +2959,16 @@ class Provides(_dependency):
             # Extract this file's requires
             reqs.update(m.contents['requires'])
             # Remove the ones that are satisfied internally
+            # First, compute the list of all internal provides
+            internalProvides = set()
+            for opath, ofiles in internalJavaDepMap.items():
+                internalProvides.update(x[0] for x in ofiles.values()
+                    if x[0] is not None)
+            reqs.difference_update(internalProvides)
+            # Now drop these internal provides from individual class requires
             for opath, ofiles in internalJavaDepMap.items():
                 for oclassName, (oclassProv, oclassReqSet) in ofiles.items():
-                    if oclassProv is not None:
-                        reqs.discard(oclassProv)
+                    oclassReqSet.difference_update(internalProvides)
 
         # For now, we are only trimming the provides (and requires) for
         # classes for which the requires are not satisfied, neither internally
@@ -2971,6 +2977,8 @@ class Provides(_dependency):
         # the removal transitively (class A requires class B which doesn't
         # have its deps satisfied should make class A unusable). This can come
         # at a later time
+        # CNY-3362: we don't drop provides for classes which had requires on
+        # classes that had their dependencies pruned. (at least not yet)
 
         if reqs:
             # Try to resolve these deps against the Conary database

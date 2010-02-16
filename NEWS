@@ -15,6 +15,11 @@ Changes in @NEW@:
     * Merged internals of localcs/verify implementation into new classes
     * Flavor objects can now be used with the stdlib "pickle" module.
 
+  o Bug Fixes:
+    * Java requirements for classes depending on other classes for which
+     provides have been dropped no longer propagate as trove or file
+     requirements. (CNY-3362)
+
 Changes in 2.1.9:
   o Bug Fixes:
     * The NO_PROXY environment variable no longer applies to conary
