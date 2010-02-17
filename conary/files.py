@@ -41,7 +41,7 @@ _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
-# files whose contents are part of a capsule
+# files whose contents are part of a capsule; only set for files w/ contents
 _FILE_FLAG_ENCAPSULATED_CONTENT = 1 << 7
 # files which are allowed to be missing -- right now this flag may be
 # set but it is not used outside of builds
@@ -49,6 +49,10 @@ _FILE_FLAG_MISSINGOKAY = 1 << 8
 # files which are in a package but not in the capsule associated with the
 # package; they were added via a derivation 
 _FILE_FLAG_CAPSULE_ADDITION = 1 << 10
+# files are part of the capsule, but have conary-style contents which should
+# override the capsule. config implies this behavior even though it may not be
+# set explicitly
+_FILE_FLAG_CAPSULE_OVERRIDE = 1 << 10
 
 FILE_STREAM_CONTENTS        = 1
 FILE_STREAM_DEVICE	    = 2
@@ -249,6 +253,9 @@ class FlagsStream(streams.IntStream):
 
     def isCapsuleAddition(self, set = None):
         return self._isFlag(_FILE_FLAG_CAPSULE_ADDITION, set)
+
+    def isCapsuleOverride(self, set = None):
+        return self._isFlag(_FILE_FLAG_CAPSULE_OVERRIDE, set)
 
     def _isFlag(self, flag, set):
 	if set != None:

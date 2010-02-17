@@ -546,6 +546,7 @@ class ChangeSet(streams.StreamSet):
             if newTroveInfo is None:
                 newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
                 newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
+            newTroveInfo.capsule.reset()
             newTroveInfoDiff = trv.getTroveInfo().diff(newTroveInfo)
 
 	    # this is a modified trove and needs to be inverted
@@ -562,7 +563,7 @@ class ChangeSet(streams.StreamSet):
 
             invertedTrove.setRequires(trv.getRequires())
             invertedTrove.setProvides(trv.getProvides())
-            invertedTrove.setTroveInfo(trv.troveInfo)
+            invertedTrove.setTroveInfo(newTroveInfo)
 
             for weak in (True, False):
                 for (name, list) in troveCs.iterChangedTroves(
@@ -590,9 +591,12 @@ class ChangeSet(streams.StreamSet):
                     continue
                 
 		(path, origFileId, version) = trv.getFile(pathId)
-		invertedTrove.newFile(pathId, path, origFileId, version)
 
 		origFile = db.getFileVersion(pathId, origFileId, version)
+                origFile.flags.isEncapsulatedContent(set = False)
+                origFileId = origFile.fileId()
+
+		invertedTrove.newFile(pathId, path, origFileId, version)
 		rollback.addFile(None, origFileId, origFile.freeze())
 
 		if not origFile.hasContents:
