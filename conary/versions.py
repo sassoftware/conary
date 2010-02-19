@@ -1382,6 +1382,8 @@ def _parseVersionString(ver, frozen):
 def ThawVersion(ver):
     if ver == "@NEW@":
 	return NewVersion()
+    elif isinstance(ver, unicode):
+        ver = ver.encode('ascii')
 
     v = thawedVersionCache.get(ver, None)
     if v is not None:
@@ -1396,6 +1398,8 @@ def ThawVersion(ver):
 def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     if ver == "@NEW@":
 	return NewVersion()
+    elif isinstance(ver, unicode):
+        ver = ver.encode('ascii')
 
     if timeStamps:
         # timeStamped VFSs are not allowed in the cache
