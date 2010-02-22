@@ -328,7 +328,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
                                         if x[1].endswith('.recipe') ]:
             log.error("recipe not in CONARY state file, please run cvc add")
             return
-
+ 
     allPaths = [ x[1] for x in state.iterFileList() ]
 
     try:
@@ -379,7 +379,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
             log.error(str(msg))
             sys.exit(1)
 
-        recipeObj.populateLcache()
         recipeObj.sourceVersion = state.getVersion()
         recipeObj.loadPolicy()
         level = log.getVerbosity()
@@ -389,9 +388,11 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
                 cook._callSetup(cfg, recipeObj, recordCalls=False)
             else:
                 log.error('you need a setup method for your recipe')
+        # setup must be called before lcache is populated
+        recipeObj.populateLcache()
 
         # os.path.basenames stripts the protocol off a url as well
-        sourceFiles = [ os.path.basename(x.getPath()) for x in 
+        sourceFiles = [ os.path.basename(x.getPath()) for x in
                                 recipeObj.getSourcePathList() ]
         # sourceFiles is a list of everything which ought to be autosourced.
         # those are either the same as in the previous trove, new (in which
@@ -2186,7 +2187,6 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     except builderrors.RecipeFileError, msg:
         raise errors.CvcError(msg)
 
-    recipeObj.populateLcache()
     recipeObj.sourceVersion = state.getVersion()
     recipeObj.loadPolicy()
     level = log.getVerbosity()
@@ -2196,6 +2196,9 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
             cook._callSetup(cfg, recipeObj, recordCalls=False)
         else:
             raise errors.CvcError('Recipe requires setup() method')
+
+    # setup must be called before lcache is populated
+    recipeObj.populateLcache()
 
     # Get rid of the negative cache entries (CNY-3157)
     lcache.clearCacheDir(recipeObj.name, negative = True)

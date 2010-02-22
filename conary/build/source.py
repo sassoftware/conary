@@ -254,7 +254,6 @@ class _Source(_AnySource):
         self.archivePath = 'rpm://%s' % os.path.dirname(sourcename)
 
     def _guessName(self):
-
         self.guessname = None
         self.suffixes = None
         if self.sourcename.endswith('/'):

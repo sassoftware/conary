@@ -21,8 +21,10 @@ import errno
 import os
 import socket
 import time
+import urllib
 import urllib2
-import urlparse
+import re
+import copy
 
 from conary.lib import log
 from conary.lib import sha1helper
@@ -32,7 +34,99 @@ from conary.build.mirror import Mirror
 from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
 
 
-NETWORK_PREFIXES = ('http', 'https', 'ftp', 'mirror')
+NETWORK_SCHEMES = ('http', 'https', 'ftp', 'mirror')
+
+NEGATIVE_CACHE_TTL = 60*60 # The TTL for negative cache entries (seconds)
+
+class laUrl(object):
+    def __init__(self, urlString, parent=None, extension=None):
+        urlString = urllib.unquote(urlString)
+
+        # unfortunately urllib doesn't support unknown schemes so we have them
+        # parsed as http
+        for x in ('mirror','multiurl','lookaside'):
+            x += '://'
+            if urlString.startswith(x):
+                savedScheme = x
+                urlString = urlString.replace(x,'http://',1)
+                break
+        else:
+            savedScheme = None
+
+        (self.scheme, self.user, self.passwd, self.host, self.port,
+         self.path, self.params, self.fragment ) = util.urlSplit(urlString)
+
+        if savedScheme:
+            self.scheme = savedScheme[:-3]
+
+        self.parent=parent
+        assert self.parent is not self
+        self.extension=extension
+
+    def asStr(self,noAuth=False,quoted=False):
+        if self.parent:
+            suffix = self.parent._getCumulativePath()
+            path = os.path.normpath(os.sep.join((self.path, suffix)))
+        else:
+            path = self.path
+
+        if self.extension:
+            path += '.' + self.extension
+
+        if quoted:
+            path = urllib.quote(path)
+
+        if noAuth:
+            return util.urlUnsplit( (self.scheme, None, None,
+                                     self.host, self.port, path,
+                                     self.params, self.fragment) )
+        return util.urlUnsplit( (self.scheme, self.user, self.passwd,
+                                 self.host, self.port, path,
+                                 self.params, self.fragment) )
+    def __str__(self):
+        return self.asStr()
+
+    def filePath(self,useParentPath=True):
+        suffix = None
+        if self.parent and useParentPath:
+            suffix = self.parent._getCumulativePath()
+        if suffix:
+            path = os.path.normpath(os.sep.join((self.path, suffix)))
+        else:
+            path = self.path
+        if self.extension:
+            path += '.' + self.extension
+
+        if path[0] == '/':
+            return os.path.join('/',self.host,path[1:])
+        elif self.host:
+            return os.path.join('/',self.host,path)
+
+        return path
+
+    def explicit(self):
+        return self.scheme not in [ 'mirror', 'multiurl']
+
+    def _getCumulativePath(self):
+        ppath=None
+        if self.parent:
+            ppath = self.parent._getCumulativePath()
+
+        if self.path:
+            if ppath:
+                return os.path.normpath(os.sep.join((self.path,ppath)))
+            else:
+                return self.path
+        return ppath
+
+def checkRefreshFilter( refreshFilter, url):
+    if not refreshFilter:
+        return False
+    if refreshFilter( str(url) ):
+        return True
+    if refreshFilter( os.path.basename(url.path) ):
+        return True
+    return False
 
 # some recipes reach into Conary internals here, and have references
 # to searchAll
@@ -80,9 +174,11 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
     ff = FileFinder(recipeName=location, repositoryCache=repCache,
                     cfg=cfg)
     try:
-        return ff.searchNetworkSources(name, name, headers=httpHeaders)
+        url = laUrl(name)
+        return ff.searchNetworkSources(url, headers=httpHeaders)
     except PathFound, pathInfo:
         return pathInfo.path
+
 
 class FileFinder(object):
 
@@ -103,13 +199,13 @@ class FileFinder(object):
         self.multiurlMap = multiurlMap
         self.mirrorDirs = mirrorDirs
 
-    def fetch(self, uri, suffixes=None, archivePath=None, headers=None,
+    def fetch(self, urlStr, suffixes=None, archivePath=None, headers=None,
               allowNone=False, searchMethod=0, # SEARCH_ALL
               refreshFilter=None):
-        uriList = self._getPathsToSearch(uri, suffixes)
-        for newUri in uriList:
+        urlList = self._getPathsToSearch(urlStr, suffixes)
+        for url in urlList:
             try:
-                self._fetch(newUri, uri,
+                self._fetch(url,
                             archivePath, headers=headers,
                             refreshFilter=refreshFilter,
                             searchMethod=searchMethod)
@@ -118,135 +214,113 @@ class FileFinder(object):
 
         # we didn't find any matching url.
         if not allowNone:
-            raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), uri)
+            raise OSError(errno.ENOENT, os.strerror(errno.ENOENT),
+                          urlStr)
         return None, None
 
-    def _fetch(self, uri, originalUri, archivePath, searchMethod, headers=None,
+    def _fetch(self, url, archivePath, searchMethod, headers=None,
                refreshFilter=None):
-        refresh = (refreshFilter and
-                   refreshFilter(os.path.basename(uri)))
+        refresh = checkRefreshFilter(refreshFilter,url)
         if searchMethod == self.SEARCH_LOCAL_ONLY:
-            self.searchFilesystem(uri)
+            self.searchFilesystem(url)
             return
         elif searchMethod == self.SEARCH_REPOSITORY_ONLY:
             if archivePath:
-                self.searchArchive(archivePath, uri)
+                self.searchArchive(archivePath, url)
             elif refresh:
-                self.searchNetworkSources(uri, originalUri, headers)
-            self.searchRepository(uri)
+                self.searchNetworkSources(url, headers)
+            self.searchRepository(url)
         else: #SEARCH_ALL
-            self.searchFilesystem(uri)
+            self.searchFilesystem(url)
             if archivePath:
-                self.searchArchive(archivePath, uri)
+                self.searchArchive(archivePath, url)
             elif refresh:
-                self.searchNetworkSources(uri, originalUri, headers)
-            self.searchRepository(uri)
-            self.searchLocalCache(uri)
-            self.searchNetworkSources(uri, originalUri, headers)
+                self.searchNetworkSources(url, headers)
+            self.searchRepository(url)
+            self.searchLocalCache(url)
+            self.searchNetworkSources(url,headers)
 
-    def searchRepository(self, uri):
-        if self.repCache.hasFileName(uri):
-            log.info('found %s in repository', uri)
-            path = self.repCache.cacheFile(self.recipeName, uri, uri)
-            raise PathFound(path, True)
-        basename = os.path.basename(uri)
-        if self.repCache.hasFileName(basename):
-            log.info('found %s in repository', basename)
-            path = self.repCache.cacheFile(self.recipeName, uri, basename)
+    def searchRepository(self, url):
+        if self.repCache.hasFilePath(url):
+            log.info('found %s in repository', url.asStr(noAuth=True) )
+            path = self.repCache.cacheFilePath(self.recipeName, url)
             raise PathFound(path, True)
 
-    def searchLocalCache(self,  uri):
+    def searchLocalCache(self,  url):
         # exact match first, then look for cached responses from other servers
-        path = self.repCache.getCacheEntry(self.recipeName, uri)
+        path = self.repCache.getCacheEntry(self.recipeName, url)
         if path: raise PathFound(path, False)
-        basename = os.path.basename(uri)
-        prefix = uri.split('://', 1)[0]
-        if prefix in NETWORK_PREFIXES or prefix == 'lookaside':
-            path = self.repCache.findInCache(self.recipeName, basename)
-            if path:
-                raise PathFound(path, False)
 
-    def searchFilesystem(self, uri):
-        if uri[0] == '/':
+    def searchFilesystem(self, url):
+        if url.filePath() == '/':
             return
-        path = util.searchFile(uri, self.localDirs)
+        path = util.searchFile(url.filePath(), self.localDirs)
+
         if path:
             raise PathFound(path, False)
 
-    def searchArchive(self, archiveName, path):
-        path =  self.repCache.getArchiveCacheEntry(archiveName, path)
+    def searchArchive(self, archiveName, url):
+        path =  self.repCache.getArchiveCacheEntry(archiveName, url)
         if path:
             raise PathFound(path, True)
 
-    def searchNetworkSources(self, uri, originalUri, headers):
-        prefix = uri.split('://', 1)[0]
-        if prefix not in NETWORK_PREFIXES:
-            return
-        # Save users from themselves - encode some characters automatically
-        uri = uri.replace(' ', '%20')
-        # check for negative cache entries to avoid spamming servers
-        negativePath =  self.repCache.checkNegativeCache(self.recipeName, uri)
-        if negativePath:
-            log.warning('not fetching %s (negative cache entry %s exists)',
-                        uri, negativePath)
+    def searchNetworkSources(self, url, headers):
+        if url.scheme not in NETWORK_SCHEMES:
             return
 
-        log.info('Trying %s...', uri)
-        explicit = (uri == originalUri)
+        # check for negative cache entries to avoid spamming servers
+        negativePath =  self.repCache.checkNegativeCache(self.recipeName, url)
+        if negativePath:
+            log.warning('not fetching %s (negative cache entry %s exists)',
+                        url, negativePath)
+            return
+
+        log.info('Trying %s...', str(url))
         if headers is None:
             headers = {}
-        inFile = self._fetchUrl(uri, headers, explicit=explicit)
+
+        inFile = self._fetchUrl(url, headers)
         if inFile is None:
-            self.repCache.createNegativeCacheEntry(self.recipeName, uri)
+            self.repCache.createNegativeCacheEntry(self.recipeName, url)
         else:
             contentLength = int(inFile.headers.get('Content-Length', 0))
-            path = self.repCache.addFileToCache(self.recipeName, uri,
+            path = self.repCache.addFileToCache(self.recipeName, url,
                                                 inFile, contentLength)
             if path:
                 raise PathFound(path, False)
         return
 
-    def _getPathsToSearch(self, uri, suffixes):
-        if '://' in uri:
-            prefix, path = uri.split('://', 1)
-        else:
-            prefix = None
-            path = uri
+    def _getPathsToSearch(self, urlStr, suffixes):
+        url = laUrl(urlStr)
 
-        if prefix == 'multiurl':
-            host, path = path.split('/', 1)
-            pathList = self.multiurlMap[host]
-            pathList = [ "%s/%s" % (x, path) for x in pathList ]
+        if url.scheme == 'multiurl':
+            multiKey = os.path.dirname(url.filePath())[1:]
+            urlObjList = [ laUrl(x,parent=url)
+                           for x in self.multiurlMap[multiKey] ]
         else:
-            pathList = [uri]
+            urlObjList = [url]
 
-        newPathList = []
-        for uri in pathList:
-            if '://' in uri:
-                prefix, path = uri.split('://', 1)
+        newUrlObjList = []
+        for ou in urlObjList:
+            if ou.scheme == 'mirror':
+                for u in Mirror(self.mirrorDirs, ou.host):
+                    mu = laUrl(u,parent=ou)
+                    newUrlObjList.append(mu)
             else:
-                prefix = None
-                path = None
-            if prefix == 'mirror':
-                mirrorType, path = path.split('/', 1)
-                for mirrorUrl in Mirror(self.mirrorDirs, mirrorType):
-                    newPathList.append('%s/%s' % (mirrorUrl, path))
-            else:
-                newPathList.append(uri)
-        pathList = newPathList
+                newUrlObjList.append(ou)
+        urlObjList = newUrlObjList
 
         if suffixes is not None:
-            newPathList = []
-            for path in pathList:
+            newUrlObjList = []
+            for url in urlObjList:
                 for suffix in suffixes:
-                    newPathList.append(path + '.' + suffix)
-            pathList = newPathList
+                    newurl = copy.copy(url)
+                    newurl.extension=suffix
+                    newUrlObjList.append(newurl)
+            urlObjList = newUrlObjList
+        return urlObjList
 
-        return pathList
-
-
-
-    def _fetchUrl(self, uri, headers, explicit=True):
+    def _fetchUrl(self, url, headers):
         retries = 0
         inFile = None
         while retries < 5:
@@ -260,39 +334,26 @@ class FileFinder(object):
                 # FIXME: should digest auth be handled too?
                 opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj),
                                               urllib2.HTTPBasicAuthHandler(pwm))
-                split = list(urlparse.urlsplit(uri))
-                protocol = split[0]
-                if protocol != 'ftp':
-                    server = split[1]
-                    if '@' in server:
-                        # username, and possibly password, were given
-                        login, server = server.split('@')
-                        # get rid of the username/password part of the server
-                        split[1] = server
-                        if ':' in login:
-                            # password was given
-                            user, passwd = login.split(':')
-                        else:
-                            # we don't have the ability to prompt.  Assume
-                            # a blank password
-                            user = login
-                            passwd = ''
-                        pwm.add_password(user, passwd)
-                name = urlparse.urlunsplit(split)
-                req = urllib2.Request(name, headers=headers)
+                if url.passwd:
+                    pwm.add_password(url.user, url.passwd)
+                elif url.user:
+                    pwm.add_password(url.user, '')
+                urlStr = url.asStr(noAuth=True,quoted=True)
+
+                req = urllib2.Request(urlStr, headers=headers)
                 inFile = opener.open(req)
-                if not name.startswith('ftp://'):
+                if not urlStr.startswith('ftp://'):
                     content_type = inFile.info()['content-type']
-                    if not explicit and 'text/html' in content_type:
-                        raise urllib2.URLError('"%s" not found' % name)
-                log.info('Downloading %s...', name)
+                    if not url.explicit() and 'text/html' in content_type:
+                        raise urllib2.URLError('"%s" not found' % urlStr)
+                log.info('Downloading %s...', urlStr)
                 break
             except urllib2.HTTPError, msg:
                 if msg.code == 404:
                     return None
                 else:
                     log.error('error downloading %s: %s',
-                              name, str(msg))
+                              urlStr, str(msg))
                     return None
             except urllib2.URLError:
                 return None
@@ -301,7 +362,7 @@ class FileFinder(object):
                 if num == errno.ECONNRESET:
                     log.info('Connection Reset by FTP server'
                              'while retrieving %s.'
-                             '  Retrying in 10 seconds.', name, msg)
+                             '  Retrying in 10 seconds.', urlStr, msg)
                     time.sleep(10)
                     retries += 1
                 else:
@@ -315,7 +376,7 @@ class FileFinder(object):
                 response = msg.args[1].args[0]
                 if isinstance(response, str) and response.startswith('421'):
                     log.info('FTP server busy when retrieving %s.'
-                             '  Retrying in 10 seconds.', name)
+                             '  Retrying in 10 seconds.', urlStr)
                     time.sleep(10)
                     retries += 1
                 else:
@@ -367,32 +428,32 @@ class RepositoryCache(object):
 	self.nameMap[path] = (troveName, troveVersion, pathId, path, fileId,
                               fileVersion, sha1, mode)
 
-    def hasFileName(self, fileName):
+    def hasFilePath(self, url):
         if self.refreshFilter:
-            if self.refreshFilter(fileName):
+            if checkRefreshFilter(self.refreshFilter,url):
                 return False
-	return fileName in self.nameMap
+        return url.filePath() in self.nameMap
 
-    def cacheFile(self, prefix, fileName, basename):
-	cachePath = self.getCachePath(prefix, fileName)
+    def cacheFilePath(self, cachePrefix, url):
+	cachePath = self.getCachePath(cachePrefix, url)
         util.mkdirChain(os.path.dirname(cachePath))
 
-        if basename in self.cacheMap:
+        if url.filePath() in self.cacheMap:
             # don't check sha1 twice
-            return self.cacheMap[basename]
+            return self.cacheMap[url.filePath()]
 	(troveName, troveVersion, pathId, troveFile, fileId,
-                    troveFileVersion, sha1, mode) = self.nameMap[basename]
+         troveFileVersion, sha1, mode) = self.nameMap[url.filePath()]
         sha1Cached = None
         cachedMode = None
 	if os.path.exists(cachePath):
             sha1Cached = sha1helper.sha1FileBin(cachePath)
         if sha1Cached != sha1:
             if sha1Cached:
-                log.info('%s sha1 %s != %s; fetching new...', basename,
+                log.info('%s sha1 %s != %s; fetching new...', url.filePath(),
                           sha1helper.sha1ToString(sha1),
                           sha1helper.sha1ToString(sha1Cached))
             else:
-                log.info('%s not yet cached, fetching...', fileName)
+                log.info('%s not yet cached, fetching...', url.filePath())
 
             if self.quiet:
                 csCallback = None
@@ -409,14 +470,14 @@ class RepositoryCache(object):
         cachedMode = os.stat(cachePath).st_mode & 0777
         if mode != cachedMode:
             os.chmod(cachePath, mode)
-        self.cacheMap[basename] = cachePath
+        self.cacheMap[url.filePath()] = cachePath
 	return cachePath
 
-    def addFileToCache(self, prefix, name, infile, contentLength):
+    def addFileToCache(self, cachePrefix, url, infile, contentLength):
         # cache needs to be hierarchical to avoid collisions, thus we
-        # use prefix so that files with the same name and different
+        # use cachePrefix so that files with the same name and different
         # contents in different packages do not collide
-        cachedname = self.getCachePath(prefix, name)
+        cachedname = self.getCachePath(cachePrefix, url)
         util.mkdirChain(os.path.dirname(cachedname))
         f = open(cachedname, "w+")
 
@@ -441,10 +502,10 @@ class RepositoryCache(object):
             raise
 
         # work around FTP bug (msw had a better way?)
-        if name.startswith("ftp://"):
+        if url.scheme == 'ftp':
             if os.stat(cachedname).st_size == 0:
                 os.unlink(cachedname)
-                self.createNegativeCacheEntry(prefix, name[5:])
+                self.createNegativeCacheEntry(cachePrefix, url)
                 return None
 
         return cachedname
@@ -452,56 +513,49 @@ class RepositoryCache(object):
     def setRefreshFilter(self, refreshFilter):
         self.refreshFilter = refreshFilter
 
-    def getCacheDir(self, prefix, negative=False):
+    def getCacheDir(self, cachePrefix, negative=False):
         if negative:
-            prefix = 'NEGATIVE' + os.sep + prefix
+            cachePrefix = 'NEGATIVE' + os.sep + cachePrefix
+        return os.sep.join((self.basePath, cachePrefix))
 
-        return os.sep.join((self.basePath, prefix))
+    def getCachePath(self, cachePrefix, url, negative=False):
+        if isinstance(url,str):
+            url=laUrl(url)
+        cacheDir = self.getCacheDir(cachePrefix, negative=negative)
+        cachePath = os.sep.join((cacheDir, url.filePath(not negative)))
+        return os.path.normpath(cachePath)
 
-    def getCachePath(self, prefix, name, negative=False):
-        name = self._truncateName(name)
-        cacheDir = self.getCacheDir(prefix, negative=negative)
-        path = os.sep.join((cacheDir, name))
-        return os.path.normpath(path)
-
-    def clearCacheDir(self, prefix, negative=False):
-        negativeCachePath = self.getCacheDir(prefix, negative = negative)
+    def clearCacheDir(self, cachePrefix, negative=False):
+        negativeCachePath = self.getCacheDir(cachePrefix, negative = negative)
         util.rmtree(os.path.dirname(negativeCachePath), ignore_errors = True)
 
-    def createNegativeCacheEntry(self, prefix, name):
-        path = self.getCachePath(prefix, name, negative=True)
-        util.mkdirChain(os.path.dirname(path))
-        open(path, 'w+')
+    def createNegativeCacheEntry(self, cachePrefix, url):
+        if isinstance(url,str):
+            url=laUrl(url)
+        cachePath = self.getCachePath(cachePrefix, url, negative=True)
+        util.mkdirChain(os.path.dirname(cachePath))
+        open(cachePath, 'w+')
 
-    def findInCache(self, prefix, basename):
+    def findInCache(self, cachePrefix, basename):
         return util.searchPath(basename,
-                               os.path.join(self.basePath, prefix))
+                               os.path.join(self.basePath, cachePrefix))
 
-    def getCacheEntry(self, prefix, path):
-        path = self.getCachePath(prefix, path)
-        if os.path.exists(path):
-            return path
+    def getCacheEntry(self, cachePrefix, url):
+        cachePath = self.getCachePath(cachePrefix, url)
+        if os.path.exists(cachePath):
+            return cachePath
 
-    def checkNegativeCache(self, prefix, name):
-        path = self.getCachePath(prefix, name, negative=True)
-        if os.path.exists(path):
-            # Keep negative cache for 1h
-            if time.time() < (60*60 + os.path.getmtime(path)):
-                return path
+    def checkNegativeCache(self, cachePrefix, url):
+        cachePath = self.getCachePath(cachePrefix, url, negative=True)
+        if os.path.exists(cachePath):
+            if time.time() < (NEGATIVE_CACHE_TTL
+                              + os.path.getmtime(cachePath)):
+                return cachePath
             else:
-                os.remove(path)
+                os.remove(cachePath)
         return False
 
-    def _truncateName(self, uri):
-        items = uri.split('://', 1)
-        if len(items) == 1:
-            return uri
-        prefix, path = items
-        if prefix in NETWORK_PREFIXES or prefix == 'lookaside':
-            return path
-        return uri
-
-    def getArchiveCachePath(self, archiveName, path=''):
+    def getArchiveCachePath(self, archiveName, url=''):
         # CNY-2627 introduced a separate lookaside stack for archive contents
         # this dir tree is parallel to NEGATIVE and trovenames.
         # the name =X_CONTENTS= was chosen because = is an illegal character
@@ -509,13 +563,14 @@ class RepositoryCache(object):
         archiveType, trailingPath = archiveName.split('://', 1)
         contentsPrefix = "=%s_CONTENTS=" % archiveType.upper()
         return self.getCachePath(contentsPrefix,
-                                 os.path.join(trailingPath, path))
+                                 os.path.join(trailingPath, url.filePath()))
 
 
-    def getArchiveCacheEntry(self, archiveName, path):
-        fullPath = self.getArchiveCachePath(archiveName, path)
+    def getArchiveCacheEntry(self, archiveName, url):
+        fullPath = self.getArchiveCachePath(archiveName, url)
         if os.path.exists(fullPath):
             return fullPath
+
 
 class PathFound(Exception):
     def __init__(self, path, isFromRepos):
