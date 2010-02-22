@@ -401,6 +401,18 @@ class Recipe(object):
 
         # populate the repository source lookaside cache from the :source
         # components
+        actions = self.getSourcePathList()
+        sourcePaths = {}
+        for a in actions:
+            ps = a.getPathAndSuffix()
+            if ps[0].find('://') != -1: # we have an autosourced file
+                # use guess name if it is provided
+                k = os.path.basename(ps[0]) or ps[1]
+                assert k
+                sourcePaths[ k ] = ps
+            else:
+                sourcePaths[ ps[0] ] = ps
+
         for rclass in classes:
             if not rclass._trove:
                 continue
@@ -425,8 +437,24 @@ class Recipe(object):
                 if isinstance(fileObj, files.RegularFile):
                     # it only makes sense to fetch regular files, skip
                     # anything that isn't
+                    fullPath =''
+                    if path in sourcePaths:
+                        fullPath = lookaside.laUrl(
+                            sourcePaths[path][0]).filePath()
+                    elif path.find("/") == -1: # we might have a guessed name
+                        for k in sourcePaths:
+                            if k and path.startswith(k) and sourcePaths[k][2]:
+                                for sk in sourcePaths[k][2]:
+                                    if path.endswith(sk) and \
+                                            len(k) + len(sk) == len(path)-1:
+                                        fullUrl = sourcePaths[k][0]+k+'.'+sk
+                                        fullPath = \
+                                            lookaside.laUrl(fullUrl).filePath()
+                    if not fullPath:
+                        fullPath = path
+
                     self.laReposCache.addFileHash(srcName, srcVersion, pathId,
-                        path, fileId, version, fileObj.contents.sha1(),
+                        fullPath, fileId, version, fileObj.contents.sha1(),
                         fileObj.inode.perms())
 
     def sourceMap(self, path):

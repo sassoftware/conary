@@ -93,20 +93,11 @@ def mkdirChain(*paths):
         if not os.path.exists(path):
             _mkdirs(path)
 
-
-def _searchVisit(arg, dirname, names):
-    file = arg[0]
-    path = arg[1]
-    testname = '%s%s%s' %(dirname, os.sep, file)
-    if file in names:
-	path[0] = testname
-	del names
-
-def searchPath(file, basepath):
-    path = [ None ]
-    # XXX replace with os.walk in python 2.3, to cut short properly
-    os.path.walk(basepath, _searchVisit, (file, path))
-    return path[0]
+def searchPath(filename, basepath):
+    path = os.path.join(basepath,filename)
+    for root, dirs, files in os.walk(basepath):
+        if filename in files:
+            return os.path.join(root,filename)
 
 def searchFile(file, searchdirs, error=None):
     for dir in searchdirs:
@@ -516,7 +507,7 @@ def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
 	log.debug('deleting [tree] %s', path)
 	# act more like rm -rf -- allow files, too
-	if (os.path.islink(path) or 
+	if (os.path.islink(path) or
                 (os.path.exists(path) and not os.path.isdir(path))):
 	    os.remove(path)
 	else:
@@ -1697,7 +1688,8 @@ def urlSplit(url, defaultPort = None):
     host, port = urllib.splitnport(hostport, None)
     if userpass:
         user, passwd = urllib.splitpasswd(userpass)
-        passwd = ProtectedString(passwd)
+        if passwd:
+            passwd = ProtectedString(passwd)
     else:
         user, passwd = None, None
     return scheme, user, passwd, host, port, path, \
@@ -1708,8 +1700,11 @@ def urlUnsplit(urlTuple):
     """
     scheme, user, passwd, host, port, path, query, fragment = urlTuple
     userpass = None
-    if user and passwd:
-        userpass = "%s:${passwd}" % (urllib.quote(user))
+    if user:
+        if passwd:
+            userpass = "%s:${passwd}" % (urllib.quote(user))
+        else:
+            userpass = urllib.quote(user)
     hostport = host
     if port:
         hostport = urllib.quote("%s:%s" % (host, port), safe = ':')

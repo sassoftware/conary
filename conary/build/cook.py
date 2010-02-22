@@ -717,7 +717,6 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                                 buildFlavor, lcache, srcdirs, macros)
-        recipeObj.populateLcache()
         recipeObj.checkBuildRequirements(cfg, sourceVersion,
                                          raiseError=not ignoreDeps)
 
@@ -727,6 +726,9 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
         _callSetup(cfg, recipeObj)
+        # setup must be called before lcache is populated
+        recipeObj.populateLcache()
+
         use.track(False)
         log.info('Building %s=%s[%s]' % ( recipeClass.name,
                                       sourceVersion.branch().label(),
@@ -1087,7 +1089,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
         os.environ[k] = v % recipeObj.macros
 
     recipeObj.setRepos(repos)
-    recipeObj.populateLcache()
     recipeObj.isatty(sys.stdout.isatty() and sys.stdin.isatty())
     recipeObj.sourceVersion = sourceVersion
     
@@ -1098,6 +1099,8 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
     policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
     _callSetup(cfg, recipeObj)
+    # setup must be called before lcache is populated
+    recipeObj.populateLcache()
 
     log.info('Building %s=%s[%s]' % ( recipeClass.name,
                                       sourceVersion.branch().label(),
