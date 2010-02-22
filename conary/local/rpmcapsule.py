@@ -14,7 +14,7 @@
 
 import itertools, rpm, os, pwd, stat, tempfile
 
-from conary import files
+from conary import files, trove
 from conary.lib import util
 from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors, update
@@ -234,7 +234,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 # this was added to the package outside of the RPM; we don't
                 # have any responsibility for it
                 continue
-            elif (update.conaryContents(hasCapsule, pathId, fileObj)
+            elif (trove.conaryContents(hasCapsule, pathId, fileObj)
                   and fileObj.lsTag != 'd'):
                 # this content isn't part of the capsule; remember to put
                 # it back when RPM is done

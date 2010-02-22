@@ -73,6 +73,14 @@ def troveIsFileSet(troveName):
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
+def conaryContents(hasCapsule, pathId, fileObj):
+    if pathId == CAPSULE_PATHID:
+        return False
+
+    return (fileObj.flags.isCapsuleOverride() or
+            fileObj.flags.isConfig() or
+            not hasCapsule)
+
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
     _SINGLE_TROVE_TUP_VERSION = 1
