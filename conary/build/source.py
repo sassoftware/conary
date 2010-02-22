@@ -1825,7 +1825,7 @@ class addGitSnapshot(_RevisionControl):
         self.url = url % recipe.macros
         self.tag = tag % recipe.macros
         self.branch = branch % recipe.macros
-        sourceName = self.getFilename()
+        sourceName = 'lookaside:/' + self.getFilename()
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
 
@@ -1905,7 +1905,7 @@ class addMercurialSnapshot(_RevisionControl):
     def __init__(self, recipe, url, tag = 'tip', **kwargs):
         self.url = url % recipe.macros
         self.tag = tag % recipe.macros
-        sourceName = self.getFilename()
+        sourceName = 'lookaside:/' + self.getFilename()
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
 class addCvsSnapshot(_RevisionControl):
@@ -1985,7 +1985,7 @@ class addCvsSnapshot(_RevisionControl):
         self.root = root % recipe.macros
         self.project = project % recipe.macros
         self.tag = tag % recipe.macros
-        sourceName = self.getFilename()
+        sourceName = 'lookaside:/' + self.getFilename()
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
 class addSvnSnapshot(_RevisionControl):
@@ -2081,8 +2081,7 @@ class addSvnSnapshot(_RevisionControl):
             self.project = recipe.name
         else:
             self.project = project % recipe.macros
-
-        sourceName = self.getFilename()
+        sourceName = 'lookaside:/' + self.getFilename()
 
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
@@ -2155,7 +2154,7 @@ class addBzrSnapshot(_RevisionControl):
         else:
             self.tag = tag
             self.tagArg = ''
-        sourceName = self.getFilename()
+        sourceName = 'lookaside:/' + self.getFilename()
 
         _RevisionControl.__init__(self, recipe, sourceName, **kwargs)
 
