@@ -220,6 +220,9 @@ class FileFinder(object):
 
     def _fetch(self, url, archivePath, searchMethod, headers=None,
                refreshFilter=None):
+        if isinstance(url,str):
+            url = laUrl(url)
+
         refresh = checkRefreshFilter(refreshFilter,url)
         if searchMethod == self.SEARCH_LOCAL_ONLY:
             self.searchFilesystem(url)
