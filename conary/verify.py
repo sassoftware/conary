@@ -160,18 +160,11 @@ class _FindLocalChanges(object):
         newFiles = []
 
         if dirType == NEW_FILES_ANY_DIR and '/' not in dirOwners:
-            # if / is owned, we don't need to worry about unowned paths
-            for dirName in os.listdir(self.cfg.root):
-                fullPath = os.path.join(self.cfg.root, dirName)
-                relPath = os.path.join('/', dirName)
-                if relPath not in skipDirs and relPath not in dirOwners:
-                    if (os.path.isdir(fullPath)):
-                        dirOwners[relPath] = None
-                    else:
-                        newFiles.append(relPath)
+            dirsToWalk = [ '/' ]
+        else:
+            dirsToWalk = sorted(dirOwners.itertops())
 
         dbPaths = self.db.db.getTroveFiles(fullTroveList)
-        dirsToWalk = sorted(dirOwners.itertops())
         fsPaths = util.walkiter(dirsToWalk, skipPathSet = skipDirs,
                                 root = self.cfg.root)
         lastDbPath = None

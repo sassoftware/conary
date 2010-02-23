@@ -8,12 +8,18 @@ Changes in @NEW@:
       to the system outside of conary package management. The
       verifyDirsNoNewFiles configuration option was added to pare down the
       tree conary looks through for new files.
+    * Config files from RPM capsules are now handled by Conary instead of
+      RPM, including diff/patch merging.
+    * Added support for RPM capsules to ChangesetExploder class
 
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
     * Merged internals of localcs/verify implementation into new classes
+    * Renamed isPayload file flag to isEncapsulatedContent
     * Flavor objects can now be used with the stdlib "pickle" module.
+    * Added file flags to allow conary to override file contents and attributes
+      for capsule-based files (such as from RPM).
 
   o Bug Fixes:
     * Java requirements for classes depending on other classes for which

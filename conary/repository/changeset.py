@@ -28,6 +28,7 @@ except ImportError:
 
 from conary import files, rpmhelper, streams, trove, versions
 from conary.lib import base85, enum, log, misc, patch, sha1helper, util, api
+from conary.lib import cpiostream
 from conary.repository import filecontainer, filecontents, errors
 
 # cft is a string used by the EnumeratedType class; it's not a type itself!
@@ -542,11 +543,16 @@ class ChangeSet(streams.StreamSet):
 
 	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
                                 troveCs.getOldFlavor())
+
+            # make a copy because we modify it locally to clear capsules
+            invertedTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
+            invertedTroveInfo.capsule.reset()
+
             newTroveInfo = troveCs.getTroveInfo()
             if newTroveInfo is None:
                 newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
                 newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
-            newTroveInfoDiff = trv.getTroveInfo().diff(newTroveInfo)
+            newTroveInfoDiff = invertedTroveInfo.diff(newTroveInfo)
 
 	    # this is a modified trove and needs to be inverted
 
@@ -562,7 +568,7 @@ class ChangeSet(streams.StreamSet):
 
             invertedTrove.setRequires(trv.getRequires())
             invertedTrove.setProvides(trv.getProvides())
-            invertedTrove.setTroveInfo(trv.troveInfo)
+            invertedTrove.setTroveInfo(invertedTroveInfo)
 
             for weak in (True, False):
                 for (name, list) in troveCs.iterChangedTroves(
@@ -1910,7 +1916,7 @@ def CreateFromFilesystem(troveList):
 	    (filecs, hash) = fileChangeSet(pathId, None, file)
 	    cs.addFile(oldFileId, newFileId, filecs)
 
-            if hash and not file.flags.isPayload():
+            if hash and not file.flags.isEncapsulatedContent():
 		cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
 			  file.flags.isConfig())
@@ -2041,12 +2047,22 @@ class AbstractChangesetExploder:
         fileList = []
         linkGroups = {}
         linkGroupFirstPath = {}
+        rpmCapsules = []
         # sort the files by pathId,fileId
         for trvCs in cs.iterNewTroveList():
+            assert(not trvCs.getOldVersion())
             trv = trove.Trove(trvCs)
             self.installingTrove(trv)
-            for pathId, path, fileId, version in trv.iterFileList():
-                fileList.append((pathId, fileId, path, trv))
+            for pathId, path, fileId, version in trv.iterFileList(
+                                capsules = True, members = True):
+                if pathId != trove.CAPSULE_PATHID:
+                    fileList.append((pathId, fileId, path, trv))
+                elif (trv.troveInfo.capsule.type() ==
+                            trove._TROVECAPSULE_TYPE_RPM):
+                    rpmCapsules.append(fileId)
+                else:
+                    raise KeyError('cannot expand capsule type %s' %
+                                        trv.troveInfo.capsule.type())
 
         fileList.sort()
 
@@ -2058,7 +2074,15 @@ class AbstractChangesetExploder:
                 self.fileMissing(trv, pathId, fileId, path)
                 continue
 
+            # and True makes hasCapsule a boolean
+            hasCapsule = trv.troveInfo.capsule.type() and True
+
             fileObj = files.ThawFile(fileCs, pathId)
+
+            # installFile can control installation of nonderived contents
+            # only
+            if not trove.conaryContents(hasCapsule, pathId, fileObj):
+                continue
 
             destDir = self.installFile(trv, path, fileObj)
             if not destDir:
@@ -2069,6 +2093,15 @@ class AbstractChangesetExploder:
                                     trv))
             else:
                 self.restoreFile(trv, fileObj, None, destDir, path)
+
+        rpmCapsules.sort()
+        for fileId in rpmCapsules:
+            (contentType, contents) = cs.getFileContents(trove.CAPSULE_PATHID,
+                                                         fileId)
+            rpmFileObj = contents.get()
+            cpioFileObj = rpmhelper.UncompressedRpmPayload(rpmFileObj)
+            exploder = cpiostream.CpioExploder(cpioFileObj)
+            exploder.explode(self.destDir)
 
         delayedRestores = {}
         for pathId, fileId, fileObj, destDir, destPath, trv in restoreList:
