@@ -189,6 +189,7 @@ class FileFinder(object):
     def __init__(self, recipeName, repositoryCache, localDirs=None,
                  multiurlMap=None, refreshFilter=None, mirrorDirs = None,
                  cfg=None):
+        self.cfg = cfg
         self.recipeName = recipeName
         self.repCache = repositoryCache
         if self.repCache:
@@ -198,6 +199,7 @@ class FileFinder(object):
         self.localDirs = localDirs
         self.multiurlMap = multiurlMap
         self.mirrorDirs = mirrorDirs
+        self.noproxyFilter = util.noproxyFilter()
 
     def fetch(self, urlStr, suffixes=None, archivePath=None, headers=None,
               allowNone=False, searchMethod=0, # SEARCH_ALL
@@ -328,21 +330,39 @@ class FileFinder(object):
         inFile = None
         while retries < 5:
             try:
-                # set up a urlopener that tracks cookies to handle
+                # set up a handler that tracks cookies to handle
                 # sites like Colabnet that want to set a session cookie
                 cj = cookielib.LWPCookieJar()
-                pwm = PasswordManager()
-                # set up a urllib2 opener that can handle cookies and basic
-                # authentication.
-                # FIXME: should digest auth be handled too?
-                opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj),
-                                              urllib2.HTTPBasicAuthHandler(pwm))
-                if url.passwd:
-                    pwm.add_password(url.user, url.passwd)
-                elif url.user:
-                    pwm.add_password(url.user, '')
-                urlStr = url.asStr(noAuth=True,quoted=True)
+                passwdMgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+                if self.cfg.proxy and \
+                        not self.noproxyFilter.bypassProxy(url.host):
+                    proxyPasswdMgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+                    opener = urllib2.build_opener(
+                        urllib2.HTTPCookieProcessor(cj),
+                        urllib2.HTTPBasicAuthHandler(passwdMgr),
+                        urllib2.ProxyBasicAuthHandler(proxyPasswdMgr),
+                        urllib2.ProxyHandler(self.cfg.proxy)
+                        )
+                else:
+                    proxyPasswdMgr = None
+                    opener = urllib2.build_opener(
+                        urllib2.HTTPCookieProcessor(cj),
+                        urllib2.HTTPBasicAuthHandler(passwdMgr),
+                        )
 
+                urlStr = url.asStr(noAuth=True,quoted=True)
+                if url.user:
+                    url.passwd = url.passwd or ''
+                    passwdMgr.add_password(None, urlStr, url.user, url.passwd)
+
+                if proxyPasswdMgr:
+                    for v in self.cfg.proxy.values():
+                        pUrl = laUrl(v[1])
+                        if pUrl.user:
+                            pUrl.passwd = pUrl.passwd or ''
+                            proxyPasswdMgr.add_password(
+                                None, pUrl.asStr(noAuth=True,quoted=True),
+                                url.user, url.passwd)
                 req = urllib2.Request(urlStr, headers=headers)
                 inFile = opener.open(req)
                 if not urlStr.startswith('ftp://'):
@@ -385,21 +405,6 @@ class FileFinder(object):
                 else:
                     return None
         return inFile
-
-class PasswordManager:
-    # password manager class for urllib2 that handles exactly 1 password
-    def __init__(self):
-        self.user = ''
-        self.passwd = ''
-
-    def add_password(self, user, passwd):
-        self.user = user
-        self.passwd = passwd
-
-    def find_user_password(self, *args, **kw):
-        return self.user, self.passwd
-
-
 
 class RepositoryCache(object):
 
