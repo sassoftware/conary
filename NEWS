@@ -25,6 +25,11 @@ Changes in @NEW@:
     * Java requirements for classes depending on other classes for which
      provides have been dropped no longer propagate as trove or file
      requirements. (CNY-3362)
+    * Auto-sourced files will now be fetched through an proxy if the
+      appropriate *_proxy environment variable is set of the a proxy is
+      configured for conary. (RBL-5714)
+    * Lookaside fixed for files that have identical names but different
+      contents (CNY-3256)
 
 Changes in 2.1.9:
   o Bug Fixes:

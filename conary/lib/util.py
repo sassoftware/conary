@@ -2179,3 +2179,28 @@ def walkiter(dirNameList, skipPathSet = set(), root = '/'):
                 for x in walkiter([fullPath], root = root,
                                   skipPathSet = skipPathSet):
                     yield x
+
+class noproxyFilter(object):
+    '''Reads the no-proxy environment variable and can be used to decide
+    if the proxy should be bypassed for a specific URL'''
+    alwayBypass = False
+    no_proxy_list = []
+    def __init__(self):
+        # From python 2.6's urllib (lynx also seems to obey NO_PROXY)
+        no_proxy = os.environ.get('no_proxy', '') or \
+            os.environ.get('NO_PROXY', '')
+        # '*' is special case for always bypass
+        self.alwaysBypass = no_proxy == '*'
+
+        for name in no_proxy.split(','):
+            name = name.strip()
+            if name:
+                self.no_proxy_list.append(name)
+
+    def bypassProxy(self,urlStr):
+        if self.alwaysBypass:
+            return True
+        for x in self.no_proxy_list:
+            if urlStr.endswith(x):
+                return True
+        return False
