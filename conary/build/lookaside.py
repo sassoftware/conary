@@ -325,6 +325,19 @@ class FileFinder(object):
             urlObjList = newUrlObjList
         return urlObjList
 
+    class BasicPasswordManager(object):
+        # password manager class for urllib2 that handles exactly 1 password
+        def __init__(self):
+            self.user = ''
+            self.passwd = ''
+
+        def add_password(self, user, passwd):
+            self.user = user
+            self.passwd = passwd
+
+        def find_user_password(self, *args, **kw):
+            return self.user, self.passwd
+
     def _fetchUrl(self, url, headers):
         retries = 0
         inFile = None
@@ -333,10 +346,10 @@ class FileFinder(object):
                 # set up a handler that tracks cookies to handle
                 # sites like Colabnet that want to set a session cookie
                 cj = cookielib.LWPCookieJar()
-                passwdMgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+                passwdMgr = self.BasicPasswordManager()
                 if self.cfg.proxy and \
                         not self.noproxyFilter.bypassProxy(url.host):
-                    proxyPasswdMgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+                    proxyPasswdMgr = urllib2.HTTPPasswordMgr()
                     opener = urllib2.build_opener(
                         urllib2.HTTPCookieProcessor(cj),
                         urllib2.HTTPBasicAuthHandler(passwdMgr),
@@ -353,7 +366,7 @@ class FileFinder(object):
                 urlStr = url.asStr(noAuth=True,quoted=True)
                 if url.user:
                     url.passwd = url.passwd or ''
-                    passwdMgr.add_password(None, urlStr, url.user, url.passwd)
+                    passwdMgr.add_password(url.user, url.passwd)
 
                 if proxyPasswdMgr:
                     for v in self.cfg.proxy.values():
