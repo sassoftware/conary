@@ -145,6 +145,7 @@ class Recipe(object):
         self._capsulePackageMap = {}
         self._capsuleDataMap = {}
         self._capsules = {}
+        self._lcachePopState = None
 
         # Metadata is a hash keyed on a trove name and with a list of
         # per-trove-name MetadataItem like objects (well, dictionaries)
@@ -382,38 +383,50 @@ class Recipe(object):
         """
         Populate a repository lookaside cache
         """
-        recipeClass = self.__class__
-        repos = self.laReposCache.repos
+        class lcachePopulationState:
+            """Used to track the state of the lcache to enable it to be
+            populated on demand efficiently"""
+            classes=None
+            sourcePaths={}
+            fetchedPaths=set()
 
-        # build a list containing this recipe class and any ancestor class
-        # from which it descends
-        classes = [ recipeClass ]
-        bases = list(recipeClass.__bases__)
-        while bases:
-            parent = bases.pop()
-            bases.extend(list(parent.__bases__))
-            if issubclass(parent, Recipe):
-                classes.append(parent)
+        if not self._lcachePopState:
+            cstate = lcachePopulationState()
 
-        # reverse the class list, this way the files will be found in the
-        # youngest descendant first
-        classes.reverse()
+            recipeClass = self.__class__
+            repos = self.laReposCache.repos
+
+            # build a list containing this recipe class and any ancestor class
+            # from which it descends
+            classes = [ recipeClass ]
+            bases = list(recipeClass.__bases__)
+            while bases:
+                parent = bases.pop()
+                bases.extend(list(parent.__bases__))
+                if issubclass(parent, Recipe):
+                    classes.append(parent)
+            # reverse the class list, this way the files will be found in the
+            # youngest descendant first
+            classes.reverse()
+            cstate.classes = classes
+            self._lcachePopState = cstate
 
         # populate the repository source lookaside cache from the :source
         # components
+        sourcePaths = self._lcachePopState.sourcePaths
         actions = self.getSourcePathList()
-        sourcePaths = {}
         for a in actions:
             ps = a.getPathAndSuffix()
             if ps[0].find('://') != -1: # we have an autosourced file
                 # use guess name if it is provided
                 k = os.path.basename(ps[0]) or ps[1]
-                assert k
+                assert(k)
                 sourcePaths[ k ] = ps
             else:
                 sourcePaths[ ps[0] ] = ps
 
-        for rclass in classes:
+        fetchedPaths = self._lcachePopState.fetchedPaths
+        for rclass in self._lcachePopState.classes:
             if not rclass._trove:
                 continue
             srcName = rclass._trove.getName()
@@ -424,6 +437,10 @@ class Recipe(object):
             # in the Conary state file, the lookaside cache has to win, so
             # don't populate it with the repository file)
             for pathId, path, fileId, version in rclass._trove.iterFileList():
+                # don't fetch things that we've already fetched
+                if path in fetchedPaths:
+                    continue
+
                 assert(path[0] != "/")
                 # we might need to retrieve this source file
                 # to enable a build, so we need to find the
@@ -456,6 +473,8 @@ class Recipe(object):
                     self.laReposCache.addFileHash(srcName, srcVersion, pathId,
                         fullPath, fileId, version, fileObj.contents.sha1(),
                         fileObj.inode.perms())
+                    assert(path not in fetchedPaths)
+                    fetchedPaths.add(path)
 
     def sourceMap(self, path):
         if os.path.exists(path):
