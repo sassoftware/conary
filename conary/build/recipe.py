@@ -390,11 +390,11 @@ class Recipe(object):
             sourcePaths={}
             fetchedPaths=set()
 
+        repos = self.laReposCache.repos
         if not self._lcachePopState:
             cstate = lcachePopulationState()
 
             recipeClass = self.__class__
-            repos = self.laReposCache.repos
 
             # build a list containing this recipe class and any ancestor class
             # from which it descends
