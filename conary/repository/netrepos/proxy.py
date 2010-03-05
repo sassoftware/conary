@@ -1106,7 +1106,7 @@ class ChangesetFilter(BaseProxy):
 
 
                 if (isinstance(fileObj, csfiles.RegularFile)
-                        and not fileObj.flags.isPayload()
+                        and not fileObj.flags.isEncapsulatedContent()
                         and fileObj.contents.size() == 0):
 
                     # Special case: some ghost files were not properly marked
@@ -1123,7 +1123,7 @@ class ChangesetFilter(BaseProxy):
                         (csfiles.SymbolicLink, csfiles.Directory)):
                     continue
                 configFileSha1 = fileObj.contents.sha1()
-                assert not fileObj.flags.isPayload()
+                assert not fileObj.flags.isEncapsulatedContent()
 
                 # Normally we should have fetched the capsule prior to the
                 # config file
