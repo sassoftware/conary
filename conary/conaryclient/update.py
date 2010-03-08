@@ -3284,10 +3284,6 @@ conary erase '%s=%s[%s]'
 
         self.updateCallback.resolvingDependencies()
 
-        # if any of the things we're about to install or remove use capsules
-        # we cannot split the job
-        split = split and self._jobIsSplittable(uJob, jobSet)
-
         # this updates jobSet w/ resolutions, and splitJob reflects the
         # jobs in the updated jobSet
         if resolveDeps or split:
@@ -3299,7 +3295,10 @@ conary erase '%s=%s[%s]'
                                       resolveSource = resolveSource,
                                       keepRequired = keepRequired,
                                       criticalUpdateInfo = criticalUpdateInfo)
-            if not split:
+
+            # if any of the things we're about to install or remove use
+            # capsules we cannot split the job
+            if not split or not self._jobIsSplittable(uJob, jobSet):
                 splitJob = [ list(jobSet) ]
         else:
             (depList, suggMap, cannotResolve, splitJob, keepList,

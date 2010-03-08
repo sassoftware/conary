@@ -24,6 +24,8 @@ Changes in @NEW@:
       configured for conary. (RBL-5714)
     * Lookaside fixed for files that have identical names but different
       contents (CNY-3256)
+    * Jobs would be split inappropriately when capsules were pulled in
+      through dependency resolution (CNY-3367)
 
 Changes in 2.1.9:
   o Bug Fixes:
