@@ -721,7 +721,8 @@ class Transport(xmlrpclib.Transport):
                     self.proxyHost = getattr(opener, 'proxyHost', None)
                     self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
                 break
-            except IOError, e:
+            except (IOError, socket.sslerror), e:
+                from conary.lib import log
                 # try resetting the resolver - /etc/resolv.conf
                 # might have changed since this process started.
                 util.res_init()
@@ -738,13 +739,17 @@ class Transport(xmlrpclib.Transport):
                     e = e.args[1]
                 if isinstance(e, socket.gaierror):
                     if e.args[0] == socket.EAI_AGAIN:
-                        from conary.lib import log
                         log.warning('got "%s" when trying to '
                                     'resolve %s.  Retrying in '
                                     '500 ms.' %(e.args[1], host))
                         time.sleep(.5)
                     else:
                         raise
+                elif isinstance(e, socket.sslerror):
+                    log.warning('got "%s" when trying to '
+                                'make an SSL connection to %s.'
+                                'Retrying in 500 ms.' %(e.args[1], host))
+                    time.sleep(.5)
                 else:
                     raise
         if hasattr(response, 'headers'):

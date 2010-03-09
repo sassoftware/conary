@@ -16,9 +16,11 @@ Changes in @NEW@:
     * Flavor objects can now be used with the stdlib "pickle" module.
 
   o Bug Fixes:
+    * SSL XMLRPC connections will now retry before raising an exception 
+      (CNY-3369)
     * Java requirements for classes depending on other classes for which
-     provides have been dropped no longer propagate as trove or file
-     requirements. (CNY-3362)
+      provides have been dropped no longer propagate as trove or file
+      requirements. (CNY-3362)
     * Auto-sourced files will now be fetched through an proxy if the
       appropriate *_proxy environment variable is set of the a proxy is
       configured for conary. (RBL-5714)
