@@ -745,7 +745,7 @@ class Transport(xmlrpclib.Transport):
                         time.sleep(.5)
                     else:
                         raise
-                elif isinstance(e, socket.sslerror):
+                elif issubclass(type(e),socket.sslerror):
                     log.warning('got "%s" when trying to '
                                 'make an SSL connection to %s.'
                                 'Retrying in 500 ms.' %(e.args[1], host))
