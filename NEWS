@@ -22,6 +22,7 @@ Changes in @NEW@:
       for capsule-based files (such as from RPM).
     * Changesets are now loaded incrementally rather than as one big string;
       this avoids a potentially large memory spike opening large changesets
+    * Added slots to DependencySet derivatives
 
   o Bug Fixes:
     * Java requirements for classes depending on other classes for which
