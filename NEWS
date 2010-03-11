@@ -20,6 +20,8 @@ Changes in @NEW@:
     * Flavor objects can now be used with the stdlib "pickle" module.
     * Added file flags to allow conary to override file contents and attributes
       for capsule-based files (such as from RPM).
+    * Changesets are now loaded incrementally rather than as one big string;
+      this avoids a potentially large memory spike opening large changesets
 
   o Bug Fixes:
     * Java requirements for classes depending on other classes for which
