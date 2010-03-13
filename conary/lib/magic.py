@@ -27,6 +27,10 @@ from conary.lib import elf
 from conary.lib import javadeps
 from conary.lib import util
 
+MSI_MAGIC_STRING = \
+    "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" \
+    "\x00\x00\x00\x00\x00\x00\x3E\x00\x03\x00\xFE\xFF\x09\x00\x06"
+
 class Magic(object):
     __slots__ = ['path', 'basedir', 'contents', 'name']
     # The file type is a generic string for a specific file type
@@ -198,7 +202,6 @@ class ZIP(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
 	Magic.__init__(self, path, basedir)
 
-
 class java(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
@@ -264,6 +267,22 @@ class RPM(Magic):
                     val = str(val)
             self.contents[key] = val
         self.contents['isSource'] = self.hdr.isSource
+
+class MSI(Magic):
+    _tagMap = [
+        ("name",    rpmhelper.NAME, str),
+        ("version", rpmhelper.VERSION, str),
+    ]
+    def __init__(self, path, basedir=''):
+	Magic.__init__(self, path, basedir)
+        self.version = 'FakeMSIVersion'
+        try:
+            f = file(path)
+        except:
+            return None
+        # Convert list of objects to simple types
+        for key, tagName, valType in self._tagMap:
+            self.contents[key] = getattr(self,key)
 
 def _javaMagic(b):
     if len(b) > 4 and b[0:4] == "\xCA\xFE\xBA\xBE":
@@ -370,6 +389,9 @@ def magic(path, basedir=''):
         return CIL(path, basedir, b)
     elif (len(b) > 4 and b[:4] == "\xed\xab\xee\xdb"):
         return RPM(path, basedir)
+    elif len(b) > len(MSI_MAGIC_STRING) and \
+            b[:len(MSI_MAGIC_STRING)] == MSI_MAGIC_STRING:
+        return MSI(path,basedir)
     elif _tarMagic(b):
         return tar(path, basedir, b)
 
