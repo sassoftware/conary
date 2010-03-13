@@ -1322,7 +1322,7 @@ class addCapsule(_Source):
     NAME
     ====
 
-    **************** UPDATE ME FOR MSI SUPPORT AS TIME POINT ************
+    **************** UPDATE ME FOR MSI SUPPORT AT SOME POINT ************
 
     B{C{r.addCapsule()}} - Add an encapsulated file
 
@@ -1453,9 +1453,10 @@ class addCapsule(_Source):
 
         # here we guarantee that package contains a package:component
         # designation.  This is required for _addComponent().
-        ### FIXME ###
-        #pname = m.contents['name']
-        pname = self.recipe.name
+        if self.capsuleType == 'rpm':
+            pname = m.contents['name']
+        else:
+            pname = self.recipe.name
         if self.package is None:
             self.package = pname + ':' + self.capsuleType
         else:
