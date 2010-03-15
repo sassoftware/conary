@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.10:
   o New Features:
     * The "conary migrate" command no longer requires interactive
       mode, and now defaults to yes rather than no. (CNY-3361)
@@ -8,6 +8,7 @@ Changes in @NEW@:
       to the system outside of conary package management. The
       verifyDirsNoNewFiles configuration option was added to pare down the
       tree conary looks through for new files.
+     * Added exceptions and exceptDeps options to RPMRequires
 
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen
