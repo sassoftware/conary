@@ -573,9 +573,7 @@ class StreamCollection(InfoStream):
 	if data is not None:
 	    self.thaw(data)
         else:
-            self._data = None
-            self._thawedItems = dict([ (x, {}) for x in self.streamDict ])
-
+            self.thaw('')
 
 class OrderedStreamCollection(StreamCollection):
     # same as StreamCollection, but ordered and can holder bigger stuff

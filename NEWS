@@ -23,6 +23,10 @@ Changes in @NEW@:
     * Changesets are now loaded incrementally rather than as one big string;
       this avoids a potentially large memory spike opening large changesets
     * Added slots to DependencySet derivatives
+    * StreamCollections are intialized as if thawing an empty string rather
+      than instantiating all of the child elements (which are often not needed
+      anyway). This reduces total ram usage by more than 5% on large
+      changesets.
 
   o Bug Fixes:
     * SSL XMLRPC connections will now retry before raising an exception 
