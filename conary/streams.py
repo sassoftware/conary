@@ -279,7 +279,7 @@ class BaseDependenciesStream(InfoStream):
         self.thaw(diff)
         return False
 
-class DependenciesStream(deps.CompressedDependencySet, BaseDependenciesStream):
+class DependenciesStream(deps.DependencySet, BaseDependenciesStream):
     __slots__ = ()
     pass
 
