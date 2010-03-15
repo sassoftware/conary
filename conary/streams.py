@@ -258,8 +258,7 @@ class BaseDependenciesStream(InfoStream):
 
     Stores list of strings; used for requires/provides lists
     """
-    #deps = DepsAttr()
-    __slots__ = ()
+    deps = DepsAttr()
 
     def __call__(self):
         return self
@@ -280,11 +279,9 @@ class BaseDependenciesStream(InfoStream):
         return False
 
 class DependenciesStream(deps.DependencySet, BaseDependenciesStream):
-    __slots__ = ()
     pass
 
 class FlavorsStream(deps.Flavor, BaseDependenciesStream):
-    __slots__ = ()
     pass
 
 class OptionalFlavorStream(InfoStream):

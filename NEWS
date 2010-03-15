@@ -22,8 +22,7 @@ Changes in @NEW@:
       for capsule-based files (such as from RPM).
     * Changesets are now loaded incrementally rather than as one big string;
       this avoids a potentially large memory spike opening large changesets
-    * Added slots to DependencySet derivatives and objects used in
-      TroveChangeSet
+    * Added slots to various stream and trove objects
     * StreamCollections are intialized as if thawing an empty string rather
       than instantiating all of the child elements (which are often not needed
       anyway). This reduces total ram usage by more than 5% on large
