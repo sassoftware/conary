@@ -114,6 +114,7 @@ class Md5Stream(StringStream):
         StringStream.set(s)
 
 class Sha1Stream(StringStream):
+    __slots__ = ()
     allowedSize = (20,)
     def freeze(self, skipSet = None):
 	assert(len(self()) in self.allowedSize)
@@ -145,6 +146,7 @@ class AbsoluteSha1Stream(Sha1Stream):
     diffs to represent having a sha1 set to having no sha1 set.  Normally
     a Sha1Stream requires its data to be 20 bytes long.  We allow 20 or 0.
     """
+    __slots__ = ()
     allowedSize = (0, 20)
 
     def diff(self, them):
@@ -256,7 +258,8 @@ class BaseDependenciesStream(InfoStream):
 
     Stores list of strings; used for requires/provides lists
     """
-    deps = DepsAttr()
+    #deps = DepsAttr()
+    __slots__ = ()
 
     def __call__(self):
         return self
@@ -276,10 +279,12 @@ class BaseDependenciesStream(InfoStream):
         self.thaw(diff)
         return False
 
-class DependenciesStream(deps.DependencySet, BaseDependenciesStream):
+class DependenciesStream(deps.CompressedDependencySet, BaseDependenciesStream):
+    __slots__ = ()
     pass
 
 class FlavorsStream(deps.Flavor, BaseDependenciesStream):
+    __slots__ = ()
     pass
 
 class OptionalFlavorStream(InfoStream):
@@ -449,6 +454,7 @@ class StreamCollection(InfoStream):
     """
 
     ignoreSkipSet = False
+    __slots__ = ( '_data', '_items', 'streamDict', '_thawedItems' )
 
     def getItems(self):
         if self._data is not None:
@@ -577,6 +583,7 @@ class StreamCollection(InfoStream):
 
 class OrderedStreamCollection(StreamCollection):
     # same as StreamCollection, but ordered and can holder bigger stuff
+    __slots__ = ()
 
     def freeze(self, skipSet = {}):
         if self._data is not None:
@@ -690,6 +697,8 @@ class AbsoluteStreamCollection(StreamCollection):
     streamDict needs to be defined as an index of small ints to
     Stream class types.
     """
+
+    __slots__ = ()
 
     def diff(self, other):
         assert(self.__class__ == other.__class__)

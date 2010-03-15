@@ -1111,6 +1111,26 @@ class DependencySet(object):
 
     thaw = __init__
 
+import zlib
+class CompressedDependencySet(DependencySet):
+
+    def __init__(self, frz = None):
+        if frz:
+            frz = zlib.compress(frz)
+        DependencySet.__init__(self, frz)
+
+    thaw = __init__
+
+    def _thaw(self):
+        frz = zlib.decompress(self._members)
+        self.thaw(frz)
+        DependencySet._thaw()
+
+    def freeze(self, skipSet = None):
+        if type(self._members) == str:
+            return zlib.decompress(self._members)
+
+        return DependencySet.freeze(self, skipSet = skipSet)
 
 # A special class for representing Flavors
 class Flavor(DependencySet):
