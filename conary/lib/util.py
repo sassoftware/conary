@@ -2222,9 +2222,11 @@ class GzipFile(gzip.GzipFile):
         # stored is the true file size mod 2**32.
         #self.fileobj.seek(-8, 1)
         crc32, isize = struct.unpack("<LL", eof)
-        if crc32 != self.crc:
+        
+        actualCrc = (self.crc & 0xffffffff)
+        if crc32 != actualCrc:
             raise IOError("CRC check failed %s != %s" % (hex(crc32),
-                                                         hex(self.crc)))
+                                                         hex(actualCrc)))
         elif isize != (self.size & 0xffffffffL):
             raise IOError, "Incorrect length of data produced"
 
