@@ -10,6 +10,10 @@ Changes in @NEW@:
       the current state of a system without reinstalling packages through
       the capsule handler.
 
+  o Bug Fixes:
+    * The Java package policies for computing provides and requires are
+      now more efficient. (CNY-3372)
+
 Changes in 2.1.10:
   o New Features:
     * The "conary migrate" command no longer requires interactive
