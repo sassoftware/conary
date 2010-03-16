@@ -56,7 +56,8 @@ class UpdateFlags(util.Flags):
     __slots__ = [ 'merge', 'ignoreUGids', 'missingFilesOkay',
                   'ignoreInitialContents', 'replaceManagedFiles',
                   'replaceUnmanagedFiles', 'replaceModifiedFiles',
-                  'replaceModifiedConfigFiles', 'ignoreMissingFiles' ]
+                  'replaceModifiedConfigFiles', 'ignoreMissingFiles',
+                  'skipCapsuleOps' ]
 
 class LastRestored(object):
 
@@ -1734,8 +1735,9 @@ class FilesystemJob:
 	self.tagRemoves = {}
         self.linkGroups = {}
         self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
-                                                       callback,
-                                                       weakref.proxy(self))
+                                   callback, weakref.proxy(self),
+                                   skipCapsuleOps = getattr(flags,
+                                       'skipCapsuleOps',False))
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db

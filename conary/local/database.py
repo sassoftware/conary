@@ -40,7 +40,8 @@ class CommitChangeSetFlags(util.Flags):
 
     __slots__ = [ 'replaceManagedFiles', 'replaceUnmanagedFiles',
                   'replaceModifiedFiles', 'justDatabase', 'localRollbacks',
-                  'test', 'keepJournal', 'replaceModifiedConfigFiles' ]
+                  'test', 'keepJournal', 'replaceModifiedConfigFiles',
+                  'skipCapsuleOps' ]
 
 class Rollback:
 
@@ -1985,7 +1986,8 @@ class Database(SqlDbRepository):
             replaceManagedFiles = commitFlags.replaceManagedFiles,
             replaceUnmanagedFiles = commitFlags.replaceUnmanagedFiles,
             replaceModifiedFiles = commitFlags.replaceModifiedFiles,
-            replaceModifiedConfigFiles = commitFlags.replaceModifiedConfigFiles)
+            replaceModifiedConfigFiles = commitFlags.replaceModifiedConfigFiles,
+            skipCapsuleOps = commitFlags.skipCapsuleOps)
 
         if rollbackPhase:
             flags.missingFilesOkay = True

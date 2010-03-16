@@ -20,13 +20,15 @@ from conary.local import journal
 
 class CapsuleOperation(object):
 
-    def __init__(self, root, db, changeSet, callback, fsJob):
+    def __init__(self, root, db, changeSet, callback, fsJob,
+                 skipCapsuleOps = False):
         self.root = root
         self.db = db
         self.changeSet = changeSet
         self.fsJob = fsJob
         self.callback = callback
         self.errors = []
+        self.skipCapsuleOps = skipCapsuleOps
 
     def apply(self, fileDict, justDatabase = False):
         raise NotImplementedException
@@ -196,6 +198,9 @@ class MetaCapsuleOperations(CapsuleOperation):
             # as a conary
             return False
 
+        if self.skipCapsuleOps:
+            return True
+
         capsule = self.getCapsule(capsuleInfo.type())
         capsule.install(flags, troveCs)
 
@@ -205,6 +210,9 @@ class MetaCapsuleOperations(CapsuleOperation):
         cType = trove.troveInfo.capsule.type()
         if not cType:
             return False
+
+        if self.skipCapsuleOps:
+            return True
 
         capsule = self.getCapsule(cType)
         capsule.remove(trove)

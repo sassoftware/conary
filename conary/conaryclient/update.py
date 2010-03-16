@@ -2846,6 +2846,7 @@ conary erase '%s=%s[%s]'
                     test = False, justDatabase = False, journal = None,
                     localRollbacks = None, autoPinList = None,
                     keepJournal = False, noRestart=False,
+                    skipCapsuleOps = False,
                     replaceManagedFiles = False,
                     replaceUnmanagedFiles = False,
                     replaceModifiedFiles = False,
@@ -2899,6 +2900,8 @@ conary erase '%s=%s[%s]'
         @param noRestart: If set, suppresses the restart after critical updates
             behavior default to conary.
         @type noRestart: bool
+        @param skipCapsuleOps: If set, capsule operations are not performed.
+        Using this w/o setting justDatabase will have unpredictable results.
         @return: None if the update was fully applied, or restart information
         if a critical update was applied and a restart is necessary to
         make it active.
@@ -2948,6 +2951,7 @@ conary erase '%s=%s[%s]'
             commitFlags.localRollbacks = localRollbacks
             commitFlags.test = test
             commitFlags.keepJournal = keepJournal
+            commitFlags.skipCapsuleOps = skipCapsuleOps
 
         if autoPinList is None:
             autoPinList = self.cfg.pinTroves
