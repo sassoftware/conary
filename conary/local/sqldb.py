@@ -2016,7 +2016,7 @@ order by
 
     def getCapsulesTroveList(self, troveList):
         """ 
-            Returns the pathHashes for the given trove list.
+            Returns the capsule data for the given trove list.
         """
         return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_CAPSULE)
 

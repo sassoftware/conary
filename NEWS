@@ -1,4 +1,9 @@
 Changes in @NEW@:
+  o New Features:
+    * The recreatedb script is now capable of populating the Conary
+      database with packages in the RPM database that are found in
+      the Conary repositories in the installLabelPath. (CNY-3373)
+
   o Internal Changes
     * Added ability to commit changesets without executing capsule
       implementations. This allows us to build a conarydb which reflects

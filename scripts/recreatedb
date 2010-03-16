@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- mode: python -*-
 #
-# Copyright (c) 2005-2008 rPath, Inc.
+# Copyright (c) 2005-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,14 +15,22 @@
 #
 
 """
-recreatedb attempts to reconstruct a database from a list of
-(name, version, flavor) tuples.  It's useful when a database
-has become damaged, but the list of installed troves is still
-retrievable.  It can also use a file containing name=version[flavor]
-lines as stored in /var/lib/conarydb/manifest
+recreatedb attempts to reconstruct or supplement a conary database
+from a list of (name, version, flavor) tuples, which it can get from
+several sources.  On a conary-managed system, the file
+/var/lib/conarydb/manifest is the most likely complete source of
+this data.  If the manifest is unavailable, and only a corrupted
+conarydb file is available, recreatedb will use minimal queries
+within the damaged conarydb that may succeed even for some damaged
+databases, to create a new copy without the damage.  It can also use
+an RPM database for a source of installed RPM packages that should
+be sought in conary repositories and matching packages represented
+in the conary database.
 """
 
+import itertools
 import os
+import struct
 import sys
 import tempfile
 
@@ -39,18 +47,21 @@ sys.path.append(os.path.dirname(fullPath))
 from conary.deps import deps
 from conary.lib import util, sha1helper
 from conary.repository import filecontents, netclient, changeset
+from conary.local import database
 from conary import callbacks
 from conary import conarycfg
 from conary import conaryclient
 from conary import files
+from conary import rpmhelper
 from conary import sqlite3
+from conary import trove
 from conary import updatecmd
 from conary import versions
 
 def usage():
-    print 'usage: %s conarydb newroot' %sys.argv[0]
+    print 'usage: %s [conarydb|manifest|rpmdb] newroot' %sys.argv[0]
 
-def collectTrovesFromDb(db):
+def collectTrovesFromConaryDb(db):
     """
     Collect (name, version, flavor) tuples from a database.  The
     minimal SQL possible is used to increase the chance of success
@@ -61,7 +72,6 @@ def collectTrovesFromDb(db):
     @return: iterator that yields (name, version, flavor) tuples
     @rtype: iterator
     """
-    troveList = []
     cu = db.cursor()
     cu.execute('SELECT trovename, version, flavor from '
                '       Instances, Versions, Flavors '
@@ -87,7 +97,6 @@ def collectTrovesFromManifest(manifest):
     @return: iterator that yields (name, version, flavor) tuples
     @rtype: iterator
     """
-    troveList = []
     for troveSpec in (x.strip() for x in manifest):
         name, versionStr, flavor = conaryclient.cmdline.parseTroveSpec(troveSpec)
         version = versions.VersionFromString(versionStr)
@@ -96,6 +105,111 @@ def collectTrovesFromManifest(manifest):
         else:
             print >> sys.stderr, ('warning: %s is cooked locally, '
                                   'cannot be restored' %name)
+
+def collectNewTrovesFromRPMDb(cfg):
+    """
+    Collect (name, version, flavor) tuples from an RPM db.
+
+    @param cfg: configuration object pointing to a conary db
+    @type cfg: conarycfg.ConaryConfiguration
+    @return: list of (name, version, flavor) tuples
+    @rtype: list
+    """
+    import rpm # in other cases do not require RPM be installed
+
+    db = database.Database(cfg.root, cfg.dbPath)
+    # mapping is not important, we care only whether they exist
+    installedCapsuleInfo = [
+        x for x in db.getCapsulesTroveList(db.iterAllTroves())
+        if x]
+
+    existingNevras = set(
+        (x.rpm.name(),
+         x.rpm.epoch(),
+         x.rpm.version(),
+         x.rpm.release(),
+         x.rpm.arch())
+        for x in installedCapsuleInfo if x.rpm)
+    # record empty epochs a second time with 0, since 0 epochs were
+    # sometimes recorded as empty epochs
+    existingNevras.update(set(
+        (x.rpm.name(),
+         0,
+         x.rpm.version(),
+         x.rpm.release(),
+         x.rpm.arch())
+        for x in installedCapsuleInfo
+        if x.rpm and x.rpm.epoch() == None))
+
+    troveList = []
+    # build a list of all installed rpms
+    ts = rpm.TransactionSet()
+    mi = ts.dbMatch()
+    nevras = set([(h['name'],
+                   h['epoch'],
+                   h['version'],
+                   h['release'],
+                   h['arch'])
+                  for h in mi])
+    # don't re-add packages already in the database
+    nevras -= existingNevras
+
+    # if there is nothing to do, do nothing
+    if not nevras:
+        return []
+
+    client = conaryclient.ConaryClient(cfg)
+    repos = client.getRepos()
+
+    matches = []
+    missing = set()
+    for label in cfg.installLabelPath:
+        troveSpace = repos.getTroveVersionsByLabel({None: {label: None}},
+                                                   bestFlavor=False)
+
+        troveList = []
+        for pkgName, vfs in troveSpace.iteritems():
+            for version, flvs in vfs.iteritems():
+                troveList.extend((pkgName, version, x) for x in flvs)
+
+        troveInfo = repos.getTroveInfo(trove._TROVEINFO_TAG_CAPSULE, troveList)
+        allNevras = dict(((x.rpm.name(),
+                           x.rpm.epoch(),
+                           x.rpm.version(),
+                           x.rpm.release(),
+                           x.rpm.arch()),
+                          y)
+                         for x, y in itertools.izip(troveInfo, troveList)
+                         if x and x.type() == trove._TROVECAPSULE_TYPE_RPM)
+
+        for nevra in sorted(nevras):
+            if nevra in allNevras:
+                matches.append(allNevras[nevra])
+                nevras.discard(nevra)
+                missing.discard(nevra)
+            # some 0 epochs were stored as None instead of 0
+            elif nevra[1] == 0:
+                nevraAlt = (nevra[0], None, nevra[2], nevra[3], nevra[4])
+                if nevraAlt in allNevras:
+                    matches.append(allNevras[nevraAlt])
+                    nevras.discard(nevra)
+                    missing.discard(nevra)
+                else:
+                    missing.add(nevra) # neither epoch encoding found
+            else:
+                missing.add(nevra) # non-zero epoch not found
+
+    if missing:
+        print >>sys.stderr, ('Could not find Conary packages for these RPMs:')
+        for nevra in sorted(missing):
+            print >> sys.stderr, (rpmhelper.NEVRA.filename(*nevra))
+
+    # now add the packages that contain the components:
+    matchingPackages = [(n.split(':')[0],v,f)
+                        for n,v,f in matches
+                        if n.endswith(':rpm')]
+
+    return matches + matchingPackages
 
 def buildCsList(client, troveList):
     """
@@ -142,7 +256,7 @@ def addConfigFileContents(client, cs):
     add file contents for config files to a changeset object
 
     @param client: the ConaryClient instance for accessing the repository
-    @type client: conrayclient.ConaryClient
+    @type client: conaryclient.ConaryClient
     @param cs: the changeset that needs config file contents added
     @type cs: repository.changeset.ChangeSet
     @return: None
@@ -161,6 +275,7 @@ def addConfigFileContents(client, cs):
     # build up the repository request
     neededContents = [x[0] for x in needed]
     print >> sys.stderr, '\ndownloading config file contents...',
+    sys.stderr.flush()
     contents = client.repos.getFileContents(neededContents)
     print >> sys.stderr, 'done.'
     # add the contents to the changeset
@@ -186,12 +301,19 @@ def main(argv):
     callback = updatecmd.UpdateCallback()
 
     # get a list of (name, version, flavor) from the old db
-    try:
-        olddb = sqlite3.connect(sys.argv[1])
-        troves = list(collectTrovesFromDb(olddb))
-    except sqlite3._sqlite.DatabaseError:
-        manifest = file(sys.argv[1])
-        troves = list(collectTrovesFromManifest(manifest))
+    if sys.argv[1] == 'rpmdb':
+        # add ability to specify a path to an rpmdb
+        troves = list(collectNewTrovesFromRPMDb(cfg))
+        if not troves:
+            print >> sys.stderr, 'No unmanaged RPM packages found'
+            sys.exit(0)
+    else:
+        try:
+            olddb = sqlite3.connect(sys.argv[1])
+            troves = list(collectTrovesFromConaryDb(olddb))
+        except sqlite3._sqlite.DatabaseError:
+            manifest = file(sys.argv[1])
+            troves = list(collectTrovesFromManifest(manifest))
 
     # double check that everything installed in the old db really exists
     # and build up a changeset request
@@ -217,7 +339,9 @@ def main(argv):
         updatecmd.doUpdate(cfg, [ path ], depCheck = False,
                            recurse = False, justDatabase = True,
                            replaceFiles = True,
-                           noRestart = True)
+                           noRestart = True,
+                           checkPathConflicts = False,
+                           skipCapsuleOps = True)
     finally:
         os.unlink(path)
 
