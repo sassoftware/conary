@@ -495,6 +495,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                         replaceModifiedConfigFiles = False,
                         tagScript = None,
                         justDatabase = False,
+                        skipCapsuleOps = False,
                         info = False,
                         keepJournal = False,
                         noRestart = False,
