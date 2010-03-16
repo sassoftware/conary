@@ -1720,7 +1720,8 @@ class FilesystemJob:
         self.linkGroups = {}
         self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
                                    callback, weakref.proxy(self),
-                                   skipCapsuleOps = flags.skipCapsuleOps)
+                                   skipCapsuleOps = getattr(flags,
+                                       'skipCapsuleOps',False))
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
 	self.db = db
