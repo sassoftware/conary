@@ -2954,21 +2954,26 @@ class Provides(_dependency):
         else:
             internalJavaDepMap = self.recipe._internalJavaDepMap
 
+        if hasattr(self.recipe, '_internalJavaProvides'):
+            internalProvides = self.recipe._internalJavaProvides
+        else:
+            # We need to cache the internal java provides, otherwise we do too
+            # much work for each file (CNY-3372)
+            self.recipe._internalJavaProvides = internalProvides = set()
+            for opath, ofiles in internalJavaDepMap.items():
+                internalProvides.update(x[0] for x in ofiles.values()
+                    if x[0] is not None)
+            # Now drop internal provides from individual class requires
+            for opath, ofiles in internalJavaDepMap.items():
+                for oclassName, (oclassProv, oclassReqSet) in ofiles.items():
+                    oclassReqSet.difference_update(internalProvides)
+
         reqs = set()
         if self._isJava(m, 'requires'):
             # Extract this file's requires
             reqs.update(m.contents['requires'])
             # Remove the ones that are satisfied internally
-            # First, compute the list of all internal provides
-            internalProvides = set()
-            for opath, ofiles in internalJavaDepMap.items():
-                internalProvides.update(x[0] for x in ofiles.values()
-                    if x[0] is not None)
             reqs.difference_update(internalProvides)
-            # Now drop these internal provides from individual class requires
-            for opath, ofiles in internalJavaDepMap.items():
-                for oclassName, (oclassProv, oclassReqSet) in ofiles.items():
-                    oclassReqSet.difference_update(internalProvides)
 
         # For now, we are only trimming the provides (and requires) for
         # classes for which the requires are not satisfied, neither internally
