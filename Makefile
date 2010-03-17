@@ -13,9 +13,9 @@
 #
 
 all: subdirs
-
-export VERSION = 2.1.9
 export TOPDIR = $(shell pwd)
+export VERSION = 2.1.9
+export CHECKSUM = $(shell ./hg-version.sh)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
 export lib = $(shell uname -m | sed -r '/x86_64|ppc64|s390x|sparc64/{s/.*/lib64/;q};s/.*/lib/')
