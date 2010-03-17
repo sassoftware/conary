@@ -542,8 +542,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 if (excludeCapsuleContents and new.troveInfo.capsule.type and
                                new.troveInfo.capsule.type()):
                     continue
-                if not withFileContents or (excludeAutoSource and
-                   newFile.flags.isAutoSource()) or newFile.flags.isPayload():
+                if (not withFileContents
+                    or (excludeAutoSource and newFile.flags.isAutoSource())
+                    or newFile.flags.isEncapsulatedContent()):
                     continue
 
 		# this test catches files which have changed from not

@@ -9,6 +9,9 @@ Changes in @NEW@:
       implementations. This allows us to build a conarydb which reflects
       the current state of a system without reinstalling packages through
       the capsule handler.
+    * Config files from RPM capsules are now handled by Conary instead of
+      RPM, including diff/patch merging.
+    * Added support for RPM capsules to ChangesetExploder class
 
   o Bug Fixes:
     * The Java package policies for computing provides and requires are
@@ -24,13 +27,23 @@ Changes in 2.1.10:
       to the system outside of conary package management. The
       verifyDirsNoNewFiles configuration option was added to pare down the
       tree conary looks through for new files.
-     * Added exceptions and exceptDeps options to RPMRequires
+    * Added exceptions and exceptDeps options to RPMRequires
 
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
     * Merged internals of localcs/verify implementation into new classes
+    * Renamed isPayload file flag to isEncapsulatedContent
     * Flavor objects can now be used with the stdlib "pickle" module.
+    * Added file flags to allow conary to override file contents and attributes
+      for capsule-based files (such as from RPM).
+    * Changesets are now loaded incrementally rather than as one big string;
+      this avoids a potentially large memory spike opening large changesets
+    * Added slots to various stream and trove objects
+    * StreamCollections are intialized as if thawing an empty string rather
+      than instantiating all of the child elements (which are often not needed
+      anyway). This reduces total ram usage by more than 5% on large
+      changesets.
 
   o Bug Fixes:
     * SSL XMLRPC connections will now retry before raising an exception
