@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.11:
   o New Features:
     * The recreatedb script is now capable of populating the Conary
       database with packages in the RPM database that are found in

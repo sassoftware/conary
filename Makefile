@@ -15,7 +15,7 @@
 all: subdirs
 
 export TOPDIR = $(shell pwd)
-export VERSION = 2.1.10
+export VERSION = 2.1.11
 export CHECKSUM = $(shell ./scripts/hg-version.sh)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
