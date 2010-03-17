@@ -12,4 +12,4 @@
 #
 
 version = "@version@"
-checksum = "@checksum@"
+changeset = "@changeset@"

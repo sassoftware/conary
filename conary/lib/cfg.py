@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rpath, Inc.
+# Copyright (c) 2004-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -37,7 +37,7 @@ from conary.lib.cfgtypes import *
 
 __developer_api__ = True
 
-class _Config:
+class _Config(object):
     """ Base configuration class.  Supports defining a configuration object, 
         and displaying that object, but has no knowledge of how the input.
 
@@ -177,6 +177,15 @@ class _Config:
         self.__dict__[key] = value
         self._options[key].setIsDefault(False)
 
+    def __setattr__(self, key, value):
+        # This ensures that the isDefault flag gets cleared if attributes are
+        # used to change an option. Note that unlike __setitem__ this function
+        # doesn't use lowerCaseMap and is therefore case-sensitive.
+        if key[0] == '_' or key not in self._options:
+            return object.__setattr__(self, key, value)
+        self.__dict__[key] = value
+        self._options[key].setIsDefault(False)
+
     def __contains__(self, key):
         if key[0] == '_' or key.lower() not in self._lowerCaseMap:
             return False
@@ -190,6 +199,9 @@ class _Config:
 
     @api.publicApi
     def isDefault(self, key):
+        # NOTE: There are ways (in code) to modify options without the
+        # isDefault flag being cleared, e.g. modifying a mutable option value
+        # directly. This is for advisory purposes only.
         return self._options[key].isDefault()
 
     def resetToDefault(self, key):
@@ -252,6 +264,27 @@ class _Config:
 
     def _writeKey(self, out, cfgItem, value, options):
         cfgItem.write(out, value, options)
+
+    # --- pickle protocol ---
+
+    def __getstate__(self):
+        return {
+                'flags': {},
+                'options': [ (key, self.__dict__[key], option.isDefault())
+                    for key, option in self._options.iteritems() ],
+                }
+
+    def __setstate__(self, state):
+        self.__dict__.clear()
+        self.__init__(**state['flags'])
+
+        for key, value, isDefault in state['options']:
+            # If the option is unknown, skip it. This allows for a little
+            # flexibility if the config definition changed.
+            option = self._options.get(key)
+            if option:
+                self.__dict__[key] = value
+                option.setIsDefault(isDefault)
 
 
 class ConfigFile(_Config):
@@ -515,6 +548,15 @@ class ConfigSection(ConfigFile):
     def includeConfigFile(self, val):
         return self._parent.includeConfigFile(val)
 
+    # --- pickle protocol ---
+
+    def __getstate__(self):
+        # Note that pickle has no problem with the reference loop here.
+        state = ConfigFile.__getstate__(self)
+        state['flags']['parent'] = self._parent
+        return state
+
+
 class SectionedConfigFile(ConfigFile):
     """ 
         A SectionedConfigFile allows the definition of sections 
@@ -623,6 +665,19 @@ class SectionedConfigFile(ConfigFile):
         rv = ConfigFile.readUrl(self, *args, **kw)
         self._sectionName = oldSection
         return rv
+
+    # --- pickle protocol ---
+
+    def __getstate__(self):
+        state = ConfigFile.__getstate__(self)
+        state['sections'] = self._sections
+        return state
+
+    def __setstate__(self, state):
+        ConfigFile.__setstate__(self, state)
+        for name, section in state['sections'].iteritems():
+            self._addSection(name, section)
+
 
 #----------------------------------------------------------
 

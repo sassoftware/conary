@@ -606,7 +606,7 @@ class ConaryContext(ConfigSection):
                                             '/media', '/initrd' ))
 
     def _resetSigMap(self):
-        self.signatureKeyMap = []
+        self.resetToDefault('signatureKeyMap')
 
     def __init__(self, *args, **kw):
         ConfigSection.__init__(self, *args, **kw)
