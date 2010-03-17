@@ -1,3 +1,5 @@
+Changes in @NEW@:
+
 Changes in 2.1.11:
   o New Features:
     * The recreatedb script is now capable of populating the Conary
