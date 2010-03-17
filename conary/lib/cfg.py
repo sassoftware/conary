@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rpath, Inc.
+# Copyright (c) 2004-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -37,7 +37,7 @@ from conary.lib.cfgtypes import *
 
 __developer_api__ = True
 
-class _Config:
+class _Config(object):
     """ Base configuration class.  Supports defining a configuration object, 
         and displaying that object, but has no knowledge of how the input.
 
@@ -174,6 +174,15 @@ class _Config:
         if key[0] == '_' or key.lower() not in self._lowerCaseMap:
             raise KeyError, 'No such attribute "%s"' % key
         key = self._lowerCaseMap[key.lower()]
+        self.__dict__[key] = value
+        self._options[key].setIsDefault(False)
+
+    def __setattr__(self, key, value):
+        # This ensures that the isDefault flag gets cleared if attributes are
+        # used to change an option. Note that unlike __setitem__ this function
+        # doesn't use lowerCaseMap and is therefore case-sensitive.
+        if key[0] == '_' or key not in self._options:
+            return object.__setattr__(self, key, value)
         self.__dict__[key] = value
         self._options[key].setIsDefault(False)
 
