@@ -199,6 +199,9 @@ class _Config(object):
 
     @api.publicApi
     def isDefault(self, key):
+        # NOTE: There are ways (in code) to modify options without the
+        # isDefault flag being cleared, e.g. modifying a mutable option value
+        # directly. This is for advisory purposes only.
         return self._options[key].isDefault()
 
     def resetToDefault(self, key):
@@ -267,22 +270,21 @@ class _Config(object):
     def __getstate__(self):
         return {
                 'flags': {},
-                'options': [ (key, self.__dict__[key])
-                    for key, option in self._options.iteritems()
-                    if not option.isDefault() ],
+                'options': [ (key, self.__dict__[key], option.isDefault())
+                    for key, option in self._options.iteritems() ],
                 }
 
     def __setstate__(self, state):
         self.__dict__.clear()
         self.__init__(**state['flags'])
 
-        for key, value in state['options']:
+        for key, value, isDefault in state['options']:
             # If the option is unknown, skip it. This allows for a little
             # flexibility if the config definition changed.
             option = self._options.get(key)
             if option:
                 self.__dict__[key] = value
-                option.setIsDefault(False)
+                option.setIsDefault(isDefault)
 
 
 class ConfigFile(_Config):
