@@ -61,7 +61,7 @@ generated_files = *.pyo *.pyc
 subdirs: default-subdirs
 
 constants.py: constants.py.in ../Makefile
-	sed -e s,@version@,$(VERSION),g -e s,@checksum@,$(CHECKSUM),g $< > $@
+	sed -e s,@version@,$(VERSION),g -e s,@changeset@,$(CHANGESET),g $< > $@
 
 install: all install-subdirs pyfiles-install
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
