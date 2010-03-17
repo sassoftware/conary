@@ -262,6 +262,28 @@ class _Config(object):
     def _writeKey(self, out, cfgItem, value, options):
         cfgItem.write(out, value, options)
 
+    # --- pickle protocol ---
+
+    def __getstate__(self):
+        return {
+                'flags': {},
+                'options': [ (key, self.__dict__[key])
+                    for key, option in self._options.iteritems()
+                    if not option.isDefault() ],
+                }
+
+    def __setstate__(self, state):
+        self.__dict__.clear()
+        self.__init__(**state['flags'])
+
+        for key, value in state['options']:
+            # If the option is unknown, skip it. This allows for a little
+            # flexibility if the config definition changed.
+            option = self._options.get(key)
+            if option:
+                self.__dict__[key] = value
+                option.setIsDefault(False)
+
 
 class ConfigFile(_Config):
     """ _Config class + ability to read in files """
@@ -524,6 +546,15 @@ class ConfigSection(ConfigFile):
     def includeConfigFile(self, val):
         return self._parent.includeConfigFile(val)
 
+    # --- pickle protocol ---
+
+    def __getstate__(self):
+        # Note that pickle has no problem with the reference loop here.
+        state = ConfigFile.__getstate__(self)
+        state['flags']['parent'] = self._parent
+        return state
+
+
 class SectionedConfigFile(ConfigFile):
     """ 
         A SectionedConfigFile allows the definition of sections 
@@ -632,6 +663,19 @@ class SectionedConfigFile(ConfigFile):
         rv = ConfigFile.readUrl(self, *args, **kw)
         self._sectionName = oldSection
         return rv
+
+    # --- pickle protocol ---
+
+    def __getstate__(self):
+        state = ConfigFile.__getstate__(self)
+        state['sections'] = self._sections
+        return state
+
+    def __setstate__(self, state):
+        ConfigFile.__setstate__(self, state)
+        for name, section in state['sections'].iteritems():
+            self._addSection(name, section)
+
 
 #----------------------------------------------------------
 
