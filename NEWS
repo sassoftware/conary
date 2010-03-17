@@ -1,3 +1,19 @@
+Changes in @NEW@:
+  o New Features:
+    * The recreatedb script is now capable of populating the Conary
+      database with packages in the RPM database that are found in
+      the Conary repositories in the installLabelPath. (CNY-3373)
+
+  o Internal Changes
+    * Added ability to commit changesets without executing capsule
+      implementations. This allows us to build a conarydb which reflects
+      the current state of a system without reinstalling packages through
+      the capsule handler.
+
+  o Bug Fixes:
+    * The Java package policies for computing provides and requires are
+      now more efficient. (CNY-3372)
+
 Changes in 2.1.10:
   o New Features:
     * The "conary migrate" command no longer requires interactive
@@ -15,13 +31,9 @@ Changes in 2.1.10:
       data if available
     * Merged internals of localcs/verify implementation into new classes
     * Flavor objects can now be used with the stdlib "pickle" module.
-    * Added ability to commit changesets without executing capsule
-      implementations. This allows us to build a conarydb which reflects
-      the current state of a system without reinstalling packages through
-      the capsule handler.
 
   o Bug Fixes:
-    * SSL XMLRPC connections will now retry before raising an exception 
+    * SSL XMLRPC connections will now retry before raising an exception
       (CNY-3369)
     * Java requirements for classes depending on other classes for which
       provides have been dropped no longer propagate as trove or file
@@ -38,7 +50,7 @@ Changes in 2.1.9:
   o Bug Fixes:
     * The NO_PROXY environment variable no longer applies to conary
       proxies. (CNY-3360)
-      
+
 Changes in 2.1.8:
   o Bug Fixes:
     * Added abort-on-error to conary rollback command which causes rollback
