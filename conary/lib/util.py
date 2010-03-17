@@ -2133,28 +2133,102 @@ class Tick:
 
 class GzipFile(gzip.GzipFile):
 
-    # fix gzip implementation to not seek
+    # fix gzip implementation to not seek. i'll probably end up in a
+    # hot, firey place for this
     def __init__(self, *args, **kwargs):
         self._first = True
         gzip.GzipFile.__init__(self, *args, **kwargs)
+
+    def _read_gzip_header(self):
+        magic = self.fileobj.read(2)
+        if magic == '':
+            return False
+
+        elif magic != '\037\213':
+            raise IOError, 'Not a gzipped file'
+        method = ord( self.fileobj.read(1) )
+        if method != 8:
+            raise IOError, 'Unknown compression method'
+        flag = ord( self.fileobj.read(1) )
+        # modtime = self.fileobj.read(4)
+        # extraflag = self.fileobj.read(1)
+        # os = self.fileobj.read(1)
+        self.fileobj.read(6)
+
+        if flag & gzip.FEXTRA:
+            # Read & discard the extra field, if present
+            xlen = ord(self.fileobj.read(1))
+            xlen = xlen + 256*ord(self.fileobj.read(1))
+            self.fileobj.read(xlen)
+        if flag & gzip.FNAME:
+            # Read and discard a null-terminated string containing the filename
+            while True:
+                s = self.fileobj.read(1)
+                if not s or s=='\000':
+                    break
+        if flag & gzip.FCOMMENT:
+            # Read and discard a null-terminated string containing a comment
+            while True:
+                s = self.fileobj.read(1)
+                if not s or s=='\000':
+                    break
+        if flag & gzip.FHCRC:
+            self.fileobj.read(2)     # Read & discard the 16-bit header CRC
+
+        return True
 
     def _read(self, size=1024):
         if self.fileobj is None:
             raise EOFError, "Reached EOF"
 
-        if self._first:
-            assert(self._new_member)
+        if self._new_member:
             # If the _new_member flag is set, we have to
             # jump to the next member, if there is one.
             self._init_read()
-            self._read_gzip_header()
+            if not self._read_gzip_header():
+                raise EOFError, "Reached EOF"
             self.decompress = zlib.decompressobj(-zlib.MAX_WBITS)
             self._new_member = False
-            self._first = False
-        elif self._new_member:
-            raise EOFError, "Reached EOF"
 
-        return gzip.GzipFile._read(self, size = size)
+        # Read a chunk of data from the file
+        buf = self.fileobj.read(size)
+
+        # If the EOF has been reached, flush the decompression object
+        # and mark this object as finished.
+
+        if buf == "":
+            uncompress = self.decompress.flush()
+            self._read_eof()
+            self._add_read_data( uncompress )
+            raise EOFError, 'Reached EOF'
+
+        uncompress = self.decompress.decompress(buf)
+        self._add_read_data( uncompress )
+
+        if self.decompress.unused_data != "":
+            eof = self.decompress.unused_data
+            eof += self.fileobj.read(8 - len(eof))
+
+            # Check the CRC and file size, and set the flag so we read
+            # a new member on the next call
+            self._read_eof(eof)
+            self._new_member = True
+
+    def _read_eof(self, eof):
+        # We've read to the end of the file, so we have to rewind in order
+        # to reread the 8 bytes containing the CRC and the file size.
+        # We check the that the computed CRC and size of the
+        # uncompressed data matches the stored values.  Note that the size
+        # stored is the true file size mod 2**32.
+        #self.fileobj.seek(-8, 1)
+        crc32, isize = struct.unpack("<LL", eof)
+        
+        actualCrc = (self.crc & 0xffffffff)
+        if crc32 != actualCrc:
+            raise IOError("CRC check failed %s != %s" % (hex(crc32),
+                                                         hex(actualCrc)))
+        elif isize != (self.size & 0xffffffffL):
+            raise IOError, "Incorrect length of data produced"
 
 # yields sorted paths and their stat bufs
 def walkiter(dirNameList, skipPathSet = set(), root = '/'):

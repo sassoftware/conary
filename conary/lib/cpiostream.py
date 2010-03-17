@@ -29,6 +29,8 @@ for ent in arch:
         # Do something with the data
 """
 
+import os
+import stat
 import StringIO
 import struct
 import sys
@@ -206,6 +208,41 @@ class CpioStream(object):
                 CpioHeader.HeaderLength, len(buf)))
         self._currentPosition += amt
         return buf
+
+class CpioExploder(CpioStream):
+
+    def explode(self, destDir):
+        for ent in self:
+            target = destDir + '/' + ent.filename
+            parent = os.path.dirname(target)
+            if not os.path.exists(parent):
+                os.makedirs(parent)
+
+            if stat.S_ISCHR(ent.header.mode):
+                os.mknod(target, stat.S_IFCHR,
+                         os.makedev(ent.rdevmajor, ent.rdevminor))
+            elif stat.S_ISBLK(ent.header.mode):
+                os.mknod(target, stat.S_IFBLK,
+                         os.makedev(ent.rdevmajor, ent.rdevminor))
+            elif stat.S_ISDIR(ent.header.mode):
+                os.mkdir(target)
+            elif stat.S_ISFIFO(ent.header.mode):
+                os.mkfifo(target)
+            elif stat.S_ISLNK(ent.header.mode):
+                os.symlink(target, ent.nlink)
+            elif stat.S_ISREG(ent.header.mode):
+                f = open(target, "w")
+                buf = ent.payload.read(64 * 1024)
+                while buf:
+                    f.write(buf)
+                    buf = ent.payload.read(64 * 1024)
+                f.close()
+            else:
+                raise Error("unknown file mode 0%o for %s"
+                                % (ent.header.mode, ent.filename))
+
+            if not stat.S_ISLNK(ent.header.mode):
+                os.chmod(target, ent.header.mode & 0777)
 
 if __name__ == '__main__':
     sys.exit(main())

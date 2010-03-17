@@ -16,6 +16,7 @@ import os, tempfile, sys
 
 from conary import files, trove
 from conary.lib import digestlib, util
+from conary.local import journal
 
 class CapsuleOperation(object):
 
@@ -29,7 +30,7 @@ class CapsuleOperation(object):
         self.errors = []
         self.skipCapsuleOps = skipCapsuleOps
 
-    def apply(self, justDatabase = False):
+    def apply(self, fileDict, justDatabase = False):
         raise NotImplementedException
 
     def install(self, troveCs):
@@ -44,18 +45,52 @@ class CapsuleOperation(object):
     def _error(self, e):
         self.errors.append(e)
 
+class ConaryOwnedJournal(journal.JobJournal):
+
+    # keep track of files which conary wants to own despite them being
+    # in the underlying capsule; we back those up before the capsule
+    # handler runs, and then restore them. this effectively takes ownership
+    # of those files away from the underlying packaging tool
+
+    def __init__(self, root = '/'):
+        tmpfd, tmpname = tempfile.mkstemp()
+        journal.JobJournal.__init__(self, tmpname, root = root, create = True)
+        os.close(tmpfd)
+        os.unlink(tmpname)
+
 class SingleCapsuleOperation(CapsuleOperation):
 
     def __init__(self, *args, **kwargs):
         CapsuleOperation.__init__(self, *args, **kwargs)
         self.installs = []
         self.removes = []
+        self.preserveList = []
 
     def _filesNeeded(self):
         return [ x[1] for x in self.installs ]
 
-    def apply(self, justDatabase = False):
+    def preservePath(self, path):
+        self.preserveList.append(path)
+
+    def doApply(self, justDatabase = False):
         raise NotImplementedError
+
+    def apply(self, fileDict, justDatabase = False):
+        if not justDatabase and self.preserveList:
+            capsuleJournal = ConaryOwnedJournal(self.root)
+            for path in self.preserveList:
+                fullPath = self.root + path
+                capsuleJournal.backup(fullPath, skipDirs = True)
+                if not util.removeIfExists(fullPath):
+                    capsuleJournal.create(fullPath)
+        else:
+            capsuleJournal = None
+
+        try:
+            self.doApply(fileDict, justDatabase = justDatabase)
+        finally:
+            if capsuleJournal:
+                capsuleJournal.revert()
 
     def install(self, flags, troveCs):
         if troveCs.getOldVersion():
@@ -103,8 +138,8 @@ class MetaCapsuleOperations(CapsuleOperation):
     availableClasses = { 'rpm' : ('conary.local.rpmcapsule',
                                   'RpmCapsuleOperation') }
 
-    def __init__(self, *args, **kwargs):
-        CapsuleOperation.__init__(self, *args, **kwargs)
+    def __init__(self, root = '/', *args, **kwargs):
+        CapsuleOperation.__init__(self, root, *args, **kwargs)
         self.capsuleClasses = {}
 
     def apply(self, justDatabase = False):

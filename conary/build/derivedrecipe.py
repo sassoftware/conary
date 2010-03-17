@@ -48,7 +48,7 @@ class DerivedChangesetExploder(changeset.ChangesetExploder):
 
         # A payload file means that we are dealing with a Capsule.  This
         # is verboten in derived recipes because it is meaningless.
-        if fileObj.flags.isPayload():
+        if fileObj.flags.isEncapsulatedContent():
             raise builderrors.RecipeFileError(
                 'Derived recipes cannot be used with %s, '
                 'it was created with a CapsuleRecipe.' % self.trv.name()

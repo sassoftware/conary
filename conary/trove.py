@@ -73,6 +73,14 @@ def troveIsFileSet(troveName):
 def troveNameIsValid(troveName):
     return not True in (x in troveName for x in '/[]!~,:=()')
 
+def conaryContents(hasCapsule, pathId, fileObj):
+    if pathId == CAPSULE_PATHID:
+        return False
+
+    return (fileObj.flags.isCapsuleOverride() or
+            fileObj.flags.isConfig() or
+            not hasCapsule)
+
 class TroveTuple(streams.StreamSet):
     _SINGLE_TROVE_TUP_NAME    = 0
     _SINGLE_TROVE_TUP_VERSION = 1
@@ -305,6 +313,7 @@ _DIGSIG_SIGNATURE     = 1
 _DIGSIG_TIMESTAMP     = 2
 
 class DigitalSignature(streams.StreamSet):
+    __slots__ = ('fingerprint', 'signature', 'timestamp')
     streamDict = {
         _DIGSIG_FINGERPRINT  : (SMALL, streams.StringStream,   'fingerprint' ),
         _DIGSIG_SIGNATURE    : (SMALL, streams.StringStream,   'signature'   ),
@@ -377,6 +386,7 @@ _DIGSIGS_DIGSIGNATURE     = 1
 # should always send the whole stream collection as a
 # AbsoluteStreamCollection
 class DigitalSignatures(streams.AbsoluteStreamCollection):
+    __slots__ = ()
     streamDict = { _DIGSIGS_DIGSIGNATURE: DigitalSignature }
 
     def add(self, val):
@@ -411,6 +421,7 @@ _VERSIONED_DIGITAL_SIGNATURES_DIGEST   = 1
 _VERSIONED_DIGITAL_SIGNATURES_DIGSIGS = 2
 
 class VersionedDigitalSignatures(streams.StreamSet):
+    __slots__ = ( 'version', 'digest', 'signatures' )
     streamDict = {
         _VERSIONED_DIGITAL_SIGNATURES_VERSION:
                 (SMALL, streams.ByteStream,    'version'   ),
@@ -492,6 +503,8 @@ class TroveSignatures(streams.StreamSet):
     considered version 0, and this object hides the different storage method
     for those signatures.
     """
+
+    __slots__ = ( 'digitalSigs', 'sha1', 'vSigs', 'ignoreUnknown', 'streamDict' )
 
     ignoreUnknown = True
     streamDict = {
@@ -3080,6 +3093,8 @@ class TroveWithFileObjects(Trove):
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
+    __slots__ = ()
+
     def freeze(self, skipSet = {}):
 	l = []
 	for name, troveList in sorted(self.iteritems()):
@@ -3113,7 +3128,7 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 	i = 0
 
 	while i < len(l):
-	    name = l[i]
+	    name = intern(l[i])
 	    self[name] = []
 
 	    i += 1
@@ -3290,7 +3305,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
                                 : (LARGE, streams.StringStream,
                                                         "extendedMetadata"   ),
     }
-
+    __slots__ = [ x[2] for x in streamDict.values() ]
     ignoreUnknown = True
 
     """
@@ -3334,6 +3349,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def getFrozenTroveInfo(self):
         return self.absoluteTroveInfo()
+
+    def hasCapsule(self):
+        troveInfo = self.absoluteTroveInfo()
+        capsuleType = TroveInfo.find(_TROVEINFO_TAG_CAPSULE,
+                                     troveInfo)
+        return (capsuleType and capsuleType.type())
 
     def getFrozenExtendedMetadata(self):
         return self.extendedMetadata()
@@ -3762,6 +3783,8 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
 class TroveChangeSet(AbstractTroveChangeSet):
 
+    __slots__ = ()
+
     def __init__(self, name, changeLog, oldVersion, newVersion, 
 		 oldFlavor, newFlavor, oldSigs, newSigs,
                  absolute = 0, type = TROVE_TYPE_NORMAL,
@@ -3793,6 +3816,8 @@ class TroveChangeSet(AbstractTroveChangeSet):
         return "conary.trove.TroveChangeSet('%s')" % self.name()
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
+
+    __slots__ = ()
 
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)
