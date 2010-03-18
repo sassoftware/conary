@@ -339,6 +339,9 @@ class FileFinder(object):
             return self.user, self.passwd
 
     def _fetchUrl(self, url, headers):
+        if isinstance(url,str):
+            url = laUrl(url)
+
         retries = 0
         inFile = None
         while retries < 5:
