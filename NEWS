@@ -1,4 +1,8 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * gzip files that are corrupt in the first 4KB of compressed data
+      no longer cause all policies that check for file type using
+      conary's "magic" module to trace back. (CNY-3377)
 
 Changes in 2.1.11:
   o New Features:
