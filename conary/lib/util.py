@@ -17,6 +17,7 @@ import bz2
 import debugger
 import errno
 import fcntl
+import fnmatch
 import gzip
 import itertools
 import log
@@ -2204,3 +2205,14 @@ class noproxyFilter(object):
             if urlStr.endswith(x):
                 return True
         return False
+
+def fnmatchTranslate(pattern):
+    "Like fnmatch.translate, but do not add the end-of-string character(s)"
+    patt = fnmatch.translate(pattern)
+    # Python 2.6.5 appends \Z(?ms) instead of $
+    if patt.endswith('$'):
+        return patt[:-1]
+    if patt.endswith(r'\Z(?ms)'):
+        return patt[:-7]
+    raise RuntimeError("Unrecognized end-of-string in %s" % patt)
+

@@ -3,6 +3,9 @@ Changes in @NEW@:
     * gzip files that are corrupt in the first 4KB of compressed data
       no longer cause all policies that check for file type using
       conary's "magic" module to trace back. (CNY-3377)
+    * conary.lib.util now has an fnmatchTranslate function that strips
+      the end-of-string termination consistently in python 2.6.5 and
+      in older versions. (CNY-3378)
 
 Changes in 2.1.11:
   o New Features:
