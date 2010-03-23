@@ -15,9 +15,9 @@
 import bdb
 import bz2
 import debugger
+import errno
 import fcntl
 import gzip
-import errno
 import itertools
 import log
 import misc
@@ -29,8 +29,8 @@ import signal
 import stat
 import string
 import StringIO
-import subprocess
 import struct
+import subprocess
 import sys
 import tempfile
 import time
