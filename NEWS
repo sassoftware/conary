@@ -6,6 +6,8 @@ Changes in @NEW@:
     * conary.lib.util now has an fnmatchTranslate function that strips
       the end-of-string termination consistently in python 2.6.5 and
       in older versions. (CNY-3378)
+    * dbstore's createIndex() method no longer fails if invoked multiple
+      times without reloading the schema. (CNY-3380)
 
 Changes in 2.1.11:
   o New Features:

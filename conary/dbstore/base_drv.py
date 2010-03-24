@@ -472,6 +472,8 @@ class BaseDatabase:
             unique, name, table, columns)
         cu = self.dbh.cursor()
         cu.execute(sql)
+        if table in self.tables and name not in self.tables[table]:
+            self.tables[table].append(name)
         return True
     def _dropIndexSql(self, table, name):
         sql = "DROP INDEX %s" % (name,)
