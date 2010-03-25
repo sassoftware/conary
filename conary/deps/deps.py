@@ -1405,6 +1405,11 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
     if isinstance(s, DependencySet):
         return s
 
+    if isinstance(s, unicode):
+        try:
+            s = s.encode("ascii")
+        except UnicodeEncodeError:
+            raise ParseError, ("invalid characters in flavor '%s'" % s)
     s = s.strip()
     match = flavorRegexp.match(s)
     if not match:

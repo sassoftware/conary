@@ -10,6 +10,8 @@ Changes in @NEW@:
       times without reloading the schema. (CNY-3380)
     * A bug related to Java files containing classes with no requirements
       is now fixed. (CNY-3379)
+    * Unicode representations of flavors are now converted to ASCII
+      strings before being parsed. (CNY-3381)
 
 Changes in 2.1.11:
   o New Features:
