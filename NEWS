@@ -8,6 +8,8 @@ Changes in @NEW@:
       in older versions. (CNY-3378)
     * dbstore's createIndex() method no longer fails if invoked multiple
       times without reloading the schema. (CNY-3380)
+    * A bug related to Java files containing classes with no requirements
+      is now fixed. (CNY-3379)
 
 Changes in 2.1.11:
   o New Features:

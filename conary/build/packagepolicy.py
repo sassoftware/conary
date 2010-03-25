@@ -2964,8 +2964,11 @@ class Provides(_dependency):
                 internalProvides.update(x[0] for x in ofiles.values()
                     if x[0] is not None)
             # Now drop internal provides from individual class requires
+
             for opath, ofiles in internalJavaDepMap.items():
                 for oclassName, (oclassProv, oclassReqSet) in ofiles.items():
+                    if oclassReqSet is None:
+                        continue
                     oclassReqSet.difference_update(internalProvides)
 
         reqs = set()
