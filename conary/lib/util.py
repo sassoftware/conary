@@ -2232,7 +2232,7 @@ class LockedFile(object):
         pass
     print fileobj.read()
     """
-    __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj', '_tmpfname')
+    __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj')
 
     # python 2.4 defines SEEK_SET in posixfile, which is deprecated
     SEEK_SET = 0
@@ -2243,7 +2243,6 @@ class LockedFile(object):
         self.lockFileName = self.fileName + '.lck'
         self._lockfobj = None
         self._tmpfobj = None
-        self._tmpfname = None
 
     def open(self, shouldLock = True):
         """
@@ -2282,10 +2281,7 @@ class LockedFile(object):
             # the lock file after releasing the lock
             return self.open()
         # Create temporary file
-        fd, self._tmpfname = tempfile.mkstemp(
-            dir = os.path.dirname(self.fileName),
-            prefix = os.path.basename(self.fileName) + ".tmp")
-        self._tmpfobj = os.fdopen(fd, "w")
+        self._tmpfobj = AtomicFile(self.fileName)
         # We now hold the lock and we have a temporary file to write to
         return None
 
@@ -2295,12 +2291,10 @@ class LockedFile(object):
         self._tmpfobj.write(data)
 
     def commit(self):
-        self._tmpfobj.close()
         # It is important that we move the file into place first, before
         # releasing the lock. This make sure that any process that was blocked
         # will see the file immediately, instead of retrying to lock
-        os.rename(self._tmpfname, self.fileName)
-        fileobj = file(self.fileName)
+        fileobj = self._tmpfobj.commit(returnHandle = True)
         self.unlock()
         return fileobj
 
@@ -2313,12 +2307,62 @@ class LockedFile(object):
         if self._tmpfobj is not None:
             self._tmpfobj.close()
             self._tmpfobj = None
-        if self._tmpfname is not None:
-            removeIfExists(self._tmpfname)
-            self._tmpfname = None
         # This also releases the lock
         if self._lockfobj is not None:
             self._lockfobj.close()
             self._lockfobj = None
 
     __del__ = close
+
+class AtomicFile(object):
+    """
+    Open a temporary file adjacent to C{path} for writing. When
+    C{f.commit()} is called, the temporary file will be flushed and
+    renamed on top of C{path}, constituting an atomic file write.
+    """
+
+    fObj = None
+
+    def __init__(self, path, mode='w+b', chmod=0644, tmpsuffix = ""):
+        self.finalPath = os.path.realpath(path)
+        self.finalMode = chmod
+
+        fDesc, self.name = tempfile.mkstemp(dir=os.path.dirname(self.finalPath),
+            suffix=tmpsuffix, prefix=os.path.basename(self.finalPath))
+        self.fObj = os.fdopen(fDesc, mode)
+
+    def __getattr__(self, name):
+        return getattr(self.fObj, name)
+
+    def commit(self, returnHandle=False):
+        """
+        C{flush()}, C{chmod()}, and C{rename()} to the target path.
+        C{close()} afterwards.
+        """
+        if self.fObj.closed:
+            raise RuntimeError("Can't commit a closed file")
+
+        # Flush and change permissions before renaming so the contents
+        # are immediately present and accessible.
+        self.fObj.flush()
+        os.chmod(self.name, self.finalMode)
+        os.fsync(self.fObj)
+
+        # Rename to the new location. Since both are on the same
+        # filesystem, this will atomically replace the old with the new.
+        os.rename(self.name, self.finalPath)
+
+        # Now close the file.
+        if returnHandle:
+            fObj, self.fObj = self.fObj, None
+            return fObj
+            return fObj
+        else:
+            self.fObj.close()
+
+    def close(self):
+        if self.fObj and not self.fObj.closed:
+            removeIfExists(self.name)
+            self.fObj.close()
+    __del__ = close
+
