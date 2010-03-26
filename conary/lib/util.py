@@ -23,6 +23,7 @@ import itertools
 import log
 import misc
 import os
+import posixfile
 import re
 import select
 import shutil
@@ -2234,7 +2235,7 @@ class LockedFile(object):
     """
     __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj', '_tmpfname')
 
-    WRLOCK = struct.pack('hhllhh', fcntl.F_WRLCK, os.SEEK_SET, 0, 0, 0, 0)
+    WRLOCK = struct.pack('hhllhh', fcntl.F_WRLCK, posixfile.SEEK_SET, 0, 0, 0, 0)
 
     def __init__(self, fileName):
         self.fileName = fileName
