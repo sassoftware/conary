@@ -2245,7 +2245,7 @@ class LockedFile(object):
         self._tmpfobj = None
         self._tmpfname = None
 
-    def open(self):
+    def open(self, shouldLock = True):
         """
         Attempt to open the file.
         Returns a file object if the file exists.
@@ -2258,7 +2258,7 @@ class LockedFile(object):
             self.close()
 
         fobj = fopenIfExists(self.fileName, "r")
-        if fobj is not None:
+        if fobj is not None or not shouldLock:
             return fobj
 
         self._lockfobj = open(self.lockFileName, "w")
