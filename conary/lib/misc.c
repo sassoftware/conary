@@ -54,6 +54,7 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args);
 static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyObject * pyfchmod(PyObject *self, PyObject *args);
+static PyObject * py_fopen(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -84,6 +85,7 @@ static PyMethodDef MiscMethods[] = {
     { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
     { "res_init", py_res_init, METH_VARARGS },
     { "fchmod", pyfchmod, METH_VARARGS },
+    { "fopenIfExists", py_fopen, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -1564,6 +1566,21 @@ static PyObject * pyfchmod(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+
+static PyObject * py_fopen(PyObject *self, PyObject *args) {
+    /* If the file exists, return it; otherwise, return None */
+    char *fn, *mode;
+    FILE *f;
+    if (!PyArg_ParseTuple(args, "ss", &fn, &mode))
+        return NULL;
+
+    f = fopen(fn, mode);
+    if (f == NULL) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyFile_FromFile(f, fn, mode, fclose);
+}
 
 #define MODULE_DOCSTR "miscellaneous low-level C functions for conary"
 

@@ -1304,7 +1304,7 @@ pread = misc.pread
 res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
 fchmod = misc.fchmod
-
+fopenIfExists = misc.fopenIfExists
 
 def _LazyFile_reopen(method):
     """Decorator to perform the housekeeping of opening/closing of fds"""
@@ -2216,3 +2216,107 @@ def fnmatchTranslate(pattern):
         return patt[:-7]
     raise RuntimeError("Unrecognized end-of-string in %s" % patt)
 
+class LockedFile(object):
+    """
+    A file protected by a lock.
+    To use it:
+
+    l = LockedFile("filename")
+    fileobj = l.open()
+    if fileobj is None:
+        # The target file does not exist. Create it.
+        l.write("Some content")
+        fileobj = l.commit()
+    else:
+        # The target file exists
+        pass
+    print fileobj.read()
+    """
+    __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj', '_tmpfname')
+
+    WRLOCK = struct.pack('hhllhh', fcntl.F_WRLCK, os.SEEK_SET, 0, 0, 0, 0)
+
+    def __init__(self, fileName):
+        self.fileName = fileName
+        self.lockFileName = self.fileName + '.lck'
+        self._lockfobj = None
+        self._tmpfobj = None
+        self._tmpfname = None
+
+    def open(self):
+        """
+        Attempt to open the file.
+        Returns a file object if the file exists.
+        Returns None if the file does not exist, and needs to be created. At
+            this point the lock is acquired. Use write() and commit() to have
+            the file created and the lock released.
+        """
+
+        if self._lockfobj is not None:
+            self.close()
+
+        fobj = fopenIfExists(self.fileName, "r")
+        if fobj is not None:
+            return fobj
+
+        self._lockfobj = open(self.lockFileName, "w")
+
+        # Attempt to lock file in write mode
+        ret = fcntl.fcntl(self._lockfobj, fcntl.F_SETLKW, self.WRLOCK)
+        # If we got this far, we now have the lock. Check if the data file was
+        # created
+        fobj = fopenIfExists(self.fileName, "r")
+        if fobj is not None:
+            # The other process committed (and we probably hold a link to a
+            # removed file).
+            self.unlock()
+            return fobj
+
+        if not os.path.exists(self.lockFileName):
+            # The original caller returned without creating the data file, and
+            # it also removed the lock file - so now we hold a lock on an
+            # orphaned fd
+            # This should normally not happen, since a close() will not remove
+            # the lock file after releasing the lock
+            return self.open()
+        # Create temporary file
+        fd, self._tmpfname = tempfile.mkstemp(
+            dir = os.path.dirname(self.fileName),
+            prefix = os.path.basename(self.fileName) + ".tmp")
+        self._tmpfobj = os.fdopen(fd, "w")
+        # We now hold the lock and we have a temporary file to write to
+        return None
+
+    def write(self, data):
+        if self._tmpfobj is None:
+            raise RuntimeError("Lock not acquired")
+        self._tmpfobj.write(data)
+
+    def commit(self):
+        self._tmpfobj.close()
+        # It is important that we move the file into place first, before
+        # releasing the lock. This make sure that any process that was blocked
+        # will see the file immediately, instead of retrying to lock
+        os.rename(self._tmpfname, self.fileName)
+        fileobj = file(self.fileName)
+        self.unlock()
+        return fileobj
+
+    def unlock(self):
+        removeIfExists(self.lockFileName)
+        self.close()
+
+    def close(self):
+        """Close without removing the lock file"""
+        if self._tmpfobj is not None:
+            self._tmpfobj.close()
+            self._tmpfobj = None
+        if self._tmpfname is not None:
+            removeIfExists(self._tmpfname)
+            self._tmpfname = None
+        # This also releases the lock
+        if self._lockfobj is not None:
+            self._lockfobj.close()
+            self._lockfobj = None
+
+    __del__ = close
