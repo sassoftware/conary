@@ -602,9 +602,7 @@ class ConaryContext(ConfigSection):
     user                  =  CfgUserInfo
     baseClassDir          =  (CfgPath, '/usr/share/conary/baseclasses')
     verifyDirsNoNewFiles  =  (CfgPathList, ('/proc', '/sys', '/home', '/dev',
-                                            '/mnt', '/tmp', '/var/tmp',
-                                            '/var/log', '/var/lock', '/var/run',
-                                            '/var/lib/conarydb',
+                                            '/mnt', '/tmp', '/var',
                                             '/media', '/initrd' ))
 
     def _resetSigMap(self):

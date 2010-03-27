@@ -333,7 +333,7 @@ class ClientClone:
                 # ptr links, but it commits just fine.
 
                 if (files.frozenFileHasContents(filecs) and
-                    not files.frozenFileFlags(filecs).isPayload() and
+                    not files.frozenFileFlags(filecs).isEncapsulatedContent() and
 			(pathId, newFileId) != lastContents):
                     # this copies the contents from the old changeset to the
                     # new without recompressing
@@ -354,7 +354,7 @@ class ClientClone:
                     itertools.izip(allFileObjects, individualFilesNeeded):
                 diff, hash = changeset.fileChangeSet(pathId, None, fileObject)
                 cs.addFile(oldFileId, newFileId, diff)
-                if not fileObject.flags.isPayload() and hash:
+                if not fileObject.flags.isEncapsulatedContent() and hash:
                     contentsNeeded.append(
                             ((pathId, fileObject.flags.isConfig()),
                              (newFileId, fromFileVersion)))

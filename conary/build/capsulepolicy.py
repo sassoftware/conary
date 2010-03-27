@@ -205,7 +205,7 @@ class Payload(policy.Policy):
                     and not f.flags.isConfig()
                     and not (f.flags.isInitialContents()
                              and not f.contents.size())):
-                    f.flags.isPayload(True)
+                    f.flags.isEncapsulatedContent(True)
 
 
 class RPMProvides(policy.Policy):

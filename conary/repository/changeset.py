@@ -542,11 +542,16 @@ class ChangeSet(streams.StreamSet):
 
 	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
                                 troveCs.getOldFlavor())
+
+            # make a copy because we modify it locally to clear capsules
+            invertedTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
+            invertedTroveInfo.capsule.reset()
+
             newTroveInfo = troveCs.getTroveInfo()
             if newTroveInfo is None:
                 newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
                 newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
-            newTroveInfoDiff = trv.getTroveInfo().diff(newTroveInfo)
+            newTroveInfoDiff = invertedTroveInfo.diff(newTroveInfo)
 
 	    # this is a modified trove and needs to be inverted
 
@@ -562,7 +567,7 @@ class ChangeSet(streams.StreamSet):
 
             invertedTrove.setRequires(trv.getRequires())
             invertedTrove.setProvides(trv.getProvides())
-            invertedTrove.setTroveInfo(trv.troveInfo)
+            invertedTrove.setTroveInfo(invertedTroveInfo)
 
             for weak in (True, False):
                 for (name, list) in troveCs.iterChangedTroves(
@@ -1910,7 +1915,7 @@ def CreateFromFilesystem(troveList):
 	    (filecs, hash) = fileChangeSet(pathId, None, file)
 	    cs.addFile(oldFileId, newFileId, filecs)
 
-            if hash and not file.flags.isPayload():
+            if hash and not file.flags.isEncapsulatedContent():
 		cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
 			  file.flags.isConfig())

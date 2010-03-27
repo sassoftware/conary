@@ -2049,7 +2049,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             oldFileObj) ) 
                         needItems.append( (pathId, None, oldFileObj) ) 
 
-                    if not newFileObj.flags.isPayload():
+                    if not newFileObj.flags.isEncapsulatedContent():
                         fetchItems.append( (newFileId, newFileVersion, newFileObj) )
                         contentsNeeded += fetchItems
 

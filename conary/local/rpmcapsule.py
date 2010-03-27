@@ -17,7 +17,7 @@ import itertools, rpm, os, pwd, stat, tempfile
 from conary import files
 from conary.lib import util
 from conary.local.capsules import SingleCapsuleOperation
-from conary.local import errors
+from conary.local import errors, update
 from conary.repository import filecontents
 
 def rpmkey(hdr):
@@ -102,7 +102,7 @@ class Callback:
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
-    def apply(self, fileDict, justDatabase = False):
+    def doApply(self, fileDict, justDatabase = False):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
@@ -179,6 +179,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         (oldTrv, trv) = rc
         trvInfo = troveCs.getNewNameVersionFlavor()
         oldTrvInfo = troveCs.getOldNameVersionFlavor()
+        hasCapsule = troveCs.hasCapsule()
 
         # Updates the fsJob metadata for installing the current trove.
         # It assumes files are replaced on install, and complains if something
@@ -228,6 +229,18 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 fileObj = files.ThawFile(fileStream, pathId)
 
             absolutePath = self.root + path
+
+            if (fileObj.flags.isCapsuleAddition()):
+                # this was added to the package outside of the RPM; we don't
+                # have any responsibility for it
+                continue
+            elif (update.conaryContents(hasCapsule, pathId, fileObj)
+                  and fileObj.lsTag != 'd'):
+                # this content isn't part of the capsule; remember to put
+                # it back when RPM is done
+                self.preservePath(path)
+                continue
+
             s = util.lstat(absolutePath)
             if not s:
                 # there is nothing in the way, so there is nothing which
@@ -317,11 +330,28 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         # shared file handling means it may not erase things which we think
         # ought to be
         for trv in self.removes:
-            for pathId, path, fileId, version in trv.iterFileList():
+            dbFileObjs = self.db.getFileVersions(
+                        [ (x[0], x[2], x[3]) for x in trv.iterFileList() ] )
+
+            for (pathId, path, fileId, version), fileObj in \
+                    itertools.izip(trv.iterFileList(), dbFileObjs):
                 fullPath = self.root + path
                 if not os.path.exists(fullPath):
                     continue
-                fileObj = files.FileFromFilesystem(fullPath, pathId)
-                self.fsJob._remove(fileObj, path, fullPath,
+
+                if (fileObj.flags.isCapsuleAddition()):
+                    # this was added to the package outside of the RPM;
+                    # we don't have any responsibility for it
+                    continue
+                elif (fileObj.hasContents and
+                      not fileObj.flags.isEncapsulatedContent()):
+                    # this content isn't part of the capsule; remember to put
+                    # it back when RPM is done
+                    self.preservePath(path)
+                    continue
+
+                fsFileObj = files.FileFromFilesystem(fullPath, pathId,
+                                                     possibleMatch = fileObj)
+                self.fsJob._remove(fsFileObj, path, fullPath,
                                    'removing rpm owned file %s',
                                    ignoreMissing = True)
