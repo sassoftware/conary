@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2009 rPath, Inc.
+# Copyright (c) 2009, 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,6 +15,7 @@
 import itertools, rpm, os, pwd, stat, tempfile
 
 from conary import files
+from conary.deps import deps
 from conary.lib import util
 from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors, update
@@ -169,6 +170,10 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             raise ValueError(str(probs))
 
     def install(self, flags, troveCs):
+        ACTION_RESTORE = 1
+        ACTION_SKIP = 2
+        ACTION_CONFLICT = 3
+
         rc = SingleCapsuleOperation.install(self, flags, troveCs)
         if rc is None:
             # parent class thinks we should just ignore this troveCs; I'm
@@ -248,10 +253,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 toRestore.append((fileInfo, fileObj))
                 continue
 
-            mayRestore = False
+            action = ACTION_CONFLICT
 
             existingOwners = list(
-                self.db.iterFindPathReferences(path, justPresent = True))
+                self.db.iterFindPathReferences(path, justPresent = True,
+                                               withStream = True))
 
             if existingOwners:
                 # Don't complain about files owned by the previous version
@@ -261,54 +267,78 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                     existingOwners.remove(l[0])
 
                 if not existingOwners:
-                    mayRestore = True
+                    action = ACTION_RESTORE
             elif stat.S_ISDIR(s.st_mode) and fileObj.lsTag == 'd':
                 # Don't let existing directories stop us from taking over
                 # ownership of the directory
-                mayRestore = True
+                action = ACTION_RESTORE
             elif fileObj.flags.isInitialContents():
                 # Initial contents files may be restored on top of things
                 # already in the filesystem. They're ghosts or config files
                 # and RPM will get the contents right either way, and we
                 # should remove them either way.
-                mayRestore = True
+                action = ACTION_RESTORE
 
-            if not mayRestore and existingOwners:
+            if action == ACTION_CONFLICT and existingOwners:
                 if fileId in [ x[4] for x in existingOwners ]:
                     # The files share metadata same. Whatever it looks like on
                     # disk, RPM is going to blow it away with the new one.
                     for info in existingOwners:
                         self.fsJob.sharedFile(info[0], info[1], info[2],
                                               info[3])
-                    mayRestore = True
-                elif flags.replaceManagedFiles:
-                    # The files are different. Bail unless we're supposed to
-                    # replace managed files.
-                    existingFile = files.FileFromFilesystem(absolutePath,
-                                                            pathId)
-                    for info in existingOwners:
-                        self.fsJob.userRemoval(
-                            fileObj = existingFile,
-                            content = filecontents.FromFilesystem(absolutePath),
-                            *info[0:4])
-                    mayRestore = True
+                    action = ACTION_RESTORE
+                else:
+                    # RPM file colors and the default RPM setting for
+                    # file color policy make ELF64 files silently replace
+                    # ELF32 files. follow that behavior here.
+                    #
+                    # no, I'm not making this up
+                    #
+                    # yes, really
+                    existingRequires = [ files.frozenFileRequires(x[5])
+                                            for x in existingOwners ]
+
+                    if 1 in [ files.rpmFileColorCmp(x, fileObj.requires)
+                              for x in existingRequires ]:
+                        # something in existingRequires is ELF64 while
+                        # fileObj is ELF32
+                        action = ACTION_SKIP
+                    elif (flags.replaceManagedFiles or
+                          1 in [ files.rpmFileColorCmp(fileObj.requires, x)
+                                 for x in existingRequires ]):
+                        # The files are different. Bail unless we're supposed
+                        # to replace managed files.
+                        existingFile = files.FileFromFilesystem(absolutePath,
+                                                                pathId)
+                        for info in existingOwners:
+                            self.fsJob.userRemoval(
+                                fileObj = existingFile,
+                                content =
+                                    filecontents.FromFilesystem(absolutePath),
+                                *info[0:4])
+                        action = ACTION_RESTORE
             elif flags.replaceUnmanagedFiles:
                 # we don't own it, but it's on disk. RPM will just write over
                 # it and we have the flag saying we're good with that
-                mayRestore = True
+                action = ACTION_RESTORE
 
-            if mayRestore:
+            if action == ACTION_RESTORE:
                 # We may proceed, and RPM will replace this file for us. We
                 # need to track that it's being restored to avoid conflicts
                 # with other restorations though.
                 toRestore.append((fileInfo, fileObj))
-            else:
+            elif action == ACTION_CONFLICT:
                 # The file exists already, we can't share it, and we're not
                 # allowed to overwrite it.
                 self._error(errors.FileInWayError(util.normpath(path),
                                                   troveCs.getName(),
                                                   troveCs.getNewVersion(),
                                                   troveCs.getNewFlavor()))
+            else:
+                assert(action == ACTION_SKIP)
+                self.preservePath(path)
+                self.fsJob.userRemoval(trv.getName(), trv.getVersion(),
+                                       trv.getFlavor(), pathId)
 
         # toRestore is the list of what is going to be restored. We need to get
         # the fileObjects which will be created so we can track them in the
@@ -316,7 +346,6 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         # conflicts within this update. We handle newly created files first
         # and files which have changed (so we have to look up the diff)
         # a bit later.
-        changedFiles = []
         for fileInfo, fileObj in toRestore:
             self.fsJob._restore(fileObj, self.root + path, trvInfo,
                                 "restoring %s from RPM",

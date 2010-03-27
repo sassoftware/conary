@@ -25,6 +25,7 @@ import tempfile
 import time
 
 from conary import errors, streams
+from conary.deps import deps
 from conary.lib import elf, util, sha1helper, log, digestlib
 
 _FILE_FLAG_CONFIG = 1 << 0
@@ -833,6 +834,9 @@ def frozenFileContentInfo(frz):
 def frozenFileTags(frz):
     return File.find(FILE_STREAM_TAGS, frz[1:])
 
+def frozenFileRequires(frz):
+    return File.find(FILE_STREAM_REQUIRES, frz[1:])
+
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])
     if not sameType:
@@ -898,6 +902,26 @@ def tupleChanged(cl, diff):
     assert(i == len(diff))
 
     return rc
+
+def rpmFileColorCmp(reqOne, reqTwo):
+    # "cmp" is a little loose here. One req is considered "greater" than
+    # the other if a file with it should be installed preferentially in
+    # accordance with RPM's coloring rules.
+    depOne = reqOne.getDepClasses()[deps.AbiDependency.tag]
+    depTwo = reqTwo.getDepClasses()[deps.AbiDependency.tag]
+
+    reqOne32 = depOne.hasDep('ELF32')
+    reqOne64 = depOne.hasDep('ELF64')
+
+    reqTwo32 = depTwo.hasDep('ELF32')
+    reqTwo64 = depTwo.hasDep('ELF64')
+
+    if reqOne32 and reqTwo64:
+        return -1
+    elif reqOne64 and reqTwo32:
+        return 1
+
+    return 0
 
 class UserGroupIdCache:
 

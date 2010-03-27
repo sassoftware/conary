@@ -102,7 +102,7 @@ class FilesystemJob:
         if target in self.restores:
             formerFileObj = self.restores[target][1]
             formerTroveInfo = self.restores[target][4]
-            if silentlyReplace(fileObj,formerFileObj):
+            if silentlyShare(fileObj,formerFileObj):
                 self.sharedFile(troveInfo[0], troveInfo[1], troveInfo[2],
                                 fileObj.pathId())
                 self.sharedFile(formerTroveInfo[0], formerTroveInfo[1],
@@ -1109,13 +1109,13 @@ class FilesystemJob:
                         if headFileId in [ x[4] for x in existingOwners ]:
                             shareFile = True
                         else:
-                            shareFile = silentlyReplace(headFile, existingFile)
+                            shareFile = silentlyShare(headFile, existingFile)
                     else:
                         # can we silently replace the unowned file on disk?
                         # we're happy to change owner/groups/perms of files to
                         # do this, but not contents
                         fileConflict = \
-                            not silentlyReplace(headFile, existingFile,
+                            not silentlyShare(headFile, existingFile,
                                                 contentsSufficient = True)
 
                     if fileConflict and replaceThisFile:
@@ -2706,8 +2706,8 @@ class TagCommand:
                 os.close(stdoutPipe[0])
                 os.close(stderrPipe[0])
 
-def silentlyReplace(newF, oldF, contentsSufficient = False):
-    # Can the file already on the disk (oldF) be replaced with the new file
+def silentlyShare(newF, oldF, contentsSufficient = False):
+    # Can the file already on the disk (oldF) be shared with the new file
     # (newF) without telling the user it happened
     if newF.__class__ != oldF.__class__:
         return False

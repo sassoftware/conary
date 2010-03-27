@@ -2,6 +2,8 @@ Changes in @NEW@:
   o New Features:
     * Config files from RPM capasules are now handled by Conary instead of
       RPM, including diff/patch merging.
+    * Emulate RPM file coloring behavior to allow a package to take ownership
+      of files from another package based on the ABI used by those binaries.
 
   o Bug Fixes:
     * gzip files that are corrupt in the first 4KB of compressed data
