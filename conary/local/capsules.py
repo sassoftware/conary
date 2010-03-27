@@ -64,21 +64,21 @@ class SingleCapsuleOperation(CapsuleOperation):
         CapsuleOperation.__init__(self, *args, **kwargs)
         self.installs = []
         self.removes = []
-        self.preserveList = []
+        self.preserveSet = set()
 
     def _filesNeeded(self):
         return [ x[1] for x in self.installs ]
 
     def preservePath(self, path):
-        self.preserveList.append(path)
+        self.preserveSet.add(path)
 
     def doApply(self, justDatabase = False):
         raise NotImplementedError
 
     def apply(self, fileDict, justDatabase = False):
-        if not justDatabase and self.preserveList:
+        if not justDatabase and self.preserveSet:
             capsuleJournal = ConaryOwnedJournal(self.root)
-            for path in self.preserveList:
+            for path in self.preserveSet:
                 fullPath = self.root + path
                 capsuleJournal.backup(fullPath, skipDirs = True)
                 if not util.removeIfExists(fullPath):
