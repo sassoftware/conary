@@ -2323,12 +2323,15 @@ class AtomicFile(object):
 
     fObj = None
 
-    def __init__(self, path, mode='w+b', chmod=0644, tmpsuffix = ""):
+    def __init__(self, path, mode='w+b', chmod=0644, tmpsuffix = "",
+                 tmpprefix = None):
         self.finalPath = os.path.realpath(path)
         self.finalMode = chmod
 
+        if tmpprefix is None:
+            tmpprefix = os.path.basename(self.finalPath) + '.tmp.'
         fDesc, self.name = tempfile.mkstemp(dir=os.path.dirname(self.finalPath),
-            suffix=tmpsuffix, prefix=os.path.basename(self.finalPath))
+            suffix=tmpsuffix, prefix=tmpprefix)
         self.fObj = os.fdopen(fDesc, mode)
 
     def __getattr__(self, name):
