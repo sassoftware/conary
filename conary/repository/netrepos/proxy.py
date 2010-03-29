@@ -1597,6 +1597,8 @@ class ChangesetCache(object):
         csInfoObj.write(csInfo.pickle())
 
         csObj.commit()
+        # If we locked the cache file, we need to no longer track it
+        self.locksMap.pop(csPath, None)
         csInfoObj.commit()
         return csPath
 
@@ -1609,20 +1611,21 @@ class ChangesetCache(object):
         util.mkdirChain(os.path.dirname(csPath))
         fileObj = lockfile.open(shouldLock=shouldLock)
 
-        dataFile = util.fopenIfExists(dataPath, "w+b")
+        dataFile = util.fopenIfExists(dataPath, "r")
 
-        if fileObj is not None:
-            if dataPath is None:
-                # We have csPath but not dataPath
-                if not shouldLock:
-                    return None
-                # Get rid of csPath - no other process can produce it because
-                # we're holding the lock
-                os.unlink(csPath)
-                # Unlock
-                lockfile.close()
-                # Try again
-                fileObj = lockfile.open()
+        # Use XOR - if one is None and one is not, we need to regenerate
+        if (fileObj is not None) ^ (dataFile is not None):
+            # We have csPath but not dataPath, or the other way around
+            if not shouldLock:
+                return None
+            # Get rid of csPath - no other process can produce it because
+            # we're holding the lock
+            util.removeIfExists(csPath)
+            util.removeIfExists(dataPath)
+            # Unlock
+            lockfile.close()
+            # Try again
+            fileObj = lockfile.open()
 
         if fileObj is None:
             if shouldLock:
