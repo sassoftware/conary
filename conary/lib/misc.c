@@ -1587,7 +1587,8 @@ static PyObject * py_fopen(PyObject *self, PyObject *args) {
 
 static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
     struct flock fl;
-    PyObject *pytype, *pywhence, *pystart, *pylen, *pypid;
+    PyObject *pystart, *pylen, *pypid;
+    short l_type, l_whence;
     memset((void *)&fl, '\0', sizeof(struct flock));
 
     if (PyTuple_GET_SIZE(args) != 5) {
@@ -1595,19 +1596,10 @@ static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    pytype = PyTuple_GET_ITEM(args, 0);
-    pywhence = PyTuple_GET_ITEM(args, 1);
-    pystart = PyTuple_GET_ITEM(args, 2);
-    pylen = PyTuple_GET_ITEM(args, 3);
-    pypid = PyTuple_GET_ITEM(args, 4);
-
-    if (!PYINT_CheckExact(pytype)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
+    if (!PyArg_ParseTuple(args, "iiOO)", &l_type, &l_whence,
+            &pystart, &pylen, &pypid))
         return NULL;
-    } else if (pywhence != Py_None && !PYINT_CheckExact(pywhence)) {
-        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
-        return NULL;
-    } else if (pystart != Py_None && !PYINT_CHECK_EITHER(pystart)) {
+    if (pystart != Py_None && !PYINT_CHECK_EITHER(pystart)) {
         PyErr_SetString(PyExc_TypeError, "third argument must be an int or long");
         return NULL;
     } else if (pylen != Py_None && !PYINT_CHECK_EITHER(pylen)) {
@@ -1618,8 +1610,8 @@ static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    fl.l_type = PYINT_AS_LONG(pytype);
-    fl.l_whence = (pywhence == Py_None) ? 0 : PYINT_AS_LONG(pywhence);
+    fl.l_type = l_type;
+    fl.l_whence = l_whence;
     fl.l_start = (pystart == Py_None) ? 0 : PYLONG_AS_ULL(pystart);
     fl.l_len = (pylen == Py_None) ? 0 : PYLONG_AS_ULL(pylen);
     fl.l_pid = (pypid == Py_None) ? 0 : PYINT_AS_LONG(pypid);
