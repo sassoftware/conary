@@ -1588,7 +1588,7 @@ static PyObject * py_fopen(PyObject *self, PyObject *args) {
 static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
     struct flock fl;
     PyObject *pystart, *pylen, *pypid;
-    short l_type, l_whence;
+    int l_type, l_whence;
     memset((void *)&fl, '\0', sizeof(struct flock));
 
     if (PyTuple_GET_SIZE(args) != 5) {
@@ -1596,7 +1596,7 @@ static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    if (!PyArg_ParseTuple(args, "iiOO)", &l_type, &l_whence,
+    if (!PyArg_ParseTuple(args, "iiOOO", &l_type, &l_whence,
             &pystart, &pylen, &pypid))
         return NULL;
     if (pystart != Py_None && !PYINT_CHECK_EITHER(pystart)) {
