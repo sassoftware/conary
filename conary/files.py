@@ -907,8 +907,14 @@ def rpmFileColorCmp(reqOne, reqTwo):
     # "cmp" is a little loose here. One req is considered "greater" than
     # the other if a file with it should be installed preferentially in
     # accordance with RPM's coloring rules.
-    depOne = reqOne.getDepClasses()[deps.AbiDependency.tag]
-    depTwo = reqTwo.getDepClasses()[deps.AbiDependency.tag]
+    if reqOne is None or reqTwo is None:
+        return 0
+
+    depOne = reqOne.getDepClasses().get(deps.AbiDependency.tag, None)
+    depTwo = reqTwo.getDepClasses().get(deps.AbiDependency.tag, None)
+
+    if depOne is None or depTwo is None:
+        return 0
 
     reqOne32 = depOne.hasDep('ELF32')
     reqOne64 = depOne.hasDep('ELF64')
