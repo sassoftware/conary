@@ -1305,6 +1305,7 @@ res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
 fchmod = misc.fchmod
 fopenIfExists = misc.fopenIfExists
+structFlock = misc.structFlock
 
 def _LazyFile_reopen(method):
     """Decorator to perform the housekeeping of opening/closing of fds"""
@@ -2236,7 +2237,7 @@ class LockedFile(object):
 
     # python 2.4 defines SEEK_SET in posixfile, which is deprecated
     SEEK_SET = 0
-    WRLOCK = struct.pack('hhllhh', fcntl.F_WRLCK, SEEK_SET, 0, 0, 0, 0)
+    WRLOCK = structFlock(fcntl.F_WRLCK, SEEK_SET, 0, 0, None)
 
     def __init__(self, fileName):
         self.fileName = fileName
@@ -2263,7 +2264,7 @@ class LockedFile(object):
         self._lockfobj = open(self.lockFileName, "w")
 
         # Attempt to lock file in write mode
-        ret = fcntl.fcntl(self._lockfobj, fcntl.F_SETLKW, self.WRLOCK)
+        fcntl.fcntl(self._lockfobj, fcntl.F_SETLKW, self.WRLOCK)
         # If we got this far, we now have the lock. Check if the data file was
         # created
         fobj = fopenIfExists(self.fileName, "r")

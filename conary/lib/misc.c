@@ -18,6 +18,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <malloc.h>
 #include <netinet/in.h>
 #include <openssl/sha.h>
@@ -55,6 +56,7 @@ static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyObject * pyfchmod(PyObject *self, PyObject *args);
 static PyObject * py_fopen(PyObject *self, PyObject *args);
+static PyObject * py_struct_flock(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -86,6 +88,7 @@ static PyMethodDef MiscMethods[] = {
     { "res_init", py_res_init, METH_VARARGS },
     { "fchmod", pyfchmod, METH_VARARGS },
     { "fopenIfExists", py_fopen, METH_VARARGS },
+    { "structFlock", py_struct_flock, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -1580,6 +1583,47 @@ static PyObject * py_fopen(PyObject *self, PyObject *args) {
         return Py_None;
     }
     return PyFile_FromFile(f, fn, mode, fclose);
+}
+
+static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
+    struct flock fl;
+    PyObject *pytype, *pywhence, *pystart, *pylen, *pypid;
+    memset((void *)&fl, '\0', sizeof(struct flock));
+
+    if (PyTuple_GET_SIZE(args) != 5) {
+        PyErr_SetString(PyExc_TypeError, "exactly five arguments expected");
+        return NULL;
+    }
+
+    pytype = PyTuple_GET_ITEM(args, 0);
+    pywhence = PyTuple_GET_ITEM(args, 1);
+    pystart = PyTuple_GET_ITEM(args, 2);
+    pylen = PyTuple_GET_ITEM(args, 3);
+    pypid = PyTuple_GET_ITEM(args, 4);
+
+    if (!PYINT_CheckExact(pytype)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
+        return NULL;
+    } else if (pywhence != Py_None && !PYINT_CheckExact(pywhence)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
+        return NULL;
+    } else if (pystart != Py_None && !PYINT_CHECK_EITHER(pystart)) {
+        PyErr_SetString(PyExc_TypeError, "third argument must be an int or long");
+        return NULL;
+    } else if (pylen != Py_None && !PYINT_CHECK_EITHER(pylen)) {
+        PyErr_SetString(PyExc_TypeError, "fourth argument must be an int or long");
+        return NULL;
+    } else if (pypid != Py_None && !PYINT_CheckExact(pypid)) {
+        PyErr_SetString(PyExc_TypeError, "fifth argument must be an int");
+        return NULL;
+    }
+
+    fl.l_type = PYINT_AS_LONG(pytype);
+    fl.l_whence = (pywhence == Py_None) ? 0 : PYINT_AS_LONG(pywhence);
+    fl.l_start = (pystart == Py_None) ? 0 : PYLONG_AS_ULL(pystart);
+    fl.l_len = (pylen == Py_None) ? 0 : PYLONG_AS_ULL(pylen);
+    fl.l_pid = (pypid == Py_None) ? 0 : PYINT_AS_LONG(pypid);
+    return PyString_FromStringAndSize((char *)&fl, sizeof(struct flock));
 }
 
 #define MODULE_DOCSTR "miscellaneous low-level C functions for conary"
