@@ -18,7 +18,6 @@ and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
 import errno
-import fnmatch
 import itertools
 import os
 import re
@@ -126,7 +125,7 @@ def _makeFilter(patterns):
         return None
 
     # convert globs to regexps, but chop off the final '$'
-    patterns = [ fnmatch.translate(x)[:-1] for x in patterns ]
+    patterns = [ util.fnmatchTranslate(x) for x in patterns ]
 
     if len(patterns) > 1:
         filter = '(' + '|'.join(patterns) + ')'

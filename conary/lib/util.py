@@ -15,9 +15,10 @@
 import bdb
 import bz2
 import debugger
-import fcntl
-import gzip
 import errno
+import fcntl
+import fnmatch
+import gzip
 import itertools
 import log
 import misc
@@ -29,8 +30,8 @@ import signal
 import stat
 import string
 import StringIO
-import subprocess
 import struct
+import subprocess
 import sys
 import tempfile
 import time
@@ -1303,7 +1304,8 @@ pread = misc.pread
 res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
 fchmod = misc.fchmod
-
+fopenIfExists = misc.fopenIfExists
+structFlock = misc.structFlock
 
 def _LazyFile_reopen(method):
     """Decorator to perform the housekeeping of opening/closing of fds"""
@@ -2204,3 +2206,167 @@ class noproxyFilter(object):
             if urlStr.endswith(x):
                 return True
         return False
+
+def fnmatchTranslate(pattern):
+    "Like fnmatch.translate, but do not add the end-of-string character(s)"
+    patt = fnmatch.translate(pattern)
+    # Python 2.6.5 appends \Z(?ms) instead of $
+    if patt.endswith('$'):
+        return patt[:-1]
+    if patt.endswith(r'\Z(?ms)'):
+        return patt[:-7]
+    raise RuntimeError("Unrecognized end-of-string in %s" % patt)
+
+class LockedFile(object):
+    """
+    A file protected by a lock.
+    To use it:
+
+    l = LockedFile("filename")
+    fileobj = l.open()
+    if fileobj is None:
+        # The target file does not exist. Create it.
+        l.write("Some content")
+        fileobj = l.commit()
+    else:
+        # The target file exists
+        pass
+    print fileobj.read()
+    """
+    __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj')
+
+    # python 2.4 defines SEEK_SET in posixfile, which is deprecated
+    SEEK_SET = 0
+    WRLOCK = structFlock(fcntl.F_WRLCK, SEEK_SET, 0, 0, None)
+
+    def __init__(self, fileName):
+        self.fileName = fileName
+        self.lockFileName = self.fileName + '.lck'
+        self._lockfobj = None
+        self._tmpfobj = None
+
+    def open(self, shouldLock = True):
+        """
+        Attempt to open the file.
+        Returns a file object if the file exists.
+        Returns None if the file does not exist, and needs to be created. At
+            this point the lock is acquired. Use write() and commit() to have
+            the file created and the lock released.
+        """
+
+        if self._lockfobj is not None:
+            self.close()
+
+        fobj = fopenIfExists(self.fileName, "r")
+        if fobj is not None or not shouldLock:
+            return fobj
+
+        self._lockfobj = open(self.lockFileName, "w")
+
+        # Attempt to lock file in write mode
+        fcntl.fcntl(self._lockfobj, fcntl.F_SETLKW, self.WRLOCK)
+        # If we got this far, we now have the lock. Check if the data file was
+        # created
+        fobj = fopenIfExists(self.fileName, "r")
+        if fobj is not None:
+            # The other process committed (and we probably hold a link to a
+            # removed file).
+            self.unlock()
+            return fobj
+
+        if not os.path.exists(self.lockFileName):
+            # The original caller returned without creating the data file, and
+            # it also removed the lock file - so now we hold a lock on an
+            # orphaned fd
+            # This should normally not happen, since a close() will not remove
+            # the lock file after releasing the lock
+            return self.open()
+        # Create temporary file
+        self._tmpfobj = AtomicFile(self.fileName)
+        # We now hold the lock and we have a temporary file to write to
+        return None
+
+    def write(self, data):
+        if self._tmpfobj is None:
+            raise RuntimeError("Lock not acquired")
+        self._tmpfobj.write(data)
+
+    def commit(self):
+        # It is important that we move the file into place first, before
+        # releasing the lock. This make sure that any process that was blocked
+        # will see the file immediately, instead of retrying to lock
+        fileobj = self._tmpfobj.commit(returnHandle = True)
+        self.unlock()
+        return fileobj
+
+    def unlock(self):
+        removeIfExists(self.lockFileName)
+        self.close()
+
+    def close(self):
+        """Close without removing the lock file"""
+        if self._tmpfobj is not None:
+            self._tmpfobj.close()
+            self._tmpfobj = None
+        # This also releases the lock
+        if self._lockfobj is not None:
+            self._lockfobj.close()
+            self._lockfobj = None
+
+    __del__ = close
+
+class AtomicFile(object):
+    """
+    Open a temporary file adjacent to C{path} for writing. When
+    C{f.commit()} is called, the temporary file will be flushed and
+    renamed on top of C{path}, constituting an atomic file write.
+    """
+
+    fObj = None
+
+    def __init__(self, path, mode='w+b', chmod=0644, tmpsuffix = "",
+                 tmpprefix = None):
+        self.finalPath = os.path.realpath(path)
+        self.finalMode = chmod
+
+        if tmpprefix is None:
+            tmpprefix = os.path.basename(self.finalPath) + '.tmp.'
+        fDesc, self.name = tempfile.mkstemp(dir=os.path.dirname(self.finalPath),
+            suffix=tmpsuffix, prefix=tmpprefix)
+        self.fObj = os.fdopen(fDesc, mode)
+
+    def __getattr__(self, name):
+        return getattr(self.fObj, name)
+
+    def commit(self, returnHandle=False):
+        """
+        C{flush()}, C{chmod()}, and C{rename()} to the target path.
+        C{close()} afterwards.
+        """
+        if self.fObj.closed:
+            raise RuntimeError("Can't commit a closed file")
+
+        # Flush and change permissions before renaming so the contents
+        # are immediately present and accessible.
+        self.fObj.flush()
+        os.chmod(self.name, self.finalMode)
+        os.fsync(self.fObj)
+
+        # Rename to the new location. Since both are on the same
+        # filesystem, this will atomically replace the old with the new.
+        os.rename(self.name, self.finalPath)
+
+        # Now close the file.
+        if returnHandle:
+            fObj, self.fObj = self.fObj, None
+            return fObj
+            return fObj
+        else:
+            self.fObj.close()
+
+    def close(self):
+        if self.fObj and not self.fObj.closed:
+            removeIfExists(self.name)
+            self.fObj.close()
+    __del__ = close
+

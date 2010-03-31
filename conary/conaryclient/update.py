@@ -3344,6 +3344,14 @@ conary erase '%s=%s[%s]'
 
                 for i, job in enumerate(jobList):
                     for j in range(i):
+                        # RPM capsules can overlap; there is special handling
+                        # for that
+                        if (trvs[i].troveInfo.capsule.type() ==
+                                trove._TROVECAPSULE_TYPE_RPM and
+                            trvs[j].troveInfo.capsule.type() ==
+                                trove._TROVECAPSULE_TYPE_RPM):
+                            continue
+
                         if not paths[i].compatibleWith(paths[j]):
                             l = conflicts.setdefault(job[0], [])
                             l.append((job[2], jobList[j][2]))

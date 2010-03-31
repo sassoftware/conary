@@ -1008,9 +1008,11 @@ order by
         cu.execute("""
             SELECT AddedFiles.path,
                    ExistingInstances.instanceId, ExistingFiles.pathId,
+                   ExistingFiles.stream,
                    ExistingInstances.troveName, ExistingVersions.version,
                    ExistingFlavors.flavor,
                    AddedInstances.instanceId, AddedFiles.pathId, 
+                   AddedFiles.stream,
                    AddedInstances.troveName,
                    AddedVersions.version, AddedFlavors.flavor
 
@@ -1042,17 +1044,45 @@ order by
 
         conflicts = []
         replaced = {}
-        for (path, existingInstanceId, existingPathId, existingTroveName,
-             existingVersion, existingFlavor,
-             addedInstanceId, addedPathId, addedTroveName, addedVersion,
-             addedFlavor) in cu:
+        for (path, existingInstanceId, existingPathId, existingStream,
+             existingTroveName, existingVersion, existingFlavor,
+             addedInstanceId, addedPathId, addedStream, addedTroveName,
+             addedVersion, addedFlavor) in cu:
             if existingPathId in sharedFiles.get(
                        (existingTroveName,
                         versions.VersionFromString(existingVersion),
                         deps.deps.ThawDependencySet(existingFlavor)), set()):
                 continue
 
+            replaceExisting = False
+
+            addedFlags = files.frozenFileFlags(addedStream)
+            existingFlags = files.frozenFileFlags(existingStream)
+            if (addedFlags.isEncapsulatedContent() and
+                existingFlags.isEncapsulatedContent()):
+                # When we install RPMs we allow 64 bit ELF files to
+                # silently replace 32 bit ELF files. This check matches
+                # one in rpmcapsule.py. We don't restrict it to RPM
+                # capsules here (we should, but that would involve walking
+                # into troveinfo), but restricting to just capsules ought
+                # to be close enough? XXX
+                #
+                # This logic only replaces "existing". It depends on seeing
+                # the conflict twice to replace "added". Gross, again.
+                addedRequires = files.frozenFileRequires(addedStream)
+                existingRequires = files.frozenFileRequires(existingStream)
+                cmp = files.rpmFileColorCmp(addedRequires, existingRequires)
+                if cmp == 1:
+                    # "added" is better than "existing"
+                    replaceExisting = True
+                elif cmp == -1:
+                    # "existing" is better than "added"
+                    continue
+
             if replaceFiles:
+                replaceExisting = True
+
+            if replaceExisting:
                 cu2.execute("UPDATE DBTroveFiles SET isPresent = 0 "
                            "WHERE instanceId = ? AND pathId = ?",
                            existingInstanceId, existingPathId)
@@ -1500,10 +1530,16 @@ order by
 
         return [ path in pathsFound for path in pathList ]
 
-    def iterFindPathReferences(self, path, justPresent = False):
+    def iterFindPathReferences(self, path, justPresent = False,
+                               withStream = False):
+        if withStream:
+            stream = "stream"
+        else:
+            stream = "NULL"
+
         cu = self.db.cursor()
         cu.execute("""SELECT troveName, version, flavor, pathId, fileId,
-                             DBTroveFiles.isPresent
+                             DBTroveFiles.isPresent, %s
                             FROM DBTroveFiles JOIN Instances ON
                                 DBTroveFiles.instanceId = Instances.instanceId
                             JOIN Versions ON
@@ -1512,9 +1548,9 @@ order by
                                 Flavors.flavorId = Instances.flavorId
                             WHERE
                                 path = ?
-                    """, path)
+                    """ % stream, path)
 
-        for (name, version, flavor, pathId, fileId, isPresent) in cu:
+        for (name, version, flavor, pathId, fileId, isPresent, stream) in cu:
             if not isPresent and justPresent:
                 continue
 
@@ -1524,7 +1560,10 @@ order by
             else:
                 flavor = deps.deps.ThawFlavor(flavor)
 
-            yield (name, version, flavor, pathId, fileId)
+            if stream:
+                yield (name, version, flavor, pathId, fileId, stream)
+            else:
+                yield (name, version, flavor, pathId, fileId)
 
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]

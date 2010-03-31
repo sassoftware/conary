@@ -19,6 +19,7 @@ import string
 import xml.dom.minidom
 import zipfile
 import gzip as gzip_module
+import zlib
 import bz2
 
 from conary import rpmhelper
@@ -308,8 +309,12 @@ def magic(path, basedir=''):
             uncompressedBuffer = gzip_module.GzipFile(n).read(4096)
             if _tarMagic(uncompressedBuffer):
                 return tar_gz(path, basedir, b, uncompressedBuffer)
-        except IOError:
-            # gzip raises IOError instead of any module specific errors
+        except (IOError, zlib.error):
+            # gzip sometimes raises IOError instead of any module-specific
+            # errors; in either error case just do not consider this a
+            # gzip file.
+            # Note that gzip or tar_gz magic does not imply that the
+            # entire file has been tested to have no compression errors!
             pass
         return gzip(path, basedir, b)
     elif len(b) > 3 and b[0:3] == "BZh":

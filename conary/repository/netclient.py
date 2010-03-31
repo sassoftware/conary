@@ -457,7 +457,8 @@ class ServerCache:
                     'Invalid URL "%s" when trying access the %s repository. '
                     'Check your repositoryMap entries' % (url, serverName))
             s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
-            url = '/'.join(s)
+            s[2] = util.ProtectedString(s[2])
+            url = util.ProtectedString('/'.join(s))
             usedMap = True
 
         shareTuple = (url, userInfo, tuple(entList), serverName)
@@ -467,6 +468,7 @@ class ServerCache:
             return server
 
         protocol, uri = urllib.splittype(url)
+        uri = util.ProtectedString(uri)
         transporter = transport.Transport(https = (protocol == 'https'),
                 proxies=self.proxies, serverName=serverName,
                 caCerts=self.caCerts)
@@ -2049,7 +2051,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                             oldFileObj) ) 
                         needItems.append( (pathId, None, oldFileObj) ) 
 
-                    if not newFileObj.flags.isPayload():
+                    if not newFileObj.flags.isEncapsulatedContent():
                         fetchItems.append( (newFileId, newFileVersion, newFileObj) )
                         contentsNeeded += fetchItems
 

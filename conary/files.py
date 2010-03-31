@@ -25,6 +25,7 @@ import tempfile
 import time
 
 from conary import errors, streams
+from conary.deps import deps
 from conary.lib import elf, util, sha1helper, log, digestlib
 
 _FILE_FLAG_CONFIG = 1 << 0
@@ -41,12 +42,18 @@ _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
-# files which are payload -- not directly represented. config files cannot
-# be payload,
-_FILE_FLAG_PAYLOAD = 1 << 7
+# files whose contents are part of a capsule; only set for files w/ contents
+_FILE_FLAG_ENCAPSULATED_CONTENT = 1 << 7
 # files which are allowed to be missing -- right now this flag may be
 # set but it is not used outside of builds
 _FILE_FLAG_MISSINGOKAY = 1 << 8
+# files which are in a package but not in the capsule associated with the
+# package; they were added via a derivation 
+_FILE_FLAG_CAPSULE_ADDITION = 1 << 10
+# files are part of the capsule, but have conary-style contents which should
+# override the capsule. config implies this behavior even though it may not be
+# set explicitly
+_FILE_FLAG_CAPSULE_OVERRIDE = 1 << 10
 
 FILE_STREAM_CONTENTS        = 1
 FILE_STREAM_DEVICE	    = 2
@@ -212,8 +219,10 @@ class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
 	result = self._isFlag(_FILE_FLAG_CONFIG, set)
-        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
-               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+        assert((self() & (_FILE_FLAG_ENCAPSULATED_CONTENT |
+                          _FILE_FLAG_CONFIG))
+               !=
+               (_FILE_FLAG_ENCAPSULATED_CONTENT | _FILE_FLAG_CONFIG))
 
         return result
 
@@ -235,11 +244,19 @@ class FlagsStream(streams.IntStream):
     def isMissingOkay(self, set = None):
         return self._isFlag(_FILE_FLAG_MISSINGOKAY, set)
 
-    def isPayload(self, set = None):
-        result = self._isFlag(_FILE_FLAG_PAYLOAD, set)
-        assert((self() & (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG)) !=
-               (_FILE_FLAG_PAYLOAD | _FILE_FLAG_CONFIG))
+    def isEncapsulatedContent(self, set = None):
+        result = self._isFlag(_FILE_FLAG_ENCAPSULATED_CONTENT, set)
+        assert((self() & (_FILE_FLAG_ENCAPSULATED_CONTENT |
+                          _FILE_FLAG_CONFIG))
+               !=
+               (_FILE_FLAG_ENCAPSULATED_CONTENT | _FILE_FLAG_CONFIG))
         return result
+
+    def isCapsuleAddition(self, set = None):
+        return self._isFlag(_FILE_FLAG_CAPSULE_ADDITION, set)
+
+    def isCapsuleOverride(self, set = None):
+        return self._isFlag(_FILE_FLAG_CAPSULE_OVERRIDE, set)
 
     def _isFlag(self, flag, set):
 	if set != None:
@@ -817,6 +834,9 @@ def frozenFileContentInfo(frz):
 def frozenFileTags(frz):
     return File.find(FILE_STREAM_TAGS, frz[1:])
 
+def frozenFileRequires(frz):
+    return File.find(FILE_STREAM_REQUIRES, frz[1:])
+
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])
     if not sameType:
@@ -882,6 +902,32 @@ def tupleChanged(cl, diff):
     assert(i == len(diff))
 
     return rc
+
+def rpmFileColorCmp(reqOne, reqTwo):
+    # "cmp" is a little loose here. One req is considered "greater" than
+    # the other if a file with it should be installed preferentially in
+    # accordance with RPM's coloring rules.
+    if reqOne is None or reqTwo is None:
+        return 0
+
+    depOne = reqOne.getDepClasses().get(deps.AbiDependency.tag, None)
+    depTwo = reqTwo.getDepClasses().get(deps.AbiDependency.tag, None)
+
+    if depOne is None or depTwo is None:
+        return 0
+
+    reqOne32 = depOne.hasDep('ELF32')
+    reqOne64 = depOne.hasDep('ELF64')
+
+    reqTwo32 = depTwo.hasDep('ELF32')
+    reqTwo64 = depTwo.hasDep('ELF64')
+
+    if reqOne32 and reqTwo64:
+        return -1
+    elif reqOne64 and reqTwo32:
+        return 1
+
+    return 0
 
 class UserGroupIdCache:
 

@@ -69,8 +69,8 @@ class TroveAdder:
         if fileStream and withContents:
             sha1 = None
 
-            if (not files.frozenFileFlags(fileStream).isPayload() and
-                        files.frozenFileHasContents(fileStream)):
+            if (not files.frozenFileFlags(fileStream).isEncapsulatedContent()
+                    and files.frozenFileHasContents(fileStream)):
                 cont = files.frozenFileContentInfo(fileStream)
                 sha1 = cont.sha1()
         else:

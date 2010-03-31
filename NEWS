@@ -1,4 +1,32 @@
 Changes in @NEW@:
+  o New Features:
+    * Config files from RPM capasules are now handled by Conary instead of
+      RPM, including diff/patch merging.
+    * Emulate RPM file coloring behavior to allow a package to take
+      ownership of files from another package based on the ABI used
+      by those binaries. (CNY-3385)
+    * The caching layer in the Conary proxy will now use locking
+      to prevent other processes from trying to do the same work.
+      (CNY-3374)
+
+  o Bug Fixes:
+    * gzip files that are corrupt in the first 4KB of compressed data
+      no longer cause all policies that check for file type using
+      conary's "magic" module to trace back. (CNY-3377)
+    * conary.lib.util now has an fnmatchTranslate function that strips
+      the end-of-string termination consistently in python 2.6.5 and
+      in older versions. (CNY-3378)
+    * dbstore's createIndex() method no longer fails if invoked multiple
+      times without reloading the schema. (CNY-3380)
+    * A bug related to Java files containing classes with no requirements
+      is now fixed. (CNY-3379)
+    * Unicode representations of flavors are now converted to ASCII
+      strings before being parsed. (CNY-3381)
+
+  o Internal Changes:
+    * Renamed isPayload file flag to isEncapsulatedContent
+    * Added file flags to allow conary to override file contents and attributes
+      for capsule-based files (such as from RPM).
 
 Changes in 2.1.11:
   o New Features:
@@ -6,7 +34,7 @@ Changes in 2.1.11:
       database with packages in the RPM database that are found in
       the Conary repositories in the installLabelPath. (CNY-3373)
 
-  o Internal Changes
+  o Internal Changes:
     * Added ability to commit changesets without executing capsule
       implementations. This allows us to build a conarydb which reflects
       the current state of a system without reinstalling packages through
@@ -26,7 +54,7 @@ Changes in 2.1.10:
       to the system outside of conary package management. The
       verifyDirsNoNewFiles configuration option was added to pare down the
       tree conary looks through for new files.
-     * Added exceptions and exceptDeps options to RPMRequires
+    * Added exceptions and exceptDeps options to RPMRequires
 
   o Internal Changes
     * Optimized StreamCollection diff and __eq__ operations to use frozen

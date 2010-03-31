@@ -357,7 +357,7 @@ class ChangeSetJob:
             return
 
         hasContents = (files.frozenFileHasContents(fileStream) and
-                       not files.frozenFileFlags(fileStream).isPayload())
+                   not files.frozenFileFlags(fileStream).isEncapsulatedContent())
         if not hasContents:
             return
 

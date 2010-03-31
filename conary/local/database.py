@@ -2690,8 +2690,10 @@ class Database(SqlDbRepository):
     def getTroveCompatibilityClass(self, name, version, flavor):
         return self.db.getTroveCompatibilityClass(name, version, flavor)
 
-    def iterFindPathReferences(self, path, justPresent = False):
-        return self.db.iterFindPathReferences(path, justPresent = justPresent)
+    def iterFindPathReferences(self, path, justPresent = False,
+                               withStream = False):
+        return self.db.iterFindPathReferences(path, justPresent = justPresent,
+                                              withStream = withStream)
 
     def pathsOwned(self, pathList):
         return self.db.pathsOwned(pathList)

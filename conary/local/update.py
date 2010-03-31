@@ -39,6 +39,14 @@ from conary.repository import changeset, filecontents
 ROLLBACK_PHASE_REPOS = 1
 ROLLBACK_PHASE_LOCAL = 2
 
+def conaryContents(hasCapsule, pathId, fileObj):
+    if pathId == trove.CAPSULE_PATHID:
+        return False
+
+    return (fileObj.flags.isCapsuleOverride() or
+            fileObj.flags.isConfig() or
+            not hasCapsule)
+
 class UpdateFlags(util.Flags):
 
     """
@@ -94,7 +102,7 @@ class FilesystemJob:
         if target in self.restores:
             formerFileObj = self.restores[target][1]
             formerTroveInfo = self.restores[target][4]
-            if silentlyReplace(fileObj,formerFileObj):
+            if silentlyShare(fileObj,formerFileObj):
                 self.sharedFile(troveInfo[0], troveInfo[1], troveInfo[2],
                                 fileObj.pathId())
                 self.sharedFile(formerTroveInfo[0], formerTroveInfo[1],
@@ -738,6 +746,7 @@ class FilesystemJob:
         fileList = [ ((pathId,) + baseTrove.getFile(pathId)[1:])
                         for pathId in troveCs.getOldFileList() ]
         fileObjs = repos.getFileVersions(fileList)
+        hasCapsule = troveCs.hasCapsule()
 
 	for pathId, oldFile in itertools.izip(troveCs.getOldFileList(), 
                                               fileObjs):
@@ -745,6 +754,10 @@ class FilesystemJob:
                 # this file was removed with 'conary remove /path', so
                 # nothing more has to be done
 		continue
+            elif not conaryContents(hasCapsule, pathId, oldFile):
+                # files which are in capsules are handled by the underlying
+                # capsule implementation
+                continue
 
 	    (path, fileId, version) = baseTrove.getFile(pathId)
 
@@ -798,7 +811,9 @@ class FilesystemJob:
         finalPath = fsPath
         pathOkay = True
         # if headPath is none, the name hasn't changed in the repository
-        if headPath and headPath != fsPath:
+        if pathId == trove.CAPSULE_PATHID:
+            return pathOkay, headPath
+        elif headPath and headPath != fsPath:
             # the paths are different; if one of them matches the one
             # from the old trove, take the other one as it is the one
             # which changed
@@ -943,6 +958,7 @@ class FilesystemJob:
             scriptList.append((s, action))
 
         job = troveCs.getJob()
+        hasCapsule = troveCs.hasCapsule()
         newCompatClass = troveCs.getNewCompatibilityClass()
         for (s, action) in scriptList:
             self.postScripts.append((job, baseCompatClass,
@@ -971,6 +987,10 @@ class FilesystemJob:
             if headPath in pathsMoved:
                 # this file looks new, but it's actually moved over from
                 # another trove. treat it as an update later on.
+                continue
+
+            if (not conaryContents(hasCapsule, pathId, headFile)):
+                # capsule management is responsible for restoring this file
                 continue
 
             if isSrcTrove:
@@ -1089,13 +1109,13 @@ class FilesystemJob:
                         if headFileId in [ x[4] for x in existingOwners ]:
                             shareFile = True
                         else:
-                            shareFile = silentlyReplace(headFile, existingFile)
+                            shareFile = silentlyShare(headFile, existingFile)
                     else:
                         # can we silently replace the unowned file on disk?
                         # we're happy to change owner/groups/perms of files to
                         # do this, but not contents
                         fileConflict = \
-                            not silentlyReplace(headFile, existingFile,
+                            not silentlyShare(headFile, existingFile,
                                                 contentsSufficient = True)
 
                     if fileConflict and replaceThisFile:
@@ -1236,6 +1256,10 @@ class FilesystemJob:
             else:
                 headFile = self._mergeFile(baseFile, headFileId, headChanges,
                                            pathId)
+
+            if (not conaryContents(hasCapsule, pathId, headFile)):
+                # capsule management is responsible for restoring this file
+                continue
 
             # final path is the path to use w/o the root
             # real path is the path to use w/ the root
@@ -1744,14 +1768,16 @@ class FilesystemJob:
             self.oldTroves.append((name, oldVersion, oldFlavor))
             oldTrove = db.getTrove(name, oldVersion, oldFlavor, 
                                    pristine = False)
-            if self.capsules.remove(oldTrove):
-                continue
+            self.capsules.remove(oldTrove)
+            # and True forces hasCapsule to be a boolean
+            hasCapsule = (oldTrove.troveInfo.capsule.type() and True)
 
             fileList = [ (x[0], x[2], x[3]) for x in oldTrove.iterFileList() ]
             fileObjs = db.getFileVersions(fileList)
             for (pathId, path, fileId, version), fileObj in \
                     itertools.izip(oldTrove.iterFileList(), fileObjs):
-                if path not in pathsMoved:
+                if (conaryContents(hasCapsule, pathId, fileObj) and
+                    path not in pathsMoved):
                     self._remove(fileObj, path, util.joinPaths(root, path),
                                  "removing %s")
             # We catch removals here
@@ -1767,8 +1793,7 @@ class FilesystemJob:
         troveList = []
 
 	for troveCs in changeSet.iterNewTroveList():
-            if self.capsules.install(flags, troveCs):
-                continue
+            self.capsules.install(flags, troveCs)
 
             old = troveCs.getOldVersion()
 	    if old:
@@ -2681,8 +2706,8 @@ class TagCommand:
                 os.close(stdoutPipe[0])
                 os.close(stderrPipe[0])
 
-def silentlyReplace(newF, oldF, contentsSufficient = False):
-    # Can the file already on the disk (oldF) be replaced with the new file
+def silentlyShare(newF, oldF, contentsSufficient = False):
+    # Can the file already on the disk (oldF) be shared with the new file
     # (newF) without telling the user it happened
     if newF.__class__ != oldF.__class__:
         return False
