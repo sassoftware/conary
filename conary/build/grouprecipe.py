@@ -3130,7 +3130,7 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
                 winner = True
                 for j, (otherFileId, otherFileObj) in enumerate(fileIdAndObj):
                     if i == j: continue
-                    if files.rpmFileColorCmp(fileObj, otherFileObj) < 1:
+                    if files.rpmFileColorCmp(fileObj.requires, otherFileObj.requires) < 1:
                         winner = False
                         break
 
