@@ -101,6 +101,7 @@ class _sourceHelper:
 	self.recipe = recipe
     def __call__(self, *args, **keywords):
         self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
+        self.recipe.populateLcache()
 
 class Recipe(object):
     """Virtual base class for all Recipes"""
@@ -393,7 +394,6 @@ class Recipe(object):
         repos = self.laReposCache.repos
         if not self._lcachePopState:
             cstate = lcachePopulationState()
-
             recipeClass = self.__class__
 
             # build a list containing this recipe class and any ancestor class
@@ -468,7 +468,10 @@ class Recipe(object):
                                         fullPath = \
                                             lookaside.laUrl(fullUrl).filePath()
                     if not fullPath:
-                        fullPath = path
+                        if not fileObj.flags.isAutoSource():
+                            fullPath = path
+                        else:
+                            continue
 
                     self.laReposCache.addFileHash(srcName, srcVersion, pathId,
                         fullPath, fileId, version, fileObj.contents.sha1(),
