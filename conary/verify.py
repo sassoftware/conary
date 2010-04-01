@@ -108,12 +108,23 @@ class _FindLocalChanges(object):
             self._handleChangeSet(trovesChanged, cs)
 
     def _handleChangeSet(self, trovesChanged, cs):
+        class NonPristineDatabaseWrapper(object):
+            def __getattr__(self, n):
+                return getattr(self.db, n)
+
+            def getTroves(self, *args, **kwargs):
+                kwargs['pristine'] = False
+                return self.db.getTroves(*args, **kwargs)
+
+            def __init__(self, db):
+                self.db = db
+
         if self.display == DISPLAY_DIFF:
             for x in cs.gitDiff(self.diffTroveSource):
                 sys.stdout.write(x)
         elif self.display == DISPLAY_CS:
             troveSpecs = [ '%s=%s[%s]' % x for x in trovesChanged ]
-            showchangeset.displayChangeSet(self.db, cs, troveSpecs,
+            showchangeset.displayChangeSet(NonPristineDatabaseWrapper(self.db), cs, troveSpecs,
                                            self.cfg, ls=True,
                                            showChanges=True, asJob=True)
 
@@ -142,7 +153,7 @@ class _FindLocalChanges(object):
                                        *thisTrv.getNameVersionFlavor())
 
             ver = thisTrv.getVersion().createShadow(versions.LocalLabel())
-            verifyList.append((thisTrv, origTrv, ver, update.UpdateFlags()))
+            verifyList.append((thisTrv, thisTrv, ver, update.UpdateFlags()))
 
         self._simpleTroveList(verifyList, newFilesByTrove)
 
