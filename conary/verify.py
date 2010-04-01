@@ -137,15 +137,12 @@ class _FindLocalChanges(object):
                                        withFileObjects = True,
                                        *troveInfo)
 
-            if self.allMachineChanges:
-                origTrv = self.db.getTrove(pristine = True,
-                                           withFileObjects = True,
-                                           *thisTrv.getNameVersionFlavor())
-            else:
-                origTrv = thisTrv
+            origTrv = self.db.getTrove(pristine = True,
+                                       withFileObjects = True,
+                                       *thisTrv.getNameVersionFlavor())
 
             ver = thisTrv.getVersion().createShadow(versions.LocalLabel())
-            verifyList.append((thisTrv, thisTrv, ver, update.UpdateFlags()))
+            verifyList.append((thisTrv, origTrv, ver, update.UpdateFlags()))
 
         self._simpleTroveList(verifyList, newFilesByTrove)
 

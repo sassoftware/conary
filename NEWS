@@ -24,6 +24,8 @@ Changes in @NEW@:
       strings before being parsed. (CNY-3381)
     * Fixed problem with the lookaside cache when a recipe defines a custom
       source action (CNY-3386)
+    * Fixed but in verify which caused traceback with traceback error message
+      about incorrect strove signatures.
 
   o Internal Changes:
     * Renamed isPayload file flag to isEncapsulatedContent
