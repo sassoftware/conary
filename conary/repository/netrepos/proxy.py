@@ -1642,7 +1642,7 @@ class ChangesetCache(object):
             fobj.seek(0)
 
         try:
-            csInfo = ChangeSetInfo(pickled = dataFile)
+            csInfo = ChangeSetInfo(pickled = dataFile.read())
             dataFile.close()
         except IOError:
             return None
