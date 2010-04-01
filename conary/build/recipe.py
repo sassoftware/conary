@@ -391,6 +391,9 @@ class Recipe(object):
             sourcePaths={}
             fetchedPaths=set()
 
+        if not self.laReposCache.repos:
+            return
+
         repos = self.laReposCache.repos
         if not self._lcachePopState:
             cstate = lcachePopulationState()
