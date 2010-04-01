@@ -22,6 +22,8 @@ Changes in @NEW@:
       is now fixed. (CNY-3379)
     * Unicode representations of flavors are now converted to ASCII
       strings before being parsed. (CNY-3381)
+    * Fixed problem with the lookaside cache when a recipe defines a custom
+      source action (CNY-3386)
 
   o Internal Changes:
     * Renamed isPayload file flag to isEncapsulatedContent
