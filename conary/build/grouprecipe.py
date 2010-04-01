@@ -35,6 +35,7 @@ from conary.lib import graph, log, util
 from conary.repository import changeset, trovesource, searchsource
 from conary import trove
 from conary import versions
+from conary import files
 
 # reasons for adding troves to a group.
 ADD_REASON_ADDED = 0    # added trove explicitly
