@@ -26,6 +26,11 @@ Changes in @NEW@:
       source action. (CNY-3386)
     * Fixed bug in verify which caused traceback with error messages
       about incorrect trove signatures.
+    * Previously, user and password information for Conary repositories
+      was hidden in backtraces only when the the user and password
+      information came from separate "user" configuration.  Now, even
+      if the user/password information is provided directly within a
+      repository URL, it will still be hidden. (RBL-5191)
 
   o Internal Changes:
     * Renamed isPayload file flag to isEncapsulatedContent.
