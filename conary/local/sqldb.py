@@ -1056,10 +1056,13 @@ order by
 
             replaceExisting = False
 
-            addedFlags = files.frozenFileFlags(addedStream)
-            existingFlags = files.frozenFileFlags(existingStream)
-            if (addedFlags.isEncapsulatedContent() and
-                existingFlags.isEncapsulatedContent()):
+            addedFile = files.ThawFile(addedStream, addedPathId)
+            existingFile = files.ThawFile(existingStream, existingPathId)
+            if (addedFile.flags.isEncapsulatedContent() and
+                existingFile.flags.isEncapsulatedContent()):
+                if addedFile.compatibleWith(existingFile):
+                    continue
+
                 # When we install RPMs we allow 64 bit ELF files to
                 # silently replace 32 bit ELF files. This check matches
                 # one in rpmcapsule.py. We don't restrict it to RPM
@@ -1069,9 +1072,7 @@ order by
                 #
                 # This logic only replaces "existing". It depends on seeing
                 # the conflict twice to replace "added". Gross, again.
-                addedRequires = files.frozenFileRequires(addedStream)
-                existingRequires = files.frozenFileRequires(existingStream)
-                cmp = files.rpmFileColorCmp(addedRequires, existingRequires)
+                cmp = files.rpmFileColorCmp(addedFile, existingFile)
                 if cmp == 1:
                     # "added" is better than "existing"
                     replaceExisting = True
