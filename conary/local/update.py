@@ -2716,6 +2716,8 @@ def silentlyShare(newF, oldF, contentsSufficient = False):
     elif isinstance(newF, files.SymbolicLink) and newF.target == oldF.target:
         # don't worry about ownerships on symlinks; it's not that important
         return True
+    elif newF.compatibleWith(oldF):
+        return True
     elif (contentsSufficient and isinstance(newF, files.RegularFile) and
           newF.contents == oldF.contents):
         return True

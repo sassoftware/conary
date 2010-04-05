@@ -288,24 +288,33 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                               info[3])
                     action = ACTION_RESTORE
                 else:
-                    # RPM file colors and the default RPM setting for
-                    # file color policy make ELF64 files silently replace
-                    # ELF32 files. follow that behavior here.
-                    #
-                    # no, I'm not making this up
-                    #
-                    # yes, really
-                    existingRequires = [ files.frozenFileRequires(x[5])
-                                            for x in existingOwners ]
+                    existingFiles = [ files.ThawFile(x[5], pathId) for x
+                                        in existingOwners ]
 
-                    if 1 in [ files.rpmFileColorCmp(x, fileObj.requires)
-                              for x in existingRequires ]:
-                        # something in existingRequires is ELF64 while
-                        # fileObj is ELF32
+                    compatibility = [ 1 for x in existingFiles
+                                        if fileObj.compatibleWith(x) ]
+
+
+                    if 1 in compatibility:
+                        # files can be shared even though the fileId's
+                        # are different
+                        for info in existingOwners:
+                            self.fsJob.sharedFile(info[0], info[1], info[2],
+                                                  info[3])
+                        action = ACTION_RESTORE
+                    elif 1 in [ files.rpmFileColorCmp(x, fileObj)
+                              for x in existingFiles ]:
+                        # rpm file colors and the default rpm setting for
+                        # file color policy make elf64 files silently replace
+                        # elf32 files. follow that behavior here.
+                        #
+                        # no, i'm not making this up
+                        #
+                        # yes, really
                         action = ACTION_SKIP
                     elif (flags.replaceManagedFiles or
-                          1 in [ files.rpmFileColorCmp(fileObj.requires, x)
-                                 for x in existingRequires ]):
+                          1 in [ files.rpmFileColorCmp(fileObj, x)
+                                 for x in existingFiles ]):
                         # The files are different. Bail unless we're supposed
                         # to replace managed files.
                         existingFile = files.FileFromFilesystem(absolutePath,
