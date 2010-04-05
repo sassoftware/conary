@@ -476,9 +476,9 @@ class Recipe(object):
                         else:
                             continue
 
-                    self.laReposCache.addFileHash(srcName, srcVersion, pathId,
-                        fullPath, fileId, version, fileObj.contents.sha1(),
-                        fileObj.inode.perms())
+                    self.laReposCache.addFileHash(fullPath, srcName,
+                        srcVersion, pathId, path, fileId, version,
+                        fileObj.contents.sha1(), fileObj.inode.perms())
                     assert(path not in fetchedPaths)
                     fetchedPaths.add(path)
 

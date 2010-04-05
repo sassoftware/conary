@@ -157,6 +157,10 @@ class InodeStream(streams.StreamSet):
                    INODE_STREAM_GROUP : (SMALL, streams.StringStream, "group") }
     __slots__ = [ "perms", "mtime", "owner", "group" ]
 
+    def compatibleWith(self, other):
+        return (self.perms == other.perms and self.owner == other.owner and
+                self.group == other.group)
+
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
 	if code & 4:
@@ -293,6 +297,10 @@ class File(streams.StreamSet):
 
     def __deepcopy__(self, mem):
         return ThawFile(self.freeze(), self.thePathId)
+
+    def compatibleWith(self, other):
+        return (self.__class__ == other.__class__ and
+                self.inode.compatibleWith(other.inode))
 
     def copy(self):
         return ThawFile(self.freeze(), self.thePathId)
@@ -439,6 +447,9 @@ class SymbolicLink(File):
     skipChmod = True
     __slots__ = [ "target", ]
 
+    def compatibleWith(self, other):
+        return File.compatibleWith(self, other) and self.target == other.target
+
     def sizeString(self):
 	return "%8d" % len(self.target())
 
@@ -513,6 +524,9 @@ class DeviceFile(File):
     _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ 'devt' ]
 
+    def compatibleWith(self, other):
+        return File.compatibleWith(self, other) and self.devt == other.devt
+
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
@@ -567,6 +581,10 @@ class RegularFile(File):
     lsTag = "-"
     statType = stat.S_IFREG
     hasContents = True
+
+    def compatibleWith(self, other):
+        return (File.compatibleWith(self, other) and
+                self.contents == other.contents)
 
     def sizeString(self):
 	return "%8d" % self.contents.size()
@@ -903,10 +921,12 @@ def tupleChanged(cl, diff):
 
     return rc
 
-def rpmFileColorCmp(reqOne, reqTwo):
+def rpmFileColorCmp(fileObjOne, fileObjTwo):
     # "cmp" is a little loose here. One req is considered "greater" than
     # the other if a file with it should be installed preferentially in
     # accordance with RPM's coloring rules.
+    reqOne = fileObjOne.requires
+    reqTwo = fileObjTwo.requires
     if reqOne is None or reqTwo is None:
         return 0
 

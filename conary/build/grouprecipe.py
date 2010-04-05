@@ -35,6 +35,7 @@ from conary.lib import graph, log, util
 from conary.repository import changeset, trovesource, searchsource
 from conary import trove
 from conary import versions
+from conary import files
 
 # reasons for adding troves to a group.
 ADD_REASON_ADDED = 0    # added trove explicitly
@@ -3092,51 +3093,69 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
                                         if x[1] == path)
 
                 if len(set(x[2] for x in fileInfo)) > 1:
-                    paths.append(path)
+                    paths.append((path, fileInfo))
 
             if paths:
-                conflictsWithFiles.append((conflictSet, paths, fileInfo))
+                conflictsWithFiles.append((conflictSet, paths))
+
+        streamsNeeded = []
+        for conflictSet, pathList in conflictsWithFiles:
+            # The files have conflicting fileIds. We need to get the
+            # streams to investigate further.
+            for paths, fileInfo in pathList:
+                    streamsNeeded.extend( (x[0], x[2], x[3]) for x in fileInfo )
+
+        fileObjs = troveCache.repos.getFileVersions(streamsNeeded)
+        filesByFileId = dict( (x[1], y) for (x, y) in
+                                izip(streamsNeeded, fileObjs) )
 
         finalConflicts = []
-        rpmCapsuleConflicts = []
-        rpmStreamsNeeded = []
-        for conflictSet, paths, fileInfo in conflictsWithFiles:
-            # The files have conflicting fileIds. If all of the
-            # troves involved are RPM capsules, we need to look
-            # at the actual streams (which we don't have yet)
+        for conflictSet, pathList in conflictsWithFiles:
+            # If the troves involved are RPM capsules, we have extra
+            # tests to do.
             capsules = [ trovesWithFiles[x].troveInfo.capsule.type()
                             for x in conflictSet ]
             if (len([ x for x in capsules
                         if x == trove._TROVECAPSULE_TYPE_RPM]) !=
                 len(capsules)):
-                finalConflicts.append((conflictSet, paths))
+                allRpms = False
             else:
-                rpmStreamsNeeded.extend( (x[0], x[2], x[3]) for x in
-                                            fileInfo )
-                rpmCapsuleConflicts.append((conflictSet, paths, fileInfo))
+                allRpms = True
 
-        rpmFileObjs = troveCache.repos.getFileVersions(rpmStreamsNeeded)
-        filesByFileId = dict( (x[1], y) for (x, y) in
-                                izip(rpmStreamsNeeded, rpmFileObjs) )
+            paths = []
+            for path, fileInfo in pathList:
+                fileIdAndObj = list(set([ (x[2], filesByFileId[x[2]])
+                                            for x in fileInfo ]))
+                # these pathIds might be compatible with each other despite
+                # having different fileIds
+                if (len(
+                      [ 1 for x in fileIdAndObj if
+                            fileIdAndObj[0][1].compatibleWith(x[1]) ]) ==
+                    len(fileIdAndObj)):
+                    continue
 
-        for conflictSet, paths, fileInfo in rpmCapsuleConflicts:
-            fileIdAndObj = set([ (x[2], filesByFileId[x[2]])
-                                 for x in fileInfo ])
-            # we now have a unique set of fileIds to look at; if one is
-            # a consistent "winner" in terms of priority, we don't have
-            # an actual conflict
-            for i, (fileId, fileObj) in enumerate(fileIdAndObj):
-                winner = True
-                for j, (otherFileId, otherFileObj) in enumerate(fileIdAndObj):
-                    if i == j: continue
-                    if files.rpmFileColorCmp(fileObj, otherFileObj) < 1:
-                        winner = False
-                        break
+                # we now have a unique set of fileIds to look at; if one is
+                # a consistent "winner" in terms of priority, we don't have
+                # an actual conflict
+                if allRpms:
+                    for i, (fileId, fileObj) in enumerate(fileIdAndObj):
+                        winner = True
+                        for j, (otherFileId, otherFileObj) in \
+                                                    enumerate(fileIdAndObj):
+                            if i == j: continue
+                            if files.rpmFileColorCmp(fileObj, otherFileObj) < 1:
+                                winner = False
+                                break
 
-                if winner:
-                    break
+                        if winner:
+                            break
 
-            if not winner:
+                    if winner:
+                        continue
+
+                paths.append(path)
+
+            if paths:
                 finalConflicts.append((conflictSet, paths))
 
         return finalConflicts

@@ -1,10 +1,13 @@
 Changes in @NEW@:
   o New Features:
-    * Config files from RPM capasules are now handled by Conary instead of
+    * Config files from RPM capsules are now handled by Conary instead of
       RPM, including diff/patch merging.
     * Emulate RPM file coloring behavior to allow a package to take
       ownership of files from another package based on the ABI used
       by those binaries. (CNY-3385)
+    * File sharing no longer requires identical fileIds. Files can now be
+      shared between troves even if metadata like link groups is different
+      between the files.
     * The caching layer in the Conary proxy will now use locking
       to prevent other processes from trying to do the same work.
       (CNY-3374)
@@ -23,12 +26,22 @@ Changes in @NEW@:
     * Unicode representations of flavors are now converted to ASCII
       strings before being parsed. (CNY-3381)
     * Fixed problem with the lookaside cache when a recipe defines a custom
-      source action (CNY-3386)
+      source action. (CNY-3386)
+    * Fixed bug in verify which caused traceback with error messages
+      about incorrect trove signatures.
+    * Previously, user and password information for Conary repositories
+      was hidden in backtraces only when the the user and password
+      information came from separate "user" configuration.  Now, even
+      if the user/password information is provided directly within a
+      repository URL, it will still be hidden. (RBL-5191)
+    * Python 2.6.5 now enforces that file objects opened with fdopen be
+      passed a "w+" mode (instead of plain "w") if read operations
+      are also intended. (CNY-3388)
 
   o Internal Changes:
-    * Renamed isPayload file flag to isEncapsulatedContent
-    * Added file flags to allow conary to override file contents and attributes
-      for capsule-based files (such as from RPM).
+    * Renamed isPayload file flag to isEncapsulatedContent.
+    * Added file flags to allow conary to override file contents and
+      attributes for capsule-based files (such as from RPM).
 
 Changes in 2.1.11:
   o New Features:
