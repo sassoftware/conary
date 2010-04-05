@@ -3110,7 +3110,7 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
             if (len([ x for x in capsules
                         if x == trove._TROVECAPSULE_TYPE_RPM]) !=
                 len(capsules)):
-                finalConflicts.append((conflictSet, [ x[0] for x in paths ] ))
+                finalConflicts.append((conflictSet, [ x[0] for x in pathList ] ))
             else:
                 for paths, fileInfo in pathList:
                     rpmStreamsNeeded.extend( (x[0], x[2], x[3]) for x in
