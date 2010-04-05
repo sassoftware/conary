@@ -34,6 +34,9 @@ Changes in @NEW@:
       information came from separate "user" configuration.  Now, even
       if the user/password information is provided directly within a
       repository URL, it will still be hidden. (RBL-5191)
+    * Python 2.6.5 now enforces that file objects opened with fdopen be
+      passed a "w+" mode (instead of plain "w") if read operations
+      are also intended. (CNY-3388)
 
   o Internal Changes:
     * Renamed isPayload file flag to isEncapsulatedContent.
