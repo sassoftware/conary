@@ -3151,7 +3151,7 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
                             break
 
                     if winner:
-                        continu
+                        continue
 
                 paths.append(path)
 
