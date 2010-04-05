@@ -726,8 +726,6 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
         _callSetup(cfg, recipeObj)
-        # setup must be called before lcache is populated
-        recipeObj.populateLcache()
 
         use.track(False)
         log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -1099,8 +1097,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
     policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
     _callSetup(cfg, recipeObj)
-    # setup must be called before lcache is populated
-    recipeObj.populateLcache()
 
     log.info('Building %s=%s[%s]' % ( recipeClass.name,
                                       sourceVersion.branch().label(),

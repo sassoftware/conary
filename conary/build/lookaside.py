@@ -59,17 +59,16 @@ class laUrl(object):
         if savedScheme:
             self.scheme = savedScheme[:-3]
 
+        if parent:
+            self.path=os.sep.join((self.path,parent.path))
+            self.path = self.path.replace('//','/')
+            self.extension=parent.extension
         self.parent=parent
         assert self.parent is not self
         self.extension=extension
 
     def asStr(self,noAuth=False,quoted=False):
-        if self.parent:
-            suffix = self.parent._getCumulativePath()
-            path = os.path.normpath(os.sep.join((self.path, suffix)))
-        else:
-            path = self.path
-
+        path = self.path
         if self.extension:
             path += '.' + self.extension
 
@@ -87,37 +86,25 @@ class laUrl(object):
         return self.asStr()
 
     def filePath(self,useParentPath=True):
-        suffix = None
         if self.parent and useParentPath:
-            suffix = self.parent._getCumulativePath()
-        if suffix:
-            path = os.path.normpath(os.sep.join((self.path, suffix)))
+            path = self.parent.path
+            host = self.parent.host
         else:
             path = self.path
+            host = self.host
         if self.extension:
             path += '.' + self.extension
 
+        path = path.replace('/../','/_../')
         if path[0] == '/':
-            return os.path.join('/',self.host,path[1:])
-        elif self.host:
-            return os.path.join('/',self.host,path)
+            path = path[1:]
 
+        if host:
+            return os.path.join('/',host,path)
         return path
 
     def explicit(self):
         return self.scheme not in [ 'mirror', 'multiurl']
-
-    def _getCumulativePath(self):
-        ppath=None
-        if self.parent:
-            ppath = self.parent._getCumulativePath()
-
-        if self.path:
-            if ppath:
-                return os.path.normpath(os.sep.join((self.path,ppath)))
-            else:
-                return self.path
-        return ppath
 
 def checkRefreshFilter( refreshFilter, url):
     if not refreshFilter:
@@ -447,9 +434,9 @@ class RepositoryCache(object):
 
     basePath = property(_getBasePath)
 
-    def addFileHash(self, troveName, troveVersion, pathId, path, fileId,
-                    fileVersion, sha1, mode):
-	self.nameMap[path] = (troveName, troveVersion, pathId, path, fileId,
+    def addFileHash(self, filePath, troveName, troveVersion, pathId, path,
+                    fileId, fileVersion, sha1, mode):
+	self.nameMap[filePath] = (troveName, troveVersion, pathId, path, fileId,
                               fileVersion, sha1, mode)
 
     def hasFilePath(self, url):

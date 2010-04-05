@@ -140,7 +140,6 @@ class _Source(_AnySource):
 
         suffixes = ( 'sig', 'sign', 'asc' )
 
-        self.recipe.populateLcache()
         inRepos, f = self.recipe.fileFinder.fetch(sourcename + filename,
                                                    suffixes=suffixes,
                                                    allowNone=True)
@@ -235,7 +234,6 @@ class _Source(_AnySource):
         source lookaside cache for the extracted file.
         """
         # Always pull from RPM
-        self.recipe.populateLcache()
         inRepos, r = self.recipe.fileFinder.fetch(self.rpm)
         self.archiveInRepos = inRepos
 
@@ -280,7 +278,6 @@ class _Source(_AnySource):
         searchMethod = searchMethodMap.get(self.recipe.cookType,
             self.recipe.fileFinder.SEARCH_ALL)
 
-        self.recipe.populateLcache()
         inRepos, source = self.recipe.fileFinder.fetch(sourcename,
                                             headers=httpHeaders,
                                            suffixes=self.suffixes,
@@ -300,7 +297,6 @@ class _Source(_AnySource):
 
         if guessname:
             toFetch += guessname
-        self.recipe.populateLcache()
         inRepos, f = self.recipe.fileFinder.fetch(toFetch,
                                           suffixes=suffixes,
                                           refreshFilter=refreshFilter,
