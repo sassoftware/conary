@@ -1,3 +1,10 @@
+Changes in @NEW@:
+  o New Features:
+
+  o Bug Fixes:
+
+  o Internal Changes:
+
 Changes in 2.1.12:
   o New Features:
     * Config files from RPM capsules are now handled by Conary instead of
