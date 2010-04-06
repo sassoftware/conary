@@ -13,7 +13,7 @@
 #
 
 all: subdirs
-export STOPME = $(shell read -n 1)
+
 export TOPDIR = $(shell pwd)
 export VERSION = 2.1.11
 export CHANGESET = $(shell ./scripts/hg-version.sh)
