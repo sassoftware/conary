@@ -870,18 +870,19 @@ class ChangesetFilter(BaseProxy):
                             absOldChangeSetMap)
                         (fd, tmppath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                          suffix = ".ccs-temp")
-                        f = os.fdopen(fd, "w")
-                        size = cs.appendToFile(f)
-                        f.close()
+                        os.unlink(tmppath)
+                        fobj = os.fdopen(fd, "w+")
+                        size = cs.appendToFile(fobj)
+                        fobj.seek(0)
                         csInfo.size = size
                         csInfo.fingerprint = fprint
 
                         # Cache the changeset
                         csPath = self.csCache.set(
                             (csInfo.fingerprint, csInfo.version),
-                            (csInfo, file(tmppath), size))
+                            (csInfo, fobj, size))
+                        fobj.close()
                         csInfo.path = csPath
-                        os.unlink(tmppath)
                         # save csInfo
                         changeSetList[idx] = csInfo
                     # At the end of this step, we have all our changesets
