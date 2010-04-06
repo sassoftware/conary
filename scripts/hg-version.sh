@@ -5,7 +5,7 @@
 #
 # Get the build version for build.xml
 
-hgDir=..
+hgDir=`dirname $0`/..
 if [[ -x /usr/bin/hg && -d $hgDir/.hg ]] ; then
     rev=`hg id -i`
 elif [ -f $hgDir/.hg_archival.txt ]; then
