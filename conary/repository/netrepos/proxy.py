@@ -1596,10 +1596,10 @@ class ChangesetCache(object):
         csInfoObj = util.AtomicFile(dataPath, tmpsuffix = '.data-new')
         csInfoObj.write(csInfo.pickle())
 
+        csInfoObj.commit()
         csObj.commit()
         # If we locked the cache file, we need to no longer track it
         self.locksMap.pop(csPath, None)
-        csInfoObj.commit()
         return csPath
 
     def get(self, key, shouldLock = True):
