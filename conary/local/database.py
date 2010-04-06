@@ -550,7 +550,7 @@ class UpdateJob:
         # CNY-2580: putting null chars in an XML dump was a bad idea
         tmpfd, tmpfile = util.tempfile.mkstemp()
         os.unlink(tmpfile)
-        jobf = os.fdopen(tmpfd, "w")
+        jobf = os.fdopen(tmpfd, "w+")
         # replace null chars with None
         oldjobf = open(jobfile)
         while 1:
