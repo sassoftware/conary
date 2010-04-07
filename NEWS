@@ -2,6 +2,8 @@ Changes in @NEW@:
   o New Features:
 
   o Bug Fixes:
+    * Fixed crash in lookaside.fetchURL when accessing an authenticated http
+      URI using python 2.6.5. (CNY-3393)
 
   o Internal Changes:
 
