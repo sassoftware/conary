@@ -1044,6 +1044,7 @@ order by
 
         conflicts = []
         replaced = {}
+        #import epdb;epdb.st()
         for (path, existingInstanceId, existingPathId, existingStream,
              existingTroveName, existingVersion, existingFlavor,
              addedInstanceId, addedPathId, addedStream, addedTroveName,
@@ -1058,11 +1059,12 @@ order by
 
             addedFile = files.ThawFile(addedStream, addedPathId)
             existingFile = files.ThawFile(existingStream, existingPathId)
+
+            if addedFile.compatibleWith(existingFile):
+                continue
+
             if (addedFile.flags.isEncapsulatedContent() and
                 existingFile.flags.isEncapsulatedContent()):
-                if addedFile.compatibleWith(existingFile):
-                    continue
-
                 # When we install RPMs we allow 64 bit ELF files to
                 # silently replace 32 bit ELF files. This check matches
                 # one in rpmcapsule.py. We don't restrict it to RPM
