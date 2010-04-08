@@ -448,7 +448,22 @@ class URLOpener(urllib.FancyURLopener):
                         'will not be validated')
 
             if host != realhost and not useConaryProxy:
-                h = self.proxy_ssl(host, realhost, proxyAuth)
+                # We're seeing occasional problems with proxies dropping the
+                # connection, resulting in errno 8:
+                # "EOF occurred in violation of protocol"
+                # XXX There already is a try/except loop that catches generic
+                # socket.sslerror problems in the request function - this
+                # should be more lightwight
+                for i in range(20):
+                    try:
+                        h = self.proxy_ssl(host, realhost, proxyAuth)
+                        break
+                    except socket.sslerror, e:
+                        if e.args[0] != 8:
+                            raise
+                        time.sleep(0.1)
+                else: # for; re-raise the last error (EOF occurred...)
+                    raise
             elif self.caCerts and SSL:
                 # If cert checking is requested use our HTTPSConnection (which
                 # uses m2crypto)
