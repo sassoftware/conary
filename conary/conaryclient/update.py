@@ -3304,6 +3304,7 @@ conary erase '%s=%s[%s]'
             # capsules we cannot split the job
             if not split or not self._jobIsSplittable(uJob, jobSet):
                 splitJob = [ list(jobSet) ]
+                criticalUpdates = []
         else:
             (depList, suggMap, cannotResolve, splitJob, keepList,
              criticalUpdates) = ( [], {}, [], [ list(jobSet) ], [], [] )
