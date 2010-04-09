@@ -1,3 +1,5 @@
+Changes in @NEW@:
+
 Changes in 2.1.13:
   o Bug Fixes:
     * Fixed crash in lookaside.fetchURL when accessing an authenticated http
@@ -83,7 +85,7 @@ Changes in 2.1.10:
       tree conary looks through for new files.
     * Added exceptions and exceptDeps options to RPMRequires
 
-  o Internal Changes
+  o Internal Changes:
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
     * Merged internals of localcs/verify implementation into new classes
