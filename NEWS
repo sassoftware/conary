@@ -1,18 +1,14 @@
-Changes in @NEW@:
-  o New Features:
-
+Changes in 2.1.13:
   o Bug Fixes:
     * Fixed crash in lookaside.fetchURL when accessing an authenticated http
       URI using python 2.6.5. (CNY-3393)
     * Changes for sharing files with different fileIDs are now done for
-      non-encapsulated files as well (CNY-3396)
+      non-encapsulated files as well. (CNY-3396)
     * Installing critical packages as part of jobs which cannot be split
-      due to capsules no longer causes an exception
+      due to capsules no longer causes an exception.
     * The Conary command-line client will no longer traceback when command
       specific options are given without a command
       (e.g. 'conary --what-requires'). (CNY-3364)
-
-  o Internal Changes:
 
 Changes in 2.1.12:
   o New Features:
