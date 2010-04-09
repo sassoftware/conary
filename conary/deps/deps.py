@@ -605,6 +605,7 @@ class DependencyClass(object):
 
 class AbiDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_ABI
     tagName = "abi"
     justOne = False
@@ -615,6 +616,7 @@ _registerDepClass(AbiDependency)
 
 class InstructionSetDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_IS
     tagName = "is"
     justOne = False
@@ -625,6 +627,7 @@ _registerDepClass(InstructionSetDependency)
 
 class TargetInstructionSetDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_TARGET_IS
     tagName = "target"
     justOne = False
@@ -635,6 +638,7 @@ _registerDepClass(TargetInstructionSetDependency)
 
 class OldSonameDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_OLD_SONAME
     tagName = "oldsoname"
     justOne = False
@@ -644,6 +648,7 @@ _registerDepClass(OldSonameDependencies)
 
 class SonameDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_SONAME
     tagName = "soname"
     justOne = False
@@ -654,6 +659,7 @@ _registerDepClass(SonameDependencies)
 
 class UserInfoDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_USERINFO
     tagName = "userinfo"
     justOne = False
@@ -663,6 +669,7 @@ _registerDepClass(UserInfoDependencies)
 
 class GroupInfoDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_GROUPINFO
     tagName = "groupinfo"
     justOne = False
@@ -672,6 +679,7 @@ _registerDepClass(GroupInfoDependencies)
 
 class CILDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_CIL
     tagName = "CIL"
     justOne = False
@@ -683,6 +691,7 @@ _registerDepClass(CILDependencies)
 
 class JavaDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_JAVA
     tagName = "java"
     justOne = False
@@ -692,6 +701,7 @@ _registerDepClass(JavaDependencies)
 
 class PythonDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_PYTHON
     tagName = "python"
     justOne = False
@@ -701,6 +711,7 @@ _registerDepClass(PythonDependencies)
 
 class PerlDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_PERL
     tagName = "perl"
     justOne = False
@@ -711,6 +722,7 @@ _registerDepClass(PerlDependencies)
 
 class RubyDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_RUBY
     tagName = "ruby"
     justOne = False
@@ -720,6 +732,7 @@ _registerDepClass(RubyDependencies)
 
 class PhpDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_PHP
     tagName = "php"
     justOne = False
@@ -729,6 +742,7 @@ _registerDepClass(PhpDependencies)
 
 class FileDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_FILES
     tagName = "file"
     justOne = False
@@ -740,6 +754,7 @@ _registerDepClass(FileDependencies)
 
 class TroveDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_TROVES
     tagName = "trove"
     justOne = False
@@ -751,6 +766,7 @@ _registerDepClass(TroveDependencies)
 
 class UseDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_USE
     tagName = "use"
     justOne = True
@@ -761,6 +777,7 @@ _registerDepClass(UseDependency)
 
 class RpmDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_RPM
     tagName = "rpm"
     justOne = False
@@ -774,6 +791,7 @@ _registerDepClass(RpmDependencies)
 
 class RpmLibDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_RPMLIB
     tagName = "rpmlib"
     justOne = False
@@ -1096,6 +1114,7 @@ class DependencySet(object):
 
 # A special class for representing Flavors
 class Flavor(DependencySet):
+    __slots__ = ()
     def __repr__(self):
         return "Flavor('%s')" % formatFlavor(self)
     def __str__(self):
