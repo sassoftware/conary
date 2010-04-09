@@ -2281,21 +2281,24 @@ class LockedFile(object):
             # This should normally not happen, since a close() will not remove
             # the lock file after releasing the lock
             return self.open()
-        # Create temporary file
-        self._tmpfobj = AtomicFile(self.fileName)
-        # We now hold the lock and we have a temporary file to write to
+        # We now hold the lock
         return None
 
     def write(self, data):
         if self._tmpfobj is None:
-            raise RuntimeError("Lock not acquired")
+            # Create temporary file
+            self._tmpfobj = AtomicFile(self.fileName)
         self._tmpfobj.write(data)
 
     def commit(self):
         # It is important that we move the file into place first, before
         # releasing the lock. This make sure that any process that was blocked
         # will see the file immediately, instead of retrying to lock
-        fileobj = self._tmpfobj.commit(returnHandle = True)
+        if self._tmpfobj is None:
+            fileobj = None
+        else:
+            fileobj = self._tmpfobj.commit(returnHandle = True)
+            self._tmpfobj = None
         self.unlock()
         return fileobj
 
