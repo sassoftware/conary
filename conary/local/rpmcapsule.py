@@ -14,7 +14,7 @@
 
 import itertools, rpm, os, pwd, stat, tempfile
 
-from conary import files
+from conary import files, trove
 from conary.deps import deps
 from conary.lib import util
 from conary.local.capsules import SingleCapsuleOperation
@@ -239,7 +239,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 # this was added to the package outside of the RPM; we don't
                 # have any responsibility for it
                 continue
-            elif (update.conaryContents(hasCapsule, pathId, fileObj)
+            elif (trove.conaryContents(hasCapsule, pathId, fileObj)
                   and fileObj.lsTag != 'd'):
                 # this content isn't part of the capsule; remember to put
                 # it back when RPM is done
@@ -373,6 +373,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
             for (pathId, path, fileId, version), fileObj in \
                     itertools.izip(trv.iterFileList(), dbFileObjs):
+                hasCapsule = trv.troveInfo.capsule.type() or False
                 fullPath = self.root + path
                 if not os.path.exists(fullPath):
                     continue
@@ -382,7 +383,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                     # we don't have any responsibility for it
                     continue
                 elif (fileObj.hasContents and
-                      not fileObj.flags.isEncapsulatedContent()):
+                      trove.conaryContents(hasCapsule, pathId, fileObj)):
                     # this content isn't part of the capsule; remember to put
                     # it back when RPM is done
                     self.preservePath(path)

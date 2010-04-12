@@ -1,4 +1,20 @@
 Changes in @NEW@:
+  o Bug Fixes:
+    * Disable diff/patch merging for RPM config files (CNY-3399)
+
+  o New Features:
+    * Added support for RPM capsules to ChangesetExploder class
+
+  o Internal Changes:
+    * Added file flags to allow conary to override file contents and attributes
+      for capsule-based files (such as from RPM).
+    * Changesets are now loaded incrementally rather than as one big string;
+      this avoids a potentially large memory spike opening large changesets
+    * Added slots to various stream and trove objects
+    * StreamCollections are intialized as if thawing an empty string rather
+      than instantiating all of the child elements (which are often not needed
+      anyway). This reduces total ram usage by more than 5% on large
+      changesets.
 
 Changes in 2.1.13:
   o Bug Fixes:
