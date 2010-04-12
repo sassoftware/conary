@@ -78,7 +78,7 @@ def conaryContents(hasCapsule, pathId, fileObj):
         return False
 
     return (fileObj.flags.isCapsuleOverride() or
-            fileObj.flags.isConfig() or
+            #fileObj.flags.isConfig() or
             not hasCapsule)
 
 class TroveTuple(streams.StreamSet):

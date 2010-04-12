@@ -1,6 +1,7 @@
 Changes in @NEW@:
   o New Features:
     * Added support for RPM capsules to ChangesetExploder class
+    * Disable diff/patch merging for RPM config files (CNY-3399)
 
   o Internal Changes:
     * Added file flags to allow conary to override file contents and attributes
