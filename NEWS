@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.14:
   o Bug Fixes:
     * Disable diff/patch merging for RPM config files (CNY-3399)
 
