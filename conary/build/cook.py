@@ -1534,7 +1534,7 @@ def _loadPolicy(recipeObj, cfg, enforceManagedPolicy):
     return policyTroves
 
 def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
-                  fileIdsPathMap, recipeObj):
+                  fileIdsPathMap, recipeObj=None):
     ident = _IdGen()
 
     # add the target branch as the first entry in the list to search
@@ -1552,7 +1552,7 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
         searchBranches.append(searchBranches[0].parentBranch())
 
     # add any branches specified in the recipe
-    if hasattr(recipeObj, 'pathIdSearchBranches'):
+    if recipeObj and hasattr(recipeObj, 'pathIdSearchBranches'):
         s = set(repos.getLabelsForHost(searchBranches[0].getHost()))
         for b in recipeObj.pathIdSearchBranches:
             if isinstance(b,str):
@@ -1598,8 +1598,7 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
                         continue
                     d[path] = pathId, fileVersion, fileId
         for path in d:
-            pass
-            #fileIdsPathMap.pop(path)
+            fileIdsPathMap.pop(path)
         ident.merge(d)
     except errors.TroveMissing:
         # a component is missing from the repository.  The repos can
@@ -1626,6 +1625,7 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
                                                   dirnames, fileIds)
                 # Remove the paths we've found already from fileIdsPathMap,
                 # so we don't ask the next branch the same questions
+
                 for k in d.iterkeys():
                     fileIdsPathMap.pop(k, None)
 
