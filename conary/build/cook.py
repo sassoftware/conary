@@ -785,7 +785,6 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     del newBuiltGroups
 
     builtGroups = groupOptions.shortenFlavors(keyFlavor, builtGroups)
-    log.info('foo')
 
     groupFlavors = [ x[1] for x in builtGroups ]
 
