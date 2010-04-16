@@ -304,6 +304,19 @@ With the latest conary, you must now cook all versions of a group at the same ti
             raise builderrors.GroupFlavorChangedError(errMsg)
 
     def shortenFlavors(self, keyFlavor, builtGroups):
+        """
+        Shortens the flavors associated with a set of groups to a minimally
+        sufficient set which will differentiate the groups. Returns a list
+        parallel to builtGroups, but with shorter flavors.
+
+        @param keyFlavor: Flavor which differentiates some of the built groups.
+        Any flavor which appears here will appear in the final shortened flavors.
+        @type keyFlavor: Flavor
+        @param builtGroups: List of ( [GroupRecipe], Flavor) tuples of the flavors
+        which need to be condensed.
+        @type builtGroups: [ ( [ GroupRecipe ], Flavor) ]
+        @rtype: [ ([ GroupRecipe ], Flavor) ]
+        """
         if not self._shortenFlavors:
             return builtGroups
         groupName = builtGroups[0][0].name
@@ -317,31 +330,38 @@ With the latest conary, you must now cook all versions of a group at the same ti
             else:
                 keyFlavors = [ use.platformFlagsToFlavor(groupName) ]
 
-        newBuiltGroups = []
-        for recipeObj, flavor in builtGroups:
-            archFlags = list(flavor.iterDepsByClass(
-                                        deps.InstructionSetDependency))
-            shortenedFlavor = deps.filterFlavor(flavor, keyFlavors)
-            if archFlags:
-                shortenedFlavor.addDeps(deps.InstructionSetDependency,
-                                        archFlags)
-            newBuiltGroups.append((recipeObj, shortenedFlavor))
+        while True:
+            newBuiltGroups = []
+            for recipeObj, flavor in builtGroups:
+                archFlags = list(flavor.iterDepsByClass(
+                                            deps.InstructionSetDependency))
+                shortenedFlavor = deps.filterFlavor(flavor, keyFlavors)
+                if archFlags:
+                    shortenedFlavor.addDeps(deps.InstructionSetDependency,
+                                            archFlags)
+                newBuiltGroups.append((recipeObj, shortenedFlavor))
 
-        groupFlavors = [x[1] for x in newBuiltGroups]
-        if len(set(groupFlavors)) == len(groupFlavors):
-            return newBuiltGroups
+            groupFlavors = [x[1] for x in newBuiltGroups]
+            if len(set(groupFlavors)) == len(groupFlavors):
+                break
 
-        duplicates = {}
-        for idx, (recipeObj, groupFlavor) in enumerate(newBuiltGroups):
-            duplicates.setdefault(groupFlavor, []).append(idx)
-        duplicates = [ x[1] for x in duplicates.items() if len(x[1]) > 1 ]
-        for duplicateIdxs in duplicates:
-            fullFlavors = [ builtGroups[x][1] for x in duplicateIdxs ]
-            fDict = deps.flavorDifferences(fullFlavors)
-            # add to keyFlavors everything that's needed to distinguish these
-            # groups.
-            keyFlavors.extend(fDict.values())
-        return self.shortenFlavors(keyFlavors, builtGroups)
+            duplicates = {}
+            for idx, (recipeObj, groupFlavor) in enumerate(newBuiltGroups):
+                duplicates.setdefault(groupFlavor, []).append(idx)
+            duplicates = [ x[1] for x in duplicates.items() if len(x[1]) > 1 ]
+            for duplicateIdxs in duplicates:
+                fullFlavors = [ builtGroups[x][1] for x in duplicateIdxs ]
+                fDict = deps.flavorDifferences(fullFlavors)
+                if (deps.Flavor()) in fDict.values():
+                    raise builderrors.RecipeFileError(
+                        'Duplicate group flavors for group %s[%s] found. This '
+                        'indicates a bug in conary.'
+                            % (groupName, str(fullFlavors[0])))
+                # add to keyFlavors everything that's needed to distinguish these
+                # groups.
+                keyFlavors.extend(fDict.values())
+
+        return newBuiltGroups
 
 def cookObject(repos, cfg, loaderList, sourceVersion,
                changeSetFile = None, prep=True, macros={},
@@ -751,8 +771,21 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     if isinstance(keyFlavor, str):
         keyFlavor = deps.parseFlavor(keyFlavor, raiseError=True)
     groupFlavors = []
+    # dedup the groups based on flavor
     newBuiltGroups = []
+    flavors = set( x[1] for x in builtGroups)
+    for (recipeObj, flavor) in builtGroups:
+        if flavor in flavors:
+            newBuiltGroups.append((recipeObj, flavor))
+            flavors.remove(flavor)
+        else:
+            log.info("Removed duplicate flavor of group %s[%s]"
+                % (recipeObj.name, str(flavor)))
+    builtGroups = newBuiltGroups
+    del newBuiltGroups
+
     builtGroups = groupOptions.shortenFlavors(keyFlavor, builtGroups)
+    log.info('foo')
 
     groupFlavors = [ x[1] for x in builtGroups ]
 

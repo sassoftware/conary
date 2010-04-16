@@ -1308,27 +1308,77 @@ def mergeFlavor(flavor, mergeBase):
     return mergedFlavor
 
 def filterFlavor(depSet, filters):
+    """
+    Returns a DependencySet based on an existing DependencySet object and a list
+    of filters (which are themselves DependencySet objects). The new object will
+    contain only dependencies which are in one or more of the filters, and the
+    flags of those dependencies will be the flags of the object which also appear
+    in one or more of the filters. Note that this uses _filterFlavorFlags(),
+    and some of the specifics of the results are explained in the documentation
+    for that function.
+
+    This is equvalent to ( depSet & [ filter1 | filter 2 | ... | filterN ]) if the
+    logical operators are not sense specific.
+
+    @param depSet: Object to filter
+    @type depSet: DependencySet
+    @param filters: List of objects to filter based on
+    @type filters: [ DependencySet ]
+    @rtype: DependencySet
+    """
+
     if not isinstance(filters, (list, tuple)):
         filters = [filters]
     finalDepSet = Flavor()
     for depTag, depClass in depSet.members.items():
+        # Build a list of the DependencyClasses for this tag in each filter.
         filterClasses = [ x.members.get(depClass.tag, None) for x in filters ]
         filterClasses = [ x for x in filterClasses if x is not None ]
         if not filterClasses:
+            # There is no overlap in the classes between this dep and the
+            # filters, so we're done. This is just a shortcut; the rest of the
+            # logic would noop anyway.
             continue
+
         depList = []
         for dep in depClass.getDeps():
+            # Get all the DependencyClasses from the filters with the same
+            # name as this dep
             filterDeps = [ x.members.get(dep.name, None) for x in filterClasses]
             filterDeps = [ x for x in filterDeps if x is not None ]
             if filterDeps:
-                finalDep = _filterDeps(depClass, dep, filterDeps)
+                finalDep = _filterFlavorFlags(depClass, dep, filterDeps)
                 if finalDep is not None:
                     depList.append(finalDep)
         if depList:
             finalDepSet.addDeps(depClass.__class__, depList)
     return finalDepSet
 
-def _filterDeps(depClass, dep, filterDeps):
+def _filterFlavorFlags(depClass, dep, filterDeps):
+    """
+    Return a new Dependency object based on an existing Dependency object and
+    a list of filters (which are themselves Dependency objects). The new
+    object will have the same name as the original Dependency, but only flags
+    which are present in both the original and one or more of the filters
+    will be present. The sense is not used for matching; the sense from the
+    original dependency is used in the return value.
+
+    This is equvalent to ( dep & [ filter1 | filter 2 | ... | filterN ]) if the
+    logical operators are not sense specific.
+
+    While this may seem general purpose, it is only used for filtering flavor
+    flags, and the name reflects this.
+
+    @param depClass: Class object used to construct the returned dependency. Should
+    be a child object of Dependency class.
+    @type depClass: class
+    @param dep: Object to filter flags from
+    @type dep: Dependency
+    @param filterDeps: Objects whose flags will be used to filter the dep parameter
+    @type filterDeps: [ Dependency ]
+    @rtype dep: Dependency
+
+    """
     filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
     finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]
     if not depClass.depNameSignificant and not finalFlags:

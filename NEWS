@@ -4,6 +4,9 @@ Changes in @NEW@:
       search the branches defined in the list for pathIds to reuse while 
       cooking. (CNY-3398)
   o Bug Fixes:
+    * Build groups whose flavors end up identical now causes one of those
+      builds to be discarded rather than an exception about "maximum
+      recursion depth exceeded" (CNY-3401)
   o Internal Changes:
 
 Changes in 2.1.14:
