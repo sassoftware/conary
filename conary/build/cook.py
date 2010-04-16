@@ -1428,7 +1428,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')
     idgen = _getPathIdGen(repos, sourceName, targetVersion, targetLabel,
-                          grpMap.keys(), fileIdsPathMap)
+                          grpMap.keys(), fileIdsPathMap, recipeObj)
     log.info('pathId lookup complete')
 
     built = []
@@ -1534,24 +1534,38 @@ def _loadPolicy(recipeObj, cfg, enforceManagedPolicy):
     return policyTroves
 
 def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
-                  fileIdsPathMap):
+                  fileIdsPathMap, recipeObj):
     ident = _IdGen()
-    searchBranch = targetVersion.branch()
+
+    # add the target branch as the first entry in the list to search
+    searchBranches = [targetVersion.branch()]
     if targetLabel:
         # this keeps cook and emerge branchs from showing up
-        searchBranch = searchBranch.parentBranch()
+        searchBranches = [searchBranches[0].parentBranch()]
 
-    if not repos or searchBranch.getHost() == 'local':
+    if not repos or searchBranches[0].getHost() == 'local':
         # we're building locally, no need to look up pathids
         return ident
 
-    versionDict = dict( [ (x, { searchBranch: None }) for x in pkgNames ] )
+    # if the target branch has a parent we'll search that too
+    if searchBranches[0].hasParentBranch():
+        searchBranches.append(searchBranches[0].parentBranch())
+
+    # add any branches specified in the recipe
+    if hasattr(recipeObj, 'pathIdSearchBranches'):
+        s = set(repos.getLabelsForHost(searchBranches[0].getHost()))
+        for b in recipeObj.pathIdSearchBranches:
+            if isinstance(b,str):
+                b = versions.VersionFromString(b)
+            if b.label() in s and b not in searchBranches:
+                searchBranches.append(b)
+
+    versionDict = {}
+    for p in pkgNames:
+        for s in searchBranches:
+            versionDict.setdefault(p,{})
+            versionDict[p][s] = None
     versionDict = repos.getTroveLeavesByBranch(versionDict)
-    if not versionDict and searchBranch.hasParentBranch():
-        # there was no match on this branch; look uphill
-        searchBranch = searchBranch.parentBranch()
-        versionDict = dict((x, { searchBranch: None }) for x in pkgNames )
-        versionDict = repos.getTroveLeavesByBranch(versionDict)
 
     # We've got all of the latest packages for each flavor.
     # Now we'll search their components for matching pathIds.
@@ -1584,7 +1598,8 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
                         continue
                     d[path] = pathId, fileVersion, fileId
         for path in d:
-            fileIdsPathMap.pop(path)
+            pass
+            #fileIdsPathMap.pop(path)
         ident.merge(d)
     except errors.TroveMissing:
         # a component is missing from the repository.  The repos can
@@ -1598,29 +1613,34 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
 
     # look up the pathids for every file that has been built by
     # this source component, following our branch ancestry
-    while True:
-        # Generate the file prefixes
-        dirnames = set(os.path.dirname(x) for x in fileIdsPathMap.iterkeys())
-        fileIds = sorted(set(fileIdsPathMap.values()))
-        if not fileIds:
-            break
-        try:
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                                              dirnames, fileIds)
-        except errors.InsufficientPermission:
-            # No permissions to search on this branch. Keep going
-            d = {}
-            #raise
-        # Remove the paths we've found already from fileIdsPathMap, so we
-        # don't ask the next server the same questions
-        for k in d.iterkeys():
-            fileIdsPathMap.pop(k, None)
+    for searchBranch in searchBranches:
+        while True:
+            # Generate the file prefixes
+            dirnames = set(os.path.dirname(x) for x in
+                           fileIdsPathMap.iterkeys())
+            fileIds = sorted(set(fileIdsPathMap.values()))
+            if not fileIds:
+                break
+            try:
+                d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                                                  dirnames, fileIds)
+                # Remove the paths we've found already from fileIdsPathMap,
+                # so we don't ask the next branch the same questions
+                for k in d.iterkeys():
+                    fileIdsPathMap.pop(k, None)
 
-        ident.merge(d)
+                ident.merge(d)
+            except errors.InsufficientPermission:
+                # No permissions to search on this branch. Keep going
+                pass
 
-        if not searchBranch.hasParentBranch():
+            if not searchBranch.hasParentBranch():
+                break
+            searchBranch = searchBranch.parentBranch()
+
+        if not fileIdsPathMap:
             break
-        searchBranch = searchBranch.parentBranch()
+
     return ident
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):

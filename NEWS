@@ -1,5 +1,8 @@
 Changes in @NEW@:
   o New Features:
+    * Recipes that have a class member list named 'pathIdSearchBranches' will
+      search the branches defined in the list for pathIds to reuse while 
+      cooking. (CNY-3398)
   o Bug Fixes:
   o Internal Changes:
 
