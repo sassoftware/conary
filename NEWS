@@ -7,6 +7,9 @@ Changes in @NEW@:
     * Build groups whose flavors end up identical now causes one of those
       builds to be discarded rather than an exception about "maximum
       recursion depth exceeded" (CNY-3401)
+    * Conary proxies will no longer cache changesets that were
+      truncated in transit. Additionally, clients will produce a more
+      useful error message if they download a truncated changeset.  (CNY-3140)
   o Internal Changes:
 
 Changes in 2.1.14:
