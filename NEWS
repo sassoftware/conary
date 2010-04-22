@@ -3,6 +3,7 @@ Changes in @NEW@:
     * Recipes that have a class member list named 'pathIdSearchBranches' will
       search the branches defined in the list for pathIds to reuse while 
       cooking. (CNY-3398)
+
   o Bug Fixes:
     * Build groups whose flavors end up identical now causes one of those
       builds to be discarded rather than an exception about "maximum
@@ -10,6 +11,9 @@ Changes in @NEW@:
     * Conary proxies will no longer cache changesets that were
       truncated in transit. Additionally, clients will produce a more
       useful error message if they download a truncated changeset.  (CNY-3140)
+    * The filewrap and wrapdir options for r.Run() previously did not
+      wrap fopen64 or freopen64. (CNY-3405)
+
   o Internal Changes:
 
 Changes in 2.1.14:
