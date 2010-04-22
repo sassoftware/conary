@@ -13,6 +13,8 @@ Changes in @NEW@:
       useful error message if they download a truncated changeset.  (CNY-3140)
     * The filewrap and wrapdir options for r.Run() previously did not
       wrap fopen64 or freopen64. (CNY-3405)
+    * Previously, user and password information for the http/https proxy
+      were visible in a traceback if a network exception occured. (RBL-5191)
 
   o Internal Changes:
 
