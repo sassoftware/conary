@@ -7,6 +7,8 @@ Changes in @NEW@:
     * Build groups whose flavors end up identical now causes one of those
       builds to be discarded rather than an exception about "maximum
       recursion depth exceeded" (CNY-3401)
+    * Optimized population of lookaside cache for recipes containing large 
+      numbers of source actions such that it is *much* faster. (CNY-3406)
   o Internal Changes:
 
 Changes in 2.1.14:
