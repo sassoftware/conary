@@ -1592,7 +1592,11 @@ class ChangesetCache(object):
             # We did not get a lock for it
             csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
 
-        util.copyfileobj(inF, csObj, sizeLimit = sizeLimit)
+        written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
+        if written != sizeLimit:
+            raise errors.RepositoryError("Changeset was truncated in transit "
+                    "(expected %d bytes, got %d bytes for subchangeset)" %
+                    (sizeLimit, written))
 
         csInfoObj = util.AtomicFile(dataPath, tmpsuffix = '.data-new')
         csInfoObj.write(csInfo.pickle())

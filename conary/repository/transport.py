@@ -358,7 +358,9 @@ class URLOpener(urllib.FancyURLopener):
             # XXX this is duplicating work done in urllib.URLoperner.open
             proxy = self.proxies.get(protocol, None)
             if proxy:
+                proxy = util.ProtectedString(proxy)
                 urltype, proxyhost = urllib.splittype(proxy)
+                proxyhost = util.ProtectedString(proxyhost)
                 host, selector = urllib.splithost(proxyhost)
                 url = (host, protocol + ':' + url)
 
@@ -369,6 +371,8 @@ class URLOpener(urllib.FancyURLopener):
             host, selector = urllib.splithost(url)
             if host:
                 user_passwd, host = urllib.splituser(host)
+                if user_passwd:
+                    user_passwd = util.ProtectedString(user_passwd)
                 host = urllib.unquote(host)
             realhost = host
             urlstr = "%s://%s%s" % (protocol, host, selector)
@@ -394,6 +398,7 @@ class URLOpener(urllib.FancyURLopener):
 
             host, selector = url
             proxyUserPasswd, host = urllib.splituser(host)
+            proxyUserPasswd = util.ProtectedString(proxyUserPasswd)
             urltype, rest = urllib.splittype(selector)
             url = rest
             user_passwd = None
@@ -404,6 +409,7 @@ class URLOpener(urllib.FancyURLopener):
                 if realhost:
                     user_passwd, realhost = urllib.splituser(realhost)
                 if user_passwd:
+                    user_passwd = util.ProtectedString(user_passwd)
                     selector = "%s://%s%s" % (urltype, realhost, rest)
                 if self.proxyBypass(host, realhost, useConaryProxy):
                     host = realhost
@@ -428,13 +434,13 @@ class URLOpener(urllib.FancyURLopener):
             ipOrHost = getIPAddress(host)
         else:
             ipOrHost = host
-
+        
         if user_passwd:
-            auth = base64.b64encode(user_passwd)
+            auth = util.ProtectedString(base64.b64encode(user_passwd))
         else:
             auth = None
         if proxyUserPasswd:
-            proxyAuth = base64.b64encode(proxyUserPasswd)
+            proxyAuth = util.ProtectedString(base64.b64encode(proxyUserPasswd))
         else:
             proxyAuth = None
 
