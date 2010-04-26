@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2004-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -21,7 +21,9 @@ import errno
 import glob
 import httplib
 import itertools
+import logging
 import os
+import random
 import select
 import socket
 import sys
@@ -41,10 +43,14 @@ except ImportError:
     SSL = None
 
 
+log = logging.getLogger(__name__)
+
+
 LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
                   socket.gethostname()])
 
 from conary.lib import util
+from conary.lib import log as clog
 
 class InfoURL(urllib.addinfourl):
     def __init__(self, fp, headers, url, protocolVersion):
@@ -347,6 +353,12 @@ class URLOpener(urllib.FancyURLopener):
         return False
 
     def createConnection(self, url, ssl=False, withProxy=False):
+        """Return a HTTP/S connection suitable for use by open_http().
+
+        @param url: A string containing a URL, or a tuple (proxyhost, url)
+        @type  url: C{str} or C{tuple}
+        @return: C{tuple} (HTTPConnection, url, selector, headers)
+        """
         # Return an HTTP or HTTPS class suitable for use by open_http
         self.usedProxy = False
         if ssl:
@@ -355,7 +367,11 @@ class URLOpener(urllib.FancyURLopener):
             protocol='http'
 
         if withProxy:
-            # XXX this is duplicating work done in urllib.URLoperner.open
+            # DEPRECATED: Check self.proxies again to see if a proxy should be
+            # used. The only apparent consumer is netclient.httpPutFile, which
+            # should be using the same interface as everyone else.  This
+            # duplicates code from URLOpener.open().
+            assert isinstance(url, str)
             proxy = self.proxies.get(protocol, None)
             if proxy:
                 urltype, proxyhost = urllib.splittype(proxy)
@@ -366,6 +382,7 @@ class URLOpener(urllib.FancyURLopener):
         user_passwd = None
         proxyUserPasswd = None
         if isinstance(url, str):
+            # Target is NOT a proxy.
             host, selector = urllib.splithost(url)
             if host:
                 user_passwd, host = urllib.splituser(host)
@@ -384,8 +401,9 @@ class URLOpener(urllib.FancyURLopener):
             # into the mix, for which we have no control over what the
             # selector is (and for the proxies we tested it's a relative URI)
         else:
-            # Request should go through a proxy
-            # Check to see if it's a conary proxy
+            # Target IS a proxy.
+            # Check to see if it's a conary proxy, in which case the behavior
+            # is slightly different (no tunneling of SSL).
             proxy = self.proxies[protocol]
             proxyUrlType, proxyhost = urllib.splittype(proxy)
             useConaryProxy = proxyUrlType in ('conary', 'conarys')
@@ -448,33 +466,51 @@ class URLOpener(urllib.FancyURLopener):
                         'will not be validated')
 
             if host != realhost and not useConaryProxy:
-                # We're seeing occasional problems with proxies dropping the
-                # connection, resulting in errno 8:
-                # "EOF occurred in violation of protocol"
-                # XXX There already is a try/except loop that catches generic
-                # socket.sslerror problems in the request function - this
-                # should be more lightwight
-                for i in range(20):
+                # Target: HTTPS proxy, origin server may or may not be SSL
+
+                # Retry the connection if the remote end closes the connection
+                # without sending a response. This may happen after shutting
+                # down the SSL stream (BadStatusLine), or without doing so
+                # (socket.sslerror)
+                timer = BackoffTimer()
+                for i in range(7):
+                    if i:
+                        log.debug("SSL proxy hung up unexpectedly, retrying.")
+                        timer.sleep()
+
                     try:
                         h = self.proxy_ssl(host, realhost, proxyAuth)
                         break
                     except socket.sslerror, e:
+                        # Proxy closed connection without shutting down SSL.
                         if e.args[0] != 8:
                             raise
-                        time.sleep(0.1)
-                else: # for; re-raise the last error (EOF occurred...)
+                    except httplib.BadStatusLine:
+                        # Proxy closed connection without sending a response.
+                        pass
+
+                    # Sleep and try again, per RFC 2626 s. 8.2.4
+
+                else:
+                    # Out of retries so rethrow the original error.
                     raise
+
             elif self.caCerts and SSL:
+                # Target: HTTPS origin server or conary proxy
+
                 # If cert checking is requested use our HTTPSConnection (which
                 # uses m2crypto)
                 commonName = urllib.splitport(host)[0]
                 h = HTTPSConnection(ipOrHost, caCerts=self.caCerts,
                         commonName=commonName)
             else:
+                # Target: HTTPS origin server or conary proxy
+
                 # Either no cert checking was requested, or we don't have the
                 # module to support it, so use vanilla httpslib.
                 h = httplib.HTTPSConnection(ipOrHost)
         else:
+            # Target: HTTP proxy or conary proxy or origin server
             h = httplib.HTTPConnection(ipOrHost)
             if host != realhost and not useConaryProxy and proxyAuth:
                 headers.append(("Proxy-Authorization",
@@ -626,6 +662,21 @@ class XMLOpener(URLOpener):
     open_conarys = URLOpener.open_https
 
 
+class BackoffTimer(object):
+    """Helper for functions that need an exponential backoff."""
+
+    factor = 2.7182818284590451
+    jitter = 0.11962656472
+
+    def __init__(self, delay=0.1):
+        self.delay = delay
+
+    def sleep(self):
+        time.sleep(self.delay)
+        self.delay *= self.factor
+        self.delay = random.normalvariate(self.delay, self.delay * self.jitter)
+
+
 def getrealhost(host):
     """ Slice off username/passwd and portnum """
     atpoint = host.find('@') + 1
@@ -737,7 +788,6 @@ class Transport(xmlrpclib.Transport):
                     self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
                 break
             except (IOError, socket.sslerror), e:
-                from conary.lib import log
                 # try resetting the resolver - /etc/resolv.conf
                 # might have changed since this process started.
                 util.res_init()
@@ -754,14 +804,14 @@ class Transport(xmlrpclib.Transport):
                     e = e.args[1]
                 if isinstance(e, socket.gaierror):
                     if e.args[0] == socket.EAI_AGAIN:
-                        log.warning('got "%s" when trying to '
+                        clog.warning('got "%s" when trying to '
                                     'resolve %s.  Retrying in '
                                     '500 ms.' %(e.args[1], host))
                         time.sleep(.5)
                     else:
                         raise
                 elif isinstance(e, socket.sslerror):
-                    log.warning('got "%s" when trying to '
+                    clog.warning('got "%s" when trying to '
                                 'make an SSL connection to %s.'
                                 'Retrying in 500 ms.' %(e.args[1], host))
                     time.sleep(.5)
