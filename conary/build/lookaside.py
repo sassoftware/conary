@@ -87,13 +87,21 @@ class laUrl(object):
 
     def filePath(self,useParentPath=True):
         if self.parent and useParentPath:
-            path = self.parent.path
+            fragment = self.parent.fragment or ''
+            port = self.parent.port or ''
+            path = self.parent.path + (self.parent.params or '')
             host = self.parent.host
         else:
-            path = self.path
+            fragment = self.fragment or ''
+            port = self.port or ''
+            path = self.path + (self.params or '')
             host = self.host
         if self.extension:
             path += '.' + self.extension
+        if fragment:
+            path += "#" + fragment
+        if port and host:
+            host += host + ":" + str(port)
 
         path = path.replace('/../','/_../')
         if path[0] == '/':
@@ -191,6 +199,7 @@ class FileFinder(object):
     def fetch(self, urlStr, suffixes=None, archivePath=None, headers=None,
               allowNone=False, searchMethod=0, # SEARCH_ALL
               refreshFilter=None):
+
         urlList = self._getPathsToSearch(urlStr, suffixes)
         for url in urlList:
             try:

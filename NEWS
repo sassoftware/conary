@@ -19,6 +19,9 @@ Changes in @NEW@:
       were visible in a traceback if a network exception occured. (RBL-5191)
     * Split out info packages from jobs even when RPM capsules are
       used (CNY-3387)
+    * Modified lookaside cache file structure to include URL parameters, 
+      fragments and ports to better generate a unique file path for a given 
+      URL (CNY-3408)
 
   o Internal Changes:
 
