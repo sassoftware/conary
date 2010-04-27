@@ -3062,6 +3062,19 @@ conary erase '%s=%s[%s]'
                 newJob.extend(thisJob)
                 i += 1
 
+        # next pass combines all jobs which contain :rpm components; it's
+        # possible this should be more general, but finding out if already
+        # installed troves are capsules is expensive enough that we'd rather
+        # avoid it, and the component name is close enough for now. this looks
+        # for the first :rpm, and combines all jobs which remain into a single
+        # one. more simple than elegant
+        firstRpmJob = None
+        for i, jobList in enumerate(combinedJobs):
+            if [ x for x in jobList if ':rpm' in x[0] ]:
+                combinedJobs = (combinedJobs[:i] +
+                    [ list(itertools.chain(*combinedJobs[i:])) ] )
+                break
+
         newJob = []
         inGroup = None
         updateMax = self.cfg.updateThreshold
@@ -3123,19 +3136,6 @@ conary erase '%s=%s[%s]'
             uJob.addJob(newJob)
 
         uJob.setCriticalJobs(finalCriticalJobs)
-
-    def _jobIsSplittable(self, uJob, jobSet):
-        troveSource = uJob.getTroveSource()
-        oldTrovesInfo = [ (x[0], x[1][0], x[1][1]) for x in jobSet
-                          if x[1][0] is not None ]
-        newTrovesInfo = [ (x[0], x[2][0], x[2][1]) for x in jobSet
-                          if x[2][0] is not None ]
-
-        capsules  = self.db.getCapsulesTroveList(oldTrovesInfo)
-        capsules += troveSource.getCapsulesForTroveList(newTrovesInfo)
-        capsules = [ x for x in capsules if x is not None and x.type() ]
-
-        return (capsules == [])
 
     @api.publicApi
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
@@ -3302,7 +3302,7 @@ conary erase '%s=%s[%s]'
 
             # if any of the things we're about to install or remove use
             # capsules we cannot split the job
-            if not split or not self._jobIsSplittable(uJob, jobSet):
+            if not split:
                 splitJob = [ list(jobSet) ]
                 criticalUpdates = []
         else:

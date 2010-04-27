@@ -2056,12 +2056,6 @@ order by
         """
         return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_PATH_HASHES)
 
-    def getCapsulesTroveList(self, troveList):
-        """ 
-            Returns the capsule data for the given trove list.
-        """
-        return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_CAPSULE)
-
     def getTroveScripts(self, troveList):
         """ 
             Returns the trove scripts for the given trove list. None is
