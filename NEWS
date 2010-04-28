@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.15:
   o New Features:
     * Recipes that have a class member list named 'pathIdSearchBranches' will
       search the branches defined in the list for pathIds to reuse while 
@@ -22,8 +22,6 @@ Changes in @NEW@:
     * Modified lookaside cache file structure to include URL parameters, 
       fragments and ports to better generate a unique file path for a given 
       URL (CNY-3408)
-
-  o Internal Changes:
 
 Changes in 2.1.14:
   o Bug Fixes:
