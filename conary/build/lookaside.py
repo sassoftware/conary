@@ -87,13 +87,21 @@ class laUrl(object):
 
     def filePath(self,useParentPath=True):
         if self.parent and useParentPath:
-            path = self.parent.path
+            fragment = self.parent.fragment or ''
+            port = self.parent.port or ''
+            path = self.parent.path + (self.parent.params or '')
             host = self.parent.host
         else:
-            path = self.path
+            fragment = self.fragment or ''
+            port = self.port or ''
+            path = self.path + (self.params or '')
             host = self.host
         if self.extension:
             path += '.' + self.extension
+        if fragment:
+            path += "#" + fragment
+        if port and host:
+            host += host + ":" + str(port)
 
         path = path.replace('/../','/_../')
         if path[0] == '/':
@@ -191,6 +199,7 @@ class FileFinder(object):
     def fetch(self, urlStr, suffixes=None, archivePath=None, headers=None,
               allowNone=False, searchMethod=0, # SEARCH_ALL
               refreshFilter=None):
+
         urlList = self._getPathsToSearch(urlStr, suffixes)
         for url in urlList:
             try:
@@ -312,7 +321,7 @@ class FileFinder(object):
             urlObjList = newUrlObjList
         return urlObjList
 
-    class BasicPasswordManager(object):
+    class BasicPasswordManager(urllib2.HTTPPasswordMgr):
         # password manager class for urllib2 that handles exactly 1 password
         def __init__(self):
             self.user = ''
@@ -323,7 +332,9 @@ class FileFinder(object):
             self.passwd = passwd
 
         def find_user_password(self, *args, **kw):
-            return self.user, self.passwd
+            if self.user:
+                return self.user, self.passwd
+            return (None,None)
 
     def _fetchUrl(self, url, headers):
         if isinstance(url,str):
@@ -336,29 +347,20 @@ class FileFinder(object):
                 # set up a handler that tracks cookies to handle
                 # sites like Colabnet that want to set a session cookie
                 cj = cookielib.LWPCookieJar()
-                passwdMgr = self.BasicPasswordManager()
+                opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+
+                # add password handler if needed
+                if url.user:
+                    url.passwd = url.passwd or ''
+                    passwdMgr = self.BasicPasswordManager()
+                    passwdMgr.add_password(url.user, url.passwd)
+                    opener.add_handler(
+                        urllib2.HTTPBasicAuthHandler(passwdMgr))
+
+                # add proxy and proxy password handler if needed
                 if self.cfg.proxy and \
                         not self.noproxyFilter.bypassProxy(url.host):
                     proxyPasswdMgr = urllib2.HTTPPasswordMgr()
-                    opener = urllib2.build_opener(
-                        urllib2.HTTPCookieProcessor(cj),
-                        urllib2.HTTPBasicAuthHandler(passwdMgr),
-                        urllib2.ProxyBasicAuthHandler(proxyPasswdMgr),
-                        urllib2.ProxyHandler(self.cfg.proxy)
-                        )
-                else:
-                    proxyPasswdMgr = None
-                    opener = urllib2.build_opener(
-                        urllib2.HTTPCookieProcessor(cj),
-                        urllib2.HTTPBasicAuthHandler(passwdMgr),
-                        )
-
-                urlStr = url.asStr(noAuth=True,quoted=True)
-                if url.user:
-                    url.passwd = url.passwd or ''
-                    passwdMgr.add_password(url.user, url.passwd)
-
-                if proxyPasswdMgr:
                     for v in self.cfg.proxy.values():
                         pUrl = laUrl(v[1])
                         if pUrl.user:
@@ -366,6 +368,13 @@ class FileFinder(object):
                             proxyPasswdMgr.add_password(
                                 None, pUrl.asStr(noAuth=True,quoted=True),
                                 url.user, url.passwd)
+
+                    opener.add_handler(
+                        urllib2.ProxyBasicAuthHandler(proxyPasswdMgr))
+                    opener.add_handler(
+                        urllib2.ProxyHandler(self.cfg.proxy))
+
+                urlStr = url.asStr(noAuth=True,quoted=True)
                 req = urllib2.Request(urlStr, headers=headers)
                 inFile = opener.open(req)
                 if not urlStr.startswith('ftp://'):

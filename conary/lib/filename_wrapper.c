@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2009 rPath, Inc.
+ * Copyright (c) 2005-2010 rPath, Inc.
  *
  * This program is distributed under the terms of the Common Public License,
  * version 1.0. A copy of this license should have been distributed with this
@@ -483,6 +483,19 @@ FILE *fopen(const char *pathname, const char *mode) {
     return real_fopen(pathname, mode);
 }
 
+FILE *fopen64(const char *pathname, const char *mode) {
+    static FILE * (*real_fopen64)(const char *pathname, const char *mode) = NULL;
+    const char *p;
+    FILE *ret;
+
+    GET_PATH(fopen64);
+    if (p) {
+	ret = real_fopen64(p, mode);
+	PUT_PATH(NULL);
+    }
+    return real_fopen64(pathname, mode);
+}
+
 FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
     static void * (*real_freopen)(const char *pathname, const char *mode, FILE *stream) = NULL;
     const char *p;
@@ -494,6 +507,19 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
 	PUT_PATH(NULL);
     }
     return real_freopen(pathname, mode, stream);
+}
+
+FILE *freopen64(const char *pathname, const char *mode, FILE *stream) {
+    static void * (*real_freopen64)(const char *pathname, const char *mode, FILE *stream) = NULL;
+    const char *p;
+    FILE *ret;
+
+    GET_PATH(freopen64);
+    if (p) {
+	ret = real_freopen64(p, mode, stream);
+	PUT_PATH(NULL);
+    }
+    return real_freopen64(pathname, mode, stream);
 }
 
 /* vim: set sts=4 sw=4 expandtab : */

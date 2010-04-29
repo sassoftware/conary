@@ -304,6 +304,19 @@ With the latest conary, you must now cook all versions of a group at the same ti
             raise builderrors.GroupFlavorChangedError(errMsg)
 
     def shortenFlavors(self, keyFlavor, builtGroups):
+        """
+        Shortens the flavors associated with a set of groups to a minimally
+        sufficient set which will differentiate the groups. Returns a list
+        parallel to builtGroups, but with shorter flavors.
+
+        @param keyFlavor: Flavor which differentiates some of the built groups.
+        Any flavor which appears here will appear in the final shortened flavors.
+        @type keyFlavor: Flavor
+        @param builtGroups: List of ( [GroupRecipe], Flavor) tuples of the flavors
+        which need to be condensed.
+        @type builtGroups: [ ( [ GroupRecipe ], Flavor) ]
+        @rtype: [ ([ GroupRecipe ], Flavor) ]
+        """
         if not self._shortenFlavors:
             return builtGroups
         groupName = builtGroups[0][0].name
@@ -317,31 +330,38 @@ With the latest conary, you must now cook all versions of a group at the same ti
             else:
                 keyFlavors = [ use.platformFlagsToFlavor(groupName) ]
 
-        newBuiltGroups = []
-        for recipeObj, flavor in builtGroups:
-            archFlags = list(flavor.iterDepsByClass(
-                                        deps.InstructionSetDependency))
-            shortenedFlavor = deps.filterFlavor(flavor, keyFlavors)
-            if archFlags:
-                shortenedFlavor.addDeps(deps.InstructionSetDependency,
-                                        archFlags)
-            newBuiltGroups.append((recipeObj, shortenedFlavor))
+        while True:
+            newBuiltGroups = []
+            for recipeObj, flavor in builtGroups:
+                archFlags = list(flavor.iterDepsByClass(
+                                            deps.InstructionSetDependency))
+                shortenedFlavor = deps.filterFlavor(flavor, keyFlavors)
+                if archFlags:
+                    shortenedFlavor.addDeps(deps.InstructionSetDependency,
+                                            archFlags)
+                newBuiltGroups.append((recipeObj, shortenedFlavor))
 
-        groupFlavors = [x[1] for x in newBuiltGroups]
-        if len(set(groupFlavors)) == len(groupFlavors):
-            return newBuiltGroups
+            groupFlavors = [x[1] for x in newBuiltGroups]
+            if len(set(groupFlavors)) == len(groupFlavors):
+                break
 
-        duplicates = {}
-        for idx, (recipeObj, groupFlavor) in enumerate(newBuiltGroups):
-            duplicates.setdefault(groupFlavor, []).append(idx)
-        duplicates = [ x[1] for x in duplicates.items() if len(x[1]) > 1 ]
-        for duplicateIdxs in duplicates:
-            fullFlavors = [ builtGroups[x][1] for x in duplicateIdxs ]
-            fDict = deps.flavorDifferences(fullFlavors)
-            # add to keyFlavors everything that's needed to distinguish these
-            # groups.
-            keyFlavors.extend(fDict.values())
-        return self.shortenFlavors(keyFlavors, builtGroups)
+            duplicates = {}
+            for idx, (recipeObj, groupFlavor) in enumerate(newBuiltGroups):
+                duplicates.setdefault(groupFlavor, []).append(idx)
+            duplicates = [ x[1] for x in duplicates.items() if len(x[1]) > 1 ]
+            for duplicateIdxs in duplicates:
+                fullFlavors = [ builtGroups[x][1] for x in duplicateIdxs ]
+                fDict = deps.flavorDifferences(fullFlavors)
+                if (deps.Flavor()) in fDict.values():
+                    raise builderrors.RecipeFileError(
+                        'Duplicate group flavors for group %s[%s] found. This '
+                        'indicates a bug in conary.'
+                            % (groupName, str(fullFlavors[0])))
+                # add to keyFlavors everything that's needed to distinguish these
+                # groups.
+                keyFlavors.extend(fDict.values())
+
+        return newBuiltGroups
 
 def cookObject(repos, cfg, loaderList, sourceVersion,
                changeSetFile = None, prep=True, macros={},
@@ -751,7 +771,19 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
     if isinstance(keyFlavor, str):
         keyFlavor = deps.parseFlavor(keyFlavor, raiseError=True)
     groupFlavors = []
+    # dedup the groups based on flavor
     newBuiltGroups = []
+    flavors = set( x[1] for x in builtGroups)
+    for (recipeObj, flavor) in builtGroups:
+        if flavor in flavors:
+            newBuiltGroups.append((recipeObj, flavor))
+            flavors.remove(flavor)
+        else:
+            log.info("Removed duplicate flavor of group %s[%s]"
+                % (recipeObj.name, str(flavor)))
+    builtGroups = newBuiltGroups
+    del newBuiltGroups
+
     builtGroups = groupOptions.shortenFlavors(keyFlavor, builtGroups)
 
     groupFlavors = [ x[1] for x in builtGroups ]
@@ -1428,7 +1460,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')
     idgen = _getPathIdGen(repos, sourceName, targetVersion, targetLabel,
-                          grpMap.keys(), fileIdsPathMap)
+                          grpMap.keys(), fileIdsPathMap, recipeObj)
     log.info('pathId lookup complete')
 
     built = []
@@ -1534,24 +1566,38 @@ def _loadPolicy(recipeObj, cfg, enforceManagedPolicy):
     return policyTroves
 
 def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
-                  fileIdsPathMap):
+                  fileIdsPathMap, recipeObj=None):
     ident = _IdGen()
-    searchBranch = targetVersion.branch()
+
+    # add the target branch as the first entry in the list to search
+    searchBranches = [targetVersion.branch()]
     if targetLabel:
         # this keeps cook and emerge branchs from showing up
-        searchBranch = searchBranch.parentBranch()
+        searchBranches = [searchBranches[0].parentBranch()]
 
-    if not repos or searchBranch.getHost() == 'local':
+    if not repos or searchBranches[0].getHost() == 'local':
         # we're building locally, no need to look up pathids
         return ident
 
-    versionDict = dict( [ (x, { searchBranch: None }) for x in pkgNames ] )
+    # if the target branch has a parent we'll search that too
+    if searchBranches[0].hasParentBranch():
+        searchBranches.append(searchBranches[0].parentBranch())
+
+    # add any branches specified in the recipe
+    if recipeObj and hasattr(recipeObj, 'pathIdSearchBranches'):
+        s = set(repos.getLabelsForHost(searchBranches[0].getHost()))
+        for b in recipeObj.pathIdSearchBranches:
+            if isinstance(b,str):
+                b = versions.VersionFromString(b)
+            if b.label() in s and b not in searchBranches:
+                searchBranches.append(b)
+
+    versionDict = {}
+    for p in pkgNames:
+        for s in searchBranches:
+            versionDict.setdefault(p,{})
+            versionDict[p][s] = None
     versionDict = repos.getTroveLeavesByBranch(versionDict)
-    if not versionDict and searchBranch.hasParentBranch():
-        # there was no match on this branch; look uphill
-        searchBranch = searchBranch.parentBranch()
-        versionDict = dict((x, { searchBranch: None }) for x in pkgNames )
-        versionDict = repos.getTroveLeavesByBranch(versionDict)
 
     # We've got all of the latest packages for each flavor.
     # Now we'll search their components for matching pathIds.
@@ -1598,29 +1644,35 @@ def _getPathIdGen(repos, sourceName, targetVersion, targetLabel, pkgNames,
 
     # look up the pathids for every file that has been built by
     # this source component, following our branch ancestry
-    while True:
-        # Generate the file prefixes
-        dirnames = set(os.path.dirname(x) for x in fileIdsPathMap.iterkeys())
-        fileIds = sorted(set(fileIdsPathMap.values()))
-        if not fileIds:
-            break
-        try:
-            d = repos.getPackageBranchPathIds(sourceName, searchBranch,
-                                              dirnames, fileIds)
-        except errors.InsufficientPermission:
-            # No permissions to search on this branch. Keep going
-            d = {}
-            #raise
-        # Remove the paths we've found already from fileIdsPathMap, so we
-        # don't ask the next server the same questions
-        for k in d.iterkeys():
-            fileIdsPathMap.pop(k, None)
+    for searchBranch in searchBranches:
+        while True:
+            # Generate the file prefixes
+            dirnames = set(os.path.dirname(x) for x in
+                           fileIdsPathMap.iterkeys())
+            fileIds = sorted(set(fileIdsPathMap.values()))
+            if not fileIds:
+                break
+            try:
+                d = repos.getPackageBranchPathIds(sourceName, searchBranch,
+                                                  dirnames, fileIds)
+                # Remove the paths we've found already from fileIdsPathMap,
+                # so we don't ask the next branch the same questions
 
-        ident.merge(d)
+                for k in d.iterkeys():
+                    fileIdsPathMap.pop(k, None)
 
-        if not searchBranch.hasParentBranch():
+                ident.merge(d)
+            except errors.InsufficientPermission:
+                # No permissions to search on this branch. Keep going
+                pass
+
+            if not searchBranch.hasParentBranch():
+                break
+            searchBranch = searchBranch.parentBranch()
+
+        if not fileIdsPathMap:
             break
-        searchBranch = searchBranch.parentBranch()
+
     return ident
 
 def logBuildEnvironment(out, sourceVersion, policyTroves, macros, cfg):

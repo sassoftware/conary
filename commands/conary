@@ -1260,7 +1260,15 @@ class ConaryMain(command.MainHandler):
             return
 
         dummyCfg = self.configClass(readConfigFiles=False)
-        cmdArgv = self._getPreCommandOptions(argv, dummyCfg)[1]
+        try:
+            # This can raise an OptionError if the user does something
+            # silly such as "conary --some-switch-that-doesnt-exist".
+            # We have to handle it here. (CNY-3364)
+            cmdArgv = self._getPreCommandOptions(argv, dummyCfg)[1]
+        except options.OptionError, oe:
+            self.usage()
+            print str(oe)
+            return 1
         thisCommand = self.getCommand(cmdArgv, dummyCfg)
         self._ignoreConfigErrors = getattr(thisCommand, 'ignoreConfigErrors', False)
         return command.MainHandler.main(self, argv, debuggerException, **kw)

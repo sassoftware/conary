@@ -146,7 +146,7 @@ class Recipe(object):
         self._capsulePackageMap = {}
         self._capsuleDataMap = {}
         self._capsules = {}
-        self._lcachePopState = None
+        self._lcstate = None
 
         # Metadata is a hash keyed on a trove name and with a list of
         # per-trove-name MetadataItem like objects (well, dictionaries)
@@ -386,21 +386,22 @@ class Recipe(object):
         """
         class lcachePopulationState:
             """Used to track the state of the lcache to enable it to be
-            populated on demand efficiently"""
+            efficiently populated on-demand"""
             classes=None
             sourcePaths={}
-            fetchedPaths=set()
+            completedActions = set()
+            pathMap = {}
 
         if not self.laReposCache.repos:
             return
 
-        repos = self.laReposCache.repos
-        if not self._lcachePopState:
-            cstate = lcachePopulationState()
-            recipeClass = self.__class__
+        if not self._lcstate:
+            repos = self.laReposCache.repos
+            self._lcstate = lcachePopulationState()
 
             # build a list containing this recipe class and any ancestor class
             # from which it descends
+            recipeClass = self.__class__
             classes = [ recipeClass ]
             bases = list(recipeClass.__bases__)
             while bases:
@@ -411,14 +412,48 @@ class Recipe(object):
             # reverse the class list, this way the files will be found in the
             # youngest descendant first
             classes.reverse()
-            cstate.classes = classes
-            self._lcachePopState = cstate
+            self._lcstate.classes = classes
+
+            for rclass in self._lcstate.classes:
+                if not rclass._trove:
+                    continue
+                srcName = rclass._trove.getName()
+                srcVersion = rclass._trove.getVersion()
+                # CNY-31: walk over the files in the trove we found upstream
+                # (which we may have modified to remove the non-autosourced
+                # files.
+                # Also, if an autosource file is marked as needing to be
+                # refreshed in the Conary state file, the lookaside cache has
+                # to win, so don't populate it with the repository file)
+                fileList = []
+                for pathId, path, fileId, version in \
+                        rclass._trove.iterFileList():
+
+                    assert(path[0] != "/")
+                    # we might need to retrieve this source file
+                    # to enable a build, so we need to find the
+                    # sha1 hash of it since that's how it's indexed
+                    # in the file store
+                    if isinstance(version, versions.NewVersion):
+                        # don't try and look up things on the NewVersion label!
+                        continue
+                    fileList.append((pathId, path, fileId, version))
+
+                fileObjs = repos.getFileVersions([ (x[0],x[2],x[3])
+                                              for x in fileList])
+                for i in range(len(fileList)):
+                    fileObj = fileObjs[i]
+                    if isinstance(fileObj, files.RegularFile):
+                        (pathId, path, fileId, version) = fileList[i]
+                        self._lcstate.pathMap[path] = (srcName, srcVersion,
+                            pathId, path, fileId, version, fileObj)
 
         # populate the repository source lookaside cache from the :source
         # components
-        sourcePaths = self._lcachePopState.sourcePaths
-        actions = self.getSourcePathList()
+        sourcePaths = self._lcstate.sourcePaths
+        actions = set(self.getSourcePathList())-self._lcstate.completedActions
         for a in actions:
+            self._lcstate.completedActions.add(a)
             ps = a.getPathAndSuffix()
             if ps[0].find('://') != -1: # we have an autosourced file
                 # use guess name if it is provided
@@ -428,59 +463,39 @@ class Recipe(object):
             else:
                 sourcePaths[ ps[0] ] = ps
 
-        fetchedPaths = self._lcachePopState.fetchedPaths
-        for rclass in self._lcachePopState.classes:
-            if not rclass._trove:
-                continue
-            srcName = rclass._trove.getName()
-            srcVersion = rclass._trove.getVersion()
-            # CNY-31: walk over the files in the trove we found upstream
-            # (which we may have modified to remove the non-autosourced files
-            # Also, if an autosource file is marked as needing to be refreshed
-            # in the Conary state file, the lookaside cache has to win, so
-            # don't populate it with the repository file)
-            for pathId, path, fileId, version in rclass._trove.iterFileList():
-                # don't fetch things that we've already fetched
-                if path in fetchedPaths:
+        pathMap = self._lcstate.pathMap
+        delList = []
+        for path in pathMap:
+            fullPath = None
+            if path in sourcePaths:
+                fullPath = lookaside.laUrl(
+                    sourcePaths[path][0]).filePath()
+            elif path.find("/") == -1: # we might have a guessed name
+                for k in sourcePaths:
+                    if k and path.startswith(k) and sourcePaths[k][2]:
+                        for sk in sourcePaths[k][2]:
+                            if path.endswith(sk) and \
+                                    len(k) + len(sk) == len(path)-1:
+                                fullUrl = sourcePaths[k][0]+k+'.'+sk
+                                fullPath = \
+                                    lookaside.laUrl(fullUrl).filePath()
+
+            (srcName, srcVersion, pathId, path, fileId, version, fileObj) = \
+                pathMap[path]
+            if not fullPath:
+                if fileObj.flags.isAutoSource():
                     continue
+                else:
+                    fullPath = path
+            self.laReposCache.addFileHash(fullPath, srcName,
+                srcVersion, pathId, path, fileId, version,
+                fileObj.contents.sha1(), fileObj.inode.perms())
+            delList.append(path)
 
-                assert(path[0] != "/")
-                # we might need to retrieve this source file
-                # to enable a build, so we need to find the
-                # sha1 hash of it since that's how it's indexed
-                # in the file store
-                if isinstance(version, versions.NewVersion):
-                    # don't try and look up things on the NewVersion label!
-                    continue
-
-                fileObj = repos.getFileVersion(pathId, fileId, version)
-                if isinstance(fileObj, files.RegularFile):
-                    # it only makes sense to fetch regular files, skip
-                    # anything that isn't
-                    fullPath =''
-                    if path in sourcePaths:
-                        fullPath = lookaside.laUrl(
-                            sourcePaths[path][0]).filePath()
-                    elif path.find("/") == -1: # we might have a guessed name
-                        for k in sourcePaths:
-                            if k and path.startswith(k) and sourcePaths[k][2]:
-                                for sk in sourcePaths[k][2]:
-                                    if path.endswith(sk) and \
-                                            len(k) + len(sk) == len(path)-1:
-                                        fullUrl = sourcePaths[k][0]+k+'.'+sk
-                                        fullPath = \
-                                            lookaside.laUrl(fullUrl).filePath()
-                    if not fullPath:
-                        if not fileObj.flags.isAutoSource():
-                            fullPath = path
-                        else:
-                            continue
-
-                    self.laReposCache.addFileHash(fullPath, srcName,
-                        srcVersion, pathId, path, fileId, version,
-                        fileObj.contents.sha1(), fileObj.inode.perms())
-                    assert(path not in fetchedPaths)
-                    fetchedPaths.add(path)
+        for path in delList:
+            if path in sourcePaths:
+                del sourcePaths[path]
+            del pathMap[path]
 
     def sourceMap(self, path):
         if os.path.exists(path):
