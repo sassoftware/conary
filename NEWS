@@ -1,5 +1,11 @@
 Changes in @NEW@:
   o New Features:
+    * RPM capsules will now represent the HDRID/SHA1HEADER tag in
+      troveInfo.  This will differentiate RPMs that are not really
+      the same but have been built with the same NEVRA. (CNY-3410)
+    * Some unhandled tags will cause errors at build time, to
+      ensure that any necessary handling is done before such
+      packages are built into a repository. (CNY-3404)
 
   o Bug Fixes:
 

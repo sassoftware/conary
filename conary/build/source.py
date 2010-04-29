@@ -2452,12 +2452,30 @@ def _extractScriptsFromRPM(rpm, directory):
         scriptFile.close()
 
 
+_forbiddenRPMTags = (
+    # RPM tags that we do not currently handle and want to raise an
+    # error rather than packaging (possibly incorrectly)
+    ('BLINKPKGID', rpmhelper.BLINKPKGID),
+    ('BLINKHDRID', rpmhelper.BLINKHDRID),
+    ('BLINKNEVRA', rpmhelper.BLINKNEVRA),
+    ('FLINKPKGID', rpmhelper.BLINKPKGID),
+    ('FLINKHDRID', rpmhelper.BLINKHDRID),
+    ('FLINKNEVRA', rpmhelper.BLINKNEVRA),
+)
+
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     assert targetfile or directory
     if not directory:
 	directory = os.path.dirname(targetfile)
     r = file(rpm, 'r')
     h = rpmhelper.readHeader(r)
+
+    # CNY-3404
+    forbiddenTags = [(tagName, tag) for (tagName, tag) in _forbiddenRPMTags
+                     if tag in h]
+    if forbiddenTags:
+        raise SourceError('Unhandled RPM tags: %s ' %
+            ', '.join(('%s(%d)'%x for x in forbiddenTags)))
 
     # The rest of this function gets information on the files stored
     # in an RPM.  Some RPMs intentionally contain no files, and
