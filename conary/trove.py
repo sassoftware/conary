@@ -1037,7 +1037,7 @@ class RpmObsoletes(streams.StreamCollection):
             single.version.set(version)
             self.addStream(1, single)
 
-class TroveCapsule(streams.StreamSet):
+class TroveRpmCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_RPM_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
@@ -1059,7 +1059,7 @@ class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
-        _TROVECAPSULE_RPM      : (SMALL, TroveCapsule,         'rpm'  ),
+        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,      'rpm'  ),
     }
 
     def reset(self):
