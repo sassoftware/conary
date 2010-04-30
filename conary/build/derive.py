@@ -20,6 +20,7 @@ resulting packages to the repository.
 import os
 import stat
 import shutil
+import re
 
 from conary import branch
 from conary import checkin
@@ -34,14 +35,14 @@ class DeriveCallback(checkin.CheckinCallback):
         # stifle update announcement for extract
         pass
 
-def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None, 
+def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
            extract = False, info = False, callback = None):
     """
         Performs all the commands necessary to create a derived recipe.
         First it shadows the package, then it creates a checkout of the shadow
         and converts the checkout to a derived recipe package.
 
-        Finally if extract = True, it installs an version of the binary 
+        Finally if extract = True, it installs an version of the binary
         package into a root.
 
         @param repos: trovesource to search for and derive packages from
@@ -91,16 +92,23 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
 
     checkoutDir = checkoutDir or troveName
     checkin.checkout(repos, cfg, checkoutDir,
-                     ["%s=%s" % (troveName, shadowedVersion)], 
+                     ["%s=%s" % (troveName, shadowedVersion)],
                      callback=callback)
     os.chdir(checkoutDir)
     recipeName = troveName + '.recipe'
+    recipeStr = open(recipeName).read()
+    if re.search('CapsuleRecipe',recipeStr):
+        derivedRecipeType = 'DerivedCapsuleRecipe'
+    else:
+        derivedRecipeType = 'DerivedPackageRecipe'
+
     shadowBranch = shadowedVersion.branch()
 
     log.info('Rewriting recipe file')
     className = ''.join([ x.capitalize() for x in troveName.split('-') ])
+
     derivedRecipe = """
-class %(className)sRecipe(DerivedPackageRecipe):
+class %(className)sRecipe(%(recipeBaseClass)s):
     name = '%(name)s'
     version = '%(version)s'
 
@@ -109,7 +117,8 @@ class %(className)sRecipe(DerivedPackageRecipe):
 
 """ % dict(className=className,
            name=troveName,
-           version=shadowedVersion.trailingRevision().getVersion())
+           version=shadowedVersion.trailingRevision().getVersion(),
+           recipeBaseClass=derivedRecipeType)
     open(recipeName, 'w').write(derivedRecipe)
 
     log.info('Removing extra files from checkout')

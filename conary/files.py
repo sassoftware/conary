@@ -47,12 +47,13 @@ _FILE_FLAG_ENCAPSULATED_CONTENT = 1 << 7
 # files which are allowed to be missing -- right now this flag may be
 # set but it is not used outside of builds
 _FILE_FLAG_MISSINGOKAY = 1 << 8
-# files which are in a package but not in the capsule associated with the
-# package; they were added via a derivation 
-_FILE_FLAG_CAPSULE_ADDITION = 1 << 10
-# files are part of the capsule, but have conary-style contents which should
-# override the capsule. config implies this behavior even though it may not be
-# set explicitly
+# files which are in a capsule package but not in the capsule associated with
+# the package; they were added via a derivation 
+_FILE_FLAG_CAPSULE_ADDITION = 1 << 9
+# files are part of a capsule package and have have conary-style contents should
+# set this flag. This includes file which were added or modified via a
+# derivation. Config implies this behavior even though it may not be set 
+# explicitly.
 _FILE_FLAG_CAPSULE_OVERRIDE = 1 << 10
 
 FILE_STREAM_CONTENTS        = 1

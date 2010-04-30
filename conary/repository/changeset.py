@@ -20,6 +20,7 @@ import errno
 import gzip
 import itertools
 import os
+import copy
 
 try:
     from cStringIO import StringIO
@@ -2083,6 +2084,8 @@ class AbstractChangesetExploder:
         linkGroups = {}
         linkGroupFirstPath = {}
         rpmCapsules = []
+        self.rpmFileObj = {}
+
         # sort the files by pathId,fileId
         for trvCs in cs.iterNewTroveList():
             assert(not trvCs.getOldVersion())
@@ -2100,19 +2103,18 @@ class AbstractChangesetExploder:
                                         trv.troveInfo.capsule.type())
 
         fileList.sort()
-
         restoreList = []
-
+        self.fileObjMap = {}
         for pathId, fileId, path, trv in fileList:
             fileCs = cs.getFileChange(None, fileId)
             if fileCs is None:
                 self.fileMissing(trv, pathId, fileId, path)
                 continue
 
-            # and True makes hasCapsule a boolean
             hasCapsule = trv.troveInfo.capsule.type() and True
 
             fileObj = files.ThawFile(fileCs, pathId)
+            self.fileObjMap[path] = fileObj
 
             # installFile can control installation of nonderived contents
             # only
@@ -2134,6 +2136,7 @@ class AbstractChangesetExploder:
             (contentType, contents) = cs.getFileContents(trove.CAPSULE_PATHID,
                                                          fileId)
             rpmFileObj = contents.get()
+            self.rpmFileObj[fileId] = rpmFileObj
             cpioFileObj = rpmhelper.UncompressedRpmPayload(rpmFileObj)
             exploder = cpiostream.CpioExploder(cpioFileObj)
             exploder.explode(self.destDir)
@@ -2150,7 +2153,7 @@ class AbstractChangesetExploder:
                 continue
 
             assert(contentType == ChangedFileTypes.file)
-
+            
             ptrId = pathId + fileId
             if pathId in delayedRestores:
                 ptrMap[pathId] = destPath
