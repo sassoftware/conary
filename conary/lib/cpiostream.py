@@ -229,7 +229,7 @@ class CpioExploder(CpioStream):
             elif stat.S_ISFIFO(ent.header.mode):
                 os.mkfifo(target)
             elif stat.S_ISLNK(ent.header.mode):
-                os.symlink(target, ent.nlink)
+                os.symlink(target, ent.payload.read())
             elif stat.S_ISREG(ent.header.mode):
                 f = open(target, "w")
                 buf = ent.payload.read(64 * 1024)
