@@ -95,9 +95,10 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
                      ["%s=%s" % (troveName, shadowedVersion)],
                      callback=callback)
     os.chdir(checkoutDir)
-    recipeName = troveName + '.recipe'
-    recipeStr = open(recipeName).read()
-    if re.search('CapsuleRecipe',recipeStr):
+    nvfs = repos.getTrovesBySource(troveToDerive[0],troveToDerive[1])
+    trvs = repos.getTroves(nvfs)
+    hasCapsule = [ x for x in trvs if x.troveInfo.capsule.type() ]
+    if hasCapsule:
         derivedRecipeType = 'DerivedCapsuleRecipe'
     else:
         derivedRecipeType = 'DerivedPackageRecipe'
@@ -105,6 +106,7 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
     shadowBranch = shadowedVersion.branch()
 
     log.info('Rewriting recipe file')
+    recipeName = troveName + '.recipe'
     className = ''.join([ x.capitalize() for x in troveName.split('-') ])
 
     derivedRecipe = """
