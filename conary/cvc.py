@@ -619,7 +619,7 @@ class DeriveCommand(CvcCommand):
         else:
             targetLabel = cfg.buildLabel
 
-        callback = derive.DeriveCallback(cfg)
+        callback = derive.DeriveCallback(cfg.trustThreshold)
         derive.derive(repos, cfg, targetLabel, troveSpec,
                 checkoutDir = checkoutDir, extract = extract,
                 info = info, callback = callback)
