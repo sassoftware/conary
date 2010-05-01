@@ -124,8 +124,12 @@ class %(className)sRecipe(%(recipeBaseClass)s):
     open(recipeName, 'w').write(derivedRecipe)
 
     log.info('Removing extra files from checkout')
+
     conaryState = state.ConaryStateFromFile('CONARY', repos)
     sourceState = conaryState.getSourceState()
+    # clear the factory since we don't care about how the parent trove was
+    # created
+    sourceState.setFactory('')
 
     for (pathId, path, fileId, version) in list(sourceState.iterFileList()):
         if path == recipeName:
