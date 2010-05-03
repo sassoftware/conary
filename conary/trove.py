@@ -3076,7 +3076,7 @@ class Trove(streams.StreamSet):
             if setVersion:
                 if type == TROVE_TYPE_REMOVED:
                     self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
-                elif type == TROVE_TYPE_REDIRECT and name.startswith('group-'):
+                elif type == TROVE_TYPE_REDIRECT and troveIsGroup(name):
                     self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
                 else:
                     self.troveInfo.troveVersion.set(TROVE_VERSION)
