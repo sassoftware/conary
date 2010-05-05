@@ -2194,7 +2194,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         seen.append(info)
                     else:
                         notMatching.append(info)
-                        if info[0].startswith('group-'):
+                        if trove.troveIsGroup(info[0]):
                             groupsToGet.append(info)
 
             if not groupsToGet:
@@ -2938,7 +2938,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # Removals of groups requires new servers. It's true of redirects
             # too, but I can't tell if this is a redirect or not so the
             # server failure will have to do :-(
-            if (trvCs.getName().startswith('group-') and
+            if (trove.troveIsGroup(trvCs.getName()) and
                         not trvCs.getNewVersion()):
                 minProtocolRequired = max(minProtocolRequired, 45)
 

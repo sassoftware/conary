@@ -820,15 +820,15 @@ class ClientClone:
             hasList += [ (x[0], clonedTup[1], clonedTup[2]) for x in
                                     cloneMap.getChildren(troveTup) ]
 
-        groupsNeeded = [ x[0] for x in needed if x[0][0].startswith('group-') ]
-        groupsNeeded += [ x[1] for x in needed if x[0][0].startswith('group-') ]
+        groupsNeeded = [ x[0] for x in needed if trove.troveIsGroup(x[0][0]) ]
+        groupsNeeded += [ x[1] for x in needed if trove.troveIsGroup(x[0][0]) ]
         groupTroves = troveCache.getTroves(groupsNeeded)
         groupTroves = dict( itertools.izip(groupsNeeded, groupTroves) )
 
         hasTroves = troveCache.hasTroves(hasList)
         toReclone = []
         for (troveTup, clonedTup) in needed:
-            if troveTup[0].startswith('group-'):
+            if trove.troveIsGroup(troveTup[0]):
                 trvChildren = list(
                     groupTroves[troveTup].iterTroveList(strongRefs = True,
                                                          weakRefs = True) )
@@ -836,7 +836,7 @@ class ClientClone:
                 trvChildren = cloneMap.getChildren(troveTup)
                 assert(trvChildren)
 
-            if troveTup[0].startswith('group-'):
+            if trove.troveIsGroup(troveTup[0]):
                 clonedChildren = list(
                     groupTroves[clonedTup].iterTroveList(strongRefs = True,
                                                          weakRefs = True) )
@@ -1237,6 +1237,8 @@ class CloneChooser(object):
         return troveTup in self.referencedByClonedMap
 
     def isExcluded(self, troveTup):
+        # excludeGroups excludes groups *and their components*, so we
+        # don't use troveIsGroup() here
         return (self.options.excludeGroups
                 and troveTup[0].startswith('group-')
                 and not troveTup[0].endswith(':source'))
@@ -1564,7 +1566,7 @@ class LeafMap(object):
         for idx, item in enumerate(troveList):
             nameList = item[1]
             if (self.options.bumpGroupVersions
-                and iter(nameList).next().startswith('group-')):
+                and trove.troveIsGroup(iter(nameList).next())):
                 bumpList[True].append((idx, item))
             else:
                 bumpList[False].append((idx, item))

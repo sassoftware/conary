@@ -128,6 +128,12 @@ class UserInformation(ServerGlobList):
             item = (item[0], (item[1], item[2]))
         ServerGlobList.insert(self, pos, item)
 
+    def __reduce__(self):
+        # This is needed to make cPickle work because __iter__ returns 3-tuples
+        # which cPickle appends directly to the list using internal list code
+        # instead of our append().
+        return (type(self), (list(self),))
+
     def __init__(self, initVal = None):
         ServerGlobList.__init__(self)
         if initVal is not None:
