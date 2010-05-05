@@ -12,6 +12,8 @@ Changes in @NEW@:
       packages are built into a repository. (CNY-3404)
 
   o Bug Fixes:
+    For locale RPM dependencies, RPM flags are now properly converted to conary 
+    dep flags (CNY-3411)
 
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the

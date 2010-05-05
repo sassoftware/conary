@@ -192,6 +192,7 @@ class _RpmHeader(object):
         depset = deps.DependencySet()
         flagre = re.compile('\((.*?)\)')
         depnamere = re.compile('(.*?)\(.*')
+        localere = re.compile('locale\((.*):(.*)\)')
         packageName = self.get(NAME, '')
 
         for dep in self.get(tag, []):
@@ -202,26 +203,44 @@ class _RpmHeader(object):
                 # Something
                 depset.addDep(deps.RpmLibDependencies,
                               deps.Dependency(dep.split('(')[1].split(')')[0]))
-            elif '(' in dep and '.so' in dep.split('(')[0] and not (
+            elif '(' in dep:
+                if '.so' in dep.split('(')[0] and not (
                     dep.startswith('perl(') or dep.startswith('config(')):
-                # assume it is a shlib or package name;
-                # convert anything inside () to a flag
-                flags = flagre.findall(dep)
-                if flags:
-                    # the dependency name is everything until the first (
-                    dep = depnamere.match(dep).group(1)
-                    if len(flags) == 2:
-                        # if we have (flags)(64bit), we need to pop
-                        # the 64bit marking off the end and namespace the
-                        # dependency name.
-                        dep += '[%s]' %flags.pop()
-                    flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags if x ]
-                else:
+                    # assume it is a shlib or package name;
+                    # convert anything inside () to a flag
+                    flags = flagre.findall(dep)
+                    if flags:
+                        # the dependency name is everything until the first (
+                        dep = depnamere.match(dep).group(1)
+                        if len(flags) == 2:
+                            # if we have (flags)(64bit), we need to pop
+                            # the 64bit marking off the end and namespace the
+                            # dependency name.
+                            dep += '[%s]' %flags.pop()
+                        flags = [ (x, deps.FLAG_SENSE_REQUIRED)
+                                  for x in flags if x ]
+                    else:
+                        flags = []
+                    depset.addDep(deps.RpmDependencies,
+                                  deps.Dependency(dep, flags))
+                elif localere.match(dep):
+                    # locale RPM flags get translated to conary dep flags
+                    m = localere.match(dep)
+                    name = m.group(1)
+                    rpmflags = m.group(2).split(';')
                     flags = []
-                depset.addDep(deps.RpmDependencies, deps.Dependency(dep, flags))
+                    for f in rpmflags:
+                        flags.append('%s:%s' % (name,f))
+                    flags = [ (x, deps.FLAG_SENSE_REQUIRED)
+                              for x in flags if x ]
+                    depset.addDep(deps.RpmDependencies,
+                                  deps.Dependency('locale', flags))
+                else:
+                    # replace any () with [] because () are special to Conary
+                    dep = dep.replace('(', '[').replace(')', ']')
+                    depset.addDep(deps.RpmDependencies,
+                                  deps.Dependency(dep, []))
             else:
-                # replace any () with [] because () are special to Conary
-                dep = dep.replace('(', '[').replace(')', ']')
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 
