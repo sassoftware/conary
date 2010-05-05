@@ -1,5 +1,9 @@
 Changes in @NEW@:
   o New Features:
+    * RPM capsule packages can now derived.  In addition, capsule 
+      recipes can now be used to modify the contents of a capsule or add
+      files to the capsule component in the non-derived case as well. 
+      (CNY-3348)
     * RPM capsules will now represent the HDRID/SHA1HEADER tag in
       troveInfo.  This will differentiate RPMs that are not really
       the same but have been built with the same NEVRA. (CNY-3410)

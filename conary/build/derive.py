@@ -25,9 +25,11 @@ import re
 from conary import branch
 from conary import checkin
 from conary import conaryclient
+from conary import errors
 from conary import state
 from conary import updatecmd
 from conary import versions
+from conary.deps import deps
 from conary.lib import log, util
 
 class DeriveCallback(checkin.CheckinCallback):
@@ -38,9 +40,8 @@ class DeriveCallback(checkin.CheckinCallback):
 def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
            extract = False, info = False, callback = None):
     """
-        Performs all the commands necessary to create a derived recipe.
-        First it shadows the package, then it creates a checkout of the shadow
-        and converts the checkout to a derived recipe package.
+        Creates a derived recipe. Note that is does not actually commit 
+        anything to the repository.
 
         Finally if extract = True, it installs an version of the binary
         package into a root.
@@ -55,48 +56,48 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
         @param extract: If True, creates a subdirectory of the checkout named
                          _ROOT_ with the contents of the binary of the derived
                          package.
-        @param info: If true, only display the information about the shadow
-                      that would be performed if the derive command were
-                      completed.
         @param callback:
     """
+
     if callback is None:
         callback = DeriveCallback()
     troveName, versionSpec, flavor = conaryclient.cmdline.parseTroveSpec(
                                                                     troveSpec)
-    result = repos.findTrove(cfg.buildLabel, (troveName, versionSpec, flavor),
-                             cfg.flavor)
-    # findTrove shouldn't return multiple items for one package anymore
-    # when a flavor is specified.
-    troveToDerive, = result
+
+    if ":" in troveName:
+        raise errors.ParseError('Cannot derive individual components: %s' %
+                                troveName)
+
+    nvfToDerive, = repos.findTrove(cfg.buildLabel, (troveName, versionSpec,
+        flavor), cfg.flavor)
+    troveToDerive = repos.getTrove(*nvfToDerive)
+
+    client = conaryclient.ConaryClient(cfg,repos=repos)
+    laterShadows = client._checkForLaterShadows(targetLabel, [troveToDerive])
+    if laterShadows:
+        msg = []
+        for n, v, f, shadowedVer in laterShadows:
+            msg.append('Cannot derive from earlier version. You are trying to '
+                       'derive from %s=%s[%s] but %s=%s[%s] is already '
+                       'shadowed on this label.'
+                       % (n, shadowedVer, f, n, v, f))
+            raise BranchError('\n\n'.join(msg))
+
     # displaying output along the screen allows there to be a record
     # of what operations were performed.  Since this command is
     # an aggregate of several commands I think that is appropriate,
     # rather than simply using a progress callback.
-    log.info('Shadowing %s=%s[%s] onto %s' % (troveToDerive[0],
-                                             troveToDerive[1],
-                                             troveToDerive[2],
-                                             targetLabel))
-    if info:
-        cfg.interactive = False
+    log.info('Shadowing %s=%s[%s] onto %s' % (nvfToDerive[0],
+                                              nvfToDerive[1],
+                                              nvfToDerive[2],
+                                              targetLabel))
 
-    error = branch.branch(repos, cfg, str(targetLabel),
-                  ['%s=%s[%s]' % troveToDerive],
-                  makeShadow = True, sourceOnly = True, binaryOnly = False,
-                  info = info)
-    if info or error:
-        return
-    shadowedVersion = troveToDerive[1].createShadow(targetLabel)
+    shadowedVersion = nvfToDerive[1].createShadow(targetLabel)
     shadowedVersion = shadowedVersion.getSourceVersion(False)
     troveName = troveName.split(':')[0]
 
-    checkoutDir = checkoutDir or troveName
-    checkin.checkout(repos, cfg, checkoutDir,
-                     ["%s=%s" % (troveName, shadowedVersion)],
-                     callback=callback)
-    os.chdir(checkoutDir)
-    nvfs = repos.getTrovesBySource(troveToDerive[0],troveToDerive[1])
-    trvs = repos.getTroves(nvfs)
+    nvfs = list(troveToDerive.iterTroveList(strongRefs=True))
+    trvs = repos.getTroves(nvfs,withFiles=False)
     hasCapsule = [ x for x in trvs if x.troveInfo.capsule.type() ]
     if hasCapsule:
         derivedRecipeType = 'DerivedCapsuleRecipe'
@@ -105,9 +106,14 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir = None,
 
     shadowBranch = shadowedVersion.branch()
 
-    log.info('Rewriting recipe file')
+    checkoutDir = checkoutDir or troveName
+    if os.path.exists(checkoutDir):
+        raise errors.CvcError("Directory '%s' already exists" % checkoutDir)
+    os.mkdir(checkoutDir)
+
+    log.info('Writing recipe file')
     recipeName = troveName + '.recipe'
-    className = ''.join([ x.capitalize() for x in troveName.split('-') ])
+    className = util.convertPackageNameToClassName(troveName)
 
     derivedRecipe = """
 class %(className)sRecipe(%(recipeBaseClass)s):
@@ -121,34 +127,24 @@ class %(className)sRecipe(%(recipeBaseClass)s):
            name=troveName,
            version=shadowedVersion.trailingRevision().getVersion(),
            recipeBaseClass=derivedRecipeType)
-    open(recipeName, 'w').write(derivedRecipe)
+    open(os.sep.join((checkoutDir,recipeName)), 'w').write(derivedRecipe)
 
-    log.info('Removing extra files from checkout')
+    oldBldLabel = cfg.buildLabel
+    cfg.buildLabel = targetLabel
+    checkin.newTrove(repos,cfg,troveName,checkoutDir)
+    cfg.buildLabel = oldBldLabel
+    os.chdir(checkoutDir)
 
-    conaryState = state.ConaryStateFromFile('CONARY', repos)
+    conaryState = state.ConaryStateFromFile('CONARY')
+    shadowedVersion.resetTimeStamps()
     sourceState = conaryState.getSourceState()
-    # clear the factory since we don't care about how the parent trove was
-    # created
-    sourceState.setFactory('')
-
-    for (pathId, path, fileId, version) in list(sourceState.iterFileList()):
-        if path == recipeName:
-            continue
-        sourceState.removeFile(pathId)
-        if util.exists(path):
-            statInfo = os.lstat(path)
-            try:
-                if statInfo.st_mode & stat.S_IFDIR:
-                    os.rmdir(path)
-                else:
-                    os.unlink(path)
-            except OSError, e:
-                log.warning("cannot remove %s: %s" % (path, e.strerror))
+    sourceState.changeVersion(shadowedVersion)
+    sourceState.changeBranch(shadowBranch)
     conaryState.write('CONARY')
 
     if extract:
         extractDir = os.path.join(os.getcwd(), '_ROOT_')
-        log.info('extracting files from %s=%s[%s]' % (troveToDerive))
+        log.info('extracting files from %s=%s[%s]' % (nvfToDerive))
         cfg.root = os.path.abspath(extractDir)
         cfg.interactive = False
         updatecmd.doUpdate(cfg, troveSpec,
