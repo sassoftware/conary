@@ -228,13 +228,10 @@ class _RpmHeader(object):
                     m = localere.match(dep)
                     name = m.group(1)
                     rpmflags = m.group(2).split(';')
-                    flags = []
-                    for f in rpmflags:
-                        flags.append('%s:%s' % (name,f))
                     flags = [ (x, deps.FLAG_SENSE_REQUIRED)
                               for x in flags if x ]
                     depset.addDep(deps.RpmDependencies,
-                                  deps.Dependency('locale', flags))
+                                  deps.Dependency('locale:%s' % name, flags))
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
