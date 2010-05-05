@@ -229,7 +229,7 @@ class _RpmHeader(object):
                     name = m.group(1)
                     rpmflags = m.group(2).split(';')
                     flags = [ (x, deps.FLAG_SENSE_REQUIRED)
-                              for x in flags if x ]
+                              for x in rpmflags if x ]
                     depset.addDep(deps.RpmDependencies,
                                   deps.Dependency('locale:%s' % name, flags))
                 else:
