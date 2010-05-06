@@ -146,7 +146,12 @@ def formatCode(frame, stream):
         return _updatecache(*args)
     linecache.updatecache = updatecache
     try:
-        fileName, lineNo, funcName, text, idx = inspect.getframeinfo(frame)
+        try:
+            frameInfo = inspect.getframeinfo(frame, context=1)
+        except:
+            frameInfo = inspect.getframeinfo(frame, context=0)
+        fileName, lineNo, funcName, text, idx = frameInfo
+
         stream.write('  File "%s", line %d, in %s\n' % 
             (fileName, lineNo, funcName))
         if text is not None and len(text) > idx:
