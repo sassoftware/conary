@@ -186,11 +186,7 @@ class %(className)sRecipe(%(recipeBaseClass)s):
                 True) ]
         cs = repos.createChangeSet(ts, recurse = True)
         exploder = ChangesetExploder(cs, extractDir)
-        #cfg.root = os.path.abspath(extractDir)
-        #cfg.interactive = False
-        #updatecmd.doUpdate(cfg, troveSpec,
-        #                   callback=callback, depCheck=False)
         secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
-        shutil.copytree(extractDir, secondDir)
+        shutil.copytree(extractDir, secondDir, symlinks=True)
 
     os.chdir(oldcwd)
