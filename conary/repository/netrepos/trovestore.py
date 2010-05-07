@@ -1434,8 +1434,6 @@ class TroveStore:
         return self.db.rollback()
 
     def _removeTrove(self, name, version, flavor, markOnly = False):
-        #if name.startswith('group-') and not name.endswith(':source'):
-            #raise errors.CommitError('Marking a group as removed is not implemented')
         cu = self.db.cursor()
 
         cu.execute("""

@@ -1683,7 +1683,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             newJobList = [ [] for x in range(len(chgSetList)) ]
 
             for jobId, job in enumerate(chgSetList):
-                if job[0].startswith('group-'):
+                if trove.troveIsGroup(job[0]):
                     foundGroups.add(jobId)
 
                 newJobList[jobId].append(job)

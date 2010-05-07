@@ -1462,7 +1462,7 @@ class _GroupRecipe(_BaseGroupRecipe):
         """
         if self._hasGroup(groupName):
             raise RecipeFileError, 'group %s was already created' % groupName
-        elif not groupName.startswith('group-'):
+        elif not trove.troveIsGroup(groupName):
             raise RecipeFileError, 'group names must start with "group-"'
 
         origGroup = self._getDefaultGroup()
@@ -1704,7 +1704,7 @@ class SingleGroup(object):
         # new group.  This function returns
 
         includeByDefault = None
-        if isinstance(parent, str) and parent.startswith('group-'):
+        if isinstance(parent, str) and trove.troveIsGroup(parent):
             byDefaultTroves = self.newGroupList[parent][2]
         else:
             byDefaultTroves = self.troves[parent][3]
@@ -2325,7 +2325,7 @@ def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
     if flags.recurse:
         groupTups = [ x for x in topTrove.iterTroveList(strongRefs=True,
                                                      weakRefs=True) \
-                                        if x[0].startswith('group-') ]
+                                        if trove.troveIsGroup(x[0]) ]
 
         trvs = repos.getTroves(groupTups, withFiles=False)
 
@@ -2376,7 +2376,7 @@ def processOneAddAllDirective(parentGroup, troveTup, flags, recipeObj, cache,
 
         for troveTup in trv.iterTroveList(strongRefs=True):
             byDefault = byDefaultTrv.includeTroveByDefault(*troveTup)
-            if flags.recurse and troveTup[0].startswith('group-'):
+            if flags.recurse and trove.troveIsGroup(troveTup[0]):
                 if flags.recurse == ADDALL_FLATTEN:
                     stack.append((groupTrvDict[troveTup], trv, parentGroup))
                     continue

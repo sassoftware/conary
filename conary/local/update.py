@@ -39,14 +39,6 @@ from conary.repository import changeset, filecontents
 ROLLBACK_PHASE_REPOS = 1
 ROLLBACK_PHASE_LOCAL = 2
 
-def conaryContents(hasCapsule, pathId, fileObj):
-    if pathId == trove.CAPSULE_PATHID:
-        return False
-
-    return (fileObj.flags.isCapsuleOverride() or
-            fileObj.flags.isConfig() or
-            not hasCapsule)
-
 class UpdateFlags(util.Flags):
 
     """
