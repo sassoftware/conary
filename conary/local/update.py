@@ -754,7 +754,7 @@ class FilesystemJob:
                 # this file was removed with 'conary remove /path', so
                 # nothing more has to be done
 		continue
-            elif not conaryContents(hasCapsule, pathId, oldFile):
+            elif not trove.conaryContents(hasCapsule, pathId, oldFile):
                 # files which are in capsules are handled by the underlying
                 # capsule implementation
                 continue
@@ -989,7 +989,7 @@ class FilesystemJob:
                 # another trove. treat it as an update later on.
                 continue
 
-            if (not conaryContents(hasCapsule, pathId, headFile)):
+            if (not trove.conaryContents(hasCapsule, pathId, headFile)):
                 # capsule management is responsible for restoring this file
                 continue
 
@@ -1257,7 +1257,7 @@ class FilesystemJob:
                 headFile = self._mergeFile(baseFile, headFileId, headChanges,
                                            pathId)
 
-            if (not conaryContents(hasCapsule, pathId, headFile)):
+            if (not trove.conaryContents(hasCapsule, pathId, headFile)):
                 # capsule management is responsible for restoring this file
                 continue
 
@@ -1776,7 +1776,7 @@ class FilesystemJob:
             fileObjs = db.getFileVersions(fileList)
             for (pathId, path, fileId, version), fileObj in \
                     itertools.izip(oldTrove.iterFileList(), fileObjs):
-                if (conaryContents(hasCapsule, pathId, fileObj) and
+                if (trove.conaryContents(hasCapsule, pathId, fileObj) and
                     path not in pathsMoved):
                     self._remove(fileObj, path, util.joinPaths(root, path),
                                  "removing %s")

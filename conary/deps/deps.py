@@ -605,6 +605,7 @@ class DependencyClass(object):
 
 class AbiDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_ABI
     tagName = "abi"
     justOne = False
@@ -615,6 +616,7 @@ _registerDepClass(AbiDependency)
 
 class InstructionSetDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_IS
     tagName = "is"
     justOne = False
@@ -625,6 +627,7 @@ _registerDepClass(InstructionSetDependency)
 
 class TargetInstructionSetDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_TARGET_IS
     tagName = "target"
     justOne = False
@@ -635,6 +638,7 @@ _registerDepClass(TargetInstructionSetDependency)
 
 class OldSonameDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_OLD_SONAME
     tagName = "oldsoname"
     justOne = False
@@ -644,6 +648,7 @@ _registerDepClass(OldSonameDependencies)
 
 class SonameDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_SONAME
     tagName = "soname"
     justOne = False
@@ -654,6 +659,7 @@ _registerDepClass(SonameDependencies)
 
 class UserInfoDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_USERINFO
     tagName = "userinfo"
     justOne = False
@@ -663,6 +669,7 @@ _registerDepClass(UserInfoDependencies)
 
 class GroupInfoDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_GROUPINFO
     tagName = "groupinfo"
     justOne = False
@@ -672,6 +679,7 @@ _registerDepClass(GroupInfoDependencies)
 
 class CILDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_CIL
     tagName = "CIL"
     justOne = False
@@ -683,6 +691,7 @@ _registerDepClass(CILDependencies)
 
 class JavaDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_JAVA
     tagName = "java"
     justOne = False
@@ -692,6 +701,7 @@ _registerDepClass(JavaDependencies)
 
 class PythonDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_PYTHON
     tagName = "python"
     justOne = False
@@ -701,6 +711,7 @@ _registerDepClass(PythonDependencies)
 
 class PerlDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_PERL
     tagName = "perl"
     justOne = False
@@ -711,6 +722,7 @@ _registerDepClass(PerlDependencies)
 
 class RubyDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_RUBY
     tagName = "ruby"
     justOne = False
@@ -720,6 +732,7 @@ _registerDepClass(RubyDependencies)
 
 class PhpDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_PHP
     tagName = "php"
     justOne = False
@@ -729,6 +742,7 @@ _registerDepClass(PhpDependencies)
 
 class FileDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_FILES
     tagName = "file"
     justOne = False
@@ -740,6 +754,7 @@ _registerDepClass(FileDependencies)
 
 class TroveDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_TROVES
     tagName = "trove"
     justOne = False
@@ -751,6 +766,7 @@ _registerDepClass(TroveDependencies)
 
 class UseDependency(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_USE
     tagName = "use"
     justOne = True
@@ -761,6 +777,7 @@ _registerDepClass(UseDependency)
 
 class RpmDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_RPM
     tagName = "rpm"
     justOne = False
@@ -774,6 +791,7 @@ _registerDepClass(RpmDependencies)
 
 class RpmLibDependencies(DependencyClass):
 
+    __slots__ = ()
     tag = DEP_CLASS_RPMLIB
     tagName = "rpmlib"
     justOne = False
@@ -1096,6 +1114,7 @@ class DependencySet(object):
 
 # A special class for representing Flavors
 class Flavor(DependencySet):
+    __slots__ = ()
     def __repr__(self):
         return "Flavor('%s')" % formatFlavor(self)
     def __str__(self):
@@ -1289,27 +1308,77 @@ def mergeFlavor(flavor, mergeBase):
     return mergedFlavor
 
 def filterFlavor(depSet, filters):
+    """
+    Returns a DependencySet based on an existing DependencySet object and a list
+    of filters (which are themselves DependencySet objects). The new object will
+    contain only dependencies which are in one or more of the filters, and the
+    flags of those dependencies will be the flags of the object which also appear
+    in one or more of the filters. Note that this uses _filterFlavorFlags(),
+    and some of the specifics of the results are explained in the documentation
+    for that function.
+
+    This is equvalent to ( depSet & [ filter1 | filter 2 | ... | filterN ]) if the
+    logical operators are not sense specific.
+
+    @param depSet: Object to filter
+    @type depSet: DependencySet
+    @param filters: List of objects to filter based on
+    @type filters: [ DependencySet ]
+    @rtype: DependencySet
+    """
+
     if not isinstance(filters, (list, tuple)):
         filters = [filters]
     finalDepSet = Flavor()
     for depTag, depClass in depSet.members.items():
+        # Build a list of the DependencyClasses for this tag in each filter.
         filterClasses = [ x.members.get(depClass.tag, None) for x in filters ]
         filterClasses = [ x for x in filterClasses if x is not None ]
         if not filterClasses:
+            # There is no overlap in the classes between this dep and the
+            # filters, so we're done. This is just a shortcut; the rest of the
+            # logic would noop anyway.
             continue
+
         depList = []
         for dep in depClass.getDeps():
+            # Get all the DependencyClasses from the filters with the same
+            # name as this dep
             filterDeps = [ x.members.get(dep.name, None) for x in filterClasses]
             filterDeps = [ x for x in filterDeps if x is not None ]
             if filterDeps:
-                finalDep = _filterDeps(depClass, dep, filterDeps)
+                finalDep = _filterFlavorFlags(depClass, dep, filterDeps)
                 if finalDep is not None:
                     depList.append(finalDep)
         if depList:
             finalDepSet.addDeps(depClass.__class__, depList)
     return finalDepSet
 
-def _filterDeps(depClass, dep, filterDeps):
+def _filterFlavorFlags(depClass, dep, filterDeps):
+    """
+    Return a new Dependency object based on an existing Dependency object and
+    a list of filters (which are themselves Dependency objects). The new
+    object will have the same name as the original Dependency, but only flags
+    which are present in both the original and one or more of the filters
+    will be present. The sense is not used for matching; the sense from the
+    original dependency is used in the return value.
+
+    This is equvalent to ( dep & [ filter1 | filter 2 | ... | filterN ]) if the
+    logical operators are not sense specific.
+
+    While this may seem general purpose, it is only used for filtering flavor
+    flags, and the name reflects this.
+
+    @param depClass: Class object used to construct the returned dependency. Should
+    be a child object of Dependency class.
+    @type depClass: class
+    @param dep: Object to filter flags from
+    @type dep: Dependency
+    @param filterDeps: Objects whose flags will be used to filter the dep parameter
+    @type filterDeps: [ Dependency ]
+    @rtype dep: Dependency
+
+    """
     filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
     finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]
     if not depClass.depNameSignificant and not finalFlags:

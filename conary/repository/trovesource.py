@@ -182,8 +182,9 @@ class AbstractTroveSource:
                      withFiles=True, asTuple=True):
         """
         Generator returns all of the troves included by topTrove, including
-        topTrove itself. It is a depth first search of strong refs.
-        
+        topTrove itself. It is a depth first search of strong refs. Punchouts
+        are taken into account.
+
         @param asTuple: If True, (name, version, flavor) tuples are returned
         instead of Trove objects. This can be much faster.
         """
@@ -284,9 +285,6 @@ class AbstractTroveSource:
         raise NotImplementedError
 
     def getDepsForTroveList(self, troveList):
-        raise NotImplementedError
-
-    def getCapsulesForTroveList(self, troveList):
         raise NotImplementedError
 
 # constants mostly stolen from netrepos/netserver
@@ -1210,29 +1208,6 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
             trvCs = cs.getNewTroveVersion(*info)
             retList.append((trvCs.getProvides(), trvCs.getRequires()))
-
-        return retList
-
-    def getCapsulesForTroveList(self, troveList):
-        # returns a list of trove.TroveContainer objects, or none for
-        # troves w/o any capsules
-        retList = []
-
-        for info in troveList:
-            cs = self.troveCsMap.get(info, None)
-            if cs is None:
-                # this isn't supported, and raises NotimplementedException
-                return SearchableTroveSource.getCapsulesForTroveList(
-                                self, troveList)
-
-            trvCs = cs.getNewTroveVersion(*info)
-            trvInfo = trvCs.getTroveInfo()
-            # None means an old server. I'm not about to lose sleep over
-            # servers too old to understand capsules
-            if trvInfo is None:
-                retList.append(None)
-            else:
-                retList.append(trvInfo.capsule)
 
         return retList
 

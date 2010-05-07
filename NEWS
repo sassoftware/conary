@@ -5,6 +5,61 @@ Changes in @NEW@:
 
   o Internal Changes:
 
+Changes in 2.1.15:
+  o New Features:
+    * Recipes that have a class member list named 'pathIdSearchBranches' will
+      search the branches defined in the list for pathIds to reuse while 
+      cooking. (CNY-3398)
+
+  o Bug Fixes:
+    * Build groups whose flavors end up identical now causes one of those
+      builds to be discarded rather than an exception about "maximum
+      recursion depth exceeded" (CNY-3401)
+    * Optimized population of lookaside cache for recipes containing large 
+      numbers of source actions such that it is *much* faster. (CNY-3406)
+    * Conary proxies will no longer cache changesets that were
+      truncated in transit. Additionally, clients will produce a more
+      useful error message if they download a truncated changeset.  (CNY-3140)
+    * The filewrap and wrapdir options for r.Run() previously did not
+      wrap fopen64 or freopen64. (CNY-3405)
+    * Previously, user and password information for the http/https proxy
+      were visible in a traceback if a network exception occured. (RBL-5191)
+    * Split out info packages from jobs even when RPM capsules are
+      used (CNY-3387)
+    * Modified lookaside cache file structure to include URL parameters, 
+      fragments and ports to better generate a unique file path for a given 
+      URL (CNY-3408)
+
+Changes in 2.1.14:
+  o Bug Fixes:
+    * Disable diff/patch merging for RPM config files (CNY-3399)
+
+  o New Features:
+    * Added support for RPM capsules to ChangesetExploder class
+
+  o Internal Changes:
+    * Added file flags to allow conary to override file contents and attributes
+      for capsule-based files (such as from RPM).
+    * Changesets are now loaded incrementally rather than as one big string;
+      this avoids a potentially large memory spike opening large changesets
+    * Added slots to various stream and trove objects
+    * StreamCollections are intialized as if thawing an empty string rather
+      than instantiating all of the child elements (which are often not needed
+      anyway). This reduces total ram usage by more than 5% on large
+      changesets.
+
+Changes in 2.1.13:
+  o Bug Fixes:
+    * Fixed crash in lookaside.fetchURL when accessing an authenticated http
+      URI using python 2.6.5. (CNY-3393)
+    * Changes for sharing files with different fileIDs are now done for
+      non-encapsulated files as well. (CNY-3396)
+    * Installing critical packages as part of jobs which cannot be split
+      due to capsules no longer causes an exception.
+    * The Conary command-line client will no longer traceback when command
+      specific options are given without a command
+      (e.g. 'conary --what-requires'). (CNY-3364)
+
 Changes in 2.1.12:
   o New Features:
     * Config files from RPM capsules are now handled by Conary instead of
@@ -78,7 +133,7 @@ Changes in 2.1.10:
       tree conary looks through for new files.
     * Added exceptions and exceptDeps options to RPMRequires
 
-  o Internal Changes
+  o Internal Changes:
     * Optimized StreamCollection diff and __eq__ operations to use frozen
       data if available
     * Merged internals of localcs/verify implementation into new classes
