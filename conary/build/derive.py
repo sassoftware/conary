@@ -167,6 +167,7 @@ class %(className)sRecipe(%(recipeBaseClass)s):
     cfg.buildLabel = targetLabel
     checkin.newTrove(repos,cfg,troveName,checkoutDir)
     cfg.buildLabel = oldBldLabel
+    oldcwd = os.getcwd()
     os.chdir(checkoutDir)
 
     conaryState = state.ConaryStateFromFile('CONARY')
@@ -186,3 +187,4 @@ class %(className)sRecipe(%(recipeBaseClass)s):
         secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
         shutil.copytree(extractDir, secondDir)
 
+    os.chdir(oldcwd)
