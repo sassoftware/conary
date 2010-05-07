@@ -20,7 +20,6 @@ import itertools
 import os
 import re
 import struct
-import subprocess
 import tempfile
 from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util
 from conary.deps import deps
@@ -192,9 +191,7 @@ class _RpmHeader(object):
         depset = deps.DependencySet()
         flagre = re.compile('\((.*?)\)')
         depnamere = re.compile('(.*?)\(.*')
-        localere = re.compile('locale\((.*):(.*)\)')
-        packageName = self.get(NAME, '')
-
+        localere = re.compile('locale\((.*)\)')
         for dep in self.get(tag, []):
             if dep.startswith('/'):
                 depset.addDep(deps.FileDependencies, deps.Dependency(dep))
@@ -226,12 +223,17 @@ class _RpmHeader(object):
                 elif localere.match(dep):
                     # locale RPM flags get translated to conary dep flags
                     m = localere.match(dep)
-                    name = m.group(1)
-                    rpmflags = m.group(2).split(';')
+                    nf = m.group(1).split(':')
+                    if len(nf) == 1:
+                        name = ''
+                        flags = nf[0].split(';')
+                    else:
+                        name = ':' + ':'.join(nf[0:-1])
+                        flags = nf[-1].split(';')
                     flags = [ (x, deps.FLAG_SENSE_REQUIRED)
-                              for x in rpmflags if x ]
+                              for x in flags if x ]
                     depset.addDep(deps.RpmDependencies,
-                                  deps.Dependency('locale:%s' % name, flags))
+                                  deps.Dependency('locale%s' % name, flags))
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
