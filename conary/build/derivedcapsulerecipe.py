@@ -1,4 +1,4 @@
-# Copyright (c) 2006-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,119 +11,27 @@
 # full details.
 
 import os
-
-from conary import files
-from conary.build import defaultrecipes
-from conary.build.packagerecipe import AbstractPackageRecipe, BaseRequiresRecipe
-from conary.repository import changeset
-
-class DerivedChangesetExploder(changeset.ChangesetExploder):
-
-    def __init__(self, recipe, cs, destDir):
-        self.byDefault = {}
-        self.troveFlavor = None
-        self.recipe = recipe
-        changeset.ChangesetExploder.__init__(self, cs, destDir)
-
-    def installingTrove(self, trv):
-        if self.troveFlavor is None:
-            self.troveFlavor = trv.getFlavor().copy()
-        else:
-            assert(self.troveFlavor == trv.getFlavor())
-
-        name = trv.getName()
-        self.recipe._componentReqs[name] = trv.getRequires().copy()
-        self.recipe._componentProvs[name] = trv.getProvides().copy()
-
-        if trv.isCollection():
-            # gather up existing byDefault status
-            # from (component, byDefault) tuples
-            self.byDefault.update(dict(
-                [(x[0][0], x[1]) for x in trv.iterTroveListInfo()]))
-
-        changeset.ChangesetExploder.installingTrove(self, trv)
-
-    def handleFileAttributes(self, trv, fileObj, path):
-        self.troveFlavor -= fileObj.flavor()
-        # Config vs. InitialContents etc. might be change in derived pkg
-        # Set defaults here, and they can be overridden with
-        # "exceptions = " later
-        if fileObj.flags.isConfig():
-            self.recipe.Config(path, allowUnusedFilters = True)
-        elif fileObj.flags.isInitialContents():
-            self.recipe.InitialContents(path, allowUnusedFilters = True)
-        elif fileObj.flags.isTransient():
-            self.recipe.Transient(path, allowUnusedFilters = True)
-
-        if isinstance(fileObj, files.SymbolicLink):
-            # mtime for symlinks is meaningless, we have to record the
-            # target of the symlink instead
-            self.recipe._derivedFiles[path] = fileObj.target()
-        else:
-            self.recipe._derivedFiles[path] = fileObj.inode.mtime()
-
-        self.recipe._componentReqs[trv.getName()] -= fileObj.requires()
-        self.recipe._componentProvs[trv.getName()] -= fileObj.requires()
-
-
-    def handleFileMode(self, trv, fileObj, path, destdir):
-        if isinstance(fileObj, files.SymbolicLink):
-            return
-
-        fullPath = '/'.join((destdir, path))
-        # Do not restore setuid/setgid bits into the filesystem.
-        # Call internal policy with path; do not use the SetModes
-        # build action because that will override anything
-        # called via setup, since setup has already been
-        # invoked.  However, SetModes as invoked from setup
-        # will call setModes after this call, which will
-        # allow modifying the mode in the derived package.
-        mode = fileObj.inode.perms()
-        os.chmod(fullPath, mode & 01777)
-        if fileObj.inode.perms() & 06000 != 0:
-            self.recipe.setModes(path, sidbits=(mode & 06000))
-
-        if isinstance(fileObj, files.Directory):
-            if (fileObj.inode.perms() & 0700) != 0700:
-                os.chmod(fullPath, (mode & 01777) | 0700)
-                self.recipe.setModes(path, userbits=(mode & 0700))
-            # remember to include this directory in the derived package even
-            # if the directory is empty
-            self.recipe.ExcludeDirectories(exceptions=path,
-                allowUnusedFilters=True)
-
-    def restoreFile(self, trv, fileObj, contents, destdir, path):
-        self.handleFileAttributes(trv, fileObj, path)
-        if isinstance(fileObj, files.DeviceFile):
-            self.recipe.MakeDevices(path, fileObj.lsTag,
-                               fileObj.devt.major(), fileObj.devt.minor(),
-                               fileObj.inode.owner(), fileObj.inode.group(),
-                               fileObj.inode.perms())
-        else:
-            changeset.ChangesetExploder.restoreFile(self, trv, fileObj,
-                                                    contents, destdir, path)
-            self.handleFileMode(trv, fileObj, path, destdir)
-
-    def restoreLink(self, trv, fileObj, destdir, sourcePath, targetPath):
-        self.handleFileAttributes(trv, fileObj, targetPath)
-        changeset.ChangesetExploder.restoreLink(self, trv, fileObj, destdir,
-                                                sourcePath, targetPath)
-
-    def installFile(self, trv, path, fileObj):
-        if path == self.recipe.macros.buildlogpath:
-            return False
-
-        return changeset.ChangesetExploder.installFile(self, trv, path, fileObj)
-
+import itertools
+import shutil
 from conary import versions
 from conary import errors as conaryerrors
+from conary import trove
+from conary import files
+from conary import rpmhelper
+from conary.build import defaultrecipes
 from conary.build import build, source
 from conary.build import errors as builderrors
-from conary.lib import log
+from conary.build.packagerecipe import BaseRequiresRecipe
+from conary.build.capsulerecipe import AbstractCapsuleRecipe
+from conary.build.derivedrecipe import DerivedChangesetExploder
+from conary.repository import changeset
+from conary.lib import log, util
 
-class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
+class AbstractDerivedCapsuleRecipe(AbstractCapsuleRecipe):
 
     internalAbstractBaseClass = 1
+    internalPolicyModules = ('packagepolicy', 'capsulepolicy',
+                             'derivedcapsulepolicy',)
     _isDerived = True
     parentVersion = None
 
@@ -136,6 +44,7 @@ class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
                                                 if exploder.byDefault[x]))
         self.setByDefaultOff(set(x for x in exploder.byDefault
                                                 if not exploder.byDefault[x]))
+        return exploder
 
     def unpackSources(self, resume=None, downloadOnly=False):
 
@@ -235,34 +144,69 @@ class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
 
         cs = repos.createChangeSet(troveSpec, recurse = False)
 
-        # Capsules are not supported in derrived packages
-        for trv in cs.iterNewTroveList():
-            if trv.hasCapsule():
-                raise builderrors.RecipeFileError(
-                    'DerivedRecipe cannot be used with %s, '
-                    'it was created with a CapsuleRecipe.  Please use'
-                    'a DerivedCapsuleRecipe instead.'
-                    % trv.name())
-
         self.setDerivedFrom([
             (x.getName(), x.getNewVersion(), x.getNewFlavor()) for x
             in cs.iterNewTroveList() ])
 
-        self._expandChangeset(cs)
+        self.exploder = self._expandChangeset(cs)
         self.cs = cs
 
-        klass = self._getParentClass('AbstractPackageRecipe')
+        # register any capsules in the changeset
+        for trvCs in cs.iterNewTroveList():
+            assert(not trvCs.getOldVersion())
+            trv = trove.Trove(trvCs)
+            for pathId, path, fileId, version in trv.iterFileList(
+                capsules = True, members = False):
+                if (trv.troveInfo.capsule.type() ==
+                    trove._TROVECAPSULE_TYPE_RPM):
+
+
+                    capFileObj = self.exploder.rpmFileObj[fileId]
+                    capFileObj.seek(0)
+                    h = rpmhelper.RpmHeader(capFileObj)
+                    capFileObj.seek(0)
+
+                    capDir =  '/'.join((
+                            os.path.dirname(self.macros.destdir),
+                            '_CAPSULES_'))
+                    util.mkdirChain(capDir)
+                    capPath = '/'.join((capDir,
+                                            h[rpmhelper.NAME] + '.rpm'))
+                    outFile = open(capPath,'w')
+                    ret = shutil.copyfileobj(capFileObj, outFile)
+                    outFile.close()
+
+                    self._addCapsule(capPath, trv.troveInfo.capsule.type(),
+                                     trv.name())
+
+                    fileData = list(itertools.izip(h[rpmhelper.OLDFILENAMES],
+                                    h[rpmhelper.FILEUSERNAME],
+                                    h[rpmhelper.FILEGROUPNAME],
+                                    h[rpmhelper.FILEMODES],
+                                    h[rpmhelper.FILESIZES],
+                                    h[rpmhelper.FILERDEVS],
+                                    h[rpmhelper.FILEFLAGS],
+                                                    ))
+                    self._setPathInfoForCapsule(capPath, fileData, self.name + '.'
+                                                + trv.troveInfo.capsule.type())
+                    for pathId, path, fileId, version in trv.iterFileList(
+                        capsules = False, members = True):
+                        fc = cs.getFileChange(None,fileId)
+                        fileObj = files.ThawFile(fc, pathId)
+                        self.exploder.handleFileAttributes(trv, fileObj, path)
+                        self.exploder.handleFileMode(trv, fileObj, path,
+                                                     self.macros.destdir)
+                elif trv.troveInfo.capsule.type():
+                    raise builderrors.CookError("Derived Packages with %s type "
+                        "capsule is unsupported." %trv.troveInfo.capsule.type())
+
+        klass = self._getParentClass('AbstractCapsuleRecipe')
         klass.unpackSources(self, resume = resume,
                                              downloadOnly = downloadOnly)
 
-    def loadPolicy(self):
-        klass = self._getParentClass('AbstractPackageRecipe')
-        return klass.loadPolicy(self,
-                                internalPolicyModules = ( 'destdirpolicy', 'packagepolicy', 'derivedpolicy', ) )
-
     def __init__(self, cfg, laReposCache, srcDirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        klass = self._getParentClass('AbstractPackageRecipe')
+        klass = self._getParentClass('AbstractCapsuleRecipe')
         klass.__init__(self, cfg, laReposCache, srcDirs,
                                         extraMacros = extraMacros,
                                         crossCompile = crossCompile,
@@ -291,7 +235,7 @@ class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
         self._addBuildAction('ManualConfigure', build.ManualConfigure)
         self._addBuildAction('Move', build.Move)
         self._addBuildAction('PythonSetup', build.PythonSetup)
-        self._addBuildAction('Remove', build.Remove)
+
         self._addBuildAction('Replace', build.Replace)
         self._addBuildAction('Run', build.Run)
         self._addBuildAction('SetModes', build.SetModes)
@@ -300,9 +244,4 @@ class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
         self._addBuildAction('XInetdService', build.XInetdService)
         self._addBuildAction('XMLCatalogEntry', build.XMLCatalogEntry)
 
-        self._addSourceAction('addArchive', source.addArchive)
-        self._addSourceAction('addAction', source.addAction)
-        self._addSourceAction('addPatch', source.addPatch)
-        self._addSourceAction('addSource', source.addSource)
-
-exec defaultrecipes.DerivedPackageRecipe
+exec defaultrecipes.DerivedCapsuleRecipe

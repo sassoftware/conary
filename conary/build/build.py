@@ -2321,6 +2321,11 @@ class Remove(BuildAction):
     keywords = { 'recursive': False , 'allowNoMatch': False}
 
     def do(self, macros):
+        for path in self.filespecs:
+            if self.recipe._getCapsulePathsForFile(path):
+                self.init_error(errors.RecipeFileError, 'Removing file %s is '
+                                ' not supported because it is contained within '
+                                'a capsule.' % path)
         # expand braceglobs only for match checking
         paths = action._expandPaths(self.filespecs, macros, braceGlob = True)
         if not paths:

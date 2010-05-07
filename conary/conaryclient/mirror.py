@@ -218,8 +218,8 @@ def groupTroves(troveList):
         if ret:
             return ret
         # if they have the same mark, sort the groups at the end
-        ahasgrp = [x[1][1] for x in a if x[1][0].startswith("group-")]
-        bhasgrp = [x[1][1] for x in b if x[1][0].startswith("group-")]
+        ahasgrp = [x[1][1] for x in a if trove.troveIsGroup(x[1][0])]
+        bhasgrp = [x[1][1] for x in b if trove.troveIsGroup(x[1][0])]
         if len(ahasgrp) > len(bhasgrp):
             return 1
         if len(bhasgrp) > len(ahasgrp):
@@ -237,7 +237,7 @@ def buildJobList(src, target, groupList, absolute = False):
     for group in groupList:
         for mark, (name, version, flavor) in group:
             # force groups to always be transferred using absolute changesets
-            if name.startswith("group-"):
+            if trove.troveIsGroup(name):
                 continue
             srcAvailable[(name,version,flavor)] = True
             d = q.setdefault(name, {})
@@ -307,7 +307,7 @@ def buildJobList(src, target, groupList, absolute = False):
         # reflect the state of the mirror after this job completes
         for mark, job in groupJobList:
             name = job[0]
-            if name.startswith("group-"):
+            if trove.troveIsGroup(name):
                 continue
             oldVersion, oldFlavor = job[1]
             newVersion, newFlavor = job[2]
@@ -333,7 +333,7 @@ recursedGroups = set()
 def recurseTrove(sourceRepos, name, version, flavor,
                  callback = ChangesetCallback()):
     global recursedGroups
-    assert(name.startswith("group-"))
+    assert(trove.troveIsGroup(name))
     # there's nothing much we can recurse from the source
     if name.endswith(":source"):
         return [], []
@@ -355,7 +355,7 @@ def recurseTrove(sourceRepos, name, version, flavor,
     for troveCs in groupCs.iterNewTroveList():
         nvf = troveCs.getNewNameVersionFlavor()
         # keep track of groups we have already recursed through
-        if nvf[0].startswith("group-"):
+        if trove.troveIsGroup(nvf[0]):
             recursedGroups.add(nvf)
         if troveCs.getType() == trove.TROVE_TYPE_REMOVED:
             removedList.append(nvf)
@@ -776,7 +776,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # avoid adding duplicates
         troveSetList = set([x[1] for x in troveList])
         for mark, (name, version, flavor) in troveList:
-            if name.startswith("group-"):
+            if trove.troveIsGroup(name):
                 recTroves, rmTroves = recurseTrove(sourceRepos, name, version, flavor,
                                                    callback = callback)
                 # add the results at the end with the current mark

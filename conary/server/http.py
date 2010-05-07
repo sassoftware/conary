@@ -25,6 +25,7 @@ import time
 import traceback
 
 from conary import metadata
+from conary import trove
 from conary import versions
 from conary import conarycfg
 from conary.deps import deps
@@ -358,7 +359,7 @@ class HttpHandler(WebHandler):
         f = deps.ThawFlavor(f)
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
         # non-source group troves only show contained troves
-        if t.startswith('group-') and not t.endswith(':source'):
+        if trove.troveIsGroup(t):
             troves = sorted(parentTrove.iterTroveList(strongRefs=True))
             return self._write("group_contents", troveName = t, troves = troves)
         fileIters = []

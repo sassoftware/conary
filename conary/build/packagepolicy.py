@@ -642,7 +642,7 @@ class PackageSpec(_filterSpec):
 
     def do(self):
         # Walk capsule contents ignored by doFile
-        for filePath, capsulePath, componentName in self.recipe._iterCapsulePaths():
+        for filePath, _, componentName in self.recipe._iterCapsulePaths():
             realPath = self.destdir + filePath
             if util.exists(realPath):
                 # Files that do not exist on the filesystem (devices)
@@ -650,7 +650,7 @@ class PackageSpec(_filterSpec):
                 self.autopkg.addFile(filePath, realPath, componentName)
         # Walk normal files
         _filterSpec.do(self)
-        
+
     def doFile(self, path):
 	# all policy classes after this require that the initial tree is built
         if not self.recipe._getCapsulePathsForFile(path):
@@ -1335,7 +1335,6 @@ class ExcludeDirectories(policy.Policy):
         # temporarily do nothing for capsules, we might do something later
         if self.recipe._getCapsulePathsForFile(path):
             return
-
 	fullpath = self.recipe.macros.destdir + os.sep + path
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]

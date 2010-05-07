@@ -21,7 +21,7 @@ from conary.trove import TroveError
 from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature
 from conary.lib.openpgpfile import IncompatibleKey
-from conary import versions
+from conary import trove, versions
 
 RepositoryError = conary.errors.RepositoryError
 
@@ -198,11 +198,11 @@ class TroveMissing(RepositoryError, InternalConaryError):
 	"""
 	self.troveName = troveName
 	self.version = version
-        if troveName.startswith('group-'):
+        if trove.troveIsGroup(troveName):
             self.type = 'group'
-        elif troveName.startswith('fileset-'):
+        elif trove.troveIsFileSet(troveName):
             self.type = 'fileset'
-        elif troveName.find(':') != -1:
+        elif trove.troveIsComponent(troveName):
             self.type = 'component'
         else:
             self.type = 'package'

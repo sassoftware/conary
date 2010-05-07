@@ -576,18 +576,16 @@ class DeriveCommand(CvcCommand):
     commands = ['derive']
     hidden = True
     paramHelp = "<trove>[=<version>][[flavor]]"
-    help = 'Aggregation command to shadow, check out and alter a recipe'
+    help = 'Create a derived package'
     commandGroup = 'Repository Access'
 
     docs = {'dir' : 'Derive single trove and check out in directory DIR',
             'extract': 'extract parent trove into _ROOT_ subdir for editing',
-            'target': 'target label which the derived package should be shadowed to (defaults to buildLabel)',
-            'info': 'Display info on shadow'}
+            'target': 'target label which the derived package should be shadowed to (defaults to buildLabel)'}
 
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef["dir"] = ONE_PARAM
-        argDef["info"] = '-i', NO_PARAM
         argDef['extract'] = NO_PARAM
         argDef['target'] = ONE_PARAM
 
@@ -598,9 +596,6 @@ class DeriveCommand(CvcCommand):
         extract = argSet.pop('extract', False)
         targetLabel = argSet.pop('target', None)
         info = prep = False
-        if argSet.has_key('info'):
-            del argSet['info']
-            info = True
 
         if argSet or len(args) != 2:
             return self.usage()
@@ -619,10 +614,10 @@ class DeriveCommand(CvcCommand):
         else:
             targetLabel = cfg.buildLabel
 
-        callback = derive.DeriveCallback(cfg)
+        callback = derive.DeriveCallback(cfg.trustThreshold)
         derive.derive(repos, cfg, targetLabel, troveSpec,
                 checkoutDir = checkoutDir, extract = extract,
-                info = info, callback = callback)
+                callback = callback)
 _register(DeriveCommand)
 
 class DiffCommand(CvcCommand):

@@ -2192,7 +2192,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         # shared pathIds in them.  If this limitation of the 
         # changeset format ever gets fixed, we can remove this
         # check.
-        if name.startswith('group-'):
+        if trove.troveIsGroup(name):
             finalItems.append((name, version, flavorList))
         else:
             for flavor in flavorList:
