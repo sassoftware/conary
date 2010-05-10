@@ -570,6 +570,47 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
         'patch:runtime',
     ]'''
 
+DerivedCapsuleRecipe = '''class DerivedCapsuleRecipe(AbstractDerivedCapsuleRecipe, BaseRequiresRecipe):
+    """
+    NAME
+    ====
+    B{C{DerivedCapsuleRecipe}} - Build derived capsule packages
+
+    SYNOPSIS
+    ========
+
+    C{DerivedCapsuleRecipe} is used to modify shadows of existing binary
+    capsule packages
+
+    DESCRIPTION
+    ===========
+
+    The C{DerivedCapsuleRecipe} class provides an interface to modify the
+    contents of a binary trove which contains a capsule without
+    recooking from source.
+
+    To use this recipe class, first shadow the upstream package, then change
+    the recipe.
+
+    Note that the Remove build action is not supported for files defined within
+    a capsule.
+
+    EXAMPLE
+    =======
+    A sample class that uses DerivedCapsuleRecipe to replace contents of
+    a config file:
+
+        class ExampleCapsule(DerivedCapsuleRecipe):
+            name = 'example'
+            version = '1.0'
+
+            def setup(r):
+                r.Replace('foo', 'bar', '/etc/example.conf')
+    """
+    name = 'derivedcapsule'
+    internalAbstractBaseClass = 1'''
+
+
 recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'package': 'PackageRecipe',
                'buildpackage': 'BuildPackageRecipe',
@@ -582,6 +623,7 @@ recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'redirect': 'RedirectRecipe',
                'fileset': 'FilesetRecipe',
                'capsule': 'CapsuleRecipe',
+               'derivedcapsule': 'DerivedCapsuleRecipe',
                }
 
 packageNames = dict([(x[1], x[0]) for x in recipeNames.iteritems()])

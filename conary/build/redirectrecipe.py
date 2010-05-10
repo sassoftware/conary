@@ -217,7 +217,7 @@ class _RedirectRecipe(Recipe):
 
         # Groups don't include any additional redirections, and
         # neither do items which aren't collections
-        if (rule.sourceName.startswith('group-') or
+        if (trove.troveIsGroup(rule.sourceName) or
             not trove.troveIsCollection(rule.sourceName)):
             return
 

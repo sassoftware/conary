@@ -33,6 +33,8 @@ class AbstractCapsuleRecipe(AbstractPackageRecipe):
             if inspect.isclass(item) and issubclass(item, action.Action):
                 self._addBuildAction(name, item)
 
+        self.capsuleFileSha1s = {}
+
     def loadSourceActions(self):
         self._loadSourceActions(lambda item: item._packageAction is True)
 

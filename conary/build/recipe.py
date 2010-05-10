@@ -180,10 +180,13 @@ class Recipe(object):
                 if className in ['Recipe', 'AbstractPackageRecipe',
                                  'SourcePackageRecipe',
                                  'BaseRequiresRecipe',
-                                 'GroupRecipe', '_GroupRecipe', 'RedirectRecipe',
+                                 'GroupRecipe', '_GroupRecipe',
+                                 'RedirectRecipe',
                                  'AbstractDerivedPackageRecipe',
-                                 'DerivedPackageRecipe', 'FilesetRecipe',
-                                 '_BaseGroupRecipe']:
+                                 'DerivedPackageRecipe',
+                                 'AbstractDerivedCapsuleRecipe',
+                                 'DerivedCapsuleRecipe',
+                                 'FilesetRecipe', '_BaseGroupRecipe']:
                     continue
                 setattr(self, itemName, self._wrapMethod(className, item))
                 self.unusedMethods.add((className, item.__name__))
@@ -956,7 +959,8 @@ class Recipe(object):
         self._capsulePackageMap[capsulePath] = capsulePackage
 
     def _getCapsulePackage(self, capsulePath):
-        '''returns the capsule package:component associated with a capsule path'''
+        '''returns the capsule package:component associated with a capsule
+        path'''
         return self._capsulePackageMap.get(capsulePath)
 
     def _getCapsule(self, capsulePackage):
@@ -973,7 +977,8 @@ class Recipe(object):
         '''
         for filePath, capsuleList in self._capsulePathMap.iteritems():
             for capsulePath in capsuleList:
-                yield filePath, capsulePath, self._getCapsulePackage(capsulePath)
+                yield filePath, capsulePath, \
+                    self._getCapsulePackage(capsulePath)
 
     def _iterCapsulePathData(self):
         '''

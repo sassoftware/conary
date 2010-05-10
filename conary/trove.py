@@ -998,6 +998,7 @@ _TROVECAPSULE_RPM_RELEASE     = 2
 _TROVECAPSULE_RPM_ARCH        = 3
 _TROVECAPSULE_RPM_EPOCH       = 4
 _TROVECAPSULE_RPM_OBSOLETES   = 5
+_TROVECAPSULE_RPM_SHA1HEADER  = 6
 
 _RPM_OBSOLETE_NAME    = 0
 _RPM_OBSOLETE_FLAGS   = 1
@@ -1046,6 +1047,7 @@ class TroveRpmCapsule(streams.StreamSet):
         _TROVECAPSULE_RPM_ARCH    : (DYNAMIC, streams.StringStream, 'arch' ),
         _TROVECAPSULE_RPM_EPOCH   : (DYNAMIC, streams.IntStream,    'epoch' ),
         _TROVECAPSULE_RPM_OBSOLETES:(DYNAMIC, RpmObsoletes,         'obsoletes' ),
+        _TROVECAPSULE_RPM_SHA1HEADER: (DYNAMIC, streams.AbsoluteSha1Stream, 'sha1header' ),
     }
 
     def reset(self):
@@ -1054,6 +1056,8 @@ class TroveRpmCapsule(streams.StreamSet):
         self.release.set(None)
         self.arch.set(None)
         self.epoch.set(None)
+        self.obsoletes = RpmObsoletes()
+        self.sha1header = streams.AbsoluteSha1Stream()
 
 class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -1712,6 +1716,10 @@ class Trove(streams.StreamSet):
         epoch = hdr.get(rpmhelper.EPOCH, [None])[0]
         if epoch is not None:
             self.troveInfo.capsule.rpm.epoch.set(epoch)
+        sha1header = hdr.get(rpmhelper.SIG_SHA1, None)
+        if sha1header is not None:
+            self.troveInfo.capsule.rpm.sha1header.set(
+                sha1helper.sha1FromString(sha1header))
 
         self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
 
@@ -3068,7 +3076,7 @@ class Trove(streams.StreamSet):
             if setVersion:
                 if type == TROVE_TYPE_REMOVED:
                     self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
-                elif type == TROVE_TYPE_REDIRECT and name.startswith('group-'):
+                elif type == TROVE_TYPE_REDIRECT and troveIsGroup(name):
                     self.troveInfo.troveVersion.set(TROVE_VERSION_1_1)
                 else:
                     self.troveInfo.troveVersion.set(TROVE_VERSION)

@@ -580,15 +580,17 @@ class ChangesetFilter(BaseProxy):
                 "Unable to produce changeset version %s "
                 "with upstream server %s" % (neededCsVersion, wireCsVersion))
 
-        changeSetList = self._getNeededChangeSets(caller,
-            authToken, verPath, chgSetList, serverVersion,
-            getCsVersion, wireCsVersion, neededCsVersion,
-            recurse, withFiles, withFileContents, excludeAutoSource,
-            mirrorMode, infoOnly)
+        try:
+            changeSetList = self._getNeededChangeSets(caller,
+                authToken, verPath, chgSetList, serverVersion,
+                getCsVersion, wireCsVersion, neededCsVersion,
+                recurse, withFiles, withFileContents, excludeAutoSource,
+                mirrorMode, infoOnly)
+        finally:
+            if self.csCache:
+                # In case we missed releasing some of the locks
+                self.csCache.resetLocks()
 
-        if self.csCache:
-            # In case we missed releasing some of the locks
-            self.csCache.resetLocks()
         if not infoOnly:
             (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                           suffix = '.cf-out')

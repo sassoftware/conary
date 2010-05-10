@@ -27,7 +27,7 @@ import sys
 import tempfile
 import stat
 
-from conary.lib import debugger, digestlib, log, magic
+from conary.lib import debugger, digestlib, log, magic, sha1helper
 from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
@@ -1473,6 +1473,7 @@ class addCapsule(_Source):
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
 
+        sha1Map = {}
         totalPathList=[]
         totalPathData=[]
         ExcludeDirectories = [] 
@@ -1480,9 +1481,9 @@ class addCapsule(_Source):
         Config = []
         MissingOkay = []
 
-        for (path, user, group, mode, size, 
+        for (path, user, group, mode, size,
              rdev, flags, vflags, digest, filelinktos, mtime) in ownerList:
-
+            fullpath = util.joinPaths(destDir,path)
 
             totalPathList.append(path)
             # CNY-3304: some RPM versions allow impossible modes on symlinks
@@ -1549,6 +1550,10 @@ class addCapsule(_Source):
             if flags & rpmhelper.RPMFILE_MISSINGOK:
                 MissingOkay.append(path)
 
+            if stat.S_ISREG(mode) and util.exists(fullpath):
+                sha1Map[path] = sha1helper.sha1FileBin(fullpath)
+
+
         if len(ExcludeDirectories):
             self.recipe.ExcludeDirectories(exceptions=filter.PathSet(
                 ExcludeDirectories))
@@ -1562,13 +1567,15 @@ class addCapsule(_Source):
         if len(MissingOkay):
             self.recipe.MissingOkay(filter.PathSet(MissingOkay))
 
+        assert f not in self.recipe.capsuleFileSha1s
+        self.recipe.capsuleFileSha1s[f] = sha1Map
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
         self.recipe._validatePathInfoForCapsule(totalPathData,
             self.ignoreConflictingPaths)
-        self.recipe._setPathInfoForCapsule(f, totalPathData, self.package)
 
-        self.recipe._addCapsule(f, self.capsuleType, self.package)
+        self.recipe._setPathInfoForCapsule(f, totalPathData, self.package)
+        self.recipe._addCapsule(f, self.capsuleType, self.package, )
 
         # Now store script info:
         scriptDir = '/'.join((
@@ -2452,12 +2459,30 @@ def _extractScriptsFromRPM(rpm, directory):
         scriptFile.close()
 
 
+_forbiddenRPMTags = (
+    # RPM tags that we do not currently handle and want to raise an
+    # error rather than packaging (possibly incorrectly)
+    ('BLINKPKGID', rpmhelper.BLINKPKGID),
+    ('BLINKHDRID', rpmhelper.BLINKHDRID),
+    ('BLINKNEVRA', rpmhelper.BLINKNEVRA),
+    ('FLINKPKGID', rpmhelper.BLINKPKGID),
+    ('FLINKHDRID', rpmhelper.BLINKHDRID),
+    ('FLINKNEVRA', rpmhelper.BLINKNEVRA),
+)
+
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
     assert targetfile or directory
     if not directory:
 	directory = os.path.dirname(targetfile)
     r = file(rpm, 'r')
     h = rpmhelper.readHeader(r)
+
+    # CNY-3404
+    forbiddenTags = [(tagName, tag) for (tagName, tag) in _forbiddenRPMTags
+                     if tag in h]
+    if forbiddenTags:
+        raise SourceError('Unhandled RPM tags: %s ' %
+            ', '.join(('%s(%d)'%x for x in forbiddenTags)))
 
     # The rest of this function gets information on the files stored
     # in an RPM.  Some RPMs intentionally contain no files, and
