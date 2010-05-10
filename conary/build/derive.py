@@ -27,6 +27,8 @@ from conary import state
 from conary import updatecmd
 from conary.lib import log, util
 from conary.versions import Label
+from conary.repository.changeset import ChangesetExploder
+
 class DeriveCallback(checkin.CheckinCallback):
     def setUpdateJob(self, *args, **kw):
         # stifle update announcement for extract
@@ -127,7 +129,7 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir = None,
         raise errors.CvcError("Directory '%s' already exists" % checkoutDir)
     os.mkdir(checkoutDir)
 
-    log.info('Writing recipe file')
+    log.info('writing recipe file')
     recipeName = troveName + '.recipe'
     className = util.convertPackageNameToClassName(troveName)
 
@@ -180,11 +182,11 @@ class %(className)sRecipe(%(recipeBaseClass)s):
     if extract:
         extractDir = os.path.join(os.getcwd(), '_ROOT_')
         log.info('extracting files from %s=%s[%s]' % (nvfToDerive))
-        cfg.root = os.path.abspath(extractDir)
-        cfg.interactive = False
-        updatecmd.doUpdate(cfg, troveSpec,
-                           callback=callback, depCheck=False)
+        ts = [ (nvfToDerive[0], (None, None), (nvfToDerive[1], nvfToDerive[2]),
+                True) ]
+        cs = repos.createChangeSet(ts, recurse = True)
+        exploder = ChangesetExploder(cs, extractDir)
         secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
-        shutil.copytree(extractDir, secondDir)
+        shutil.copytree(extractDir, secondDir, symlinks=True)
 
     os.chdir(oldcwd)
