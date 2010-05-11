@@ -1322,7 +1322,7 @@ class addCapsule(_Source):
 
     SYNOPSIS
     ========
-    C{r.addCapsule(I{capsulename}, [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{mode}=,] [I{package}=,] [I{sourceDir}=,] I{ignoreConflictingPaths}=])}
+    C{r.addCapsule(I{capsulename}, [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{mode}=,] [I{package}=,] [I{sourceDir}=,] I{ignoreConflictingPaths}=,] I{ignoreAllConflictingTimes}=])}
 
     DESCRIPTION
     ===========
@@ -1375,6 +1375,9 @@ class addCapsule(_Source):
     B{ignoreConflictingPaths} : A list of paths in which C{r.addCapsule} will
     not check files for conflicting contents.
 
+    B{ignoreAllConflictingTimes} : When checking for conflicts between
+    files contained in multiple capsules, ignore the mtime on the files.
+
     EXAMPLES
     ========
 
@@ -1389,6 +1392,7 @@ class addCapsule(_Source):
     """
 
     keywords = {'ignoreConflictingPaths': set(),
+                'ignoreAllConflictingTimes': False,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -1418,6 +1422,8 @@ class addCapsule(_Source):
         for files.
         @keyword ignoreConflictingPaths: A list of paths that will not be
         checked for conflicting file contents
+        @keyword ignoreAllConflictingTimes: When checking for conflicts between
+        files contained in multiple capsules, ignore the mtime on the files.
         """
         _Source.__init__(self, recipe, *args, **keywords)
         self.capsuleType = None
@@ -1488,7 +1494,11 @@ class addCapsule(_Source):
             # CNY-3304: some RPM versions allow impossible modes on symlinks
             if stat.S_ISLNK(mode):
                 mode = stat.S_IFLNK | 0777
-            totalPathData.append((path, user, group, mode, digest, mtime))
+            if self.ignoreAllConflictingTimes:
+                checkTime = 0 # CNY-3415
+            else:
+                checkTime = mtime
+            totalPathData.append((path, user, group, mode, digest, checkTime))
 
             devtype = None
             if stat.S_ISBLK(mode):

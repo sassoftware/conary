@@ -1,3 +1,7 @@
+    * The addCapsule source action now takes a ignoreAllConflictingTimes
+      boolean argument which causes it to not raise errors when overlapping
+      paths otherwise allowed have conflicting mtimes. (CNY-3415)
+
 Changes in 2.1.15:
   o New Features:
     * Recipes that have a class member list named 'pathIdSearchBranches' will
