@@ -3090,7 +3090,7 @@ conary erase '%s=%s[%s]'
                 (name, (oldVersion, oldFlavor),
                        (newVersion, newFlavor), absolute) = job
 
-                if name.startswith('group-'):
+                if trove.troveIsGroup(name):
                     foundGroup = True
 
                 if name.startswith('info-'):

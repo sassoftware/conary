@@ -2192,7 +2192,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         # shared pathIds in them.  If this limitation of the 
         # changeset format ever gets fixed, we can remove this
         # check.
-        if name.startswith('group-'):
+        if trove.troveIsGroup(name):
             finalItems.append((name, version, flavorList))
         else:
             for flavor in flavorList:
@@ -2390,6 +2390,12 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
                 log.info('Unused methods:\n%s' % '\n'.join(unusedMethods))
     except Exception, err:
         if cfg.debugRecipeExceptions:
+            os.close(0)
+            os.open('/dev/tty', os.O_RDONLY)
+            os.close(1)
+            os.open('/dev/tty', os.O_RDWR)
+            os.close(2)
+            os.open('/dev/tty', os.O_RDWR)
             traceback.print_exception(*sys.exc_info())
             debugger.post_mortem(sys.exc_info()[2])
             raise CookError(str(err))

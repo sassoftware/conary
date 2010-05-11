@@ -20,7 +20,6 @@ import itertools
 import os
 import re
 import struct
-import subprocess
 import tempfile
 from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util
 from conary.deps import deps
@@ -77,6 +76,14 @@ DIRNAMES        = 1118
 PAYLOADFORMAT     = 1124
 PAYLOADCOMPRESSOR = 1125
 FILECOLORS      = 1140
+# BLINK*, FLINK*, and TRIGGERPREIN included from SUSE fork of RPM
+BLINKPKGID      = 1164
+BLINKHDRID      = 1165
+BLINKNEVRA      = 1166
+FLINKPKGID      = 1167
+FLINKHDRID      = 1168
+FLINKNEVRA      = 1169
+TRIGGERPREIN    = 1170
 
 SIG_BASE        = 256
 SIG_SHA1        = 269
@@ -184,8 +191,7 @@ class _RpmHeader(object):
         depset = deps.DependencySet()
         flagre = re.compile('\((.*?)\)')
         depnamere = re.compile('(.*?)\(.*')
-        packageName = self.get(NAME, '')
-
+        localere = re.compile('locale\((.*)\)')
         for dep in self.get(tag, []):
             if dep.startswith('/'):
                 depset.addDep(deps.FileDependencies, deps.Dependency(dep))
@@ -194,26 +200,46 @@ class _RpmHeader(object):
                 # Something
                 depset.addDep(deps.RpmLibDependencies,
                               deps.Dependency(dep.split('(')[1].split(')')[0]))
-            elif '(' in dep and '.so' in dep.split('(')[0] and not (
+            elif '(' in dep:
+                if '.so' in dep.split('(')[0] and not (
                     dep.startswith('perl(') or dep.startswith('config(')):
-                # assume it is a shlib or package name;
-                # convert anything inside () to a flag
-                flags = flagre.findall(dep)
-                if flags:
-                    # the dependency name is everything until the first (
-                    dep = depnamere.match(dep).group(1)
-                    if len(flags) == 2:
-                        # if we have (flags)(64bit), we need to pop
-                        # the 64bit marking off the end and namespace the
-                        # dependency name.
-                        dep += '[%s]' %flags.pop()
-                    flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags if x ]
+                    # assume it is a shlib or package name;
+                    # convert anything inside () to a flag
+                    flags = flagre.findall(dep)
+                    if flags:
+                        # the dependency name is everything until the first (
+                        dep = depnamere.match(dep).group(1)
+                        if len(flags) == 2:
+                            # if we have (flags)(64bit), we need to pop
+                            # the 64bit marking off the end and namespace the
+                            # dependency name.
+                            dep += '[%s]' %flags.pop()
+                        flags = [ (x, deps.FLAG_SENSE_REQUIRED)
+                                  for x in flags if x ]
+                    else:
+                        flags = []
+                    depset.addDep(deps.RpmDependencies,
+                                  deps.Dependency(dep, flags))
+                elif localere.match(dep):
+                    # locale RPM flags get translated to conary dep flags
+                    m = localere.match(dep)
+                    nf = m.group(1).split(':')
+                    if len(nf) == 1:
+                        name = ''
+                        flags = nf[0].split(';')
+                    else:
+                        name = ':' + ':'.join(nf[0:-1])
+                        flags = nf[-1].split(';')
+                    flags = [ (x, deps.FLAG_SENSE_REQUIRED)
+                              for x in flags if x ]
+                    depset.addDep(deps.RpmDependencies,
+                                  deps.Dependency('locale%s' % name, flags))
                 else:
-                    flags = []
-                depset.addDep(deps.RpmDependencies, deps.Dependency(dep, flags))
+                    # replace any () with [] because () are special to Conary
+                    dep = dep.replace('(', '[').replace(')', ']')
+                    depset.addDep(deps.RpmDependencies,
+                                  deps.Dependency(dep, []))
             else:
-                # replace any () with [] because () are special to Conary
-                dep = dep.replace('(', '[').replace(')', ']')
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 

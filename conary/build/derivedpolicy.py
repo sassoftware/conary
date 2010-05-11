@@ -18,12 +18,6 @@ from conary import files, trove
 from conary.build import destdirpolicy, filter, packagepolicy, policy
 from conary.deps import deps
 
-FixDirModes = destdirpolicy.FixDirModes
-
-Config = packagepolicy.Config
-InitialContents = packagepolicy.InitialContents
-Transient = packagepolicy.Transient
-
 class ComponentSpec(packagepolicy.ComponentSpec):
     processUnmodified = True
 
@@ -130,7 +124,7 @@ class Flavor(packagepolicy.Flavor):
         f = pkg.getFile(path)
 
         # Only recompute the file's flavor if the file has changed
-        if self.mtimeChanged(path):
+        if self.fileChanged(path):
             packagepolicy.Flavor.doFile(self, path)
         else:
             self.packageFlavor.union(f.flavor())
@@ -235,7 +229,6 @@ class ByDefault(packagepolicy.ByDefault):
              - set(self.inclusions))
         recipe.setByDefaultOn(inclusions)
         recipe.setByDefaultOff(exceptions)
-    
 
 class TagSpec(packagepolicy.TagSpec):
     # do not load the system-defined tags for derived packages
@@ -246,22 +239,3 @@ class TagSpec(packagepolicy.TagSpec):
         self.db = None
         self.fullReqs = set()
         packagepolicy._addInfo.doProcess(self, recipe)
-
-
-ExcludeDirectories = packagepolicy.ExcludeDirectories
-MakeDevices = packagepolicy.MakeDevices
-Ownership = packagepolicy.Ownership
-UtilizeUser = packagepolicy.UtilizeUser
-UtilizeGroup = packagepolicy.UtilizeGroup
-TagDescription = packagepolicy.TagDescription
-TagHandler = packagepolicy.TagHandler
-
-setModes = packagepolicy.setModes
-LinkType = packagepolicy.LinkType
-LinkCount = packagepolicy.LinkCount
-reportMissingBuildRequires = packagepolicy.reportMissingBuildRequires
-reportExcessBuildRequires = packagepolicy.reportExcessBuildRequires
-reportErrors = packagepolicy.reportErrors
-
-ProcessGroupInfoPackage = packagepolicy.ProcessGroupInfoPackage
-ProcessUserInfoPackage = packagepolicy.ProcessUserInfoPackage

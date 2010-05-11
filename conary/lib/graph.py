@@ -462,6 +462,7 @@ class DirectedGraph:
                     labelStr = edgeFormatFn(fromNode,
                                          nodes[toIdx],
                                          value)
-                    out.write(' [label="%s"]' % (labelStr,))
+                    if labelStr is not None:
+                        out.write(' [label="%s"]' % (labelStr,))
                 out.write('\n')
         out.write('}\n')

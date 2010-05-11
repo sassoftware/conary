@@ -84,6 +84,9 @@ class Importer(object):
                                       'UserInfoRecipe', 'GroupInfoRecipe')),
         ('conary.build.capsulerecipe',  ('CapsuleRecipe',
                                       )),
+        ('conary.build.derivedcapsulerecipe', ('DerivedChangesetExploder',
+                            'AbstractDerivedCapsuleRecipe',
+                            'DerivedCapsuleRecipe')),
         ('conary.lib', ('util',)),
         ('os',),
         ('re',),
@@ -533,12 +536,13 @@ class RecipeLoaderFromString(object):
                 continue
 
             if hasattr(obj, 'name') and hasattr(obj, 'version'):
+
                 self._validateRecipe(obj, pkgname, basename)
 
                 if result:
                     raise builderrors.RecipeFileError(
-                        'Error in recipe file "%s": multiple recipe classes '
-                        'with both name and version exist' % basename)
+                    'Error in recipe file "%s": multiple recipe classes '
+                    'with both name and version exist' % basename)
 
                 result = (name, obj)
             else:
@@ -565,7 +569,7 @@ class RecipeLoaderFromString(object):
                 'Error in recipe file "%s": package name must start '
                 'with an ascii letter or digit.' % fileName)
 
-        if '-' in recipeClass.version:
+        if not hasattr(recipeClass,'parent') and '-' in recipeClass.version:
             raise RecipeFileError(
                 "Version string %s has illegal '-' character" % recipeClass.version)
 

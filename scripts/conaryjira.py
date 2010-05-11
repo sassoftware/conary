@@ -66,6 +66,7 @@ import textwrap
 from conary import conarycfg
 from conary import conaryclient
 from conary import dbstore
+from conary import trove
 from conary import updatecmd
 from conary import versions
 from conary.deps import deps
@@ -140,7 +141,7 @@ class jiraMine:
         sourceOwner = {}
         label = versions.Label(labelText)
 
-        repoPkgs = frozenset([ x for x in self.repos.troveNames(label) if ':' not in x and not (x.startswith('cross-') or x.startswith('bootstrap-') or x.startswith('group-')) ])
+        repoPkgs = frozenset([ x for x in self.repos.troveNames(label) if ':' not in x and not (x.startswith('cross-') or x.startswith('bootstrap-') or trove.troveIsGroup(x)) ])
 
         cu = self.db.cursor()
         cu.execute("""SELECT component.cname

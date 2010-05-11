@@ -21,9 +21,8 @@ import os
 import sys
 import types
 
-from conary.lib import util, log, graph
+from conary.lib import util, log, graph, sha1helper
 from conary.build import action, errors, filter, trovefilter
-
 
 # buckets (enum -- but may possibly work someday as bitmask for policy
 # that could run more than once in different contexts)
@@ -235,7 +234,7 @@ class Policy(BasePolicy):
     derived packages.  C{True} causes C{doFile} to be called for
     all files found, regardless of whether they are in the
     parent version, and C{False} causes C{doFile} to be called
-    only for files that are new or have changed timestamps.
+    only for files that are new or have changed.
     Note that if C{filetree} is C{policy.PACKAGE}, unchanged
     file contents will lead to unchanged timestamps.
     """
@@ -452,28 +451,75 @@ class Policy(BasePolicy):
 	   if self._pathAllowed(thispath):
 	       self.doFile(thispath)
 
-    def mtimeChanged(self, path):
+    FILE_MISSING = -1
+    FILE_UNCHANGED = 0
+    FILE_CHANGED = 1
+    FILE_NEW = 2
+    def fileChanged(self, path):
+	"""
+        check to see if the file has changed
+        @param path: the path to check
+        @return: FILE_MISSING, FILE_CHANGED, FILE_UNCHANGED, FILE_NEW
+        @rtype: int
+	"""
         newPath = util.joinPaths(self.macros.destdir, path)
         if not util.exists(newPath):
-            return True
-        oldMtime = self.recipe._derivedFiles.get(path, None)
-        try:
+            return self.FILE_MISSING
+
+        from conary.build.recipe import RECIPE_TYPE_CAPSULE
+        if self.recipe._recipeType == RECIPE_TYPE_CAPSULE:
+            if not os.path.isfile(newPath):
+                # for capsules we get everything but contents from
+                # the capsule header
+                return self.FILE_UNCHANGED
+
+            # For derived capsule recipes we use the exploder to provide the old
+            # sha1. For regular capsule recipes we use the capsuleFileSha1s map
+            # to provide the old sha1.
+            oldSha1=None
             if os.path.islink(newPath):
-                # symlinks are special, we compare the target of the link
-                # instead of the mtime
-                newMtime = os.readlink(newPath)
+                oldSha1 = os.readlink(newPath)
+            elif hasattr(self.recipe,'exploder'):
+                oldf = self.recipe.exploder.fileObjMap.get(path,None)
+                if oldf and oldf.hasContents:
+                    oldSha1 = oldf.contents.sha1()
             else:
-                newMtime = os.lstat(newPath).st_mtime
-            return oldMtime != newMtime
-        except:
-            return True
+                capPaths = self.recipe._getCapsulePathsForFile(path)
+                if not capPaths:
+                    return self.FILE_NEW
+                oldSha1 = self.recipe.capsuleFileSha1s[capPaths[0]][path]
+
+            if oldSha1:
+                if os.path.islink(newPath):
+                    newSha1 = os.readlink(newPath)
+                else:
+                    newSha1 = sha1helper.sha1FileBin(newPath)
+                if oldSha1 == newSha1:
+                    return self.FILE_UNCHANGED
+                return self.FILE_CHANGED
+            return self.FILE_NEW
+
+        oldMtime = self.recipe._derivedFiles.get(path, None)
+        if os.path.islink(newPath):
+            # symlinks are special, we compare the target of the link
+            # instead of the mtime
+            newMtime = os.readlink(newPath)
+        else:
+            newMtime = os.lstat(newPath).st_mtime
+        if oldMtime:
+            if oldMtime == newMtime:
+                return self.FILE_UNCHANGED
+            return self.FILE_CHANGED
+        return self.FILE_NEW
+    # for backwards compatiblity
+    mtimeChanged=fileChanged
 
     def policyInclusion(self, filespec):
         if (hasattr(self.recipe, '_isDerived')
             and self.recipe._isDerived == True
             and self.processUnmodified is False
             and filespec in self.recipe._derivedFiles
-            and not self.mtimeChanged(filespec)):
+            and not self.fileChanged(filespec)):
             # policy has elected not to handle unchanged files
             return False
         if not self.inclusions and self.invariantinclusions is None:
@@ -777,6 +823,7 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
     # Load conary internal policy
     import conary.build.destdirpolicy
     import conary.build.derivedpolicy
+    import conary.build.derivedcapsulepolicy
     import conary.build.infopolicy
     import conary.build.packagepolicy
     import conary.build.capsulepolicy
