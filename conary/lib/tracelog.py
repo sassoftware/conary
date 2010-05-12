@@ -145,7 +145,7 @@ class FileLog(NullLog):
     def printLog(self, level, msg):
         try:
             self.fd.write("%s %d %s\n" % (logTime(), self.pid, msg))
-        except OSError, e:
+        except OSError:
             pass
 
     # close on exit
@@ -172,7 +172,7 @@ class TraceLog(FileLog):
             self.times[i] = t
         try:
             self.fd.write("%s\n" % (lineStr,))
-        except OSError, e:
+        except OSError:
             pass
 
     def reset(self, level=None):

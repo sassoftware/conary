@@ -18,9 +18,6 @@ from conary import errors
 from conary import versions
 from conary import conaryclient
 from conary.conaryclient import ConaryClient, cmdline
-from conary.build.cook import signAbsoluteChangesetByConfig
-from conary.conarycfg import selectSignatureKey
-from conary.deps import deps
 
 def displayCloneJob(cs):
     indent = '   '

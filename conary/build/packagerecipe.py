@@ -15,12 +15,10 @@
 import sys
 import os
 import inspect
-import itertools
 
 from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
 from conary.build import defaultrecipes
 from conary.build import lookaside
-from conary.build.errors import RecipeFileError
 from conary import trove
 
 from conary.build import action
@@ -30,11 +28,7 @@ from conary.build import macros
 from conary.build import policy
 from conary.build import use
 from conary.deps import deps
-from conary.lib import log, magic, util
-
-from conary.repository import errors as repoerrors
-
-
+from conary.lib import magic, util
 
 crossMacros = {
     'crossdir'          : 'cross-target-%(target)s',
@@ -185,18 +179,18 @@ class AbstractPackageRecipe(Recipe):
 	resume = self.resumeList
 	resumeBegin = resume[0][0]
 	resumeEnd = resume[0][1]
-	for action in actions:
-	    if not resumeBegin or action.linenum >= resumeBegin:
-		if not resumeEnd or action.linenum <= resumeEnd:
-		    yield action
+	for a in actions:
+	    if not resumeBegin or a.linenum >= resumeBegin:
+		if not resumeEnd or a.linenum <= resumeEnd:
+		    yield a
 		elif resumeEnd:
 		    resume = resume[1:]
 		    if not resume:
 			return
 		    resumeBegin = resume[0][0]
 		    resumeEnd = resume[0][1]
-		    if action.linenum == resumeBegin:
-			yield action
+		    if a.linenum == resumeBegin:
+			yield a
 
     def extraBuild(self, action):
 	"""
@@ -313,7 +307,7 @@ class AbstractPackageRecipe(Recipe):
                     flavor = deps.parseFlavor('target: ' + arch)
                 else:
                     flavor = deps.parseFlavor('is: ' + arch)
-            except deps.ParseError, msg:
+            except deps.ParseError:
                 raise errors.CookError('Invalid architecture specification %s'
                                        %archSpec)
 
@@ -410,8 +404,6 @@ class AbstractPackageRecipe(Recipe):
 
         self.macros.update(dict(x for x in crossMacros.iteritems() 
                                  if x[0] not in self.macros))
-
-        tmpArch = use.Arch.copy()
 
         _setBuildMacros(self.macros)
 

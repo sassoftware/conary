@@ -23,16 +23,13 @@ import select
 import stat
 import sys
 import tempfile
-import zlib
 import weakref
 
 from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
-from conary.deps import deps
-from conary.lib import digestlib, log, patch, sha1helper, util, fixedglob
+from conary.lib import log, patch, sha1helper, util, fixedglob
 from conary.local import capsules
-from conary.local.errors import *
 from conary.local.journal import NoopJobJournal
 from conary.repository import changeset, filecontents
 
@@ -107,7 +104,7 @@ class FilesystemJob:
                 # we're not going to be able to install this; record the
                 # error, but fix things up so we don't generate a duplicate
                 # error later on
-                self.errors.append(DatabasePathConflictError(
+                self.errors.append(errors.DatabasePathConflictError(
                                    util.normpath(target),
                                    troveInfo[0], troveInfo[1], troveInfo[2]))
                 self.userRemoval(formerTroveInfo[0], formerTroveInfo[1],
@@ -261,7 +258,6 @@ class FilesystemJob:
     def restoreFile(cls, fileObj, contents, root, target, journal, opJournal,
             isSourceTrove, keepTempfile = False):
         opJournal.backup(target)
-        rootLen = len(root.rstrip('/'))
 
         if fileObj.hasContents and contents and not \
                                    fileObj.flags.isConfig():
@@ -331,7 +327,6 @@ class FilesystemJob:
         restores.sort()
         delayedRestores = []
         ptrTargets = {}
-        ptrTempFiles = {}
         tmpPtrFiles = []
 
         # this sorting ensures /dir/file is removed before /dir
@@ -825,7 +820,7 @@ class FilesystemJob:
                 pathOkay = False
                 finalPath = fsPath	# let updates work still
                 self.errors.append(
-                    PathConflictError(util.normpath(fsPath), headPath))
+                    errors.PathConflictError(util.normpath(fsPath), headPath))
 
         return pathOkay, finalPath
 
@@ -1007,7 +1002,7 @@ class FilesystemJob:
                                 isConfig = headFile.flags.isConfig(),
                                 isAutoSource = headFile.flags.isAutoSource())
                     else:
-                        self.errors.append(DuplicatePath(headPath))
+                        self.errors.append(errors.DuplicatePath(headPath))
 
                     continue
                 elif dup:
@@ -1065,11 +1060,11 @@ class FilesystemJob:
                     # specified) or we don't have a flag which lets us replace
                     # the empty directory with a file
                     self.errors.append(
-                               DirectoryInWayError(
-                                   util.normpath(headRealPath),
-                                   troveCs.getName(),
-                                   troveCs.getNewVersion(),
-                                   troveCs.getNewFlavor()))
+                        errors.DirectoryInWayError(
+                            util.normpath(headRealPath),
+                            troveCs.getName(),
+                            troveCs.getNewVersion(),
+                            troveCs.getNewFlavor()))
                 elif (not(flags.ignoreInitialContents) and
                       headFile.flags.isInitialContents() and
                       not self.removes.has_key(headRealPath)):
@@ -1134,7 +1129,7 @@ class FilesystemJob:
                                   filecontents.FromFilesystem(headRealPath),
                                 *info[0:4])
                     else:
-                        self.errors.append(FileInWayError(
+                        self.errors.append(errors.FileInWayError(
                                util.normpath(headRealPath),
                                troveCs.getName(),
                                troveCs.getNewVersion(),
@@ -1351,12 +1346,12 @@ class FilesystemJob:
                             newLocation = os.path.abspath(os.path.join(
                                 os.path.dirname(finalPath), headFile.target()))
                             self.errors.append(
-                                DirectoryToSymLinkError(finalPath,
+                                errors.DirectoryToSymLinkError(finalPath,
                                                         newLocation,
                                                         headFile.target()))
                         else:
                             self.errors.append(
-                                DirectoryToNonDirectoryError(finalPath))
+                                errors.DirectoryToNonDirectoryError(finalPath))
                         continue
                     else:
                         # someone changed the filesystem so we're replacing
@@ -1371,7 +1366,7 @@ class FilesystemJob:
                     fsFile = headFile
                     forceUpdate = True
                 elif baseFile.lsTag != fsFile.lsTag:
-                    self.errors.append(FileTypeChangedError(finalPath))
+                    self.errors.append(errors.FileTypeChangedError(finalPath))
                     continue
             elif baseFile.lsTag != fsFile.lsTag:
                 # the user changed the file type. we could try and
@@ -1382,7 +1377,7 @@ class FilesystemJob:
                     fsFile = headFile
                     forceUpdate = True
                 else:
-                    self.errors.append(FileTypeChangedError(finalPath))
+                    self.errors.append(errors.FileTypeChangedError(finalPath))
                     continue
 
             # if we're forcing an update, we don't need to merge this
@@ -1406,7 +1401,7 @@ class FilesystemJob:
 			attributesChanged = True
 		    else:
 			contentsOkay = False
-                        self.errors.append(FileAttributesConflictError(
+                        self.errors.append(errors.FileAttributesConflictError(
                                                 realPath))
 		else:
 		    # this forces the change to apply
@@ -1542,7 +1537,8 @@ class FilesystemJob:
 
                     contentsOkay = True
 		else:
-                    self.errors.append(FileContentsConflictError(realPath))
+                    self.errors.append(
+                        errors.FileContentsConflictError(realPath))
 		    contentsOkay = False
             elif headFile.hasContents and headFile.linkGroup():
                 # the contents haven't changed, but the link group has changed.

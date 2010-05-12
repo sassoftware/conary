@@ -27,12 +27,7 @@ from conary.deps import deps
 from conary.lib import log
 from conary.lib.sha1helper import sha1ToString, md5ToString
 from conary.lib import util
-from conary import metadata
 from conary.repository import errors
-
-from conary import conaryclient
-from conaryclient import newtrove
-
 
 def jobKey(x):
     return (x[0], (str(x[1][0]), str(x[1][1])),
@@ -215,7 +210,6 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             hasTrovesCache = dict(itertools.izip(allTups, hasTroves))
         troves = [ troveCache.get(x, None) for x in troveTups ]
 
-    indent = 0
     seen = set()  # cached info about what troves we've called hasTrove on.
     #import epdb; epdb.st()
     for troveTup, trv in itertools.izip(troveTups, troves):
@@ -288,7 +282,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                                 newToCheck.append(tup)
                         for tup, parent in alsoToCheck.iteritems():
                             if topTrove.hasTrove(*tup):
-                                if top.includeTroveByDefault(*tup):
+                                if topTrove.includeTroveByDefault(*tup):
                                     newToCheck.append(tup)
                             elif trv.hasTrove(*tup):
                                 if trv.includeTroveByDefault(*tup):
@@ -824,7 +818,6 @@ class TroveFormatter(TroveTupFormatter):
             yield ''
 
     def formatDigSigs(self, trv, indent=0):
-        sigList = [x for x in trv.troveInfo.sigs.digitalSigs.iter()]
         for fingerprint, timestamp, sigTuple \
                 in trv.troveInfo.sigs.digitalSigs.iter():
             yield 2*indent*' ' + 'Digital Signature:'
@@ -956,10 +949,9 @@ def displayJobLists(dcfg, formatter, jobLists, prepare=True):
     formatter.prepareJobLists(jobLists)
 
     for index, jobList in enumerate(jobLists):
-        displayJobs(dcfg, formatter, jobList, prepare=False, jobNum=index,
-                                                             total=totalJobs)
+        displayJobs(dcfg, formatter, jobList, prepare=False, jobNum=index)
 
-def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
+def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0):
     """
     display the given list of jobs
 
@@ -972,9 +964,6 @@ def displayJobs(dcfg, formatter, jobs, prepare=True, jobNum=0, total=0):
     """
     if prepare:
         formatter.prepareJobs(jobs)
-
-    if jobNum and total:
-        print formatter.formatJobNum(index, totalJobs)
 
     for job, comps in formatter.compressJobList(sorted(jobs, key=jobKey)):
         if dcfg.printTroveHeader():
@@ -1130,7 +1119,7 @@ class JobTupFormatter(TroveFormatter):
 class JobFormatter(JobTupFormatter):
 
     def formatJobNum(self, jobNum, total):
-        return 'Job %d of %d:' %(num + 1, totalJobs)
+        return 'Job %d of %d:' %(jobNum + 1, total)
 
     def formatJobHeader(self, job, comps):
         dcfg = self.dcfg

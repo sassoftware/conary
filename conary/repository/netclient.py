@@ -14,7 +14,6 @@
 
 import base64
 import gzip
-import httplib
 import itertools
 import os
 import socket
@@ -259,13 +258,6 @@ class ServerProxy(util.ServerProxy):
                 return False
 
             user = user[:-1]
-
-            # if there is a port number, strip it off
-            l = fullHost.split(':', 1)
-            if len(l) == 2:
-                host = l[0]
-            else:
-                host = fullHost
 
             user, password = self.__pwCallback(self.__serverName, user)
             if not user or not password:
@@ -657,13 +649,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             troveList = [troveList]
 
         frozenList = []
-        for trove in troveList:
-            branch = self.fromBranch(trove[1])
-            if len(trove) == 2:
+        for trv in troveList:
+            branch = self.fromBranch(trv[1])
+            if len(trv) == 2:
                 version = ""
             else:
-                version = self.fromBranch(trove[2])
-            item = (trove[0], branch, version)
+                version = self.fromBranch(trv[2])
+            item = (trv[0], branch, version)
             frozenList.append(item)
          
         mdDict = {}
@@ -687,7 +679,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def addDigitalSignature(self, name, version, flavor, digsig):
         if self.c[version].getProtocolVersion() < 45:
-            raise InvalidServerVersion("Cannot sign troves on Conary "
+            raise errors.InvalidServerVersion("Cannot sign troves on Conary "
                                        "repositories older than 1.1.20")
 
         encSig = base64.b64encode(digsig.freeze())
@@ -742,8 +734,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for server in byServer.keys():
             s = self.c[version]
             if s.getProtocolVersion() < 47:
-                raise InvalidServerVersion, "Cannot add metadata to troves on " \
-                      "repositories older than 1.1.24"
+                raise errors.InvalidServerVersion,\
+                    "Cannot add metadata to troves on " \
+                    "repositories older than 1.1.24"
         for server in byServer.keys():
             s = self.c[server]
             s.addMetadataItems(byServer[server])
@@ -1834,7 +1827,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         assert(not [ x for x in chgSetList if (x[1][0] and x[-1]) ])
 
         cs = None
-        scheduledSet = {}
         internalCs = None
         filesNeeded = set()
         removedList = []
@@ -2638,8 +2630,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for host, l in byServer.iteritems():
             server = self.c[host]
             if server.getProtocolVersion() < 62:
-                raise InvalidServerVersion("Server %s does not have support "
-                                           "for a commitCheck() call" % (host,))
+                raise errors.InvalidServerVersion(
+                    "Server %s does not have support "
+                    "for a commitCheck() call" % (host,))
             ret = self.c[host].commitCheck([(n, self.fromVersion(v)) for n,v in l])
             for (n,v), r in itertools.izip(l, ret):
                 if not r:

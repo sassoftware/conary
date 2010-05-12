@@ -537,7 +537,7 @@ class Configure(BuildCommand):
         try:
             try:
                 util.execute(self.command %macros)
-            except RuntimeError, info:
+            except RuntimeError:
                 if not self.recipe.isatty():
                     # When conary is being scripted, logs might be
                     # redirected to a file, and it might be easier to
@@ -685,7 +685,7 @@ class CMake(Configure):
 
         try:
             util.execute(self.command %macros)
-        except RuntimeError, info:
+        except RuntimeError:
             if not self.recipe.isatty():
                 # When conary is being scripted, logs might be
                 # redirected to a file, and it might be easier to
@@ -2487,7 +2487,7 @@ class Replace(BuildAction):
         for path in paths:
             try:
                 os.lstat(path)
-            except OSError, e:
+            except OSError:
                 raise RuntimeError, "No such file(s) '%s'" %path
             if not util.isregular(path):
                 if path.startswith(macros.destdir):
@@ -2601,7 +2601,6 @@ class Doc(_FileAction):
 
     def do(self, macros):
 	macros = macros.copy()
-	destlen = len(macros['destdir'])
 	if self.dir:
 	    macros['dir'] = '/%s' % self.dir
 	else:

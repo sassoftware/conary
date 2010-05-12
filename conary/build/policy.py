@@ -16,7 +16,6 @@ Base classes and data used for all policy
 """
 
 import imp
-import itertools
 import os
 import sys
 import types
@@ -146,13 +145,13 @@ class BasePolicy(action.RecipeAction):
 
     def postPolicy(self):
         if self.unusedFilters['exceptions']:
-            for filter in self.unusedFilters['exceptions']:
+            for uf in self.unusedFilters['exceptions']:
                 self.warn('Exception %s for %s was not used' % \
-                        (filter, self.__class__.__name__))
+                        (uf, self.__class__.__name__))
         if self.unusedFilters['inclusions']:
-            for filter in self.unusedFilters['inclusions']:
+            for uf in self.unusedFilters['inclusions']:
                 self.warn('Inclusion %s for %s was not used' % \
-                        (filter, self.__class__.__name__))
+                        (uf, self.__class__.__name__))
 
     # warning and error reporting
 

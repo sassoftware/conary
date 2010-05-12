@@ -307,7 +307,6 @@ class Recipe(object):
             Return locations for all files that are not autosourced.
             Useful for determining where used in the recipe are located.
         """
-        files = []
         for src in self.getSourcePathList():
             f = src.fetchLocal()
             if f:
@@ -332,7 +331,6 @@ class Recipe(object):
                                   " files with the same name from different"
                                   " locations):\n   " + '\n   '.join(errlist))
         self.prepSources()
-        files = []
         for src in self.getSourcePathList():
             if skipFilter and skipFilter(os.path.basename(src.getPath())):
                 continue
@@ -738,8 +736,6 @@ class Recipe(object):
 
             else:
                 crossDb = database.Database(sysroot, cfg.dbPath)
-        time = sourceVersion.timeStamps()[-1]
-
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
         if self.needsCrossFlags() and self.crossRequires:
             crossReqMap, missingCrossReqs = _matchReqs(self.crossRequires,

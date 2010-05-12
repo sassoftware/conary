@@ -219,12 +219,12 @@ class _GroupRecipe(_BaseGroupRecipe):
                                                 self.getSearchFlavor(),
                                                 troveSource=troveSource)
         elif isinstance(ref, (tuple, list)):
-            source = searchsource.createSearchSourceStack(searchSource,
-                                                      item, searchFlavor)
+            source = searchsource.createSearchSourceStack(self.searchSource,
+                                                      ref, self.searchFlavor)
         else:
             source = ref
             assert(isinstance(source, GroupReference))
-            source.findSources(defaultSource, searchFlavor)
+            source.findSources(self.defaultSource, self.searchFlavor)
         return source
 
 
@@ -1631,7 +1631,7 @@ class SingleGroup(object):
 
     def _getMoveComponentMap(self, movingComponents):
         componentMap = {}
-        for (toGroupList, componentList, copy, byDefault) in movingComponents:
+        for (toGroupList, componentList, ccopy, byDefault) in movingComponents:
             for component in componentList:
                 for toGroup in toGroupList:
                     componentMap.setdefault(component, []).append((toGroup,
@@ -2005,9 +2005,7 @@ class TroveCache(dict):
             from repos.  Children's children should only be necessary
             if the group doesn't have weak references (i.e. is old).
         """
-        childTroves = []
         hasWeak = False
-
         childColls = []
         for childTup, byDefault, isStrong in trv.iterTroveListInfo():
             if not isStrong:
@@ -2021,10 +2019,9 @@ class TroveCache(dict):
         # FIXME: unforunately, there are a very few troves out there that
         # do not recursively descend when creating weak reference lists.
         # Since that's the case, we can't trust weak reference lists :/
-        #if hasWeak:
-        #    return
+        if hasWeak:
+            return
 
-        newColls = []
         for childTup, byDefault, isStrong in childColls:
 
             childTrv = self[childTup]
@@ -2119,7 +2116,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     resolveSpecs = recipeObj.getResolveTroveSpecs()
     log.info('Getting initial set of troves for'
             ' building all %s groups' % (len(list(recipeObj.iterGroupList()))))
-    defaultSource = recipeObj._getSearchSource()
+    recipeObj._getSearchSource()
 
     troveMap = findTrovesForGroups(recipeObj.searchSource,
                                    recipeObj._getSearchSource(),
@@ -2139,7 +2136,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         resolveSource = recipeObj._getSearchSource()
     groupsWithConflicts = {}
 
-    newGroups = processAddAllDirectives(recipeObj, troveMap, cache, repos)
+    processAddAllDirectives(recipeObj, troveMap, cache, repos)
 
     groupList = _sortGroups(recipeObj.iterGroupList())
 
@@ -2227,7 +2224,6 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
 def findTrovesForGroups(searchSource, defaultSource, groupList, replaceSpecs, 
                         resolveSpecs, labelPath, searchFlavor, callback):
     toFind = {}
-    troveMap = {}
 
     for troveSpec, refSource, requireLatest in replaceSpecs:
         toFind.setdefault((refSource, requireLatest), set()).add(troveSpec)
@@ -2300,7 +2296,6 @@ def followRedirect(recipeObj, trove, ref, reason):
 
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
-        groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
         for troveSpec, flags in group.iterAddAllSpecs():
             for troveTup in \
                     troveMap[(flags.ref, flags.requireLatest)][troveSpec]:
@@ -2734,7 +2729,6 @@ def findAllWeakTrovesToRemove(group, primaryErases, cache, childGroups,
     # removes or b) they are referenced only by troves being removed
     primaryErases = list(primaryErases)
     toErase = set(primaryErases)
-    seen = set()
     parents = {}
 
     troveQueue = util.IterableQueue()
@@ -2994,7 +2988,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
     # Resolve all byDefault=True troves and add there deps
     # as byDefault=True.
     defaultTroves = set(group.iterDefaultTroveList())
-    newTroves = findDeps(defaultTroves, byDefault=True)
+    findDeps(defaultTroves, byDefault=True)
 
     if group.checkOnlyByDefaultDeps == False:
         # Get full list of troves to dep resolve and current list of
@@ -3004,7 +2998,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 
         # Resolve deps of all troves adding any new troves as
         # byDefault=False.
-        newNewTroves = findDeps(allTroves, byDefault=False,
+        findDeps(allTroves, byDefault=False,
                                 resolved=resolvedTroves)
 
     callback.done()
@@ -3163,12 +3157,8 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
     size = 0
     validSize = True
 
-    implicit = []
     allPathHashes = []
     checkPathConflicts = group.checkPathConflicts
-
-    # FIXME: perhaps this should be a config options?
-    checkNotByDefaultPaths = False
 
     isColl = trove.troveIsCollection
     neededInfo = [ x for x in group.iterTroveListInfo() \
@@ -3340,8 +3330,6 @@ def _findTroves(repos, toFind, labelPath, searchFlavor, defaultSource):
         else:
             source = troveSource
             troveSource.findSources(repos,  labelPath, searchFlavor),
-            myLabelPath = None
-            mySearchFlavor = None
         try:
             # just drop missing troves.  They are probably packages
             # created from another source, and if they didn't include a

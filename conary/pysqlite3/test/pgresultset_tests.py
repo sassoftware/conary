@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import testsupport
-import os, unittest, sys
+import unittest
 import sqlite3 as sqlite
 
 class PgResultSetTests(unittest.TestCase, testsupport.TestSupport):
@@ -21,7 +21,7 @@ class PgResultSetTests(unittest.TestCase, testsupport.TestSupport):
     def getResult(self):
         try:
             self.cur.execute("DROP TABLE TEST")
-        except sqlite.DatabaseError, reason:
+        except sqlite.DatabaseError:
             pass
 
         self.cur.execute("CREATE TABLE TEST (id, name, age)")

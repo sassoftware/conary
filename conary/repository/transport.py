@@ -203,7 +203,7 @@ def getIPAddress(hostAndPort):
         return hostAndPort
     try:
         ret = socket.gethostbyname(host)
-    except (IOError, socket.error), err:
+    except (IOError, socket.error):
         util.res_init()
         # error looking up the host.  If this fails,
         # the we fall back to the cache

@@ -94,7 +94,7 @@ class ChangeLog(streams.StreamSet):
                 # Capture stderr and discard it
                 retcode = subprocess.call(" ".join(cmdargs), shell=True,
                     stderr=subprocess.PIPE)
-            except OSError, e:
+            except OSError:
                 raise EditorError
             if retcode != 0:
                 raise EditorError

@@ -59,7 +59,6 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
-        paths = []
         csList = []
         def _cvtTroveList(l):
             new = []
@@ -85,7 +84,6 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
             return new
 
         for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
-            newVer = self.toVersion(new)
             if old == 0:
                 l = (name, (None, None),
                            (self.toVersion(new), self.toFlavor(newFlavor)),

@@ -810,7 +810,6 @@ class VersionSequence(AbstractVersion):
                 yield item
 
     def depth(self):
-        count = 0
         return len([x for x in self.versions if isinstance(x, Label)])
 
     @api.publicApi

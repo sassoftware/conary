@@ -14,10 +14,9 @@
 import base64
 
 import conary.errors
-from conary.errors import ConaryError, FilesystemError, InternalConaryError
-from conary.errors import TroveNotFound, InvalidRegex
-from conary.trove import DigitalSignatureVerificationError, TroveIntegrityError
-from conary.trove import TroveError
+from conary.errors import ConaryError, InternalConaryError
+from conary.errors import InvalidRegex
+from conary.trove import DigitalSignatureVerificationError
 from conary.lib import sha1helper
 from conary.lib.openpgpfile import KeyNotFound, BadSelfSignature
 from conary.lib.openpgpfile import IncompatibleKey
@@ -41,7 +40,6 @@ class RepositoryMismatch(RepositoryError):
         self.right = right
         self.wrong = wrong
         if right and wrong:
-            detail = ''
             if isinstance(right, list):
                 # turn multiple server names into something more readable
                 if len(right) > 1:

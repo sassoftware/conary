@@ -31,7 +31,6 @@ from conary.repository.datastore import DataStoreSet
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository import netclient
-from conary.server import schema
 
 class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, repos, cs, *args, **kw):
@@ -389,7 +388,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         removedTroveList = []
 
 	dupFilter = set()
-        resultList = []
 
 	# make a copy to remove things from
 	troveList = origTroveList[:]
@@ -486,7 +484,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	    # sort the set of files we need into bins based on the server
 	    # name
-	    serverIdx = {}
             getList = []
             localFilesNeeded = []
 

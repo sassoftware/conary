@@ -19,14 +19,12 @@ import errno
 import fcntl
 import fnmatch
 import gzip
-import itertools
 import log
 import misc
 import os
 import re
 import select
 import shutil
-import signal
 import stat
 import string
 import StringIO
@@ -42,7 +40,7 @@ import weakref
 import xmlrpclib
 import zlib
 
-from conary.lib import fixedglob, graph, log, api
+from conary.lib import fixedglob, api
 
 # Imported for the benefit of older code,
 from conary.lib.formattrace import formatTrace
@@ -95,7 +93,6 @@ def mkdirChain(*paths):
             _mkdirs(path)
 
 def searchPath(filename, basepath):
-    path = os.path.join(basepath,filename)
     for root, dirs, files in os.walk(basepath):
         if filename in files:
             return os.path.join(root,filename)
@@ -226,7 +223,6 @@ def genExcepthook(debug=True,
             elif cmd.endswith('/commands/cvc'):
                 cmd = cmd[:len('/commands/cvc')] + '/bin/cvc'
                 
-            origTb = tb
             cmd = normpath(cmd)
             sys.argv[0] = cmd
             while tb.tb_next: tb = tb.tb_next
@@ -871,7 +867,6 @@ class SendableFileSet:
 
     def send(self, sock):
         stack = self.l[:]
-        allFds = []
         toSend = []
         handled = set()
 
@@ -904,7 +899,6 @@ class SendableFileSet:
             handled.add(f)
 
         fds = list(set([ x[1] for x in toSend if x[1] is not None]))
-        objsById = dict( (id(x[2]), x[2]) for x in toSend )
 
         sendmsg(sock, [ struct.pack("@I", len(fds)) ] )
         sendmsg(sock, [ struct.pack("@II", len(self.l), len(toSend)) ], fds)
@@ -928,7 +922,6 @@ class SendableFileSet:
     def recv(sock):
         hdrSize = len(struct.pack("@BIIPP", 0, 0, 0, 0, 0))
 
-        q = IterableQueue()
         s = recvmsg(sock, 4)
         fdCount = struct.unpack("@I", s)[0]
         if fdCount:

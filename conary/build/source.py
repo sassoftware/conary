@@ -18,7 +18,6 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import itertools
-import gzip
 import os
 import re
 import shutil, subprocess
@@ -28,7 +27,6 @@ import tempfile
 import stat
 
 from conary.lib import debugger, digestlib, log, magic, sha1helper
-from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
 from conary.build import action, errors, filter
@@ -956,7 +954,6 @@ class addPatch(_Source):
         logFiles = []
         log.info('attempting to apply %s to %s with patch level(s) %s'
                  %(patchPath, destDir, ', '.join(str(x) for x in patchlevels)))
-        partiallyApplied = []
         for patchlevel in patchlevels:
             failed, logFile = self._applyPatch(patchlevel, patch, destDir,
                                               dryRun=True)
@@ -2561,7 +2558,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
 	    break
         try:
             os.write(wpipe, buf)
-        except OSError, msg:
+        except OSError:
             break
     os.close(wpipe)
     (pid, status) = os.waitpid(pid, 0)
@@ -2589,7 +2586,6 @@ def _extractFilesFromISO(iso, directory):
         raise IOError('ISO %s contains neither Joliet nor Rock Ridge info'
                       %iso)
 
-    errorMessage = 'extracting ISO %s' %os.path.basename(iso)
     filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 

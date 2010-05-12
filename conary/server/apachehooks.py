@@ -113,7 +113,7 @@ def logAndEmail(req, cfg, header, msg):
              cfg.bugsEmailSubject, body)
 
 def logErrorAndEmail(req, cfg, exception, e, bt):
-    timeStamp = time.ctime(time.time())
+    #timeStamp = time.ctime(time.time())
 
     header = 'Unhandled exception from conary repository: %s\n%s: %s\n' % (
         req.hostname, exception.__name__, e)

@@ -3,8 +3,7 @@
 # Copyright (c) 2005 rPath, Inc.
 #
 
-import testsupport
-import os, sys, tempfile, time, unittest, thread
+import os, tempfile, unittest, thread
 import sqlite3 as sqlite
 
 class ThreadTests(unittest.TestCase):

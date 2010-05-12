@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import testsupport
-import os, string, sys, types, unittest, weakref
+import sys, types, unittest, weakref
 import sqlite3 as sqlite
 
 class DBAPICompliance(unittest.TestCase):
@@ -342,7 +342,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
     def CheckCursorConnection(self):
         if not isinstance(self.cur.connection, weakref.ProxyType) and \
            not isinstance(self.cur.connection, weakref.CallableProxyType):
-            fail("cursor.connection doesn't return the correct type")
+            self.fail("cursor.connection doesn't return the correct type")
 
     def CheckCursorLastRowID(self):
         self.cur.execute("create table test (id integer primary key, name)")

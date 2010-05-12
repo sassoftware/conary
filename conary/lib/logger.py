@@ -869,7 +869,6 @@ class _ChildLogger:
         ptyFd = self.ptyFd
         lexer = self.lexer
         stdin = sys.stdin.fileno()
-        unLogged = ''
 
         pollObj = select.poll()
         pollObj.register(ptyFd, select.POLLIN)
