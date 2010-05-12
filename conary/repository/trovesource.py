@@ -14,11 +14,13 @@
 
 import itertools
 
+from conary import errors as conaryerrors
 from conary import files
 from conary import trove
 from conary.deps import arch, deps
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
+from conary.lib import api
 
 TROVE_QUERY_ALL = 0                 # normal, removed, redirect
 TROVE_QUERY_PRESENT = 1             # normal, redirect (and repositories < 1.1)
@@ -481,6 +483,7 @@ class SearchableTroveSource(AbstractTroveSource):
             if not troves:
                 continue
             if not versionQuery:
+                allTroves.update(troves)
                 continue
             for resultName in troves:
                 versionResults = self._filterByVersionQuery(versionType,
@@ -824,6 +827,7 @@ class SearchableTroveSource(AbstractTroveSource):
         preferenceList = self._flavorPreferences
         if not preferenceList:
             return troveList
+        bestPreference = []
         matchingNone = set(troveList)
         bestMatching = []
         for pref in preferenceList:
@@ -946,6 +950,8 @@ class TroveListTroveSource(SimpleTroveSource):
         self.source = source
         self.sourceTups = troveTups[:]
 
+        foundTups = set()
+        
         # recurse into the given trove tups to include all child troves
         for (n,v,f) in troveTups:
             self._trovesByName.setdefault(n, set()).add((n,v,f))
@@ -1357,6 +1363,8 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         newCs = changeset.ChangeSet()
         mergedCs = changeset.ReadOnlyChangeSet()
 
+        jobFromCs = set()
+
         for job in jobList:
             oldInfo = (job[0], job[1][0], job[1][1])
             newInfo = (job[0], job[2][0], job[2][1])
@@ -1566,6 +1574,7 @@ class SourceStack(object):
 
         for source in self.sources:
             newTroveList = []
+            newIndexes = []
             try:
                 troves = source.getTroves([x[1] for x in troveList], 
                                           withFiles=withFiles,
@@ -1614,7 +1623,7 @@ class SourceStack(object):
             try:
                 return source.getFileVersions(fileIds)
             # FIXME: there should be a better error for this
-            except (KeyError, NotImplementedError):
+            except (KeyError, NotImplementedError), e:
                 continue
         return None
 
@@ -1624,7 +1633,7 @@ class SourceStack(object):
             try:
                 return source.getFileVersion(pathId, fileId, version)
             # FIXME: there should be a better error for this
-            except (KeyError, NotImplementedError):
+            except (KeyError, NotImplementedError), e:
                 continue
         return None
 

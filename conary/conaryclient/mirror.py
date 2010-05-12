@@ -858,7 +858,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             try:
                 sourceRepos.createChangeSetFile(jobList, tmpName, recurse = False,
                                                 callback = callback, mirrorMode = True)
-            except changeset.ChangeSetKeyConflictError:
+            except changeset.ChangeSetKeyConflictError, e:
                 splitJobList(jobList, sourceRepos, targetSet, hidden=hidden,
                              callback=callback)
             else:

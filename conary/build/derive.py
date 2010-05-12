@@ -24,6 +24,7 @@ from conary import checkin
 from conary import conaryclient
 from conary import errors
 from conary import state
+from conary import updatecmd
 from conary.lib import log, util
 from conary.versions import Label
 from conary.repository.changeset import ChangesetExploder
@@ -184,7 +185,7 @@ class %(className)sRecipe(%(recipeBaseClass)s):
         ts = [ (nvfToDerive[0], (None, None), (nvfToDerive[1], nvfToDerive[2]),
                 True) ]
         cs = repos.createChangeSet(ts, recurse = True)
-        ChangesetExploder(cs, extractDir)
+        exploder = ChangesetExploder(cs, extractDir)
         secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
         shutil.copytree(extractDir, secondDir, symlinks=True)
 

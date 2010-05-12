@@ -16,12 +16,14 @@
 Provides the output for the "cvc" subcommands
 """
 
+import inspect
 import optparse
 import os
 import sys
 
 from conary import branch
 from conary import checkin
+from conary import callbacks
 from conary import command
 from conary import commit
 from conary import conarycfg
@@ -30,6 +32,7 @@ from conary import constants
 from conary import deps
 from conary import errors, keymgmt
 from conary import state
+from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove, derive, explain
 from conary.build import errors as builderrors
@@ -338,6 +341,7 @@ class CommitCommand(CvcCommand):
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
         logfile = argSet.pop("log-file", None)
+        sourceCheck = True
 
         if argSet or len(args) != 1: return self.usage()
 
@@ -449,6 +453,7 @@ class CookCommand(CvcCommand):
         prep = 0
         downloadOnly = False
         resume = None
+        buildBranch = None
         if argSet.has_key('flavor'):
             buildFlavor = deps.deps.parseFlavor(argSet['flavor'],
                                                 raiseError=True)
@@ -543,6 +548,7 @@ class CookCommand(CvcCommand):
         if not items:
             # if nothing was specified, try to build the package in the current
             # directory
+            name = os.path.basename(os.getcwd())
 
             if os.path.isfile('CONARY'):
                 conaryState = state.ConaryStateFromFile('CONARY', repos)
@@ -589,7 +595,8 @@ class DeriveCommand(CvcCommand):
         checkoutDir = argSet.pop('dir', None)
         extract = argSet.pop('extract', False)
         targetLabel = argSet.pop('target', None)
-        
+        info = prep = False
+
         if argSet or len(args) != 2:
             return self.usage()
 
@@ -1088,7 +1095,7 @@ def main(argv=None):
                                             debugCtrlC=debugAll)
         return cvcMain.main(argv, debuggerException, debugAll=debugAll,
                             cfg=ccfg)
-    except debuggerException:
+    except debuggerException, err:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError,
             openpgpfile.PGPError), e:

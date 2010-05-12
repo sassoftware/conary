@@ -23,6 +23,7 @@ import socket
 import time
 import urllib
 import urllib2
+import re
 import copy
 
 from conary.lib import log
@@ -510,9 +511,9 @@ class RepositoryCache(object):
 
             wrapper = callbacks.CallbackRateWrapper(callback, callback.fetch,
                                                     contentLength)
-            util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
-                             rateLimit = self.downloadRateLimit,
-                             callback = wrapper.callback)
+            total = util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
+                                     rateLimit = self.downloadRateLimit,
+                                     callback = wrapper.callback)
 
             f.close()
             infile.close()

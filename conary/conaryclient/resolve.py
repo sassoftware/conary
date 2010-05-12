@@ -16,6 +16,9 @@ import itertools
 from conary import errors
 from conary.lib import log
 from conary.repository import searchsource
+from conary.repository.resolvemethod import DepResolutionByTroveList, \
+    ResolutionStack, BasicResolutionMethod, DepResolutionByLabelPath, \
+    DepResolutionMethod
 
 class DependencySolver(object):
 
@@ -68,6 +71,7 @@ class DependencySolver(object):
 
         ineligible = set()
 
+        from conary.deps import deps
         check = self.db.getDepStateClass(uJob.getTroveSource(),
            findOrdering = split, ignoreDepClasses = self.cfg.ignoreDependencies)
 
@@ -326,10 +330,10 @@ class DependencySolver(object):
 
         try:
             newJob = self.client.newUpdateJob(closeDatabase = False)
-            self.client.prepareUpdateJob(newJob, updateJobs,
-                                         keepExisting=False,
-                                         resolveDeps=False,
-                                         split=False)
+            suggMap = self.client.prepareUpdateJob(newJob, updateJobs,
+                                                     keepExisting=False,
+                                                     resolveDeps=False,
+                                                     split=False)
             newJobSet = newJob.getJobs()
 
             # ignore updates where updating this trove would update

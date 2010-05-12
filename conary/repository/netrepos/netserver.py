@@ -24,13 +24,15 @@ import time
 import types
 
 from conary import files, trove, versions, streams
-from conary import conarycfg as cfg
+from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
+from conary.lib.cfg import *
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap, deptable
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
+from conary.trove import DigitalSignature
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -179,7 +181,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
             self.__delDB = True
-        schema.checkVersion(self.db)
+        dbVer = schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
 	self.troveStore = trovestore.TroveStore(self.db, self.log)
@@ -1418,7 +1420,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         # 1 means it is cached (don't erase it after sending)
                         os.write(fd, "%s %d 0 1\n" % (filePath, size))
                     except OSError, e:
-                        if e.errno != errors.errno.ENOENT:
+                        if e.errno != errno.ENOENT:
                             raise
                         exception = errors.FileContentsNotFound
 
@@ -2175,7 +2177,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         # now i+1 is how many items we shall return
         # None in streams means the stream wasn't found.
-        fstreams = [ None ] * (i+1)
+        streams = [ None ] * (i+1)
 
         # use the list of uniqified fileIds to look up streams in the repo
         def _iterIdList(uniqIdList):
@@ -2207,7 +2209,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if stream is None:
                 continue
             for streamIdx in fileIdMap[fileId]:
-                fstreams[streamIdx] = stream
+                streams[streamIdx] = stream
             # mark as processed
             uniqIdList[i] = None
         # FIXME: the fact that we're not extracting the list ordered
@@ -3021,6 +3023,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if False in self.auth.batchCheck(authToken, [t for t,s in infoList],
                                          write=True, cu = cu):
             raise errors.InsufficientPermission
+        updateCount = 0
 
         # look up if we have all the troves we're asked
         schema.resetTable(cu, "tmpInstanceId")
@@ -3259,7 +3262,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ret.append( (mark, (name, version, flavor), troveType) )
             if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
-                cu.fetchall()
+                junk = cu.fetchall()
                 break
         # older mirror clients do not support getting the troveType values
         if clientVersion < 40:
@@ -3558,39 +3561,38 @@ class GlobListType(list):
 
         return False
 
-class ServerConfig(cfg.ConfigFile):
-    authCacheTimeout        = cfg.CfgInt
-    baseUri                 = (cfg.CfgString, None)
-    bugsToEmail             = cfg.CfgString
-    bugsFromEmail           = cfg.CfgString
-    bugsEmailName           = (cfg.CfgString, 'Conary Repository')
-    bugsEmailSubject        = (cfg.CfgString, 'Conary Repository Error Message')
+class ServerConfig(ConfigFile):
+    authCacheTimeout        = CfgInt
+    baseUri                 = (CfgString, None)
+    bugsToEmail             = CfgString
+    bugsFromEmail           = CfgString
+    bugsEmailName           = (CfgString, 'Conary Repository')
+    bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
     cacheDB                 = dbstore.CfgDriver
-    changesetCacheDir       = cfg.CfgPath
-    closed                  = cfg.CfgString
-    commitAction            = cfg.CfgString
-    contentsDir             = cfg.CfgPath
-    capsuleServerUrl        = (cfg.CfgString, None)
-    deadlockRetry           = (cfg.CfgInt, 5)
-    entitlement             = cfg.CfgEntitlement
-    entitlementCheckURL     = cfg.CfgString
-    excludeCapsuleContents  = (cfg.CfgBool, False)
-    externalPasswordURL     = cfg.CfgString
-    forceSSL                = cfg.CfgBool
-    injectCapsuleContentServers = cfg.CfgList(cfg.CfgString)
-    logFile                 = cfg.CfgPath
-    proxy                   = (cfg.CfgProxy, None)
-    conaryProxy             = (cfg.CfgProxy, None)
-    paranoidCommits         = (cfg.CfgBool, False)
-    proxyContentsDir        = cfg.CfgPath
-    readOnlyRepository      = cfg.CfgBool
+    changesetCacheDir       = CfgPath
+    closed                  = CfgString
+    commitAction            = CfgString
+    contentsDir             = CfgPath
+    capsuleServerUrl        = (CfgString, None)
+    deadlockRetry           = (CfgInt, 5)
+    entitlement             = CfgEntitlement
+    entitlementCheckURL     = CfgString
+    excludeCapsuleContents  = (CfgBool, False)
+    externalPasswordURL     = CfgString
+    forceSSL                = CfgBool
+    injectCapsuleContentServers = CfgList(CfgString)
+    logFile                 = CfgPath
+    proxy                   = (CfgProxy, None)
+    conaryProxy             = (CfgProxy, None)
+    paranoidCommits         = (CfgBool, False)
+    proxyContentsDir        = CfgPath
+    readOnlyRepository      = CfgBool
     repositoryDB            = dbstore.CfgDriver
-    repositoryMap           = cfg.CfgRepoMap
-    requireSigs             = cfg.CfgBool
-    serverName              = cfg.CfgLineList(cfg.CfgString,
-                                              listType = GlobListType)
-    staticPath              = (cfg.CfgPath, '/conary-static')
-    serializeCommits        = (cfg.CfgBool, False)
-    tmpDir                  = (cfg.CfgPath, '/var/tmp')
+    repositoryMap           = CfgRepoMap
+    requireSigs             = CfgBool
+    serverName              = CfgLineList(CfgString, listType = GlobListType)
+    staticPath              = (CfgPath, '/conary-static')
+    serializeCommits        = (CfgBool, False)
+    tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
-    user                    = cfg.CfgUserInfo
+    user                    = CfgUserInfo

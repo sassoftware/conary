@@ -18,12 +18,13 @@ This allows for creation of filestreams without the need to create files
 on the filesystem.
 """
 
+import itertools
 import os
 import time
 
 from conary import errors, files
 from conary.deps import deps
-from conary.lib import digestlib, util
+from conary.lib import digestlib, sha1helper, util
 from conary.repository import filecontents
 
 class ParameterError(errors.ClientError):

@@ -14,6 +14,7 @@
 #
 import os
 
+from conary import conarycfg
 from conary import errors
 from conary import state
 from conary.deps import deps

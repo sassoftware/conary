@@ -14,6 +14,8 @@
 
 import os
 import sys
+import tempfile
+import subprocess
 from time import time
 
 from conary import callbacks, versions
@@ -26,7 +28,9 @@ from openpgpfile import BadPassPhrase
 from openpgpfile import KeyNotFound
 from openpgpfile import num_getRelPrime
 from openpgpfile import seekKeyById
+from openpgpfile import parseAsciiArmorKey
 from openpgpfile import PublicKeyring
+from openpgpfile import SEEK_SET, SEEK_END
 from openpgpfile import TRUST_UNTRUSTED, TRUST_TRUSTED
 
 #-----#

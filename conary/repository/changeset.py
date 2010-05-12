@@ -13,11 +13,14 @@
 #
 
 import difflib
+import stat
 import struct
+import tempfile
 import errno
 import gzip
 import itertools
 import os
+import copy
 
 try:
     from cStringIO import StringIO
@@ -142,7 +145,7 @@ class ChangeSetFileDict(dict, streams.InfoStream):
             item = item[1]
         return dict.__setitem__(self, item, val)
 
-    def __hasitem__(self,item):
+    def __hasitem__(self):
         if item[0] is None:
             item = item[1]
         return dict.__hasitem__(self, item)
@@ -405,7 +408,7 @@ class ChangeSet(streams.StreamSet):
         else:
             # we have compressed contents, but have been asked for uncompressed
             assert(0)
-            uncompressed = gzip.GzipFile(None, "r", fileobj = contentObj.get())
+            uncompressor = gzip.GzipFile(None, "r", fileobj = contentObj.get())
             contentObj = filecontents.FromFile(uncompressed)
 
         return (tag, contentObj)
@@ -789,6 +792,7 @@ class ChangeSet(streams.StreamSet):
 		    if fsFile and fsFile.hasContents and \
 			    fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
+                        contType = ChangedFileTypes.file
                         rollback.addFileContents(pathId, fileId,
                                         ChangedFileTypes.file,
                                         filecontents.FromFilesystem(fullPath),
@@ -999,6 +1003,9 @@ class ChangeSet(streams.StreamSet):
         return False
 
     def _sendInfo(self):
+        new = self.newTroves.freeze()
+        old = self.oldTroves.freeze()
+
         s = self.freeze()
 
         return ([ self.configCache, self.fileContents ], s)
@@ -1133,7 +1140,7 @@ class ChangeSet(streams.StreamSet):
             if job[1][0] is not None:
                 oldTrv = oldTroves.pop(0)
             else:
-                oldTrv = None
+                trv = None
 
             # look at the changed files and get a list of file objects
             # we need to have available
@@ -1158,6 +1165,7 @@ class ChangeSet(streams.StreamSet):
         # so we don't have to go seeking all over the changeset
         configList = []
         normalList = []
+        removeList = []
         for job in jobs:
             trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
             for (pathId, path, fileId, fileVersion) in \
@@ -1442,15 +1450,16 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                                    trv.getFlavor()))
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
+	    newFlavor = troveCs.getNewFlavor()
 	    assert(troveCs.getOldVersion() == trv.getVersion())
             assert(trv.getName() == troveName)
 
             # XXX this is broken.  makeAbsolute() is only used for
             # committing local changesets, and they can't have new
             # files, so we're OK at the moment.
-	    #for (pathId, path, fileId, version) in troveCs.getNewFileList():
-		#filecs = self.files[(None, fileId)]
-		#newFiles.append((None, fileId, filecs))
+	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
+		filecs = self.files[(None, fileId)]
+		newFiles.append((None, fileId, filecs))
 
 	    for (pathId, path, fileId, version) in troveCs.getChangedFileList():
 		(oldPath, oldFileId, oldVersion) = trv.getFile(pathId)
@@ -1542,6 +1551,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 	for (key, troveCs) in self.newTroves.items():
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
+	    newFlavor = troveCs.getNewFlavor()
 
             if key not in troveMap:
                 continue
@@ -2017,7 +2027,7 @@ def _convertChangeSetV2V1(inPath, outPath):
             key = key[0:16]
 
             if key == lastPathId:
-                raise PathIdsConflictError(key)
+                raise changeset.PathIdsConflictError(key)
 
             size -= 20
 
@@ -2072,6 +2082,7 @@ class AbstractChangesetExploder:
 
         fileList = []
         linkGroups = {}
+        linkGroupFirstPath = {}
         rpmCapsules = []
         self.rpmFileObj = {}
 
@@ -2178,7 +2189,7 @@ class AbstractChangesetExploder:
         util.createLink(destdir + sourcePath, destdir + targetPath)
 
     def installFile(self, trv, path, fileObj):
-        raise errors.NotImplementedException
+        raise NotImplementedException
 
     def fileMissing(self, trv, pathId, fileId, path):
         raise KeyError, pathId + fileId

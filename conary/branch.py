@@ -22,6 +22,7 @@ from conary import errors
 from conary import updatecmd
 from conary.lib import log
 from conaryclient import cmdline
+from conary.build.cook import signAbsoluteChangeset
 from conary.conarycfg import selectSignatureKey
 
 def _getBranchType(binaryOnly, sourceOnly):

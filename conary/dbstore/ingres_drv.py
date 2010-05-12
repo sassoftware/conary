@@ -12,9 +12,14 @@
 # full details.
 #
 
+import os
+import re
+import sys
+import time
+
 import ingresdbi
 
-from base_drv import BaseDatabase, BaseCursor, BaseKeywordDict, BaseBinary
+from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseKeywordDict, BaseBinary
 import sqlerrors, sqllib
 
 class KeywordDict(BaseKeywordDict):
@@ -44,9 +49,9 @@ class Cursor(BaseCursor):
             # normalize cu.execute(sql, a, b, c) -> cu.execute(sql, (a,b,c))
             # XXX: this should be done by the base driver
             if len(params) and not isinstance(params[0], tuple):
-                BaseCursor.execute(self, sql, params)
+                ret = BaseCursor.execute(self, sql, params)
             else:
-                BaseCursor.execute(self, sql, *params)
+                ret = BaseCursor.execute(self, sql, *params)
         except ingresdbi.DataError, e:
             (err, msg) = (e.args[1], e.args[3])
             if err in [2117, 2753]:

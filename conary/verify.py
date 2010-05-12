@@ -22,7 +22,7 @@ from conary import conaryclient, files
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import dirset, log, sha1helper, util
-from conary.local import update
+from conary.local import defaultmap, update
 from conary.repository import changeset, filecontents, trovesource
 from conary import errors
 
@@ -86,7 +86,7 @@ class _FindLocalChanges(object):
         except OSError, err:
             if err.errno == 13:
                 log.warning("Permission denied creating local changeset for"
-                            " %s " % str([ x[0].getName() for x in troveList ]))
+                            " %s " % str([ x[0].getName() for x in l ]))
             return
 
         trovesChanged = []
@@ -153,7 +153,7 @@ class _FindLocalChanges(object):
                                        *thisTrv.getNameVersionFlavor())
 
             ver = thisTrv.getVersion().createShadow(versions.LocalLabel())
-            verifyList.append((thisTrv, origTrv, ver, update.UpdateFlags()))
+            verifyList.append((thisTrv, thisTrv, ver, update.UpdateFlags()))
 
         self._simpleTroveList(verifyList, newFilesByTrove)
 
@@ -345,12 +345,11 @@ class DiffObject(_FindLocalChanges):
             else:
                 newFiles = NEW_FILES_OWNED_DIR
 
-        _FindLocalChanges.__init__(self, db, cfg,
+        verifier = _FindLocalChanges.__init__(self, db, cfg,
                         display=display,
                         forceHashCheck=forceHashCheck,
                         changeSetPath=changesetPath,
                         asDiff=asDiff, repos=repos, newFiles=newFiles)
-
         self.run(troveNameList, all=all)
 
 class verify(DiffObject):
@@ -369,9 +368,9 @@ class verify(DiffObject):
 class LocalChangeSetCommand(_FindLocalChanges):
 
     def __init__(self, db, cfg, item, changeSetPath = None):
-        _FindLocalChanges.__init__(self, db, cfg,
-                                   display=DISPLAY_NONE,
-                                   allMachineChanges=True)
+        changeObj = _FindLocalChanges.__init__(self, db, cfg,
+                                               display=DISPLAY_NONE,
+                                               allMachineChanges=True)
         cs = self.run([item])
 
         if not [ x for x in cs.iterNewTroveList() ]:

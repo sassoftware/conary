@@ -18,7 +18,7 @@ import itertools
 
 from conary.repository import changeset, errors, filecontents
 from conary import files, trove
-from conary.lib import log, patch, sha1helper, util
+from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper, util
 
 class AbstractTroveDatabase:
 
@@ -350,6 +350,8 @@ class ChangeSetJob:
         # extra magic for tracking since we may have to merge
         # contents
 
+        repos = self.repos
+
         if not fileStream or not restoreContents:
             # empty fileStream means there are no contents to restore
             return
@@ -392,6 +394,7 @@ class ChangeSetJob:
                     # crazy, but we need it to get reference counting right.
                     fileContents = filecontents.FromDataStore(
                                      self.repos.contentsStore, sha1)
+                    contType = changeset.ChangedFileTypes.file
                     self.addFileContents(sha1, fileContents,
                                          restoreContents, isConfig)
                 else:
@@ -751,7 +754,7 @@ class ChangeSetJob:
                     raise errors.IntegrityError(
                         "Missing file contents for pathId %s, fileId %s" % (
                                         sha1helper.md5ToString(pathId),
-                                        sha1helper.sha1ToString(newFileId)))
+                                        sha1helper.sha1ToString(fileId)))
 
 		oldLines = f.readlines()
                 f.close()

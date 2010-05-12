@@ -31,13 +31,13 @@ class CapsuleOperation(object):
         self.skipCapsuleOps = skipCapsuleOps
 
     def apply(self, fileDict, justDatabase = False):
-        raise NotImplementedError
+        raise NotImplementedException
 
     def install(self, troveCs):
-        raise NotImplementedError
+        raise NotImplementedException
 
     def remove(self, trove):
-        raise NotImplementedError
+        raise NotImplementedException
 
     def getErrors(self):
         return self.errors

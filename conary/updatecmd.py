@@ -21,8 +21,10 @@ from conary import callbacks
 from conary import conaryclient
 from conary import display
 from conary import errors
+from conary import versions
 from conary.deps import deps
 from conary.lib import api
+from conary.lib import log
 from conary.lib import util
 from conary.local import database
 from conary.repository import changeset
@@ -82,6 +84,17 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         t = ""
 
         if self.updateText:
+	    if self.updateHunk is not None and self.updateHunk[1] != 1:
+		if self.csText is None:
+		    ofText = " of %d" % self.updateHunk[1]
+		else:
+		    ofText = ""
+
+		job = "Job %d%s: %s%s" % (self.updateHunk[0], 
+					  ofText,
+					  self.updateText[0].lower(),
+					  self.updateText[1:])
+
             t += self.updateText
 
         if self.csText:

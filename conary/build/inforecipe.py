@@ -14,7 +14,7 @@
 
 from conary.build.packagerecipe import AbstractPackageRecipe, _recipeHelper
 from conary.build import defaultrecipes
-from conary.build.recipe import RECIPE_TYPE_INFO
+from conary.build.recipe import Recipe, RECIPE_TYPE_INFO
 from conary.build import policy
 from conary.build import usergroup
 

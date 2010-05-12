@@ -15,9 +15,10 @@
 import itertools, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
+from conary.deps import deps
 from conary.lib import util
 from conary.local.capsules import SingleCapsuleOperation
-from conary.local import errors
+from conary.local import errors, update
 from conary.repository import filecontents
 
 def rpmkey(hdr):
@@ -106,6 +107,8 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
+        rpmList = []
+
         ts = rpm.TransactionSet(self.root, rpm._RPMVSF_NOSIGNATURES)
 
         if justDatabase:
@@ -125,6 +128,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             hdr = ts.hdrFromFdno(fd)
             os.close(fd)
             ts.addInstall(hdr, (hdr, localPath), "i")
+            hasTransaction = True
 
             if (rpm.__dict__.has_key('RPMTAG_LONGARCHIVESIZE') and
                 rpm.RPMTAG_LONGARCHIVESIZE in hdr.keys()):
@@ -134,6 +138,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
             self.fsJob.addToRestoreSize(thisSize)
 
+        removeList = []
         for trv in self.removes:
             ts.addErase("%s-%s-%s.%s" % (
                     trv.troveInfo.capsule.rpm.name(),

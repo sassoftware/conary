@@ -49,6 +49,7 @@ from conary import trove
 from conary import versions
 from conary import errors as baseerrors
 
+from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import resolvemethod
 from conary.repository import trovesource
@@ -304,6 +305,7 @@ class SearchSourceStack(trovesource.SourceStack, AbstractSearchSource):
             uses the associated database for branch/flavor affinity.
         """
         troveSpecs = list(troveSpecs)
+        reposSpecs = {}
         results = {}
         networkSource = None
         for source in self.sources:

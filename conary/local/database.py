@@ -864,8 +864,8 @@ class UpdateJob:
         ret = self._troveMap = {}
         if not destdir or not os.path.exists(destdir):
             return ret
-        dfiles = os.listdir(destdir)
-        for f in dfiles:
+        files = os.listdir(destdir)
+        for f in files:
             if not f.endswith('.ccs'):
                 continue
             fileName = util.joinPaths(destdir, f)
@@ -1621,7 +1621,7 @@ class Database(SqlDbRepository):
             # get the current troves installed
             try:
                 instList += self.trovesByName(name)
-            except repository.TroveNotFound:
+            except repository.TroveNotFound, e:
                 pass
 
         # now we need to figure out how to match up the version and flavors

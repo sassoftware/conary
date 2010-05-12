@@ -904,6 +904,7 @@ class Metadata(streams.OrderedStreamCollection):
         if filteredKeyValues is None:
             filteredKeyValues = []
         items = {}
+        keys = MetadataItem._keys
         for item in self.getStreams(1):
             language = item.language()
             newItem = items.setdefault(language, MetadataItem())
@@ -1949,6 +1950,13 @@ class Trove(streams.StreamSet):
                 (oldDir, oldBase, oldFileId, oldVersion) = self.idMap[pathId]
                 self.updateRawFile(pathId, dirName, baseName, fileVersion,
                                    fileId)
+                # look up the path/version in self.idMap as the ones here
+                # could be None
+                if baseName is not None:
+                    path = os.path.join(dirName, baseName)
+                else:
+                    path = None
+
                 if needNewFileMap:
                     fileMap[pathId] = (None, fileVersion, fileId, self.name(),
                                        os.path.join(oldDir, oldBase),
@@ -2401,6 +2409,7 @@ class Trove(streams.StreamSet):
                     oldHash = oldHashes[oldInfo]
                     oldInfo = (oldInfo[1], oldInfo[2])
                     if newHash & oldHash:
+                        found = True
                         # just mark by version, flavor
                         overlaps.setdefault(newInfo, [])
                         overlaps[newInfo].append(oldInfo)
@@ -3213,7 +3222,7 @@ class ReferencedFileList(list, streams.InfoStream):
         # there are two sequential versions which are the same; this is a
         # massive speedup for troves with many files (90% or better)
         lastVerStr = None;
-        lastVer = None
+
         i = 0
         while i < len(data):
             i, (pathId, path, fileId, verStr) = misc.unpack("!S16SHSHSH", i, 
@@ -3471,7 +3480,9 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if oldCompatibilityClass == thisCompatClass:
             return False
 
-        postRollback = self.getPostRollbackScript()
+        # FIXME: the rollbackScript variable below is never used.
+        rollbackScript = self.getPostRollbackScript()
+        postRollback = self._getScriptObj(_TROVESCRIPTS_POSTROLLBACK)
 
         if postRollback is None or not postRollback.script():
             # there is no rollback script; use a strict compatibility class

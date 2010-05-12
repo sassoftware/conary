@@ -12,7 +12,7 @@
 # full details.
 #
 
-import os
+import os, re
 from conary.lib import util
 from conary.build.filter import PathSet
 

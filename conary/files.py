@@ -567,6 +567,7 @@ class CharacterDevice(DeviceFile):
     statType = stat.S_IFCHR
     __slots__ = []
 
+import gzip
 class RegularFile(File):
 
     streamDict = { 

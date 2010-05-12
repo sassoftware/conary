@@ -15,7 +15,7 @@
 import itertools
 import re
 import weakref
-from conary.lib import misc, api
+from conary.lib import misc, util, api
 from conary.errors import ParseError
 
 DEP_CLASS_ABI		= 0
@@ -1424,6 +1424,7 @@ def formatFlavor(flavor):
         l.sort()
         return " ".join(l)
 
+    classes = flavor.getDepClasses()
     insSet = list(flavor.iterDepsByClass(InstructionSetDependency))
     targetSet = list(flavor.iterDepsByClass(TargetInstructionSetDependency))
     useFlags = list(flavor.iterDepsByClass(UseDependency))
@@ -1719,6 +1720,7 @@ def getMajorArch(flavor):
 
 @api.developerApi
 def getShortFlavorDescriptors(flavors):
+    contextStr = {}
     descriptors = {}
     for flavor in flavors:
         majorArch = getMajorArch(flavor)

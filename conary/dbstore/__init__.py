@@ -15,6 +15,10 @@
 import os
 
 from conary.lib import cfg, cfgtypes
+
+from base_drv import BaseDatabase as Database
+from base_drv import BaseCursor as Cursor
+from migration import SchemaMigration
 from sqlerrors import InvalidBackend
 
 # default driver we want to use
