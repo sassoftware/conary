@@ -501,7 +501,6 @@ class DependencyChecker:
                                 wasIn):
         from conary.local import sqldb
         flavorCache = sqldb.FlavorCache()
-        versionCache = sqldb.VersionCache()
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
             failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None)
@@ -750,7 +749,6 @@ class DependencyChecker:
         def _findRelatedJobs(job):
             # return jobs that must be updated before or after job
             # due to dependencies in order to have a consistent system.
-            jobs = []
             if job[2][0]:
                 nodeId = self.newInfoToNodeId[job[0], job[2][0], job[2][1]]
             else:
@@ -801,8 +799,6 @@ class DependencyChecker:
         # no dependency reason to order them a particular way.
         jobComp = {}
         for jobSet in jobSets:
-            value = []
-
             isCritical = 0
             for idx, jobSetList in enumerate(reversed(criticalJobSetsList)):
                 if jobSet in jobSetList:
@@ -1162,11 +1158,11 @@ class DependencyChecker:
         result = self._check(linkedJobs=linkedJobs, createGraph=True)
 
         externalDepGraph = graph.DirectedGraph()
-        for nodeId in depGraph.iterNodes():
+        for nodeId in externalDepGraph.iterNodes():
             # translate from nodeId -> job for external consumption
             job = self.nodes[nodeId][0]
             externalDepGraph.addNode(job)
-        for fromNode, toNode in depGraph.iterEdges():
+        for fromNode, toNode in externalDepGraph.iterEdges():
             externalDepGraph.addEdge(self.nodes[fromNode][0],
                                      self.nodes[toNode][0])
 
@@ -1553,9 +1549,9 @@ class DependencyDatabase(DependencyTables):
         cu = self.db.cursor()
         self._add(cu, troveId, provides, requires)
 
-    def delete(self):
+    def delete(self, troveId):
         cu = self.db.cursor()
-        DependencyDatabase.delete(self, cu, troveId)
+        DependencyTables.delete(self, cu, troveId)
 
     def commit(self):
         self.db.commit()

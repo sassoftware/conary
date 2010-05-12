@@ -103,7 +103,6 @@ class QuerySet(object):
             The returned result is of the form:
             [(queueIdx, list of queries for this idx), (queueIdx', ...)]
         """
-        active = False
         searches = []
         for queueIdx, searchQueue in enumerate(self._searchQueues):
             if not self._activeByQueue[queueIdx]:
@@ -453,7 +452,6 @@ class TroveFinder(object):
                 if newRes and (origRes != newRes):
                     maxVersion = max(x[1] for x in origRes)
                     if maxVersion != max(x[1] for x in newRes):
-                        trvName = newRes[0][0]
                         flavors = sorted([x[2] for x in origRes \
                                 if x[1] == maxVersion])
                         latestRequired.append((newRes[0], flavors, maxVersion))

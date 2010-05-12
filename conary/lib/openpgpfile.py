@@ -14,7 +14,6 @@
 
 import base64
 import binascii
-import errno
 import fcntl
 import itertools
 import os
@@ -292,7 +291,7 @@ def seekKeyById(keyId, keyRing):
     if isinstance(keyRing, str):
         try:
             keyRing = util.ExtendedFile(keyRing, buffering = False)
-        except (IOError, OSError), e:
+        except (IOError, OSError):
             # if we can't read/find the key, it's not there.
             return False
     msg = PGP_Message(keyRing)
@@ -316,7 +315,7 @@ def exportKey(keyId, keyRing, armored=False):
     if isinstance(keyRing, str):
         try:
             keyRing = util.ExtendedFile(keyRing, buffering = False)
-        except (IOError, OSError), e:
+        except (IOError, OSError):
             # if we can't read/find the key, it's not there.
             raise KeyNotFound(keyId)
     msg = PGP_Message(keyRing)
@@ -943,7 +942,7 @@ class PGP_PacketFromStream(object):
             self.bodyLength = int4FromBytes(*rest)
             return
         # 4.2.2.4. Partial Body Lengths
-        partialBodyLength = 1 << (body1 & 0x1F)
+        #partialBodyLength = 1 << (body1 & 0x1F)
         raise NotImplementedError("Patial body lengths not implemented")
 
 class PGP_BasePacket(object):
@@ -1456,7 +1455,6 @@ class PGP_Signature(PGP_BaseKeySig):
         self.hashedFile.seek(0, SEEK_END)
 
         self.unhashedFile.seek(0, SEEK_END)
-        unhashedLen = self.unhashedFile.tell()
 
         self._writeBin(stream, [4, self.sigType, self.pubKeyAlg, self.hashAlg])
 
@@ -2211,13 +2209,6 @@ class PGP_Key(PGP_BaseKeySig):
             self.getKeyFingerprint()
             return self._keyId[1]
         return self.getKeyFingerprint()[-16:]
-
-    def hasKeyId(self, keyId):
-        keyId = keyId.upper()
-        if self.version == 3:
-            if self.getKeyId().endswith(keyId):
-                return True
-        return self.getKeyFingerprint().endswith(keyId)
 
     def hasKeyId(self, keyId):
         keyId = keyId.upper()

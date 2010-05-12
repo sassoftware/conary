@@ -19,12 +19,11 @@ from conary import trove
 from conary import files
 from conary import rpmhelper
 from conary.build import defaultrecipes
-from conary.build import build, source
+from conary.build import build
 from conary.build import errors as builderrors
 from conary.build.packagerecipe import BaseRequiresRecipe
 from conary.build.capsulerecipe import AbstractCapsuleRecipe
 from conary.build.derivedrecipe import DerivedChangesetExploder
-from conary.repository import changeset
 from conary.lib import log, util
 
 class AbstractDerivedCapsuleRecipe(AbstractCapsuleRecipe):
@@ -173,7 +172,7 @@ class AbstractDerivedCapsuleRecipe(AbstractCapsuleRecipe):
                     capPath = '/'.join((capDir,
                                             h[rpmhelper.NAME] + '.rpm'))
                     outFile = open(capPath,'w')
-                    ret = shutil.copyfileobj(capFileObj, outFile)
+                    shutil.copyfileobj(capFileObj, outFile)
                     outFile.close()
 
                     self._addCapsule(capPath, trv.troveInfo.capsule.type(),

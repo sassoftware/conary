@@ -173,7 +173,7 @@ class WAR(Magic):
         ddcontent = zipFileObj.read(self._xmlMetadataFile)
         try:
             dom = xml.dom.minidom.parseString(ddcontent)
-        except Exception, e:
+        except Exception:
             # Error parsing the XML, move on
             return
         # Grab data from the DOM

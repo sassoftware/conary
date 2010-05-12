@@ -12,12 +12,12 @@
 # full details.
 #
 
-from conary import trove, versions
+from conary import versions
 from conary.dbstore import idtable
 from conary.dbstore import sqlerrors
 from conary.repository import trovesource
 from conary.repository.errors import DuplicateBranch, InvalidSourceNameError
-from conary.repository.netrepos import instances, items
+from conary.repository.netrepos import items
 
 LATEST_TYPE_ANY     = trovesource.TROVE_QUERY_ALL     # redirects, removed, and normal
 LATEST_TYPE_PRESENT = trovesource.TROVE_QUERY_PRESENT # redirects and normal

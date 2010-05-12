@@ -29,7 +29,7 @@ import os
 import sys
 import time
 
-from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+from logging import DEBUG
 LOWLEVEL=DEBUG - 5
 from conary import constants
 from conary.lib import xmllog

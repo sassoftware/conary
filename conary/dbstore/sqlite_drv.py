@@ -291,7 +291,6 @@ class Database(BaseDatabase):
             if lastField:
                 break
             fStr = "(%s)" % (d["rest"],)
-        assert(fields), "Could not parse table fields:\n%s" %(stmt["fields"],)
         return fields
 
     # grab the SQL definition of this table

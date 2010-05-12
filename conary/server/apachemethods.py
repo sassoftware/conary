@@ -13,7 +13,6 @@
 #
 
 from mod_python import apache
-from mod_python.util import FieldStorage
 import os
 import sys
 import time

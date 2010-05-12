@@ -12,7 +12,7 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib, urllib2, urlparse
+import cPickle, itertools, os, tempfile, urllib, urllib2, urlparse
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, util
@@ -418,21 +418,6 @@ class ChangesetFilter(BaseProxy):
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
         self.csCache = cache
-
-    def _cvtJobEntry(self, authToken, jobEntry):
-        (name, (old, oldFlavor), (new, newFlavor), mbsolute) = jobEntry
-
-        newVer = self.toVersion(new)
-
-        if old == 0:
-            l = (name, (None, None),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        else:
-            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        return l
 
     @staticmethod
     def _getChangeSetVersion(clientVersion):
@@ -939,7 +924,6 @@ class ChangesetFilter(BaseProxy):
 
             fc = filecontainer.FileContainer(
                 util.ExtendedFile(csInfo.path, 'r', buffering = False))
-            csVersion = fc.version
             fc.close()
             if csInfo.version == neededCsVersion:
                 # We already have the right version
@@ -1051,11 +1035,9 @@ class ChangesetFilter(BaseProxy):
         # We need to restore primaryTroveList in the end
         primaryTroveList = newCs.primaryTroveList.copy()
         csfiles = changeset.files
-        getFrozenFileFlags = csfiles.frozenFileFlags
         for trvCs in newCs.iterNewTroveList():
             job = trvCs.getJob()
             sjob = self.toJob(job)
-            fileList = trvCs.getNewFileList()
             if not trvCs.getTroveInfo().capsule.type():
                 # This is a non-capsule trove changeset. Merge the
                 # corresponding changeset we previously retrieved withContents
@@ -1187,8 +1169,6 @@ class ChangesetFilter(BaseProxy):
 
     def _addCapsuleFileToChangeset(self, destChangeset,
             oldChangeset, oldTrove, newChangeset, rpmData, (pathId, fileId)):
-        csfiles = changeset.files
-        csfilecontents = changeset.filecontents
         contType = changeset.ChangedFileTypes.file
         fileObj = self._getFileObject(pathId, fileId, oldTrove, oldChangeset,
             newChangeset)
@@ -1240,7 +1220,7 @@ class ChangesetFilter(BaseProxy):
             digest = digestlib.sha1()
             try:
                 req = urllib2.urlopen(url)
-            except urllib2.HTTPError, e:
+            except urllib2.HTTPError:
                 raise Exception("XXX FIXME")
             out = util.BoundedStringIO()
             util.copyfileobj(req, out, digest = digest)

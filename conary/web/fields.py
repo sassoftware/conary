@@ -61,7 +61,7 @@ def intFields(**params):
                 if name in kw:
                     try:
                         value = int(kw[name])
-                    except ValueError, ve:
+                    except ValueError:
                         raise BadParameterError(param=name, badvalue=kw[name])
                 elif default is None:
                     raise MissingParameterError(str(name))
@@ -97,7 +97,7 @@ def boolFields(**params):
                 if name in kw:
                     try:
                         value = bool(int(kw[name]))
-                    except ValueError, ve:
+                    except ValueError:
                         raise BadParameterError(param=name, badvalue=kw[name])
                 elif default is None:
                     raise MissingParameterError(name)

@@ -34,7 +34,6 @@ from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import api, graph, log, util
 from conary.local import database
-from conary import trove
 from conary import versions
 
 class SubloadData(object):
@@ -417,7 +416,7 @@ class RecipeLoaderFromString(object):
                                        buildFlavor, 
                                        allowMissing=True,
                                        bestFlavor=True)
-        except (IOError, errors.ProxyError), err:
+        except (IOError, errors.ProxyError):
             nvfDict = {}
 
         neededTroveSpecs = [ x for x in troveSpecs if x not in nvfDict ]

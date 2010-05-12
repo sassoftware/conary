@@ -15,14 +15,12 @@
 #
 
 import base64
-import errno
 import os
 import posixpath
 import select
 import socket
 import sys
 import urllib
-import zlib
 import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
@@ -100,7 +98,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
 
             sizeCb(size, tag)
-            bytes = util.copyfileobj(f, outF)
+            util.copyfileobj(f, outF)
 
         if (self.restHandler and self.path.startswith(self.restUri)):
             self.restHandler.handle(self, self.path)
@@ -119,7 +117,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 # handle CNY-1142
                 self.send_error(400)
                 return None
-            urlPath = posixpath.normpath(urllib.unquote(self.path))
+
             localName = self.tmpDir + "/" + queryString + "-out"
             if os.path.realpath(localName) != localName:
                 self.send_error(404)
@@ -334,7 +332,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             # send 411: Length Required
             self.send_error(411)
 
-        authToken = self.getAuth()
+        #authToken = self.getAuth()
 
         if self.cfg.proxyContentsDir:
             status, reason = netclient.httpPutFile(self.path, self.rfile, contentLength)

@@ -74,7 +74,7 @@ class Action:
             if type(arg) is str and '%' in arg:
                 try:
                     arg % d
-                except ValueError, msg:
+                except ValueError:
                     log.error('invalid macro substitution in "%s", missing "s"?' %arg)
                     raise
 
@@ -471,7 +471,7 @@ class Glob(object):
         # escaped
         try:
             pat = self.pattern % self.macros
-        except ValueError, msg:
+        except ValueError:
             log.error('invalid macro substitution in "%s", missing "s"?' % \
                     self.pattern)
             raise

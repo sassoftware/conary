@@ -47,7 +47,7 @@ class SchemaMigration:
             return sqllib.DBversion(v)
         elif isinstance(v, tuple):
             return sqllib.DBversion(*v)
-        raise RuntimeError("Invalid DBversion specification", DBversion)
+        raise RuntimeError("Invalid DBversion specification", sqllib.DBversion)
     
     # likely candidates for overrides
     def canUpgrade(self):

@@ -18,7 +18,6 @@ import struct
 import tempfile
 
 from conary import callbacks
-from conary.files import InodeStream
 from conary.streams import *
 
 JOURNAL_VERSION = 1

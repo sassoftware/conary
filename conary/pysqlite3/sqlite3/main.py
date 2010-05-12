@@ -1,7 +1,7 @@
 from __future__ import nested_scopes
 import conary._sqlite3 as _sqlite
 
-import copy, new, sys, weakref
+import sys, weakref
 from types import *
 
 import errno

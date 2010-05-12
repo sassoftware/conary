@@ -85,7 +85,7 @@ class Filter:
 	    for subre in regex:
                 try:
                     subre = self._anchor(subre %macros)
-                except ValueError, msg:
+                except ValueError:
                     log.error('invalid macro substitution in "%s", missing "s"?' %subre)
                     raise
 		tmplist.append('(?:' + subre + ')')

@@ -12,7 +12,6 @@ for i, c in enumerate(encMap):
     decMap[ord(c)] = i
 
 def decodestring(s):
-    result = ''
     strLen = ord(s[0])
     if ord('A') <= strLen and strLen <= ord('Z'):
         strLen = strLen - ord('A') + 1

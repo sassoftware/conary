@@ -145,7 +145,7 @@ class Macros(dict):
             # just accessing the element will copy it to this
             # macro
             for key in self.__macros.keys():
-                dummy = self[key]
+                self[key]
             self.__macros = {}
 
     def __iter__(self):

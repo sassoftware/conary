@@ -3,8 +3,7 @@
 # Copyright (c) 2004-2005 rPath, Inc.
 #
 
-import testsupport
-import os, sys, tempfile, time, unittest
+import os, tempfile, time, unittest
 import sqlite3 as sqlite
 
 class Waiter:
@@ -89,12 +88,14 @@ class ConcurrencyTests(unittest.TestCase):
         cu2.execute('BEGIN DEFERRED')
         cu2.execute('INSERT INTO foo VALUES(1)')
         t1 = time.time()
+        t1 = t1
         try:
             cu1.execute('BEGIN DEFERRED')            
             cu1.execute('INSERT INTO foo VALUES(2)')
         except sqlite.InternalError, e:
             assert(str(e) == "database is locked")
         t2 = time.time()
+        t2=t2
         assert(waiter.count == 6)
         db2.commit()
         cu1.stmt.step()

@@ -12,8 +12,6 @@
 # full details.
 #
 
-import re, os
-
 from conary.build import packagepolicy, policy
 
 class ComponentSpec(packagepolicy.ComponentSpec, policy.UserGroupBasePolicy):

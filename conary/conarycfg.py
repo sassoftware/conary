@@ -679,7 +679,6 @@ class ConaryConfiguration(SectionedConfigFile):
         if not os.path.isdir(self.entitlementDirectory):
             return
 
-        warn = False
         try:
             files = os.listdir(self.entitlementDirectory)
         except OSError:
@@ -880,7 +879,6 @@ def loadEntitlementFromString(xmlContent, *args, **kw):
             p.parse(xmlContent)
 
         try:
-            entServer = p.get('server', None)
             entClass = p.get('class', None)
             entKey = p['key']
         except KeyError:
@@ -923,7 +921,7 @@ def loadEntitlementFromProgram(fullPath, serverName):
                 os.close(stdErrWrite)
                 util.massCloseFileDescriptors(3, 252)
                 os.execl(fullPath, fullPath, serverName)
-            except Exception, err:
+            except Exception:
                 traceback.print_exc(sys.stderr)
         finally:
             os._exit(1)
@@ -982,7 +980,6 @@ def loadEntitlement(dirName, serverName):
 
     fullPath = os.path.join(dirName, serverName)
 
-    p = EntitlementParser()
     if not os.access(fullPath, os.R_OK):
         return None
 

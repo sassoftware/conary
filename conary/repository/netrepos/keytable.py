@@ -18,7 +18,6 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
-import base64
 
 from conary.lib import openpgpfile, openpgpkey, util
 
@@ -64,7 +63,7 @@ class OpenPGPKeyTable:
 
         # if key already exists we need to ensure it's safe to overwrite
         # the old one, and then just do it.
-        r = cu.execute('SELECT KeyId, pgpKey FROM PGPKeys WHERE fingerprint=?',
+        cu.execute('SELECT KeyId, pgpKey FROM PGPKeys WHERE fingerprint=?',
                        mainFingerprint)
         for (keyId, keyBlob) in cu.fetchall():
             origKey = cu.frombinary(keyBlob)
@@ -190,7 +189,6 @@ class OpenPGPKeyDBCache(openpgpkey.OpenPGPKeyCache):
             raise openpgpkey.KeyNotFound(keyId, "Can't open database")
 
         # get the key data from the database
-        fingerprint = keyTable.getFingerprint(keyId)
         keyData = keyTable.getPGPKeyData(keyId)
 
         # instantiate the key object from the raw key data

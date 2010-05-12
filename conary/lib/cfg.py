@@ -16,7 +16,6 @@ Provides a generic config file format that supports creating your own config
 types and value types.
 """
 import copy
-import errno
 import inspect
 import os
 import socket
@@ -392,12 +391,11 @@ class ConfigFile(_Config):
         try:
             f = self._openUrl(url)
             self.readObject(url, f)
-        except CfgEnvironmentError, err:
+        except CfgEnvironmentError:
             if not self._ignoreErrors:
                 raise
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
-        origLine = line
         line = line.strip()
         line = line.replace('\\\\', '\0').replace('\\#', '\1')
         line = line.split('#', 1)[0]

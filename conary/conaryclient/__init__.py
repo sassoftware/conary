@@ -11,17 +11,15 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-import itertools
 import os
 import pickle
 
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
-from conary.conaryclient import clone, resolve, update, filetypes, callbacks, mirror
+from conary.conaryclient import clone, resolve, update
 from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
-from conary.repository import trovesource
 from conary.repository import searchsource
 from conary.repository import resolvemethod
 
@@ -192,7 +190,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
                     cacheFp = open(cacheFile, "rw")
                     cache = pickle.load(cacheFp)
                     cacheFp.close()
-                except IOError, EOFError:
+                except (IOError, EOFError):
                     cache = {}
 
                 cacheFp = open(cacheFile, "w")
