@@ -420,7 +420,7 @@ class UpdateJob:
     def getTroveSource(self):
         """
         @return: the TroveSource for this UpdateJob
-        @rtype: L{repository.trovesource.ChangeSetFilesTroveSource} 
+        @rtype: L{repository.trovesource.ChangeSetFilesTroveSource}
         """
         return self.troveSource
 
@@ -509,7 +509,7 @@ class UpdateJob:
         assert os.path.isdir(frzdir), "Not a directory: %s" % frzdir
         assert not os.listdir(frzdir), "Directory %s not empty" % frzdir
 
-        assert isinstance(self.troveSource, 
+        assert isinstance(self.troveSource,
             trovesource.ChangesetFilesTroveSource), "Unsupported %s" % self.troveSource
 
         drep = self._saveInvocationInfo()
@@ -611,7 +611,7 @@ class UpdateJob:
         @raises errors.InternalConaryError: raised if the frozen data is a
         newer than this conary version understands
         @raises IOError: raised if there's an I/O Error opening the jobfile
-        @raises OSError: raised if there are other errors opening the jobfile 
+        @raises OSError: raised if there are other errors opening the jobfile
         """
         jobfile = os.path.join(frzdir, "jobfile")
         drep = self._loadFrozenRepr(jobfile)
@@ -772,7 +772,7 @@ class UpdateJob:
                 cs = changeset.ChangeSetFromFile(self.lzCache.open(csFileName))
                 troveSource.addChangeSet(cs, bool(includesFileContents))
         except IOError, e:
-            raise errors.InternalConaryError("Missing changeset file %s" % 
+            raise errors.InternalConaryError("Missing changeset file %s" %
                                              e.filename)
 
         return self.lzCache
@@ -1274,13 +1274,13 @@ class DepCheckState:
 
 class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
-		      repository.AbstractRepository):
+                      repository.AbstractRepository):
 
     def iterAllTroveNames(self):
-	return self.db.iterAllTroveNames()
+        return self.db.iterAllTroveNames()
 
     def iterAllTroves(self):
-	return self.db.iterAllTroves()
+        return self.db.iterAllTroves()
 
     def findRemovedByName(self, name):
         return self.db.findRemovedByName(name)
@@ -1341,39 +1341,39 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def getTroveLatestVersion(self, name, branch):
         cu = self.db.db.cursor()
-	cu.execute("""SELECT version, timeStamps FROM Instances 
-			JOIN Versions ON
-			    Instances.versionId == Versions.versionId
-			WHERE Instances.troveName == ? AND
-			      isPresent == 1
-		   """, name)
+        cu.execute("""SELECT version, timeStamps FROM Instances
+                        JOIN Versions ON
+                            Instances.versionId == Versions.versionId
+                        WHERE Instances.troveName == ? AND
+                              isPresent == 1
+                   """, name)
 
-	last = None
-	for versionStr, timeStamps in cu:
-	    version = versions.VersionFromString(versionStr)
-	    if version.branch() != branch:
-		continue
+        last = None
+        for versionStr, timeStamps in cu:
+            version = versions.VersionFromString(versionStr)
+            if version.branch() != branch:
+                continue
 
-	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
-	    if not last or version.isAfter(last):
-		last = version
+            version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+            if not last or version.isAfter(last):
+                last = version
 
-	return last
+        return last
 
     def getAllTroveFlavors(self, troveDict):
         return self.db.getAllTroveFlavors(troveDict)
 
     def troveVersionFlavors(self, troveName, version):
-	l = [ x.getFlavor() for x in self.db.iterFindByName(troveName)
-		     if version == x.getVersion() ]
+        l = [ x.getFlavor() for x in self.db.iterFindByName(troveName)
+                     if version == x.getVersion() ]
 
-	return l
+        return l
 
     def hasTroveByName(self, name):
-	return self.db.hasByName(name)
+        return self.db.hasByName(name)
 
     def trovesByName(self, name):
-	return [ (name, x[0], x[1]) \
+        return [ (name, x[0], x[1]) \
                     for x in self.db.iterVersionByName(name, True) ]
 
     def hasTroves(self, troves):
@@ -1403,48 +1403,48 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
         result = cu.next()[0] != 0
 
-	return result
+        return result
 
     def getTroveVersionList(self, name, withFlavors = False, troveTypes=None):
-	"""
-	Returns a list of all of the versions of a trove available
-	in the repository.. If withFlavors is True, (version, flavor)
+        """
+        Returns a list of all of the versions of a trove available
+        in the repository.. If withFlavors is True, (version, flavor)
         tuples are returned instead.
 
-	@param name: trove
-	@type name: str
+        @param name: trove
+        @type name: str
         @param withFlavors: If True, flavor information is also returned.
         @type withFlavors: boolean
-	@rtype: list of versions.Version
-	"""
-	return [ x for x in self.db.iterVersionByName(name, withFlavors) ]
+        @rtype: list of versions.Version
+        """
+        return [ x for x in self.db.iterVersionByName(name, withFlavors) ]
 
     def getTroveList(self, name):
-	"""
-	Returns a list of all of the troves available in the
-	repository.
+        """
+        Returns a list of all of the troves available in the
+        repository.
 
-	@param name: trove
-	@type name: str
-	@rtype: list of trove.Trove instances
-	"""
-	return [ x for x in self.db.iterFindByName(name) ]
+        @param name: trove
+        @type name: str
+        @rtype: list of trove.Trove instances
+        """
+        return [ x for x in self.db.iterFindByName(name) ]
 
     def getFileStream(self, fileId):
         return self.db.getFileStream(fileId, pristine = True)
 
     def getFileVersion(self, pathId, fileId, version, withContents = 0):
-	fileObj = self.db.getFile(pathId, fileId, pristine = True)
-	if withContents:
-	    if fileObj.hasContents:
-		cont = filecontents.FromDataStore(self.contentsStore,
-					          fileObj.contents.sha1())
-	    else:
-		cont = None
+        fileObj = self.db.getFile(pathId, fileId, pristine = True)
+        if withContents:
+            if fileObj.hasContents:
+                cont = filecontents.FromDataStore(self.contentsStore,
+                                                  fileObj.contents.sha1())
+            else:
+                cont = None
 
-	    return (fileObj, cont)
+            return (fileObj, cont)
 
-	return fileObj
+        return fileObj
 
     def getConfigFileContents(self, sha1):
         return filecontents.FromDataStore(self.contentsStore, sha1)
@@ -1453,7 +1453,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return self.db.findFileVersion(fileId)
 
     def getFileVersions(self, l, allowMissingFiles=False):
-	return self.db.iterFiles(l)
+        return self.db.iterFiles(l)
 
     def getTransactionCounter(self):
         """
@@ -1479,17 +1479,17 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
                 yield x
 
     def iterFilesWithTag(self, tag):
-	return self.db.iterFilesWithTag(tag)
+        return self.db.iterFilesWithTag(tag)
 
     def addFileVersion(self, troveId, pathId, path, fileId, version,
                        fileStream = None, isPresent = True):
         self._updateTransactionCounter = True
-	self.db.addFile(troveId, pathId, path, fileId, version,
+        self.db.addFile(troveId, pathId, path, fileId, version,
                         fileStream = fileStream, isPresent = isPresent)
 
     def addTrove(self, trove, pin = False, oldTroveSpec = None):
         self._updateTransactionCounter = True
-	return self.db.addTrove(trove, pin = pin, oldTroveSpec = oldTroveSpec)
+        return self.db.addTrove(trove, pin = pin, oldTroveSpec = oldTroveSpec)
 
     def addTroveDone(self, troveInfo):
         self._updateTransactionCounter = True
@@ -1514,14 +1514,14 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         return self.db.trovesArePinned(troveList)
 
     def commit(self):
-        # At this point we should already have a write lock on the database, 
+        # At this point we should already have a write lock on the database,
         # we can safely increment the transaction count
         # This works as long as the underlying database has only
         # database-level locking. If table locking or row locking are
         # available, we need a different technique
         if self._updateTransactionCounter:
             self.db.incrementTransactionCounter()
-	self.db.commit()
+        self.db.commit()
 
     def close(self):
         if self._db:
@@ -1535,14 +1535,14 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 
     def eraseTrove(self, troveName, version, flavor):
         self._updateTransactionCounter = True
-	self.db.eraseTrove(troveName, version, flavor)
+        self.db.eraseTrove(troveName, version, flavor)
 
     def pathIsOwned(self, path):
-	return self.db.pathIsOwned(path)
+        return self.db.pathIsOwned(path)
 
     def eraseFileVersion(self, pathId, version):
-	# files get removed with their troves
-	pass
+        # files get removed with their troves
+        pass
 
     def writeAccess(self):
         assert(self.db) # when checking for write access, make sure the
@@ -1581,7 +1581,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
 class Database(SqlDbRepository):
 
     # XXX some of these interfaces are horribly inefficient as we have
-    # to instantiate a full trove object to do anything... 
+    # to instantiate a full trove object to do anything...
     # FilesystemRepository has the same problem
 
     ROLLBACK_PHASE_LOCAL = update.ROLLBACK_PHASE_LOCAL
@@ -1589,13 +1589,13 @@ class Database(SqlDbRepository):
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
                          capsules = True):
-	return SqlDbRepository.iterFilesInTrove(self, troveName, version,
-			flavor, sortByPath = sortByPath,
-			withFiles = withFiles, pristine = False,
+        return SqlDbRepository.iterFilesInTrove(self, troveName, version,
+                        flavor, sortByPath = sortByPath,
+                        withFiles = withFiles, pristine = False,
                         capsules = capsules)
 
     def iterTrovesByPath(self, path):
-	return [ x for x in self.db.iterFindByPath(path) ]
+        return [ x for x in self.db.iterFindByPath(path) ]
 
     def outdatedTroves(self, l, ineligible = set()):
         """
@@ -1610,7 +1610,7 @@ class Database(SqlDbRepository):
         """
 
         names = {}
-        newGroup = trove.Trove("@update", versions.NewVersion(), 
+        newGroup = trove.Trove("@update", versions.NewVersion(),
                                 deps.Flavor(), None)
         for name, version, flavor in l:
             names[name] = True
@@ -1628,8 +1628,8 @@ class Database(SqlDbRepository):
         # pair. a shortcut is to stick the old troves in one group and
         # the new troves in another group; when we diff those groups
         # diff tells us how to match them up. anything which doesn't get
-        # a match gets removed. got that? 
-        instGroup = trove.Trove("@update", versions.NewVersion(), 
+        # a match gets removed. got that?
+        instGroup = trove.Trove("@update", versions.NewVersion(),
                                 deps.Flavor(), None)
         for info in instList:
             if info not in ineligible:
@@ -1641,7 +1641,7 @@ class Database(SqlDbRepository):
         for (name, (oldVersion, oldFlavor), (newVersion, newFlavor),
                             isAbsolute) in trvChgs:
             if newVersion:
-                resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
+                resultDict[(name, newVersion, newFlavor)] = (name, oldVersion,
                                                              oldFlavor)
 
         return resultDict
@@ -1737,7 +1737,7 @@ class Database(SqlDbRepository):
                 for (path, (pathId, (troveName, version, flavor)),
                            newTroveInfo) in e.getConflicts():
                     dbConflicts.append(DatabasePathConflictError(
-                            util.joinPaths(self.root, path), 
+                            util.joinPaths(self.root, path),
                             troveName, version, flavor))
                 csJob = None
 
@@ -1803,7 +1803,7 @@ class Database(SqlDbRepository):
         if errList:
             # make sure we release the lock on the database
             self.db.rollback()
-            raise CommitError, ('applying update would cause errors:\n' + 
+            raise CommitError, ('applying update would cause errors:\n' +
                                 '\n\n'.join(str(x) for x in errList))
         if commitFlags.test:
             self.db.rollback()
@@ -1842,13 +1842,13 @@ class Database(SqlDbRepository):
         for trvCs in cs.iterNewTroveList():
             if not trvCs.getOldVersion():
                 log.syslog("installed %s=%s[%s]", trvCs.getName(),
-                         trvCs.getNewVersion(), 
+                         trvCs.getNewVersion(),
                          deps.formatFlavor(trvCs.getNewFlavor()))
             else:
                 log.syslog("updated %s=%s[%s]--%s[%s]", trvCs.getName(),
-                         trvCs.getOldVersion(), 
+                         trvCs.getOldVersion(),
                          deps.formatFlavor(trvCs.getOldFlavor()),
-                         trvCs.getNewVersion(), 
+                         trvCs.getNewVersion(),
                          deps.formatFlavor(trvCs.getNewFlavor()))
 
         for (name, version, flavor) in cs.getOldTroveList():
@@ -1939,7 +1939,7 @@ class Database(SqlDbRepository):
         # removeRollback, which contains local changes this update will do.
         # Those two could overlap, so we need to merge them carefully.
         for removeCs in [ x for x in removeRollback.iterNewTroveList() ]:
-            newInfo = (removeCs.getName(), removeCs.getNewVersion(), 
+            newInfo = (removeCs.getName(), removeCs.getNewVersion(),
                        removeCs.getNewFlavor())
             if not localRollback.hasNewTrove(*newInfo):
                 continue
@@ -1972,12 +1972,12 @@ class Database(SqlDbRepository):
     def commitChangeSet(self, cs, uJob,
                         rollbackPhase = None, updateDatabase = True,
                         tagScript = None,
-			journal = None,
+                        journal = None,
                         callback = UpdateCallback(),
                         removeHints = {}, autoPinList = RegularExpressionList(),
                         deferredScripts = None, commitFlags = None,
                         repair = False):
-	assert(not cs.isAbsolute())
+        assert(not cs.isAbsolute())
 
         if commitFlags is None:
             commitFlags = CommitChangeSetFlags()
@@ -1998,33 +1998,33 @@ class Database(SqlDbRepository):
 
         self.db.begin()
 
-	for trv in cs.iterNewTroveList():
-	    if trv.getName().endswith(":source"):
+        for trv in cs.iterNewTroveList():
+            if trv.getName().endswith(":source"):
                 raise SourceComponentInstall
 
-	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
+        tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
         dbCache = DatabaseCacheWrapper(self)
 
-	# create the change set from A->A.local
-	troveList = []
-	for newTrove in cs.iterNewTroveList():
-	    name = newTrove.getName()
-	    old = newTrove.getOldVersion()
-	    flavor = newTrove.getOldFlavor()
-	    if self.hasTroveByName(name) and old:
+        # create the change set from A->A.local
+        troveList = []
+        for newTrove in cs.iterNewTroveList():
+            name = newTrove.getName()
+            old = newTrove.getOldVersion()
+            flavor = newTrove.getOldFlavor()
+            if self.hasTroveByName(name) and old:
                 if old.onLocalLabel():
                     old = newTrove.getNewVersion()
                 ver = old.createShadow(versions.LocalLabel())
-		trv = dbCache.getTrove(name, old, flavor, pristine = False)
-		origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
-		assert(trv)
-		troveList.append((trv, origTrove, ver, flags))
+                trv = dbCache.getTrove(name, old, flavor, pristine = False)
+                origTrove = dbCache.getTrove(name, old, flavor, pristine = True)
+                assert(trv)
+                troveList.append((trv, origTrove, ver, flags))
 
         for (name, version, flavor) in cs.getOldTroveList():
             rollbackVersion = version.createShadow(versions.RollbackLabel())
             trv = dbCache.getTrove(name, version, flavor, pristine = False)
-            origTrove = dbCache.getTrove(name, version, flavor, 
+            origTrove = dbCache.getTrove(name, version, flavor,
                                          pristine = True)
             assert(trv)
             troveList.append((trv, origTrove, rollbackVersion,
@@ -2032,9 +2032,9 @@ class Database(SqlDbRepository):
 
         callback.creatingRollback()
 
-	result = update.buildLocalChanges(self, troveList, root = self.root,
+        result = update.buildLocalChanges(self, troveList, root = self.root,
                                           callback = callback)
-	if not result: return
+        if not result: return
 
         retList = result[1]
         localRollback = changeset.ReadOnlyChangeSet()
@@ -2044,7 +2044,7 @@ class Database(SqlDbRepository):
         for (changed, fsTrove) in retList:
             fsTroveDict[fsTrove.getNameVersionFlavor()] = fsTrove
 
-	if rollbackPhase is None:
+        if rollbackPhase is None:
             reposRollback = cs.makeRollback(dbCache,
                        redirectionRollbacks = (not commitFlags.localRollbacks))
             flags.merge = True
@@ -2057,16 +2057,16 @@ class Database(SqlDbRepository):
                                      rollbackPhase = rollbackPhase,
                                      deferredScripts = deferredScripts)
 
-	# look through the directories which have had files removed and
-	# see if we can remove the directories as well
+        # look through the directories which have had files removed and
+        # see if we can remove the directories as well
         dirSet = fsJob.getDirectoryCountSet()
         lst = dirSet.keys()
-	lst.sort()
-	lst.reverse()
-	directoryCandidates = {}
-	while (lst):
-	    path = lst[0]
-	    del lst[0]
+        lst.sort()
+        lst.reverse()
+        directoryCandidates = {}
+        while (lst):
+            path = lst[0]
+            del lst[0]
             try:
                 entries = len(os.listdir(self.root + '/' + path))
             except OSError, e:
@@ -2076,23 +2076,23 @@ class Database(SqlDbRepository):
 
             entries -= dirSet[path]
 
-	    # listdir excludes . and ..
-	    if (entries) != 0: continue
+            # listdir excludes . and ..
+            if (entries) != 0: continue
 
-	    directoryCandidates[path] = True
+            directoryCandidates[path] = True
 
-	    parent = os.path.dirname(path)
+            parent = os.path.dirname(path)
             if dirSet.has_key(parent):
                 dirSet[parent] += 1
-	    else:
+            else:
                 dirSet[parent] = 1
-		lst.append(parent)
-		# insertion is linear, sort is n log n
-		# oh well.
-		lst.sort()
-		lst.reverse()
+                lst.append(parent)
+                # insertion is linear, sort is n log n
+                # oh well.
+                lst.sort()
+                lst.reverse()
 
-	# -------- database and system are updated below this line ---------
+        # -------- database and system are updated below this line ---------
 
         if self.opJournalPath:
             opJournal = JobJournal(self.opJournalPath, self.root, create = True,
@@ -2207,7 +2207,7 @@ class Database(SqlDbRepository):
                         trv.getVersion().createShadow(versions.LocalLabel()))
 
             for path in pathList:
-                fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList() 
+                fileList = [ (x[0], x[2], x[3]) for x in trv.iterFileList()
                                                     if x[1] in path ]
                 assert(len(fileList) == 1)
                 pathId, fileId, fileVersion = fileList[0]
@@ -2362,23 +2362,23 @@ class Database(SqlDbRepository):
 
     # name looks like "r.%d"
     def removeRollback(self, name):
-	rollback = int(name[2:])
+        rollback = int(name[2:])
         try:
             shutil.rmtree(self.rollbackCache + "/%d" % rollback)
         except OSError, e:
             if e.errno == 2:
                 pass
-	if rollback == self.lastRollback:
-	    self.lastRollback -= 1
-	    self.writeRollbackStatus()
+        if rollback == self.lastRollback:
+            self.lastRollback -= 1
+            self.writeRollbackStatus()
 
     def getRollbackList(self):
         self._ensureReadableRollbackStack()
-	lst = []
-	for i in range(self.firstRollback, self.lastRollback + 1):
-	    lst.append("r.%d" % i)
+        lst = []
+        for i in range(self.firstRollback, self.lastRollback + 1):
+            lst.append("r.%d" % i)
 
-	return lst
+        return lst
 
     def iterRollbacksList(self):
         """Generator for rollback data.
@@ -2415,22 +2415,22 @@ class Database(SqlDbRepository):
             raise ConaryError("Unable to open rollback directory")
 
     def hasRollback(self, name):
-	try:
-	    num = int(name[2:])
-	except ValueError:
-	    return False
+        try:
+            num = int(name[2:])
+        except ValueError:
+            return False
 
         self._ensureReadableRollbackStack()
 
-	if (num >= self.firstRollback and num <= self.lastRollback):
-	    return True
-	
-	return False
+        if (num >= self.firstRollback and num <= self.lastRollback):
+            return True
+
+        return False
 
     def getRollback(self, name):
-	if not self.hasRollback(name): return None
+        if not self.hasRollback(name): return None
 
-	num = int(name[2:])
+        num = int(name[2:])
         dir = self.rollbackCache + "/" + "%d" % num
         return Rollback(dir, load = True)
 
@@ -2463,15 +2463,15 @@ class Database(SqlDbRepository):
             raise RollbackError(names, "Database state has changed, please "
                 "run the rollback command again")
 
-	last = self.rollbackStack.last
-	for name in names:
-	    if not self.rollbackStack.hasRollback(name):
-		raise RollbackDoesNotExist(name)
+        last = self.rollbackStack.last
+        for name in names:
+            if not self.rollbackStack.hasRollback(name):
+                raise RollbackDoesNotExist(name)
 
-	    num = int(name[2:])
-	    if num != last:
-		raise RollbackOrderError(name)
-	    last -= 1
+            num = int(name[2:])
+            if num != last:
+                raise RollbackOrderError(name)
+            last -= 1
 
         # Count the number of jobs in the rollback. We have to open the
         # local rollbacks to know if there is any work to do, which is
@@ -2483,7 +2483,7 @@ class Database(SqlDbRepository):
             totalCount += 0
 
             for i in xrange(rb.getCount()):
-                (reposCs, localCs) = rb.getLast() 
+                (reposCs, localCs) = rb.getLast()
                 if not reposCs.isEmpty():
                     totalCount += 1
                 if not localCs.isEmpty():
@@ -2491,7 +2491,7 @@ class Database(SqlDbRepository):
 
         itemCount = 0
         for i, name in enumerate(names):
-	    rb = self.rollbackStack.getRollback(name)
+            rb = self.rollbackStack.getRollback(name)
 
             # we don't want the primary troves from reposCs to win, so get
             # rid of them (otherwise we're left with redirects!). primaries
@@ -2773,7 +2773,7 @@ class Database(SqlDbRepository):
 
     def _initDb(self):
         SqlDbRepository._initDb(self)
-        if (self.opJournalPath and os.path.exists(self.opJournalPath) 
+        if (self.opJournalPath and os.path.exists(self.opJournalPath)
             and self.lockFile and not os.path.exists(self.lockFile)):
             raise ExistingJournalError(os.path.dirname(self.opJournalPath),
                     'journal file exists. use revert command to '
@@ -2796,15 +2796,15 @@ class Database(SqlDbRepository):
         @raises IOError: raised when an I/O error occurs in readRollbackStatus
         """
 
-	self.root = root
+        self.root = root
 
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
             # use :memory: as a marker not to bother with locking
-            self.lockFile = path 
+            self.lockFile = path
             self.opJournalPath = None
         else:
-            conarydbPath = util.joinPaths(root, path) 
+            conarydbPath = util.joinPaths(root, path)
             SqlDbRepository.__init__(self, conarydbPath, timeout = timeout)
             self.opJournalPath = conarydbPath + '/journal'
             top = util.joinPaths(root, path)
@@ -2841,14 +2841,14 @@ class DatabaseCacheWrapper:
         for i, info in enumerate(l):
             retList.append(self.cache.get((info, pristine), None))
 
-        missing = [ (x[0], x[1][1]) for x in 
+        missing = [ (x[0], x[1][1]) for x in
                         enumerate(itertools.izip(retList, l)) if
                         x[1][0] is None ]
 
         if not missing:
             return retList
 
-        trvs = self.db.getTroves([ x[1] for x in missing ], 
+        trvs = self.db.getTroves([ x[1] for x in missing ],
                                  pristine = pristine)
         for (idx, info), trv in itertools.izip(missing, trvs):
             retList[idx] = trv
@@ -2866,31 +2866,31 @@ class RollbackError(errors.ConaryError):
     """Base class for exceptions related to applying rollbacks"""
 
     def __init__(self, rollbackName, errorMessage=''):
-	"""
-        Create new new RollbackrError
-	@param rollbackName: string represeting the name of the rollback
         """
-	self.name = rollbackName
+        Create new new RollbackrError
+        @param rollbackName: string represeting the name of the rollback
+        """
+        self.name = rollbackName
         self.error = errorMessage
 
     def __str__(self):
-	return "rollback %s cannot be applied:\n%s" % (self.name, self.error)
+        return "rollback %s cannot be applied:\n%s" % (self.name, self.error)
 
 class PreScriptError(errors.ConaryError):
 
     """Raised for exceptions related to executing pre-scripts"""
 
     def __init__(self, script, errorCode, errorMessage=''):
-	"""
-	@param script: string represeting the path of the failed script
+        """
+        @param script: string represeting the path of the failed script
         @param errorCode: the return code of the script
         """
-	self.name = script
+        self.name = script
         self.errorCode = errorCode
         self.error = errorMessage
 
     def __str__(self):
-	return "Pre-Script\n\"%s\"\nhas failed. Return Code=%s\n%s" % (self.name,
+        return "Pre-Script\n\"%s\"\nhas failed. Return Code=%s\n%s" % (self.name,
                                                          self.errorCode,
                                                          self.error)
 
@@ -2900,12 +2900,12 @@ class RollbackOrderError(RollbackError):
        wrong order"""
 
     def __str__(self):
-	return "rollback %s cannot be applied out of order" % self.name
+        return "rollback %s cannot be applied out of order" % self.name
 
     def __init__(self, rollbackName):
-	"""Create new new RollbackOrderError
-	@param rollbackName: string represeting the name of the rollback
-	which was trying to be applied out of order"""
+        """Create new new RollbackOrderError
+        @param rollbackName: string represeting the name of the rollback
+        which was trying to be applied out of order"""
         RollbackError.__init__(self, rollbackName)
 
 class RollbackDoesNotExist(RollbackError):
@@ -2914,18 +2914,18 @@ class RollbackDoesNotExist(RollbackError):
        the database"""
 
     def __str__(self):
-	return "rollback %s does not exist" % self.name
+        return "rollback %s does not exist" % self.name
 
     def __init__(self, rollbackName):
-	"""Create new new RollbackOrderError
-	@param rollbackName: string represeting the name of the rollback
-	which does not exist"""
+        """Create new new RollbackOrderError
+        @param rollbackName: string represeting the name of the rollback
+        which does not exist"""
         RollbackError.__init__(self, rollbackName)
 
 class SourceComponentInstall(DatabaseError):
 
     def __str__(self):
-	return "cannot install a source component onto the local system"
+        return "cannot install a source component onto the local system"
 
 class OpenError(DatabaseError):
 
@@ -2933,8 +2933,8 @@ class OpenError(DatabaseError):
         return 'Unable to open database %s: %s' % (self.path, self.msg)
 
     def __init__(self, path, msg):
-	self.path = path
-	self.msg = msg
+        self.path = path
+        self.msg = msg
 
 class ExistingJournalError(OpenError):
 

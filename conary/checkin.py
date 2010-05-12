@@ -110,13 +110,13 @@ def _verifyAtHead(repos, headPkg, state):
     # make sure the files in this directory are based on the same
     # versions as those in the package at head
     for (pathId, path, fileId, version) in state.iterFileList():
-	if isinstance(version, versions.NewVersion):
-	    assert(not headPkg.hasFile(pathId))
-	    # new file, it shouldn't be in the old package at all
-	else:
-	    srcFileVersion = headPkg.getFile(pathId)[2]
+        if isinstance(version, versions.NewVersion):
+            assert(not headPkg.hasFile(pathId))
+            # new file, it shouldn't be in the old package at all
+        else:
+            srcFileVersion = headPkg.getFile(pathId)[2]
             if version != srcFileVersion:
-		return False
+                return False
 
     return True
 
@@ -207,7 +207,7 @@ class CheckoutExploder(changeset.AbstractChangesetExploder):
         (destDir, pathId, fileId, version) = \
                     self.pathMap[(trv.getNameVersionFlavor(), path)]
 
-        self.sourceStateMap[trv.getNameVersionFlavor()].addFile(pathId, path, 
+        self.sourceStateMap[trv.getNameVersionFlavor()].addFile(pathId, path,
                                  version, fileId,
                                  isConfig = fileObj.flags.isConfig(),
                                  isAutoSource = fileObj.flags.isAutoSource())
@@ -243,7 +243,7 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
                           workDir, str(err))
                 return
 
-        jobList.append((trvInfo[0], (None, None), (trvInfo[1], trvInfo[2]), 
+        jobList.append((trvInfo[0], (None, None), (trvInfo[1], trvInfo[2]),
                         True))
 
         sourceState = SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
@@ -286,8 +286,8 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
         callback = CheckinCallback()
 
     if cfg.name is None or cfg.contact is None:
-	log.error("name and contact information must be set for commits")
-	return
+        log.error("name and contact information must be set for commits")
+        return
 
     conaryState = ConaryStateFromFile("CONARY", repos)
     state = conaryState.getSourceState()
@@ -296,7 +296,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     conflicts = []
 
     if isinstance(state.getVersion(), versions.NewVersion):
-	# new package, so it shouldn't exist yet
+        # new package, so it shouldn't exist yet
         # Don't add TROVE_QUERY_ALL here, removed packages could exist
         # and we'd still want newpkg to work
         matches = repos.getTroveLeavesByLabel(
@@ -305,14 +305,14 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
         if matches:
             for version in matches:
                 if version.branch() == state.getBranch():
-                    log.error("%s is marked as a new package but it " 
+                    log.error("%s is marked as a new package but it "
                               "already exists" % troveName)
                     return
                 else:
                     conflicts.append(version)
         srcPkg = None
     else:
-        srcPkg = repos.getTrove(troveName, state.getVersion(), 
+        srcPkg = repos.getTrove(troveName, state.getVersion(),
                                 deps.deps.Flavor(), callback=callback)
         if not _verifyAtHead(repos, srcPkg, state):
             log.error("contents of working directory are not all "
@@ -327,7 +327,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
                                         if x[1].endswith('.recipe') ]:
             log.error("recipe not in CONARY state file, please run cvc add")
             return
- 
+
     allPaths = [ x[1] for x in state.iterFileList() ]
 
     try:
@@ -434,7 +434,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
         # there is no reason to download anything which is already in the
         # current directory and not autosourced
-        skipPatterns.update([ x[1] for x in state.iterFileList() 
+        skipPatterns.update([ x[1] for x in state.iterFileList()
                                 if not state.fileIsAutoSource(x[0]) ])
         skipFilter = _makeFilter(skipPatterns)
 
@@ -449,7 +449,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
             srcFiles = recipeObj.fetchAllSources(skipFilter = skipFilter)
         except OSError, e:
             if e.errno == errno.ENOENT:
-                raise errors.CvcError('Source file %s does not exist' % 
+                raise errors.CvcError('Source file %s does not exist' %
                                       e.filename)
             else:
                 raise errors.CvcError('Error accessing source file %s: %s' %
@@ -504,7 +504,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     branch = state.getBranch()
 
-    if (state.getLastMerged() 
+    if (state.getLastMerged()
           and recipeVersionStr == state.getLastMerged().trailingRevision().getVersion()):
         # If we've merged, and our changes did not affect the original
         # version, then we try to maintain appropriate shadow dots
@@ -545,8 +545,8 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
         del d
 
     try:
-        result = update.buildLocalChanges(repos, 
-                        [(state, srcPkg, newVersion, 
+        result = update.buildLocalChanges(repos,
+                        [(state, srcPkg, newVersion,
                           update.UpdateFlags(ignoreUGids = True))],
                         forceSha1=True,
                         crossRepositoryDeltas = False,
@@ -567,17 +567,17 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     if not isDifferent and state.getLastMerged() is None:
         # if there are no changes, but this is the result of a
         # merge, we want to commit anyway
-	log.info("no changes have been made to commit")
-	return
+        log.info("no changes have been made to commit")
+        return
 
     if message and message[-1] != '\n':
-	message += '\n'
+        message += '\n'
 
     cl = changelog.ChangeLog(cfg.name, cfg.contact, message)
     if message is None and not cl.getMessageFromUser():
-	log.error("no change log message was given")
-	return
-    
+        log.error("no change log message was given")
+        return
+
 
 
     if cfg.interactive:
@@ -649,7 +649,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
         shadowedVer = state.getLastMerged().createShadow(shadowLabel)
         noDeps = deps.deps.Flavor()
 
-        # Conary requires that if you're committing a source change that 
+        # Conary requires that if you're committing a source change that
         # contains an upstream merge, you also commit a shadow of that
         # version, for tracking purposes.  This allows future merges
         # to know that you've already merged to this point.
@@ -677,7 +677,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     # committing to the repository changes the version timestamp; get the
     # right timestamp to put in the CONARY file
-    matches = repos.getTroveVersionsByBranch({ newState.getName() : 
+    matches = repos.getTroveVersionsByBranch({ newState.getName() :
                                 { newState.getVersion().branch() : None } })
     for ver in matches[newState.getName()]:
         if ver == newState.getVersion():
@@ -709,7 +709,7 @@ def annotate(repos, filename):
         if b not in branchVerList:
             branchVerList[b] = []
         branchVerList[b].append(ver)
-    
+
     found = False
     for (pathId, name, fileId, someFileV) in state.iterFileList():
         if name == filename:
@@ -724,22 +724,22 @@ def annotate(repos, filename):
         log.error("%s is not a text file", filename)
         return
 
-    # finalLines contains the current version of the file and the 
+    # finalLines contains the current version of the file and the
     # annotated information about its creation
     finalLines = []
 
     # lineMap maps lines in an earlier version of the file to version
     # in finalLines.  This map allows a diff showing line changes
-    # between two older versions to be mapped to the latest version 
+    # between two older versions to be mapped to the latest version
     # of the file
-    # Linemap has to be a dict because it is potentially a spare array: 
-    # Line 2301 of an older version could be the same as line 10 in the 
+    # Linemap has to be a dict because it is potentially a spare array:
+    # Line 2301 of an older version could be the same as line 10 in the
     # newest version.
-    lineMap = {} 
-                 
+    lineMap = {}
+
     s = fixeddifflib.SequenceMatcher(None)
     newV = newTrove = newLines = newFileV = newContact = None
-    
+
     verList = [ v for v in branchVerList[branch] if not v.isAfter(curVersion) ]
 
     while verList:
@@ -760,27 +760,27 @@ def annotate(repos, filename):
             oldLines = oldFile.get().readlines()
             oldContact = oldTrove.changeLog.getName()
             if newV == None:
-                # initialization case -- set up finalLines 
+                # initialization case -- set up finalLines
                 # and lineMap
                 index = 0
                 for line in oldLines:
                     # mark all lines as having come from this version
                     finalLines.append([line, None])
-                    lineMap[index] = index 
+                    lineMap[index] = index
                     index = index + 1
                 unmatchedLines = index
             else:
                 for i in xrange(0, len(newLines)):
                     if lineMap.get(i, None) is not None:
                         assert(newLines[i] == finalLines[lineMap[i]][0])
-                # use fixeddifflib SequenceMatcher to 
+                # use fixeddifflib SequenceMatcher to
                 # find lines that are shared between old and new files
                 s.set_seqs(oldLines, newLines)
                 blocks = s.get_matching_blocks()
                 laststartnew = 0
                 laststartold = 0
                 for (startold, startnew, lines) in blocks:
-                    # range (laststartnew, startnew) is the list of all 
+                    # range (laststartnew, startnew) is the list of all
                     # lines in the newer of the two files being diffed
                     # that don't exist in the older of the two files
                     # being diffed.  Associate those lines with the
@@ -792,7 +792,7 @@ def annotate(repos, filename):
                         if lineMap.get(i,None) is not None:
                             # if this entry does not exist in lineMap,
                             # then line i in this file does not match
-                            # to any line in the final file 
+                            # to any line in the final file
                             assert(newLines[i] == finalLines[lineMap[i]][0])
                             assert(finalLines[lineMap[i]][1] is None)
                             finalLines[lineMap[i]][1] = (newV, newContact)
@@ -804,22 +804,22 @@ def annotate(repos, filename):
                 if unmatchedLines == 0:
                     break
 
-                # future diffs 
+                # future diffs
                 changes = {}
                 for (startold, startnew, lines) in blocks:
                     if startold == startnew:
                         continue
                     # the range(startnew, startnew + lines) are the lines
                     # that are the same between newfile and oldfile.  Since
-                    # all future diffs will be against oldfile, we want to 
+                    # all future diffs will be against oldfile, we want to
                     # ensure that the lineMap points from the line numbers
                     # in the old file to the line numbers in the final file
-                    
+
                     for i in range(0, lines):
                         if lineMap.get(startnew + i, None) is not None:
                             changes[startold + i] = lineMap[startnew + i]
                             # the pointer at lineMap[startnew + i]
-                            # is now invalid; the correct pointer is 
+                            # is now invalid; the correct pointer is
                             # now at lineMap[startold + i]
                             if startnew + i not in changes:
                                 changes[startnew + i] = None
@@ -827,12 +827,12 @@ def annotate(repos, filename):
         (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
         (newFileV, newLines) = (oldFileV, oldLines)
 
-        # assert that the lineMap is still correct -- 
+        # assert that the lineMap is still correct --
         for i in xrange(0, len(newLines)):
             if lineMap.get(i, None) is not None:
                 assert(newLines[i] == finalLines[lineMap[i]][0])
-            
-        # there are still unmatched lines, and there is a parent branch,  
+
+        # there are still unmatched lines, and there is a parent branch,
         # so search the parent branch for matches
         if not verList and branch.hasParentBranch():
             switchedBranches = True
@@ -859,7 +859,7 @@ def annotate(repos, filename):
             if line[1] is None:
                 line[1] = (oldV, contact)
 
-    # we have to do some preprocessing try to line up the code w/ long 
+    # we have to do some preprocessing try to line up the code w/ long
     # branch names, otherwise te output is (even more) unreadable
     maxV = 0
     maxN= 0
@@ -874,10 +874,10 @@ def annotate(repos, filename):
         tv = version.trailingRevision()
         name = line[1][1]
         date = time.strftime('%Y-%m-%d', time.localtime(tv.timeStamp))
-        info = '(%-*s %s):' % (maxN, name, date) 
+        info = '(%-*s %s):' % (maxN, name, date)
         versionStr = version.asString(defaultBranch=branch)
         # since the line is not necessary starting at a tabstop,
-        # lines might not line up 
+        # lines might not line up
         line[0] = line[0].replace('\t', ' ' * 8)
         print "%-*s %s %s" % (maxV, version.asString(defaultBranch=branch), info, line[0]),
 
@@ -886,7 +886,7 @@ def _describeShadow(oldVersion, newVersion):
 
 # findRelativeVersion might move to another module?
 def findRelativeVersion(repos, troveName, count, newV):
-    vers = repos.getTroveVersionsByBranch( 
+    vers = repos.getTroveVersionsByBranch(
                             { troveName : { newV.branch() : None } } )
     vers = vers[troveName].keys()
     vers.sort()
@@ -897,7 +897,7 @@ def findRelativeVersion(repos, troveName, count, newV):
     branchList = []
     for v in vers:
         if v.branch() == newV.branch():
-	    branchList.append(v)
+            branchList.append(v)
 
     if len(branchList) < count:
         oldV = None
@@ -988,12 +988,12 @@ def rdiffChangeSet(repos, job):
 
 def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
-	troveName += ":source"
+        troveName += ":source"
 
-    new = repos.findTrove(buildLabel, (troveName, newVersion, None)) 
+    new = repos.findTrove(buildLabel, (troveName, newVersion, None))
     if len(new) > 1:
-	log.error("%s matches multiple versions" % newVersion)
-	return
+        log.error("%s matches multiple versions" % newVersion)
+        return
     new = new[0]
     newV = new[1]
 
@@ -1010,12 +1010,12 @@ def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
             print _describeShadow(oldVersion, newVersion)
             return
 
-	old = repos.findTrove(buildLabel, (troveName, oldVersion, None)) 
-	if len(old) > 1:
-	    log.error("%s matches multiple versions" % oldVersion)
-	    return
-	old = old[0]
-	oldV = old[1]
+        old = repos.findTrove(buildLabel, (troveName, oldVersion, None))
+        if len(old) > 1:
+            log.error("%s matches multiple versions" % oldVersion)
+            return
+        old = old[0]
+        oldV = old[1]
 
     if old:
         old, new = repos.getTroves((old, new))
@@ -1127,7 +1127,7 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
                 return 2
 
     if versionStr:
-	versionStr = state.expandVersionStr(versionStr)
+        versionStr = state.expandVersionStr(versionStr)
 
         try:
             pkgList = repos.findTrove(None, (state.getName(), versionStr, None))
@@ -1135,17 +1135,17 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
             log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
             return 2
-        
-	if len(pkgList) > 1:
-	    log.error("%s specifies multiple versions" % versionStr)
-	    return 2
 
-	oldTrove = repos.getTrove(*pkgList[0])
+        if len(pkgList) > 1:
+            log.error("%s specifies multiple versions" % versionStr)
+            return 2
+
+        oldTrove = repos.getTrove(*pkgList[0])
     else:
-	oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
+        oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
-    result = update.buildLocalChanges(repos, 
-	    [(state, oldTrove, versions.NewVersion(),
+    result = update.buildLocalChanges(repos,
+            [(state, oldTrove, versions.NewVersion(),
               update.UpdateFlags(ignoreUGids = True))],
             forceSha1=True, ignoreAutoSource = True,
             root = dirName)
@@ -1170,23 +1170,23 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
     yield ''
 
     fileList = [ (x[0], x[1], True, x[2], x[3]) for x in troveCs.getNewFileList() ]
-    fileList += [ (x[0], x[1], False, x[2], x[3]) for x in 
-			    troveCs.getChangedFileList() ]
+    fileList += [ (x[0], x[1], False, x[2], x[3]) for x in
+                            troveCs.getChangedFileList() ]
 
     # sort by pathId to match the changeset order
     fileList.sort()
     for (pathId, path, isNew, fileId, newVersion) in fileList:
-	if isNew:
-	    yield '%s: new' % path
-	    chg = changeSet.getFileChange(None, fileId)
-	    f = files.ThawFile(chg, pathId)
-	    if pathList:
-	        continue;
+        if isNew:
+            yield '%s: new' % path
+            chg = changeSet.getFileChange(None, fileId)
+            f = files.ThawFile(chg, pathId)
+            if pathList:
+                continue;
 
 
             if (displayAutoSourceFiles or not f.flags.isAutoSource()) \
                     and f.hasContents and f.flags.isConfig():
-		(contType, contents) = changeSet.getFileContents(pathId, fileId)
+                (contType, contents) = changeSet.getFileContents(pathId, fileId)
                 lines = contents.get().readlines()
 
                 yield '--- /dev/null'
@@ -1195,7 +1195,7 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
                 for line in lines:
                     yield '+%s' %line.rstrip('\n')
                 yield ''
-	    continue
+            continue
 
         # changed file
         if path:
@@ -1229,9 +1229,9 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
         else:
             yield 'version'
 
-	if csInfo and files.contentsChanged(csInfo):
-	    (contType, contents) = changeSet.getFileContents(pathId, fileId)
-	    if contType == changeset.ChangedFileTypes.diff:
+        if csInfo and files.contentsChanged(csInfo):
+            (contType, contents) = changeSet.getFileContents(pathId, fileId)
+            if contType == changeset.ChangedFileTypes.diff:
                 yield '--- %s %s' %(path, oldTrove.getVersion().asString())
                 yield '+++ %s %s' %(path, newVersion.asString())
                 for line in contents.get().readlines():
@@ -1240,8 +1240,8 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
                 yield ''
 
     for pathId in troveCs.getOldFileList():
-	path = oldTrove.getFile(pathId)[0]
-	yield '%s: removed' % path
+        path = oldTrove.getFile(pathId)[0]
+        yield '%s: removed' % path
 
 @api.developerApi
 def updateSrc(repos, versionList = None, callback = None):
@@ -1459,7 +1459,7 @@ def merge(cfg, repos, versionSpec=None, callback=None):
                     return
         versionList = repos.findTrove(parentLabel,
                                      (troveName, versionSpec, None), None)
-        # we use findTrove so we can support both upstream version and 
+        # we use findTrove so we can support both upstream version and
         # upstream version + release.
         if not versionList:
             log.error("Revision %s of %s not found on branch %s" % (versionSpec, troveName, parentBranch))
@@ -1542,8 +1542,8 @@ def merge(cfg, repos, versionSpec=None, callback=None):
             return
 
     changeSet = repos.createChangeSet([(troveName,
-                            (parentRootVersion, deps.deps.Flavor()), 
-                            (parentHeadVersion, deps.deps.Flavor()), 
+                            (parentRootVersion, deps.deps.Flavor()),
+                            (parentHeadVersion, deps.deps.Flavor()),
                             0)], excludeAutoSource = True, callback = callback)
 
     # make sure there are changes to apply
@@ -1553,14 +1553,14 @@ def merge(cfg, repos, versionSpec=None, callback=None):
 
     localVer = parentRootVersion.createShadow(versions.LocalLabel())
     fsJob = update.FilesystemJob(repos, changeSet,
-                                 { (state.getName(), localVer, 
+                                 { (state.getName(), localVer,
                                     state.getFlavor()) : state },
                                  os.getcwd(),
                                  flags = update.UpdateFlags(ignoreUGids = True,
                                                             merge = True) )
     errList = fsJob.getErrorList()
     if errList:
-	for err in errList: log.error(err)
+        for err in errList: log.error(err)
         return 1
     fsJob.apply()
 
@@ -1582,7 +1582,7 @@ def markRemoved(cfg, repos, troveSpec):
     trvList = repos.findTrove(cfg.buildLabel, troveSpec,
                               defaultFlavor = cfg.flavor)
     if len(trvList) > 1:
-        log.error("multiple troves found " + 
+        log.error("multiple troves found " +
             " ".join([ "%s=%s[%s]" % x for x in trvList ] ))
         return 1
 
@@ -1622,7 +1622,7 @@ def markRemoved(cfg, repos, troveSpec):
 
     repos.commitChangeSet(cs)
 
-def addFiles(fileList, ignoreExisting=False, text=False, binary=False, 
+def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
              repos=None, defaultToText=True):
 
     def _addFile(filename, state, stateHash):
@@ -1630,13 +1630,13 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
             log.error("cannot add special directory %s to trove" % filename)
             return
 
-	try:
-	    os.lstat(filename)
-	except OSError:
-	    log.error("file %s does not exist", filename)
+        try:
+            os.lstat(filename)
+        except OSError:
+            log.error("file %s does not exist", filename)
             return
 
-        # Normalize the file path. This will remove things like 
+        # Normalize the file path. This will remove things like
         # ./CONARY, ././CONARY etc.
         filename = os.path.normpath(filename)
 
@@ -1688,7 +1688,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
                 term = fobj.read(1)
                 fobj.close()
                 if term != '\n':
-                    log.error("%s does not end with a trailing new line", 
+                    log.error("%s does not end with a trailing new line",
                                 filename)
 
                     # XXX Should this terminate the import of the whole set,
@@ -1733,7 +1733,7 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
         deref = os.readlink(filename)
         if deref[0] == '/':
             # Absolute paths not allowed
-            log.error("not adding absolute symlink %s -> %s" 
+            log.error("not adding absolute symlink %s -> %s"
                       % (filename, deref))
             continue
 
@@ -1910,26 +1910,26 @@ def renameFile(oldName, newName, repos=None):
     sourceState = conaryState.getSourceState()
 
     if not os.path.exists(oldName):
-	log.error("%s does not exist or is not a regular file" % oldName)
-	return
+        log.error("%s does not exist or is not a regular file" % oldName)
+        return
 
     try:
-	os.lstat(newName)
+        os.lstat(newName)
     except:
-	pass
+        pass
     else:
-	log.error("%s already exists" % newName)
-	return
+        log.error("%s already exists" % newName)
+        return
 
     for (pathId, path, fileId, version) in sourceState.iterFileList():
-	if path == oldName:
-	    os.rename(oldName, newName)
-	    sourceState.addFile(pathId, newName, version, fileId,
+        if path == oldName:
+            os.rename(oldName, newName)
+            sourceState.addFile(pathId, newName, version, fileId,
                         isConfig = sourceState.fileIsConfig(pathId),
                         isAutoSource = sourceState.fileIsAutoSource(pathId))
-	    conaryState.write("CONARY")
-	    return
-    
+            conaryState.write("CONARY")
+            return
+
     log.error("file %s is not under management" % oldName)
 
 def showLog(repos, branch = None, newer = False):
@@ -1957,12 +1957,12 @@ def iterLog(repos, branch = None, newer = False, dirName = '.'):
     state = ConaryStateFromFile(os.sep.join((dirName, "CONARY")),
                                 repos).getSourceState()
     if not branch:
-	branch = state.getBranch()
+        branch = state.getBranch()
     else:
-	if branch[0] != '/':
-	    log.error("branch name expected instead of %s" % branch)
-	    return
-	branch = versions.VersionFromString(branch)
+        if branch[0] != '/':
+            log.error("branch name expected instead of %s" % branch)
+            return
+        branch = versions.VersionFromString(branch)
 
     troveName = state.getName()
 
@@ -1981,7 +1981,7 @@ def iterLog(repos, branch = None, newer = False, dirName = '.'):
     for version in verList:
         if newer and not version.isAfter(newer):
             break
-	l.append((troveName, version, deps.deps.Flavor()))
+        l.append((troveName, version, deps.deps.Flavor()))
 
     yield 'Name  : ' + troveName
     yield 'Branch: ' + branch.asString()
@@ -1993,9 +1993,9 @@ def iterLog(repos, branch = None, newer = False, dirName = '.'):
 
 def iterLogMessages(troves):
     for trove in troves:
-	v = trove.getVersion()
-	cl = trove.getChangeLog()
-	for line in formatOneLog(v, cl):
+        v = trove.getVersion()
+        cl = trove.getChangeLog()
+        for line in formatOneLog(v, cl):
             yield line
         # separate log entries (RBLD-115)
         yield ''
@@ -2008,21 +2008,21 @@ def formatOneLog(version, changeLog=''):
     logMessage = []
 
     if version == versions.NewVersion():
-	versionStr = "(working version)"
+        versionStr = "(working version)"
     else:
-	versionStr = version.trailingRevision().asString()
+        versionStr = version.trailingRevision().asString()
 
     if changeLog.getName():
-	logMessage.append("%s %s (%s) %s" %
-	    (versionStr, changeLog.getName(), changeLog.getContact(), when))
-	lines = changeLog.getMessage().split("\n")
+        logMessage.append("%s %s (%s) %s" %
+            (versionStr, changeLog.getName(), changeLog.getContact(), when))
+        lines = changeLog.getMessage().split("\n")
         if not lines[-1]:
             # remove trailing newline in log message (RBLD-115)
             del lines[-1]
-	for l in lines:
-	    logMessage.append("    %s" % l)
+        for l in lines:
+            logMessage.append("    %s" % l)
     else:
-	logMessage.append('%s %s (no log message)' %(versionStr, when))
+        logMessage.append('%s %s (no log message)' %(versionStr, when))
     return logMessage
 
 def setContext(cfg, contextName=None, ask=False, repos=None):
@@ -2071,7 +2071,7 @@ def setContext(cfg, contextName=None, ask=False, repos=None):
         # ask and not context
         print '* Creating new context %s' % contextName
         context = cfg.setSection(contextName)
-        conaryrc = _ask('File to store context definition in', 
+        conaryrc = _ask('File to store context definition in',
                         os.environ['HOME'] + '/.conaryrc')
 
         buildLabel = str(cfg.buildLabel)
@@ -2206,7 +2206,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
                                              skipFilter = skipFilter)
     except OSError, e:
         if e.errno == errno.ENOENT:
-            raise errors.CvcError('Source file %s does not exist' % 
+            raise errors.CvcError('Source file %s does not exist' %
                                   e.filename)
         else:
             raise errors.CvcError('Error accessing source file %s: %s' %
@@ -2270,12 +2270,12 @@ def generateStatus(repos, dirName='.'):
         results.extend([('A', x) for x in addedFilenames])
         # Sort by file path
         results.sort(lambda x, y: cmp(x[1], y[1]))
-	return results
+        return results
 
     oldTrove = repos.getTrove(state.getName(), state.getVersion(), deps.deps.Flavor())
 
-    result = update.buildLocalChanges(repos, 
-	    [(state, oldTrove, versions.NewVersion(),
+    result = update.buildLocalChanges(repos,
+            [(state, oldTrove, versions.NewVersion(),
               update.UpdateFlags(ignoreUGids = True) )],
             forceSha1=True, ignoreAutoSource = True, root = dirName)
     result = localAutoSourceChanges(oldTrove, result)
@@ -2295,18 +2295,18 @@ troveCs.getNewFileList() ]
         # autosource files aren't in this set, so discard not remove
         dirfilesSet.discard(path)
 
-	if isNew:
+        if isNew:
             results.append(('A', path))
             continue
 
-	# changed file
+        # changed file
         if not path:
             path = oldTrove.getFile(pathId)[0]
         results.append(('M', path))
         continue
 
     for pathId in troveCs.getOldFileList():
-	path = oldTrove.getFile(pathId)[0]
+        path = oldTrove.getFile(pathId)[0]
         results.append(('R', path))
 
     trackedFiles = {}
@@ -2327,7 +2327,7 @@ troveCs.getNewFileList() ]
     results.sort(lambda x, y: cmp(x[1], y[1]))
 
     return results
-	
+
 def _showStat(results):
     'print out status lists as returned by C{generateStatus}'
     for fstat, path in results:

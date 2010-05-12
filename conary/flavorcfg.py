@@ -46,7 +46,7 @@ class CfgFlagSense(CfgType):
             return "prefernot"
         elif val == deps.FLAG_SENSE_REQUIRED:
             return "required"
-  
+
 class SubArchConfig(ConfigFile):
     name             = None
     buildName        = None
@@ -55,20 +55,20 @@ class SubArchConfig(ConfigFile):
     shortDoc         = CfgString
     longDoc          = CfgString
     macro            = CfgDict(CfgString)
-  
+
 class ArchConfig(ConfigFile):
-  
-    _requiredArchProps = ['bits32', 'bits64', 'LE', 'BE'] 
-  
+
+    _requiredArchProps = ['bits32', 'bits64', 'LE', 'BE']
+
     name             = CfgString
     buildName        = CfgString
     shortDoc         = CfgString
     longDoc          = CfgString
     archProp         = CfgDict(CfgBool)
     macro            = CfgDict(CfgString)
- 
+
     def configLine(self, line, file = "override", lineno = '<No line>'):
-	line = line.strip()
+        line = line.strip()
         if line and line[0] == '[' and line[-1] == ']':
             self.setSection(line[1:-1])
             return
@@ -91,18 +91,18 @@ class ArchConfig(ConfigFile):
         self._section = sectionName
 
     def __init__(self, name):
-	ConfigFile.__init__(self)
+        ConfigFile.__init__(self)
         self._section = ''
         self._sections = {}
         self.name = name
 
     def read(self, path):
         ConfigFile.read(self, path)
-	if sorted(self.archProp.iterkeys()) != sorted(self._requiredArchProps):
-	    raise RuntimeError, \
-		    ('Arch %s must specify arch properties %s using the'
-		     ' archProp directive' % (self.name,
-		     ', '.join(sorted(self._requiredArchProps))))
+        if sorted(self.archProp.iterkeys()) != sorted(self._requiredArchProps):
+            raise RuntimeError, \
+                    ('Arch %s must specify arch properties %s using the'
+                     ' archProp directive' % (self.name,
+                     ', '.join(sorted(self._requiredArchProps))))
 
     def addArchFlags(self):
         if 'unamearch' not in self.macro:
@@ -110,7 +110,7 @@ class ArchConfig(ConfigFile):
 
         if 'targetarch' not in self.macro:
             self.macro['targetarch'] = self.name
-        use.Arch._addFlag(self.name, archProps = self.archProp, 
+        use.Arch._addFlag(self.name, archProps = self.archProp,
                           macros=self.macro, platform=True)
         for subArchName in self._sections:
             subArch = self._sections[subArchName]
@@ -124,7 +124,7 @@ class ArchConfig(ConfigFile):
                 newSubsumes.append(item)
             subArch.subsumes = newSubsumes
             use.Arch[self.name]._addFlag(subArch.name,
-                                         subsumes=subArch.subsumes, 
+                                         subsumes=subArch.subsumes,
                                          macros=subArch.macro)
             if subArch.buildName and subArch.buildName != subArch.name:
                 use.Arch[self.name]._addAlias(subArch.name, subArch.buildName)
@@ -142,7 +142,7 @@ class UseFlagConfig(ConfigFile):
     platform         = (CfgBool, False)
 
     def __init__(self, name):
-	ConfigFile.__init__(self)
+        ConfigFile.__init__(self)
         self.name = name
         self.path = None
 
@@ -174,7 +174,7 @@ class UseFlagConfig(ConfigFile):
 
 class FlavorConfig:
     """
-    contains information reflecting the use flags specified by the 
+    contains information reflecting the use flags specified by the
     use and arch paths
     """
 
@@ -193,7 +193,7 @@ class FlavorConfig:
                 continue
             for flag in os.listdir(useDir):
                 flagPath = os.path.join(useDir, flag)
-                if (os.path.isfile(flagPath) 
+                if (os.path.isfile(flagPath)
                     and not flag.startswith('.')):
                     if flag not in self.flags:
                         self.flags[flag] = UseFlagConfig(flag)
@@ -202,7 +202,7 @@ class FlavorConfig:
             useDir = os.path.expanduser(useDir)
             if archDir and os.path.exists(archDir):
                 for arch in os.listdir(archDir):
-                    if (os.path.isfile(os.path.join(archDir, arch)) and 
+                    if (os.path.isfile(os.path.join(archDir, arch)) and
                        not arch.startswith('.')):
                        if arch not in self.arches:
                             self.arches[arch] = ArchConfig(arch)
@@ -210,9 +210,9 @@ class FlavorConfig:
 
     def toDependency(self, override=None):
         useFlags = deps.Flavor()
-        flags = [x.toDepFlag() for x in self.flags.values() ] 
+        flags = [x.toDepFlag() for x in self.flags.values() ]
 
-        useFlags.addDep(deps.UseDependency, 
+        useFlags.addDep(deps.UseDependency,
                         deps.Dependency("use", flags))
         if override:
             if isinstance(override, list):
@@ -234,6 +234,6 @@ class FlavorConfig:
         for arch in self.arches.itervalues():
             arch.addArchFlags()
 
-	# These are the required arch properties, every architecture
+        # These are the required arch properties, every architecture
         # must specify these values
-	use.Arch._setArchProps('bits32', 'bits64', 'LE', 'BE')
+        use.Arch._setArchProps('bits32', 'bits64', 'LE', 'BE')

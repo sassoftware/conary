@@ -30,7 +30,7 @@ class Database(PgDatabase):
     poolmode = True
     cursorClass = Cursor
     iterCursorClass = IterCursor
-           
+
     def connect(self, **kw):
         PgDatabase.connect(self, **kw)
         # we assume that the temptables are held by the pgpool

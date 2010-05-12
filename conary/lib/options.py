@@ -76,7 +76,7 @@ class OptionParser(optparse.OptionParser):
         raise OptionError(msg, self)
 
     def _process_short_opts(self, rargs, values):
-        if (self.hobbleShortOpts and 
+        if (self.hobbleShortOpts and
             (len(self.rargs[0]) > 2 or self.rargs[0][1] in self.forbiddenOpts)):
             self.largs.append(self.rargs.pop(0))
         else:
@@ -104,7 +104,7 @@ class OptionGroup(optparse.OptionGroup):
         if log.getVerbosity() > log.INFO:
             found = False
             for option in self.option_list:
-                if (option.help_level == NORMAL_HELP 
+                if (option.help_level == NORMAL_HELP
                     and option.help != optparse.SUPPRESS_HELP):
                     found = True
                     break
@@ -121,7 +121,7 @@ def optParamCallback(option, opt_str, value, parser, *args, **kw):
         del parser.rargs[0]
         if newValue: # handle --opt= - treat like --opt
             value = newValue
-    elif (not strict and parser.rargs 
+    elif (not strict and parser.rargs
           and parser.rargs[0] and parser.rargs[0][0] != '-'):
         newValue = parser.rargs[0]
         del parser.rargs[0]
@@ -207,7 +207,7 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=None):
     return _processArgs(argDef, cfgMap, cfg, usage, argv)[:2]
 
 def _getUsageStr(usage):
-    # historically, usage was generally a function to print out the usage 
+    # historically, usage was generally a function to print out the usage
     # message.  We want it to be a string.  For now, we
     # convert here to allow backwards compatibility.
     if hasattr(usage, '__call__'):
@@ -223,7 +223,7 @@ def _getUsageStr(usage):
             try:
                 usage()
             except SystemExit:
-                # some of these old usage functions even exit after 
+                # some of these old usage functions even exit after
                 # printing the usage message!
                 pass
             rc = stdout.getvalue() + stderr.getvalue()
@@ -281,7 +281,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=None, version=None,
 
     parser = _getParser(params, cfgMap, usage, version, useHelp, defaultGroup,
                         interspersedArgs, hobbleShortOpts,
-                        addDebugOptions=addDebugOptions, 
+                        addDebugOptions=addDebugOptions,
                         addConfigOptions=addConfigOptions,
                         addVerboseOptions=addVerboseOptions,
                         description=description)
@@ -330,7 +330,7 @@ def _processArgs(params, cfgMap, cfg, usage, argv=None, version=None,
     return argSet, otherArgs, parser, options
 
 def getOptionParser(params, usage, version=None, useHelp=False,
-                    defaultGroup=None, interspersedArgs=True, 
+                    defaultGroup=None, interspersedArgs=True,
                     hobbleShortOpts=False, description=None):
     parser = OptionParser(usage=usage, add_help_option=useHelp,
                           version=version,

@@ -40,8 +40,8 @@ class FileContents(object):
 
     def __init__(self):
         self.compressed = False
-	if self.__class__ == FileContents:
-	    raise NotImplementedError
+        if self.__class__ == FileContents:
+            raise NotImplementedError
 
 class FromDataStore(FileContents):
 
@@ -51,15 +51,15 @@ class FromDataStore(FileContents):
         return self.__class__(self.store, self.sha1)
 
     def get(self):
-	return self.store.openFile(sha1helper.sha1ToString(self.sha1))
+        return self.store.openFile(sha1helper.sha1ToString(self.sha1))
 
     def path(self):
         return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
 
     def __init__(self, store, sha1):
         self.compressed = False
-	self.store = store
-	self.sha1 = sha1
+        self.store = store
+        self.sha1 = sha1
 
 class CompressedFromDataStore(FileContents):
 
@@ -72,14 +72,14 @@ class CompressedFromDataStore(FileContents):
         return self.__class__(self.store, self.sha1)
 
     def get(self):
-	return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
+        return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
 
     def path(self):
         return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
 
     def __init__(self, store, sha1):
-	self.store = store
-	self.sha1 = sha1
+        self.store = store
+        self.sha1 = sha1
         self.compressed = True
 
 class FromFilesystem(FileContents):
@@ -103,7 +103,7 @@ class FromFilesystem(FileContents):
         return f
 
     def __init__(self, path, compressed = False):
-	self.path = path
+        self.path = path
         self.compressed = compressed
 
 class FromChangeSet(FileContents):
@@ -114,13 +114,13 @@ class FromChangeSet(FileContents):
         return self.__class__(self.cs, self.pathId)
 
     def get(self):
-	return self.cs.getFileContents(self.pathId, self.fileId,
+        return self.cs.getFileContents(self.pathId, self.fileId,
                                        compressed = self.compressed)[1].get()
 
     def __init__(self, cs, pathId, fileId, compressed = False):
-	self.cs = cs
-	self.pathId = pathId
-	self.fileId = fileId
+        self.cs = cs
+        self.pathId = pathId
+        self.fileId = fileId
         self.compressed = compressed
 
 class FromString(FileContents):
@@ -139,7 +139,7 @@ class FromString(FileContents):
         return self.__class__(self.str)
 
     def get(self):
-	return StringIO(self.str)
+        return StringIO(self.str)
 
     def __eq__(self, other):
         if type(other) is str:
@@ -149,7 +149,7 @@ class FromString(FileContents):
         return False
 
     def __init__(self, str, compressed = False):
-	self.str = str
+        self.str = str
         self.compressed = compressed
 util.SendableFileSet._register(FromString)
 
@@ -163,10 +163,10 @@ class FromFile(FileContents):
 
     def get(self):
         self.f.seek(0)
-	return self.f
+        return self.f
 
     def __init__(self, f, compressed = False):
-	self.f = f
+        self.f = f
         self.compressed = compressed
 
 class WithFailedHunks(FileContents):
@@ -177,12 +177,12 @@ class WithFailedHunks(FileContents):
         return self.__class__(self.fc, self.hunks)
 
     def get(self):
-	return self.fc.get()
+        return self.fc.get()
 
     def getHunks(self):
-	return self.hunks
+        return self.hunks
 
     def __init__(self, fc, hunks):
-	self.fc = fc
-	self.hunks = hunks
+        self.fc = fc
+        self.hunks = hunks
         self.compressed = False

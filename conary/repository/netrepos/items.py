@@ -37,8 +37,8 @@ class Items(idtable.IdTable):
         if val: val = 1
         else:   val = 0
         # we attempt to avoid doing busywork here in order to reduce
-        # lock contention on the items table during multiple commits       
-	cu.execute("UPDATE Items SET hasTrove = ? "
+        # lock contention on the items table during multiple commits
+        cu.execute("UPDATE Items SET hasTrove = ? "
                    "WHERE itemId = ? AND hasTrove != ?",
                    (val, itemId, val))
 
@@ -49,13 +49,13 @@ class Items(idtable.IdTable):
             yield row[0]
 
     def removeUnused(self):
-	cu = self.db.cursor()
-	cu.execute("""
-	    DELETE FROM Items WHERE Items.itemId IN
-		(SELECT items.itemId FROM items
-		 LEFT OUTER JOIN instances ON items.itemId = instances.itemId
-		 WHERE instances.itemId is NULL)
-	""")
+        cu = self.db.cursor()
+        cu.execute("""
+            DELETE FROM Items WHERE Items.itemId IN
+                (SELECT items.itemId FROM items
+                 LEFT OUTER JOIN instances ON items.itemId = instances.itemId
+                 WHERE instances.itemId is NULL)
+        """)
 
     def updateCheckTrove(self, itemId, item):
         cu = self.db.cursor()
@@ -70,7 +70,7 @@ class Items(idtable.IdTable):
         select distinct i.item, i.itemId from Permissions as p
         join Items as i on p.itemId = i.itemId
         where not exists (
-            select 1 from CheckTroveCache as ctc 
+            select 1 from CheckTroveCache as ctc
             where i.itemId = ctc.patternId and ctc.itemId = ? ) """, itemId)
         pattSet = set([(x[0],x[1]) for x in cu.fetchall()])
         # add the marker - this should not exist since we checked it earlier
@@ -80,7 +80,7 @@ class Items(idtable.IdTable):
                 cu.execute("""
                 insert into CheckTroveCache(itemId, patternId)
                 values (?,?) """, (itemId, patternId))
-                
+
     def delId(self, theId):
         cu = self.db.cursor()
         cu.execute("delete from CheckTroveCache where itemId = ?", theId)
@@ -107,5 +107,5 @@ class Items(idtable.IdTable):
                 cu.execute("insert into CheckTroveCache(itemId, patternId) "
                            "values (?,?)", (tid, itemId))
         return itemId
-    
-            
+
+

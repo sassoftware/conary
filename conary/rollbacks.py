@@ -106,7 +106,7 @@ def formatRollbacks(cfg, rollbacks, stream=None):
                     # Don't display changes to local branch
                     continue
                 if not oldVersion:
-                    w_(templ % ('erased', name, 
+                    w_(templ % ('erased', name,
                                 verStr(cfg, newVersion, newFlavor)))
                 else:
                     ov = oldVersion.trailingRevision()
@@ -139,7 +139,7 @@ def formatRollbacks(cfg, rollbacks, stream=None):
                         continue
 
                 if (name, version, flavor) in compByPkg:
-                    comps = [ ":" + x 
+                    comps = [ ":" + x
                                 for x in compByPkg[(name, version, flavor)]
                                 if x is not None ]
                     if comps:
@@ -155,7 +155,7 @@ def formatRollbacksAsUpdate(cfg, rollbackList):
 
     for idx, rb in enumerate(rollbackList):
         print 'Job %s of %s' % (idx + 1, len(rollbackList))
-        
+
         newList = []
         oldList = []
         for cs in rb.iterChangeSets():
@@ -179,8 +179,8 @@ def formatRollbacksAsUpdate(cfg, rollbackList):
                 pkgInfo = info
                 component = None
             l = compByPkg.setdefault(pkgInfo, [])
-            l.append(component)                
-        
+            l.append(component)
+
         oldList.sort()
         for info in newList:
             (name, oldVersion, oldFlavor, newVersion, newFlavor) = info
@@ -194,13 +194,13 @@ def formatRollbacksAsUpdate(cfg, rollbackList):
                 comps = [":" + x for x in compByPkg[info] if x is not None]
                 if comps:
                     name += '(%s)' % " ".join(comps)
-                    
+
             if newVersion.onLocalLabel():
                 # Don't display changes to local branch
                 continue
-                
+
             if not oldVersion:
-                print(templ % ('Install', name, 
+                print(templ % ('Install', name,
                             verStr(cfg, newVersion, newFlavor)))
             else:
                 ov = oldVersion.trailingRevision()
@@ -233,7 +233,7 @@ def formatRollbacksAsUpdate(cfg, rollbackList):
                     continue
 
             if (name, version, flavor) in compByPkg:
-                comps = [ ":" + x 
+                comps = [ ":" + x
                             for x in compByPkg[(name, version, flavor)]
                             if x is not None ]
                 if comps:
@@ -313,7 +313,7 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
     if showInfoOnly or client.cfg.interactive:
         rollbackList = [ rollbackStack.getRollback(x) for x in rollbacks if rollbackStack.hasRollback(x) ]
         formatRollbacksAsUpdate(client.cfg, rollbackList)
-        
+
     if showInfoOnly:
         return 0
 
@@ -437,7 +437,7 @@ class _RollbackScripts(object):
         try:
             stream = file(cls._getMDFileName(dir))
         except IOError, e:
-            raise RollbackScriptsError("Open error: %s: %s: %s" % 
+            raise RollbackScriptsError("Open error: %s: %s: %s" %
                 (e.errno, e.filename, e.strerror))
 
         while 1:
@@ -527,7 +527,7 @@ class _RollbackScripts(object):
         try:
             fd = os.open(fileName, flags, 0600)
         except OSError, e:
-            raise RollbackScriptsError("Open error: %s: %s: %s" % 
+            raise RollbackScriptsError("Open error: %s: %s: %s" %
                 (e.errno, e.filename, e.strerror))
 
         return os.fdopen(fd, "w")

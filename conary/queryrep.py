@@ -1,4 +1,4 @@
-# 
+#
 # Copyright (c) 2004-2008 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
@@ -36,19 +36,19 @@ FLAVOR_FILTER_EXACT  = 3
 
 def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
                   # query options
-                  versionFilter=VERSION_FILTER_LATEST, 
-                  flavorFilter=FLAVOR_FILTER_BEST, 
+                  versionFilter=VERSION_FILTER_LATEST,
+                  flavorFilter=FLAVOR_FILTER_BEST,
                   useAffinity = False,
                   # trove options
                   info = False, digSigs = False, showDeps = False,
-                  showBuildReqs = False, showBuildLog = False, filesToShow = [], 
+                  showBuildReqs = False, showBuildLog = False, filesToShow = [],
                   # file options
-                  ls = False, lsl = False, ids = False, sha1s = False, 
+                  ls = False, lsl = False, ids = False, sha1s = False,
                   tags = False, fileDeps = False, fileVersions = False,
                   fileFlavors = False, capsules = False,
                   # collection options
                   showTroves = False, recurse = None, showAllTroves = False,
-                  weakRefs = False, showTroveFlags = False, 
+                  weakRefs = False, showTroveFlags = False,
                   alwaysDisplayHeaders = False,
                   troveTypes=trovesource.TROVE_QUERY_PRESENT):
     """
@@ -58,10 +58,10 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @type cfg: conarycfg.ConaryConfiguration
        @param troveSpecs: troves to search for
        @type troveSpecs: list of troveSpecs (n[=v][[f]])
-       @param versionFilter: add documentation here.  Check man page for 
+       @param versionFilter: add documentation here.  Check man page for
        general description
        @type versionFilter: bool
-       @param flavorFilter: add documentation here.  Check man page for 
+       @param flavorFilter: add documentation here.  Check man page for
        general description.
        @type flavorFilter: bool
        @param useAffinity: If False, disallow affinity database use.
@@ -73,7 +73,7 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @param showBuildReqs: If true, display the versions and flavors of the
        build requirements that were used to build the given troves
        @type showBuildReqs: bool
-       @param showDeps: If true, display provides and requires information 
+       @param showDeps: If true, display provides and requires information
        for the trove.
        @type showDeps: bool
        @param ls: If true, list files in the trove
@@ -95,7 +95,7 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @type showTroves: bool
        @param recurse: display child troves of this trove, recursively
        @type recurse: bool
-       @param showAllTroves: If true, display all byDefault False child troves 
+       @param showAllTroves: If true, display all byDefault False child troves
        of this trove
        @type showAllTroves: bool
        @param weakRefs: display both weak and strong references of this trove.
@@ -103,7 +103,7 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
        @param showTroveFlags: display [<flags>] list with information about
        the given troves.
        @type showTroveFlags: bool
-       @param alwaysDisplayHeaders: If true, display headers even when listing  
+       @param alwaysDisplayHeaders: If true, display headers even when listing
        files.
        @type alwaysDisplayHeaders: bool
        @rtype: None
@@ -124,22 +124,22 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
 
     whatProvidesList = [ deps.parseDep(x) for x in whatProvidesList ]
 
-    troveTups = getTrovesToDisplay(repos, troveSpecs, pathList, 
+    troveTups = getTrovesToDisplay(repos, troveSpecs, pathList,
                                    whatProvidesList,
                                    versionFilter, flavorFilter,
-                                   cfg.installLabelPath, cfg.flavor, 
+                                   cfg.installLabelPath, cfg.flavor,
                                    affinityDb,
                                    troveTypes=troveTypes)
 
     if (filesToShow or showBuildLog) and len(troveTups)>1:
         raise ConaryError('Error: %s is ambigious. Please specify one of: \n%s' % \
-                    (troveSpecs[0], 
+                    (troveSpecs[0],
                     "\n".join([x[0]+"="+str(x[1].trailingLabel()) for x in troveTups]) ))
 
     dcfg = display.DisplayConfig(repos, affinityDb)
 
     dcfg.setTroveDisplay(deps=showDeps, info=info,
-                         showBuildReqs=showBuildReqs, showBuildLog=showBuildLog, filesToShow = filesToShow, 
+                         showBuildReqs=showBuildReqs, showBuildLog=showBuildLog, filesToShow = filesToShow,
                          digSigs=digSigs, fullVersions=cfg.fullVersions,
                          showLabels=cfg.showLabels, fullFlavors=cfg.fullFlavors,
                          showComponents = cfg.showComponents,
@@ -152,11 +152,11 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
     recurseOne = showTroves or showAllTroves or weakRefs
     if recurse is None and not recurseOne and troveSpecs:
         # if we didn't explicitly set recurse and we're not recursing one
-        # level explicitly and we specified troves (so everything won't 
+        # level explicitly and we specified troves (so everything won't
         # show up at the top level anyway), guess at whether to recurse
         recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps,
                            fileVersions, fileFlavors)
-    displayHeaders = alwaysDisplayHeaders or showTroveFlags 
+    displayHeaders = alwaysDisplayHeaders or showTroveFlags
 
     dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = showAllTroves or showBuildLog,
@@ -174,8 +174,8 @@ def displayTroves(cfg, troveSpecs=[], pathList = [], whatProvidesList=[],
     display.displayTroves(dcfg, formatter, troveTups)
 
 
-def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList, 
-                       versionFilter, flavorFilter, labelPath, defaultFlavor, 
+def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
+                       versionFilter, flavorFilter, labelPath, defaultFlavor,
                        affinityDb, troveTypes=trovesource.TROVE_QUERY_PRESENT):
     """ Finds troves that match the given trove specifiers, using the
         current configuration, and parameters
@@ -225,7 +225,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
             troveTups.extend(results)
 
         # Search for troves using findTroves.  The options we
-        # specify to findTroves are determined by the version and 
+        # specify to findTroves are determined by the version and
         # flavor filter.
         if pathList:
             troveTups += getTrovesByPath(repos, pathList, versionFilter,
@@ -236,7 +236,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
             return sorted(troveTups, display._sortTroves)
 
         # Search for troves using findTroves.  The options we
-        # specify to findTroves are determined by the version and 
+        # specify to findTroves are determined by the version and
         # flavor filter.
         troveSpecs = [ ((not isinstance(x, str) and x) or
                          cmdline.parseTroveSpec(x, allowEmptyName=False)) \
@@ -262,13 +262,13 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
 
         exactFlavors = False
         if flavorFilter == FLAVOR_FILTER_ALL:
-            searchFlavor = None 
-            bestFlavor = False 
+            searchFlavor = None
+            bestFlavor = False
             acrossFlavors = True # there are no flavors to go 'across'
             newSpecs = []
             origSpecs = {}
-            # We do extra processing here.  We want FLAVOR_FILTER_ALL to work 
-            # when you specify a flavor to limit the all to. 
+            # We do extra processing here.  We want FLAVOR_FILTER_ALL to work
+            # when you specify a flavor to limit the all to.
             # But findTrove won't let us do that, since it expects that
             # the flavors it gets passed are supersets of the trove flavors
             # So we search with no flavor and search by hand afterwards.
@@ -309,7 +309,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
                                    exactFlavors = exactFlavors)
 
         # do post processing on the result if necessary
-        if (flavorFilter == FLAVOR_FILTER_ALL 
+        if (flavorFilter == FLAVOR_FILTER_ALL
             or versionFilter == VERSION_FILTER_LATEST):
             for (n,vS,fS), tups in results.iteritems():
                 if not tups:
@@ -370,7 +370,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
 
         resultsDict = {}
 
-        resultsDict = queryFn({'': {labelPath[0] : flavor}}, 
+        resultsDict = queryFn({'': {labelPath[0] : flavor}},
                                bestFlavor = bestFlavor, troveTypes=troveTypes)
         for label in labelPath[1:]:
             d = queryFn({'': {label : flavor}}, bestFlavor = bestFlavor,

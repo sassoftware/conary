@@ -39,7 +39,7 @@ class SchemaMigration:
         self.msg = "Converting database schema to version %s..." % self.Version
         # enforce strict pecking order on major schema revisions
         assert (self.canUpgrade())
-        
+
     def _dbVersion(self, v):
         if isinstance(v, sqllib.DBversion):
             return v
@@ -48,7 +48,7 @@ class SchemaMigration:
         elif isinstance(v, tuple):
             return sqllib.DBversion(*v)
         raise RuntimeError("Invalid DBversion specification", DBversion)
-    
+
     # likely candidates for overrides
     def canUpgrade(self):
         # comparing db version vs our Version
@@ -57,7 +57,7 @@ class SchemaMigration:
         if self.version.major == self.Version.major - 1:
             return True
         return False
-    
+
     # "migrate" function handles major scham changes (ie, (14,7) -> (15,0)
     # for minor schema updates we will look up migrate1, migrate2, etc
     def migrate(self):
@@ -83,7 +83,7 @@ class SchemaMigration:
             if not skipCommit:
                 self.db.commit()
         return toVer
-    
+
     def __call__(self, skipCommit=False):
         if not self.canUpgrade():
             return self.version

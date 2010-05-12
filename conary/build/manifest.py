@@ -29,7 +29,7 @@ class Manifest:
         # where package is derived from data not available at __init__ time
         if package is None:
             package = self.package
-        
+
         self.manifestsDir = '%s/%s/_MANIFESTS_' \
             % (util.normpath(self.recipe.cfg.buildPath), self.recipe.name)
 

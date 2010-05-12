@@ -31,7 +31,7 @@ from conary.repository import changeset
 from conaryclient import cmdline
 from conaryclient.cmdline import parseTroveSpec
 
-# FIXME client should instantiated once per execution of the command line 
+# FIXME client should instantiated once per execution of the command line
 # conary client
 
 class CriticalUpdateInfo(conaryclient.CriticalUpdateInfo):
@@ -84,25 +84,25 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         t = ""
 
         if self.updateText:
-	    if self.updateHunk is not None and self.updateHunk[1] != 1:
-		if self.csText is None:
-		    ofText = " of %d" % self.updateHunk[1]
-		else:
-		    ofText = ""
+            if self.updateHunk is not None and self.updateHunk[1] != 1:
+                if self.csText is None:
+                    ofText = " of %d" % self.updateHunk[1]
+                else:
+                    ofText = ""
 
-		job = "Job %d%s: %s%s" % (self.updateHunk[0], 
-					  ofText,
-					  self.updateText[0].lower(),
-					  self.updateText[1:])
+                job = "Job %d%s: %s%s" % (self.updateHunk[0],
+                                          ofText,
+                                          self.updateText[0].lower(),
+                                          self.updateText[1:])
 
             t += self.updateText
 
         if self.csText:
             t = self.csText + ' '
 
-	if t and len(t) < 76:
+        if t and len(t) < 76:
             t = t[:76]
-	    t += '...'
+            t += '...'
 
         self._message(t)
 
@@ -226,8 +226,8 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         """
         @see: callbacks.UpdateCallback.preparingUpdate
         """
-        self.updateMsg("Preparing update (%d of %d)" % 
-		      (troveNum, troveCount))
+        self.updateMsg("Preparing update (%d of %d)" %
+                      (troveNum, troveCount))
 
     @locked
     def restoreFiles(self, size, totalSize):
@@ -237,7 +237,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         # Locked, because we modify self.restored
         if totalSize != 0:
             self.restored += size
-            self.updateMsg("Writing %dk of %dk (%d%%)" 
+            self.updateMsg("Writing %dk of %dk (%d%%)"
                         % (self.restored / 1024 , totalSize / 1024,
                            (self.restored * 100) / totalSize))
 
@@ -254,7 +254,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         @see: callbacks.UpdateCallback.creatingDatabaseTransaction
         """
         self.updateMsg("Creating database transaction (%d of %d)" %
-		      (troveNum, troveCount))
+                      (troveNum, troveCount))
 
     def updatingDatabase(self, step, stepNum, stepCount):
         if step == 'latest':
@@ -645,24 +645,24 @@ def updateConary(cfg, conaryVersion):
         print >> sys.stderr, "While attempting to download from", url.url
         print >> sys.stderr, "ERROR: Could not download the conary changeset."
         if msg is not None:
-            print >> sys.stderr, "Server Error Code:", msg.code, msg.msg        
+            print >> sys.stderr, "Server Error Code:", msg.code, msg.msg
         url.close()
-        return -1    
+        return -1
     # first, grab the label of the installed conary client
-    db = database.Database(cfg.root, cfg.dbPath)    
+    db = database.Database(cfg.root, cfg.dbPath)
     troves = db.trovesByName("conary")
 
     if len(troves) > 1:
         # filter based on the version of conary this is (after all, we should
         # try to update ourself; not something else)
-        troves = [ x for x in troves if 
+        troves = [ x for x in troves if
                    x[1].trailingRevision().getVersion() == conaryVersion ]
 
     # FIXME: if no conary troves are found to be installed, should we
     # attempt a recover/install anyway?
     assert(len(troves)==1)
 
-    (name, version, flavor) = troves[0]   
+    (name, version, flavor) = troves[0]
     client = conaryclient.ConaryClient(cfg)
     csUrl = client.getConaryUrl(version, flavor)
     if csUrl == "":
@@ -675,7 +675,7 @@ def updateConary(cfg, conaryVersion):
     csSize = 0
     if url.info().has_key("content-length"):
         csSize = int(url.info()["content-length"])
-        
+
     # check that we can make updates before bothering with downloading this
     client.checkWriteableRoot()
 
@@ -753,7 +753,7 @@ def updateAll(cfg, **kwargs):
 def changePins(cfg, troveStrList, pin = True):
     client = conaryclient.ConaryClient(cfg)
     client.checkWriteableRoot()
-    troveList = [] 
+    troveList = []
     for item in troveStrList:
         name, ver, flv = parseTroveSpec(item)
         troves = client.db.findTrove(None, (name, ver, flv))

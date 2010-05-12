@@ -234,7 +234,7 @@ class TagSpec(packagepolicy.TagSpec):
     # do not load the system-defined tags for derived packages
     processUnmodified = True
     def doProcess(self, recipe):
-	self.tagList = []
+        self.tagList = []
         self.suggestBuildRequires = set()
         self.db = None
         self.fullReqs = set()

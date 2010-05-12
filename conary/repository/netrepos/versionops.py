@@ -31,58 +31,58 @@ class BranchTable(idtable.IdTable):
         assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
         cu.execute("INSERT INTO Branches (branch) VALUES (?)",
-		   branch.asString())
-	return cu.lastrowid
+                   branch.asString())
+        return cu.lastrowid
 
     def getId(self, theId):
-	return versions.VersionFromString(idtable.IdTable.getId(self, theId))
+        return versions.VersionFromString(idtable.IdTable.getId(self, theId))
 
     def __getitem__(self, branch):
         assert(isinstance(branch, versions.Branch))
-	return idtable.IdTable.__getitem__(self, branch.asString())
+        return idtable.IdTable.__getitem__(self, branch.asString())
 
     def get(self, branch, defValue):
         assert(isinstance(branch, versions.Branch))
-	return idtable.IdTable.get(self, branch.asString(), defValue)
+        return idtable.IdTable.get(self, branch.asString(), defValue)
 
     def __delitem__(self, branch):
         assert(isinstance(branch, versions.Branch))
-	idtable.IdTable.__delitem__(self, branch.asString())
+        idtable.IdTable.__delitem__(self, branch.asString())
 
     def has_key(self, branch):
         assert(isinstance(branch, versions.Branch))
-	return idtable.IdTable.has_key(self, branch.asString())
+        return idtable.IdTable.has_key(self, branch.asString())
 
     def iterkeys(self):
-	raise NotImplementedError
+        raise NotImplementedError
 
     def iteritems(self):
-	raise NotImplementedError
+        raise NotImplementedError
 
 class LabelTable(idtable.IdTable):
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
 
     def addId(self, label):
-	idtable.IdTable.addId(self, label.asString())
+        idtable.IdTable.addId(self, label.asString())
 
     def __getitem__(self, label):
-	return idtable.IdTable.__getitem__(self, label.asString())
+        return idtable.IdTable.__getitem__(self, label.asString())
 
     def get(self, label, defValue):
-	return idtable.IdTable.get(self, label.asString(), defValue)
+        return idtable.IdTable.get(self, label.asString(), defValue)
 
     def __delitem__(self, label):
-	idtable.IdTable.__delitem__(self, label.asString())
+        idtable.IdTable.__delitem__(self, label.asString())
 
     def has_key(self, label):
-	return idtable.IdTable.has_key(self, label.asString())
+        return idtable.IdTable.has_key(self, label.asString())
 
     def iterkeys(self):
-	raise NotImplementedError
+        raise NotImplementedError
 
     def iteritems(self):
-	raise NotImplementedError
+        raise NotImplementedError
 
 # class and methods for handling LatestCache operations
 class LatestTable:
@@ -119,7 +119,7 @@ class LatestTable:
         _insertView(cu, LATEST_TYPE_NORMAL)
         self.db.analyze("LatestCache")
         return
-    
+
     def update(self, cu, itemId, branchId, flavorId, roleId = None):
         cond = ""
         args = [itemId, branchId, flavorId]
@@ -185,50 +185,50 @@ class LatestTable:
         join Nodes using(itemId, versionId) """)
         for itemId, flavorId, branchId in cu.fetchall():
             self.update(cu, itemId, branchId, flavorId, roleId)
-    
+
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
-	idtable.IdPairMapping.__init__(self, db, 'LabelMap', 'itemId', 'labelId', 'branchId')
+        idtable.IdPairMapping.__init__(self, db, 'LabelMap', 'itemId', 'labelId', 'branchId')
 
     def branchesByItem(self, itemId):
-	return self.getByFirst(itemId)
+        return self.getByFirst(itemId)
 
 class Nodes:
     def __init__(self, db):
-	self.db = db
+        self.db = db
 
     def addRow(self, itemId, branchId, versionId, sourceItemId, timeStamps):
         cu = self.db.cursor()
-	cu.execute("""
+        cu.execute("""
         INSERT INTO Nodes
         (itemId, branchId, versionId, sourceItemId, timeStamps, finalTimeStamp)
         VALUES (?, ?, ?, ?, ?, ?)""",
-		   itemId, branchId, versionId, sourceItemId,
-		   ":".join(["%.3f" % x for x in timeStamps]),
-		   '%.3f' %timeStamps[-1])
-	return cu.lastrowid
+                   itemId, branchId, versionId, sourceItemId,
+                   ":".join(["%.3f" % x for x in timeStamps]),
+                   '%.3f' %timeStamps[-1])
+        return cu.lastrowid
 
     def hasItemId(self, itemId):
         cu = self.db.cursor()
         cu.execute("SELECT itemId FROM Nodes WHERE itemId=?",
-		   itemId)
-	return not(cu.fetchone() == None)
+                   itemId)
+        return not(cu.fetchone() == None)
 
     def hasRow(self, itemId, versionId):
         cu = self.db.cursor()
         cu.execute("SELECT itemId FROM Nodes "
-			"WHERE itemId=? AND versionId=?", itemId, versionId)
-	return not(cu.fetchone() == None)
+                        "WHERE itemId=? AND versionId=?", itemId, versionId)
+        return not(cu.fetchone() == None)
 
     def getRow(self, itemId, versionId, default):
         cu = self.db.cursor()
         cu.execute("SELECT nodeId FROM Nodes "
-			"WHERE itemId=? AND versionId=?", itemId, versionId)
-	nodeId = cu.fetchone()
-	if nodeId is None:
-	    return default
-	return nodeId[0]
+                        "WHERE itemId=? AND versionId=?", itemId, versionId)
+        nodeId = cu.fetchone()
+        if nodeId is None:
+            return default
+        return nodeId[0]
 
     def updateSourceItemId(self, nodeId, sourceItemId, mirrorMode=False):
         # mirrorMode is allowed to "steal" the sourceItemId of an
@@ -258,55 +258,55 @@ class Nodes:
 class SqlVersioning:
     def __init__(self, db, versionTable, branchTable):
         self.items = items.Items(db)
-	self.labels = LabelTable(db)
-	self.labelMap = LabelMap(db)
-	self.versionTable = versionTable
+        self.labels = LabelTable(db)
+        self.labelMap = LabelMap(db)
+        self.versionTable = versionTable
         self.branchTable = branchTable
-	self.needsCleanup = False
-	self.nodes = Nodes(db)
-	self.db = db
+        self.needsCleanup = False
+        self.nodes = Nodes(db)
+        self.db = db
 
     def versionsOnBranch(self, itemId, branchId):
-	cu = self.db.cursor()
-	cu.execute("""
-	    SELECT versionId FROM Nodes WHERE
-		itemId=? AND branchId=? ORDER BY finalTimeStamp DESC
-	""", itemId, branchId)
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT versionId FROM Nodes WHERE
+                itemId=? AND branchId=? ORDER BY finalTimeStamp DESC
+        """, itemId, branchId)
 
-	for (versionId,) in cu:
-	    yield versionId
+        for (versionId,) in cu:
+            yield versionId
 
     def branchesOfLabel(self, itemId, label):
-	labelId = self.labels[label]
-	return self.labelMap[(itemId, labelId)]
+        labelId = self.labels[label]
+        return self.labelMap[(itemId, labelId)]
 
     def versionsOfItem(self, itemId):
-	for branchId in self.labelMap.branchesByItem(itemId):
-	    for versionId in self.versionsOnBranch(itemId, branchId):
-		yield versionId
+        for branchId in self.labelMap.branchesByItem(itemId):
+            for versionId in self.versionsOnBranch(itemId, branchId):
+                yield versionId
 
     def branchesOfItem(self, itemId):
-	return self.labelMap.branchesByItem(itemId)
+        return self.labelMap.branchesByItem(itemId)
 
     def hasVersion(self, itemId, versionId):
-	return self.nodes.hasItemId(itemId)
+        return self.nodes.hasItemId(itemId)
 
     def createVersion(self, itemId, version, flavorId, sourceName):
-	"""
-	Creates a new versionId for itemId. The branch must already exist
-	for the given itemId.
-	"""
-	# make sure the branch exists; we need the branchId in case we
-	# need to make this the latest version on the branch
-	branch = version.branch()
+        """
+        Creates a new versionId for itemId. The branch must already exist
+        for the given itemId.
+        """
+        # make sure the branch exists; we need the branchId in case we
+        # need to make this the latest version on the branch
+        branch = version.branch()
         label = branch.label()
-	branchId = self.branchTable.get(branch, None)
-	if not branchId:
-	    # should we implicitly create these? it's certainly easier...
-	    #raise MissingBranchError(itemId, branch)
-	    branchId = self.createBranch(itemId, branch)
-	else:
-	    # make sure the branch exists for this itemId; there are cases
+        branchId = self.branchTable.get(branch, None)
+        if not branchId:
+            # should we implicitly create these? it's certainly easier...
+            #raise MissingBranchError(itemId, branch)
+            branchId = self.createBranch(itemId, branch)
+        else:
+            # make sure the branch exists for this itemId; there are cases
             # where the branch can exist but not the label (most notably
             # if the branch was part of a redirect target)
             labelId = self.labels.get(label, None)
@@ -319,68 +319,68 @@ class SqlVersioning:
                 if existingBranchId == branchId: break
 
             if existingBranchId != branchId:
-		self.createBranch(itemId, branch)
+                self.createBranch(itemId, branch)
 
-	versionId = self.versionTable.get(version, None)
-	if versionId == None:
+        versionId = self.versionTable.get(version, None)
+        if versionId == None:
             try:
                 self.versionTable.addId(version)
             except sqlerrors.ColumnNotUnique:
                 import sys
                 print >> sys.stderr, 'ERROR: tried to add', version.asString(), 'to version table but it seems to already be there', versionId
                 raise
-	    versionId = self.versionTable.get(version, None)
+            versionId = self.versionTable.get(version, None)
 
-	if self.nodes.hasRow(itemId, versionId):
-	    raise DuplicateVersionError(itemId, version)
+        if self.nodes.hasRow(itemId, versionId):
+            raise DuplicateVersionError(itemId, version)
 
         sourceItemId = None
         if sourceName:
             sourceItemId = self.items.getOrAddId(sourceName)
 
-	nodeId = self.nodes.addRow(itemId, branchId, versionId, sourceItemId,
-				   version.timeStamps())
+        nodeId = self.nodes.addRow(itemId, branchId, versionId, sourceItemId,
+                                   version.timeStamps())
 
-	return (nodeId, versionId)
+        return (nodeId, versionId)
 
     def createBranch(self, itemId, branch):
-	"""
-	Creates a new branch for the given node.
-	"""
-	label = branch.label()
-	branchId = self.branchTable.get(branch, None)
-	if not branchId:
-	    branchId = self.branchTable.addId(branch)
-	    if not self.labels.has_key(label):
-		self.labels.addId(label)
+        """
+        Creates a new branch for the given node.
+        """
+        label = branch.label()
+        branchId = self.branchTable.get(branch, None)
+        if not branchId:
+            branchId = self.branchTable.addId(branch)
+            if not self.labels.has_key(label):
+                self.labels.addId(label)
 
-	labelId = self.labels[label]
+        labelId = self.labels[label]
 
-	if self.labelMap.has_key((itemId, labelId)) and \
+        if self.labelMap.has_key((itemId, labelId)) and \
            branchId in self.labelMap[(itemId, labelId)]:
             raise DuplicateBranch
-	self.labelMap.addItem((itemId, labelId), branchId)
+        self.labelMap.addItem((itemId, labelId), branchId)
 
-	return branchId
+        return branchId
 
 class SqlVersionsError(Exception):
     pass
 
 class MissingBranchError(SqlVersionsError):
     def __str__(self):
-	return "node %d does not contain branch %s" % (
+        return "node %d does not contain branch %s" % (
             self.itemId, self.branch.asString())
     def __init__(self, itemId, branch):
-	SqlVersionsError.__init__(self)
-	self.branch = branch
-	self.itemId = itemId
+        SqlVersionsError.__init__(self)
+        self.branch = branch
+        self.itemId = itemId
 
 class DuplicateVersionError(SqlVersionsError):
     def __str__(self):
-	return "node %d already contains version %s" % (
+        return "node %d already contains version %s" % (
             self.itemId, self.version.asString())
     def __init__(self, itemId, version):
-	SqlVersionsError.__init__(self)
-	self.version = version
-	self.itemId = itemId
+        SqlVersionsError.__init__(self)
+        self.version = version
+        self.itemId = itemId
 

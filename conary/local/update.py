@@ -76,7 +76,7 @@ class FilesystemJob:
     """
 
     def _rename(self, oldPath, newPath, msg):
-	self.renames.append((oldPath, newPath, msg))
+        self.renames.append((oldPath, newPath, msg))
 
     def _registerLinkGroup(self, linkGroup, target):
         self.linkGroups[linkGroup] = target
@@ -128,10 +128,10 @@ class FilesystemJob:
 
     def _remove(self, fileObj, relativePath, target, msg,
                 ignoreMissing = False):
-	if isinstance(fileObj, files.Directory):
+        if isinstance(fileObj, files.Directory):
             self.directorySet.setdefault(relativePath, 0)
-	else:
-	    self.removes[target] = (relativePath, fileObj, msg, ignoreMissing)
+        else:
+            self.removes[target] = (relativePath, fileObj, msg, ignoreMissing)
 
             # track removals from each directory
             if relativePath:
@@ -140,7 +140,7 @@ class FilesystemJob:
                 self.directorySet.setdefault(dir, 0)
                 self.directorySet[dir] += 1
 
-	for tag in fileObj.tags:
+        for tag in fileObj.tags:
             l = self.tagRemoves.setdefault(tag, [])
             l.append(target)
 
@@ -166,12 +166,12 @@ class FilesystemJob:
         return self.userRemovals.iteritems()
 
     def _createFile(self, target, str, msg):
-	self.newFiles.append((target, str, msg))
+        self.newFiles.append((target, str, msg))
 
     def preapply(self, tagSet = {}, tagScript = None):
-	# this is run before the change make it to the database
-	rootLen = len(self.root.rstrip('/'))
-	tagCommands = TagCommand(callback = self.callback)
+        # this is run before the change make it to the database
+        rootLen = len(self.root.rstrip('/'))
+        tagCommands = TagCommand(callback = self.callback)
 
         # processing these before the tagRemoves taghandler files ensures
         # we run them even if the taghandler will be removed in the same
@@ -209,13 +209,13 @@ class FilesystemJob:
                     tagCommands.addCommand(ti, 'handler', 'preremove',
                         [x for x in self.db.iterFilesWithTag(ti.tag)])
 
-	for tag, l in self.tagRemoves.iteritems():
-	    if tag == 'tagdescription' or tag == 'taghandler':
+        for tag, l in self.tagRemoves.iteritems():
+            if tag == 'tagdescription' or tag == 'taghandler':
                 continue
-	    if not tagSet.has_key(tag): continue
-	    tagInfo = tagSet[tag]
+            if not tagSet.has_key(tag): continue
+            tagInfo = tagSet[tag]
 
-	    if "files preremove" in tagInfo.implements:
+            if "files preremove" in tagInfo.implements:
                 tagCommands.addCommand(tagInfo, 'files', 'preremove',
                     [x[rootLen:] for x in l ])
 
@@ -316,13 +316,13 @@ class FilesystemJob:
         if not opJournal:
             opJournal = NoopJobJournal()
 
-	for (oldPath, newPath, msg) in self.renames:
+        for (oldPath, newPath, msg) in self.renames:
             opJournal.rename(oldPath, newPath)
-	    os.rename(oldPath, newPath)
-	    log.debug(msg)
+            os.rename(oldPath, newPath)
+            log.debug(msg)
 
-	contents = None
-	# restore in the same order files appear in the change set (which
+        contents = None
+        # restore in the same order files appear in the change set (which
         # is sorted by pathId,fileId combos
         # pathId, fileId, fileObj, targetPath, contentsOverride, msg
         restores = [ (x[1][0], x[1][5], x[1][1], x[0], x[1][2], x[1][3]) for x
@@ -359,7 +359,7 @@ class FilesystemJob:
                 if (stat.S_ISDIR(info.st_mode)
                     and not isinstance(fileObj, files.Directory)):
                     self.callback.warning('%s was changed into a directory'
-                                          ' - not removing', 
+                                          ' - not removing',
                                           target[rootLen:])
                     continue
 
@@ -372,7 +372,7 @@ class FilesystemJob:
                                         target[rootLen:], e.strerror)
                     raise
 
-	    log.debug(msg, target)
+            log.debug(msg, target)
 
         restoreIndex = 0
         j = 0
@@ -401,7 +401,7 @@ class FilesystemJob:
                                             pathId, fileId,
                                             compressed = True)
                 assert(contType == changeset.ChangedFileTypes.file)
-		tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
+                tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
                     target, journal, opJournal, self.isSourceTrove,
                     keepTempfile = True)
                 del delayedRestores[match[0]]
@@ -416,8 +416,8 @@ class FilesystemJob:
                 ptrTargets[ptrId] = tmpPtrFile
                 continue
 
-	    # None means "don't restore contents"; "" means "take the
-	    # contents from the change set or from the database". If we 
+            # None means "don't restore contents"; "" means "take the
+            # contents from the change set or from the database". If we
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
             needContents = fileObj.hasContents
@@ -426,7 +426,7 @@ class FilesystemJob:
                 needContents = False
                 contents = override
             if needContents and fileObj.hasContents:
-                self.callback.restoreFiles(fileObj.contents.size(), 
+                self.callback.restoreFiles(fileObj.contents.size(),
                                            self.restoreSize)
                 if fileObj.flags.isConfig() and not fileObj.flags.isSource():
                     # take the config file from the local database
@@ -508,7 +508,7 @@ class FilesystemJob:
             if override != "":
                 contents = override
 
-	    tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
+            tmpPtrFile = self.restoreFile(fileObj, contents, self.root,
                         target, journal, opJournal, self.isSourceTrove,
                         keepTempfile = isPtrTarget)
             if tmpPtrFile != target:
@@ -520,13 +520,13 @@ class FilesystemJob:
             lastRestored.fileId = fileId
             lastRestored.target = tmpPtrFile
             lastRestored.type = changeset.ChangedFileTypes.file
-	    log.debug(msg, target)
+            log.debug(msg, target)
 
             if fileObj.hasContents and fileObj.linkGroup():
                 linkGroup = fileObj.linkGroup()
                 self.linkGroups[linkGroup] = target
 
-	for (pathId, fileObj, target, msg, ptrId, fileId) in delayedRestores:
+        for (pathId, fileObj, target, msg, ptrId, fileId) in delayedRestores:
             # we wouldn't be here if the fileObj didn't have contents and
             # no override
 
@@ -551,9 +551,9 @@ class FilesystemJob:
             else:
                 contents = ptrTargets[ptrId]
                 ptrTargets[ptrId] = target
-                
-	    self.restoreFile(fileObj, contents,
-			self.root, target, journal=journal,
+
+            self.restoreFile(fileObj, contents,
+                        self.root, target, journal=journal,
                         opJournal = opJournal,
                         isSourceTrove = self.isSourceTrove)
             log.debug(msg, target)
@@ -563,18 +563,18 @@ class FilesystemJob:
         for fname in tmpPtrFiles:
             os.unlink(fname)
 
-	for (target, contents, msg) in self.newFiles:
+        for (target, contents, msg) in self.newFiles:
             opJournal.backup(target)
             try:
                 os.unlink(target)
             except OSError, e:
                 if e.errno != errno.ENOENT:
                     raise
-	    f = open(target, "w")
+            f = open(target, "w")
             opJournal.create(target)
-	    f.write(contents)
-	    f.close()
-	    self.callback.warning(msg)
+            f.write(contents)
+            f.close()
+            self.callback.warning(msg)
 
     def runPostTagScripts(self, tagSet = {}, tagScript = None):
         # this is run after the changes are in the database (but before
@@ -589,21 +589,21 @@ class FilesystemJob:
         if ('group-info' in self.tagUpdates
             and not _checkHandler('group-info', self.root)):
             groupAction(self.root, self.tagUpdates['group-info'])
-	    del self.tagUpdates['group-info']
+            del self.tagUpdates['group-info']
 
         if ('user-info' in self.tagUpdates
             and not _checkHandler('user-info', self.root)):
             userAction(self.root, self.tagUpdates['user-info'])
-	    del self.tagUpdates['user-info']
+            del self.tagUpdates['user-info']
 
 
-	if 'shlib' in self.tagUpdates:
-	    shlibAction(self.root, self.tagUpdates['shlib'],
+        if 'shlib' in self.tagUpdates:
+            shlibAction(self.root, self.tagUpdates['shlib'],
                         tagScript = tagScript, logger=self.callback)
-	    del self.tagUpdates['shlib']
-	elif runLdconfig:
-	    # override to force ldconfig to run on shlib removal
-	    shlibAction(self.root, [], logger=self.callback)
+            del self.tagUpdates['shlib']
+        elif runLdconfig:
+            # override to force ldconfig to run on shlib removal
+            shlibAction(self.root, [], logger=self.callback)
 
         # build a set of the new tag descriptions. we index them two ways
         # to make the rest of this a bit easier
@@ -617,14 +617,14 @@ class FilesystemJob:
 
         for path in self.tagUpdates.get('taghandler', []):
             # make these look like tagdescription changes, which then
-            # get run with "handler update". 
+            # get run with "handler update".
 
             tagInfo = newTagSetByHandler.get(path, None)
             if tagInfo is None:
                 path = path[rootLen:]
-                tagInfo = None	
+                tagInfo = None
                 for ti in tagSet.itervalues():
-                    if ti.file == path: 
+                    if ti.file == path:
                         tagInfo = ti
                         break
 
@@ -647,7 +647,7 @@ class FilesystemJob:
 
             tagInfo = newTagSetByDescFile[path]
             path = path[rootLen:]
-            
+
             # don't run these twice
             if self.tagUpdates.has_key(tagInfo.tag):
                 del self.tagUpdates[tagInfo.tag]
@@ -660,35 +660,35 @@ class FilesystemJob:
                 # update" is implemented. if so, we need to call this
                 # for all of those items files (otherwise the handler will
                 # never be called for files which are already installed)
-                fileList = [x for x in 
-                            self.db.iterFilesWithTag(tagInfo.tag) ] 
+                fileList = [x for x in
+                            self.db.iterFilesWithTag(tagInfo.tag) ]
                 if fileList:
                     tagCommands.addCommand(tagInfo, 'files', 'update', fileList)
 
             tagSet[tagInfo.tag] = tagInfo
 
-	for (tag, l) in self.tagUpdates.iteritems():
+        for (tag, l) in self.tagUpdates.iteritems():
             if tag == 'tagdescription':
                 continue
 
-	    tagInfo = tagSet.get(tag, None)
-	    if tagInfo is None: continue
+            tagInfo = tagSet.get(tag, None)
+            if tagInfo is None: continue
 
-	    if "files update" in tagInfo.implements:
+            if "files update" in tagInfo.implements:
                 tagCommands.addCommand(tagInfo, 'files', 'update',
-		    [x[rootLen:] for x in l])
+                    [x[rootLen:] for x in l])
 
-	for tag, l in self.tagRemoves.iteritems():
-	    if not tagSet.has_key(tag): continue
-	    tagInfo = tagSet[tag]
+        for tag, l in self.tagRemoves.iteritems():
+            if not tagSet.has_key(tag): continue
+            tagInfo = tagSet[tag]
 
-	    if "files remove" in tagInfo.implements:
+            if "files remove" in tagInfo.implements:
                 tagCommands.addCommand(tagInfo, 'files', 'remove',
                     [x[rootLen:] for x in l])
-	    
-	if tagCommands:
+
+        if tagCommands:
             self.callback.runningPostTagHandlers()
-	    tagCommands.run(tagScript, self.root)
+            tagCommands.run(tagScript, self.root)
 
     def orderPostScripts(self, uJob):
         self.postScripts = uJob.orderScriptListByBucket(self.postScripts,
@@ -706,16 +706,16 @@ class FilesystemJob:
                            newCompatClass = newCompatClass)
 
     def getErrorList(self):
-	return self.errors + self.capsules.getErrors()
+        return self.errors + self.capsules.getErrors()
 
     def iterNewTroveList(self):
-	return iter(self.newTroves)
+        return iter(self.newTroves)
 
     def getOldTroveList(self):
-	return self.oldTroves
+        return self.oldTroves
 
     def getDirectoryCountSet(self):
-	return self.directorySet
+        return self.directorySet
 
     def filterRemoves(self):
         """
@@ -740,51 +740,51 @@ class FilesystemJob:
         fileObjs = repos.getFileVersions(fileList)
         hasCapsule = troveCs.hasCapsule()
 
-	for pathId, oldFile in itertools.izip(troveCs.getOldFileList(), 
+        for pathId, oldFile in itertools.izip(troveCs.getOldFileList(),
                                               fileObjs):
             if not baseTrove.hasFile(pathId):
                 # this file was removed with 'conary remove /path', so
                 # nothing more has to be done
-		continue
+                continue
             elif not trove.conaryContents(hasCapsule, pathId, oldFile):
                 # files which are in capsules are handled by the underlying
                 # capsule implementation
                 continue
 
-	    (path, fileId, version) = baseTrove.getFile(pathId)
+            (path, fileId, version) = baseTrove.getFile(pathId)
 
             if path in pathsMoved:
                 log.debug("%s is being replaced by a new install" % path)
                 continue
 
-	    if not fsTrove.hasFile(pathId):
-		log.debug("%s has already been removed" % path)
-		continue
+            if not fsTrove.hasFile(pathId):
+                log.debug("%s has already been removed" % path)
+                continue
 
-	    if path[0] == '/':
-		realPath = util.joinPaths(root, path)
-	    else:
+            if path[0] == '/':
+                realPath = util.joinPaths(root, path)
+            else:
                 cwd = os.getcwd()
-		realPath = util.joinPaths(cwd, path)
+                realPath = util.joinPaths(cwd, path)
 
-	    if flags.merge:
-		try:
-		    # don't remove files if they've been changed locally
-		    localFile = files.FileFromFilesystem(realPath, pathId,
+            if flags.merge:
+                try:
+                    # don't remove files if they've been changed locally
+                    localFile = files.FileFromFilesystem(realPath, pathId,
                                                 possibleMatch = oldFile)
-		except OSError, exc:
-		    # it's okay if the file is missing, it means we all agree
-		    if exc.errno == errno.ENOENT:
-			fsTrove.removeFile(pathId)
-			continue
-		    else:
-			raise
-	    else:
-		localFile = None
+                except OSError, exc:
+                    # it's okay if the file is missing, it means we all agree
+                    if exc.errno == errno.ENOENT:
+                        fsTrove.removeFile(pathId)
+                        continue
+                    else:
+                        raise
+            else:
+                localFile = None
 
-	    # don't worry about metadata changes, just content changes
-	    if oldFile.hasContents and localFile and localFile.hasContents and \
-			oldFile.contents != localFile.contents and \
+            # don't worry about metadata changes, just content changes
+            if oldFile.hasContents and localFile and localFile.hasContents and \
+                        oldFile.contents != localFile.contents and \
                         not oldFile.flags.isTransient():
                 self.callback.warning("%s has changed but has been removed "
                                       "on head", path)
@@ -795,10 +795,10 @@ class FilesystemJob:
                 self.callback.warning("%s was changed to a directory - "
                                       "ignoring", path)
                 continue
-	    self._remove(oldFile, path, realPath, "removing %s")
-	    fsTrove.removeFile(pathId)
+            self._remove(oldFile, path, realPath, "removing %s")
+            fsTrove.removeFile(pathId)
 
-    def _pathMerge(self, pathId, headPath, fsTrove, fsPath, baseTrove, 
+    def _pathMerge(self, pathId, headPath, fsTrove, fsPath, baseTrove,
                    rootFixup, flags):
         finalPath = fsPath
         pathOkay = True
@@ -823,7 +823,7 @@ class FilesystemJob:
                 finalPath = headPath
             else:
                 pathOkay = False
-                finalPath = fsPath	# let updates work still
+                finalPath = fsPath      # let updates work still
                 self.errors.append(
                     PathConflictError(util.normpath(fsPath), headPath))
 
@@ -862,25 +862,25 @@ class FilesystemJob:
 
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
                      removalHints, pathsMoved, flags):
-	"""
-	Build up the todo list for applying a single trove to the
-	filesystem. 
+        """
+        Build up the todo list for applying a single trove to the
+        filesystem.
 
-	@param repos: the repository the files for baseTrove are stored in
-	@type repos: repository.Repository
-	@param troveCs: the trove changeset to apply to the filesystem
-	@type troveCs: trove.TroveChangeSet
-	@param changeSet: the changeset troveCs is part of
-	@type changeSet: changeset.ChangeSet
-	@param baseTrove: the trove the stuff in the filesystem came from
-	@type baseTrove: trove.Trove
-	@param fsTrove: the trove representing what's in the filesystem now.
+        @param repos: the repository the files for baseTrove are stored in
+        @type repos: repository.Repository
+        @param troveCs: the trove changeset to apply to the filesystem
+        @type troveCs: trove.TroveChangeSet
+        @param changeSet: the changeset troveCs is part of
+        @type changeSet: changeset.ChangeSet
+        @param baseTrove: the trove the stuff in the filesystem came from
+        @type baseTrove: trove.Trove
+        @param fsTrove: the trove representing what's in the filesystem now.
         it is updated to represent what will be in the filesystem for this
         trove if apply() is used.
-	@type fsTrove: trove.Trove
-	@param root: root directory to apply changes to (this is ignored for
-	source management, which uses the cwd)
-	@type root: str
+        @type fsTrove: trove.Trove
+        @param root: root directory to apply changes to (this is ignored for
+        source management, which uses the cwd)
+        @type root: str
         @param removalHints: set of (name, version, flavor) tuples which
         are being removed as part of this operation; troves which are
         scheduled to be removed won't generate file conflicts with new
@@ -888,11 +888,11 @@ class FilesystemJob:
         @param pathsMoved: dict of paths which moved into this trove from
         another trove in the same job
         @type pathsMoved: dict
-	@param flags: flags which modify update behavior
-	@type flags: UpdateFlags
-	"""
+        @param flags: flags which modify update behavior
+        @type flags: UpdateFlags
+        """
 
-	if baseTrove:
+        if baseTrove:
             assert(troveCs.getOldVersion() == baseTrove.getVersion() or
                    troveCs.getOldVersion().parentVersion() ==
                                 baseTrove.getVersion())
@@ -900,14 +900,14 @@ class FilesystemJob:
         # fully updated tracks whether any errors have occurred; if no
         # errors occur, the version for fsTrove gets set to the head version
         # this doesn't matter for binary stuff, just source management
-	fullyUpdated = True
+        fullyUpdated = True
 
-	if flags.ignoreUGids or os.getuid():
-	    noIds = True
+        if flags.ignoreUGids or os.getuid():
+            noIds = True
             twmSkipList = { "contents" : True, "owner" : True,
                             "group" : True}
-	else:
-	    noIds = False
+        else:
+            noIds = False
             twmSkipList = {  "contents" : True }
 
         if troveCs.getName().endswith(':source'):
@@ -958,7 +958,7 @@ class FilesystemJob:
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
-	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
+        for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
             headRealPath = util.joinPaths(rootFixup, headPath)
 
             # a continue anywhere in this loop means that the file does not
@@ -1143,7 +1143,7 @@ class FilesystemJob:
                         restoreFile = False
 
             if restoreFile:
-                self._restore(headFile, headRealPath, newTroveInfo, 
+                self._restore(headFile, headRealPath, newTroveInfo,
                               "creating %s",
                               overrideInternalConflicts =
                                                     flags.replaceManagedFiles,
@@ -1158,7 +1158,7 @@ class FilesystemJob:
                                     headFileId)
 
         # get the baseFile which was originally installed
-        baseFileList = [ ((x[0],) + baseTrove.getFile(x[0])[1:]) 
+        baseFileList = [ ((x[0],) + baseTrove.getFile(x[0])[1:])
                                         for x in troveCs.getChangedFileList() ]
         baseFileList = repos.getFileVersions(baseFileList)
 
@@ -1180,7 +1180,7 @@ class FilesystemJob:
              baseFile, headChanges, fileOnSystem) \
                 in itertools.chain(changedHere, changedOther):
             # NOTE: there used to be an assert(not(pathId in removalList))
-            # here.  But it's possible for this pathId to be set up 
+            # here.  But it's possible for this pathId to be set up
             # for removal in the local changeset and considered only "changed"
             # from the repository's point of view.
 
@@ -1196,14 +1196,14 @@ class FilesystemJob:
                 if fsPath is None:
                     fsPath = baseTrove.getFile(pathId)[0]
 
-	    contentsOkay = True         # do we have valid contents
+            contentsOkay = True         # do we have valid contents
 
-	    # pathOkay is "do we have a valid, merged path?"
+            # pathOkay is "do we have a valid, merged path?"
             pathOkay, finalPath = self._pathMerge(pathId, headPath, fsTrove,
                                                   fsPath, baseTrove,
                                                   rootFixup, flags)
 
-	    # headFileVersion is None for renames, but in that case there
+            # headFileVersion is None for renames, but in that case there
             # is nothing left to do for this file
             if not headFileVersion:
                 if isSrcTrove:
@@ -1301,7 +1301,7 @@ class FilesystemJob:
                 self._restore(headFile, realPath, newTroveInfo,
                               "creating %s with contents "
                               "from repository",
-                              overrideInternalConflicts = 
+                              overrideInternalConflicts =
                                     flags.replaceManagedFiles,
                               fileId = headFileId)
                 continue
@@ -1330,7 +1330,7 @@ class FilesystemJob:
 
             # this is changed to true when the file attributes have changed;
             # this helps us know if we need a restore event
-	    attributesChanged = False
+            attributesChanged = False
 
             # this forces the file to be restored, with contents
             forceUpdate = False
@@ -1387,38 +1387,38 @@ class FilesystemJob:
 
             # if we're forcing an update, we don't need to merge this
             # stuff
-	    if not forceUpdate and \
+            if not forceUpdate and \
                not fsFile.eq(headFile, ignoreOwnerGroup = noIds):
-		# some of the attributes have changed for this file; try
+                # some of the attributes have changed for this file; try
                 # and merge
-		if flags.merge:
-		    if noIds:
-			# we don't want to merge owner/group ids in
-			# this case (something other than owner/group
-			# changed, such as size).  simply take the
-			# head values
-			baseFile.inode.owner.set(headFile.inode.owner())
-			baseFile.inode.group.set(headFile.inode.group())
+                if flags.merge:
+                    if noIds:
+                        # we don't want to merge owner/group ids in
+                        # this case (something other than owner/group
+                        # changed, such as size).  simply take the
+                        # head values
+                        baseFile.inode.owner.set(headFile.inode.owner())
+                        baseFile.inode.group.set(headFile.inode.group())
 
-		    conflicts = fsFile.twm(headChanges, baseFile, 
-					   skip = twmSkipList)
-		    if not conflicts:
-			attributesChanged = True
-		    else:
-			contentsOkay = False
+                    conflicts = fsFile.twm(headChanges, baseFile,
+                                           skip = twmSkipList)
+                    if not conflicts:
+                        attributesChanged = True
+                    else:
+                        contentsOkay = False
                         self.errors.append(FileAttributesConflictError(
                                                 realPath))
-		else:
-		    # this forces the change to apply
+                else:
+                    # this forces the change to apply
                     if headChanges is not None:
-                        fsFile.twm(headChanges, fsFile, 
+                        fsFile.twm(headChanges, fsFile,
                                    skip = { "contents" : True })
 
-		    attributesChanged = True
+                    attributesChanged = True
 
-	    beenRestored = False
+            beenRestored = False
 
-	    if forceUpdate or (
+            if forceUpdate or (
                    headFile.hasContents and \
                    fsFile.hasContents and \
                    fsFile.contents.sha1() != headFile.contents.sha1() and \
@@ -1428,19 +1428,19 @@ class FilesystemJob:
                 if not(flags.ignoreInitialContents) and \
                    not forceUpdate and \
                    headFile.flags.isInitialContents():
-		    log.debug("skipping new contents of InitialContents file"
+                    log.debug("skipping new contents of InitialContents file"
                               " %s" % finalPath)
-		elif forceUpdate or replaceThisModifiedFile or \
+                elif forceUpdate or replaceThisModifiedFile or \
                         (not flags.merge) or \
-			headFile.flags.isTransient() or \
-			fsFile.contents == baseFile.contents:
+                        headFile.flags.isTransient() or \
+                        fsFile.contents == baseFile.contents:
 
-		    # the contents changed in just the repository, so take
-		    # those changes
+                    # the contents changed in just the repository, so take
+                    # those changes
                     if headFile.flags.isConfig() and \
                                 changeSet.configFileIsDiff(pathId, headFileId):
-			(headFileContType,
-			 headFileContents) = changeSet.getFileContents(
+                        (headFileContType,
+                         headFileContents) = changeSet.getFileContents(
                                                 pathId, headFileId)
 
                         if oldOnLocalLabel:
@@ -1451,14 +1451,14 @@ class FilesystemJob:
                             baseLineF = repos.getFileContents([ (baseFileId,
                                     baseTrove.getFile(pathId)[2]) ])[0].get()
 
-			baseLines = baseLineF.readlines()
-			del baseLineF
-			diff = headFileContents.get().readlines()
+                        baseLines = baseLineF.readlines()
+                        del baseLineF
+                        diff = headFileContents.get().readlines()
                         log.info('patching %s', realPath)
-			(newLines, failedHunks) = patch.patch(baseLines, diff)
-			assert(not failedHunks)
+                        (newLines, failedHunks) = patch.patch(baseLines, diff)
+                        assert(not failedHunks)
                         newContents = "".join(newLines)
-			headFileContents = filecontents.FromString(newContents)
+                        headFileContents = filecontents.FromString(newContents)
 
                         # now set the sha1 and size of the fsFile's
                         # contents to match what will be on the system
@@ -1468,39 +1468,39 @@ class FilesystemJob:
                         self._restore(fsFile, realPath, newTroveInfo,
                                       "replacing %s with merged "
                                       "config file",
-				      contentsOverride = headFileContents,
+                                      contentsOverride = headFileContents,
                                       overrideInternalConflicts =
                                             flags.replaceManagedFiles,
                                       fileId = headFileId)
-		    else:
+                    else:
                         # switch the fsFile to the sha1 for the new file
                         if fsFile.hasContents:
                             fsFile.contents.sha1.set(headFile.contents.sha1())
                             fsFile.contents.size.set(headFile.contents.size())
                         self._restore(fsFile, realPath, newTroveInfo,
-				      "replacing %s with contents "
-				      "from repository",
+                                      "replacing %s with contents "
+                                      "from repository",
                                       overrideInternalConflicts =
                                             flags.replaceManagedFiles,
                                       fileId = headFileId)
 
-		    beenRestored = True
-		elif headFile.contents == baseFile.contents:
-		    # it changed in just the filesystem, so leave that change
-		    log.debug("preserving new contents of %s" % finalPath)
-		elif headFile.flags.isConfig() and \
-					    not baseFile.flags.isConfig():
-		    # it changed in the filesystem and the repository,
-		    # but it wasn't always a config file. this means we
-		    # don't have a patch available for it, and we just leave
-		    # the old contents in place
-		    if headFile.contents.sha1() != baseFile.contents.sha1():
+                    beenRestored = True
+                elif headFile.contents == baseFile.contents:
+                    # it changed in just the filesystem, so leave that change
+                    log.debug("preserving new contents of %s" % finalPath)
+                elif headFile.flags.isConfig() and \
+                                            not baseFile.flags.isConfig():
+                    # it changed in the filesystem and the repository,
+                    # but it wasn't always a config file. this means we
+                    # don't have a patch available for it, and we just leave
+                    # the old contents in place
+                    if headFile.contents.sha1() != baseFile.contents.sha1():
                         self.callback.warning("preserving contents of %s "
                                               "(now a config file)" % finalPath)
-		elif headFile.flags.isConfig():
-		    # it changed in both the filesystem and the repository; our
-		    # only hope is to generate a patch for what changed in the
-		    # repository and try and apply it here
+                elif headFile.flags.isConfig():
+                    # it changed in both the filesystem and the repository; our
+                    # only hope is to generate a patch for what changed in the
+                    # repository and try and apply it here
 
                     if changeSet.configFileIsDiff(pathId, headFileId):
                         (headFileContType,
@@ -1534,25 +1534,25 @@ class FilesystemJob:
 
                     if failedHunks:
                         self._createFile(
-                            realPath + ".conflicts", 
+                            realPath + ".conflicts",
                             "".join([x.asString() for x in failedHunks]),
-                            "conflicts from merging changes from " 
-                            "head into %s saved as %s.conflicts" % 
+                            "conflicts from merging changes from "
+                            "head into %s saved as %s.conflicts" %
                         (realPath, realPath))
 
                     contentsOkay = True
-		else:
+                else:
                     self.errors.append(FileContentsConflictError(realPath))
-		    contentsOkay = False
+                    contentsOkay = False
             elif headFile.hasContents and headFile.linkGroup():
                 # the contents haven't changed, but the link group has changed.
                 # we want to let files in that link group hard link to this file
                 # (if appropriate)
                 self._registerLinkGroup(headFile.linkGroup(), realPath)
 
-	    if attributesChanged and not beenRestored:
+            if attributesChanged and not beenRestored:
                 self._restore(fsFile, realPath, newTroveInfo,
-		      "merging changes from repository into %s",
+                      "merging changes from repository into %s",
                       contentsOverride = None,
                       overrideInternalConflicts = flags.replaceManagedFiles,
                       fileId = headFileId)
@@ -1570,10 +1570,10 @@ class FilesystemJob:
                       overrideInternalConflicts = flags.replaceManagedFiles,
                       fileId = headFileId, restoreFile = restoreFile)
 
-	    if pathOkay and contentsOkay:
-		# XXX this doesn't even attempt to merge file permissions
-		# and such; the good part of that is differing owners don't
-		# break things
+            if pathOkay and contentsOkay:
+                # XXX this doesn't even attempt to merge file permissions
+                # and such; the good part of that is differing owners don't
+                # break things
                 if isSrcTrove:
                     fsTrove.addFile(pathId, finalPath, headFileVersion,
                                 headFileId,
@@ -1582,8 +1582,8 @@ class FilesystemJob:
                 else:
                     fsTrove.addFile(pathId, finalPath, headFileVersion,
                                     headFileId)
-	    else:
-		fullyUpdated = False
+            else:
+                fullyUpdated = False
 
         if not isSrcTrove and troveCs.getOldVersion():
             # if there are any files missing when we compare the fsTrove to
@@ -1601,10 +1601,10 @@ class FilesystemJob:
                 self.userRemoval(
                              *(troveCs.getNewNameVersionFlavor() + (pathId,)))
 
-	if fullyUpdated:
-	    fsTrove.changeVersion(troveCs.getNewVersion())
+        if fullyUpdated:
+            fsTrove.changeVersion(troveCs.getNewVersion())
 
-	return fsTrove
+        return fsTrove
 
     def _findMovedPaths(self, db, changeSet, fsTroveDict):
         # Lookup paths which have swithed troves. These look like a
@@ -1671,7 +1671,7 @@ class FilesystemJob:
                     localVer = oldVer.createShadow(versions.LocalLabel())
                 fileExists = fsTroveDict[oldName, localVer, oldFlavor].hasFile(oldPathId)
 
-                # NOTE: if the file doesn't exist we could 
+                # NOTE: if the file doesn't exist we could
                 # avoid this thawing and diffing.  But that is the odd case.
                 newStream = changeSet.getFileChange(None, fileId)
                 newFile = files.ThawFile(newStream, pathId)
@@ -1693,22 +1693,22 @@ class FilesystemJob:
     def __init__(self, db, changeSet, fsTroveDict, root,
                  callback = None, flags = None, removeHints = {},
                  rollbackPhase = None, deferredScripts = None):
-	"""
-	Constructs the job for applying a change set to the filesystem.
+        """
+        Constructs the job for applying a change set to the filesystem.
 
-	@param db: the db the current trove and file information 
-	is in
-	@type db: local.database.Database
-	@param changeSet: the changeset to apply to the filesystem
-	@type changeSet: changeset.ChangeSet
-	@param fsTroveDict: dictionary mapping a trove name to the trove
-	object representing what's currently stored in the filesystem
-	@type fsTroveDict: dict of trove.Trove
-	@param root: root directory to apply changes to (this is ignored for
-	source management, which uses the cwd)
-	@type root: str
-	@param flags: flags which modify update behavior.
-	@type flags: UpdateFlags
+        @param db: the db the current trove and file information
+        is in
+        @type db: local.database.Database
+        @param changeSet: the changeset to apply to the filesystem
+        @type changeSet: changeset.ChangeSet
+        @param fsTroveDict: dictionary mapping a trove name to the trove
+        object representing what's currently stored in the filesystem
+        @type fsTroveDict: dict of trove.Trove
+        @param root: root directory to apply changes to (this is ignored for
+        source management, which uses the cwd)
+        @type root: str
+        @param flags: flags which modify update behavior.
+        @type flags: UpdateFlags
         @param removeHints: Files which should not be written to disk
         as part of this update. This is used when a later changeset is
         coming in which will remove a file from here. It prevents false
@@ -1717,22 +1717,22 @@ class FilesystemJob:
         @type removeHints: dict
         @param rollbackPhase: What part of a rollback is this (None for
         normal installs)
-	@type rollbackPhase: int
-	"""
-	self.renames = []
-	self.restores = {}
+        @type rollbackPhase: int
+        """
+        self.renames = []
+        self.restores = {}
         self.restoreSize = 0
-	self.removes = {}
-	self.oldTroves = []
-	self.errors = []
-	self.newFiles = []
-	self.root = root
-	self.changeSet = changeSet
-	self.directorySet = {}
-	self.userRemovals = {}
-	self.sharedFilesByTrove = {}
-	self.tagUpdates = {}
-	self.tagRemoves = {}
+        self.removes = {}
+        self.oldTroves = []
+        self.errors = []
+        self.newFiles = []
+        self.root = root
+        self.changeSet = changeSet
+        self.directorySet = {}
+        self.userRemovals = {}
+        self.sharedFilesByTrove = {}
+        self.tagUpdates = {}
+        self.tagRemoves = {}
         self.linkGroups = {}
         self.capsules = capsules.MetaCapsuleOperations(root, db, changeSet,
                                    callback, weakref.proxy(self),
@@ -1740,7 +1740,7 @@ class FilesystemJob:
                                        'skipCapsuleOps',False))
         self.postScripts = []
         self.rollbackPhase = rollbackPhase
-	self.db = db
+        self.db = db
         self.pathRemovedCache = (None, None, None)
         if callback is None:
             callback = UpdateCallback()
@@ -1758,7 +1758,7 @@ class FilesystemJob:
 
         for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
             self.oldTroves.append((name, oldVersion, oldFlavor))
-            oldTrove = db.getTrove(name, oldVersion, oldFlavor, 
+            oldTrove = db.getTrove(name, oldVersion, oldFlavor,
                                    pristine = False)
             self.capsules.remove(oldTrove)
             # and True forces hasCapsule to be a boolean
@@ -1784,17 +1784,17 @@ class FilesystemJob:
 
         troveList = []
 
-	for troveCs in changeSet.iterNewTroveList():
+        for troveCs in changeSet.iterNewTroveList():
             self.capsules.install(flags, troveCs)
 
             old = troveCs.getOldVersion()
-	    if old:
+            if old:
                 if old.onLocalLabel():
                     localVer = troveCs.getOldVersion()
                 else:
                     localVer = old.createShadow(versions.LocalLabel())
                 newFsTrove = fsTroveDict[(troveCs.getName(), localVer, troveCs.getOldFlavor())].copy()
-                baseTrove = db.getTrove(troveCs.getName(), old, 
+                baseTrove = db.getTrove(troveCs.getName(), old,
                                          troveCs.getOldFlavor())
             else:
                 newFsTrove = trove.Trove(troveCs.getName(), versions.NewVersion(),
@@ -1807,19 +1807,19 @@ class FilesystemJob:
             newFsTrove.troveInfo = troveCs.getTroveInfo()
             troveList.append((troveCs, baseTrove, newFsTrove))
 
-	for (troveCs, baseTrove, newFsTrove) in troveList:
+        for (troveCs, baseTrove, newFsTrove) in troveList:
             self._setupRemoves(db, pathsMoved, troveCs, changeSet, baseTrove,
                                newFsTrove, root, flags)
 
-	for i, (troveCs, baseTrove, newFsTrove) in enumerate(troveList):
+        for i, (troveCs, baseTrove, newFsTrove) in enumerate(troveList):
             callback.preparingUpdate(i + 1, len(troveList))
 
-	    if baseTrove:
-		self.oldTroves.append((baseTrove.getName(), 
-					 baseTrove.getVersion(),
-					 baseTrove.getFlavor()))
+            if baseTrove:
+                self.oldTroves.append((baseTrove.getName(),
+                                         baseTrove.getVersion(),
+                                         baseTrove.getFlavor()))
 
-            self._singleTrove(db, troveCs, changeSet, baseTrove, newFsTrove, 
+            self._singleTrove(db, troveCs, changeSet, baseTrove, newFsTrove,
                               root, removeHints, pathsMoved, flags)
 
             newFsTrove.mergeTroveListChanges(
@@ -1857,12 +1857,12 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     @param flags: boolean flags for this operation
     @type flags: UpdateFlags
     @param forceSha1: disallows the use of inode information to avoid
-                      checking the sha1 of the file if the inode information 
+                      checking the sha1 of the file if the inode information
                       matches exactly.
     @type forceSha1: bool
-    @param ignoreTransient: ignore transient files 
+    @param ignoreTransient: ignore transient files
     @type ignoreTransient: bool
-    @param ignoreAutoSource: ignore automatically added source files 
+    @param ignoreAutoSource: ignore automatically added source files
     @type ignoreAutoSource: bool
     @type crossRepositoryDeltas: If set, deltas between file streams and
             file contents can be used even when the old and new versions
@@ -1877,7 +1877,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     pathIds = {}
     for (pathId, path, fileId, version) in newTrove.iterFileList():
-	pathIds[pathId] = True
+        pathIds[pathId] = True
 
     # Iterating over the files in newTrove would be much more natural
     # then iterating over the ones in the old trove, and then going
@@ -1885,11 +1885,11 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     # hard way lets us iterate right over the changeset we get from
     # the repository.
     if srcTrove:
-	fileList = [ x for x in srcTrove.iterFileList() ]
-	# need to walk changesets in order of fileid
-	fileList.sort()
+        fileList = [ x for x in srcTrove.iterFileList() ]
+        # need to walk changesets in order of fileid
+        fileList.sort()
     else:
-	fileList = []
+        fileList = []
 
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
@@ -1904,9 +1904,9 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                                             allowMissingFiles=allowMissingFiles)
     for (pathId, srcPath, srcFileId, srcFileVersion), srcFile in \
                     itertools.izip(fileList, srcFileObjs):
-	# files which disappear don't need to make it into newTrove
-	if not pathIds.has_key(pathId): continue
-	del pathIds[pathId]
+        # files which disappear don't need to make it into newTrove
+        if not pathIds.has_key(pathId): continue
+        del pathIds[pathId]
 
         # transient files never show up in in local changesets...
         if ignoreTransient and srcFile.flags.isTransient():
@@ -1927,7 +1927,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                 newTrove.removeFile(pathId)
                 continue
 
-	(path, fileId, version) = newTrove.getFile(pathId)
+        (path, fileId, version) = newTrove.getFile(pathId)
 
         if isSrcTrove:
             if path in curTrove.pathMap:
@@ -1942,30 +1942,30 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                 isAutoSource = False
                 realPath = util.joinPaths(root, path)
         else:
-	    realPath = util.joinPaths(root, path)
+            realPath = util.joinPaths(root, path)
 
         if forceSha1:
             possibleMatch = None
         else:
             possibleMatch = srcFile
 
-	try:
+        try:
             f = files.FileFromFilesystem(realPath, pathId,
                                          possibleMatch = possibleMatch,
                                          statBuf =
                                             statCache.get(realPath, None))
-	except OSError, e:
+        except OSError, e:
             if isSrcTrove:
-		callback.error(
-                    "%s is missing (use remove if this is intentional)" 
-		    % util.normpath(path))
+                callback.error(
+                    "%s is missing (use remove if this is intentional)"
+                    % util.normpath(path))
                 return None
 
             if e.errno == errno.ENOENT and flags.ignoreMissingFiles:
                 pass
             elif e.errno == errno.ENOENT and not flags.missingFilesOkay:
                 callback.warning(
-                    "%s is missing (use remove if this is intentional)" 
+                    "%s is missing (use remove if this is intentional)"
                     % util.normpath(path))
             else:
                 callback.warning(
@@ -1982,7 +1982,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             f.flags.isConfig(set = curTrove.fileIsConfig(pathId))
 
 
-	if not f.eq(srcFile, ignoreOwnerGroup = flags.ignoreUGids):
+        if not f.eq(srcFile, ignoreOwnerGroup = flags.ignoreUGids):
             newFileId = f.fileId()
             if isSrcTrove:
                 newTrove.addFile(pathId, path, newVersion, newFileId,
@@ -2000,12 +2000,12 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             else:
                 (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
 
-	    changeSet.addFile(srcFileId, newFileId, filecs)
+            changeSet.addFile(srcFileId, newFileId, filecs)
 
-	    if hash and withFileContents:
-		newCont = filecontents.FromFilesystem(realPath)
+            if hash and withFileContents:
+                newCont = filecontents.FromFilesystem(realPath)
 
-		if srcFile.hasContents:
+                if srcFile.hasContents:
                     if needAbsolute or not f.flags.isConfig():
                         changeSet.addFileContents(pathId, newFileId,
                                           changeset.ChangedFileTypes.file,
@@ -2029,7 +2029,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
     # anything left in pathIds has been newly added
     for pathId in pathIds.iterkeys():
-	(path, fileId, version) = newTrove.getFile(pathId)
+        (path, fileId, version) = newTrove.getFile(pathId)
 
         if isSrcTrove:
             if path in curTrove.pathMap:
@@ -2057,17 +2057,17 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                                      isAutoSource=True)
                     continue
         else:
-	    realPath = util.joinPaths(root, path)
+            realPath = util.joinPaths(root, path)
 
-	# if we're committing against head, this better be a new file.
-	# if we're generating a diff against someplace else, it might not 
-	# be.
-	assert(srcTrove or isinstance(version, versions.NewVersion))
+        # if we're committing against head, this better be a new file.
+        # if we're generating a diff against someplace else, it might not
+        # be.
+        assert(srcTrove or isinstance(version, versions.NewVersion))
 
-	f = files.FileFromFilesystem(realPath, pathId,
+        f = files.FileFromFilesystem(realPath, pathId,
                                      statBuf = statCache.get(realPath, None))
 
-	if isSrcTrove:
+        if isSrcTrove:
             f.flags.isSource(set = True)
             f.flags.isAutoSource(set = isAutoSource)
             f.flags.isConfig(set= curTrove.fileIsConfig(pathId))
@@ -2079,14 +2079,14 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
             # troves for installed systems
             newTrove.addFile(pathId, path, newVersion, f.fileId())
 
-	# new file, so this part is easy
-	changeSet.addFile(None, f.fileId(), f.freeze())
+        # new file, so this part is easy
+        changeSet.addFile(None, f.fileId(), f.freeze())
 
-	if f.hasContents and withFileContents:
-	    newCont = filecontents.FromFilesystem(realPath)
-	    changeSet.addFileContents(pathId, f.fileId(),
-				      changeset.ChangedFileTypes.file,
-				      newCont, f.flags.isConfig())
+        if f.hasContents and withFileContents:
+            newCont = filecontents.FromFilesystem(realPath)
+            changeSet.addFileContents(pathId, f.fileId(),
+                                      changeset.ChangedFileTypes.file,
+                                      newCont, f.flags.isConfig())
 
     # local changes don't use capsules to store information
     newTrove.troveInfo.capsule.reset()
@@ -2130,15 +2130,15 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
     in which case files are assumed to be in the current directory)
     @type root: str
     @param forceSha1: disallows the use of inode information to avoid
-                      checking the sha1 of the file if the inode information 
+                      checking the sha1 of the file if the inode information
                       matches exactly.
     @type forceSha1: bool
-    @param ignoreTransient: ignore transient files 
+    @param ignoreTransient: ignore transient files
     @type ignoreTransient: bool
-    @param ignoreAutoSource: ignore automatically added source files 
+    @param ignoreAutoSource: ignore automatically added source files
     @type ignoreAutoSource: bool
-    @param updateContainers: Container troves are updated to point to the 
-                             new versions of troves which have had files 
+    @param updateContainers: Container troves are updated to point to the
+                             new versions of troves which have had files
                              changed.
     @param statCache: Dictionary mapping paths to stat buffers.
     @type statCache: dict
@@ -2147,11 +2147,11 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
     changeSet = changeset.ChangeSet()
     changedTroves = {}
     returnList = []
-    for (curTrove, srcTrove, newVersion, flags) in pkgList: 
-	result = _localChanges(repos, changeSet, curTrove, srcTrove,
+    for (curTrove, srcTrove, newVersion, flags) in pkgList:
+        result = _localChanges(repos, changeSet, curTrove, srcTrove,
                                newVersion, root, flags,
                                withFileContents = withFileContents,
-                               forceSha1 = forceSha1, 
+                               forceSha1 = forceSha1,
                                ignoreTransient = ignoreTransient,
                                ignoreAutoSource = ignoreAutoSource,
                                crossRepositoryDeltas = crossRepositoryDeltas,
@@ -2168,7 +2168,7 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
                                              curTrove.getFlavor())
                          ] = (curTrove.getName(), newVersion, curTrove.getFlavor())
 
-	returnList.append(result)
+        returnList.append(result)
 
     if not updateContainers:
         return (changeSet, returnList)
@@ -2186,11 +2186,11 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
             # these are only different if files have been manually removd;
             # they should be the same for containers
             if tuple in changedTroves:
-                newTrove.addTrove(*(changedTroves[tuple] + 
+                newTrove.addTrove(*(changedTroves[tuple] +
                                     (newTrove.includeTroveByDefault(*tuple),)))
                 newTrove.delTrove(*(tuple + (False,)))
                 changed = True
-                
+
         if changed:
             newTrove.changeVersion(newVersion)
             newTrove.invalidateDigests()
@@ -2198,7 +2198,7 @@ def buildLocalChanges(repos, pkgList, root = ".", withFileContents=True,
             trvCs = newTrove.diff(curTrove)[0]
             returnList[i] = (True, newTrove)
             changeSet.newTrove(trvCs)
-            
+
     return (changeSet, returnList)
 
 def shlibAction(root, shlibList, tagScript = None, logger=log):
@@ -2207,16 +2207,16 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
     # write any needed entries in ld.so.conf before running ldconfig
     sysetc = util.joinPaths(root, '/etc')
     if not os.path.isdir(sysetc):
-	# normally happens only during testing, but why not be safe?
-	util.mkdirChain(sysetc)
+        # normally happens only during testing, but why not be safe?
+        util.mkdirChain(sysetc)
     ldsopath = util.joinPaths(root, '/etc/ld.so.conf')
     ldsoDpath = util.joinPaths(root, '/etc/ld.so.conf.d')
 
     if util.exists(ldsopath):
         ldsolines = file(ldsopath).readlines()
     else:
-	# bootstrap
-	ldsolines = []
+        # bootstrap
+        ldsolines = []
 
     ldsoDlines = set()
     if util.exists(ldsoDpath):
@@ -2230,11 +2230,11 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
     rootlen = len(root.rstrip('/'))
 
     for path in shlibList:
-	dirname = os.path.dirname(path)[rootlen:]
-	dirline = dirname+'\n'
+        dirname = os.path.dirname(path)[rootlen:]
+        dirline = dirname+'\n'
         if dirline not in ldsolines and dirline not in ldsoDlines:
-	    ldsolines.append(dirline)
-	    newlines.append(dirname)
+            ldsolines.append(dirline)
+            newlines.append(dirname)
 
     includeEntry = 'include /etc/ld.so.conf.d/*.conf\n'
     if ldsoDlines and includeEntry not in ldsolines:
@@ -2242,46 +2242,46 @@ def shlibAction(root, shlibList, tagScript = None, logger=log):
         newlines.insert(0, includeEntry.strip())
 
     if newlines:
-	log.debug("adding ld.so.conf entries: %s",
-		  " ".join(newlines))
-	ldsofd, ldsotmpname = tempfile.mkstemp(
-	    'ld.so.conf', '.ct', sysetc)
+        log.debug("adding ld.so.conf entries: %s",
+                  " ".join(newlines))
+        ldsofd, ldsotmpname = tempfile.mkstemp(
+            'ld.so.conf', '.ct', sysetc)
         if not os.getuid():
             # ld.so.conf should always be 0.0
             os.chown(ldsotmpname, 0, 0)
-	try:
-	    ldso = os.fdopen(ldsofd, 'w')
-	    os.chmod(ldsotmpname, 0644)
-	    ldso.writelines(ldsolines)
-	    ldso.close()
-	    os.rename(ldsotmpname, ldsopath)
-	except:
-	    os.unlink(ldsotmpname)
-	    raise
+        try:
+            ldso = os.fdopen(ldsofd, 'w')
+            os.chmod(ldsotmpname, 0644)
+            ldso.writelines(ldsolines)
+            ldso.close()
+            os.rename(ldsotmpname, ldsopath)
+        except:
+            os.unlink(ldsotmpname)
+            raise
 
     if tagScript is not None:
         f = open(tagScript, "a")
         f.write("/sbin/ldconfig\n")
     elif os.getuid():
-	logger.warning("ldconfig skipped (insufficient permissions)")
+        logger.warning("ldconfig skipped (insufficient permissions)")
     elif not os.access(util.joinPaths(root, p), os.X_OK):
-	logger.error("/sbin/ldconfig is not available")
+        logger.error("/sbin/ldconfig is not available")
     else:
-	log.debug("running ldconfig")
-	pid = os.fork()
-	if not pid:
+        log.debug("running ldconfig")
+        pid = os.fork()
+        if not pid:
             util.massCloseFileDescriptors(3, 252)
-	    os.chroot(root)
-	    os.chdir('/')
-	    try:
-		# XXX add a test case for an invalid ldconfig binary
-		os.execl(p, p)
-	    except:
-		pass
-	    os._exit(1)
-	(id, status) = os.waitpid(pid, 0)
-	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-	    logger.error("ldconfig failed")
+            os.chroot(root)
+            os.chdir('/')
+            try:
+                # XXX add a test case for an invalid ldconfig binary
+                os.execl(p, p)
+            except:
+                pass
+            os._exit(1)
+        (id, status) = os.waitpid(pid, 0)
+        if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+            logger.error("ldconfig failed")
 
 
 def _checkHandler(tag, root):
@@ -2605,7 +2605,7 @@ class TagCommand:
                             elif datasource == 'multitag':
                                 for fileName in sorted(hi.fileToTag):
                                     try:
-                                        os.write(inputPipe[1], 
+                                        os.write(inputPipe[1],
                                             "%s\n%s\n" %(" ".join(
                                             sorted([x.tag for x in
                                                     hi.fileToTag[fileName]])),

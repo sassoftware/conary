@@ -29,60 +29,60 @@ class _FilesetRecipe(Recipe):
 
     # XXX need to work on adding files from different flavors of troves
     def addFileFromPackage(self, pattern, pkg, recurse, remapList):
-	pathMap = {}
-	for (pathId, pkgPath, fileId, version) in pkg.iterFileList():
-	    pathMap[pkgPath] = (pathId, fileId, version)
+        pathMap = {}
+        for (pathId, pkgPath, fileId, version) in pkg.iterFileList():
+            pathMap[pkgPath] = (pathId, fileId, version)
 
-	patternList = util.braceExpand(pattern)
-	matches = {}
-	for pattern in patternList:
-	    if not recurse:
-		matchList = [ n for n in pathMap.keys() if 
-				    fnmatchcase(n, pattern)]
-	    else:
-		matchList = []	
-		dirCount = pattern.count("/")
-		for n in pathMap.iterkeys():
-		    i = n.count("/")
-		    if i > dirCount:
-			dirName = os.sep.join(n.split(os.sep)[:dirCount + 1])
-			match = fnmatchcase(dirName, pattern)
-		    elif i == dirCount:
-			match = fnmatchcase(n, pattern)
-		    else:
-			match = False
+        patternList = util.braceExpand(pattern)
+        matches = {}
+        for pattern in patternList:
+            if not recurse:
+                matchList = [ n for n in pathMap.keys() if
+                                    fnmatchcase(n, pattern)]
+            else:
+                matchList = []
+                dirCount = pattern.count("/")
+                for n in pathMap.iterkeys():
+                    i = n.count("/")
+                    if i > dirCount:
+                        dirName = os.sep.join(n.split(os.sep)[:dirCount + 1])
+                        match = fnmatchcase(dirName, pattern)
+                    elif i == dirCount:
+                        match = fnmatchcase(n, pattern)
+                    else:
+                        match = False
 
-		    if match: matchList.append(n)
-			
-	    for path in matchList:
-		matches[path] = pathMap[path]
+                    if match: matchList.append(n)
 
-	if not matches:
-	    return False
+            for path in matchList:
+                matches[path] = pathMap[path]
 
-	for path in matches.keys():
-	    (pathId, fileId, version) = matches[path]
+        if not matches:
+            return False
 
-	    for (old, new) in remapList:
-		if path == old:
-		    path = new
-		    break
-		elif len(path) > len(old) and path.startswith(old) and \
-					      path[len(old)] == "/":
-		    path = new + path[len(old):]
-		    break
+        for path in matches.keys():
+            (pathId, fileId, version) = matches[path]
 
-	    if self.paths.has_key(path):
-		raise builderrors.RecipeFileError(
+            for (old, new) in remapList:
+                if path == old:
+                    path = new
+                    break
+                elif len(path) > len(old) and path.startswith(old) and \
+                                              path[len(old)] == "/":
+                    path = new + path[len(old):]
+                    break
+
+            if self.paths.has_key(path):
+                raise builderrors.RecipeFileError(
                         "%s has been included multiple times" % path)
 
-	    self.files[pathId] = (path, fileId, version)
-	    self.paths[path] = 1
+            self.files[pathId] = (path, fileId, version)
+            self.paths[path] = 1
 
-	return True
+        return True
 
     def addFile(self, pattern, component, versionStr = None, recurse = True,
-		remap = []):
+                remap = []):
         pattern = pattern % self.macros
         component = component % self.macros
         if versionStr:
@@ -96,15 +96,15 @@ class _FilesetRecipe(Recipe):
             (component, versionStr), []).append((pattern, recurse, remap))
 
     def _addFile(self, pkg, itemList):
-	"""
-	Adds files which match pattern from version versionStr of component.
-	Pattern is glob-style, with brace expansion. If recurse is set,
-	anything below a directory which matches pattern is also included,
-	and the directory itself does not have to be part of the trove.
-	Remap is a list of (oldPath, newPath) tuples. The first oldPath
-	which matches the start of a matched pattern is rewritten as
-	newPath.
-	"""
+        """
+        Adds files which match pattern from version versionStr of component.
+        Pattern is glob-style, with brace expansion. If recurse is set,
+        anything below a directory which matches pattern is also included,
+        and the directory itself does not have to be part of the trove.
+        Remap is a list of (oldPath, newPath) tuples. The first oldPath
+        which matches the start of a matched pattern is rewritten as
+        newPath.
+        """
 
         for (pattern, recurse, remap) in itemList:
             foundIt = False
@@ -137,20 +137,20 @@ class _FilesetRecipe(Recipe):
 
             pkg = self.repos.getTrove(*pkgList[0])
             self._addFile(pkg, itemList)
-	    
+
     def iterFileList(self):
-	for (pathId, (path, fileId, version)) in self.files.iteritems():
-	    yield (pathId, path, fileId, version)
+        for (pathId, (path, fileId, version)) in self.files.iteritems():
+            yield (pathId, path, fileId, version)
 
     def __init__(self, repos, cfg, label, flavor, extraMacros={},
                  laReposCache = None, srcdirs = None):
         Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs)
-	self.repos = repos
-	self.cfg = cfg
-	self.files = {}
-	self.paths = {}
-	self.label = label
-	self.flavor = flavor
+        self.repos = repos
+        self.cfg = cfg
+        self.files = {}
+        self.paths = {}
+        self.label = label
+        self.flavor = flavor
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.requestedFiles = {}

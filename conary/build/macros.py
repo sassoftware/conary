@@ -22,20 +22,20 @@ from conary.build.errors import MacroKeyError
 
 class Macros(dict):
     def __init__(self, macros={}, shadow=False, ignoreUnknown=False):
-	self.__tracked = {}
-	self.__track = False
-	self.__overrides = {}
+        self.__tracked = {}
+        self.__track = False
+        self.__overrides = {}
         self.__callbacks = {}
         self.__ignoreUnknown = ignoreUnknown
-	if shadow:
-	    self.__macros = macros
-	else:
-	    self.__macros = {}
-	    self.update(macros)
+        if shadow:
+            self.__macros = macros
+        else:
+            self.__macros = {}
+            self.update(macros)
 
     def _get(self, key):
         return dict.__getitem__(self, key)
-            
+
     def update(self, other):
         if isinstance(other, dict):
             for key, item in other.iteritems():
@@ -45,24 +45,24 @@ class Macros(dict):
                 self[key] = item
 
     def setCallback(self, name, callback):
-        """ Add a callback to a particular macros.  When that macro is 
+        """ Add a callback to a particular macros.  When that macro is
             accessed, the callback function will be called with that macro's
-            name as an argument 
+            name as an argument
         """
         self.__callbacks[name] = callback
 
     def unsetCallback(self, name):
         del self.__callbacks[name]
-    
+
     def __setitem__(self, name, value):
-	if name.startswith('_Macros'):
-	    dict.__setitem__(self, name, value)
-	    return
+        if name.startswith('_Macros'):
+            dict.__setitem__(self, name, value)
+            return
         # '.' in name reserved for getting alternative representations
         if '.' in name:
             raise MacroError, 'name "%s" contains illegal character: "."' % name
-	if self.__track:
-	    self.__tracked[name] = 1 
+        if self.__track:
+            self.__tracked[name] = 1
         # only expand references to ourself
         d = {name: self.get(name)}
         # escape any macros in the new value
@@ -70,22 +70,22 @@ class Macros(dict):
         # unescape references to ourself
         value = value.replace('%%%%(%s)s' %name, '%%(%s)s'%name)
         # expand our old value when defining the new value
- 	dict.__setitem__(self, name, value % d)
+        dict.__setitem__(self, name, value % d)
 
     # overrides allow you to set a macro value at the command line
-    # or in a config file and use it despite the value being 
+    # or in a config file and use it despite the value being
     # set subsequently within the recipe
-     
+
     def _override(self, key, value):
-	self.__overrides[key] = value
+        self.__overrides[key] = value
         self[key] = value
 
     def __setattr__(self, name, value):
-	self.__setitem__(name, value)
+        self.__setitem__(name, value)
 
     def __getitem__(self, name):
-	if name.startswith('_Macros'):
-	    return dict.__getitem__(self, name)
+        if name.startswith('_Macros'):
+            return dict.__getitem__(self, name)
         repmethod = None
         parts = name.split('.', 1)
         if len(parts) > 1:
@@ -93,10 +93,10 @@ class Macros(dict):
             name = parts[0]
         if name in self.__callbacks:
             self.__callbacks[name](name)
-	if name in self.__overrides:
-	    return self.__repmethod(self.__overrides[name], repmethod)
-	if not name in self:
-	    # update on access
+        if name in self.__overrides:
+            return self.__repmethod(self.__overrides[name], repmethod)
+        if not name in self:
+            # update on access
             try:
                 value = self.__macros[name]
             except KeyError:
@@ -106,11 +106,11 @@ class Macros(dict):
                     return ''
                 raise MacroKeyError(name)
 
-	    value = self.__macros[name]
-	    self[name] = value
-	    return self.__repmethod(value, repmethod)
-	else:
-	    return self.__repmethod(dict.__getitem__(self, name) % self, repmethod)
+            value = self.__macros[name]
+            self[name] = value
+            return self.__repmethod(value, repmethod)
+        else:
+            return self.__repmethod(dict.__getitem__(self, name) % self, repmethod)
 
     def __repmethod(self, name, repmethod):
         if repmethod is None:
@@ -119,25 +119,25 @@ class Macros(dict):
             return re.escape(name)
         # should not be reached
         raise MacroError, 'unknown representation method %s for %s' %(repmethod, name)
-    
+
     def __getattr__(self, name):
-	return self.__getitem__(name)
+        return self.__getitem__(name)
 
     def trackChanges(self, flag=True):
-	self.__track = flag
+        self.__track = flag
 
     def getTrackedChanges(self):
-	return self.__tracked.keys()
-    
+        return self.__tracked.keys()
+
     def copy(self, shadow=True):
-	# shadow saves initial copying cost for a higher search cost
+        # shadow saves initial copying cost for a higher search cost
         if not shadow:
             return Macros([(x, self._get(x)) for x in dict.__iter__(self)])
-	return Macros(self, shadow)
+        return Macros(self, shadow)
 
     def __deepcopy__(self, memo):
         return self.copy(self, shadow=False)
-    
+
     # occasionally it may be desirable to switch from shadowing
     # to a flattened representation
     def _flatten(self):
@@ -150,7 +150,7 @@ class Macros(dict):
 
     def __iter__(self):
         # since we are accessing every element in the parent anyway
-        # just flatten hierarchy first, which greatly simplifies iterating 
+        # just flatten hierarchy first, which greatly simplifies iterating
         self._flatten()
         # iter over self and parents
         for key in dict.__iter__(self):
@@ -178,7 +178,7 @@ class MacroError(Exception):
         self.msg = msg
 
     def __repr__(self):
-	return self.msg
+        return self.msg
 
     def __str__(self):
-	return repr(self)
+        return repr(self)

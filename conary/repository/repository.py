@@ -23,193 +23,193 @@ from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper, util
 class AbstractTroveDatabase:
 
     def commitChangeSet(self, cs):
-	raise NotImplementedError
+        raise NotImplementedError
 
     def getFileVersion(self, pathId, fileId, version, withContents = 0):
-	"""
-	Returns the file object for the given (pathId, fileId, version).
-	"""
-	raise NotImplementedError
+        """
+        Returns the file object for the given (pathId, fileId, version).
+        """
+        raise NotImplementedError
 
     def getFileVersions(self, l):
-	"""
-	Returns the file objects for the (pathId, fileId, version) pairs in
-	list; the order returns is the same order in the list.
+        """
+        Returns the file objects for the (pathId, fileId, version) pairs in
+        list; the order returns is the same order in the list.
 
-	@param l:
-	@type l: list
-	@rtype list
-	"""
+        @param l:
+        @type l: list
+        @rtype list
+        """
         for x in l:
             yield self.getFileVersion(*x)
 
     def getFileContents(self, fileList):
         # troveName, troveVersion, pathId, fileVersion, fileObj
 
-	raise NotImplementedError
+        raise NotImplementedError
 
     def getTrove(self, troveName, version, flavor, withFiles=True):
-	"""
-	Returns the trove which matches (troveName, version, flavor). If
-	the trove does not exist, TroveMissing is raised.
+        """
+        Returns the trove which matches (troveName, version, flavor). If
+        the trove does not exist, TroveMissing is raised.
 
-	@param troveName: trove name
-	@type troveName: str
-	@param version: version
-	@type version: versions.Version
-	@param flavor: flavor
-	@type flavor: deps.deps.Flavor
-	@rtype: trove.Trove
-	"""
-	raise NotImplementedError
+        @param troveName: trove name
+        @type troveName: str
+        @param version: version
+        @type version: versions.Version
+        @param flavor: flavor
+        @type flavor: deps.deps.Flavor
+        @rtype: trove.Trove
+        """
+        raise NotImplementedError
 
     def getTroves(self, troveList):
-	"""
-	Returns a list of trove objects which parallels troveList. troveList 
-	is a list of (troveName, version, flavor) tuples. Version can
-	a version or a branch; if it's a branch the latest version of the
-	trove on that branch is returned. If there is no match for a
-	particular tuple, None is placed in the return list for that tuple.
-	"""
-	raise NotImplementedError
+        """
+        Returns a list of trove objects which parallels troveList. troveList
+        is a list of (troveName, version, flavor) tuples. Version can
+        a version or a branch; if it's a branch the latest version of the
+        trove on that branch is returned. If there is no match for a
+        particular tuple, None is placed in the return list for that tuple.
+        """
+        raise NotImplementedError
 
     def iterAllTroveNames(self, serverName):
-	"""
-	Returns a list of all of the troves contained in a repository.
+        """
+        Returns a list of all of the troves contained in a repository.
 
         @param serverName: name of the server containing troves
         @type serverName: str
-	@rtype: list of str
-	"""
-	raise NotImplementedError
+        @rtype: list of str
+        """
+        raise NotImplementedError
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
-	"""
-	Returns a generator for (pathId, path, fileId, version) tuples for all
-	of the files in the trove. This is equivlent to trove.iterFileList(),
-	but if withFiles is set this is *much* more efficient.
+        """
+        Returns a generator for (pathId, path, fileId, version) tuples for all
+        of the files in the trove. This is equivlent to trove.iterFileList(),
+        but if withFiles is set this is *much* more efficient.
 
-	@param withFiles: if set, the file object for the file is 
-	created and returned as the fourth element in the tuple.
-	"""
-	raise NotImplementedError
+        @param withFiles: if set, the file object for the file is
+        created and returned as the fourth element in the tuple.
+        """
+        raise NotImplementedError
 
 class IdealRepository(AbstractTroveDatabase):
 
     def createBranch(self, newBranch, where, troveList = []):
-	"""
-	Creates a branch for the troves in the repository. This
-	operations is recursive, with any required troves and files
-	also getting branched. Duplicate branches can be created,
-	but only if one of the following is true:
-	 
-	  1. C{where} specifies a particular version to branch from
-	  2. the branch does not yet exist and C{where} is a label which matches multiple existing branches
+        """
+        Creates a branch for the troves in the repository. This
+        operations is recursive, with any required troves and files
+        also getting branched. Duplicate branches can be created,
+        but only if one of the following is true:
 
-	C{where} specifies the node branches are created from for the
-	troves in C{troveList} (or all of the troves if C{troveList}
-	is empty). Any troves or files branched due to inclusion in a
-	branched trove will be branched at the version required by the
-	object including it. If different versions of objects are
-	included from multiple places, bad things will happen (an
-	incomplete branch will be formed). More complicated algorithms
-	for branch will fix this, but it's not clear doing so is
-	necessary.
+          1. C{where} specifies a particular version to branch from
+          2. the branch does not yet exist and C{where} is a label which matches multiple existing branches
 
-	@param newBranch: Label of the new branch
-	@type newBranch: versions.Label
-	@param where: Where the branch should be created from
-	@type where: versions.Version or versions.Label
-	@param troveList: Name of the troves to branch; empty list if all
-	troves in the repository should be branched.
-	@type troveList: list of str
-	"""
-	raise NotImplementedError
+        C{where} specifies the node branches are created from for the
+        troves in C{troveList} (or all of the troves if C{troveList}
+        is empty). Any troves or files branched due to inclusion in a
+        branched trove will be branched at the version required by the
+        object including it. If different versions of objects are
+        included from multiple places, bad things will happen (an
+        incomplete branch will be formed). More complicated algorithms
+        for branch will fix this, but it's not clear doing so is
+        necessary.
+
+        @param newBranch: Label of the new branch
+        @type newBranch: versions.Label
+        @param where: Where the branch should be created from
+        @type where: versions.Version or versions.Label
+        @param troveList: Name of the troves to branch; empty list if all
+        troves in the repository should be branched.
+        @type troveList: list of str
+        """
+        raise NotImplementedError
 
     def getTroveVersionList(self, troveNameList):
-	"""
-	Returns a dictionary indexed by the items in troveNameList. Each
-	item in the dictionary is a list of all of the versions for that 
-	trove. If no versions are available for a particular trove,
-	the dictionary entry for that trove's name is left empty.
+        """
+        Returns a dictionary indexed by the items in troveNameList. Each
+        item in the dictionary is a list of all of the versions for that
+        trove. If no versions are available for a particular trove,
+        the dictionary entry for that trove's name is left empty.
 
-	@param troveNameList: list trove names
-	@type troveNameList: list of str
-	@rtype: dict of lists
-	"""
-	raise NotImplementedError
+        @param troveNameList: list trove names
+        @type troveNameList: list of str
+        @rtype: dict of lists
+        """
+        raise NotImplementedError
 
     def getAllTroveLeaves(self, troveNameList):
-	"""
-	Returns a dictionary indexed by the items in troveNameList. Each
-	item in the dictionary is a list of all of the leaf versions for
-	that trove. If no branches are available for a particular trove,
-	the dictionary entry for that trove's name is left empty.
+        """
+        Returns a dictionary indexed by the items in troveNameList. Each
+        item in the dictionary is a list of all of the leaf versions for
+        that trove. If no branches are available for a particular trove,
+        the dictionary entry for that trove's name is left empty.
 
-	@param troveNameList: trove names
-	@type troveNameList: list of str
-	@rtype: dict of lists
-	"""
-	raise NotImplementedError
+        @param troveNameList: trove names
+        @type troveNameList: list of str
+        @rtype: dict of lists
+        """
+        raise NotImplementedError
 
     def getTroveLeavesByLabel(self, troveNameList, label):
-	"""
-	Returns a dictionary indexed by the items in troveNameList. Each
-	item in the dictionary is a list of all of the leaf versions for
-	that trove which are on a branch w/ the given label. If a trove
-	does not have any branches for the given label, the version list
-	for that trove name will be empty. The versions returned include
-	timestamps.
+        """
+        Returns a dictionary indexed by the items in troveNameList. Each
+        item in the dictionary is a list of all of the leaf versions for
+        that trove which are on a branch w/ the given label. If a trove
+        does not have any branches for the given label, the version list
+        for that trove name will be empty. The versions returned include
+        timestamps.
 
-	@param troveNameList: trove names
-	@type troveNameList: list of str
-	@param label: label
-	@type label: versions.Label
-	@rtype: dict of lists
-	"""
-	raise NotImplementedError
+        @param troveNameList: trove names
+        @type troveNameList: list of str
+        @param label: label
+        @type label: versions.Label
+        @rtype: dict of lists
+        """
+        raise NotImplementedError
 
     def getTroveVersionsByLabel(self, troveNameList, label):
-	"""
-	Returns a dictionary indexed by troveNameList. Each item in the
-	dictionary is a list of all of the versions of that trove
-	on the given branch, and newer versions appear later in the list.
+        """
+        Returns a dictionary indexed by troveNameList. Each item in the
+        dictionary is a list of all of the versions of that trove
+        on the given branch, and newer versions appear later in the list.
 
-	@param troveNameList: trove names
-	@type troveNameList: list of str
-	@param label: label
-	@type label: versions.Label
-	@rtype: dict of lists
-	"""
-	raise NotImplementedError
+        @param troveNameList: trove names
+        @type troveNameList: list of str
+        @param label: label
+        @type label: versions.Label
+        @rtype: dict of lists
+        """
+        raise NotImplementedError
 
     def getTroveLatestVersion(self, troveName, branch):
-	"""
-	Returns the version of the latest version of a trove on a particular
-	branch. If that branch doesn't exist for the trove, TroveMissing
-	is raised. The version returned includes timestamps.
+        """
+        Returns the version of the latest version of a trove on a particular
+        branch. If that branch doesn't exist for the trove, TroveMissing
+        is raised. The version returned includes timestamps.
 
-	@param troveName: trove name
-	@type troveName: str
-	@param branch: branch
-	@type branch: versions.Version
-	@rtype: versions.Version
-	"""
-	raise NotImplementedError
+        @param troveName: trove name
+        @type troveName: str
+        @param branch: branch
+        @type branch: versions.Version
+        @rtype: versions.Version
+        """
+        raise NotImplementedError
 
 
     def getAllTroveFlavors(self, troveDict):
-	"""
-	Converts a dictionary of the format retured by getAllTroveLeaves()
-	to contain dicts of { version : flavorList } sets instead of 
-	containing lists of versions. The flavorList lists all of the
+        """
+        Converts a dictionary of the format retured by getAllTroveLeaves()
+        to contain dicts of { version : flavorList } sets instead of
+        containing lists of versions. The flavorList lists all of the
         flavors available for that vesrion of the trove.
 
-	@type troveDict: dict
-	@rtype: dict
-	"""
-	raise NotImplementedError
+        @type troveDict: dict
+        @rtype: dict
+        """
+        raise NotImplementedError
 
     def queryMerge(self, target, source):
         """
@@ -230,25 +230,25 @@ class AbstractRepository(IdealRepository):
     ### Trove access functions
 
     def hasTroveByName(self, troveName):
-	"""
-	Tests to see if the repository contains any version of the named
-	trove.
+        """
+        Tests to see if the repository contains any version of the named
+        trove.
 
-	@param troveName: trove name
-	@type troveName: str
-	@rtype: boolean
-	"""
-	raise NotImplementedError
+        @param troveName: trove name
+        @type troveName: str
+        @rtype: boolean
+        """
+        raise NotImplementedError
 
     def hasTrove(self, troveName, version, flavor):
-	"""
-	Tests if the repository contains a particular version of a trove.
+        """
+        Tests if the repository contains a particular version of a trove.
 
-	@param troveName: trove name
-	@type troveName: str
-	@rtype: boolean
-	"""
-	raise NotImplementedError
+        @param troveName: trove name
+        @type troveName: str
+        @rtype: boolean
+        """
+        raise NotImplementedError
 
     def getTroveInfo(self, infoType, troveList):
         """
@@ -287,7 +287,7 @@ class AbstractRepository(IdealRepository):
     ### File functions
 
     def __init__(self):
-	assert(self.__class__ != AbstractRepository)
+        assert(self.__class__ != AbstractRepository)
 
 class ChangeSetJob:
     """
@@ -301,14 +301,14 @@ class ChangeSetJob:
     storeOnlyConfigFiles = False
 
     def addTrove(self, oldTroveSpec, trove, trvCs, hidden = False):
-	return self.repos.addTrove(trove, trvCs, hidden = hidden,
+        return self.repos.addTrove(trove, trvCs, hidden = hidden,
                                    oldTroveSpec = oldTroveSpec)
 
     def addTroveDone(self, troveId, mirror=False):
-	self.repos.addTroveDone(troveId, mirror=mirror)
+        self.repos.addTroveDone(troveId, mirror=mirror)
 
     def oldTrove(self, *args):
-	pass
+        pass
 
     def markTroveRemoved(self, name, version, flavor):
         raise NotImplementedError
@@ -319,13 +319,13 @@ class ChangeSetJob:
         else:
             return self.invalidateRollbacksFlag
 
-    def addFileContents(self, sha1, fileContents, restoreContents, isConfig, 
+    def addFileContents(self, sha1, fileContents, restoreContents, isConfig,
                         precompressed = False):
-	# Note that the order doesn't matter, we're just copying
-	# files into the repository. Restore the file pointer to
-	# the beginning of the file as we may want to commit this
-	# file to multiple locations.
-	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
+        # Note that the order doesn't matter, we're just copying
+        # files into the repository. Restore the file pointer to
+        # the beginning of the file as we may want to commit this
+        # file to multiple locations.
+        self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
     def addFileVersion(self, troveInfo, pathId, path, fileId,
@@ -336,7 +336,7 @@ class ChangeSetJob:
 
     def checkTroveCompleteness(self, trv):
         pass
-    
+
     def checkTroveSignatures(self, trv, callback):
         assert(hasattr(callback, 'verifyTroveSignatures'))
         return callback.verifyTroveSignatures(trv)
@@ -390,7 +390,7 @@ class ChangeSetJob:
                     (pathId, fileId, sha1) = tup[0:3]
                     restoreContents = tup[-1]
                     # if we already have the file in the data store we can
-                    # get the contents from there. This double store looks 
+                    # get the contents from there. This double store looks
                     # crazy, but we need it to get reference counting right.
                     fileContents = filecontents.FromDataStore(
                                      self.repos.contentsStore, sha1)
@@ -444,7 +444,7 @@ class ChangeSetJob:
                                 newVersion, fileStream = fileStream,
                                 withContents = restoreContents)
 
-            self._handleContents(pathId, fileId, fileStream, configRestoreList, 
+            self._handleContents(pathId, fileId, fileStream, configRestoreList,
                                  normalRestoreList,
                                  restoreContents = restoreContents)
 
@@ -454,10 +454,10 @@ class ChangeSetJob:
                                    callback = None, hidden = False,
                                    mirror = False, allowIncomplete = False,
                                    excludeCapsuleContents = False):
-	# create the trove objects which need to be installed; the
-	# file objects which map up with them are created later, but
-	# we do need a map from pathId to the path and version of the
-	# file we need, so build up a dictionary with that information
+        # create the trove objects which need to be installed; the
+        # file objects which map up with them are created later, but
+        # we do need a map from pathId to the path and version of the
+        # file we need, so build up a dictionary with that information
 
         configRestoreList = []
         normalRestoreList = []
@@ -472,7 +472,7 @@ class ChangeSetJob:
         oldTroveIter = repos.iterTroves(oldTrovesNeeded, hidden = True)
 
         troveNo = 0
-	for csTrove in newList:
+        for csTrove in newList:
             if csTrove.troveType() == trove.TROVE_TYPE_REMOVED:
                 # deal with these later on to ensure any changesets which
                 # are relative to removed troves can be processed
@@ -480,21 +480,21 @@ class ChangeSetJob:
 
             troveNo += 1
 
-	    if callback:
-		callback.creatingDatabaseTransaction(troveNo, len(newList))
+            if callback:
+                callback.creatingDatabaseTransaction(troveNo, len(newList))
 
-	    newVersion = csTrove.getNewVersion()
-	    oldTroveVersion = csTrove.getOldVersion()
+            newVersion = csTrove.getNewVersion()
+            oldTroveVersion = csTrove.getOldVersion()
             oldTroveFlavor = csTrove.getOldFlavor()
-	    troveName = csTrove.getName()
-	    troveFlavor = csTrove.getNewFlavor()
+            troveName = csTrove.getName()
+            troveFlavor = csTrove.getNewFlavor()
 
-	    if repos.hasTrove(troveName, newVersion, troveFlavor):
-		raise errors.CommitError, \
-		       "version %s of %s already exists" % \
-			(newVersion.asString(), csTrove.getName())
+            if repos.hasTrove(troveName, newVersion, troveFlavor):
+                raise errors.CommitError, \
+                       "version %s of %s already exists" % \
+                        (newVersion.asString(), csTrove.getName())
 
-	    if oldTroveVersion:
+            if oldTroveVersion:
                 newTrove = oldTroveIter.next()
                 assert(newTrove.getNameVersionFlavor() ==
                         csTrove.getOldNameVersionFlavor())
@@ -507,8 +507,8 @@ class ChangeSetJob:
                                    oldCompatibilityClass = oldCompatClass,
                                    update = True):
                     self.invalidateRollbacks(set = True)
-	    else:
-		newTrove = trove.Trove(csTrove.getName(), newVersion,
+            else:
+                newTrove = trove.Trove(csTrove.getName(), newVersion,
                                        troveFlavor, csTrove.getChangeLog(),
                                        setVersion = False)
                 # FIXME: we reset the trove version
@@ -516,7 +516,7 @@ class ChangeSetJob:
                 # from applyChangeSet
                 allowIncomplete = True
 
-	    newFileMap = newTrove.applyChangeSet(csTrove,
+            newFileMap = newTrove.applyChangeSet(csTrove,
                                      needNewFileMap=True,
                                      allowIncomplete=allowIncomplete)
             skipContents = (excludeCapsuleContents and
@@ -527,8 +527,8 @@ class ChangeSetJob:
                 log.warning('trove %s has schema version %s, which contains'
                         ' information not handled by this client.  This'
                         ' version of Conary understands schema version %s.'
-                        ' Dropping extra information.  Please upgrade conary.', 
-                        newTrove.getName(), newTrove.troveInfo.troveVersion(), 
+                        ' Dropping extra information.  Please upgrade conary.',
+                        newTrove.getName(), newTrove.troveInfo.troveVersion(),
                         trove.TROVE_VERSION)
 
             self.checkTroveCompleteness(newTrove)
@@ -543,7 +543,7 @@ class ChangeSetJob:
                 troveInfo = self.addTrove(None, newTrove, csTrove,
                                           hidden = hidden)
 
-            checkFilesList += self._getCheckFilesList(csTrove, troveInfo, 
+            checkFilesList += self._getCheckFilesList(csTrove, troveInfo,
                 fileHostFilter, configRestoreList, normalRestoreList,
                 restoreContents = not skipContents)
 
@@ -658,8 +658,8 @@ class ChangeSetJob:
                                 oldfile = oldfile,
                                 restoreContents = restoreContents)
 
-	    del newFileMap
-	    self.addTroveDone(troveInfo, mirror=mirror)
+            del newFileMap
+            self.addTroveDone(troveInfo, mirror=mirror)
 
         try:
             # we need to actualize this, not just get a generator
@@ -696,11 +696,11 @@ class ChangeSetJob:
                  hidden = False, mirror = False,
                  excludeCapsuleContents = False):
 
-	self.repos = repos
-	self.cs = cs
+        self.repos = repos
+        self.cs = cs
         self.invalidateRollbacksFlag = False
 
-	newList = [ x for x in cs.iterNewTroveList() ]
+        newList = [ x for x in cs.iterNewTroveList() ]
 
         if resetTimestamps:
             # This depends intimiately on the versions cache. We don't
@@ -742,10 +742,10 @@ class ChangeSetJob:
             if cs.configFileIsDiff(pathId, newFileId):
                 (contType, fileContents) = cs.getFileContents(pathId, newFileId)
 
-		# the content for this file is in the form of a
-		# diff, which we need to apply against the file in
-		# the repository
-		assert(oldVersion)
+                # the content for this file is in the form of a
+                # diff, which we need to apply against the file in
+                # the repository
+                assert(oldVersion)
 
                 try:
                     f = self.repos.getFileContents(
@@ -756,16 +756,16 @@ class ChangeSetJob:
                                         sha1helper.md5ToString(pathId),
                                         sha1helper.sha1ToString(fileId)))
 
-		oldLines = f.readlines()
+                oldLines = f.readlines()
                 f.close()
                 del f
-		diff = fileContents.get().readlines()
-		(newLines, failedHunks) = patch.patch(oldLines, 
-						      diff)
-		fileContents = filecontents.FromString(
-						"".join(newLines))
+                diff = fileContents.get().readlines()
+                (newLines, failedHunks) = patch.patch(oldLines,
+                                                      diff)
+                fileContents = filecontents.FromString(
+                                                "".join(newLines))
 
-		assert(not failedHunks)
+                assert(not failedHunks)
             else:
                 # config files are not always available compressed (due
                 # to the config file cache)
@@ -805,7 +805,7 @@ class ChangeSetJob:
 
                 continue
 
-	    assert(contType == changeset.ChangedFileTypes.file)
+            assert(contType == changeset.ChangedFileTypes.file)
             self.addFileContents(sha1, fileContents, restoreContents, 0,
                                  precompressed = True)
 
@@ -817,8 +817,8 @@ class ChangeSetJob:
             else:
                 self.addFileContents(sha1, None, False, 0)
 
-	#del configRestoreList
-	#del normalRestoreList
+        #del configRestoreList
+        #del normalRestoreList
 
         for csTrove in newList:
             if csTrove.troveType() != trove.TROVE_TYPE_REMOVED:
@@ -832,6 +832,6 @@ class ChangeSetJob:
             self.markTroveRemoved(csTrove.getName(), csTrove.getNewVersion(),
                                   csTrove.getNewFlavor())
 
-	for (troveName, version, flavor) in cs.getOldTroveList():
-	    trv = self.repos.getTrove(troveName, version, flavor)
-	    self.oldTrove(trv, None, troveName, version, flavor)
+        for (troveName, version, flavor) in cs.getOldTroveList():
+            trv = self.repos.getTrove(troveName, version, flavor)
+            self.oldTrove(trv, None, troveName, version, flavor)

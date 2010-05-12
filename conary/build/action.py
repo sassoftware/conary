@@ -36,12 +36,12 @@ def checkUse(use):
     @type use: None, boolean, or tuple of booleans
     """
     if use is None:
-	return True
+        return True
     if type(use) is not tuple:
-	use = (use,)
+        use = (use,)
     for usevar in use:
-	if not usevar:
-	    return False
+        if not usevar:
+            return False
     return True
 
 class _AnyDict(dict):
@@ -59,15 +59,15 @@ class Action:
     @cvar keywords: The keywords and default values accepted by the class
     """
 
-    keywords = { 'debug' : False } 
+    keywords = { 'debug' : False }
 
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
-	# keywords will be in the class object, not the instance
-	if not hasattr(self.__class__, 'keywords'):
-	    self.keywords = {}
+        # keywords will be in the class object, not the instance
+        if not hasattr(self.__class__, 'keywords'):
+            self.keywords = {}
         self._applyDefaults()
-	self.addArgs(*args, **keywords)
+        self.addArgs(*args, **keywords)
         # verify that there are not broken format strings
         d = _AnyDict()
         for arg in args:
@@ -79,12 +79,12 @@ class Action:
                     raise
 
     def doAction(self):
-	if self.debug:
-	    debugger.set_trace()
-	self.do()
+        if self.debug:
+            debugger.set_trace()
+        self.do()
 
     def do(self):
-	pass
+        pass
 
     def _applyDefaults(self):
         """
@@ -95,8 +95,8 @@ class Action:
         baselist = [self.__class__]
         bases = list(self.__class__.__bases__)
         while bases:
-	    parent = bases.pop()
-	    bases.extend(list(parent.__bases__))
+            parent = bases.pop()
+            bases.extend(list(parent.__bases__))
             baselist.append(parent)
         baselist.reverse()
         for base in baselist:
@@ -126,7 +126,7 @@ def genExcepthook(self):
             prefix = "%s:%s:" % (self.file, self.linenum)
             prefix_len = len(prefix)
             if str(exc_msg)[:prefix_len] != prefix:
-                exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
+                exc_message = "%s:%s: %s: %s" % (self.file, self.linenum,
                                               type.__name__, exc_msg)
             print exc_message
 
@@ -170,11 +170,11 @@ class RecipeAction(Action):
 
     def __init__(self, recipe, *args, **keywords):
         assert(self.__class__ is not RecipeAction)
-	self._getLineNum()
-	Action.__init__(self, *args, **keywords)
-	self.recipe = recipe
-	# change self.use to be a simple flag
-	self.use = checkUse(self.use)
+        self._getLineNum()
+        Action.__init__(self, *args, **keywords)
+        self.recipe = recipe
+        # change self.use to be a simple flag
+        self.use = checkUse(self.use)
 
     def _addActionPathBuildRequires(self, buildRequires):
         # We do not want dynamically added requirements to modify the class
@@ -192,9 +192,9 @@ class RecipeAction(Action):
 
     # virtual method for actually executing the action
     def doAction(self):
-	if self.debug:
-	    debugger.set_trace()
-	if self.use:
+        if self.debug:
+            debugger.set_trace()
+        if self.use:
             try:
                 if self.linenum is None:
                     self.do()
@@ -209,7 +209,7 @@ class RecipeAction(Action):
             finally:
                 # we need to provide suggestions even in the failure case
                 self.doSuggestAutoBuildReqs()
-	else:
+        else:
             # any invariant suggestions should be provided even if not self.use
             self.doSuggestAutoBuildReqs()
 
@@ -280,52 +280,52 @@ class RecipeAction(Action):
             self.recipe.reportMissingBuildRequires(sorted(suggests))
 
     def doPrep(self):
-	pass
+        pass
 
     def do(self):
-	pass
+        pass
 
     def _getLineNum(self):
-	"""Gets the line number and file name of the place where the 
-	   Action is instantiated, which is important for returning
-	   useful error messages"""
+        """Gets the line number and file name of the place where the
+           Action is instantiated, which is important for returning
+           useful error messages"""
 
-	# Moves up the frame stack to outside of Action class --
-	# also passes by __call__ function, used by helper functions
-	# internally to instantiate Actions.  
-	#
-	# Another alternative would be to look at filepath until we 
-	# reach outside of conary source tree
-	f = sys._getframe(1) # get frame above this one
+        # Moves up the frame stack to outside of Action class --
+        # also passes by __call__ function, used by helper functions
+        # internally to instantiate Actions.
+        #
+        # Another alternative would be to look at filepath until we
+        # reach outside of conary source tree
+        f = sys._getframe(1) # get frame above this one
 
-	while f != None:
-	    if f.f_code.co_argcount == 0:  # break if non-class fn
-		break
+        while f != None:
+            if f.f_code.co_argcount == 0:  # break if non-class fn
+                break
 
-	    firstargname = f.f_code.co_varnames[0]
-	    firstarg = f.f_locals[firstargname]
-	    if not isinstance(firstarg, Action): 
-	       if f.f_code.co_name != '__call__':  
-		   break			 
-	    f = f.f_back # go up a frame
+            firstargname = f.f_code.co_varnames[0]
+            firstarg = f.f_locals[firstargname]
+            if not isinstance(firstarg, Action):
+               if f.f_code.co_name != '__call__':
+                   break
+            f = f.f_back # go up a frame
 
-	assert f is not None 
-	self.file = f.f_code.co_filename
-	self.linenum = f.f_lineno
-	if not self.file:
-	    self.file = '<None>'
+        assert f is not None
+        self.file = f.f_code.co_filename
+        self.linenum = f.f_lineno
+        if not self.file:
+            self.file = '<None>'
 
     def init_error(self, type, msg):
-	"""
-	    use in action __init__ to add lineno to exceptions
-	    raised.  Usually this is handled automatically, 
-	    but it is (almost) impossible to wrap init calls.
-	    Actually, this probably could be done by changing 
-	    recipe helper, but until that is done use this funciton
-	"""
-	
-	raise type, "%s:%s: %s: %s" % (self.file, self.linenum,
-					   type.__name__, msg)
+        """
+            use in action __init__ to add lineno to exceptions
+            raised.  Usually this is handled automatically,
+            but it is (almost) impossible to wrap init calls.
+            Actually, this probably could be done by changing
+            recipe helper, but until that is done use this funciton
+        """
+
+        raise type, "%s:%s: %s: %s" % (self.file, self.linenum,
+                                           type.__name__, msg)
 
     def _getDb(self):
         if not hasattr(self.recipe, '_db') or self.recipe._db is None:
@@ -345,7 +345,7 @@ class ShellCommand(RecipeAction):
      - keys passed in through the macros argument will need %% to
        escape them for delayed evaluation; for example,
        %%(builddir)s and %%(destdir)s
-    
+
     @ivar self.command: Shell command to execute. This is built from the
     C{template} static class variable in derived classes.
     @type self.command: str
@@ -363,10 +363,10 @@ class ShellCommand(RecipeAction):
         accepted by the class.
         @rtype: ShellCommand
         """
-	# enforce pure virtual status
+        # enforce pure virtual status
         assert(self.__class__ is not ShellCommand)
-	self.recipe = recipe
-	self.arglist = args
+        self.recipe = recipe
+        self.arglist = args
         self.args = string.join(args)
         # fill in anything in the template that might be specified
         # as a keyword.  Keywords only because a part of this class
@@ -381,9 +381,9 @@ class ShellCommand(RecipeAction):
                 arg % d
 
     def addArgs(self, *args, **keywords):
-	# append new arguments as well as include keywords
+        # append new arguments as well as include keywords
         self.args = self.args + string.join(args)
-	RecipeAction.addArgs(self, *args, **keywords)
+        RecipeAction.addArgs(self, *args, **keywords)
 
 
 def _expandOnePath(path, macros, defaultDir=None, braceGlob=False, error=False):
@@ -481,8 +481,8 @@ def _expandPaths(paths, macros, defaultDir=None, braceGlob=True, error=False):
     """
     Expand braces, globs, and macros in path names, and root all path names
     to either the build dir or dest dir.  Relative paths (not starting with
-    a /) are relative to builddir.  All absolute paths to are relative to 
-    destdir.  
+    a /) are relative to builddir.  All absolute paths to are relative to
+    destdir.
     """
     destdir = macros.destdir
     if defaultDir is None:

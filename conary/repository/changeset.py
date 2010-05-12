@@ -74,9 +74,9 @@ class FileInfo(streams.StreamSet):
     __slots__ = [ "oldFileId", "newFileId", "csInfo" ]
 
     def __init__(self, first, newFileId = None, csInfo = None):
-	if newFileId is None:
-	    streams.StreamSet.__init__(self, first)
-	else:
+        if newFileId is None:
+            streams.StreamSet.__init__(self, first)
+        else:
             streams.StreamSet.__init__(self)
             self.oldFileId.set(first)
             self.newFileId.set(newFileId)
@@ -114,21 +114,21 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
                                           trvCs.getNewFlavor())] = trvCs
 
     def __init__(self, data = None):
-	if data:
-	    self.thaw(data)
+        if data:
+            self.thaw(data)
 
 class ChangeSetFileDict(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
-	fileList = []
-	for ((oldFileId, newFileId), (csInfo)) in sorted(self.iteritems()):
-	    if not oldFileId:
+        fileList = []
+        for ((oldFileId, newFileId), (csInfo)) in sorted(self.iteritems()):
+            if not oldFileId:
                 oldFileId = ""
 
-	    s = FileInfo(oldFileId, newFileId, csInfo).freeze()
-	    fileList.append(struct.pack("!I", len(s)) + s)
+            s = FileInfo(oldFileId, newFileId, csInfo).freeze()
+            fileList.append(struct.pack("!I", len(s)) + s)
 
-	return "".join(fileList)
+        return "".join(fileList)
 
     def __getitem__(self, item):
         if item[0] is None:
@@ -161,8 +161,8 @@ class ChangeSetFileDict(dict, streams.InfoStream):
         return list(self.iteritems())
 
     def thaw(self ,data):
-	i = 0
-	while i < len(data):
+        i = 0
+        while i < len(data):
             i, ( frzFile, ) = misc.unpack("!SI", i, data)
             info = FileInfo(frzFile)
 
@@ -174,8 +174,8 @@ class ChangeSetFileDict(dict, streams.InfoStream):
                 self[(intern(oldFileId), intern(newFileId))] = info.csInfo()
 
     def __init__(self, data = None):
-	if data:
-	    self.thaw(data)
+        if data:
+            self.thaw(data)
 
 class ChangeSetFileContentsTuple(tuple):
 
@@ -266,14 +266,14 @@ class ChangeSet(streams.StreamSet):
         return not bool(self.newTroves) and not bool(self.oldTroves)
 
     def isAbsolute(self):
-	return self.absolute
+        return self.absolute
 
     def isLocal(self):
-	return self.local
+        return self.local
 
     def addPrimaryTrove(self, name, version, flavor):
         assert(flavor is not None)
-	self.primaryTroveList.append((name, version, flavor))
+        self.primaryTroveList.append((name, version, flavor))
 
     def setPrimaryTroveList(self, l):
         del self.primaryTroveList[:]
@@ -281,7 +281,7 @@ class ChangeSet(streams.StreamSet):
 
     @api.publicApi
     def getPrimaryTroveList(self):
-	return self.primaryTroveList
+        return self.primaryTroveList
 
     def getPrimaryPackageList(self):
         import warnings
@@ -290,18 +290,18 @@ class ChangeSet(streams.StreamSet):
         return self.primaryTroveList
 
     def newTrove(self, csTrove):
-	old = csTrove.getOldVersion()
-	new = csTrove.getNewVersion()
-	assert(not old or min(old.timeStamps()) > 0)
-	assert(min(new.timeStamps()) > 0)
+        old = csTrove.getOldVersion()
+        new = csTrove.getNewVersion()
+        assert(not old or min(old.timeStamps()) > 0)
+        assert(min(new.timeStamps()) > 0)
 
-	self.newTroves[(csTrove.getName(), new,
+        self.newTroves[(csTrove.getName(), new,
                         csTrove.getNewFlavor())] = csTrove
 
-	if csTrove.isAbsolute():
-	    self.absolute = True
-	if (old and old.onLocalLabel()) or new.onLocalLabel():
-	    self.local = 1
+        if csTrove.isAbsolute():
+            self.absolute = True
+        if (old and old.onLocalLabel()) or new.onLocalLabel():
+            self.local = 1
 
     def newPackage(self, csTrove):
         import warnings
@@ -310,13 +310,13 @@ class ChangeSet(streams.StreamSet):
         return self.newTrove(csTrove)
 
     def delNewTrove(self, name, version, flavor):
-	del self.newTroves[(name, version, flavor)]
+        del self.newTroves[(name, version, flavor)]
         if (name, version, flavor) in self.primaryTroveList:
             self.primaryTroveList.remove((name, version, flavor))
 
     def oldTrove(self, name, version, flavor):
-	assert(min(version.timeStamps()) > 0)
-	self.oldTroves.append((name, version, flavor))
+        assert(min(version.timeStamps()) > 0)
+        self.oldTroves.append((name, version, flavor))
 
     def hasOldTrove(self, name, version, flavor):
         return (name, version, flavor) in self.oldTroves
@@ -329,7 +329,7 @@ class ChangeSet(streams.StreamSet):
         """
         @return: dictionary-valueiterator object
         """
-	return self.newTroves.itervalues()
+        return self.newTroves.itervalues()
 
     def iterNewPackageList(self):
         import warnings
@@ -338,13 +338,13 @@ class ChangeSet(streams.StreamSet):
 
     @api.publicApi
     def getNewTroveVersion(self, name, version, flavor):
-	return self.newTroves[(name, version, flavor)]
+        return self.newTroves[(name, version, flavor)]
 
     def hasNewTrove(self, name, version, flavor):
-	return self.newTroves.has_key((name, version, flavor))
+        return self.newTroves.has_key((name, version, flavor))
 
     def getOldTroveList(self):
-	return self.oldTroves
+        return self.oldTroves
 
     def configFileIsDiff(self, pathId, fileId):
         key = makeKey(pathId, fileId)
@@ -367,7 +367,7 @@ class ChangeSet(streams.StreamSet):
                  otherContType == ChangedFileTypes.diff):
                 raise ChangeSetKeyConflictError(key)
 
-	if cfgFile:
+        if cfgFile:
             if compressed:
                 s = util.decompressString(contents.get().read())
                 contents = filecontents.FromString(s)
@@ -417,22 +417,22 @@ class ChangeSet(streams.StreamSet):
         self.files[(oldFileId, newFileId)] = csInfo
 
     def formatToFile(self, cfg, f):
-	f.write("primary troves:\n")
-	for (troveName, version, flavor) in self.primaryTroveList:
-	    if flavor.isEmpty():
-		f.write("\t%s %s\n" % (troveName, version.asString()))
-	    else:
-		f.write("\t%s %s %s\n" % (
+        f.write("primary troves:\n")
+        for (troveName, version, flavor) in self.primaryTroveList:
+            if flavor.isEmpty():
+                f.write("\t%s %s\n" % (troveName, version.asString()))
+            else:
+                f.write("\t%s %s %s\n" % (
                     troveName, version.asString(), flavor.freeze()))
-	f.write("\n")
+        f.write("\n")
 
-	for trv in self.newTroves.itervalues():
-	    trv.formatToFile(self, f)
-	for (troveName, version, flavor) in self.oldTroves:
-	    f.write("remove %s %s\n" % (troveName, version.asString()))
+        for trv in self.newTroves.itervalues():
+            trv.formatToFile(self, f)
+        for (troveName, version, flavor) in self.oldTroves:
+            f.write("remove %s %s\n" % (troveName, version.asString()))
 
     def getFileChange(self, oldFileId, newFileId):
-	return self.files.get((oldFileId, newFileId), None)
+        return self.files.get((oldFileId, newFileId), None)
 
     def _findFileChange(self, fileId):
         # XXX this is a linear search - do not use this method!
@@ -442,27 +442,27 @@ class ChangeSet(streams.StreamSet):
                 return oldFileId, self.files[(oldFileId, newFileId)]
 
     def writeContents(self, csf, contents, early, withReferences):
-	# these are kept sorted so we know which one comes next
-	idList = contents.keys()
-	idList.sort()
+        # these are kept sorted so we know which one comes next
+        idList = contents.keys()
+        idList.sort()
 
         sizeCorrection = 0
 
-	if early:
-	    tag = "1 "
-	else:
-	    tag = "0 "
+        if early:
+            tag = "1 "
+        else:
+            tag = "0 "
 
         # diffs come first, followed by plain files
 
-	for hash in idList:
-	    (contType, f, compressed) = contents[hash]
+        for hash in idList:
+            (contType, f, compressed) = contents[hash]
             if contType == ChangedFileTypes.diff:
                 csf.addFile(hash, f, tag + contType[4:],
                             precompressed = compressed)
 
-	for hash in idList:
-	    (contType, f, compressed) = contents[hash]
+        for hash in idList:
+            (contType, f, compressed) = contents[hash]
             if contType != ChangedFileTypes.diff:
                 if withReferences and \
                         isinstance(f, filecontents.CompressedFromDataStore):
@@ -472,7 +472,7 @@ class ChangeSet(streams.StreamSet):
                     if realSize >= 0x100000000:
                         # add 4 bytes to store a 64-bit size
                         sizeCorrection += 4
-                    csf.addFile(hash, 
+                    csf.addFile(hash,
                                 filecontents.FromString(path,
                                                         compressed = True),
                                 tag + ChangedFileTypes.refr[4:],
@@ -485,7 +485,7 @@ class ChangeSet(streams.StreamSet):
 
     def writeAllContents(self, csf, withReferences):
         one = self.writeContents(csf, self.configCache, True, withReferences)
-	two = self.writeContents(csf, self.fileContents, False, withReferences)
+        two = self.writeContents(csf, self.fileContents, False, withReferences)
 
         return one + two
 
@@ -499,14 +499,14 @@ class ChangeSet(streams.StreamSet):
 
         str = self.freeze()
         csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
-        correction = self.writeAllContents(csf, 
+        correction = self.writeAllContents(csf,
                                            withReferences = withReferences)
         return (outFile.tell() - start) + correction
 
     def writeToFile(self, outFileName, withReferences = False, mode = 0666,
                     versionOverride = None):
         # 0666 is right for mode because of umask
-	try:
+        try:
             outFileFd = os.open(outFileName,
                                 os.O_RDWR | os.O_CREAT | os.O_TRUNC, mode)
 
@@ -516,12 +516,12 @@ class ChangeSet(streams.StreamSet):
                                      versionOverride = versionOverride)
             outFile.close()
             return size
-	except:
-	    os.unlink(outFileName)
-	    raise
+        except:
+            os.unlink(outFileName)
+            raise
 
     def makeRollback(self, db, redirectionRollbacks = True, repos = None):
-	assert(not self.absolute)
+        assert(not self.absolute)
 
         rollback = ChangeSet()
 
@@ -531,13 +531,13 @@ class ChangeSet(streams.StreamSet):
         # in this list and handle it later on
         hldrContents = []
 
-	for troveCs in self.iterNewTroveList():
-	    if not troveCs.getOldVersion():
-		# this was a new trove, and the inverse of a new
-		# trove is an old trove
-		rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(), 
-				    troveCs.getNewFlavor())
-		continue
+        for troveCs in self.iterNewTroveList():
+            if not troveCs.getOldVersion():
+                # this was a new trove, and the inverse of a new
+                # trove is an old trove
+                rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(),
+                                    troveCs.getNewFlavor())
+                continue
 
             # if redirectionRollbacks are requested, create one for troves
             # which are not on the local branch (ones which exist in the
@@ -545,17 +545,17 @@ class ChangeSet(streams.StreamSet):
             if not troveCs.getOldVersion().isOnLocalHost() and \
                not troveCs.getNewVersion().isOnLocalHost() and \
                redirectionRollbacks:
-                newTrove = trove.Trove(troveCs.getName(), 
+                newTrove = trove.Trove(troveCs.getName(),
                                        troveCs.getNewVersion(),
                                        troveCs.getNewFlavor(), None)
-                oldTrove = trove.Trove(troveCs.getName(), 
+                oldTrove = trove.Trove(troveCs.getName(),
                                        troveCs.getOldVersion(),
                                        troveCs.getOldFlavor(), None,
                                        type = trove.TROVE_TYPE_REDIRECT)
                 rollback.newTrove(oldTrove.diff(newTrove)[0])
                 continue
 
-	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
+            trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
                                 troveCs.getOldFlavor())
 
             # make a copy because we modify it locally to clear capsules
@@ -568,9 +568,9 @@ class ChangeSet(streams.StreamSet):
                 newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
             newTroveInfoDiff = invertedTroveInfo.diff(newTroveInfo)
 
-	    # this is a modified trove and needs to be inverted
+            # this is a modified trove and needs to be inverted
 
-	    invertedTrove = trove.TroveChangeSet(troveCs.getName(), 
+            invertedTrove = trove.TroveChangeSet(troveCs.getName(),
                                                  trv.getChangeLog(),
                                                  troveCs.getNewVersion(),
                                                  troveCs.getOldVersion(),
@@ -600,42 +600,42 @@ class ChangeSet(streams.StreamSet):
                             invertedTrove.changedTrove(name, version, flavor, not byDef,
                                                        weakRef = weak)
 
-	    for (pathId, path, origFileId, version) in troveCs.getNewFileList():
-		invertedTrove.oldFile(pathId)
+            for (pathId, path, origFileId, version) in troveCs.getNewFileList():
+                invertedTrove.oldFile(pathId)
 
-	    for pathId in troveCs.getOldFileList():
+            for pathId in troveCs.getOldFileList():
                 if not trv.hasFile(pathId):
                     # this file was removed using 'conary remove /path'
                     # so it does not go in the rollback
                     continue
-                
-		(path, origFileId, version) = trv.getFile(pathId)
-		invertedTrove.newFile(pathId, path, origFileId, version)
 
-		origFile = db.getFileVersion(pathId, origFileId, version)
-		rollback.addFile(None, origFileId, origFile.freeze())
+                (path, origFileId, version) = trv.getFile(pathId)
+                invertedTrove.newFile(pathId, path, origFileId, version)
 
-		if not origFile.hasContents:
-		    continue
+                origFile = db.getFileVersion(pathId, origFileId, version)
+                rollback.addFile(None, origFileId, origFile.freeze())
 
-		# We only have the contents of config files available
-		# from the db. Files which aren't in the db
-		# we'll gather from the filesystem *as long as they have
-		# not changed*. If they have changed, they'll show up as
-		# members of the local branch, and their contents will be
-		# saved as part of that change set. we don't rely on
+                if not origFile.hasContents:
+                    continue
+
+                # We only have the contents of config files available
+                # from the db. Files which aren't in the db
+                # we'll gather from the filesystem *as long as they have
+                # not changed*. If they have changed, they'll show up as
+                # members of the local branch, and their contents will be
+                # saved as part of that change set. we don't rely on
                 # the contents staying in the datastore; we cache them
                 # instead
-		if origFile.flags.isConfig():
-		    cont = filecontents.FromDataStore(db.contentsStore, 
-						      origFile.contents.sha1())
+                if origFile.flags.isConfig():
+                    cont = filecontents.FromDataStore(db.contentsStore,
+                                                      origFile.contents.sha1())
                     rollback.addFileContents(pathId, origFileId,
                                              ChangedFileTypes.file,
                                              filecontents.FromString(
                                                 cont.get().read()),
                                              1)
-		else:
-		    fullPath = db.root + path
+                else:
+                    fullPath = db.root + path
 
                     try:
                         fsFile = files.FileFromFilesystem(fullPath, pathId,
@@ -645,7 +645,7 @@ class ChangeSet(streams.StreamSet):
                             raise
                         fsFile = None
 
-		    if fsFile and fsFile.contents == origFile.contents:
+                    if fsFile and fsFile.contents == origFile.contents:
                         rollback.addFileContents(pathId, origFileId,
                                  ChangedFileTypes.file,
                                  filecontents.FromFilesystem(fullPath), 0)
@@ -654,17 +654,17 @@ class ChangeSet(streams.StreamSet):
                                              version, 0))
 
 
-	    for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
-		if not trv.hasFile(pathId):
-		    # the file has been removed from the local system; we
-		    # don't need to restore it on a rollback
-		    continue
-		(curPath, curFileId, curVersion) = trv.getFile(pathId)
+            for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
+                if not trv.hasFile(pathId):
+                    # the file has been removed from the local system; we
+                    # don't need to restore it on a rollback
+                    continue
+                (curPath, curFileId, curVersion) = trv.getFile(pathId)
 
-		if newPath:
-		    invertedTrove.changedFile(pathId, curPath, curFileId, curVersion)
-		else:
-		    invertedTrove.changedFile(pathId, None, curFileId, curVersion)
+                if newPath:
+                    invertedTrove.changedFile(pathId, curPath, curFileId, curVersion)
+                else:
+                    invertedTrove.changedFile(pathId, None, curFileId, curVersion)
 
                 if curFileId == newFileId:
                     continue
@@ -690,38 +690,38 @@ class ChangeSet(streams.StreamSet):
                 else:
                     newFile = files.ThawFile(csInfo, pathId)
 
-		rollback.addFile(newFileId, curFileId, origFile.diff(newFile))
+                rollback.addFile(newFileId, curFileId, origFile.diff(newFile))
 
-		if not isinstance(origFile, files.RegularFile):
-		    continue
+                if not isinstance(origFile, files.RegularFile):
+                    continue
 
-		# If a config file has changed between versions, save
-		# it; if it hasn't changed the unmodified version will
-		# still be available from the database when the rollback
-		# gets applied. We may be able to get away with just reversing
-		# a diff rather then saving the full contents
-		if origFile.flags.isConfig() and newFile.flags.isConfig() and \
+                # If a config file has changed between versions, save
+                # it; if it hasn't changed the unmodified version will
+                # still be available from the database when the rollback
+                # gets applied. We may be able to get away with just reversing
+                # a diff rather then saving the full contents
+                if origFile.flags.isConfig() and newFile.flags.isConfig() and \
                         (origFile.contents.sha1() != newFile.contents.sha1()):
                     if self.configFileIsDiff(newFile.pathId(), newFileId):
                         (contType, cont) = self.getFileContents(
                                     newFile.pathId(), newFileId)
-			f = cont.get()
-			diff = "".join(patch.reverse(f.readlines()))
-			f.seek(0)
-			cont = filecontents.FromString(diff)
+                        f = cont.get()
+                        diff = "".join(patch.reverse(f.readlines()))
+                        f.seek(0)
+                        cont = filecontents.FromString(diff)
                         rollback.addFileContents(pathId, curFileId,
-						 ChangedFileTypes.diff, cont, 1)
-		    else:
-			cont = filecontents.FromDataStore(db.contentsStore, 
-				    origFile.contents.sha1())
+                                                 ChangedFileTypes.diff, cont, 1)
+                    else:
+                        cont = filecontents.FromDataStore(db.contentsStore,
+                                    origFile.contents.sha1())
                         rollback.addFileContents(pathId, curFileId,
-						 ChangedFileTypes.file, cont,
-						 newFile.flags.isConfig())
-		elif ((origFile.hasContents != newFile.hasContents) or
+                                                 ChangedFileTypes.file, cont,
+                                                 newFile.flags.isConfig())
+                elif ((origFile.hasContents != newFile.hasContents) or
                       (origFile.hasContents and newFile.hasContents and
                          origFile.contents.sha1() != newFile.contents.sha1())):
-		    # this file changed, so we need the contents
-		    fullPath = db.root + curPath
+                    # this file changed, so we need the contents
+                    fullPath = db.root + curPath
                     try:
                         fsFile = files.FileFromFilesystem(fullPath, pathId,
                                     possibleMatch = origFile)
@@ -739,7 +739,7 @@ class ChangeSet(streams.StreamSet):
 
                     if (isinstance(fsFile, files.RegularFile) and
                         fsFile.contents.sha1() == origFile.contents.sha1()):
-			# the contents in the file system are right
+                        # the contents in the file system are right
                         rollback.addFileContents(pathId, curFileId,
                                          ChangedFileTypes.file,
                                          filecontents.FromFilesystem(fullPath),
@@ -750,27 +750,27 @@ class ChangeSet(streams.StreamSet):
                         hldrContents.append((trv, pathId, curFileId, curVersion,
                                              isConfig))
 
-	    rollback.newTrove(invertedTrove)
+            rollback.newTrove(invertedTrove)
 
-	for (name, version, flavor) in self.getOldTroveList():
+        for (name, version, flavor) in self.getOldTroveList():
             if not version.isOnLocalHost() and redirectionRollbacks:
-                oldTrove = trove.Trove(name, version, flavor, None, 
+                oldTrove = trove.Trove(name, version, flavor, None,
                                        type = trove.TROVE_TYPE_REDIRECT)
                 rollback.newTrove(oldTrove.diff(None)[0])
                 continue
 
-	    trv = db.getTrove(name, version, flavor)
-	    troveDiff = trv.diff(None)[0]
-	    rollback.newTrove(troveDiff)
+            trv = db.getTrove(name, version, flavor)
+            troveDiff = trv.diff(None)[0]
+            rollback.newTrove(troveDiff)
 
             # everything in the rollback is considered primary
             rollback.addPrimaryTrove(name, version, flavor)
 
-	    for (pathId, path, fileId, fileVersion) in trv.iterFileList():
-		fileObj = db.getFileVersion(pathId, fileId, fileVersion)
-		rollback.addFile(None, fileId, fileObj.freeze())
-		if fileObj.hasContents:
-		    fullPath = db.root + path
+            for (pathId, path, fileId, fileVersion) in trv.iterFileList():
+                fileObj = db.getFileVersion(pathId, fileId, fileVersion)
+                rollback.addFile(None, fileId, fileObj.freeze())
+                if fileObj.hasContents:
+                    fullPath = db.root + path
 
                     if fileObj.flags.isConfig():
                         cont = filecontents.FromDataStore(db.contentsStore,
@@ -783,15 +783,15 @@ class ChangeSet(streams.StreamSet):
                                                  fileObj.flags.isConfig())
                         continue
 
-		    if os.path.exists(fullPath):
-			fsFile = files.FileFromFilesystem(fullPath, pathId,
-				    possibleMatch = fileObj)
-		    else:
-			fsFile = None
+                    if os.path.exists(fullPath):
+                        fsFile = files.FileFromFilesystem(fullPath, pathId,
+                                    possibleMatch = fileObj)
+                    else:
+                        fsFile = None
 
-		    if fsFile and fsFile.hasContents and \
-			    fsFile.contents.sha1() == fileObj.contents.sha1():
-			# the contents in the file system are right
+                    if fsFile and fsFile.hasContents and \
+                            fsFile.contents.sha1() == fileObj.contents.sha1():
+                        # the contents in the file system are right
                         contType = ChangedFileTypes.file
                         rollback.addFileContents(pathId, fileId,
                                         ChangedFileTypes.file,
@@ -856,44 +856,44 @@ class ChangeSet(streams.StreamSet):
                                              filecontents.FromFile(f),
                                              isConfig)
 
-	return rollback
+        return rollback
 
     def setTargetShadow(self, repos, targetShadowLabel):
-	"""
-	Retargets this changeset to create troves and files on
-	shadow targetLabel off of the parent of the source node. Version
-        calculations aren't quite right for source troves 
+        """
+        Retargets this changeset to create troves and files on
+        shadow targetLabel off of the parent of the source node. Version
+        calculations aren't quite right for source troves
         (s/incrementBuildCount).
 
-	@param repos: repository which will be committed to
-	@type repos: repository.Repository
-	@param targetShadowLabel: label of the branch to commit to
-	@type targetShadowLabel: versions.Label
-	"""
-	assert(not targetShadowLabel == versions.LocalLabel())
+        @param repos: repository which will be committed to
+        @type repos: repository.Repository
+        @param targetShadowLabel: label of the branch to commit to
+        @type targetShadowLabel: versions.Label
+        """
+        assert(not targetShadowLabel == versions.LocalLabel())
         # if it's local, Version.parentVersion() has to work everywhere
         assert(self.isLocal())
         assert(not self.isAbsolute())
 
-	troveVersions = {}
+        troveVersions = {}
 
         troveCsList = [ (x.getName(), x) for x in self.iterNewTroveList() ]
         troveCsList.sort()
         troveCsList.reverse()
         origTroveList = repos.getTroves([ (x[1].getName(), x[1].getOldVersion(),
-                                           x[1].getOldFlavor()) 
+                                           x[1].getOldFlavor())
                                           for x in troveCsList ])
 
         # this loop needs to handle components before packages; reverse
         # sorting by name ensures that
         #
-        # XXX this is busted for groups 
+        # XXX this is busted for groups
 
-	for (name, troveCs), oldTrv in \
+        for (name, troveCs), oldTrv in \
                                 itertools.izip(troveCsList, origTroveList):
             origVer = troveCs.getNewVersion()
 
-	    oldVer = troveCs.getOldVersion()
+            oldVer = troveCs.getOldVersion()
             assert(oldVer is not None)
             newVer = oldVer.createShadow(targetShadowLabel)
             newVer.incrementBuildCount()
@@ -935,8 +935,8 @@ class ChangeSet(streams.StreamSet):
             troveCs = newTrv.diff(oldTrv)[0]
             self.newTrove(troveCs)
 
-	# this has to be true, I think...
-	self.local = 0
+        # this has to be true, I think...
+        self.local = 0
 
     def getJobSet(self, primaries = False):
         """
@@ -947,7 +947,7 @@ class ChangeSet(streams.StreamSet):
 
         for trvCs in self.newTroves.values():
             if trvCs.getOldVersion():
-                job = (trvCs.getName(), 
+                job = (trvCs.getName(),
                        (trvCs.getOldVersion(), trvCs.getOldFlavor()),
                        (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                        trvCs.isAbsolute())
@@ -962,7 +962,7 @@ class ChangeSet(streams.StreamSet):
 
         for item in self.oldTroves:
             if not primaries or item in self.primaryTroveList:
-                jobSet.add((item[0], (item[1], item[2]), 
+                jobSet.add((item[0], (item[1], item[2]),
                                 (None, None), False))
 
         return jobSet
@@ -1221,11 +1221,11 @@ class ChangeSet(streams.StreamSet):
 
 
     def __init__(self, data = None):
-	streams.StreamSet.__init__(self, data)
-	self.configCache = ChangeSetFileContentsDict()
-	self.fileContents = ChangeSetFileContentsDict()
-	self.absolute = False
-	self.local = 0
+        streams.StreamSet.__init__(self, data)
+        self.configCache = ChangeSetFileContentsDict()
+        self.fileContents = ChangeSetFileContentsDict()
+        self.absolute = False
+        self.local = 0
 util.SendableFileSet._register(ChangeSet)
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
@@ -1233,8 +1233,8 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
     #streamDict = ChangeSet.streamDict
 
     def __init__(self, absCS):
-	self.absCS = absCS
-	ChangeSet.__init__(self)
+        self.absCS = absCS
+        ChangeSet.__init__(self)
 
 class ChangeSetKeyConflictError(Exception):
 
@@ -1355,7 +1355,7 @@ class ReadOnlyChangeSet(ChangeSet):
         if self.lastCsf:
             next = self.lastCsf.getNextFile()
             if next:
-                util.tupleListBsearchInsert(self.fileQueue, 
+                util.tupleListBsearchInsert(self.fileQueue,
                                             next + (self.lastCsf,),
                                             self.fileQueueCmp)
             self.lastCsf = None
@@ -1372,14 +1372,14 @@ class ReadOnlyChangeSet(ChangeSet):
     def getFileContents(self, pathId, fileId, compressed = False):
         name = None
         key = makeKey(pathId, fileId)
-	if self.configCache.has_key(pathId):
+        if self.configCache.has_key(pathId):
             assert(not compressed)
             name = pathId
-	    (tag, contents, alreadyCompressed) = self.configCache[pathId]
+            (tag, contents, alreadyCompressed) = self.configCache[pathId]
             cont = contents
-	elif self.configCache.has_key(key):
+        elif self.configCache.has_key(key):
             name = key
-	    (tag, contents, alreadyCompressed) = self.configCache[key]
+            (tag, contents, alreadyCompressed) = self.configCache[key]
 
             cont = contents
 
@@ -1390,7 +1390,7 @@ class ReadOnlyChangeSet(ChangeSet):
                 compressor.close()
                 f.seek(0)
                 cont = filecontents.FromFile(f, compressed = True)
-	else:
+        else:
             self.filesRead = True
 
             rc = self._nextFile()
@@ -1398,7 +1398,7 @@ class ReadOnlyChangeSet(ChangeSet):
                 name, tagInfo, f, csf = rc
                 if not compressed:
                     f = gzip.GzipFile(None, "r", fileobj = f)
-                
+
                 # if we found the key we're looking for, or the pathId
                 # we got is a config file, cache or break out of the loop
                 # accordingly
@@ -1423,14 +1423,14 @@ class ReadOnlyChangeSet(ChangeSet):
             return (tag, cont)
 
     def makeAbsolute(self, repos):
-	"""
+        """
         Converts this (relative) change set to an abstract change set.  File
         streams and contents are omitted unless the file changed. This is fine
         for changesets being committed, not so hot for changesets which are
         being applied directly to a system. The absolute changeset is returned
         as a new changeset; self is left unchanged.
-	"""
-	assert(not self.absolute)
+        """
+        assert(not self.absolute)
 
         absCs = ChangeSet()
         absCs.setPrimaryTroveList(self.getPrimaryTroveList())
@@ -1440,59 +1440,59 @@ class ReadOnlyChangeSet(ChangeSet):
                           x.getOldFlavor()) for x in self.newTroves.values() ]
         oldTroves = repos.getTroves(oldTroveList)
 
-	# for each file find the old fileId for it so we can assemble the
-	# proper stream and contents
-	for trv, troveCs in itertools.izip(oldTroves,
+        # for each file find the old fileId for it so we can assemble the
+        # proper stream and contents
+        for trv, troveCs in itertools.izip(oldTroves,
                                            self.newTroves.itervalues()):
             if trv.troveInfo.incomplete():
                 raise errors.TroveError('''\
 Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary and/or reinstall %s=%s[%s].''' % (trv.getName(), trv.getVersion(),
                                    trv.getFlavor()))
-	    troveName = troveCs.getName()
-	    newVersion = troveCs.getNewVersion()
-	    newFlavor = troveCs.getNewFlavor()
-	    assert(troveCs.getOldVersion() == trv.getVersion())
+            troveName = troveCs.getName()
+            newVersion = troveCs.getNewVersion()
+            newFlavor = troveCs.getNewFlavor()
+            assert(troveCs.getOldVersion() == trv.getVersion())
             assert(trv.getName() == troveName)
 
             # XXX this is broken.  makeAbsolute() is only used for
             # committing local changesets, and they can't have new
             # files, so we're OK at the moment.
-	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
-		filecs = self.files[(None, fileId)]
-		newFiles.append((None, fileId, filecs))
+            for (pathId, path, fileId, version) in troveCs.getNewFileList():
+                filecs = self.files[(None, fileId)]
+                newFiles.append((None, fileId, filecs))
 
-	    for (pathId, path, fileId, version) in troveCs.getChangedFileList():
-		(oldPath, oldFileId, oldVersion) = trv.getFile(pathId)
-		filecs = self.files[(oldFileId, fileId)]
-		neededFiles.append((pathId, oldFileId, fileId, oldVersion,
+            for (pathId, path, fileId, version) in troveCs.getChangedFileList():
+                (oldPath, oldFileId, oldVersion) = trv.getFile(pathId)
+                filecs = self.files[(oldFileId, fileId)]
+                neededFiles.append((pathId, oldFileId, fileId, oldVersion,
                                     version, filecs))
 
             # we've mucked around with this troveCs, it won't pass
             # integrity checks
-	    trv.applyChangeSet(troveCs, skipIntegrityChecks = True)
-	    newCs = trv.diff(None, absolute = True)[0]
-	    absCs.newTrove(newCs)
+            trv.applyChangeSet(troveCs, skipIntegrityChecks = True)
+            newCs = trv.diff(None, absolute = True)[0]
+            absCs.newTrove(newCs)
 
-	fileList = [ (x[0], x[1], x[3]) for x in neededFiles ]
-	fileObjs = repos.getFileVersions(fileList)
+        fileList = [ (x[0], x[1], x[3]) for x in neededFiles ]
+        fileObjs = repos.getFileVersions(fileList)
 
         # XXX this would be markedly more efficient if we batched up getting
         # file contents
-	for ((pathId, oldFileId, newFileId, oldVersion, newVersion, filecs), 
+        for ((pathId, oldFileId, newFileId, oldVersion, newVersion, filecs),
                         fileObj) in itertools.izip(neededFiles, fileObjs):
-	    fileObj.twm(filecs, fileObj)
-	    (absFileCs, hash) = fileChangeSet(pathId, None, fileObj)
-	    absCs.addFile(None, newFileId, absFileCs)
+            fileObj.twm(filecs, fileObj)
+            (absFileCs, hash) = fileChangeSet(pathId, None, fileObj)
+            absCs.addFile(None, newFileId, absFileCs)
 
             if newVersion != oldVersion and fileObj.hasContents:
-		# we need the contents as well
+                # we need the contents as well
                 if files.contentsChanged(filecs):
                     if fileObj.flags.isConfig():
                         # config files aren't available compressed
                         (contType, cont) = self.getFileContents(
                                      pathId, newFileId)
                         if contType == ChangedFileTypes.diff:
-                            origCont = repos.getFileContents([(oldFileId, 
+                            origCont = repos.getFileContents([(oldFileId,
                                                                oldVersion)])[0]
                             diff = cont.get().readlines()
                             oldLines = origCont.get().readlines()
@@ -1501,7 +1501,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                             fileContents = filecontents.FromString(
                                                             "".join(newLines))
                             absCs.addFileContents(pathId, newFileId,
-                                                  ChangedFileTypes.file, 
+                                                  ChangedFileTypes.file,
                                                   fileContents, True)
                         else:
                             absCs.addFileContents(pathId, newFileId,
@@ -1525,33 +1525,33 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         return absCs
 
     def rootChangeSet(self, db, troveMap):
-	"""
-	Converts this (absolute) change set to a relative change
-	set. The second parameter, troveMap, specifies the old trove
-	for each trove listed in this change set. It is a dictionary
-	mapping (troveName, newVersion, newFlavor) tuples to 
-	(oldVersion, oldFlavor) pairs. The troveMap may be (None, None)
-	if a new install is desired (the trove is switched from absolute
+        """
+        Converts this (absolute) change set to a relative change
+        set. The second parameter, troveMap, specifies the old trove
+        for each trove listed in this change set. It is a dictionary
+        mapping (troveName, newVersion, newFlavor) tuples to
+        (oldVersion, oldFlavor) pairs. The troveMap may be (None, None)
+        if a new install is desired (the trove is switched from absolute
         to relative to nothing in this case). If an entry is missing for
         a trove, that trove is left absolute.
 
         Rooting can happen multiple times (only once per trove though). To
         allow this, the absolute file streams remain available from this
         changeset for all time; rooting does not remove them.
-	"""
-	# this has an empty source path template, which is only used to
-	# construct the eraseFiles list anyway
-	
-	# absolute change sets cannot have eraseLists
-	#assert(not eraseFiles)
+        """
+        # this has an empty source path template, which is only used to
+        # construct the eraseFiles list anyway
 
-	newFiles = []
-	newTroves = []
+        # absolute change sets cannot have eraseLists
+        #assert(not eraseFiles)
 
-	for (key, troveCs) in self.newTroves.items():
-	    troveName = troveCs.getName()
-	    newVersion = troveCs.getNewVersion()
-	    newFlavor = troveCs.getNewFlavor()
+        newFiles = []
+        newTroves = []
+
+        for (key, troveCs) in self.newTroves.items():
+            troveName = troveCs.getName()
+            newVersion = troveCs.getNewVersion()
+            newFlavor = troveCs.getNewFlavor()
 
             if key not in troveMap:
                 continue
@@ -1561,43 +1561,43 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
             (oldVersion, oldFlavor) = troveMap[key]
 
-	    if not oldVersion:
-		# new trove; the Trove.diff() right after this never
-		# sets the absolute flag, so the right thing happens
-		old = None
-	    else:
-		old = db.getTrove(troveName, oldVersion, oldFlavor,
-					     pristine = True)
-	    newTrove = trove.Trove(troveCs)
+            if not oldVersion:
+                # new trove; the Trove.diff() right after this never
+                # sets the absolute flag, so the right thing happens
+                old = None
+            else:
+                old = db.getTrove(troveName, oldVersion, oldFlavor,
+                                             pristine = True)
+            newTrove = trove.Trove(troveCs)
 
-	    # we ignore trovesNeeded; it doesn't mean much in this case
-	    (troveChgSet, filesNeeded, trovesNeeded) = \
+            # we ignore trovesNeeded; it doesn't mean much in this case
+            (troveChgSet, filesNeeded, trovesNeeded) = \
                           newTrove.diff(old, absolute = 0)
-	    newTroves.append(troveChgSet)
+            newTroves.append(troveChgSet)
             filesNeeded.sort()
 
-	    for x in filesNeeded:
+            for x in filesNeeded:
                 (pathId, oldFileId, oldVersion, newFileId, newVersion) = x
                 filecs = self.getFileChange(None, newFileId)
 
-		if not oldVersion:
-		    newFiles.append((oldFileId, newFileId, filecs))
-		    continue
-		
-		fileObj = files.ThawFile(filecs, pathId)
-		(oldFile, oldCont) = db.getFileVersion(pathId, 
-				oldFileId, oldVersion, withContents = 1)
-		(filecs, hash) = fileChangeSet(pathId, oldFile, fileObj)
+                if not oldVersion:
+                    newFiles.append((oldFileId, newFileId, filecs))
+                    continue
 
-		newFiles.append((oldFileId, newFileId, filecs))
+                fileObj = files.ThawFile(filecs, pathId)
+                (oldFile, oldCont) = db.getFileVersion(pathId,
+                                oldFileId, oldVersion, withContents = 1)
+                (filecs, hash) = fileChangeSet(pathId, oldFile, fileObj)
+
+                newFiles.append((oldFileId, newFileId, filecs))
 
         # leave the old files in place; we my need those diffs for a
         # trvCs which hasn't been rooted yet
-	for tup in newFiles:
-	    self.addFile(*tup)
+        for tup in newFiles:
+            self.addFile(*tup)
 
-	for troveCs in newTroves:
-	    self.newTrove(troveCs)
+        for troveCs in newTroves:
+            self.newTrove(troveCs)
 
         self.absolute = False
 
@@ -1638,7 +1638,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         entry = wrapper.getNextFile()
         if entry:
             util.tupleListBsearchInsert(self.fileQueue,
-                                        entry + (wrapper,), 
+                                        entry + (wrapper,),
                                         self.fileQueueCmp)
 
         next = self._nextFile()
@@ -1686,7 +1686,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         self.fileContainers += otherCs.fileContainers
         self.csfWrappers += otherCs.csfWrappers
         for entry in otherCs.fileQueue:
-            util.tupleListBsearchInsert(self.fileQueue, entry, 
+            util.tupleListBsearchInsert(self.fileQueue, entry,
                                         self.fileQueueCmp)
 
     def _mergeCs(self, otherCs):
@@ -1698,7 +1698,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         entry = wrapper.getNextFile()
         if entry:
             util.tupleListBsearchInsert(self.fileQueue,
-                                        entry + (wrapper,), 
+                                        entry + (wrapper,),
                                         self.fileQueueCmp)
     def merge(self, otherCs):
         self.files.update(otherCs.files)
@@ -1795,7 +1795,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         return fullCs
 
     def __init__(self, data = None):
-	ChangeSet.__init__(self, data = data)
+        ChangeSet.__init__(self, data = data)
         self.filesRead = False
         self.csfWrappers = []
         self.fileContainers = []
@@ -1814,7 +1814,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                     f = util.ExtendedFile(fileName, "r", buffering = False)
                 except IOError, err:
                     raise errors.ConaryError(
-                                "Error opening changeset '%s': %s" % 
+                                "Error opening changeset '%s': %s" %
                                     (fileName, err.strerror))
                 try:
                     csf = filecontainer.FileContainer(f)
@@ -1834,27 +1834,27 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                         "File %s is not a valid conary changeset." % fileName)
 
         control.file.seek(control.start, 0)
-	ReadOnlyChangeSet.__init__(self)
-	start = gzip.GzipFile(None, 'r', fileobj = control)
+        ReadOnlyChangeSet.__init__(self)
+        start = gzip.GzipFile(None, 'r', fileobj = control)
         self.thawFromFile(start)
 
-	self.absolute = True
-	empty = True
+        self.absolute = True
+        empty = True
         self.fileContainers = [ csf ]
 
-	for trvCs in self.newTroves.itervalues():
-	    if not trvCs.isAbsolute():
-		self.absolute = False
-	    empty = False
+        for trvCs in self.newTroves.itervalues():
+            if not trvCs.isAbsolute():
+                self.absolute = False
+            empty = False
 
-	    old = trvCs.getOldVersion()
-	    new = trvCs.getNewVersion()
+            old = trvCs.getOldVersion()
+            new = trvCs.getNewVersion()
 
-	    if (old and old.onLocalLabel()) or new.onLocalLabel():
-		self.local = 1
+            if (old and old.onLocalLabel()) or new.onLocalLabel():
+                self.local = 1
 
-	if empty:
-	    self.absolute = False
+        if empty:
+            self.absolute = False
 
         # load the diff cache
         nextFile = csf.getNextFile()
@@ -1896,19 +1896,19 @@ def fileChangeSet(pathId, old, new):
     diff = new.diff(old)
 
     if old and old.__class__ == new.__class__:
-	if isinstance(new, files.RegularFile) and      \
-		  isinstance(old, files.RegularFile)   \
-		  and ((new.contents.sha1() != old.contents.sha1()) or
+        if isinstance(new, files.RegularFile) and      \
+                  isinstance(old, files.RegularFile)   \
+                  and ((new.contents.sha1() != old.contents.sha1()) or
                        (not old.flags.isConfig() and new.flags.isConfig())):
-	    contentsHash = new.contents.sha1()
+            contentsHash = new.contents.sha1()
     elif isinstance(new, files.RegularFile):
-	    contentsHash = new.contents.sha1()
+            contentsHash = new.contents.sha1()
 
     return (diff, contentsHash)
 
 def fileContentsUseDiff(oldFile, newFile, mirrorMode = False):
     # Don't use diff's for config files when the autosource flag changes
-    # because the client may not have anything around it can apply the diff 
+    # because the client may not have anything around it can apply the diff
     # to.
     return ((not mirrorMode) and
                 oldFile and oldFile.flags.isConfig() and
@@ -1917,21 +1917,21 @@ def fileContentsUseDiff(oldFile, newFile, mirrorMode = False):
 
 def fileContentsDiff(oldFile, oldCont, newFile, newCont, mirrorMode = False):
     if fileContentsUseDiff(oldFile, newFile, mirrorMode = mirrorMode):
-	first = oldCont.get().readlines()
-	second = newCont.get().readlines()
+        first = oldCont.get().readlines()
+        second = newCont.get().readlines()
 
-	if first or second:
+        if first or second:
             diff = patch.unifiedDiff(first, second, "old", "new")
             diff.next()
             diff.next()
-	    cont = filecontents.FromString("".join(diff))
-	    contType = ChangedFileTypes.diff
-	else:
-	    cont = filecontents.FromString("".join(second))
-	    contType = ChangedFileTypes.file
+            cont = filecontents.FromString("".join(diff))
+            contType = ChangedFileTypes.diff
+        else:
+            cont = filecontents.FromString("".join(second))
+            contType = ChangedFileTypes.file
     else:
-	cont = newCont
-	contType = ChangedFileTypes.file
+        cont = newCont
+        contType = ChangedFileTypes.file
 
     return (contType, cont)
 
@@ -1943,19 +1943,19 @@ def CreateFromFilesystem(troveList):
     cs = ChangeSet()
 
     for (oldTrv, trv, fileMap) in troveList:
-	(troveChgSet, filesNeeded, trovesNeeded) = trv.diff(oldTrv,
+        (troveChgSet, filesNeeded, trovesNeeded) = trv.diff(oldTrv,
                                                             absolute = 1)
-	cs.newTrove(troveChgSet)
+        cs.newTrove(troveChgSet)
 
-	for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:
-	    (file, realPath, filePath) = fileMap[pathId]
-	    (filecs, hash) = fileChangeSet(pathId, None, file)
-	    cs.addFile(oldFileId, newFileId, filecs)
+        for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:
+            (file, realPath, filePath) = fileMap[pathId]
+            (filecs, hash) = fileChangeSet(pathId, None, file)
+            cs.addFile(oldFileId, newFileId, filecs)
 
             if hash and not file.flags.isEncapsulatedContent():
-		cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
-			  filecontents.FromFilesystem(realPath),
-			  file.flags.isConfig())
+                cs.addFileContents(pathId, newFileId, ChangedFileTypes.file,
+                          filecontents.FromFilesystem(realPath),
+                          file.flags.isConfig())
 
     return cs
 
@@ -2004,7 +2004,7 @@ class DictAsCsf:
         # convert the dict (which is a changeSet.fileContents object) to a
         # (name, contTag, contObj, compressed) list, where contTag is the same
         # kind of tag we use in csf files "[0|1] [file|diff]"
-        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1], x[1][2]) for x in 
+        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1], x[1][2]) for x in
                             contents.iteritems() ]
         self.items.sort()
         self.next = 0
@@ -2036,7 +2036,7 @@ def _convertChangeSetV2V1(inPath, outPath):
             # can only happen if there are multiple files with the same
             # PathId, which would cause the conflict we test for above
             oldCompressed = f.read()
-            old = gzip.GzipFile(None, "r", 
+            old = gzip.GzipFile(None, "r",
                                 fileobj = StringIO(oldCompressed)).read()
             new = old[0:16]
             newCompressedF = StringIO()
@@ -2057,7 +2057,7 @@ def _convertChangeSetV2V1(inPath, outPath):
 def getNativeChangesetVersion(protocolVersion):
     """Return the native changeset version supported by a client speaking the
     supplied protocol version
-    
+
     @param protocolVersion: Protocol version that the client negotiated with
     the server
     @type protocolVersion: int
@@ -2153,7 +2153,7 @@ class AbstractChangesetExploder:
                 continue
 
             assert(contentType == ChangedFileTypes.file)
-            
+
             ptrId = pathId + fileId
             if pathId in delayedRestores:
                 ptrMap[pathId] = destPath

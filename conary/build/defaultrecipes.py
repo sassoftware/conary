@@ -542,7 +542,7 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
     DESCRIPTION
     ===========
 
-    The C{CapsuleRecipe} class provides an interface to create a capsule 
+    The C{CapsuleRecipe} class provides an interface to create a capsule
     package.  A capsule package encapsulates an unmodified, foreign package that
     is created by another packaging system.  Currently only RPM is supported.
     When a capsule package is installed or updated, the actual install or update

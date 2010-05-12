@@ -17,7 +17,7 @@ from conary import errors
 class MissingParameterError(errors.WebError):
     def __init__(self, param):
         self.param = param
-        
+
     def __str__(self):
         return "Missing Parameter: %s" % self.param
 
@@ -31,9 +31,9 @@ class BadParameterError(errors.WebError):
                 (self.badvalue, self.param)
 
 def strFields(**params):
-    """Decorator for cgi fields.  Use like @strFields(foo=None, bar='foo') 
+    """Decorator for cgi fields.  Use like @strFields(foo=None, bar='foo')
     where foo is a required parameter, and bar defaults to 'foo'.
-    Converts parameters to the given type, leaves other parameters untouched.  
+    Converts parameters to the given type, leaves other parameters untouched.
     """
     def deco(func):
         def wrapper(self, **kw):
@@ -41,7 +41,7 @@ def strFields(**params):
                 if name in kw:
                     value = str(kw[name])
                 elif default is None:
-                    raise MissingParameterError(str(name)) 
+                    raise MissingParameterError(str(name))
                 else:
                     value = default
                 kw[name] = value
@@ -50,9 +50,9 @@ def strFields(**params):
     return deco
 
 def intFields(**params):
-    """Decorator for cgi fields.  Use like @intFields(foo=None, bar=2) 
+    """Decorator for cgi fields.  Use like @intFields(foo=None, bar=2)
     where foo is a required parameter, and bar defaults to 2.
-    Converts parameters to the given type, leaves other parameters untouched.  
+    Converts parameters to the given type, leaves other parameters untouched.
     """
 
     def deco(func):
@@ -115,9 +115,9 @@ def dictFields(**params):
                 parts = key.split('.')
                 if len(parts) > 1 and parts[0] in params:
                     d = kw
-                    d.setdefault(parts[0], {}) 
+                    d.setdefault(parts[0], {})
                     while len(parts) > 1:
-                        d.setdefault(parts[0], {}) 
+                        d.setdefault(parts[0], {})
                         d = d[parts[0]]
                         parts = parts[1:]
                     value = kw[key]

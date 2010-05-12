@@ -24,4 +24,4 @@ class ChangeLogTable:
         cu.execute("INSERT INTO ChangeLogs (nodeId, name, contact, message) "
                    "VALUES (?, ?, ?, ?)",
                    (nodeId, cl.getName(), cl.getContact(), cl.getMessage()))
-	return cu.lastrowid
+        return cu.lastrowid

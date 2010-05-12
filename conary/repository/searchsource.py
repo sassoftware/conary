@@ -39,7 +39,7 @@
     For all of these sources, you simply call findTroves(troveSpecs),
     without passing in flavor or installLabelPath.
 
-    You can also create a searchSourceStack by calling 
+    You can also create a searchSourceStack by calling
     createSearchSourceStackFromStrings.
 """
 
@@ -107,7 +107,7 @@ class SearchSource(AbstractSearchSource):
 
     def findTroves(self, troveSpecs, useAffinity=False, **kw):
         """
-            Finds the trove matching the given list of 
+            Finds the trove matching the given list of
             (name, versionSpec, flavor) troveSpecs.  If useAffinity is True,
             uses the associated database for label/flavor affinity.
         """
@@ -198,7 +198,7 @@ class NetworkSearchSource(SearchSource):
         elif '@' in versionStr:
             if '/' in versionStr:
                 label, remainder = versionStr.split('/')
-                return [ '%s/%s' % (x, remainder) for x in self.installLabelPath 
+                return [ '%s/%s' % (x, remainder) for x in self.installLabelPath
                          if str(x) == label ]
             return [ str(x) for x in self.installLabelPath if str(x) == versionStr ]
         # version/revision only are all ok - they don't modify the label we search on.
@@ -433,7 +433,7 @@ def createSearchSourceStackFromStrings(searchSource, searchPath, flavor,
                                      ' '.join(strings), err))
 
 def createSearchSourceStack(searchSource, searchPath, flavor, db=None,
-                            resolveLeavesFirst=True, troveSource=None, 
+                            resolveLeavesFirst=True, troveSource=None,
                             useAffinity=True, fallBackToRepos=True):
     """
         Creates a searchSourceStack based on a searchPath.

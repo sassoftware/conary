@@ -59,7 +59,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
 
     if showChanges:
         lsl = True
-    
+
     if recurseRepos:
         recurse = True
 
@@ -95,16 +95,16 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
         dcfg.setTroveDisplay(deps=deps, info=info, showBuildReqs=showBuildReqs,
                              digSigs=digSigs, fullFlavors=cfg.fullFlavors,
                              showLabels=cfg.showLabels, baseFlavors=cfg.flavor,
-                             fullVersions=cfg.fullVersions, 
+                             fullVersions=cfg.fullVersions,
                              )
-        dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags, 
+        dcfg.setFileDisplay(ls=ls, lsl=lsl, ids=ids, sha1s=sha1s, tags=tags,
                             fileDeps=fileDeps, fileVersions=fileVersions,
                             fileFlavors=fileFlavors, capsules=capsules)
 
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:
             # if we didn't explicitly set recurse and we're not recursing one
-            # level explicitly 
+            # level explicitly
             recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
                                fileVersions, fileFlavors)
 
@@ -120,7 +120,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
         formatter = display.TroveFormatter(dcfg)
         display.displayTroves(dcfg, formatter, troveTups)
     else:
-        changeSetSource = trovesource.ChangeSetJobSource(repos, 
+        changeSetSource = trovesource.ChangeSetJobSource(repos,
                                              trovesource.stack(db, repos))
         changeSetSource.addChangeSet(cs)
 
@@ -143,7 +143,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
         recurseOne = showTroves or showAllTroves or weakRefs
         if recurse is None and not recurseOne:
             # if we didn't explicitly set recurse and we're not recursing one
-            # level explicitly and we specified troves (so everything won't 
+            # level explicitly and we specified troves (so everything won't
             # show up at the top level anyway), guess at whether to recurse
             recurse = True in (ls, lsl, ids, sha1s, tags, deps, fileDeps,
                                fileVersions, fileFlavors)
@@ -158,7 +158,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
 
 
 def getJobsToDisplay(jobSource, jobSpecs):
-    if jobSpecs:  
+    if jobSpecs:
         jobSpecs = cmdline.parseChangeList(jobSpecs, allowChangeSets=False)
     else:
         jobSpecs = []

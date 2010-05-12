@@ -248,19 +248,19 @@ class Policy(BasePolicy):
         'use': None,
         'exceptions': None,
         'inclusions': None,
-	'subtrees': None,
+        'subtrees': None,
     }
 
     def __init__(self, recipe, **keywords):
-	"""
-	@keyword exceptions: Optional argument; regexp(s) specifying
-	files to ignore while taking the policy action.  It will be
-	interpolated against recipe macros before being used.
-	@type exceptions: None, filter string/tuple, or
-	tuple/list of filter strings/tuples
-	@keyword use: Optional argument; Use flag(s) telling whether
-	to actually perform the action.
-	@type use: None, Use flag, or tuple/list of Use flags
+        """
+        @keyword exceptions: Optional argument; regexp(s) specifying
+        files to ignore while taking the policy action.  It will be
+        interpolated against recipe macros before being used.
+        @type exceptions: None, filter string/tuple, or
+        tuple/list of filter strings/tuples
+        @keyword use: Optional argument; Use flag(s) telling whether
+        to actually perform the action.
+        @type use: None, Use flag, or tuple/list of Use flags
         @keyword subtree: Subtree to which to limit the policy, or it
         it already is limited (invariantsubtrees), then additional
         subtrees to consider.
@@ -270,12 +270,12 @@ class Policy(BasePolicy):
         C{FileFilter}s to include within the general limitation.
         @type inclusions: C{FileFilter} strings, C{FileFilter} tuples,
         or list (not tuple) of C{FileFilter} strings or C{FileFilter} tuples.
-	"""
-	# enforce abstract base class status
-	assert(self.__class__ is not Policy)
+        """
+        # enforce abstract base class status
+        assert(self.__class__ is not Policy)
 
         BasePolicy.__init__(self, None, [], **keywords)
-	self.recipe = recipe
+        self.recipe = recipe
         if self.rootdir is None and self.filetree:
             self.rootdir = {
                 DESTDIR: '%(destdir)s',
@@ -297,9 +297,9 @@ class Policy(BasePolicy):
                 kwargs['rootdir'])
 
     def filterExpArgs(self, expression, name=None):
-	"""
-	@param expression: regular expression or tuple of
-	(regex, [setmode, [unsetmode]])
+        """
+        @param expression: regular expression or tuple of
+        (regex, [setmode, [unsetmode]])
         Creates arguments to filter.Filter.__init__
         """
         kwargs = {
@@ -314,7 +314,7 @@ class Policy(BasePolicy):
             return (expression, macros), kwargs
 
         if not isinstance(expression, list):
-	    expression = list(expression)
+            expression = list(expression)
 
         # this normally happens when code at a higher level
         # has a filterExp tuple in a list of items and does
@@ -351,15 +351,15 @@ class Policy(BasePolicy):
             unusedList.update(newUnused)
 
     def doProcess(self, recipe):
-	"""
-	Invocation instance
+        """
+        Invocation instance
         @param recipe: holds the recipe object, which is used for
-	the macro set and package objects.
+        the macro set and package objects.
         @return: None
         @rtype: None
-	"""
-	self.recipe = recipe
-	self.macros = recipe.macros
+        """
+        self.recipe = recipe
+        self.macros = recipe.macros
 
         if self.rootdir:
             self.rootdir = util.normpath(self.rootdir % self.macros)
@@ -370,52 +370,52 @@ class Policy(BasePolicy):
             # This policy does not handle derived packages
             return
 
-	if hasattr(self.__class__, 'preProcess'):
-	    self.preProcess()
+        if hasattr(self.__class__, 'preProcess'):
+            self.preProcess()
 
-	# is runtime check implemented?
-	if hasattr(self.__class__, 'test'):
-	    if not self.test():
-		return
+        # is runtime check implemented?
+        if hasattr(self.__class__, 'test'):
+            if not self.test():
+                return
 
-	# change self.use to be a simple flag
-	self.use = action.checkUse(self.use)
+        # change self.use to be a simple flag
+        self.use = action.checkUse(self.use)
 
-	# compile the exceptions
-	self.exceptionFilters = []
-	self.compileFilters(self.invariantexceptions, self.exceptionFilters)
-	if self.exceptions:
-	    if not isinstance(self.exceptions, (tuple, list)):
-		# turn a plain string into a sequence
-		self.exceptions = (self.exceptions,)
-	    self.compileFilters(self.exceptions, self.exceptionFilters, self.unusedFilters['exceptions'])
+        # compile the exceptions
+        self.exceptionFilters = []
+        self.compileFilters(self.invariantexceptions, self.exceptionFilters)
+        if self.exceptions:
+            if not isinstance(self.exceptions, (tuple, list)):
+                # turn a plain string into a sequence
+                self.exceptions = (self.exceptions,)
+            self.compileFilters(self.exceptions, self.exceptionFilters, self.unusedFilters['exceptions'])
 
-	# compile the inclusions
-	self.inclusionFilters = []
+        # compile the inclusions
+        self.inclusionFilters = []
         if self.invariantinclusions is None:
             self.compileFilters([], self.inclusionFilters)
         else:
             self.compileFilters(self.invariantinclusions, self.inclusionFilters)
-	if not self.inclusions:
-	    # an empty list, as opposed to None, means nothing is included
-	    if isinstance(self.inclusions, (tuple, list)):
-		return
-	else:
-	    if not isinstance(self.inclusions, (tuple, list)):
-		# turn a plain string into a sequence
-		self.inclusions = (self.inclusions,)
-	    self.compileFilters(self.inclusions, self.inclusionFilters, self.unusedFilters['inclusions'])
+        if not self.inclusions:
+            # an empty list, as opposed to None, means nothing is included
+            if isinstance(self.inclusions, (tuple, list)):
+                return
+        else:
+            if not isinstance(self.inclusions, (tuple, list)):
+                # turn a plain string into a sequence
+                self.inclusions = (self.inclusions,)
+            self.compileFilters(self.inclusions, self.inclusionFilters, self.unusedFilters['inclusions'])
 
-	# dispatch if/as appropriate
-	if self.use:
-	    self.do()
+        # dispatch if/as appropriate
+        if self.use:
+            self.do()
 
-	if hasattr(self.__class__, 'postProcess'):
-	    self.postProcess()
+        if hasattr(self.__class__, 'postProcess'):
+            self.postProcess()
 
     def do(self):
-	# calls doFile on all appropriate files -- can be overridden by
-	# subclasses
+        # calls doFile on all appropriate files -- can be overridden by
+        # subclasses
         if not self.filetree:
             return
 
@@ -427,12 +427,12 @@ class Policy(BasePolicy):
             return
 
         assert(self.filetree & DIR)
-	if self.subtrees:
-	    self.invariantsubtrees.extend(self.subtrees)
-	if not self.invariantsubtrees:
-	    self.invariantsubtrees.append('/')
-	for self.currentsubtree in self.invariantsubtrees:
-	    fullpath = (self.rootdir+self.currentsubtree) %self.macros
+        if self.subtrees:
+            self.invariantsubtrees.extend(self.subtrees)
+        if not self.invariantsubtrees:
+            self.invariantsubtrees.append('/')
+        for self.currentsubtree in self.invariantsubtrees:
+            fullpath = (self.rootdir+self.currentsubtree) %self.macros
             dirs = util.braceGlob(fullpath)
             for d in dirs:
                 if self.recursive:
@@ -443,25 +443,25 @@ class Policy(BasePolicy):
                         self.walkDir(None, d, os.listdir(d))
 
     def walkDir(self, ignore, dirname, names):
-	# chop off bit not useful for comparison
-	rootdirlen = len(self.rootdir)
-	path=dirname[rootdirlen:]
-	for name in names:
-	   thispath = util.normpath(path + os.sep + name)
-	   if self._pathAllowed(thispath):
-	       self.doFile(thispath)
+        # chop off bit not useful for comparison
+        rootdirlen = len(self.rootdir)
+        path=dirname[rootdirlen:]
+        for name in names:
+           thispath = util.normpath(path + os.sep + name)
+           if self._pathAllowed(thispath):
+               self.doFile(thispath)
 
     FILE_MISSING = -1
     FILE_UNCHANGED = 0
     FILE_CHANGED = 1
     FILE_NEW = 2
     def fileChanged(self, path):
-	"""
+        """
         check to see if the file has changed
         @param path: the path to check
         @return: FILE_MISSING, FILE_CHANGED, FILE_UNCHANGED, FILE_NEW
         @rtype: int
-	"""
+        """
         newPath = util.joinPaths(self.macros.destdir, path)
         if not util.exists(newPath):
             return self.FILE_MISSING

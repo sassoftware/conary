@@ -153,7 +153,7 @@ class CfgUserInfoItem(CfgType):
 
     def format(self, val, displayOptions=None):
         serverGlob, user, password = val
-        if password is None: 
+        if password is None:
             return '%s %s' % (serverGlob, user)
         elif displayOptions.get('hidePasswords'):
             return '%s %s <password>' % (serverGlob, user)
@@ -245,7 +245,7 @@ class CfgRepoMapEntry(CfgType):
             user, server = match.groups()
             raise ParseError, ('repositoryMap entries should not contain '
                                'user names and passwords; use '
-                               '"user %s %s <password>" instead' % 
+                               '"user %s %s <password>" instead' %
                                (server, user))
 
         return (val[0], val[1])
@@ -416,7 +416,7 @@ class CfgLabelList(list):
                 secondIdx = i
 
         if firstIdx is None or secondIdx is None:
-            return None 
+            return None
 
         return cmp(firstIdx, secondIdx)
 
@@ -507,8 +507,8 @@ def _getDefaultPublicKeyrings():
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
         be set based on a keyword that can be set at the command line.
-        Configuartion values that are set in a context are overridden 
-        by the values in the context that have been set.  Values that are 
+        Configuartion values that are set in a context are overridden
+        by the values in the context that have been set.  Values that are
         unset in the context do not override the default config values.
     """
     archDirs              =  (CfgPathList, ('/etc/conary/arch',
@@ -527,7 +527,7 @@ class ConaryContext(ConfigSection):
                                             '~/.conary/components'))
     configComponent       =  (CfgBool, True)
     contact               =  None
-    context		  =  None
+    context               =  None
     dbPath                =  '/var/lib/conarydb'
     debugExceptions       =  (CfgBool, False)
     debugRecipeExceptions =  (CfgBool, False)
@@ -558,8 +558,8 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/distro/mirrors',
                                             '/etc/conary/mirrors',))
     name                  =  None
-    quiet		  =  CfgBool
-    pinTroves		  =  CfgRegExpList
+    quiet                 =  CfgBool
+    pinTroves             =  CfgRegExpList
     policyDirs            =  (CfgPathList, ('/usr/lib/conary/policy',
                                             '/usr/lib/conary/distro/policy',
                                             '/etc/conary/policy',
@@ -620,11 +620,11 @@ class ConaryContext(ConfigSection):
 
     def _writeKey(self, out, cfgItem, value, options):
         if cfgItem.isDefault():
-            return 
+            return
         ConfigSection._writeKey(self, out, cfgItem, value, options)
 
 class ConaryConfiguration(SectionedConfigFile):
-    # this allows a new section to be created on the fly with the type 
+    # this allows a new section to be created on the fly with the type
     # ConaryContext
     _allowNewSections     = True
     _defaultSectionType   =  ConaryContext
@@ -635,21 +635,21 @@ class ConaryConfiguration(SectionedConfigFile):
         """
         Initialize a ConaryConfiguration object
 
-        @param readConfigFiles: If True, read /etc/conaryrc and entitlements 
+        @param readConfigFiles: If True, read /etc/conaryrc and entitlements
         files
         @type readConfigFiles: bool
 
         @param ignoreErrors: If True, ParseError exceptions will not be raised
         @type ignoreErrors: bool
 
-        @param readProxyValuesFirst: If True, parse local config files for 
+        @param readProxyValuesFirst: If True, parse local config files for
         proxy settings and apply them before further configuration.
-        @type readProxyValuesFirst: bool  
+        @type readProxyValuesFirst: bool
 
         @raises ParseError: Raised if configuration syntax is invalid and
         ignoreErrors is False.
         """
-	SectionedConfigFile.__init__(self)
+        SectionedConfigFile.__init__(self)
         self._ignoreErrors = ignoreErrors
 
         for info in ConaryContext._getConfigOptions():
@@ -697,11 +697,11 @@ class ConaryConfiguration(SectionedConfigFile):
                 return
 
     def readFiles(self):
-	self.read("/etc/conaryrc", exception=False)
-	if os.environ.has_key("HOME"):
-	    self.read(os.environ["HOME"] + "/" + ".conaryrc", exception=False)
-	self.read("conaryrc", exception=False)
-  
+        self.read("/etc/conaryrc", exception=False)
+        if os.environ.has_key("HOME"):
+            self.read(os.environ["HOME"] + "/" + ".conaryrc", exception=False)
+        self.read("conaryrc", exception=False)
+
     def setContext(self, name):
         """ Copy the config values from the context named name (if any)
             into the main config file.  Returns False if not such config
@@ -752,11 +752,11 @@ class ConaryConfiguration(SectionedConfigFile):
         found in /etc/conary/arch (archDirs) and /etc/conary/use
 
         @raises RuntimeError: Raised if use flags conflict in
-        a way which cannot be reconciled 
+        a way which cannot be reconciled
         (see L{deps.DependencyClass.MergeFlags})
 
         """
-        self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
+        self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs,
                                                    self.archDirs)
         if self.flavor == []:
             self.flavor = [deps.Flavor()]
@@ -765,7 +765,7 @@ class ConaryConfiguration(SectionedConfigFile):
 
         newFlavors = []
         hasIns = False
-        
+
         # if any flavor has an instruction set, don't merge
         for flavor in self.flavor:
             if deps.DEP_CLASS_IS in flavor.getDepClasses():
@@ -785,12 +785,12 @@ class ConaryConfiguration(SectionedConfigFile):
             self.flavor = newFlavors
 
         # buildFlavor is installFlavor + overrides
-        self.buildFlavor = deps.overrideFlavor(self.flavor[0], 
+        self.buildFlavor = deps.overrideFlavor(self.flavor[0],
                                                     self.buildFlavor)
         if self.isDefault('flavorPreferences'):
             self.flavorPreferences = arch.getFlavorPreferencesFromFlavor(
                                                                 self.flavor[0])
-	self.flavorConfig.populateBuildFlags()
+        self.flavorConfig.populateBuildFlags()
 
 def selectSignatureKey(cfg, label):
     if not cfg.signatureKeyMap:
@@ -915,7 +915,7 @@ def loadEntitlementFromProgram(fullPath, serverName):
                 os.close(nullFd)
 
                 # both error and stderr are redirected  - the entitlement
-                # should be on stdout, and error info should be 
+                # should be on stdout, and error info should be
                 # on stderr.
                 os.dup2(writeFd, 1)
                 os.dup2(stdErrWrite, 2)

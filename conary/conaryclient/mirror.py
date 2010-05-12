@@ -102,7 +102,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     lockFile              =  cfg.CfgString
     useHiddenCommits      =  (cfg.CfgBool, True)
     absoluteChangesets    =  (cfg.CfgBool, False)
-    
+
     _allowNewSections   = True
     _defaultSectionType = MirrorConfigurationSection
 
@@ -163,7 +163,7 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
         targets.append(target)
     # checkSync is a special operation...
     if checkSync:
-        return checkSyncRepos(cfg, sourceRepos, targets)        
+        return checkSyncRepos(cfg, sourceRepos, targets)
     # we pass in the sync flag only the first time around, because after
     # that we need the targetRepos mark to advance accordingly after being
     # reset to -1
@@ -302,7 +302,7 @@ def buildJobList(src, target, groupList, absolute = False):
                               (version, flavor), currentMatch[0] is None)
 
             groupJobList.append((mark, job))
-        
+
         # now iterate through groupJobList and update latestAvailable to
         # reflect the state of the mirror after this job completes
         for mark, job in groupJobList:
@@ -495,7 +495,7 @@ def _getNewInfo(src, cfg, mark):
         # otherwise we mirror just the sigs...
         infoList = _getNewSigs(src, cfg, mark)
     return infoList
-            
+
 # mirror new trove info for troves we have already mirrored.
 def mirrorTroveInfo(src, targets, mark, cfg, resync=False):
     if resync:
@@ -603,11 +603,11 @@ class TargetRepository:
             # only send up the troves that actually have a signature change
             infoList = [ x for x in infoList if len(x[1]) > 0 ]
             log.debug("%s pushing %d trove sigs...", self.name, len(infoList))
-            self.repo.setTroveSigs(infoList)          
+            self.repo.setTroveSigs(infoList)
         else:
             log.debug("%s uploaded %d info records", self.name, len(infoList))
         return len(infoList)
-    
+
     def addTroveList(self, tl):
         # Filter out troves which are already in the local repository. Since
         # the marks aren't distinct (they increase, but not monotonically), it's
@@ -634,7 +634,7 @@ class TargetRepository:
     def presentHiddenTroves(self):
         log.debug("%s unhiding comitted troves", self.name)
         self.repo.presentHiddenTroves(self.cfg.host)
-                                      
+
 # split a troveList in changeset jobs
 def buildBundles(sourceRepos, target, troveList, absolute=False):
     bundles = []
@@ -750,7 +750,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     if fastSync:
         updateCount = 0
         log.debug("skip trove info records sync because of fast-sync")
-    else:                  
+    else:
         updateCount = mirrorTroveInfo(sourceRepos, targets, currentMark, cfg, syncSigs)
     newMark, troveList = getTroveList(sourceRepos, cfg, currentMark)
     if not troveList:
@@ -758,7 +758,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             for t in targets:
                 t.setMirrorMark(newMark)
             return -1 # call again
-        return 0   
+        return 0
     # prepare a new max mark to be used when we need to break out of a loop
     crtMaxMark = max(long(x[0]) for x in troveList)
     if currentMark > 0 and crtMaxMark == currentMark:
@@ -824,7 +824,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             t.setMirrorMark(crtMaxMark)
         # try again
         return -1
-    
+
     # now we get each section of the troveList for each targetSet. We
     # start off mirroring by those required by fewer targets, using
     # the assumption that those troves are what is required for the
@@ -899,7 +899,7 @@ def checkSyncRepos(config, sourceRepos, targetRepos):
     checkConfig(config)
     targets = _makeTargets(config, targetRepos)
     log.setVerbosity(log.DEBUG)
-        
+
     # retrieve the set of troves from a give repository
     def _getTroveSet(config, repo):
         def _flatten(troveSpec):

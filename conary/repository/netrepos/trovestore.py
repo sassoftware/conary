@@ -37,11 +37,11 @@ class LocalRepVersionTable(versiontable.VersionTable):
         JOIN Versions USING (versionId)
         WHERE Nodes.versionId=? AND Nodes.itemId=?
         """, theId, itemId)
-	try:
-	    (s, t) = cu.next()
-	    v = self._makeVersion(s, t)
-	    return v
-	except StopIteration:
+        try:
+            (s, t) = cu.next()
+            v = self._makeVersion(s, t)
+            return v
+        except StopIteration:
             raise KeyError, theId
 
     def getTimeStamps(self, version, itemId):
@@ -51,10 +51,10 @@ class LocalRepVersionTable(versiontable.VersionTable):
         FROM Nodes
         WHERE versionId = (SELECT versionId from Versions WHERE version=?)
           AND itemId=?""", version.asString(), itemId)
-	try:
-	    (t,) = cu.next()
-	    return [ float(x) for x in t.split(":") ]
-	except StopIteration:
+        try:
+            (t,) = cu.next()
+            return [ float(x) for x in t.split(":") ]
+        except StopIteration:
             raise KeyError, itemId
 
 class TroveAdder:
@@ -168,20 +168,20 @@ def addPrefixesFromList(db, dirnameList):
 
 class TroveStore:
     def __init__(self, db, log = None):
-	self.db = db
+        self.db = db
 
-	self.items = items.Items(self.db)
-	self.flavors = flavors.Flavors(self.db)
+        self.items = items.Items(self.db)
+        self.flavors = flavors.Flavors(self.db)
         self.branchTable = versionops.BranchTable(self.db)
         self.changeLogs = cltable.ChangeLogTable(self.db)
 
-	self.versionTable = LocalRepVersionTable(self.db)
-	self.versionOps = versionops.SqlVersioning(
+        self.versionTable = LocalRepVersionTable(self.db)
+        self.versionOps = versionops.SqlVersioning(
             self.db, self.versionTable, self.branchTable)
-	self.instances = instances.InstanceTable(self.db)
+        self.instances = instances.InstanceTable(self.db)
         self.latest = versionops.LatestTable(self.db)
         self.ri = accessmap.RoleInstances(self.db)
-        
+
         self.keyTable = keytable.OpenPGPKeyTable(self.db)
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db, create = False)
@@ -215,54 +215,54 @@ class TroveStore:
 
     def getInstanceId(self, itemId, versionId, flavorId, clonedFromId,
                       troveType, isPresent = instances.INSTANCE_PRESENT_NORMAL):
- 	theId = self.instances.get((itemId, versionId, flavorId), None)
-	if theId == None:
-	    theId = self.instances.addId(itemId, versionId, flavorId,
+        theId = self.instances.get((itemId, versionId, flavorId), None)
+        if theId == None:
+            theId = self.instances.addId(itemId, versionId, flavorId,
                                          clonedFromId,
-					 troveType, isPresent = isPresent)
+                                         troveType, isPresent = isPresent)
         # XXX we shouldn't have to do this unconditionally
         if isPresent != instances.INSTANCE_PRESENT_MISSING:
-	    self.instances.update(theId, isPresent=isPresent, clonedFromId=clonedFromId)
+            self.instances.update(theId, isPresent=isPresent, clonedFromId=clonedFromId)
             self.items.setTroveFlag(itemId, 1)
- 	return theId
+        return theId
 
     def getVersionId(self, version):
-	theId = self.versionIdCache.get(version, None)
-	if theId:
-	    return theId
+        theId = self.versionIdCache.get(version, None)
+        if theId:
+            return theId
 
-	theId = self.versionTable.get(version, None)
-	if theId == None:
-	    theId = self.versionTable.addId(version)
+        theId = self.versionTable.get(version, None)
+        if theId == None:
+            theId = self.versionTable.addId(version)
 
-	self.versionIdCache[version] = theId
-	return theId
+        self.versionIdCache[version] = theId
+        return theId
 
     def getFullVersion(self, item, version):
-	"""
-	Updates version with full timestamp information.
-	"""
-	cu = self.db.cursor()
-	cu.execute("""
+        """
+        Updates version with full timestamp information.
+        """
+        cu = self.db.cursor()
+        cu.execute("""
         SELECT timeStamps
         FROM Nodes
         WHERE itemId=(SELECT itemId FROM Items WHERE item=?)
           AND versionId=(SELECT versionId FROM Versions WHERE version=?)
-	""", item, version.asString())
+        """, item, version.asString())
 
-	timeStamps = cu.fetchone()[0]
-	version.setTimeStamps([float(x) for x in timeStamps.split(":")])
+        timeStamps = cu.fetchone()[0]
+        version.setTimeStamps([float(x) for x in timeStamps.split(":")])
 
     def createTroveBranch(self, troveName, branch):
-	itemId = self.getItemId(troveName)
-	self.versionOps.createBranch(itemId, branch)
+        itemId = self.getItemId(troveName)
+        self.versionOps.createBranch(itemId, branch)
 
     def getTroveFlavors(self, troveDict):
-	cu = self.db.cursor()
-	vMap = {}
-	outD = {}
-	# I think we might be better of intersecting subqueries rather
-	# then using all of the and's in this join
+        cu = self.db.cursor()
+        vMap = {}
+        outD = {}
+        # I think we might be better of intersecting subqueries rather
+        # then using all of the and's in this join
 
         schema.resetTable(cu, 'tmpIVF')
         for troveName in troveDict.keys():
@@ -291,7 +291,7 @@ class TroveStore:
             ver = vMap[verString]
             outD[item][ver].append(flavor)
 
-	return outD
+        return outD
 
     def iterTroveNames(self):
         cu = self.db.cursor()
@@ -330,19 +330,19 @@ class TroveStore:
         #      that we don't repeat it for every identically flavored trove we commit
         # XXX: seems to me that if we run this once for the top of stack
         #      group/package we don't need to repeat it for its members
-	troveFlavor = trv.getFlavor()
+        troveFlavor = trv.getFlavor()
 
-	# start off by creating the flavors we need; we could combine this
-	# to some extent with the file table creation below, but there are
-	# normally very few flavors per trove so this probably better
-	flavorsNeeded = {}
-	if troveFlavor is not None:
-	    flavorsNeeded[troveFlavor] = True
+        # start off by creating the flavors we need; we could combine this
+        # to some extent with the file table creation below, but there are
+        # normally very few flavors per trove so this probably better
+        flavorsNeeded = {}
+        if troveFlavor is not None:
+            flavorsNeeded[troveFlavor] = True
 
-	for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
+        for (name, version, flavor) in trv.iterTroveList(strongRefs = True,
                                                            weakRefs = True):
-	    if flavor is not None:
-		flavorsNeeded[flavor] = True
+            if flavor is not None:
+                flavorsNeeded[flavor] = True
 
         for (name, branch, flavor) in trv.iterRedirects():
             if flavor is not None:
@@ -391,12 +391,12 @@ class TroveStore:
 
             del flavorIndex
 
-	if troveFlavor is not None:
-	    troveFlavorId = flavors[troveFlavor]
-	else:
-	    troveFlavorId = 0
+        if troveFlavor is not None:
+            troveFlavorId = flavors[troveFlavor]
+        else:
+            troveFlavorId = 0
         return troveFlavorId
-    
+
     # tmpNewFiles can contain duplicate entries for the same fileId,
     # (with stream being NULL or not), so the FileStreams update
     # is happening in three steps:
@@ -588,8 +588,8 @@ class TroveStore:
 
         self.log(3, trv)
 
-	troveVersion = trv.getVersion()
-	troveItemId = self.getItemId(trv.getName())
+        troveVersion = trv.getVersion()
+        troveItemId = self.getItemId(trv.getName())
         sourceName = trv.troveInfo.sourceName()
 
         # Pull out the clonedFromId
@@ -604,31 +604,31 @@ class TroveStore:
                      not trv.getName().startswith('fileset') and
                      ':' not in trv.getName())
 
-	troveVersionId = self.versionTable.get(troveVersion, None)
-	if troveVersionId is not None:
-	    nodeId = self.versionOps.nodes.getRow(
+        troveVersionId = self.versionTable.get(troveVersion, None)
+        if troveVersionId is not None:
+            nodeId = self.versionOps.nodes.getRow(
                 troveItemId, troveVersionId, None)
 
         # this also adds all the missing flavors into the mix
         troveFlavorId = self._addTroveNewFlavors(cu, trv)
 
-	if troveVersionId is None or nodeId is None:
-	    (nodeId, troveVersionId) = self.versionOps.createVersion(
+        if troveVersionId is None or nodeId is None:
+            (nodeId, troveVersionId) = self.versionOps.createVersion(
                 troveItemId, troveVersion, troveFlavorId, sourceName)
-	    if trv.getChangeLog() and trv.getChangeLog().getName():
-		self.changeLogs.add(nodeId, trv.getChangeLog())
+            if trv.getChangeLog() and trv.getChangeLog().getName():
+                self.changeLogs.add(nodeId, trv.getChangeLog())
         elif sourceName: # make sure the sourceItemId matches for the trove we are comitting
             sourceItemId = self.items.getOrAddId(sourceName)
             self.versionOps.nodes.updateSourceItemId(nodeId, sourceItemId, mirrorMode=mirror)
 
-	# the instance may already exist (it could be referenced by a package
-	# which has already been added)
+        # the instance may already exist (it could be referenced by a package
+        # which has already been added)
         if hidden:
             presence = instances.INSTANCE_PRESENT_HIDDEN
         else:
             presence = instances.INSTANCE_PRESENT_NORMAL
 
-	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
+        troveInstanceId = self.getInstanceId(troveItemId, troveVersionId,
                          troveFlavorId, clonedFromId, trv.getType(),
                          isPresent = presence)
         # check that we don't have any TroveTroves entries yet
@@ -721,7 +721,7 @@ class TroveStore:
                            start_transaction=False)
             self.db.analyze("tmpNewRedirects")
 
-            # again need to pay attention to CheckTrovesCache and use 
+            # again need to pay attention to CheckTrovesCache and use
             # items.addId()
             cu.execute("""
             SELECT tmpNewRedirects.item
@@ -731,7 +731,7 @@ class TroveStore:
             """)
             for (newItem,) in cu.fetchall():
                 self.items.addId(newItem)
-            
+
             cu.execute("""
             INSERT INTO Branches (branch)
             SELECT tmpNewRedirects.branch
@@ -745,8 +745,8 @@ class TroveStore:
             SELECT tmpNewRedirects.flavor
             FROM tmpNewRedirects
             LEFT JOIN Flavors USING (flavor)
-            WHERE 
-                Flavors.flavor is not NULL 
+            WHERE
+                Flavors.flavor is not NULL
                 AND Flavors.flavorId is NULL
             """)
 
@@ -1080,34 +1080,34 @@ class TroveStore:
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = None):
         self.log(3, troveName, troveVersion, troveFlavor)
 
-	if not troveVersion:
-	    return self.items.has_key(troveName)
+        if not troveVersion:
+            return self.items.has_key(troveName)
 
-	assert(troveFlavor is not None)
+        assert(troveFlavor is not None)
 
         # if we can not find the ids for the troveName, troveVersion
         # or troveFlavor in their respective tables, than this trove
         # can't possibly exist...
-	troveItemId = self.items.get(troveName, None)
-	if troveItemId is None:
-	    return False
-	troveVersionId = self.versionTable.get(troveVersion, None)
-	if troveVersionId is None:
+        troveItemId = self.items.get(troveName, None)
+        if troveItemId is None:
             return False
-	troveFlavorId = self.flavors.get(troveFlavor, None)
-	if troveFlavorId is None:
+        troveVersionId = self.versionTable.get(troveVersion, None)
+        if troveVersionId is None:
+            return False
+        troveFlavorId = self.flavors.get(troveFlavor, None)
+        if troveFlavorId is None:
             return False
 
-	return self.instances.isPresent((troveItemId, troveVersionId,
-					 troveFlavorId))
+        return self.instances.isPresent((troveItemId, troveVersionId,
+                                         troveFlavorId))
 
     def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True,
                  hidden = False):
-	troveIter = self.iterTroves(( (troveName, troveVersion, troveFlavor), ),
+        troveIter = self.iterTroves(( (troveName, troveVersion, troveFlavor), ),
                                     withFiles = withFiles, hidden = hidden)
         trv = [ x for x in troveIter ][0]
         if trv is None:
-	    raise errors.TroveMissing(troveName, troveVersion)
+            raise errors.TroveMissing(troveName, troveVersion)
         return trv
 
     def iterTroves(self, troveInfoList, withFiles = True,
@@ -1227,8 +1227,8 @@ class TroveStore:
 
         troveRedirectsCursor = self.db.cursor()
         troveRedirectsCursor.execute("""
-        SELECT tmpInstanceId.idx, Items.item, Branches.branch, Flavors.flavor 
-        FROM tmpInstanceId 
+        SELECT tmpInstanceId.idx, Items.item, Branches.branch, Flavors.flavor
+        FROM tmpInstanceId
         JOIN TroveRedirects using (instanceId)
         JOIN Items using (itemId)
         JOIN Branches ON TroveRedirects.branchId = Branches.branchId
@@ -1290,7 +1290,7 @@ class TroveStore:
                 # we're at the end; that's okay
                 pass
 
-	    fileContents = {}
+            fileContents = {}
             try:
                 next = troveFilesCursor.next()
                 while next[0] == idx:
@@ -1298,10 +1298,10 @@ class TroveStore:
                      stream) = next
                     path = os.path.join(dirname, basename)
                     version = versions.VersionFromString(versionId)
-                    trv.addFile(cu.frombinary(pathId), path, version, 
+                    trv.addFile(cu.frombinary(pathId), path, version,
                                 cu.frombinary(fileId))
-		    if stream is not None:
-			fileContents[fileId] = stream
+                    if stream is not None:
+                        fileContents[fileId] = stream
                     next = troveFilesCursor.next()
 
                 troveFilesCursor.push(next)
@@ -1328,10 +1328,10 @@ class TroveStore:
             self.depTables.get(cu, trv, troveInstanceId)
             self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
-	    if withFileStreams:
-		yield trv, fileContents
-	    else:
-		yield trv
+            if withFileStreams:
+                yield trv, fileContents
+            else:
+                yield trv
 
         # yield None for anything not found at the end
         while neededIdx < len(troveInfoList):
@@ -1359,11 +1359,11 @@ class TroveStore:
         troveInstanceId = self.instances.getInstanceId(
             troveName, troveVersion, troveFlavor)
         sort = ""
-	if sortByPath:
-	    sort = " order by d.dirname, b.basename"
+        if sortByPath:
+            sort = " order by d.dirname, b.basename"
         # iterfiles
-	cu = self.db.cursor()
-	cu.execute("""
+        cu = self.db.cursor()
+        cu.execute("""
         select fp.pathId, d.dirname, b.basename, fs.fileId,
                tf.versionId, fs.stream
         from TroveFiles as tf
@@ -1374,22 +1374,22 @@ class TroveStore:
         where tf.instanceId = ?
         %s""" % sort, troveInstanceId)
 
-	versionCache = {}
-	for (pathId, dirname, basename, fileId, versionId, stream) in cu:
-	    version = versionCache.get(versionId, None)
+        versionCache = {}
+        for (pathId, dirname, basename, fileId, versionId, stream) in cu:
+            version = versionCache.get(versionId, None)
             path = os.path.join(dirname, basename)
-	    if not version:
-		version = self.versionTable.getBareId(versionId)
-		versionCache[versionId] = version
+            if not version:
+                version = self.versionTable.getBareId(versionId)
+                versionCache[versionId] = version
 
             if stream: # try thawing as a sanity check
                 files.ThawFile(cu.frombinary(stream), cu.frombinary(fileId))
 
-	    if withFiles:
-		yield (cu.frombinary(pathId), path, cu.frombinary(fileId), 
+            if withFiles:
+                yield (cu.frombinary(pathId), path, cu.frombinary(fileId),
                        version, cu.frombinary(stream))
-	    else:
-		yield (cu.frombinary(pathId), path, cu.frombinary(fileId), 
+            else:
+                yield (cu.frombinary(pathId), path, cu.frombinary(fileId),
                        version)
 
     def getFile(self, pathId, fileId):
@@ -1428,7 +1428,7 @@ class TroveStore:
         if serialize:
             schema.lockCommits(self.db)
         return cu
-    
+
     def rollback(self):
         self._cleanCache()
         return self.db.rollback()
@@ -1504,7 +1504,7 @@ class TroveStore:
               where Others.filePathId = TF.filePathId
                 and Others.instanceId != ? )
         """, (instanceId, instanceId))
-        
+
         filePathIdsToRemove = [ x[0] for x in cu ]
 
         # Now remove the files. Gather a list of sha1s of files to remove
@@ -1586,7 +1586,7 @@ class TroveStore:
         FROM TroveRedirects WHERE TroveRedirects.instanceId = ?
         """, instanceId, start_transaction=False)
         self.db.analyze("tmpRemovals")
-        
+
         # remove access to troves we're about to remove
         self.ri.deleteInstanceIds("tmpRemovals")
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?", instanceId)
@@ -1614,7 +1614,7 @@ class TroveStore:
         WHERE Instances.itemId IS NULL
         """, start_transaction=False)
         self.db.analyze("tmpId")
-        
+
         # Was this the only Instance for the node?
         cu.execute("""
         DELETE FROM Changelogs
@@ -1758,20 +1758,20 @@ class TroveStore:
         return cu.fetchall()
 
     def commit(self):
-	if self.needsCleanup:
-	    assert(0)
-	    self.instances.removeUnused()
-	    self.items.removeUnused()
-	    self.needsCleanup = False
+        if self.needsCleanup:
+            assert(0)
+            self.instances.removeUnused()
+            self.items.removeUnused()
+            self.needsCleanup = False
 
-	if self.versionOps.needsCleanup:
-	    assert(0)
-	    self.versionTable.removeUnused()
-	    self.branchTable.removeUnused()
-	    self.versionOps.labelMap.removeUnused()
-	    self.versionOps.needsCleanup = False
+        if self.versionOps.needsCleanup:
+            assert(0)
+            self.versionTable.removeUnused()
+            self.branchTable.removeUnused()
+            self.versionOps.labelMap.removeUnused()
+            self.versionOps.needsCleanup = False
 
-	self.db.commit()
+        self.db.commit()
         self._cleanCache()
 
 class FileRetriever:

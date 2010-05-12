@@ -467,7 +467,7 @@ class Database(BaseDatabase):
                 raise
         self.dbName = dbName
         self.database = "/".join([self.database.rsplit("/", 1)[0], dbName])
-        
+
         self._setCharSet(cu)
         # wipe out the preloaded schema we had (if any), but don't
         # load up the new one - on mysql this is a very expensive operation
@@ -509,5 +509,5 @@ class Database(BaseDatabase):
         # mysql doesn't start from the "next" value, so we do it for it
         cu.execute("ALTER TABLE %s AUTO_INCREMENT = ?" % (table,), value+1)
         return True
-    
-        
+
+

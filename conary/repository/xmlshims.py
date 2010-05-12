@@ -19,60 +19,60 @@ from conary import deps, files, versions
 class NetworkConvertors(object):
 
     def freezeVersion(self, v):
-	return v.freeze()
+        return v.freeze()
 
     def thawVersion(self, v):
-	return versions.ThawVersion(v)
+        return versions.ThawVersion(v)
 
     def fromVersion(self, v):
-	return v.asString()
+        return v.asString()
 
     def toVersion(self, v):
-	return versions.VersionFromString(v)
+        return versions.VersionFromString(v)
 
     def fromPathId(self, f):
         assert(len(f) == 16)
-	return base64.encodestring(f)
+        return base64.encodestring(f)
 
     def toPathId(self, f):
         assert(len(f) == 25)
-	return base64.decodestring(f)
+        return base64.decodestring(f)
 
     def fromFileId(self, f):
         assert(len(f) == 20)
-	return base64.encodestring(f)
+        return base64.encodestring(f)
 
     def toFileId(self, f):
         assert(len(f) == 29)
-	return base64.decodestring(f)
+        return base64.decodestring(f)
 
     def fromPath(self, path):
-	return base64.encodestring(path)
+        return base64.encodestring(path)
 
     def toPath(self, path):
-	return base64.decodestring(path)
+        return base64.decodestring(path)
 
     def fromBranch(self, b):
-	return b.asString()
+        return b.asString()
 
     def toBranch(self, b):
-	return versions.VersionFromString(b)
+        return versions.VersionFromString(b)
 
     def toFlavor(self, f):
         assert(f is not None)
         if f is 0:
             return None
-	return deps.deps.ThawFlavor(f)
+        return deps.deps.ThawFlavor(f)
 
     def fromFlavor(self, f):
         if f is None:
             return 0
-	return f.freeze()
+        return f.freeze()
 
     def toFile(self, f):
         pathId = f[:25]
-        return files.ThawFile(base64.decodestring(f[25:]), 
-			      self.toPathId(pathId))
+        return files.ThawFile(base64.decodestring(f[25:]),
+                              self.toPathId(pathId))
 
     def fromFile(self, f):
         s = base64.encodestring(f.freeze())
@@ -93,10 +93,10 @@ class NetworkConvertors(object):
         return pathId + s
 
     def fromLabel(self, l):
-	return l.asString()
+        return l.asString()
 
     def toLabel(self, l):
-	return versions.Label(l)
+        return versions.Label(l)
 
     def fromDepSet(self, ds):
         return ds.freeze()
@@ -112,16 +112,16 @@ class NetworkConvertors(object):
 
     def fromTroveTup(self, tuple, withTime=False):
         if withTime:
-            return (tuple[0], self.freezeVersion(tuple[1]), 
+            return (tuple[0], self.freezeVersion(tuple[1]),
                     self.fromFlavor(tuple[2]))
         else:
-            return (tuple[0], self.fromVersion(tuple[1]), 
+            return (tuple[0], self.fromVersion(tuple[1]),
                     self.fromFlavor(tuple[2]))
 
     def toTroveTup(self, tuple, withTime=False):
         if withTime:
-            return (tuple[0], self.thawVersion(tuple[1]), 
+            return (tuple[0], self.thawVersion(tuple[1]),
                     self.toFlavor(tuple[2]))
         else:
             return (tuple[0], self.toVersion(tuple[1]), self.toFlavor(tuple[2]))
-        
+

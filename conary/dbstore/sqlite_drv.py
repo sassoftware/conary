@@ -27,7 +27,7 @@ class KeywordDict(BaseKeywordDict):
         'PATHTYPE'  : 'TEXT',
         'STRING'    : 'TEXT',
         })
-    
+
 # implement the regexp function for sqlite
 def _regexp(pattern, item):
     regexp = re.compile(pattern)
@@ -156,7 +156,7 @@ class Database(BaseDatabase):
             self.inode = (None, None)
             self.closed = False
             return True
-	sb = os.stat(self.database)
+        sb = os.stat(self.database)
         self.inode = (sb.st_dev, sb.st_ino)
         self.closed = False
         return True
@@ -170,7 +170,7 @@ class Database(BaseDatabase):
             return False
         sb = os.stat(self.database)
         inode = (sb.st_dev, sb.st_ino)
-	if self.inode != inode and self.dbh:
+        if self.inode != inode and self.dbh:
             self.dbh.close()
             self.dbh = None
         if not self.dbh:
@@ -210,7 +210,7 @@ class Database(BaseDatabase):
         # sqlite's analyzer has not been tested yet for single table updates.
         if table:
             return
-        
+
         # perform table analysis to help the optimizer
         doAnalyze = False
         cu = self.cursor()

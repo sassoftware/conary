@@ -24,7 +24,7 @@ class ECompleter(rlcompleter.Completer):
 
         """
 # lines commented out make tab completion match keywords and builtins,
-# which we don't want 
+# which we don't want
 #        import keyword
         matches = []
         n = len(text)

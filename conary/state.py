@@ -77,11 +77,11 @@ class ConaryState:
         self.source = source
 
     def write(self, filename):
-	f = open(filename, "w")
+        f = open(filename, "w")
         self._write(f)
         if self.hasSourceState():
             self.source._write(f)
-            
+
     def _write(self, f):
         f.write("stateversion %d\n" % self.stateVersion)
         if self.getContext():
@@ -91,7 +91,7 @@ class ConaryState:
         return bool(self.context )
 
     def getContext(self):
-        return self.context 
+        return self.context
 
     def setContext(self, name):
         self.context = name
@@ -113,7 +113,7 @@ class ConaryState:
         else:
             sourceState = None
         return ConaryState(self.context, sourceState)
-        
+
 class SourceState(trove.Trove):
 
     __slots__ = [ "branch", "pathMap", "lastMerged", "fileInfo" ]
@@ -133,34 +133,34 @@ class SourceState(trove.Trove):
                                          isAutoSource = isAutoSource)
 
     def removeFilePath(self, file):
-	for (pathId, path, fileId, version) in self.iterFileList():
-	    if path == file: 
-		self.removeFile(pathId)
-		return True
+        for (pathId, path, fileId, version) in self.iterFileList():
+            if path == file:
+                self.removeFile(pathId)
+                return True
 
-	return False
+        return False
 
     def _write(self, f):
         """
-	Returns a string representing file information for this trove
-	trove, which can later be read by the read() method. This is
-	only used to create the Conary control file when dealing with
-	:source component checkins, so things like trove dependency
-	information is not needed.  The format of the string is:
+        Returns a string representing file information for this trove
+        trove, which can later be read by the read() method. This is
+        only used to create the Conary control file when dealing with
+        :source component checkins, so things like trove dependency
+        information is not needed.  The format of the string is:
 
         name <name>
         version <version>
         branch <branch>
         (lastmerged <version>)?
         (factory <name>)?
-	<file count>
-	PATHID1 PATH1 FILEID1 ISCONFIG1 REFRESH1 VERSION1
-	PATHID2 PATH2 FILEID2 ISCONFIG2 REFRESH2 VERSION2
-	.
-	.
-	.
-	PATHIDn PATHn FILEIDn ISCONFIGn REFRESHn VERSIONn
-	"""
+        <file count>
+        PATHID1 PATH1 FILEID1 ISCONFIG1 REFRESH1 VERSION1
+        PATHID2 PATH2 FILEID2 ISCONFIG2 REFRESH2 VERSION2
+        .
+        .
+        .
+        PATHIDn PATHn FILEIDn ISCONFIGn REFRESHn VERSIONn
+        """
         assert(len(self.strongTroves) == 0)
         assert(len(self.weakTroves) == 0)
 
@@ -182,11 +182,11 @@ class SourceState(trove.Trove):
                                 x[3].asString())
                 for x in sorted(self.iterFileList()) ]
 
-	f.write("".join(rc))
+        f.write("".join(rc))
 
 
     def changeBranch(self, branch):
-	self.branch = branch
+        self.branch = branch
 
     def getBranch(self):
         return self.branch
@@ -204,16 +204,16 @@ class SourceState(trove.Trove):
         return os.path.join(os.getcwd(), name + '.recipe')
 
     def expandVersionStr(self, versionStr):
-	if versionStr[0] == "@":
-	    # get the name of the repository from the current branch
-	    repName = self.getVersion().getHost()
-	    return repName + versionStr
-	elif versionStr[0] != "/" and versionStr.find("@") == -1:
-	    # non fully-qualified version; make it relative to the current
+        if versionStr[0] == "@":
+            # get the name of the repository from the current branch
+            repName = self.getVersion().getHost()
+            return repName + versionStr
+        elif versionStr[0] != "/" and versionStr.find("@") == -1:
+            # non fully-qualified version; make it relative to the current
             # label
             return str(self.getVersion().trailingLabel()) + "/" + versionStr
 
-	return versionStr
+        return versionStr
 
     def copy(self, classOverride = None):
         new = trove.Trove.copy(self, classOverride = classOverride)
@@ -256,7 +256,7 @@ class SourceState(trove.Trove):
 
         factory = kw.pop('factory', None)
 
-	trove.Trove.__init__(self, name, version, deps.Flavor(),
+        trove.Trove.__init__(self, name, version, deps.Flavor(),
                              None, **kw)
         if factory:
             self.setFactory(factory)
@@ -271,7 +271,7 @@ class ConaryStateFromFile(ConaryState):
     __developer_api__ = True
 
     def parseFile(self, filename, repos=None, parseSource=True):
-	f = open(filename)
+        f = open(filename)
         lines = f.readlines()
 
         stateVersion = 0
@@ -294,7 +294,7 @@ class ConaryStateFromFile(ConaryState):
 
         if lines and parseSource:
             try:
-                self.source = SourceStateFromLines(lines, stateVersion, 
+                self.source = SourceStateFromLines(lines, stateVersion,
                                                    repos=repos)
             except ConaryStateError, err:
                 raise ConaryStateError('Cannot parse state file %s: %s' % (filename, err))
@@ -311,7 +311,7 @@ class ConaryStateFromFile(ConaryState):
         elif not os.path.isfile(path):
             raise CONARYNotFile
 
-	versionUpdated = self.parseFile(path, repos=repos,
+        versionUpdated = self.parseFile(path, repos=repos,
                                         parseSource=parseSource)
         if versionUpdated and os.access(path, os.W_OK):
             self.write(path)
@@ -326,15 +326,15 @@ class SourceStateFromLines(SourceState):
                'version'    : (True,  True ) }
 
     def _readFileList(self, lines, stateVersion, repos):
-	fileCount = int(lines[0][:-1])
+        fileCount = int(lines[0][:-1])
         configFlagNeeded = []
         autoSourceFlagNeeded = []
 
         for line in lines[1:]:
             # chop
             line = line[:-1]
-	    fields = line.split()
-	    pathId = sha1helper.md5FromString(fields.pop(0))
+            fields = line.split()
+            pathId = sha1helper.md5FromString(fields.pop(0))
             version = versions.VersionFromString(fields.pop(-1))
 
             isConfig = False
@@ -350,7 +350,7 @@ class SourceStateFromLines(SourceState):
             elif stateVersion == 0:
                 info = FileInfo()
 
-	    fileId = sha1helper.sha1FromString(fields.pop(-1))
+            fileId = sha1helper.sha1FromString(fields.pop(-1))
 
             if stateVersion == 0:
                 if not isinstance(version, versions.NewVersion):
@@ -360,7 +360,7 @@ class SourceStateFromLines(SourceState):
                 if not isinstance(version, versions.NewVersion):
                     autoSourceFlagNeeded.append((pathId, fileId, version))
 
-	    path = " ".join(fields)
+            path = " ".join(fields)
 
             self.addFile(pathId, path, version, fileId,
                          isConfig = info.isConfig,
@@ -390,31 +390,31 @@ class SourceStateFromLines(SourceState):
         kwargs = {}
 
         while lines:
-	    fields = lines[0][:-1].split()
+            fields = lines[0][:-1].split()
 
             # the file count ends the list of fields
             if len(fields) == 1: break
-	    assert(len(fields) == 2)
+            assert(len(fields) == 2)
             del lines[0]
 
-	    what = fields[0]
+            what = fields[0]
             assert(not kwargs.has_key(what))
             if what not in self.fields:
                 raise ConaryStateError('Invalid field "%s"' % what)
-                
+
             isVer = self.fields[what][0]
 
-	    if isVer:
+            if isVer:
                 kwargs[what] = versions.ThawVersion(fields[1])
-	    else:
+            else:
                 kwargs[what] = fields[1]
 
         required = set([ x[0] for x in self.fields.items() if x[1][1] ])
         assert((set(kwargs.keys()) & required) == required)
 
-	SourceState.__init__(self, **kwargs)
+        SourceState.__init__(self, **kwargs)
 
-	self._readFileList(lines, stateVersion, repos)
+        self._readFileList(lines, stateVersion, repos)
 
     def __init__(self, lines, stateVersion, repos=None):
         self.parseLines(lines, stateVersion, repos )

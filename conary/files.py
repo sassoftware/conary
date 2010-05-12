@@ -41,31 +41,31 @@ _FILE_FLAG_TRANSIENT = 1 << 4
 _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user.
-_FILE_FLAG_AUTOSOURCE = 1 << 6	
+_FILE_FLAG_AUTOSOURCE = 1 << 6
 # files whose contents are part of a capsule; only set for files w/ contents
 _FILE_FLAG_ENCAPSULATED_CONTENT = 1 << 7
 # files which are allowed to be missing -- right now this flag may be
 # set but it is not used outside of builds
 _FILE_FLAG_MISSINGOKAY = 1 << 8
 # files which are in a capsule package but not in the capsule associated with
-# the package; they were added via a derivation 
+# the package; they were added via a derivation
 _FILE_FLAG_CAPSULE_ADDITION = 1 << 9
 # files are part of a capsule package and have have conary-style contents should
 # set this flag. This includes file which were added or modified via a
-# derivation. Config implies this behavior even though it may not be set 
+# derivation. Config implies this behavior even though it may not be set
 # explicitly.
 _FILE_FLAG_CAPSULE_OVERRIDE = 1 << 10
 
 FILE_STREAM_CONTENTS        = 1
-FILE_STREAM_DEVICE	    = 2
-FILE_STREAM_FLAGS	    = 3
-FILE_STREAM_FLAVOR	    = 4
-FILE_STREAM_INODE	    = 5
+FILE_STREAM_DEVICE          = 2
+FILE_STREAM_FLAGS           = 3
+FILE_STREAM_FLAVOR          = 4
+FILE_STREAM_INODE           = 5
 FILE_STREAM_PROVIDES        = 6
 FILE_STREAM_REQUIRES        = 7
-FILE_STREAM_TAGS	    = 8
-FILE_STREAM_TARGET	    = 9
-FILE_STREAM_LINKGROUP	    = 10
+FILE_STREAM_TAGS            = 8
+FILE_STREAM_TARGET          = 9
+FILE_STREAM_LINKGROUP       = 10
 
 DEVICE_STREAM_MAJOR = 1
 DEVICE_STREAM_MINOR = 2
@@ -125,16 +125,16 @@ class LinkGroupStream(streams.StringStream):
         if diff == "\0":
             diff = None
 
-	if self() == base():
+        if self() == base():
             self.set(diff)
-	    return False
-	elif self() != diff:
-	    return True
+            return False
+        elif self() != diff:
+            return True
 
-	return False
+        return False
 
     def __init__(self, data = None):
-	streams.StringStream.__init__(self, data)
+        streams.StringStream.__init__(self, data)
 
 REGULAR_FILE_SIZE = 1
 REGULAR_FILE_SHA1 = 2
@@ -163,37 +163,37 @@ class InodeStream(streams.StreamSet):
                 self.group == other.group)
 
     def triplet(self, code, setbit = 0):
-	l = [ "-", "-", "-" ]
-	if code & 4:
-	    l[0] = "r"
-	    
-	if code & 2:
-	    l[1] = "w"
+        l = [ "-", "-", "-" ]
+        if code & 4:
+            l[0] = "r"
 
-	if setbit:
-	    if code & 1:
-		l[2] = "s"
-	    else:
-		l[2] = "S"
-	elif code & 1:
-	    l[2] = "x"
-	    
-	return l
+        if code & 2:
+            l[1] = "w"
+
+        if setbit:
+            if code & 1:
+                l[2] = "s"
+            else:
+                l[2] = "S"
+        elif code & 1:
+            l[2] = "x"
+
+        return l
 
     def permsString(self):
-	perms = self.perms()
+        perms = self.perms()
 
-	l = self.triplet(perms >> 6, perms & 04000) + \
-	    self.triplet(perms >> 3, perms & 02000) + \
-	    self.triplet(perms >> 0)
-	
-	if perms & 01000:
-	    if l[8] == "x":
-		l[8] = "t"
-	    else:
-		l[8] = "T"
+        l = self.triplet(perms >> 6, perms & 04000) + \
+            self.triplet(perms >> 3, perms & 02000) + \
+            self.triplet(perms >> 0)
 
-	return "".join(l)
+        if perms & 01000:
+            if l[8] == "x":
+                l[8] = "t"
+            else:
+                l[8] = "T"
+
+        return "".join(l)
 
     def timeString(self, now = None):
         # We're ignoring now now
@@ -207,7 +207,7 @@ class InodeStream(streams.StreamSet):
 
     def __init__(self, perms = None, mtime = None, owner = None, group = None):
         if perms is not None and mtime is None:
-            # allow us to to pass in a frozen InodeStream as the 
+            # allow us to to pass in a frozen InodeStream as the
             # first argument - mtime will be None in that case.
             streams.StreamSet.__init__(self, perms)
         else:
@@ -223,7 +223,7 @@ class InodeStream(streams.StreamSet):
 class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
-	result = self._isFlag(_FILE_FLAG_CONFIG, set)
+        result = self._isFlag(_FILE_FLAG_CONFIG, set)
         assert((self() & (_FILE_FLAG_ENCAPSULATED_CONTENT |
                           _FILE_FLAG_CONFIG))
                !=
@@ -232,19 +232,19 @@ class FlagsStream(streams.IntStream):
         return result
 
     def isPathDependencyTarget(self, set = None):
-	return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
+        return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
 
     def isInitialContents(self, set = None):
-	return self._isFlag(_FILE_FLAG_INITIAL_CONTENTS, set)
+        return self._isFlag(_FILE_FLAG_INITIAL_CONTENTS, set)
 
     def isSource(self, set = None):
-	return self._isFlag(_FILE_FLAG_SOURCEFILE, set)
+        return self._isFlag(_FILE_FLAG_SOURCEFILE, set)
 
     def isAutoSource(self, set = None):
-	return self._isFlag(_FILE_FLAG_AUTOSOURCE, set)
+        return self._isFlag(_FILE_FLAG_AUTOSOURCE, set)
 
     def isTransient(self, set = None):
-	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
+        return self._isFlag(_FILE_FLAG_TRANSIENT, set)
 
     def isMissingOkay(self, set = None):
         return self._isFlag(_FILE_FLAG_MISSINGOKAY, set)
@@ -264,15 +264,15 @@ class FlagsStream(streams.IntStream):
         return self._isFlag(_FILE_FLAG_CAPSULE_OVERRIDE, set)
 
     def _isFlag(self, flag, set):
-	if set != None:
+        if set != None:
             if self() is None:
                 self.set(0x0)
-	    if set:
-		self.set(self() | flag)
-	    else:
-		self.set(self() & ~(flag))
+            if set:
+                self.set(self() | flag)
+            else:
+                self.set(self() & ~(flag))
 
-	return (self() and self() & flag)
+        return (self() and self() & flag)
 
 class File(streams.StreamSet):
 
@@ -308,48 +308,48 @@ class File(streams.StreamSet):
 
     def diff(self, other):
         # this never returns None; empty file diffs == '\x01'
-	if other is None or self.lsTag != other.lsTag:
-	    return self.freeze()
+        if other is None or self.lsTag != other.lsTag:
+            return self.freeze()
 
-	rc = [ FILE_TYPE_DIFF, self.lsTag ]
+        rc = [ FILE_TYPE_DIFF, self.lsTag ]
         streamDiff = streams.StreamSet.diff(self, other)
         if streamDiff is not None:
             rc.append(streamDiff)
 
-	return "".join(rc)
+        return "".join(rc)
 
     def modeString(self):
-	l = self.inode.permsString()
-	return self.lsTag + string.join(l, "")
+        l = self.inode.permsString()
+        return self.lsTag + string.join(l, "")
 
     def timeString(self):
-	return self.inode.timeString()
+        return self.inode.timeString()
 
     def sizeString(self):
-	return "       0"
+        return "       0"
 
     def pathId(self, new = None):
-	if new:
-	    self.thePathId = new
+        if new:
+            self.thePathId = new
 
-	return self.thePathId
+        return self.thePathId
 
     def fileId(self):
         return sha1helper.sha1String(self.freeze(skipSet = { 'mtime' : True }))
 
     def remove(self, target):
-	os.unlink(target)
+        os.unlink(target)
 
     def restore(self, root, target, skipMtime=False, journal=None,
                 nameLookup=True, **kwargs):
-	self.setPermissions(root, target, journal=journal, nameLookup=nameLookup)
+        self.setPermissions(root, target, journal=journal, nameLookup=nameLookup)
 
-	if not skipMtime:
-	    self.setMtime(target)
+        if not skipMtime:
+            self.setMtime(target)
         return target
 
     def setMtime(self, target):
-	os.utime(target, (self.inode.mtime(), self.inode.mtime()))
+        os.utime(target, (self.inode.mtime(), self.inode.mtime()))
 
     def chmod(self, target, mask=0):
         if not self.skipChmod:
@@ -359,7 +359,7 @@ class File(streams.StreamSet):
 
     def setPermissions(self, root, target, journal=None, nameLookup=True):
         # do the chmod after the chown because some versions of Linux
-        # remove setuid/gid flags when changing ownership to root 
+        # remove setuid/gid flags when changing ownership to root
         if journal:
             journal.lchown(root, target, self.inode.owner(),
                            self.inode.group())
@@ -390,22 +390,22 @@ class File(streams.StreamSet):
         self.chmod(target, mask)
 
     def twm(self, diff, base, skip = None):
-	sameType = struct.unpack("B", diff[0])
-	if not sameType: 
-	    # XXX file type changed -- we don't support this yet
-	    raise AssertionError
-	assert(self.lsTag == base.lsTag)
-	assert(self.lsTag == diff[1])
-	
-	return streams.StreamSet.twm(self, diff[2:], base, skip = skip)
+        sameType = struct.unpack("B", diff[0])
+        if not sameType:
+            # XXX file type changed -- we don't support this yet
+            raise AssertionError
+        assert(self.lsTag == base.lsTag)
+        assert(self.lsTag == diff[1])
+
+        return streams.StreamSet.twm(self, diff[2:], base, skip = skip)
 
     def __eq__(self, other, ignoreOwnerGroup = False):
-	if other.lsTag != self.lsTag: return False
+        if other.lsTag != self.lsTag: return False
 
-	if ignoreOwnerGroup:
-            return streams.StreamSet.__eq__(self, other, 
+        if ignoreOwnerGroup:
+            return streams.StreamSet.__eq__(self, other,
                            skipSet = { 'mtime' : True,
-                                       'owner' : True, 
+                                       'owner' : True,
                                        'group' : True } )
 
         return streams.StreamSet.__eq__(self, other)
@@ -413,15 +413,15 @@ class File(streams.StreamSet):
     eq = __eq__
 
     def freeze(self, skipSet = None):
-	return self.lsTag + streams.StreamSet.freeze(self, skipSet = skipSet)
+        return self.lsTag + streams.StreamSet.freeze(self, skipSet = skipSet)
 
     def __init__(self, pathId, streamData = None):
         assert(self.__class__ is not File)
-	self.thePathId = pathId
-	if streamData is not None:
-	    streams.StreamSet.__init__(self, streamData, offset = 1)
-	else:
-	    streams.StreamSet.__init__(self)
+        self.thePathId = pathId
+        if streamData is not None:
+            streams.StreamSet.__init__(self, streamData, offset = 1)
+        else:
+            streams.StreamSet.__init__(self)
 
 class MissingFile(File):
 
@@ -452,15 +452,15 @@ class SymbolicLink(File):
         return File.compatibleWith(self, other) and self.target == other.target
 
     def sizeString(self):
-	return "%8d" % len(self.target())
+        return "%8d" % len(self.target())
 
     def restore(self, fileContents, root, target, journal=None, nameLookup=True,                **kwargs):
         util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
-	os.symlink(self.target(), target)
+        os.symlink(self.target(), target)
         # utime() follows symlinks and Linux currently does not implement
         # lutimes()
-	return File.restore(self, root, target, skipMtime=True, journal=journal,
+        return File.restore(self, root, target, skipMtime=True, journal=journal,
             nameLookup=nameLookup, **kwargs)
 
 class Socket(File):
@@ -476,7 +476,7 @@ class Socket(File):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	return File.restore(self, root, target, journal=journal,
+        return File.restore(self, root, target, journal=journal,
             nameLookup=nameLookup, **kwargs)
 
 class NamedPipe(File):
@@ -489,8 +489,8 @@ class NamedPipe(File):
                 **kwargs):
         util.removeIfExists(target)
         util.mkdirChain(os.path.dirname(target))
-	os.mkfifo(target)
-	return File.restore(self, root, target, journal=journal,
+        os.mkfifo(target)
+        return File.restore(self, root, target, journal=journal,
             nameLookup=nameLookup, **kwargs)
 
 class Directory(File):
@@ -510,13 +510,13 @@ class Directory(File):
                 os.unlink(target)
                 util.mkdirChain(target)
         else:
-	    util.mkdirChain(target)
+            util.mkdirChain(target)
 
-	return File.restore(self, root, target, journal=journal,
+        return File.restore(self, root, target, journal=journal,
             nameLookup=nameLookup, **kwargs)
 
     def remove(self, target):
-	raise NotImplementedError
+        raise NotImplementedError
 
 class DeviceFile(File):
 
@@ -529,7 +529,7 @@ class DeviceFile(File):
         return File.compatibleWith(self, other) and self.devt == other.devt
 
     def sizeString(self):
-	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
+        return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
     def restore(self, fileContents, root, target, journal=None, nameLookup=True,
                 **kwargs):
@@ -548,7 +548,7 @@ class DeviceFile(File):
                 flags = stat.S_IFCHR
             else:
                 flags = stat.S_IFBLK
-            os.mknod(target, flags, os.makedev(self.devt.major(), 
+            os.mknod(target, flags, os.makedev(self.devt.major(),
                                                self.devt.minor()))
 
             return File.restore(self, root, target, journal=journal,
@@ -570,8 +570,8 @@ class CharacterDevice(DeviceFile):
 import gzip
 class RegularFile(File):
 
-    streamDict = { 
-	FILE_STREAM_CONTENTS : (SMALL, RegularFileStream,      'contents'  ),
+    streamDict = {
+        FILE_STREAM_CONTENTS : (SMALL, RegularFileStream,      'contents'  ),
         FILE_STREAM_LINKGROUP: (SMALL, LinkGroupStream,        'linkGroup' ),
     }
 
@@ -588,17 +588,17 @@ class RegularFile(File):
                 self.contents == other.contents)
 
     def sizeString(self):
-	return "%8d" % self.contents.size()
+        return "%8d" % self.contents.size()
 
     def restore(self, fileContents, root, target, journal=None, sha1 = None,
                 nameLookup=True, **kwargs):
 
         keepTempfile = kwargs.get('keepTempfile', False)
 
-	if fileContents != None:
-	    # this is first to let us copy the contents of a file
-	    # onto itself; the unlink helps that to work
-	    src = fileContents.get()
+        if fileContents != None:
+            # this is first to let us copy the contents of a file
+            # onto itself; the unlink helps that to work
+            src = fileContents.get()
             inFd = None
 
             if fileContents.isCompressed():
@@ -611,8 +611,8 @@ class RegularFile(File):
 
             name = os.path.basename(target)
             path = os.path.dirname(target)
-	    if not os.path.isdir(path):
-		util.mkdirChain(path)
+            if not os.path.isdir(path):
+                util.mkdirChain(path)
 
             if inFd is not None:
                 if keepTempfile:
@@ -666,14 +666,14 @@ class RegularFile(File):
 
             File.restore(self, root, target, journal=journal,
                 nameLookup=nameLookup, **kwargs)
-	else:
+        else:
             destTarget = target
-	    File.restore(self, root, target, journal=journal,
+            File.restore(self, root, target, journal=journal,
                 nameLookup=nameLookup, **kwargs)
         return destTarget
 
     def __init__(self, *args, **kargs):
-	File.__init__(self, *args, **kargs)
+        File.__init__(self, *args, **kargs)
 
 def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
                        assumeRoot = False, statBuf = None):
@@ -704,38 +704,38 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)
 
     if (stat.S_ISREG(s.st_mode)):
-	f = RegularFile(pathId)
-	needsSha1 = 1
+        f = RegularFile(pathId)
+        needsSha1 = 1
     elif (stat.S_ISLNK(s.st_mode)):
-	f = SymbolicLink(pathId)
-	f.target.set(os.readlink(path))
+        f = SymbolicLink(pathId)
+        f.target.set(os.readlink(path))
     elif (stat.S_ISDIR(s.st_mode)):
-	f = Directory(pathId)
+        f = Directory(pathId)
     elif (stat.S_ISSOCK(s.st_mode)):
-	f = Socket(pathId)
+        f = Socket(pathId)
     elif (stat.S_ISFIFO(s.st_mode)):
-	f = NamedPipe(pathId)
+        f = NamedPipe(pathId)
     elif (stat.S_ISBLK(s.st_mode)):
-	f = BlockDevice(pathId)
-	f.devt.major.set(s.st_rdev >> 8)
-	f.devt.minor.set(s.st_rdev & 0xff)
+        f = BlockDevice(pathId)
+        f.devt.major.set(s.st_rdev >> 8)
+        f.devt.minor.set(s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
-	f = CharacterDevice(pathId)
-	f.devt.major.set(s.st_rdev >> 8)
-	f.devt.minor.set(s.st_rdev & 0xff)
+        f = CharacterDevice(pathId)
+        f.devt.major.set(s.st_rdev >> 8)
+        f.devt.minor.set(s.st_rdev & 0xff)
     else:
         raise FilesError("unsupported file type for %s" % path)
 
     f.inode = inode
     f.flags = FlagsStream(0)
-    
+
     # assume we have a match if the FileMode and object type match
     if possibleMatch and (possibleMatch.__class__ == f.__class__) \
-		     and f.inode == possibleMatch.inode \
-		     and f.inode.mtime() == possibleMatch.inode.mtime() \
-		     and (not s.st_size or
-			  (possibleMatch.hasContents and
-			   s.st_size == possibleMatch.contents.size())):
+                     and f.inode == possibleMatch.inode \
+                     and f.inode.mtime() == possibleMatch.inode.mtime() \
+                     and (not s.st_size or
+                          (possibleMatch.hasContents and
+                           s.st_size == possibleMatch.contents.size())):
         f.flags.set(possibleMatch.flags())
         return possibleMatch
     elif (possibleMatch and (isinstance(f, RegularFile) and
@@ -751,7 +751,7 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
         return possibleMatch
 
     if needsSha1:
-	f.contents = RegularFileStream()
+        f.contents = RegularFileStream()
 
         undoPrelink = False
         try:
@@ -779,11 +779,11 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
             prelink.wait()
             f.contents.size.set(size)
             sha1 = d.digest()
-        else:     
+        else:
             sha1 = sha1helper.sha1FileBin(path)
             f.contents.size.set(s.st_size)
 
-	f.contents.sha1.set(sha1)
+        f.contents.sha1.set(sha1)
 
     if inodeInfo:
         return (f, s.st_nlink, (s.st_rdev, s.st_ino))
@@ -792,19 +792,19 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
 
 def ThawFile(frz, pathId):
     if frz[0] == "-":
-	return RegularFile(pathId, streamData = frz)
+        return RegularFile(pathId, streamData = frz)
     elif frz[0] == "d":
-	return Directory(pathId, streamData = frz)
+        return Directory(pathId, streamData = frz)
     elif frz[0] == "p":
-	return NamedPipe(pathId, streamData = frz)
+        return NamedPipe(pathId, streamData = frz)
     elif frz[0] == "s":
-	return Socket(pathId, streamData = frz)
+        return Socket(pathId, streamData = frz)
     elif frz[0] == "l":
-	return SymbolicLink(pathId, streamData = frz)
+        return SymbolicLink(pathId, streamData = frz)
     elif frz[0] == "b":
-	return BlockDevice(pathId, streamData = frz)
+        return BlockDevice(pathId, streamData = frz)
     elif frz[0] == "c":
-	return CharacterDevice(pathId, streamData = frz)
+        return CharacterDevice(pathId, streamData = frz)
     elif frz[0] == "m":
         return MissingFile(pathId, streamData = frz)
 
@@ -816,28 +816,28 @@ class FilesError(errors.ConaryError):
         self.msg = msg
 
     def __repr__(self):
-	return self.msg
+        return self.msg
 
     def __str__(self):
-	return repr(self)
+        return repr(self)
 
 def contentsChanged(diff):
     if diff[0] == 0:
-	return False
+        return False
 
     type = diff[1]
     if type != "-": return False
 
     i = 2
     while i < len(diff):
-	streamId, size = struct.unpack("!BH", diff[i:i+3])
-	i += 3
-	
-	if RegularFile.streamDict[streamId][2] == "contents":
+        streamId, size = struct.unpack("!BH", diff[i:i+3])
+        i += 3
+
+        if RegularFile.streamDict[streamId][2] == "contents":
             if tupleChanged(RegularFileStream, diff[i:i+size]):
                 return True
-	i += size
-        
+        i += size
+
     return False
 
 # shortcuts to get items directly from frozen files
@@ -859,51 +859,51 @@ def frozenFileRequires(frz):
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])
     if not sameType:
-	return [ "type" ]
+        return [ "type" ]
     type = diff[1]
     i = 2
 
     if type == "-":
-	cl = RegularFile
+        cl = RegularFile
     elif type == "d":
-	cl = Directory
+        cl = Directory
     elif type == "b":
-	cl = BlockDevice
+        cl = BlockDevice
     elif type == "c":
-	cl = CharacterDevice
+        cl = CharacterDevice
     elif type == "s":
-	cl = Socket
+        cl = Socket
     elif type == "l":
-	cl = SymbolicLink
+        cl = SymbolicLink
     elif type == "p":
-	cl = NamedPipe
+        cl = NamedPipe
     elif type == "m":
         cl = MissingFile
     else:
-	raise AssertionError
+        raise AssertionError
 
     rc = []
 
     while i < len(diff):
-	streamId, size = struct.unpack("!BH", diff[i:i+3])
-	i += 3
+        streamId, size = struct.unpack("!BH", diff[i:i+3])
+        i += 3
 
-	name = cl.streamDict[streamId][2]
-	
-	if name == "inode":
-	    l = tupleChanged(InodeStream, diff[i:i+size])
-	    if l:
-		s = " ".join(l)
-		rc.append("inode(%s)" % s)
-	elif name == "contents":
-	    l = tupleChanged(RegularFileStream, diff[i:i+size])
-	    if l:
-		s = " ".join(l)
-		rc.append("contents(%s)" % s)
-	else:
-	    rc.append(name)
+        name = cl.streamDict[streamId][2]
 
-	i += size
+        if name == "inode":
+            l = tupleChanged(InodeStream, diff[i:i+size])
+            if l:
+                s = " ".join(l)
+                rc.append("inode(%s)" % s)
+        elif name == "contents":
+            l = tupleChanged(RegularFileStream, diff[i:i+size])
+            if l:
+                s = " ".join(l)
+                rc.append("contents(%s)" % s)
+        else:
+            rc.append(name)
+
+        i += size
 
     assert(i == len(diff))
 
@@ -953,22 +953,22 @@ def rpmFileColorCmp(fileObjOne, fileObjTwo):
 class UserGroupIdCache:
 
     def lookupName(self, root, name):
-	theId = self.nameCache.get(name, None)
-	if theId is not None:
-	    return theId
+        theId = self.nameCache.get(name, None)
+        if theId is not None:
+            return theId
 
         # if not root, cannot chroot and so fall back to system ids
         getChrootIds = root and root != '/' and not os.getuid()
 
-	if getChrootIds:
+        if getChrootIds:
             if root[0] != '/':
                 root = os.sep.join((os.getcwd(), root))
-	    curDir = os.open(".", os.O_RDONLY)
+            curDir = os.open(".", os.O_RDONLY)
             # chdir to the current root to allow us to chroot
             # back out again
             os.chdir('/')
-	    os.chroot(root)
-	
+            os.chroot(root)
+
         if name and name[0] == '+':
             # An id mapped as a string
             try:
@@ -983,41 +983,41 @@ class UserGroupIdCache:
                 log.warning('%s %s does not exist - using root', self.name, name)
                 theId = 0
 
-	if getChrootIds:
-	    os.chroot(".")
-	    os.fchdir(curDir)
+        if getChrootIds:
+            os.chroot(".")
+            os.fchdir(curDir)
             os.close(curDir)
 
-	self.nameCache[name] = theId
-	self.idCache[theId] = name
-	return theId
+        self.nameCache[name] = theId
+        self.idCache[theId] = name
+        return theId
 
     def lookupId(self, root, theId):
-	theName = self.idCache.get(theId, None)
-	if theName is not None:
-	    return theName
+        theName = self.idCache.get(theId, None)
+        if theName is not None:
+            return theName
 
-	if root and root != '/':
-	    curDir = os.open(".", os.O_RDONLY)
-	    os.chdir("/")
-	    os.chroot(root)
-	
-	name = self.idLookupFn(theId)[0]
-	if root and root != '/':
-	    os.chroot(".")
-	    os.fchdir(curDir)
+        if root and root != '/':
+            curDir = os.open(".", os.O_RDONLY)
+            os.chdir("/")
+            os.chroot(root)
+
+        name = self.idLookupFn(theId)[0]
+        if root and root != '/':
+            os.chroot(".")
+            os.fchdir(curDir)
             os.close(curDir)
 
-	self.nameCache[name] = theId
-	self.idCache[theId] = name
-	return name
+        self.nameCache[name] = theId
+        self.idCache[theId] = name
+        return name
 
     def __init__(self, name, nameLookupFn, idLookupFn):
-	self.nameLookupFn = nameLookupFn
-	self.idLookupFn = idLookupFn
-	self.name = name
-	self.nameCache = { 'root' : 0 }
-	self.idCache = { 0 : 'root' }
+        self.nameLookupFn = nameLookupFn
+        self.idLookupFn = idLookupFn
+        self.name = name
+        self.nameCache = { 'root' : 0 }
+        self.idCache = { 0 : 'root' }
         # Make sure that the resolver is initialized outside the chroot
         # (if any) so that the correct configuration and libraries are
         # loaded. (CNY-1515)

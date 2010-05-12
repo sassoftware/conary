@@ -38,7 +38,7 @@ def displayCloneJob(cs):
         print "%sClone  %-20s (%s)" % (indent, csTrove.getName(), newInfo)
 
 def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
-               info = False, cloneSources = False, message = None, 
+               info = False, cloneSources = False, message = None,
                test = False, fullRecurse = False, ignoreConflicts = False,
                exactFlavors = False):
     client = ConaryClient(cfg)
@@ -50,13 +50,13 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
 
     troveSpecs = [ cmdline.parseTroveSpec(x) for x in troveSpecList]
 
-    componentSpecs = [ x[0] for x in troveSpecs 
+    componentSpecs = [ x[0] for x in troveSpecs
                        if ':' in x[0] and x[0].split(':')[1] != 'source']
     if componentSpecs:
         raise errors.ParseError('Cannot clone components: %s' % ', '.join(componentSpecs))
 
 
-    trovesToClone = repos.findTroves(cfg.installLabelPath, 
+    trovesToClone = repos.findTroves(cfg.installLabelPath,
                                     troveSpecs, cfg.flavor,
                                     exactFlavors = exactFlavors)
     trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
@@ -106,7 +106,7 @@ def _convertLabelOrBranch(lblStr, template):
 def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                   info=False, message=None, test=False,
                   ignoreConflicts=False, cloneOnlyByDefaultTroves=False,
-                  cloneSources = False, allFlavors = False, client=None, 
+                  cloneSources = False, allFlavors = False, client=None,
                   targetFile = None, exactFlavors = None,
                   excludeGroups = False):
     targetMap = {}
@@ -181,7 +181,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
                         test=test, ignoreConflicts=ignoreConflicts,
                         targetFile=targetFile)
 
-def _finishClone(client, cfg, cs, callback, info=False, test=False, 
+def _finishClone(client, cfg, cs, callback, info=False, test=False,
                  ignoreConflicts=False, targetFile=None):
     repos = client.repos
     if cfg.interactive or info:

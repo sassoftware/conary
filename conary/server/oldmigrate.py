@@ -377,11 +377,11 @@ class MigrateTo_11(SchemaMigration):
         cu = self.cu
         cu2 = self.db.cursor()
 
-	logMe(1, "Rebuilding the Latest table...")
+        logMe(1, "Rebuilding the Latest table...")
         cu.execute("DROP TABLE Latest")
         self.db.loadSchema()
         schema.createLatest(self.db)
-	cu.execute("""
+        cu.execute("""
             insert into Latest (itemId, branchId, flavorId, versionId)
                 select
                     instances.itemid as itemid,
@@ -440,8 +440,8 @@ class MigrateTo_11(SchemaMigration):
         """, trove._TROVEINFO_TAG_SIGS)
 
         logMe(1, "updating path hashes...")
-	cu.execute("SELECT instanceId, data FROM hashUpdatesTmp")
-	for (instanceId, data) in cu:
+        cu.execute("SELECT instanceId, data FROM hashUpdatesTmp")
+        for (instanceId, data) in cu:
             cu2.execute("UPDATE TroveInfo SET data=? WHERE "
                        "infoType=? AND instanceId=?",
                         (data, trove._TROVEINFO_TAG_PATH_HASHES, instanceId))
@@ -545,7 +545,7 @@ class MigrateTo_13(SchemaMigration):
 
         logMe(1, "Changing absolute redirects to branch redirects...")
         self.cu.execute("""
-                    SELECT instanceId, item, version FROM Instances 
+                    SELECT instanceId, item, version FROM Instances
                         JOIN Items USING (itemId)
                         JOIN Versions ON Instances.versionId = Versions.versionId
                         WHERE isRedirect = 1""")
@@ -593,7 +593,7 @@ class MigrateTo_13(SchemaMigration):
                 if subPkgName != pkgName or branchStr != subBranchStr:
                     if compName == subCompName:
                         branchId = cu2.execute("SELECT branchId FROM "
-                                               "Branches WHERE branch=?", 
+                                               "Branches WHERE branch=?",
                                                branchStr).fetchall()
                         if not branchId:
                             cu2.execute("INSERT INTO Branches (branch) "

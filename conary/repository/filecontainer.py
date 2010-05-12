@@ -31,9 +31,9 @@ The file format is::
   - file table entry 2
   - file N
 
-The header and table entries are uncompressed.  The contents of the file 
-table are compressed, and each file is individually compressed. When files 
-are retrieved from the container, the returned file object automatically 
+The header and table entries are uncompressed.  The contents of the file
+table are compressed, and each file is individually compressed. When files
+are retrieved from the container, the returned file object automatically
 uncompresses the file.
 
 There are two formats for file table entries. The original format is used
@@ -98,34 +98,34 @@ class FileContainer:
     bufSize = 128 * 1024
 
     def readHeader(self):
-	magic = self.file.pread(4, 0)
-	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
-	    raise BadContainer, "bad magic"
+        magic = self.file.pread(4, 0)
+        if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
+            raise BadContainer, "bad magic"
 
-	version = self.file.pread(4, 4)
-	if len(version) != 4:
-	    raise BadContainer, "invalid container version"
+        version = self.file.pread(4, 4)
+        if len(version) != 4:
+            raise BadContainer, "invalid container version"
         self.version = struct.unpack("!I", version)[0]
         if self.version not in READABLE_VERSIONS:
             raise BadContainer, "unsupported file container version %d" % \
                         self.version
 
-	self.contentsStart = 8
-	self.next = self.contentsStart
+        self.contentsStart = 8
+        self.next = self.contentsStart
 
     def close(self):
         self.file = None
-    
-    def addFile(self, fileName, contents, tableData, precompressed = False):
-	assert(isinstance(contents, filecontents.FileContents))
-	assert(self.mutable)
 
-	fileObj = contents.get()
+    def addFile(self, fileName, contents, tableData, precompressed = False):
+        assert(isinstance(contents, filecontents.FileContents))
+        assert(self.mutable)
+
+        fileObj = contents.get()
         headerOffset = self.file.tell()
         self.file.write(struct.pack("!HH", SUBFILE_MAGIC, len(fileName)))
-	self.file.write(struct.pack("!IH", 0, len(tableData)))
-	self.file.write(fileName)
-	self.file.write(tableData)
+        self.file.write(struct.pack("!IH", 0, len(tableData)))
+        self.file.write(fileName)
+        self.file.write(tableData)
 
         if precompressed:
             size = util.copyfileobj(fileObj, self.file)
@@ -150,24 +150,24 @@ class FileContainer:
             self.file.write(struct.pack("!HH", len(fileName), len(tableData)))
 
     def getNextFile(self):
-	assert(not self.mutable)
+        assert(not self.mutable)
 
         name, tag, size, dataOffset, nextOffset = self._nextFile()
 
-	if name is None:
-	    return None
+        if name is None:
+            return None
 
-	fcf = util.SeekableNestedFile(self.file, size, start = dataOffset)
+        fcf = util.SeekableNestedFile(self.file, size, start = dataOffset)
 
         self.next = nextOffset
 
-	return (name, tag, fcf)
+        return (name, tag, fcf)
 
     def _nextFile(self):
         offset = self.next
 
-	nameLen = self.file.pread(10, offset)
-	if not len(nameLen):
+        nameLen = self.file.pread(10, offset)
+        if not len(nameLen):
             return (None, None, None, None, None)
 
         offset += 10
@@ -209,7 +209,7 @@ class FileContainer:
                                   name, tag)
             dumpString(hdr)
 
-	assert(not self.mutable)
+        assert(not self.mutable)
 
         fileHeader = self.file.pread(8, 0)
         dumpString(fileHeader)
@@ -221,7 +221,7 @@ class FileContainer:
             # realSize is an out parameter
             realSize = [0]
             dumpFile(name, tag, size, fcf,
-                     lambda size, newTag: 
+                     lambda size, newTag:
                         sizeCallback(dumpString, name, newTag, size, realSize))
             # > 4 GiB files have length of file name and tag after contents
             # (see format at the top of this file)
@@ -238,13 +238,13 @@ class FileContainer:
         self.next = self.contentsStart
 
     def __del__(self):
-	if self.file:
-	    self.close()
+        if self.file:
+            self.close()
 
     def __init__(self, file, version = None, append = False):
         """
         Create a FileContainer object.
-        
+
         @param file: an open python file object referencing the file
         container file on disk. If that file is empty (size 0) the
         file container is immediately initialized. A copy of the file
@@ -253,32 +253,32 @@ class FileContainer:
         of the passed flie object
         """
 
-	# make our own copy of this file which nobody can close underneath us
-	self.file = file
+        # make our own copy of this file which nobody can close underneath us
+        self.file = file
 
         if version is None:
             version = FILE_CONTAINER_VERSION_LATEST
 
-	self.file.seek(0, SEEK_END)
-	if append or not self.file.tell():
+        self.file.seek(0, SEEK_END)
+        if append or not self.file.tell():
             if not append:
                 self.file.seek(SEEK_SET, 0)
                 self.file.truncate()
 
-	    self.file.write(FILE_CONTAINER_MAGIC)
-	    self.file.write(struct.pack("!I", version))
+            self.file.write(FILE_CONTAINER_MAGIC)
+            self.file.write(struct.pack("!I", version))
 
-	    self.mutable = True
-	else:
+            self.mutable = True
+        else:
             # we don't need to put this file pointer back; we don't depend
             # on it here at all; everything is through pseek
-	    try:
-		self.readHeader()
-	    except:
-		self.file.close()
-		self.file = None
-		raise
-	    self.mutable = False
+            try:
+                self.readHeader()
+            except:
+                self.file.close()
+                self.file = None
+                raise
+            self.mutable = False
 
 class BadContainer(conary.errors.ConaryError):
 

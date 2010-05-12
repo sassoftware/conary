@@ -698,11 +698,11 @@ class Logger:
             self.close()
 
     def startLog(self):
-        """Starts the log to path.  The parent process becomes the "slave" 
+        """Starts the log to path.  The parent process becomes the "slave"
         process: its stdin, stdout, and stderr are redirected to a pseudo tty.
         A child logging process controls the real stdin, stdout, and stderr,
-        and writes stdout and stderr both to the screen and to the logfile 
-        at path.  
+        and writes stdout and stderr both to the screen and to the logfile
+        at path.
         """
         self.restoreTerminalControl = (sys.stdin.isatty() and
             os.tcgetpgrp(0) == os.getpid())
@@ -712,11 +712,11 @@ class Logger:
 
         pid = os.fork()
         if pid:
-            # make parent process the pty slave - the opposite of 
+            # make parent process the pty slave - the opposite of
             # pty.fork().  In this setup, the parent process continues
-            # to act normally, while the child process performs the 
+            # to act normally, while the child process performs the
             # logging.  This makes it simple to kill the logging process
-            # when we are done with it and restore the parent process to 
+            # when we are done with it and restore the parent process to
             # normal, unlogged operation.
             os.close(masterFd)
             self._becomeLogSlave(slaveFd, pid)
@@ -822,7 +822,7 @@ class Logger:
 
 class _ChildLogger:
     def __init__(self, ptyFd, lexer, controlTerminal, withStdin):
-        # ptyFd is the fd of the pseudo tty master 
+        # ptyFd is the fd of the pseudo tty master
         self.ptyFd = ptyFd
         # lexer is a python file-like object that supports the write
         # and close methods
@@ -858,9 +858,9 @@ class _ChildLogger:
     def log(self):
         if self.shouldControlTerminal:
             self._controlTerminal()
-    
-        # standardize terminal size at 24, 80 for those programs that 
-        # access it.  This should ensure that programs that look at 
+
+        # standardize terminal size at 24, 80 for those programs that
+        # access it.  This should ensure that programs that look at
         # terminal size for displaying log info will look similar across
         # runs.
         self._setTerminalSize(24, 80)
@@ -898,8 +898,8 @@ class _ChildLogger:
                 try:
                     output = os.read(ptyFd, BUFFER)
                 except OSError, msg:
-                    if msg.errno == errno.EIO: 
-                        # input/output error - pty closed 
+                    if msg.errno == errno.EIO:
+                        # input/output error - pty closed
                         # shut down logger
                         break
                     elif msg.errno != errno.EINTR:
@@ -910,13 +910,13 @@ class _ChildLogger:
                     lexer.write(output)
 
             if stdin in read:
-                # read input from stdin, and pass to 
-                # pseudo tty 
+                # read input from stdin, and pass to
+                # pseudo tty
                 try:
                     input = os.read(stdin, BUFFER)
                 except OSError, msg:
-                    if msg.errno == errno.EIO: 
-                        # input/output error - stdin closed 
+                    if msg.errno == errno.EIO:
+                        # input/output error - stdin closed
                         # shut down logger
                         break
                     elif msg.errno != errno.EINTR:

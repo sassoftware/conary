@@ -56,17 +56,17 @@ class ChangeLog(streams.StreamSet):
         return self.message()
 
     def setMessage(self, value):
-	assert(not value or value[-1] == '\n')
+        assert(not value or value[-1] == '\n')
         self.message.set(value)
 
     def getMessageFromUser(self, prompt=''):
-	editor = os.environ.get("EDITOR", "/bin/vi")
-	(fd, name) = tempfile.mkstemp()
+        editor = os.environ.get("EDITOR", "/bin/vi")
+        (fd, name) = tempfile.mkstemp()
         if not prompt:
             prompt = 'Enter your change log message.'
-	msg = "\n-----\n%s\n" % prompt
-	os.write(fd, msg)
-	os.close(fd)
+        msg = "\n-----\n%s\n" % prompt
+        os.write(fd, msg)
+        os.close(fd)
 
         def _getMessageNoEditor():
             sys.stderr.write("Error executing %s. Please set the EDITOR\n"
@@ -106,19 +106,19 @@ class ChangeLog(streams.StreamSet):
             self.message.set(msg)
             return True
 
-	newMsg = open(name).read()
-	os.unlink(name)
+        newMsg = open(name).read()
+        os.unlink(name)
 
-	if newMsg == msg:
-	    return False
+        if newMsg == msg:
+            return False
 
-	if newMsg[-len(msg):]:
-	    newMsg = newMsg[:-len(msg)]
+        if newMsg[-len(msg):]:
+            newMsg = newMsg[:-len(msg)]
 
-	newMsg = string.strip(newMsg)
-	newMsg += '\n'
-	self.setMessage(newMsg)
-	return True
+        newMsg = string.strip(newMsg)
+        newMsg += '\n'
+        self.setMessage(newMsg)
+        return True
 
     def __init__(self, name = None, contact = None, message = None):
         if contact is None:

@@ -35,7 +35,7 @@ class ConcurrencyTests(unittest.TestCase):
         cu2.execute('INSERT INTO foo VALUES(1)')
         t1 = time.time()
         try:
-            cu1.execute('BEGIN DEFERRED')            
+            cu1.execute('BEGIN DEFERRED')
             cu1.execute('INSERT INTO foo VALUES(2)')
         except sqlite.InternalError, e:
             assert(str(e) == "database is locked")
@@ -44,7 +44,7 @@ class ConcurrencyTests(unittest.TestCase):
         assert(t2 - t1 >= 2 and t2 - t1 <= 3)
         db2.commit()
         cu1.stmt.step()
-        assert [ x for x in cu1.execute('select * from foo') ] == [(1,), (2,)] 
+        assert [ x for x in cu1.execute('select * from foo') ] == [(1,), (2,)]
 
     def CheckSingleProcessTimeoutsOnBeginImmediate(self):
         fd, dbfile = tempfile.mkstemp()
@@ -71,7 +71,7 @@ class ConcurrencyTests(unittest.TestCase):
         # make sure that re-trying the BEGIN works
         cu1.stmt.step()
         db1.rollback()
-        
+
     def CheckSingleProcessCallbacksDeferred(self):
         fd, dbfile = tempfile.mkstemp()
         os.close(fd)
@@ -90,7 +90,7 @@ class ConcurrencyTests(unittest.TestCase):
         cu2.execute('INSERT INTO foo VALUES(1)')
         t1 = time.time()
         try:
-            cu1.execute('BEGIN DEFERRED')            
+            cu1.execute('BEGIN DEFERRED')
             cu1.execute('INSERT INTO foo VALUES(2)')
         except sqlite.InternalError, e:
             assert(str(e) == "database is locked")
@@ -98,7 +98,7 @@ class ConcurrencyTests(unittest.TestCase):
         assert(waiter.count == 6)
         db2.commit()
         cu1.stmt.step()
-        assert [ x for x in cu1.execute('select * from foo') ] == [(1,), (2,)] 
+        assert [ x for x in cu1.execute('select * from foo') ] == [(1,), (2,)]
 
 
 def suite():
@@ -112,5 +112,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
-        
+
+

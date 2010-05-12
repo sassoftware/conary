@@ -160,7 +160,7 @@ class Row(object):
     Immutable wrapper around a single result row from a query.
 
     Behaves as both a tuple and a dictionary, including unpacking.
-    
+
     For example:
     >>> row = Row([1, 2, 3], ['foo', 'bar', 'baz'])
     >>> print row[0]

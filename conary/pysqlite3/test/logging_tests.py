@@ -64,7 +64,7 @@ class CommandLoggingTests(unittest.TestCase, testsupport.TestSupport):
 
         logger.seek(0)
         real_output = logger.read()
-        
+
         if expected_output != real_output:
             self.fail("Logging didn't produce expected output.")
 

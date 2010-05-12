@@ -149,7 +149,7 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             searchMethod = ff.SEARCH_LOCAL_ONLY
         else:
             # BW COMPATIBLE HACK - since we know we aren't actually searching
-            # srcdirs since they're empty, we take this to mean 
+            # srcdirs since they're empty, we take this to mean
             # repository only.
             searchMethod = ff.SEARCH_REPOSITORY_ONLY
     elif autoSource:
@@ -421,9 +421,9 @@ class FileFinder(object):
 class RepositoryCache(object):
 
     def __init__(self, repos, refreshFilter=None, cfg=None):
-	self.repos = repos
+        self.repos = repos
         self.refreshFilter = refreshFilter
-	self.nameMap = {}
+        self.nameMap = {}
         self.cacheMap = {}
         self.quiet = False
         self._basePath = self.downloadRatedLimit = None
@@ -445,7 +445,7 @@ class RepositoryCache(object):
 
     def addFileHash(self, filePath, troveName, troveVersion, pathId, path,
                     fileId, fileVersion, sha1, mode):
-	self.nameMap[filePath] = (troveName, troveVersion, pathId, path, fileId,
+        self.nameMap[filePath] = (troveName, troveVersion, pathId, path, fileId,
                               fileVersion, sha1, mode)
 
     def hasFilePath(self, url):
@@ -455,17 +455,17 @@ class RepositoryCache(object):
         return url.filePath() in self.nameMap
 
     def cacheFilePath(self, cachePrefix, url):
-	cachePath = self.getCachePath(cachePrefix, url)
+        cachePath = self.getCachePath(cachePrefix, url)
         util.mkdirChain(os.path.dirname(cachePath))
 
         if url.filePath() in self.cacheMap:
             # don't check sha1 twice
             return self.cacheMap[url.filePath()]
-	(troveName, troveVersion, pathId, troveFile, fileId,
+        (troveName, troveVersion, pathId, troveFile, fileId,
          troveFileVersion, sha1, mode) = self.nameMap[url.filePath()]
         sha1Cached = None
         cachedMode = None
-	if os.path.exists(cachePath):
+        if os.path.exists(cachePath):
             sha1Cached = sha1helper.sha1FileBin(cachePath)
         if sha1Cached != sha1:
             if sha1Cached:
@@ -491,7 +491,7 @@ class RepositoryCache(object):
         if mode != cachedMode:
             os.chmod(cachePath, mode)
         self.cacheMap[url.filePath()] = cachePath
-	return cachePath
+        return cachePath
 
     def addFileToCache(self, cachePrefix, url, infile, contentLength):
         # cache needs to be hierarchical to avoid collisions, thus we

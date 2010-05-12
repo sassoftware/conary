@@ -30,9 +30,9 @@ def parseTroveSpec(specStr, allowEmptyName = True, withFrozenFlavor = False):
     @param specStr: the input string
     @type specStr: string
 
-    @param allowEmptyName: if set, will accept an empty string and some other 
+    @param allowEmptyName: if set, will accept an empty string and some other
     variations.
-    @type allowEmptyName: bool 
+    @type allowEmptyName: bool
 
     @param withFrozenFlavor: if set, will accept a frozen flavor
     @type withFrozenFlavor: bool
@@ -81,7 +81,7 @@ def _getChangeSet(path):
             # ensure that it is obvious that a file is being referenced
             if path[0] not in './':
                 path = './' + path
-            log.error("'%s' is not a valid conary changeset: %s" % 
+            log.error("'%s' is not a valid conary changeset: %s" %
                       (path, msg))
             # XXX sys.exit is gross
             import sys
@@ -114,10 +114,10 @@ def parseUpdateList(updateList, keepExisting, updateByDefault=True,
                 applyList.append((troveSpec[0], troveSpec[1:],
                                   (None, None), False))
             elif troveSpec[0][0] == '+':
-                applyList.append((troveSpec[0], (None, None), 
+                applyList.append((troveSpec[0], (None, None),
                                   troveSpec[1:], areAbsolute))
             elif updateByDefault:
-                applyList.append((troveSpec[0], (None, None), 
+                applyList.append((troveSpec[0], (None, None),
                                   troveSpec[1:], areAbsolute))
             else:
                 applyList.append((troveSpec[0], troveSpec[1:],
@@ -140,17 +140,17 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
 
     @note: If a filename is passed as a changeSpec, and the file does not contain
     a valid conary changeset, a sys.exit() will be called.
-    
+
     @param changeSpecList: a changeSpec, such as C{foo=1.1--1.2}
     @type changeSpecList: string
 
     @param keepExisting: specifies whether an installed trove should be
     kept in addition to an updated version.
     @type keepExisting: bool
-    
+
     @param updateByDefault:
     @type updateByDefault: bool
-   
+
     @param allowChangeSets: specifies whether file-based changesets are
     allowed.
     @type allowChangeSets: bool
@@ -164,7 +164,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
     @rtype: list
     @return: a list of changes to apply, of the form
     (name, (oldVersion, oldFlavor), (newVersion, newFlavor), replaceExisting)
-    where either the old or new version/flavor (but not both) may be 
+    where either the old or new version/flavor (but not both) may be
     (None, None)
     """
     applyList = []
@@ -174,7 +174,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
 
 
     for changeSpec in changeSpecList:
-        if (allowChangeSets and os.path.exists(changeSpec) 
+        if (allowChangeSets and os.path.exists(changeSpec)
             and os.path.isfile(changeSpec)):
             applyList.append(_getChangeSet(changeSpec))
             continue
@@ -183,7 +183,7 @@ def parseChangeList(changeSpecList, keepExisting=False, updateByDefault=True,
                             updateByDefault = updateByDefault,
                             withFrozenFlavor = withFrozenFlavor))
 
-    # dedup, but keep ordering - this is a little slower but can be handy 
+    # dedup, but keep ordering - this is a little slower but can be handy
     # for lining up input -> output (if input is deduped)
     finalList = []
     for item in applyList:

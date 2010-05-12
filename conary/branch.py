@@ -63,7 +63,7 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
 
     troveSpecs = [ updatecmd.parseTroveSpec(x) for x in troveSpecs ]
 
-    componentSpecs = [ x[0] for x in troveSpecs 
+    componentSpecs = [ x[0] for x in troveSpecs
                         if (':' in x[0] and x[0].split(':')[1] != 'source')]
     if componentSpecs:
         raise errors.ParseError('Cannot branch or shadow individual components: %s' % ', '.join(componentSpecs))
@@ -110,9 +110,9 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
                   'This is not recommended\nwith this version of cvc.' \
                     % branchOps
             print
-        okay = cmdline.askYn('Continue with %s? [y/N]' % branchOps.lower(), 
+        okay = cmdline.askYn('Continue with %s? [y/N]' % branchOps.lower(),
                              default=False)
-        if not okay: 
+        if not okay:
             return
     elif (not forceBinary) and hasBinary and branchType & client.BRANCH_BINARY:
         print 'Creating binary %s is only allowed in interactive mode. ' \

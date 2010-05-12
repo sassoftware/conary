@@ -76,7 +76,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
         """
         path = posixpath.normpath(urllib.unquote(path))
-	path = path.split("?", 1)[1]
+        path = path.split("?", 1)[1]
         words = path.split('/')
         words = filter(None, words)
         path = self.tmpDir
@@ -86,9 +86,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
             if word in (os.curdir, os.pardir): continue
             path = os.path.join(path, word)
 
-	path += "-out"
+        path += "-out"
 
-	self.cleanup = path
+        self.cleanup = path
         return path
 
     def do_GET(self):
@@ -219,15 +219,15 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return httpAuthToken
 
     def checkAuth(self):
- 	if not self.headers.has_key('Authorization'):
+        if not self.headers.has_key('Authorization'):
             self.requestAuth()
             return None
-	else:
+        else:
             authToken = self.getAuth()
             if authToken is None:
                 return
 
-	return authToken
+        return authToken
 
     def requestAuth(self):
         self.send_response(401)
@@ -236,7 +236,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return None
 
     def handleXml(self, authToken):
-	contentLength = int(self.headers['Content-Length'])
+        contentLength = int(self.headers['Content-Length'])
         sio = util.BoundedStringIO()
 
         actual = util.copyStream(self.rfile, sio, contentLength)
@@ -288,19 +288,19 @@ class HttpRequests(SimpleHTTPRequestHandler):
         result = result[1:-1]
 
         sio = util.BoundedStringIO()
-	util.xmlrpcDump((result,), stream = sio, methodresponse=1)
+        util.xmlrpcDump((result,), stream = sio, methodresponse=1)
         respLen = sio.tell()
         logMe(3, "encoded xml-rpc response to %d bytes" % respLen)
 
-	self.send_response(200)
+        self.send_response(200)
         encoding = self.headers.get('Accept-encoding', '')
         if respLen > 200 and 'deflate' in encoding:
             sio.seek(0)
             sio = util.compressStream(sio, level = 5)
             respLen = sio.tell()
             self.send_header('Content-encoding', 'deflate')
-	self.send_header("Content-type", "text/xml")
-	self.send_header("Content-length", str(respLen))
+        self.send_header("Content-type", "text/xml")
+        self.send_header("Content-length", str(respLen))
         if usedAnonymous:
             self.send_header("X-Conary-UsedAnonymous", '1')
         if extraInfo:
@@ -316,7 +316,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
             self.send_header('Via', via)
 
-	self.end_headers()
+        self.end_headers()
         sio.seek(0)
         util.copyStream(sio, self.wfile)
         logMe(3, "sent response to client", respLen, "bytes")
@@ -445,8 +445,8 @@ class ServerConfig(netserver.ServerConfig):
     useSSL                  = CfgBool
 
     def __init__(self, path="serverrc"):
-	netserver.ServerConfig.__init__(self)
-	self.read(path, exception=False)
+        netserver.ServerConfig.__init__(self)
+        self.read(path, exception=False)
 
     def check(self):
         if self.closed:
@@ -505,11 +505,11 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
     argDef = {}
     cfgMap = {
         'contents-dir'  : 'contentsDir',
-	'db'	        : 'repositoryDB',
-	'log-file'	: 'logFile',
-	'map'	        : 'repositoryMap',
-	'port'	        : 'port',
-	'tmp-dir'       : 'tmpDir',
+        'db'            : 'repositoryDB',
+        'log-file'      : 'logFile',
+        'map'           : 'repositoryMap',
+        'port'          : 'port',
+        'tmp-dir'       : 'tmpDir',
         'require-sigs'  : 'requireSigs',
         'server-name'   : 'serverName'
     }
@@ -542,8 +542,8 @@ def getServer(argv = sys.argv, reqClass = HttpRequests):
         usage()
 
     if not os.path.isdir(cfg.tmpDir):
-	print cfg.tmpDir + " needs to be a directory"
-	sys.exit(1)
+        print cfg.tmpDir + " needs to be a directory"
+        sys.exit(1)
     if not os.access(cfg.tmpDir, os.R_OK | os.W_OK | os.X_OK):
         print cfg.tmpDir + " needs to allow full read/write access"
         sys.exit(1)

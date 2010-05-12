@@ -80,7 +80,7 @@ def Archive(fileObj):
         if '/' in name and len(name) > 1:
             # GNU adds trailing / to names; '/' is the name of ranlib table
             name = name.rstrip('/')
-            
+
         yield ArFile(
             name = name,
             mtime = int(hdr[16:28]),

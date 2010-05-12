@@ -424,7 +424,7 @@ class UpdateCallback(ChangesetCallback):
 
     def verifyTroveSignatures(self, trv):
         # @rtype: (int, list)
-        # @raise DigitalSignatureVerificationError: 
+        # @raise DigitalSignatureVerificationError:
 
         # Default implementation - you can override it if you want to handle
         # the exception yourself

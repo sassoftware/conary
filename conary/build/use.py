@@ -22,14 +22,14 @@
 #  +--LocalFlag
 
 # Collection
-#  | 
-#  +--UseCollection          
-#  | 
+#  |
+#  +--UseCollection
+#  |
 #  +--ArchCollection
-#  | 
+#  |
 #  +--LocalFlagCollection
 #
-# MajorArch derives from CollectionWithFlag, which is a subclass of Flag and 
+# MajorArch derives from CollectionWithFlag, which is a subclass of Flag and
 # Collection. (maybe CollectionWithFlag and MajorArch should be collapsed?)
 
 """
@@ -46,7 +46,7 @@ from conary.errors import CvcError
 
 class Flag(dict):
 
-    def __init__(self, name, parent=None, value=False, 
+    def __init__(self, name, parent=None, value=False,
                  required=True, track=False, path=None, platform=False):
         self._name = name
         self._value = value
@@ -59,7 +59,7 @@ class Flag(dict):
         self._platform = platform
 
     def __repr__(self):
-        if self._alias: 
+        if self._alias:
             return "%s (alias %s): %s" % (self._name, self._alias, self._value)
         else:
             return "%s: %s" % (self._name, self._value)
@@ -89,10 +89,10 @@ class Flag(dict):
 
     def _get(self):
         """ Grab value without tracking """
-        return self._value 
+        return self._value
 
     def _fullName(self):
-        return ('.'.join(x._name for x in self._reverseParents()) 
+        return ('.'.join(x._name for x in self._reverseParents())
                                                 + '.' + self._name)
 
     def _reverseParents(self):
@@ -105,7 +105,7 @@ class Flag(dict):
         if self._get():
             if self._required:
                 return deps.FLAG_SENSE_REQUIRED
-            else: 
+            else:
                 return deps.FLAG_SENSE_PREFERRED
         else:
             return deps.FLAG_SENSE_PREFERNOT
@@ -143,13 +143,13 @@ class Flag(dict):
         return bool(self) | other
 
     def __or__(self, other):
-	return self.__ror__(other)
+        return self.__ror__(other)
 
     def __rand__(self, other):
         return bool(self) & other
 
     def __and__(self, other):
-	return self.__rand__(other)
+        return self.__rand__(other)
 
 
 
@@ -166,34 +166,34 @@ class Collection(dict):
     def _addAlias(self, realKey, alias):
         """ Add a second way to access the given item.
             Necessary if the actual name for a flag is not a valid
-            python identifier. 
+            python identifier.
         """
         if alias in self or alias in self._attrs:
             raise RuntimeError, 'alias is already set'
         elif self[realKey]._alias:
             raise RuntimeError, 'key %s already has an alias' % realKey
         else:
-	    self._setAttr(alias, self[realKey])
+            self._setAttr(alias, self[realKey])
             self[realKey]._alias = alias
 
     def _setAttr(self, name, value):
-	""" A generic way to add a temporary attribute to this collection.
-	    Attributes stored in this manner will be removed when the 
-	    collection is cleared, but are not tracked like flags.
-	"""
-	self._attrs[name] = value
+        """ A generic way to add a temporary attribute to this collection.
+            Attributes stored in this manner will be removed when the
+            collection is cleared, but are not tracked like flags.
+        """
+        self._attrs[name] = value
 
     def _delAttr(self, name):
-	del self._attrs[name]
+        del self._attrs[name]
 
     def _getAttr(self, name):
-	return self._attrs[name]
+        return self._attrs[name]
 
     def _addFlag(self, key, *args, **kw):
-	if 'track' not in kw:
-	    kw = kw.copy()
-	    kw['track'] = self._tracking
-        dict.__setitem__(self, key, self._collectionType(key, self, 
+        if 'track' not in kw:
+            kw = kw.copy()
+            kw['track'] = self._tracking
+        dict.__setitem__(self, key, self._collectionType(key, self,
                                                          *args, **kw))
 
     def __repr__(self):
@@ -208,7 +208,7 @@ class Collection(dict):
     def _clear(self):
         for flag in self.keys():
             del self[flag]
-	for attr in self._attrs.keys():
+        for attr in self._attrs.keys():
             del self._attrs[attr]
 
     def __getattr__(self, key):
@@ -249,7 +249,7 @@ class Collection(dict):
                 yield child
 
     def _setStrictMode(self, value=True):
-        """ Strict mode determines whether you receive an error or 
+        """ Strict mode determines whether you receive an error or
             an empty flag upon accessing a nonexistant flag
         """
         self._strictMode = value
@@ -261,7 +261,7 @@ class Collection(dict):
                 yield parent
             yield self._parent
 
-    # -- Tracking Commands -- 
+    # -- Tracking Commands --
 
     def _trackUsed(self, value=True):
         self._tracking = value
@@ -273,7 +273,7 @@ class Collection(dict):
             child._resetUsed()
 
     def _getUsed(self):
-        return [ x for x in self._iterUsed() ] 
+        return [ x for x in self._iterUsed() ]
 
     def _iterUsed(self):
         for child in self.itervalues():
@@ -294,7 +294,7 @@ class CollectionWithFlag(Flag, Collection):
     def _trackUsed(self, value=True):
         Flag._trackUsed(self, value)
         Collection._trackUsed(self, value)
-        
+
     def _resetUsed(self):
         Flag._resetUsed(self)
         Collection._resetUsed(self)
@@ -311,7 +311,7 @@ class CollectionWithFlag(Flag, Collection):
             yield child
 
     def __repr__(self):
-        return "%s: %s {%s}" % (self._name, self._value, 
+        return "%s: %s {%s}" % (self._name, self._value,
                                 ', '.join((repr(x) for x in self.values())))
 
 class NoSuchUseFlagError(CvcError):
@@ -328,7 +328,7 @@ ${HOME}/.conary/use/%s, or use the --unknown-flags option on
 the command line to make conary assume that all unknown flags are
 not relevant to your system.
 """ % (self.key, self.key, self.key)
-             
+
 class NoSuchArchFlagError(CvcError):
 
     def __init__(self, key):
@@ -338,16 +338,16 @@ class NoSuchArchFlagError(CvcError):
         return """
 
 
-An unknown architecture, Arch.%s, was accessed.  The default 
-behavior of conary is to complain about the missing flag, 
-since it may be a typo.  You can add the architecture 
-/etc/conary/arch/%s or ${HOME}/.conary/arch/%s, or 
-use the --unknown-flags option on the command line to make 
-conary assume that all unknown flags are not relevant to 
+An unknown architecture, Arch.%s, was accessed.  The default
+behavior of conary is to complain about the missing flag,
+since it may be a typo.  You can add the architecture
+/etc/conary/arch/%s or ${HOME}/.conary/arch/%s, or
+use the --unknown-flags option on the command line to make
+conary assume that all unknown flags are not relevant to
 your system.
 
 """ % (self.key, self.key, self.key)
- 
+
 class NoSuchSubArchFlagError(CvcError):
 
     def __init__(self, majArch, key):
@@ -358,15 +358,15 @@ class NoSuchSubArchFlagError(CvcError):
         return """
 
 
-An unknown sub architecture, Arch.%s.%s was accessed.  The default 
-behavior of conary is to complain about the missing flag, since it 
-may be a typo.  You can add the subarchitecture /etc/conary/arch/%s 
-or $(HOME)/.conary/architecture/%s, or use the --unknown-flags 
-option on the command line to make conary assume that all unknown flags are 
-not relevant to your system.  
+An unknown sub architecture, Arch.%s.%s was accessed.  The default
+behavior of conary is to complain about the missing flag, since it
+may be a typo.  You can add the subarchitecture /etc/conary/arch/%s
+or $(HOME)/.conary/architecture/%s, or use the --unknown-flags
+option on the command line to make conary assume that all unknown flags are
+not relevant to your system.
 
 """ % (self.majArch, self.key, self.majArch, self.majArch)
- 
+
 
 
 
@@ -375,7 +375,7 @@ not relevant to your system.
 class ArchCollection(Collection):
 
     def __init__(self):
-	self._archProps = []
+        self._archProps = []
         self._collectionType = MajorArch
         Collection.__init__(self, 'Arch')
 
@@ -388,62 +388,62 @@ class ArchCollection(Collection):
             return self[key]
 
     def _setArch(self, majArch, subArches=None):
-        """ Set the current build architecture and subArches.  
-            All other architectures are set to false, and not 
-            tracked. 
+        """ Set the current build architecture and subArches.
+            All other architectures are set to false, and not
+            tracked.
         """
-	found = False
+        found = False
         for key in self:
             if key == majArch:
                 self[key]._set(True, subArches)
-		self._setArchPropValues(self[key])
-		found = True
+                self._setArchPropValues(self[key])
+                found = True
             else:
                 self[key]._set(False)
-	if not found:
-	    raise AttributeError, "No Such Arch %s" % majArch
+        if not found:
+            raise AttributeError, "No Such Arch %s" % majArch
 
     def _setArchProps(self, *archProps):
-	""" Sets the required arch properties.
+        """ Sets the required arch properties.
 
-	    archProps are flags at the Arch level that describe
-	    cross-architecture features, such as endianess or 
-	    whether the arch is 32 or 64 bit oriented. 
+            archProps are flags at the Arch level that describe
+            cross-architecture features, such as endianess or
+            whether the arch is 32 or 64 bit oriented.
 
-	    For the current definition of required archProps, see flavorCfg.
-	"""
-	for archProp in self._archProps:
-	    try:
-		self._delAttr(archProp)
-	    except KeyError:
-		pass
-	self._archProps = archProps[:]
-	for archProp in self._archProps:
+            For the current definition of required archProps, see flavorCfg.
+        """
+        for archProp in self._archProps:
+            try:
+                self._delAttr(archProp)
+            except KeyError:
+                pass
+        self._archProps = archProps[:]
+        for archProp in self._archProps:
             self._setAttr(archProp, False)
 
     def _setArchPropValues(self, majArch):
-	"""
-	    archProps are flags at the Arch level that describe
-	    cross-architecture features, such as endianess or 
-	    whether the arch is 32 or 64 bit oriented. 
-	    
-	    For the current definition of required archProps, see flavorCfg.
-	"""
-	archProps = majArch._archProps.copy()
-	extraKeys = tuple(set(archProps.keys()) - set(self._archProps))
-	missingKeys = tuple(set(self._archProps) - set(archProps.keys()))
-	if extraKeys:
-	    raise RuntimeError, \
-		'Extra arch properties %s provided by %s' % (extraKeys, majArch)
-	if missingKeys:
-	    raise RuntimeError, \
-	        'Missing arch properties %s not provided by %s' % (missingKeys,
-								   majArch)
-	for archProp, value in archProps.iteritems():
-	    self._setAttr(archProp, value)
+        """
+            archProps are flags at the Arch level that describe
+            cross-architecture features, such as endianess or
+            whether the arch is 32 or 64 bit oriented.
+
+            For the current definition of required archProps, see flavorCfg.
+        """
+        archProps = majArch._archProps.copy()
+        extraKeys = tuple(set(archProps.keys()) - set(self._archProps))
+        missingKeys = tuple(set(self._archProps) - set(archProps.keys()))
+        if extraKeys:
+            raise RuntimeError, \
+                'Extra arch properties %s provided by %s' % (extraKeys, majArch)
+        if missingKeys:
+            raise RuntimeError, \
+                'Missing arch properties %s not provided by %s' % (missingKeys,
+                                                                   majArch)
+        for archProp, value in archProps.iteritems():
+            self._setAttr(archProp, value)
 
     def _iterAll(self):
-        """ Only iterate over the current architecture.  This is 
+        """ Only iterate over the current architecture.  This is
             almost always what you want, otherwise it's easy enough
             to manually go through the architectures
         """
@@ -454,7 +454,7 @@ class ArchCollection(Collection):
 
     def _getAttr(self, name):
         currentArch = self.getCurrentArch()
-        # when getting an architecture prop like bits64, 
+        # when getting an architecture prop like bits64,
         # set the architecture flag if tracking is on
         if currentArch is not None:
             bool(currentArch)
@@ -470,7 +470,7 @@ class ArchCollection(Collection):
 
 
     def _getMacros(self):
-        """ return the macros defined by the current architecture 
+        """ return the macros defined by the current architecture
         """
         arch = self.getCurrentArch()
         if arch is None:
@@ -483,7 +483,7 @@ class ArchCollection(Collection):
                 return majarch
 
 class MajorArch(CollectionWithFlag):
-    
+
     def __init__(self, name, parent, track=False, archProps=None, macros=None,
                  platform=False):
         self._collectionType = SubArch
@@ -527,8 +527,8 @@ class MajorArch(CollectionWithFlag):
             return self[key]
 
     def _set(self, value=True, subArches=None):
-        """ Allows you to set the value of this arch, and also set the 
-            values of the subArches.  
+        """ Allows you to set the value of this arch, and also set the
+            values of the subArches.
             XXX hmmm...should there be a difference between subArches=None,
             and subArches=[]?  Maybe this is too complicated, and you should
             just have to set the subarches yourself.
@@ -565,7 +565,7 @@ class MajorArch(CollectionWithFlag):
 
 class SubArch(Flag):
 
-    def __init__(self, name, parent, track=False, subsumes=None, 
+    def __init__(self, name, parent, track=False, subsumes=None,
                  macros=None):
         if not subsumes:
             self._subsumes = []
@@ -587,9 +587,9 @@ class SubArch(Flag):
 
     def _toDependency(self, depType=deps.InstructionSetDependency):
         """ Creates a Flavor dep set with the subarch in it.
-            Also includes any subsumed subarches if the 
+            Also includes any subsumed subarches if the
             value of this subarch is true
-            (better comment about why we do that here) 
+            (better comment about why we do that here)
         """
         set = deps.Flavor()
         sense = self._getDepSense()
@@ -601,7 +601,7 @@ class SubArch(Flag):
         dep = deps.Dependency(parent._name, depFlags)
         set.addDep(depType, dep)
         return set
-        
+
 ####################### USE STUFF HERE ###########################
 
 class UseFlag(Flag):
@@ -612,7 +612,7 @@ class UseFlag(Flag):
         dep = deps.Dependency('use', depFlags)
         set.addDep(deps.UseDependency, dep)
         return set
-    
+
 
 class UseCollection(Collection):
 
@@ -630,7 +630,7 @@ class UseCollection(Collection):
 
 
 ####################### LOCALFLAG STUFF HERE ###########################
- 
+
 class LocalFlag(Flag):
 
     def __init__(self, name, parent, track=False, required=False, path=None,
@@ -646,7 +646,7 @@ class LocalFlag(Flag):
         self._override = override
 
     def _toDependency(self, recipeName):
-        depFlags =  [('.'.join((recipeName, self._name)), 
+        depFlags =  [('.'.join((recipeName, self._name)),
                                               self._getDepSense())]
         set = deps.Flavor()
         dep = deps.Dependency('use', depFlags)
@@ -671,7 +671,7 @@ class LocalFlagCollection(Collection):
             self.__dict__[key] = value
         else:
             if key not in self:
-                self._addFlag(key) 
+                self._addFlag(key)
             self[key]._set(value)
 
 ####################### Package Local Flags Here ###################
@@ -693,7 +693,7 @@ class PackageFlagCollection(Collection):
         return self[key]
 
 class PackageFlagPackageCollection(Collection):
-    
+
     def __init__(self, name, parent, track=False):
         self._collectionType = PackageFlag
         Collection.__init__(self, name, parent)
@@ -726,8 +726,8 @@ def resetUsed():
     LocalFlags._resetUsed()
 
 def clearFlags():
-    """ Remove all build flags so that the set of flags can 
-        be repopulated 
+    """ Remove all build flags so that the set of flags can
+        be repopulated
     """
     Use._clear()
     Arch._clear()
@@ -743,8 +743,8 @@ def track(value=True):
     LocalFlags._trackUsed(value)
 
 def iterAll():
-    return itertools.chain(Arch._iterAll(), 
-                           Use._iterAll(), 
+    return itertools.chain(Arch._iterAll(),
+                           Use._iterAll(),
                            LocalFlags._iterAll(),
                            PackageFlags._iterAll())
 def getUsed():
@@ -766,14 +766,14 @@ def localFlagsToFlavor(recipeName):
 
 def platformFlagsToFlavor(recipeName=None):
     flags = []
-    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(), 
+    for flag in itertools.chain(Use._iterAll(), PackageFlags._iterAll(),
                                 LocalFlags._iterAll()):
         if flag.isPlatformFlag():
             flags.append(flag)
     return createFlavor(recipeName, flags, error=False)
 
 def createFlavor(recipeName, *flagIterables, **kw):
-    """ create a dependency set consisting of all of the flags in the 
+    """ create a dependency set consisting of all of the flags in the
         given flagIterables.  Note that is a broad category that includes
         lists, iterators, etc. RecipeName is the recipe which local flags
         should be relative to, can be set to None if there are definitely
@@ -826,7 +826,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False,
                         value = True
                     else:
                         value = False
-                    # see if there is a . -- indicating this is a 
+                    # see if there is a . -- indicating this is a
                     # local flag
                     if flag == 'cross':
                         crossCompiling = True
@@ -848,7 +848,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False,
                         if recipeName:
                             if packageName == recipeName:
                                 # local flag values set from a build flavor
-                                # are overrides -- the recipe should not 
+                                # are overrides -- the recipe should not
                                 # change these values
                                 LocalFlags._override(flag, value)
                         elif error:

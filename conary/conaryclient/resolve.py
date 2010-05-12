@@ -51,7 +51,7 @@ class DependencySolver(object):
             @param resolveDeps: If True, try to resolve any dependency problems
             by modifying the given job.
             @type resolveDeps: bool
-            @param useRepos: If True, search for dependency solutions in the 
+            @param useRepos: If True, search for dependency solutions in the
             repository after searching the update job search source.
             @param keepRequired: If True, the resolver will attempt to remove
             erase jobs from the job set to resolve dependency problems
@@ -135,13 +135,13 @@ class DependencySolver(object):
         return (depList, suggMap, cannotResolve, changeSetList, keepList,
                 criticalUpdates)
 
-    def addUpdates(self, troves, uJob, jobSet, ineligible, keepList, 
+    def addUpdates(self, troves, uJob, jobSet, ineligible, keepList,
                    troveSource, resolveSource):
         """
         Add the given dep resolution solutions to the current jobSet.
         """
         # We found good suggestions, merge in those troves. Items
-        # which are being removed by the current job cannot be 
+        # which are being removed by the current job cannot be
         # removed again.
         beingRemoved = set((x[0], x[1][0], x[1][1]) for x in
                             jobSet if x[1][0] is not None )
@@ -226,7 +226,7 @@ class DependencySolver(object):
                      '   Requires:\n'
                      '     %s\n'
                      '   Provided by removed or updated packages: %s')
-                args = (reqInfo[0], reqInfo[1].trailingRevision(), depSet, 
+                args = (reqInfo[0], reqInfo[1].trailingRevision(), depSet,
                         ', '.join(x[0] for x in provInfo))
                 log.debug(msg, *args)
             if self.cfg.resolveLevel > 1:
@@ -255,11 +255,11 @@ class DependencySolver(object):
 
         return (result, cannotResolve, keepList, ineligible)
 
-    def resolveEraseByUpdating(self, trvSrc, cannotResolve, uJob, jobSet, 
+    def resolveEraseByUpdating(self, trvSrc, cannotResolve, uJob, jobSet,
                                ineligible, check):
         """
-            Attempt to resolve broken erase dependencies by updating the 
-            package that has the dependency on the trove that is being 
+            Attempt to resolve broken erase dependencies by updating the
+            package that has the dependency on the trove that is being
             erased.
             @param ineligible: Ineligible troves are troves that were
             involved in resolveEraseByUpdating before.
@@ -281,17 +281,17 @@ class DependencySolver(object):
             # provInfo = the troves that provide the dependency
 
             if reqInfo in newIdx:
-                # The thing with the requirement is something we asked 
+                # The thing with the requirement is something we asked
                 # to be installed - don't try to update it again!
                 continue
 
             found = False
             for provInfo in provInfoList:
                 if provInfo in ineligible:
-                    # The trove that we erased due to an earlier 
+                    # The trove that we erased due to an earlier
                     # resolveEraseByUpdating was required by other troves!
                     # We don't allow this process to recurse to avoid
-                    # accidentally updating your entire system due to 
+                    # accidentally updating your entire system due to
                     # a glibc update request, e.g.
                     found = True
                     break
@@ -362,7 +362,7 @@ class DependencySolver(object):
             newJobSet = set()
 
         if newJobSet:
-            log.debug('updated %s troves:\n   %s', len(newJobSet), 
+            log.debug('updated %s troves:\n   %s', len(newJobSet),
                        '\n   '.join(sorted('%s=%s/%s[%s]' % (x[0], x[2][0].branch().label(), x[2][0].trailingRevision(), x[2][1]) for x in newJobSet if x[2][0])))
 
         return cannotResolve, newJobSet
@@ -422,7 +422,7 @@ class DependencySolver(object):
                            '    Required: %s'
                            '    Keeping: %s=%s[%s]')
                     args = (reqInfo[0], reqInfo[1].trailingRevision(),
-                            reqInfo[2], depSet, 
+                            reqInfo[2], depSet,
                             job[0], job[1][0].trailingRevision(), job[1][1])
                     log.debug(msg, *args)
 
@@ -431,7 +431,7 @@ class DependencySolver(object):
 
         if self.cfg.autoResolvePackages:
            # if we're keeping any components, keep the package as well.
-           jobsByOld = dict(((x[0], x[1]), x) for x in jobSet 
+           jobsByOld = dict(((x[0], x[1]), x) for x in jobSet
                             if ':' not in x[0])
            for job in list(restoreSet):
                if ':' in job[0]:

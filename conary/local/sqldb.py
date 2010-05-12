@@ -24,7 +24,7 @@ OldDatabaseSchema = schema.OldDatabaseSchema
 
 class Tags(idtable.CachedIdTable):
     def __init__(self, db):
-	idtable.CachedIdTable.__init__(self, db, "Tags", "tagId", "tag")
+        idtable.CachedIdTable.__init__(self, db, "Tags", "tagId", "tag")
 
 class VersionCache(dict):
     def get(self, vs, ts):
@@ -60,47 +60,47 @@ class DBTroveFiles:
     def __init__(self, db):
         self.db = db
         schema.createDBTroveFiles(db)
-	self.tags = Tags(self.db)
+        self.tags = Tags(self.db)
 
     def __getitem__(self, instanceId):
-	cu = self.db.cursor()
-	cu.execute("SELECT path, stream FROM DBTroveFiles "
-		   "WHERE instanceId=? and isPresent=1", instanceId)
-	for path, stream in cu:
+        cu = self.db.cursor()
+        cu.execute("SELECT path, stream FROM DBTroveFiles "
+                   "WHERE instanceId=? and isPresent=1", instanceId)
+        for path, stream in cu:
             yield (path, stream)
 
     def getByInstanceId(self, instanceId, justPresent = True):
-	cu = self.db.cursor()
+        cu = self.db.cursor()
 
-	if justPresent:
-	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE instanceId=? and isPresent=1", instanceId)
-	else:
-	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE instanceId=?", instanceId)
+        if justPresent:
+            cu.execute("SELECT path, stream FROM DBTroveFiles "
+                       "WHERE instanceId=? and isPresent=1", instanceId)
+        else:
+            cu.execute("SELECT path, stream FROM DBTroveFiles "
+                       "WHERE instanceId=?", instanceId)
 
-	for path, stream in cu:
-	    yield (path, stream)
+        for path, stream in cu:
+            yield (path, stream)
 
     def delInstance(self, instanceId):
         cu = self.db.cursor()
- 	cu.execute("""DELETE FROM DBFileTags WHERE streamId IN
+        cu.execute("""DELETE FROM DBFileTags WHERE streamId IN
         (SELECT streamId from DBTroveFiles WHERE instanceId=?)""", instanceId)
         cu.execute("DELETE from DBTroveFiles WHERE instanceId=?", instanceId)
 
     def getFileByFileId(self, fileId, justPresent = True):
-	cu = self.db.cursor()
-	if justPresent:
-	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=? AND isPresent = 1", fileId)
-	else:
-	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=?", fileId)
-	# there could be multiple matches, but they should all be redundant
-	try:
+        cu = self.db.cursor()
+        if justPresent:
+            cu.execute("SELECT path, stream FROM DBTroveFiles "
+                       "WHERE fileId=? AND isPresent = 1", fileId)
+        else:
+            cu.execute("SELECT path, stream FROM DBTroveFiles "
+                       "WHERE fileId=?", fileId)
+        # there could be multiple matches, but they should all be redundant
+        try:
             path, stream = cu.next()
             return (path, stream)
-	except StopIteration:
+        except StopIteration:
             raise KeyError, fileId
 
     def addItem(self, cu, pathId, versionId, path, fileId, instanceId,
@@ -113,23 +113,23 @@ class DBTroveFiles:
         cu.execute(addItemSql, pathId, versionId, path, fileId, instanceId,
                     1, stream)
 
-	streamId = cu.lastrowid
+        streamId = cu.lastrowid
 
-	for tag in tags:
-	    cu.execute("INSERT INTO DBFileTags(streamId, tagId) VALUES (?, ?)",
-		       streamId, self.tags[tag])
+        for tag in tags:
+            cu.execute("INSERT INTO DBFileTags(streamId, tagId) VALUES (?, ?)",
+                       streamId, self.tags[tag])
 
     def iterPath(self, path):
         cu = self.db.cursor()
-	cu.execute("SELECT instanceId FROM DBTroveFiles WHERE "
-		   "isPresent=1 AND path=?", path)
-	for instanceId in cu:
-	    yield instanceId[0]
+        cu.execute("SELECT instanceId FROM DBTroveFiles WHERE "
+                   "isPresent=1 AND path=?", path)
+        for instanceId in cu:
+            yield instanceId[0]
 
     def removePath(self, instanceId, path):
         cu = self.db.cursor()
-	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=? "
-		   "AND instanceId=?", (path, instanceId))
+        cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=? "
+                   "AND instanceId=?", (path, instanceId))
 
     def _updatePathIdsPresent(self, instanceId, pathIdList, isPresent):
         # Max number of bound params
@@ -154,17 +154,17 @@ class DBTroveFiles:
         self._updatePathIdsPresent(instanceId, pathIdList, isPresent = 1)
 
     def iterFilesWithTag(self, tag):
-	cu = self.db.cursor()
-	cu.execute("""
-	    SELECT path FROM Tags
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT path FROM Tags
                 INNER JOIN DBFileTags ON Tags.tagId = DBFileTags.tagId
                 INNER JOIN DBTroveFiles ON
                     DBFileTags.streamId = DBTroveFiles.streamId
-		WHERE tag=? ORDER BY DBTroveFiles.path
-	""", tag)
+                WHERE tag=? ORDER BY DBTroveFiles.path
+        """, tag)
 
-	for path, in cu:
-	    yield path
+        for path, in cu:
+            yield path
 
 class DBInstanceTable:
     """
@@ -176,42 +176,42 @@ class DBInstanceTable:
         schema.createInstances(db)
 
     def iterNames(self):
-	cu = self.db.cursor()
-	cu.execute("SELECT DISTINCT troveName FROM Instances "
-		    "WHERE isPresent=1")
-	for match in cu:
-	    yield match[0]
+        cu = self.db.cursor()
+        cu.execute("SELECT DISTINCT troveName FROM Instances "
+                    "WHERE isPresent=1")
+        for match in cu:
+            yield match[0]
 
     def hasName(self, name):
-	cu = self.db.cursor()
-	cu.execute("SELECT instanceId FROM Instances "
-		   "WHERE troveName=? AND isPresent=1",
-		   name)
-	return cu.fetchone() != None
+        cu = self.db.cursor()
+        cu.execute("SELECT instanceId FROM Instances "
+                   "WHERE troveName=? AND isPresent=1",
+                   name)
+        return cu.fetchone() != None
 
     def iterByName(self, name):
-	cu = self.db.cursor()
-	cu.execute("SELECT instanceId, versionId, troveName, flavorId FROM "
-		   "Instances WHERE troveName=? AND isPresent=1", name)
- 	for match in cu:
-	    yield match
+        cu = self.db.cursor()
+        cu.execute("SELECT instanceId, versionId, troveName, flavorId FROM "
+                   "Instances WHERE troveName=? AND isPresent=1", name)
+        for match in cu:
+            yield match
 
     def addId(self, troveName, versionId, flavorId, timeStamps,
-	      isPresent = True, pinned = False):
-	assert(min(timeStamps) > 0)
-	if isPresent:
-	    isPresent = 1
-	else:
-	    isPresent = 0
+              isPresent = True, pinned = False):
+        assert(min(timeStamps) > 0)
+        if isPresent:
+            isPresent = 1
+        else:
+            isPresent = 0
 
         cu = self.db.cursor()
         cu.execute("INSERT INTO Instances(troveName, versionId, flavorId, "
                                         " timeStamps, isPresent, pinned) "
                    "VALUES (?, ?, ?, ?, ?, ?)",
                    (troveName, versionId, flavorId,
-		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
+                    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
                     pinned))
-	return cu.lastrowid
+        return cu.lastrowid
 
     def delId(self, theId):
         assert(type(theId) is int)
@@ -221,16 +221,16 @@ class DBInstanceTable:
     def getId(self, theId, justPresent = True):
         cu = self.db.cursor()
 
-	if justPresent:
-	    pres = "AND isPresent=1"
-	else:
-	    pres = ""
+        if justPresent:
+            pres = "AND isPresent=1"
+        else:
+            pres = ""
 
         cu.execute("SELECT troveName, versionId, flavorId, isPresent "
-		   "FROM Instances WHERE instanceId=? %s" % pres, theId)
-	try:
-	    return cu.next()
-	except StopIteration:
+                   "FROM Instances WHERE instanceId=? %s" % pres, theId)
+        try:
+            return cu.next()
+        except StopIteration:
             raise KeyError, theId
 
     def isPresent(self, item):
@@ -239,79 +239,79 @@ class DBInstanceTable:
                    "troveName=? AND versionId=? AND flavorId=?",
                    item)
 
-	val = cu.fetchone()
-	if not val:
-	    return 0
+        val = cu.fetchone()
+        if not val:
+            return 0
 
-	return val[0]
+        return val[0]
 
     def idIsPresent(self, instanceId):
         cu = self.db.cursor()
         cu.execute("SELECT isPresent FROM Instances WHERE "
-			"instanceId=?", instanceId)
+                        "instanceId=?", instanceId)
 
-	val = cu.fetchone()
-	if not val:
-	    return 0
+        val = cu.fetchone()
+        if not val:
+            return 0
 
-	return val[0]
+        return val[0]
 
     def setPresent(self, theId, val, pinned):
         cu = self.db.cursor()
-	cu.execute("UPDATE Instances SET isPresent=?, pinned=? WHERE instanceId=%d" 
-			% theId, val, pinned)
+        cu.execute("UPDATE Instances SET isPresent=?, pinned=? WHERE instanceId=%d"
+                        % theId, val, pinned)
 
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
                    "troveName=? AND versionId=? AND flavorId=?",
                    item)
-	return not(cu.fetchone() == None)
+        return not(cu.fetchone() == None)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
                    "troveName=? AND versionId=? AND flavorId=?",
                    item)
-	try:
-	    return cu.next()[0]
-	except StopIteration:
+        try:
+            return cu.next()[0]
+        except StopIteration:
             raise KeyError, item
 
     def get(self, item, defValue, justPresent = True):
         cu = self.db.cursor()
 
-	if justPresent:
-	    pres = " AND isPresent=1"
-	else:
-	    pres = ""
+        if justPresent:
+            pres = " AND isPresent=1"
+        else:
+            pres = ""
 
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"troveName=? AND versionId=? AND "
-			"flavorId=? %s" % pres, item)
-	item = cu.fetchone()
-	if not item:
-	    return defValue
-	return item[0]
+                        "troveName=? AND versionId=? AND "
+                        "flavorId=? %s" % pres, item)
+        item = cu.fetchone()
+        if not item:
+            return defValue
+        return item[0]
 
     def getVersion(self, instanceId):
         cu = self.db.cursor()
         cu.execute("""SELECT version, timeStamps FROM Instances
-		      INNER JOIN Versions ON
-			    Instances.versionId = Versions.versionId
-		      WHERE instanceId=?""", instanceId)
-	try:
-	    (s, t) = cu.next()
+                      INNER JOIN Versions ON
+                            Instances.versionId = Versions.versionId
+                      WHERE instanceId=?""", instanceId)
+        try:
+            (s, t) = cu.next()
             ts = [ float(x) for x in t.split(":") ]
-	    v = versions.VersionFromString(s, timeStamps=ts)
-	    return v
-	except StopIteration:
+            v = versions.VersionFromString(s, timeStamps=ts)
+            return v
+        except StopIteration:
             raise KeyError, instanceId
 
 class Flavors(idtable.IdTable):
 
     def addId(self, flavor):
-	return idtable.IdTable.addId(self, flavor.freeze())
+        return idtable.IdTable.addId(self, flavor.freeze())
 
     def __getitem__(self, flavor):
         if flavor is None:
@@ -322,10 +322,10 @@ class Flavors(idtable.IdTable):
         assert(isinstance(flavor, deps.deps.DependencySet))
         if flavor.isEmpty():
             return 0
-	return idtable.IdTable.__getitem__(self, flavor.freeze())
+        return idtable.IdTable.__getitem__(self, flavor.freeze())
 
     def getId(self, flavorId):
-	return deps.deps.ThawFlavor(idtable.IdTable.getId(self, flavorId))
+        return deps.deps.ThawFlavor(idtable.IdTable.getId(self, flavorId))
 
     def get(self, flavor, defValue):
         if flavor is None:
@@ -336,7 +336,7 @@ class Flavors(idtable.IdTable):
         assert(isinstance(flavor, deps.deps.DependencySet))
         if flavor.isEmpty():
             return 0
-	return idtable.IdTable.get(self, flavor.freeze(), defValue)
+        return idtable.IdTable.get(self, flavor.freeze(), defValue)
 
     def __delitem__(self, flavor):
         # XXX: We really should be testing for a deps.deps.Flavor
@@ -345,27 +345,27 @@ class Flavors(idtable.IdTable):
         assert(isinstance(flavor, deps.deps.DependencySet))
         if flavor.isEmpty():
             return
-	idtable.IdTable.__delitem__(self, flavor.freeze())
+        idtable.IdTable.__delitem__(self, flavor.freeze())
 
     def getItemDict(self, itemSeq):
-	cu = self.db.cursor()
+        cu = self.db.cursor()
         cu.execute("SELECT %s, %s FROM %s WHERE %s in (%s)"
                    % (self.strName, self.keyName, self.tableName, self.strName,
-		      ",".join(["'%s'" % x.freeze() for x in itemSeq])))
-	return dict(cu)
+                      ",".join(["'%s'" % x.freeze() for x in itemSeq])))
+        return dict(cu)
 
     def __init__(self, db):
-	idtable.IdTable.__init__(self, db, "Flavors", "flavorId", "flavor")
-	cu = db.cursor()
-	cu.execute("SELECT FlavorID from Flavors")
-	if cu.fetchone() == None:
-	    # reserve flavor 0 for "no flavor information"
-	    cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, NULL)")
+        idtable.IdTable.__init__(self, db, "Flavors", "flavorId", "flavor")
+        cu = db.cursor()
+        cu.execute("SELECT FlavorID from Flavors")
+        if cu.fetchone() == None:
+            # reserve flavor 0 for "no flavor information"
+            cu.execute("INSERT INTO Flavors (flavorId, flavor) VALUES (0, NULL)")
 
 class DBFlavorMap(idtable.IdMapping):
     def __init__(self, db):
-	idtable.IdMapping.__init__(self, db, "DBFlavorMap", "instanceId",
-				   "flavorId")
+        idtable.IdMapping.__init__(self, db, "DBFlavorMap", "instanceId",
+                                   "flavorId")
 
 
 class Database:
@@ -412,13 +412,13 @@ class Database:
         schema.setupTempDepTables(self.db, cu)
         schema.setupTempTables(self.db, cu)
 
-	self.troveFiles = DBTroveFiles(self.db)
-	self.instances = DBInstanceTable(self.db)
-	self.versionTable = versiontable.VersionTable(self.db)
-	self.flavors = Flavors(self.db)
-	self.flavorMap = DBFlavorMap(self.db)
-	self.depTables = deptable.DependencyTables(self.db)
-	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
+        self.troveFiles = DBTroveFiles(self.db)
+        self.instances = DBInstanceTable(self.db)
+        self.versionTable = versiontable.VersionTable(self.db)
+        self.flavors = Flavors(self.db)
+        self.flavorMap = DBFlavorMap(self.db)
+        self.depTables = deptable.DependencyTables(self.db)
+        self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
 
         self.needsCleanup = False
         self.addVersionCache = {}
@@ -430,25 +430,25 @@ class Database:
         del self.db
 
     def begin(self):
-	"""
-	Force the database to begin a transaction; this locks the database
-	so no one can touch it until a commit() or rollback().
-	"""
-	return self.db.transaction()
+        """
+        Force the database to begin a transaction; this locks the database
+        so no one can touch it until a commit() or rollback().
+        """
+        return self.db.transaction()
 
     def rollback(self):
         self.needsCleanup = False
-	self.db.rollback()
+        self.db.rollback()
 
     def iterAllTroveNames(self):
-	return self.instances.iterNames()
+        return self.instances.iterNames()
 
     def iterFindByName(self, name, pristine = False):
         instanceIds = [x[0] for x in self.instances.iterByName(name)]
         return self._iterTroves(instanceIds=instanceIds, pristine = pristine)
 
     def iterVersionByName(self, name, withFlavors):
-	cu = self.db.cursor()
+        cu = self.db.cursor()
 
         if withFlavors:
             flavorCol = "flavor"
@@ -458,15 +458,15 @@ class Database:
             flavorCol = "NULL"
             flavorClause = ""
 
-	cu.execute("""SELECT DISTINCT version, timeStamps, %s
+        cu.execute("""SELECT DISTINCT version, timeStamps, %s
                         FROM Instances NATURAL JOIN Versions
                         %s
-		        WHERE troveName='%s' AND isPresent=1"""
+                        WHERE troveName='%s' AND isPresent=1"""
                             % (flavorCol, flavorClause, name))
 
         flavors = {}
 
- 	for (match, timeStamps, flavorStr) in cu:
+        for (match, timeStamps, flavorStr) in cu:
             ts = [float(x) for x in timeStamps.split(':')]
             version = versions.VersionFromString(match, timeStamps=ts)
 
@@ -541,7 +541,7 @@ class Database:
     def trovesArePinned(self, troveList):
         """
         Get a list of which troves in troveList are pinned
-        
+
         @param troveList: a list of troves in (name, version, flavor) form
         @type troveList: list
 
@@ -550,7 +550,7 @@ class Database:
         defined in L{conary.dbstore.sqlerrors}
 
         @raises AssertionError:
-        """ 
+        """
         cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE tlList(
@@ -590,30 +590,30 @@ order by
         return results
 
     def hasByName(self, name):
-	return self.instances.hasName(name)
+        return self.instances.hasName(name)
 
     def getVersionId(self, version, cache):
-	theId = cache.get(version, None)
-	if theId:
-	    return theId
+        theId = cache.get(version, None)
+        if theId:
+            return theId
 
-	theId = self.versionTable.get(version, None)
-	if theId == None:
-	    theId = self.versionTable.addId(version)
+        theId = self.versionTable.get(version, None)
+        if theId == None:
+            theId = self.versionTable.addId(version)
 
-	cache[version] = theId
+        cache[version] = theId
 
-	return theId
+        return theId
 
     def getInstanceId(self, troveName, versionId, flavorId,
-		      timeStamps, isPresent = True):
-	theId = self.instances.get((troveName, versionId, flavorId),
-				   None)
-	if theId is None:
-	    theId = self.instances.addId(troveName, versionId, flavorId,
-					 timeStamps, isPresent = isPresent)
+                      timeStamps, isPresent = True):
+        theId = self.instances.get((troveName, versionId, flavorId),
+                                   None)
+        if theId is None:
+            theId = self.instances.addId(troveName, versionId, flavorId,
+                                         timeStamps, isPresent = isPresent)
 
-	return theId
+        return theId
 
     def _findTroveInstanceId(self, cu, name, version, flavor):
         if flavor.isEmpty():
@@ -639,79 +639,79 @@ order by
         return rows[0][0]
 
     def addTrove(self, trove, pin = False, oldTroveSpec = None):
-	cu = self.db.cursor()
+        cu = self.db.cursor()
 
-	troveName = trove.getName()
-	troveVersion = trove.getVersion()
-	troveVersionId = self.getVersionId(troveVersion, {})
-	self.addVersionCache[troveVersion] = troveVersionId
+        troveName = trove.getName()
+        troveVersion = trove.getVersion()
+        troveVersionId = self.getVersionId(troveVersion, {})
+        self.addVersionCache[troveVersion] = troveVersionId
 
         if oldTroveSpec is not None:
             oldTroveId = self._findTroveInstanceId(cu, *oldTroveSpec)
         else:
             oldTroveId = None
 
-	troveFlavor = trove.getFlavor()
+        troveFlavor = trove.getFlavor()
         if not troveFlavor.isEmpty():
-	    self.flavorsNeeded[troveFlavor] = True
+            self.flavorsNeeded[troveFlavor] = True
 
-	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
+        for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
                                                            weakRefs=True):
             if not flavor.isEmpty():
-		self.flavorsNeeded[flavor] = True
+                self.flavorsNeeded[flavor] = True
 
-	if self.flavorsNeeded:
-	    # create all of the flavor id's we'll need
-	    cu.execute("""
+        if self.flavorsNeeded:
+            # create all of the flavor id's we'll need
+            cu.execute("""
             CREATE TEMPORARY TABLE flavorsNeeded(
                 empty INTEGER,
                 flavor %(STRING)s
             )""" % self.db.keywords)
-	    for flavor in self.flavorsNeeded.keys():
-		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
-			   None, flavor.freeze())
-	    cu.execute("""
+            for flavor in self.flavorsNeeded.keys():
+                cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)",
+                           None, flavor.freeze())
+            cu.execute("""
             INSERT INTO Flavors (flavorId, flavor)
             SELECT flavorsNeeded.empty, flavorsNeeded.flavor
             FROM flavorsNeeded LEFT OUTER JOIN Flavors USING(flavor)
             WHERE Flavors.flavorId is NULL
             """)
-	    cu.execute("DROP TABLE flavorsNeeded")
-	    self.flavorsNeeded = {}
+            cu.execute("DROP TABLE flavorsNeeded")
+            self.flavorsNeeded = {}
 
-	# get all of the flavor id's we might need; this could be somewhat
-	# more efficient for an update, but it's not clear making it
-	# more efficient is actually a speedup (as we'd have to figure out
-	# which flavorId's we need). it could be that all of this code
-	# would get faster if we just added the files to a temporary table
-	# first and insert'd into the final table???
-	flavors = {}
+        # get all of the flavor id's we might need; this could be somewhat
+        # more efficient for an update, but it's not clear making it
+        # more efficient is actually a speedup (as we'd have to figure out
+        # which flavorId's we need). it could be that all of this code
+        # would get faster if we just added the files to a temporary table
+        # first and insert'd into the final table???
+        flavors = {}
         if not troveFlavor.isEmpty():
-	    flavors[troveFlavor] = True
-	for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
+            flavors[troveFlavor] = True
+        for (name, version, flavor) in trove.iterTroveList(strongRefs=True,
                                                            weakRefs=True):
-	    if not flavor.isEmpty():
-		flavors[flavor] = True
+            if not flavor.isEmpty():
+                flavors[flavor] = True
 
-	flavorMap = self.flavors.getItemDict(flavors.iterkeys())
-	del flavors
+        flavorMap = self.flavors.getItemDict(flavors.iterkeys())
+        del flavors
 
         if troveFlavor.isEmpty():
-	    troveFlavorId = 0
-	else:
-	    troveFlavorId = flavorMap[troveFlavor.freeze()]
+            troveFlavorId = 0
+        else:
+            troveFlavorId = flavorMap[troveFlavor.freeze()]
 
-	# the instance may already exist (it could be referenced by a package
-	# which has already been added, or it may be in the database as
-	# not present)
-	troveInstanceId = self.instances.get((troveName, troveVersionId,
-				    troveFlavorId), None, justPresent = False)
-	if troveInstanceId:
-	    self.instances.setPresent(troveInstanceId, 1, pinned=pin)
-	else:
-	    assert(min(troveVersion.timeStamps()) > 0)
-	    troveInstanceId = self.instances.addId(troveName, troveVersionId,
-				       troveFlavorId, troveVersion.timeStamps(),
+        # the instance may already exist (it could be referenced by a package
+        # which has already been added, or it may be in the database as
+        # not present)
+        troveInstanceId = self.instances.get((troveName, troveVersionId,
+                                    troveFlavorId), None, justPresent = False)
+        if troveInstanceId:
+            self.instances.setPresent(troveInstanceId, 1, pinned=pin)
+        else:
+            assert(min(troveVersion.timeStamps()) > 0)
+            troveInstanceId = self.instances.addId(troveName, troveVersionId,
+                                       troveFlavorId, troveVersion.timeStamps(),
                                        pinned = pin)
 
         assert(cu.execute("SELECT COUNT(*) FROM TroveTroves WHERE "
@@ -739,8 +739,8 @@ order by
                     flags |= schema.TROVE_TROVES_WEAKREF
                 if byDefault:
                     flags |= schema.TROVE_TROVES_BYDEFAULT;
-                yield (name, versionId, flavorId, 
-                       ":".join([ "%.3f" % x for x in version.timeStamps()]), 
+                yield (name, versionId, flavorId,
+                       ":".join([ "%.3f" % x for x in version.timeStamps()]),
                        flags)
 
         cu.executemany("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",
@@ -806,11 +806,11 @@ order by
                         tag %(STRING)s)""" % self.db.keywords)
 
         stmt = cu.compile("""
-                INSERT INTO NewFiles (pathId, versionId, path, fileId, 
+                INSERT INTO NewFiles (pathId, versionId, path, fileId,
                                       stream, isPresent)
                         VALUES (?, ?, ?, ?, ?, ?)""")
 
-	return (cu, troveInstanceId, stmt, oldTroveId)
+        return (cu, troveInstanceId, stmt, oldTroveId)
 
     def _sanitizeTroveCollection(self, cu, instanceId, nameHint = None):
         # examine the list of present, missing, and not inPristine troves
@@ -914,11 +914,11 @@ order by
 
     def addFile(self, troveInfo, pathId, path, fileId, fileVersion,
                 fileStream = None, isPresent = True):
-	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
-	versionId = self.getVersionId(fileVersion, self.addVersionCache)
+        (cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
+        versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
         if fileStream:
-            cu.execstmt(addFileStmt, pathId, versionId, path, fileId, 
+            cu.execstmt(addFileStmt, pathId, versionId, path, fileId,
                         fileStream, isPresent)
 
             tags = files.frozenFileTags(fileStream)
@@ -926,7 +926,7 @@ order by
             if tags:
                 cu.executemany("INSERT INTO NewFileTags VALUES (?, ?)",
                                itertools.izip(itertools.repeat(pathId), tags))
-	else:
+        else:
             cu.execute("""
               UPDATE DBTroveFiles
                   SET instanceId=?, isPresent=?, path=?, versionId=?
@@ -935,17 +935,17 @@ order by
                     pathId, oldInstanceId)
 
     def addTroveDone(self, troveInfo):
-	(cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
+        (cu, troveInstanceId, addFileStmt, oldInstanceId) = troveInfo
 
         cu.execute("""
             INSERT INTO DBTroveFiles (pathId, versionId, path, fileId,
                                       instanceId, isPresent, stream)
                         SELECT pathId, versionId, path, fileId, %d,
-                               isPresent, stream FROM NewFiles""" 
+                               isPresent, stream FROM NewFiles"""
                % troveInstanceId)
         cu.execute("""
             INSERT INTO Tags (tag) SELECT DISTINCT
-                NewFileTags.tag FROM NewFileTags 
+                NewFileTags.tag FROM NewFileTags
                 LEFT OUTER JOIN Tags USING (tag)
                 WHERE Tags.tag is NULL
         """)
@@ -1011,7 +1011,7 @@ order by
                    ExistingFiles.stream,
                    ExistingInstances.troveName, ExistingVersions.version,
                    ExistingFlavors.flavor,
-                   AddedInstances.instanceId, AddedFiles.pathId, 
+                   AddedInstances.instanceId, AddedFiles.pathId,
                    AddedFiles.stream,
                    AddedInstances.troveName,
                    AddedVersions.version, AddedFlavors.flavor
@@ -1116,12 +1116,12 @@ order by
         return replaced
 
     def getFile(self, pathId, fileId, pristine = False):
-	stream = self.troveFiles.getFileByFileId(fileId,
-						 justPresent = not pristine)[1]
-	return files.ThawFile(stream, pathId)
+        stream = self.troveFiles.getFileByFileId(fileId,
+                                                 justPresent = not pristine)[1]
+        return files.ThawFile(stream, pathId)
 
     def getFileStream(self, fileId, pristine = False):
-        return self.troveFiles.getFileByFileId(fileId, 
+        return self.troveFiles.getFileByFileId(fileId,
                                                justPresent = not pristine)[1]
 
     def findFileVersion(self, fileId):
@@ -1137,7 +1137,7 @@ order by
         return None
 
     def iterFiles(self, l):
-	cu = self.db.cursor()
+        cu = self.db.cursor()
 
         schema.resetTable(cu, 'getFilesTbl')
         cu.executemany('INSERT INTO getFilesTbl VALUES (?, ?)',
@@ -1149,7 +1149,7 @@ order by
         # millions of rows, we perform some more complicated sql.
         cu.execute("""
                 SELECT row, (SELECT stream
-                              FROM DBTroveFiles AS dbt 
+                              FROM DBTroveFiles AS dbt
                               WHERE dbt.fileId = gft.fileId LIMIT 1) AS stream
                     FROM getfilesTbl AS gft
                     WHERE stream IS NOT NULL
@@ -1157,7 +1157,7 @@ order by
 
         l2 = [ None ] * len(l)
 
-	for (row, stream) in cu:
+        for (row, stream) in cu:
             fObj = files.ThawFile(stream, l[row][0])
             assert(l[row][1] == fObj.fileId())
             l2[row] = fObj
@@ -1181,7 +1181,7 @@ order by
         toFind = {}
 
         # go through some hoops to give the same order
-        # when troves are missing - _iterTroves doesn't 
+        # when troves are missing - _iterTroves doesn't
         # handle missing troves.
         for i, instanceId in enumerate(instances):
             if instanceId is not None:
@@ -1215,7 +1215,7 @@ order by
                                 instanceId INT)
                    """ % self.db.keywords, start_transaction = False)
 
-        cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)", 
+        cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)",
                        list(enumerate(instanceIds)), start_transaction=False)
 
         if onlyDirectories:
@@ -1305,7 +1305,7 @@ order by
                                 instanceId INT)
                    """ % self.db.keywords, start_transaction = False)
 
-        cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)", 
+        cu.executemany("INSERT INTO getTrovesTbl VALUES (?, ?)",
                        list(enumerate(instanceIds)), start_transaction=False)
 
         cu.execute("""SELECT idx, troveName, version, flavor, timeStamps
@@ -1413,13 +1413,13 @@ order by
             cu.execute("CREATE TEMPORARY TABLE RemovedVersions "
                        "(rmvdVer %(PRIMARYKEY)s)" % self.db.keywords)
 
-	troveVersionId = self.versionTable[troveVersion]
-	if troveFlavor is None:
-	    troveFlavorId = 0
-	else:
-	    troveFlavorId = self.flavors[troveFlavor]
-	troveInstanceId = self.instances[(troveName, troveVersionId,
-					  troveFlavorId)]
+        troveVersionId = self.versionTable[troveVersion]
+        if troveFlavor is None:
+            troveFlavorId = 0
+        else:
+            troveFlavorId = self.flavors[troveFlavor]
+        troveInstanceId = self.instances[(troveName, troveVersionId,
+                                          troveFlavorId)]
 
         cu.execute("INSERT OR IGNORE INTO RemovedVersions "
                    "VALUES (?)", troveVersionId)
@@ -1438,39 +1438,39 @@ order by
 
         wasIn = [ x for x in cu.execute("select distinct troveTroves.instanceId from instances join trovetroves on instances.instanceid = trovetroves.includedId where troveName=? and (trovetroves.inPristine = 0 or instances.isPresent = 0)", troveName) ]
 
-	self.troveFiles.delInstance(troveInstanceId)
+        self.troveFiles.delInstance(troveInstanceId)
         cu.execute("DELETE FROM TroveTroves WHERE instanceId=?",
                    troveInstanceId)
         cu.execute("DELETE FROM TroveTroves WHERE includedId=? AND "
                    "inPristine=0", troveInstanceId)
         self.depTables.delete(self.db.cursor(), troveInstanceId)
 
-	# mark this trove as not present
-	self.instances.setPresent(troveInstanceId, 0, False)
+        # mark this trove as not present
+        self.instances.setPresent(troveInstanceId, 0, False)
 
         for x, in wasIn:
             self._sanitizeTroveCollection(cu, x, nameHint = troveName)
 
     def commit(self):
-	if self.needsCleanup:
-	    # this join could be slow; it would be much better if we could
-	    # restrict the select on Instances by instanceId, but that's
-	    # not so easy and may require multiple passes (since we may
-	    # now be able to remove a trove which was included by a trove
-	    # which was included by a trove which was removed; getting that
-	    # closure may have to be iterative?). that process may be faster
-	    # then the full join?
+        if self.needsCleanup:
+            # this join could be slow; it would be much better if we could
+            # restrict the select on Instances by instanceId, but that's
+            # not so easy and may require multiple passes (since we may
+            # now be able to remove a trove which was included by a trove
+            # which was included by a trove which was removed; getting that
+            # closure may have to be iterative?). that process may be faster
+            # then the full join?
             # NOTE: if we could assume that we have weak references this
             # would be a two-step process
             cu = self.db.cursor()
 
-            cu.execute("""DELETE FROM TroveInfo WHERE 
+            cu.execute("""DELETE FROM TroveInfo WHERE
                     instanceId IN (
                         SELECT Instances.instanceId FROM Instances
                         WHERE isPresent = 0)
                       """)
 
-            cu.execute("""DELETE FROM Instances WHERE 
+            cu.execute("""DELETE FROM Instances WHERE
                     instanceId IN (
                         SELECT Instances.instanceId
                         FROM
@@ -1489,11 +1489,11 @@ order by
                                     Instances.versionId is NULL AND
                                     DBTroveFiles.versionId is NULL)""")
             cu.execute("DROP TABLE RemovedVersions")
-	    self.needsCleanup = False
+            self.needsCleanup = False
 
-	self.db.commit()
-	self.addVersionCache = {}
-	self.flavorsNeeded = {}
+        self.db.commit()
+        self.addVersionCache = {}
+        self.flavorsNeeded = {}
 
     def dependencyChecker(self, troveSource, findOrdering = True,
                           ignoreDepClasses = set()):
@@ -1502,14 +1502,14 @@ order by
                                           ignoreDepClasses = ignoreDepClasses)
 
     def pathIsOwned(self, path):
-	for instanceId in self.troveFiles.iterPath(path):
-	    if self.instances.idIsPresent(instanceId):
-		return True
+        for instanceId in self.troveFiles.iterPath(path):
+            if self.instances.idIsPresent(instanceId):
+                return True
 
-	return False
+        return False
 
     def iterFindByPath(self, path, pristine = False):
-	return self._iterTroves(instanceIds=self.troveFiles.iterPath(path),
+        return self._iterTroves(instanceIds=self.troveFiles.iterPath(path),
                                 pristine=pristine)
 
     def pathsOwned(self, pathList):
@@ -1569,17 +1569,17 @@ order by
                 yield (name, version, flavor, pathId, fileId)
 
     def removeFileFromTrove(self, trove, path):
-	versionId = self.versionTable[trove.getVersion()]
+        versionId = self.versionTable[trove.getVersion()]
         flavorId = self.flavors[trove.getFlavor()]
-	instanceId = self.instances[(trove.getName(), versionId, flavorId)]
-	self.troveFiles.removePath(instanceId, path)
+        instanceId = self.instances[(trove.getName(), versionId, flavorId)]
+        self.troveFiles.removePath(instanceId, path)
 
     def removePathIdsFromTrove(self, troveName, troveVersion, troveFlavor,
                                pathIdList):
-	versionId = self.versionTable[troveVersion]
+        versionId = self.versionTable[troveVersion]
         flavorId = self.flavors[troveFlavor]
-	instanceId = self.instances[(troveName, versionId, flavorId)]
-	self.troveFiles.removePathIds(instanceId, pathIdList)
+        instanceId = self.instances[(troveName, versionId, flavorId)]
+        self.troveFiles.removePathIds(instanceId, pathIdList)
 
     def restorePathIdsToTrove(self, troveName, troveVersion, troveFlavor,
                               pathIdList):
@@ -1590,43 +1590,43 @@ order by
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
-			 pristine = False):
-	if sortByPath:
-	    sort = " ORDER BY path"
-	else:
-	    sort =""
-	cu = self.db.cursor()
+                         pristine = False):
+        if sortByPath:
+            sort = " ORDER BY path"
+        else:
+            sort =""
+        cu = self.db.cursor()
 
-	troveVersionId = self.versionTable[version]
+        troveVersionId = self.versionTable[version]
         if flavor.isEmpty():
-	    troveFlavorId = 0
-	else:
-	    troveFlavorId = self.flavors[flavor]
-	troveInstanceId = self.instances[(troveName, troveVersionId,
-					  troveFlavorId)]
-	versionCache = {}
+            troveFlavorId = 0
+        else:
+            troveFlavorId = self.flavors[flavor]
+        troveInstanceId = self.instances[(troveName, troveVersionId,
+                                          troveFlavorId)]
+        versionCache = {}
 
-	if pristine:
-	    cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
-		       "DBTroveFiles WHERE instanceId = ? "
-		       "%s" % sort, troveInstanceId)
-	else:
-	    cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
-		       "DBTroveFiles WHERE instanceId = ? "
-		       "AND isPresent=1 %s" % sort, troveInstanceId)
+        if pristine:
+            cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
+                       "DBTroveFiles WHERE instanceId = ? "
+                       "%s" % sort, troveInstanceId)
+        else:
+            cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
+                       "DBTroveFiles WHERE instanceId = ? "
+                       "AND isPresent=1 %s" % sort, troveInstanceId)
 
-	versionCache = {}
-	for (pathId, path, fileId, versionId, stream) in cu:
-	    version = versionCache.get(versionId, None)
-	    if not version:
-		version = self.versionTable.getBareId(versionId)
-		versionCache[versionId] = version
+        versionCache = {}
+        for (pathId, path, fileId, versionId, stream) in cu:
+            version = versionCache.get(versionId, None)
+            if not version:
+                version = self.versionTable.getBareId(versionId)
+                versionCache[versionId] = version
 
-	    if withFiles:
-		fileObj = files.ThawFile(stream, pathId)
-		yield (pathId, path, fileId, version, fileObj)
-	    else:
-		yield (pathId, path, fileId, version)
+            if withFiles:
+                fileObj = files.ThawFile(stream, pathId)
+                yield (pathId, path, fileId, version, fileObj)
+            else:
+                yield (pathId, path, fileId, version)
 
     def mapPinnedTroves(self, mapList):
         if not mapList:
@@ -1642,7 +1642,7 @@ order by
             mappedTimestamps %(STRING)s,
             mappedFlavor     %(STRING)s
         ) """ % self.db.keywords)
-        
+
         def _iter(ml):
             for (name, pinnedInfo, mapInfo) in ml:
                 assert(sum(mapInfo[0].timeStamps()) > 0)
@@ -1728,7 +1728,7 @@ order by
             for idx, info in enumerate(infoList):
                 resultList.append([])
                 yield (idx, info[0], info[1].asString(), info[2].freeze())
-        cu.executemany("INSERT INTO ftc VALUES(?, ?, ?, ?)", 
+        cu.executemany("INSERT INTO ftc VALUES(?, ?, ?, ?)",
                        _iter(l, result), start_transaction = False)
 
         if included:
@@ -1885,12 +1885,12 @@ order by
 
     def iterUpdateContainerInfo(self, troveNames=None):
         """
-            Returns information about troves and their containers that should 
-            be enough to determine what local updates have been made to the 
+            Returns information about troves and their containers that should
+            be enough to determine what local updates have been made to the
             system.
 
             If troveNames are specified, returns enough information to be
-            used to determine what local updates have been made to the 
+            used to determine what local updates have been made to the
             given troves.
 
             Yields ((name, version, flavor), parentInfo, isPresent)
@@ -1900,9 +1900,9 @@ order by
         cu = self.db.cursor()
 
         if troveNames:
-            # Return information needed for determining local updates 
-            # concerning the given troves only.  To do that, we need a 
-            # list of all troves that could potentially affect whether this 
+            # Return information needed for determining local updates
+            # concerning the given troves only.  To do that, we need a
+            # list of all troves that could potentially affect whether this
             # trove is an update - that all parents of these troves
             # and all troves with the same name as the parents of these troves.
             cu.execute("CREATE TEMPORARY TABLE tmpInst(instanceId INT)",
@@ -1912,7 +1912,7 @@ order by
                 """INSERT INTO tmpInst SELECT instanceId FROM Instances
                 WHERE troveName = ?""", troveNames, start_transaction = False)
             # Summary, Insert into this tmpInst all troves that are parents
-            # of the troves already in tmpIst + all troves with the same 
+            # of the troves already in tmpIst + all troves with the same
             # name.
             cu.execute('''
                 INSERT INTO tmpInst
@@ -1979,14 +1979,14 @@ order by
             2. We only want parents that are pristine
          */
         WHERE (NotReferenced.instanceId IS NULL
-              AND (TroveTroves.inPristine=1 
+              AND (TroveTroves.inPristine=1
                     OR TroveTroves.inPristine is NULL)
               )
         """ % fromClause)
 
         versionCache = VersionCache()
         flavorCache = FlavorCache()
-        for (isPresent, name, versionStr, timeStamps, flavorStr, 
+        for (isPresent, name, versionStr, timeStamps, flavorStr,
              parentName, parentVersionStr, parentTimeStamps, parentFlavor,
              flags) in cu:
             if parentName:
@@ -2051,13 +2051,13 @@ order by
         return r
 
     def getPathHashesForTroveList(self, troveList):
-        """ 
+        """
             Returns the pathHashes for the given trove list.
         """
         return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_PATH_HASHES)
 
     def getTroveScripts(self, troveList):
-        """ 
+        """
             Returns the trove scripts for the given trove list. None is
             returned for troves with no scripts. Returns a list of
             trove.TroveScripts objects.
@@ -2147,8 +2147,8 @@ order by
             flavorArgs = []
 
         cu.execute("""
-                SELECT data FROM Instances 
-                    JOIN Versions USING (versionId) 
+                SELECT data FROM Instances
+                    JOIN Versions USING (versionId)
                     JOIN Flavors ON
                         Instances.flavorId = Flavors.flavorId
                     JOIN TroveInfo ON
@@ -2157,14 +2157,14 @@ order by
                     infoType = ? AND
                     troveName = ? AND
                     version = ? AND
-                    %s""" % flavorStr, 
+                    %s""" % flavorStr,
                         [trove._TROVEINFO_TAG_INCOMPLETE,
                          name, str(version)] + flavorArgs)
         frzIncomplete = cu.next()[0]
         return streams.ByteStream(frzIncomplete)() != 0
 
     def iterFilesWithTag(self, tag):
-	return self.troveFiles.iterFilesWithTag(tag)
+        return self.troveFiles.iterFilesWithTag(tag)
 
     def getTrovesWithProvides(self, depSetList):
         return self.depTables.getLocalProvides(depSetList)
@@ -2183,9 +2183,9 @@ order by
                        start_transaction = False)
         cu.execute("""
                 SELECT Instances.troveName, version, flavor, isPresent,
-                       timeStamps, TroveTroves.flags, TroveTroves.inPristine 
+                       timeStamps, TroveTroves.flags, TroveTroves.inPristine
                     FROM
-                    gcts LEFT OUTER JOIN Instances 
+                    gcts LEFT OUTER JOIN Instances
                         USING (troveName)
                     JOIN Versions
                         USING(versionId)
@@ -2227,9 +2227,9 @@ order by
         referencedStrong = set(referencedStrong)
         installedAndReferenced = set(installedAndReferenced)
 
-        return (set(installedNotReferenced) - installedAndReferenced, 
-                installedAndReferenced, 
-                referencedStrong, 
+        return (set(installedNotReferenced) - installedAndReferenced,
+                installedAndReferenced,
+                referencedStrong,
                 set(referencedWeak) - referencedStrong)
 
     def getMissingPathIds(self, name, version, flavor):
@@ -2304,5 +2304,5 @@ order by
         return counter
 
     def close(self):
-	self.db.close()
+        self.db.close()
 

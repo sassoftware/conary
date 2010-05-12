@@ -1,6 +1,6 @@
 #
 # This file is a modified copy of the glob.py module distributed as part of
-# python 2.3. As such, it is licensed under the Python Software Foundation 
+# python 2.3. As such, it is licensed under the Python Software Foundation
 # license agreement, which can be found at www.python.org.
 #
 """Filename globbing utility."""
@@ -32,15 +32,15 @@ def glob(pathname):
         for dirname in list:
             if basename or os.path.isdir(dirname):
                 name = os.path.join(dirname, basename)
-		try:
-		    os.lstat(name)
-		except OSError, err:
+                try:
+                    os.lstat(name)
+                except OSError, err:
                     # if the file does not exist, or if an element of the
                     # path to the file is not a directory, ignore the error
                     if err.errno != errno.ENOENT and err.errno != errno.ENOTDIR:
-			raise
-		else:
-		    result.append(name)
+                        raise
+                else:
+                    result.append(name)
     else:
         result = []
         for dirname in list:

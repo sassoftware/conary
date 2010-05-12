@@ -341,7 +341,7 @@ def createLatest(db, withIndexes = True):
         db.createIndex("LatestCache", "LC_versionId_fk", "versionId")
         if createTrigger(db, "LatestCache"):
             commit = True
-    
+
     # a cache table for netauth.checktrove calls for use in SQL
     if commit:
         db.loadSchema()
@@ -1309,7 +1309,7 @@ def setupTempTables(db):
             versionId           INTEGER NOT NULL,
             filePathId          INTEGER NOT NULL,
             streamId            INTEGER NOT NULL,
-            finalTimestamp      NUMERIC(13,3) NOT NULL      
+            finalTimestamp      NUMERIC(13,3) NOT NULL
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tempTables["tmpPathIdLookup"] = True
 
@@ -1360,7 +1360,7 @@ def createSchema(db, commit=True):
     createEntitlements(db)
     createPGPKeys(db)
     createAccessMaps(db)
-    
+
     createChangeLog(db)
     createLatest(db)
 
@@ -1386,7 +1386,7 @@ def lockCommits(db):
     # server config has to be set to a reasonable value
     cu.execute("update CommitLock set lockName = lockName")
     return True
-    
+
 # this should only check for the proper schema version. This function
 # is called usually from the multithreaded setup, so schema operations
 # should be avoided here
@@ -1401,7 +1401,7 @@ def checkVersion(db):
         Your database schema is not initalized or it is too old.  Please
         run the standalone server with the --migrate argument to
         upgrade/initialize the database schema for the Conary Repository.
-        
+
         Current schema version is %s; Required schema version is %s.
         """ % (version, VERSION), version)
 

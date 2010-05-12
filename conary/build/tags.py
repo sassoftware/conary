@@ -26,7 +26,7 @@ class CfgImplementsItem(CfgEnum):
     validValueDict = {'files':   ('update', 'preremove', 'remove',
                                   'preupdate'),
                       'handler': ('update', 'preremove'),
-		      'description':  ('update', 'preremove')}
+                      'description':  ('update', 'preremove')}
 
     def __init__(self):
         validValues = []
@@ -36,14 +36,14 @@ class CfgImplementsItem(CfgEnum):
         CfgEnum.__init__(self)
 
     def checkEntry(self, val):
-	if val.find(" ") < 0:
+        if val.find(" ") < 0:
             raise ParseError, \
                 'missing type/action in "implements %s"' %val
         CfgEnum.checkEntry(self, val)
         # XXX missing check for description here
 
 CfgImplements = CfgList(CfgImplementsItem)
-        
+
 
 class CfgDataSource(CfgEnum):
     validValues = ['args', 'stdin', 'multitag' ]
@@ -65,23 +65,23 @@ class TagFile(ConfigFile):
     description       = CfgString
     datasource        = (CfgDataSource, 'args')
     implements        = CfgImplements
-  
+
     def __init__(self, filename, macros = {}, warn=False):
-	ConfigFile.__init__(self)
+        ConfigFile.__init__(self)
         self.addConfigOption('include', CfgCallBack(self.filterCB, 'include'))
         self.addConfigOption('exclude', CfgCallBack(self.filterCB, 'exclude'))
 
-	self.tag = os.path.basename(filename)
-	self.tagFile = filename
-	self.macros = macros
-	self.filterlist = []
-	self.read(filename, exception=True)
-	if 'implements' in self.__dict__:
-	    for item in self.__dict__['implements']:
-		if item.find(" ") < 0:
-		    raise ParseError, \
-			'missing type/action in "implements %s"' %item
-		key, val = item.split(" ")
+        self.tag = os.path.basename(filename)
+        self.tagFile = filename
+        self.macros = macros
+        self.filterlist = []
+        self.read(filename, exception=True)
+        if 'implements' in self.__dict__:
+            for item in self.__dict__['implements']:
+                if item.find(" ") < 0:
+                    raise ParseError, \
+                        'missing type/action in "implements %s"' %item
+                key, val = item.split(" ")
                 # deal with self->handler protocol change
                 if key == 'description':
                     if warn:
@@ -93,26 +93,26 @@ class TagFile(ConfigFile):
 
 
     def match(self, filename):
-	for keytype, filter in self.filterlist:
-	    if filter.match(filename):
-		if keytype == EXCLUDE:
-		    return False
-		else:
-		    return True
-	return False
+        for keytype, filter in self.filterlist:
+            if filter.match(filename):
+                if keytype == EXCLUDE:
+                    return False
+                else:
+                    return True
+        return False
 
 def loadTagDict(dirPath):
     d = {}
     try:
-	files = os.listdir(dirPath)
+        files = os.listdir(dirPath)
     except OSError:
-	return {}
+        return {}
 
     for path in files:
         # ignore hidden files
         if path.startswith('.'):
             continue
-	c = TagFile(os.path.join(dirPath, path))
-	d[c.tag] = c
+        c = TagFile(os.path.join(dirPath, path))
+        d[c.tag] = c
 
     return d

@@ -53,7 +53,7 @@ from conary.lib.formattrace import formatTrace
 def normpath(path):
     s = os.path.normpath(path)
     if s.startswith(os.sep + os.sep):
-	return s[1:]
+        return s[1:]
     return s
 
 def realpath(path):
@@ -225,7 +225,7 @@ def genExcepthook(debug=True,
                 cmd = cmd[:len('/commands/conary')] + '/bin/conary'
             elif cmd.endswith('/commands/cvc'):
                 cmd = cmd[:len('/commands/cvc')] + '/bin/cvc'
-                
+
             origTb = tb
             cmd = normpath(cmd)
             sys.argv[0] = cmd
@@ -251,14 +251,14 @@ def genExcepthook(debug=True,
 
 def _handle_rc(rc, cmd):
     if rc:
-	if not os.WIFEXITED(rc):
-	    info = 'Shell command "%s" killed with signal %d' \
-		    %(cmd, os.WTERMSIG(rc))
-	if os.WEXITSTATUS(rc):
-	    info = 'Shell command "%s" exited with exit code %d' \
-		    %(cmd, os.WEXITSTATUS(rc))
+        if not os.WIFEXITED(rc):
+            info = 'Shell command "%s" killed with signal %d' \
+                    %(cmd, os.WTERMSIG(rc))
+        if os.WEXITSTATUS(rc):
+            info = 'Shell command "%s" exited with exit code %d' \
+                    %(cmd, os.WEXITSTATUS(rc))
         log.error(info)
-	raise RuntimeError, info
+        raise RuntimeError, info
 
 def execute(cmd, destDir=None, verbose=True):
     """
@@ -283,7 +283,7 @@ class popen:
     """
     # unfortunately, can't derive from os.popen.  Add methods as necessary.
     def __init__(self, *args):
-	self.p = os.popen(*args)
+        self.p = os.popen(*args)
         self.write = self.p.write
         self.read = self.p.read
         self.readline = self.p.readline
@@ -291,8 +291,8 @@ class popen:
         self.writelines = self.p.writelines
 
     def close(self, *args):
-	rc = self.p.close(*args)
-	_handle_rc(rc, self.p.name)
+        rc = self.p.close(*args)
+        _handle_rc(rc, self.p.name)
         return rc
 
 # string extensions
@@ -301,10 +301,10 @@ def find(s, subs, start=0):
     ret = -1
     found = None
     for sub in subs:
-	this = string.find(s, sub, start)
-	if this > -1 and ( ret < 0 or this < ret):
-	    ret = this
-	    found = s[this:this+1]
+        this = string.find(s, sub, start)
+        if this > -1 and ( ret < 0 or this < ret):
+            ret = this
+            found = s[this:this+1]
     return (ret, found)
 
 def literalRegex(s):
@@ -500,47 +500,47 @@ def braceGlob(paths):
     """
     pathlist = []
     for path in braceExpand(paths):
-	pathlist.extend(fixedglob.glob(path))
+        pathlist.extend(fixedglob.glob(path))
     return pathlist
 
 @api.developerApi
 def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
-	log.debug('deleting [tree] %s', path)
-	# act more like rm -rf -- allow files, too
-	if (os.path.islink(path) or
+        log.debug('deleting [tree] %s', path)
+        # act more like rm -rf -- allow files, too
+        if (os.path.islink(path) or
                 (os.path.exists(path) and not os.path.isdir(path))):
-	    os.remove(path)
-	else:
-	    os.path.walk(path, _permsVisit, None)
-	    shutil.rmtree(path, ignore_errors, onerror)
+            os.remove(path)
+        else:
+            os.path.walk(path, _permsVisit, None)
+            shutil.rmtree(path, ignore_errors, onerror)
 
 def _permsVisit(arg, dirname, names):
     for name in names:
-	path = dirname + os.sep + name
-	mode = os.lstat(path)[stat.ST_MODE]
-	# has to be executable to cd, readable to list, writeable to delete
-	if stat.S_ISDIR(mode) and (mode & 0700) != 0700:
-	    log.warning("working around illegal mode 0%o at %s", mode, path)
-	    mode |= 0700
-	    os.chmod(path, mode)
+        path = dirname + os.sep + name
+        mode = os.lstat(path)[stat.ST_MODE]
+        # has to be executable to cd, readable to list, writeable to delete
+        if stat.S_ISDIR(mode) and (mode & 0700) != 0700:
+            log.warning("working around illegal mode 0%o at %s", mode, path)
+            mode |= 0700
+            os.chmod(path, mode)
 
 def remove(paths, quiet=False):
     for path in braceGlob(paths):
-	if os.path.isdir(path) and not os.path.islink(path):
-	    log.warning('Not removing directory %s', path)
-	elif os.path.exists(path) or os.path.islink(path):
+        if os.path.isdir(path) and not os.path.islink(path):
+            log.warning('Not removing directory %s', path)
+        elif os.path.exists(path) or os.path.islink(path):
             if not quiet:
                 log.debug('deleting [file] %s', path)
-	    os.remove(path)
-	else:
-	    log.warning('file %s does not exist when attempting to delete [file]', path)
+            os.remove(path)
+        else:
+            log.warning('file %s does not exist when attempting to delete [file]', path)
 
 def copyfile(sources, dest, verbose=True):
     for source in braceGlob(sources):
-	if verbose:
-	    log.info('copying %s to %s', source, dest)
-	shutil.copy2(source, dest)
+        if verbose:
+            log.info('copying %s to %s', source, dest)
+        shutil.copy2(source, dest)
 
 def copyfileobj(source, dest, callback = None, digest = None,
                 abortCheck = None, bufSize = 128*1024, rateLimit = None,
@@ -599,7 +599,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if now == starttime:
             rate = 0 # don't bother limiting download until now > starttime.
         else:
-            rate = copied / ((now - starttime)) 
+            rate = copied / ((now - starttime))
 
         if callback:
             callback(total, rate)
@@ -614,8 +614,8 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
 def rename(sources, dest):
     for source in braceGlob(sources):
-	log.debug('renaming %s to %s', source, dest)
-	os.rename(source, dest)
+        log.debug('renaming %s to %s', source, dest)
+        os.rename(source, dest)
 
 def _copyVisit(arg, dirname, names):
     sourcelist = arg[0]
@@ -624,12 +624,12 @@ def _copyVisit(arg, dirname, names):
     filemode = arg[3]
     dirmode = arg[4]
     if dirmode:
-	os.chmod(dirname, dirmode)
+        os.chmod(dirname, dirmode)
     for name in names:
-	if filemode:
-	    os.chmod(dirname+os.sep+name, filemode)
-	sourcelist.append(os.path.normpath(
-	    dest + os.sep + dirname[sourcelen:] + os.sep + name))
+        if filemode:
+            os.chmod(dirname+os.sep+name, filemode)
+        sourcelist.append(os.path.normpath(
+            dest + os.sep + dirname[sourcelen:] + os.sep + name))
 
 def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     """
@@ -638,26 +638,26 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     """
     sourcelist = []
     for source in braceGlob(sources):
-	if os.path.isdir(source):
-	    if source[-1] == '/':
-		source = source[:-1]
-	    thisdest = '%s%s%s' %(dest, os.sep, os.path.basename(source))
-	    log.debug('copying [tree] %s to %s', source, thisdest)
-	    shutil.copytree(source, thisdest, symlinks)
-	    if dirmode:
-		os.chmod(thisdest, dirmode)
-	    os.path.walk(source, _copyVisit,
-			 (sourcelist, len(source), thisdest, filemode, dirmode))
-	else:
-	    log.debug('copying [file] %s to %s', source, dest)
-	    shutil.copy2(source, dest)
-	    if dest.endswith(os.sep):
-		thisdest = dest + os.sep + os.path.basename(source)
-	    else:
-		thisdest = dest
-	    if filemode:
-		os.chmod(thisdest, filemode)
-	    sourcelist.append(thisdest)
+        if os.path.isdir(source):
+            if source[-1] == '/':
+                source = source[:-1]
+            thisdest = '%s%s%s' %(dest, os.sep, os.path.basename(source))
+            log.debug('copying [tree] %s to %s', source, thisdest)
+            shutil.copytree(source, thisdest, symlinks)
+            if dirmode:
+                os.chmod(thisdest, dirmode)
+            os.path.walk(source, _copyVisit,
+                         (sourcelist, len(source), thisdest, filemode, dirmode))
+        else:
+            log.debug('copying [file] %s to %s', source, dest)
+            shutil.copy2(source, dest)
+            if dest.endswith(os.sep):
+                thisdest = dest + os.sep + os.path.basename(source)
+            else:
+                thisdest = dest
+            if filemode:
+                os.chmod(thisdest, filemode)
+            sourcelist.append(thisdest)
     return sourcelist
 
 def checkPath(binary, root=None):
@@ -667,7 +667,7 @@ def checkPath(binary, root=None):
     """
     path = os.environ.get('PATH', '')
     if binary[0] == '/':
-        # handle case where binary starts with / seperately 
+        # handle case where binary starts with / seperately
         # because os.path.join will not do the right
         # thing with root set.
         if root:
@@ -713,10 +713,10 @@ def splitPath(path):
 
 def assertIteratorAtEnd(iter):
     try:
-	iter.next()
-	raise AssertionError
+        iter.next()
+        raise AssertionError
     except StopIteration:
-	return True
+        return True
 
 ref = weakref.ref
 class ObjectCache(dict):
@@ -765,7 +765,7 @@ def memusage(pid = None):
         pfn = "/proc/%d/statm" % pid
     line = open(pfn).readline()
     # Assume page size is 4k (true for i386). This can be adjusted by reading
-    # resource.getpagesize() 
+    # resource.getpagesize()
     arr = [ 4 * int(x) for x in line.split()[:6] ]
     vmsize, vmrss, vmshared, text, lib, data = arr
 
@@ -1129,11 +1129,11 @@ class SeekableNestedFile:
         else:
             readPos = offset
 
-	if bytes < 0 or (self.end - readPos) <= bytes:
-	    # return the rest of the file
-	    count = self.end - readPos
-	    newPos = self.end
-	else:
+        if bytes < 0 or (self.end - readPos) <= bytes:
+            # return the rest of the file
+            count = self.end - readPos
+            newPos = self.end
+        else:
             count = bytes
             newPos = readPos + bytes
 
@@ -1406,7 +1406,7 @@ class _LazyFile(object):
 
 class LazyFileCache:
     """An object tracking open files. It will serve file-like objects that get
-    closed behind the scene (and reopened on demand) if the number of open 
+    closed behind the scene (and reopened on demand) if the number of open
     files in the current process exceeds a threshold.
     The objects will close automatically when they fall out of scope.
     """
@@ -1420,7 +1420,7 @@ class LazyFileCache:
         # Counter used for hashing
         self._fdCounter = 0
         self._fdMap = {}
-    
+
     @api.publicApi
     def open(self, path, mode="r"):
         """
@@ -2096,7 +2096,7 @@ def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
     when re-throwing a re-thrown exception so that the intermediate
     class is not prepended to a value that already has the original
     class name in it.
-    
+
     @param newClassOrInstance: Class of the new exception to be thrown,
         or the exact exception instance to be thrown.
     @type  newClass: subclass or instance of Exception
@@ -2224,7 +2224,7 @@ class GzipFile(gzip.GzipFile):
         # stored is the true file size mod 2**32.
         #self.fileobj.seek(-8, 1)
         crc32, isize = struct.unpack("<LL", eof)
-        
+
         actualCrc = (self.crc & 0xffffffff)
         if crc32 != actualCrc:
             raise IOError("CRC check failed %s != %s" % (hex(crc32),

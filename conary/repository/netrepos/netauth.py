@@ -735,7 +735,7 @@ class NetworkAuthorization:
         for letter in name:
             if letter not in nameCharacterSet:
                 raise errors.InvalidName(name)
-        
+
     def addUserByMD5(self, user, salt, password):
         self.log(3, user)
         self._checkValidName(user)
@@ -911,7 +911,7 @@ class NetworkAuthorization:
 
     def addRoleMember(self, role, userName, commit = True):
         cu = self.db.cursor()
-        # we do this in multiple select to let us generate the proper 
+        # we do this in multiple select to let us generate the proper
         # exceptions when the names don't xist
         roleId = self._getRoleIdByName(role)
         userId = self.userAuth.getUserIdByName(userName)
@@ -963,9 +963,9 @@ class NetworkAuthorization:
         # verify that the user has permission to change this entitlement
         # group
         cu.execute("""
-            SELECT entGroupId FROM EntitlementGroups 
+            SELECT entGroupId FROM EntitlementGroups
                 JOIN EntitlementOwners USING (entGroupId)
-                WHERE 
+                WHERE
                     ownerGroupId IN (%s)
                   AND
                     entGroup = ?
@@ -1173,7 +1173,7 @@ class NetworkAuthorization:
             # XXX gafton said he'd clean this up
             cu.execute("""SELECT entGroup FROM EntitlementOwners
                             JOIN EntitlementGroups USING (entGroupId)
-                            WHERE ownerGroupId IN (%s)""" % 
+                            WHERE ownerGroupId IN (%s)""" %
                        ",".join([ "%d" % x for x in roleIds ]))
 
         return [ x[0] for x in cu ]
@@ -1216,7 +1216,7 @@ class NetworkAuthorization:
         # this would be faster with temporary tables; I doubt it matters
         # XXX gafton said he'd clean this up
         cu.execute("""SELECT entGroup, entGroupId FROM EntitlementGroups
-                      WHERE entGroup IN (%s)""" % 
+                      WHERE entGroup IN (%s)""" %
                    ",".join([ "'%s'" % x for x in classInfo ]))
         entClassMap = dict(x for x in cu)
         if len(entClassMap) != len(classInfo):
@@ -1226,7 +1226,7 @@ class NetworkAuthorization:
         rolesNeeded = set(itertools.chain(*classInfo.itervalues()))
         if rolesNeeded:
             cu.execute("""SELECT userGroup, userGroupId FROM UserGroups
-                              WHERE userGroup IN (%s)""" % 
+                              WHERE userGroup IN (%s)""" %
                        ",".join([ "'%s'" % x for x in rolesNeeded ]))
             roleMap = dict(x for x in cu)
         else:

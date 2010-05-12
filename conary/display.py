@@ -40,7 +40,7 @@ def jobKey(x):
 
 def displayTroves(dcfg, formatter, troveTups):
     """
-    display the given list of source troves 
+    display the given list of source troves
 
     @param dcfg: stores information about the type of display to perform
     @type dcfg: display.DisplayConfig
@@ -99,7 +99,7 @@ def displayTroves(dcfg, formatter, troveTups):
 
 def getBuildLog(troveSource, n, v, f):
     iter = troveSource.iterFilesInTrove(n, v, f,
-                                        sortByPath = True, 
+                                        sortByPath = True,
                                         withFiles = True)
     for (pathId, path, fileId, version, file_) in iter:
         if 'buildlog' in file_.tags:
@@ -133,7 +133,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                   needTroves=False, getPristine=True,
                   showNotByDefault=False, showWeakRefs=False,
                   checkExists=False, showNotExists=False,
-                  showFlags=False, showBuildLog=False, 
+                  showFlags=False, showBuildLog=False,
                   filesToShow = [], primaryTroves=[]):
     """
     Given a troveTup list, iterate over those troves and their child troves
@@ -150,14 +150,14 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
     @type needTroves: bool
     @param getPristine: if True, get pristine trove objects
     @type getPristine: bool
-    @param showNotByDefault: if True, yield not bydefault troves 
+    @param showNotByDefault: if True, yield not bydefault troves
     @type showNotByDefault: bool
     @param showWeakRefs: if True, yield troves that are weak references
     @type showWeakRefs: bool
     @param checkExists: if True, add flag MISSING for troves that do not
     exist (but are referenced) in this troveSource
     @type checkExists: bool
-    @param showNotExists: if True, show troves that do not exist (but are 
+    @param showNotExists: if True, show troves that do not exist (but are
     referenced) in this troveSource
     @type showNotExists: bool
 
@@ -197,7 +197,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
         # troves we'll need, hasTroves info we'll need.
         # If we cache this now, we cut down significantly on the
         # number of function calls we need.
-        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True) 
+        childTups = list(itertools.chain(*( x.iterTroveList(strongRefs=True)
                          for x in troves if x)))
         if recurseAll:
             if recursePackages:
@@ -223,7 +223,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             # recurse all troves, depth first.
             topTrove = trv
 
-            troves = [(trv, (troveTup, trv, 
+            troves = [(trv, (troveTup, trv,
                     TROVE_BYDEFAULT | TROVE_STRONGREF | TROVE_HASTROVE, 0))]
 
             while troves:
@@ -275,7 +275,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                         if newTrove is None:
                             continue
                         alsoToCheck.update(dict((x, newTrove) for x in \
-                                        newTrove.iterTroveList(True, True) 
+                                        newTrove.iterTroveList(True, True)
                                         if x not in toCheck and x not in seen))
 
                     if not showNotByDefault:
@@ -338,8 +338,8 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
             # recurse one level or recurse no levels.
             yield troveTup, trv, TROVE_STRONGREF | TROVE_BYDEFAULT | TROVE_HASTROVE, 0
 
-            if (trv and 
-                (recurseOne 
+            if (trv and
+                (recurseOne
                  or recursePackages and (trove.troveIsPackage(trv.getName())))):
                 newTroveTups = trv.iterTroveListInfo()
 
@@ -350,7 +350,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
                     newTroveTups = (x for x in newTroveTups if x[1])
 
                 newTroveTups = sorted(newTroveTups)
-                
+
                 if needTroves or trv.isRedirect():
                     newTroves = troveSource.getTroves(
                                                 [x[0] for x in newTroveTups],
@@ -382,7 +382,7 @@ def iterTroveList(troveSource, troveTups, recurseAll=False,
 
 class DisplayConfig:
     """ Configuration for a display command.  Contains both specified
-        parameters as well as information about some derived parameters 
+        parameters as well as information about some derived parameters
         (such as whether or not a particular display command will need
         file lists)
     """
@@ -395,7 +395,7 @@ class DisplayConfig:
         self.setChildDisplay()
         self.setPrimaryTroves(set())
 
-    def setTroveDisplay(self, deps=False, info=False, showBuildReqs=False, 
+    def setTroveDisplay(self, deps=False, info=False, showBuildReqs=False,
                         showBuildLog=False, filesToShow = [],
                         digSigs=False, showLabels=False, fullVersions=False,
                         fullFlavors=False, baseFlavors=[],
@@ -415,7 +415,7 @@ class DisplayConfig:
         # FIXME: showComponents should really be in setChildDisplay.
         self.showComponents = showComponents
 
-    def setFileDisplay(self, ls = False, lsl = False, ids = False, 
+    def setFileDisplay(self, ls = False, lsl = False, ids = False,
                        sha1s = False, tags = False, fileDeps = False,
                        fileVersions = False, fileFlavors = False,
                        capsules = False):
@@ -432,7 +432,7 @@ class DisplayConfig:
 
     def setChildDisplay(self, recurseAll = False, recurseOne = False,
                         showNotByDefault = False, showWeakRefs = False,
-                        showTroveFlags = False, displayHeaders = False, 
+                        showTroveFlags = False, displayHeaders = False,
                         checkExists = False, showNotExists = False):
         self.recurseAll = recurseAll
         self.recurseOne = recurseOne
@@ -449,7 +449,7 @@ class DisplayConfig:
     def getPrimaryTroves(self):
         return self.primaryTroves
 
-    #### Accessors 
+    #### Accessors
     #### Methods to grab information passed into the DisplayConfig
 
     def needFileContents(self):
@@ -503,7 +503,7 @@ class DisplayConfig:
     #### What the given display configuration implies that we need
 
     def needTroves(self):
-        # we need the trove 
+        # we need the trove
         return self.info or self.showBuildReqs or self.showBuildLog or self.digSigs or self.deps or self.printFiles()
 
     def needFiles(self):
@@ -529,7 +529,7 @@ class TroveTupFormatter:
     """ Formats (n,v,f) troveTuples taking into account the other
         tuples that have and will be formatted
     """
-    
+
     def __init__(self, dcfg=None):
         self._vCache = {}
         self._fCache = {}
@@ -661,7 +661,7 @@ class TroveFormatter(TroveTupFormatter):
                 sourceTrove = troveSource.getTrove(
                     sourceName, sourceVer, deps.Flavor(), withFiles = False)
                 # FIXME: all trove sources should return TroveMissing
-                # on failed getTrove calls 
+                # on failed getTrove calls
             except errors.TroveMissing:
                 pass
             except errors.InsufficientPermission:
@@ -690,9 +690,9 @@ class TroveFormatter(TroveTupFormatter):
             yield "Label     : %s" % v.branch().label().asString()
         else:
             yield "%-30s %s" % \
-                (("Version   : %s" % 
+                (("Version   : %s" %
                             v.trailingRevision().asString()),
-                 ("Label     : %s" % 
+                 ("Label     : %s" %
                             v.branch().label().asString()))
 
         yield '%-30s' % ("Size      : %s" % size)
@@ -771,7 +771,7 @@ class TroveFormatter(TroveTupFormatter):
                         if rFlavor is None:
                             flag = 'Redirect -> %s=%s' % (rName, rBranch)
                         else:
-                            flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch, 
+                            flag = 'Redirect -> %s=%s[%s]' % (rName, rBranch,
                                                               rFlavor)
                         redirectFlags.append(flag)
                     if not redirectFlags:
@@ -801,7 +801,7 @@ class TroveFormatter(TroveTupFormatter):
                                    key=lambda x:x[0]):
                 yield '  ' * (indent) + self.formatNVF(*buildReq)
         elif dcfg.printDeps():
-            for line in self.formatDeps(trove.getProvides(), 
+            for line in self.formatDeps(trove.getProvides(),
                                         trove.getRequires(),
                                         indent=indent):
                 yield line
@@ -840,7 +840,7 @@ class TroveFormatter(TroveTupFormatter):
                                             sortByPath = True,
                                             withFiles = needFiles,
                                             capsules = dcfg.getOnlyCapsules())
-        
+
         if dcfg.needFileContents():
             if not needFiles:
                 iter = [ x + (None,) for x in iter ]
@@ -849,7 +849,7 @@ class TroveFormatter(TroveTupFormatter):
                                                                 path,
                                                                 fileId, version,
                                                                 file)
-                                                                
+
                 if not shouldDisplay:
                     continue
                 file = troveSource.getFileContents([(fileId, version)])[0]
@@ -867,7 +867,7 @@ class TroveFormatter(TroveTupFormatter):
             for (pathId, path, fileId, version) in iter:
                 yield path
 
-    def formatFile(self, pathId, path, fileId, version, fileObj=None, 
+    def formatFile(self, pathId, path, fileId, version, fileObj=None,
                    prefix='', indent=0):
         taglist = ''
         sha1 = ''
@@ -927,11 +927,11 @@ class TroveFormatter(TroveTupFormatter):
             if group[0] == '+':
                 group = group[1:]
 
-        if verbose: 
+        if verbose:
             ln = "%s%s%s%s%s    1 %-8s %-8s %s %s %s%s%s%s" % \
               (spacer,
                prefix, id, sha1, fileObj.modeString(), owner,
-               group, fileObj.sizeString(), 
+               group, fileObj.sizeString(),
                fileObj.timeString(), name, flavor, taglist, verStr)
         else:
             ln = "%s%s%s%s%s%s%s" % (spacer, id, sha1, path, flavor,
@@ -997,26 +997,26 @@ class JobDisplayConfig(DisplayConfig):
         self.setJobDisplay()
 
     def compressJobs(self):
-        """ compress jobs so that updates of components are displayed with 
+        """ compress jobs so that updates of components are displayed with
             the update of their package
         """
         return self.compressJobList and not self.needFiles()
 
     def needOldFileObjects(self):
-        """ If true, we're going to display information about the old  
+        """ If true, we're going to display information about the old
             versions of troves.
         """
         return self.showChanges
 
     def needTroves(self):
-        """ 
-            If true, we're going to display information about the 
+        """
+            If true, we're going to display information about the
             new versions of troves.
         """
         return self.showChanges or DisplayConfig.needTroves(self)
 
     def printFiles(self):
-        """  
+        """
              If true, we're going to display file lists associated with
              this job.
         """
@@ -1034,8 +1034,8 @@ class JobTupFormatter(TroveFormatter):
         TroveFormatter.__init__(self, dcfg)
 
     def prepareJobLists(self, jobLists):
-        """ 
-            Store information about the jobs that are planned to be 
+        """
+            Store information about the jobs that are planned to be
             displayed, so that the correct about of version/flavor
             will be displayed.
         """
@@ -1063,7 +1063,7 @@ class JobTupFormatter(TroveFormatter):
             return
 
         compsByJob = {}
-        for jobTup in jobTups:  
+        for jobTup in jobTups:
             name = jobTup[0]
             if ':' in name:
                 pkg, comp = jobTup[0].split(':')
@@ -1072,7 +1072,7 @@ class JobTupFormatter(TroveFormatter):
             else:
                 compsByJob.setdefault(jobTup[:3], [False, []])[0] = True
 
-        for jobTup in jobTups:  
+        for jobTup in jobTups:
             name = jobTup[0]
             if ':' in name:
                 pkg, comp = jobTup[0].split(':')
@@ -1081,7 +1081,7 @@ class JobTupFormatter(TroveFormatter):
                     yield jobTup, []
             else:
                 yield jobTup, compsByJob[jobTup[:3]][1]
-        
+
     def getJobStrings(self, job):
         """Get the version/flavor strings to display for this job"""
         # format a single job entry
@@ -1153,12 +1153,12 @@ class JobFormatter(JobTupFormatter):
         troveSource = dcfg.getTroveSource()
 
         iter = troveSource.iterFilesInJob(job,
-                                          sortByPath = True, 
-                                          withFiles = needFiles, 
+                                          sortByPath = True,
+                                          withFiles = needFiles,
                                           withOldFiles = needOldFiles)
         if needFiles:
             if needOldFiles:
-                for (pathId, path, fileId, version, fileObj, 
+                for (pathId, path, fileId, version, fileObj,
                      oldPath, oldFileId, oldVersion, oldFileObj, modType) in iter:
 
                     if modType == troveSource.NEW_F:
@@ -1169,9 +1169,9 @@ class JobFormatter(JobTupFormatter):
                             yield ln
 
                     elif modType == troveSource.MOD_F:
-                        for ln in self.formatFileChange(pathId, path, fileId, 
-                                           version, fileObj, oldPath, 
-                                           oldFileId, oldVersion, oldFileObj, 
+                        for ln in self.formatFileChange(pathId, path, fileId,
+                                           version, fileObj, oldPath,
+                                           oldFileId, oldVersion, oldFileObj,
                                            indent=1):
                             yield ln
 
@@ -1192,7 +1192,7 @@ class JobFormatter(JobTupFormatter):
                     elif modType == troveSource.OLD_F:
                         prefix = ' Del '
 
-                    for ln in self.formatFile(pathId, path, fileId, version, 
+                    for ln in self.formatFile(pathId, path, fileId, version,
                                               fileObj, prefix=prefix,
                                               indent=1):
                         yield ln
@@ -1201,7 +1201,7 @@ class JobFormatter(JobTupFormatter):
             for (pathId, path, fileId, version) in iter:
                 yield path
 
-    def formatFileChange(self, pathId, path, fileId, version, 
+    def formatFileChange(self, pathId, path, fileId, version,
                          fileObj, oldPath, oldFileId, oldVersion, oldFileObj,
                          indent=1):
         for ln in self.formatFile(pathId, oldPath, oldFileId, oldVersion,
@@ -1257,7 +1257,7 @@ class JobFormatter(JobTupFormatter):
         if not dcfg.tags or not fileObj.tags:
             taglist = ''
         else:
-            taglist = ' {' + ' '.join(fileObj.tags) + '}' 
+            taglist = ' {' + ' '.join(fileObj.tags) + '}'
 
         spacer = '  ' * indent
         yield "%s---> %s%s%-10s      %-8s %-8s %8s %11s %s%s" % \

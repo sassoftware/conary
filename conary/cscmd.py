@@ -41,7 +41,7 @@ def computeTroveList(client, applyList):
             toFind.add((n, None, None))
 
     repos = client.getRepos()
-    results = repos.findTroves(client.cfg.installLabelPath, toFind, 
+    results = repos.findTroves(client.cfg.installLabelPath, toFind,
                                client.cfg.flavor)
 
     for troveSpec, trovesFound in results.iteritems():
@@ -54,7 +54,7 @@ def computeTroveList(client, applyList):
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
         if n[0] == '-':
             updateByDefault = False
-        else: 
+        else:
             updateByDefault = True
 
         if n[0] in ('-', '+'):
@@ -86,6 +86,6 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
 
     primaryCsList = computeTroveList(client, applyList)
 
-    client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 
-                               callback = callback, 
+    client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse,
+                               callback = callback,
                                excludeList = cfg.excludeTroves)

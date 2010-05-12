@@ -48,7 +48,7 @@ class GroupPathConflicts(CookError):
                 if len(paths) > 10:
                     errStrings.append('      ... (%s more)' % (len(paths) - 10))
                 errStrings.append('')
-            
+
         # CNY-3079: self.args has to be an array or tuple
         self.args = ("""
 The following troves in the following groups have conflicts:
@@ -83,7 +83,7 @@ class GroupAddAllError(CookError):
         lns = ['Cannot recursively addAll from group "%s":' % troveTup[0]]
         lns.append('Multiple groups with the same name(s) %s' % repeatedGroups)
         lns.append('are included.')
-            
+
         self.args = ('\n  '.join(lns),)
 
 class GroupImplicitReplaceError(CookError):

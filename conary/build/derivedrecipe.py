@@ -206,7 +206,7 @@ class AbstractDerivedPackageRecipe(AbstractPackageRecipe):
         else:
             parentVersion = parentBranch
         try:
-            troveList = repos.findTrove(None, 
+            troveList = repos.findTrove(None,
                                    (self.name, parentVersion, self._buildFlavor))
         except conaryerrors.TroveNotFound, err:
             raise builderrors.RecipeFileError('Could not find package to derive from for this flavor: ' + str(err))

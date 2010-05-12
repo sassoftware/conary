@@ -52,8 +52,8 @@ def _install():
         raise RuntimeError, 'COVERAGE_DIR must be set to a path for cache file'
     util.mkdirChain(coverageDir)
 
-    if ('coverage' in sys.modules 
-        and (sys.modules['coverage'].__file__ == coverageLoc 
+    if ('coverage' in sys.modules
+        and (sys.modules['coverage'].__file__ == coverageLoc
              or sys.modules['coverage'].__file__ == coverageLoc + 'c')):
         coverage = sys.modules['coverage']
     else:

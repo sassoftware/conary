@@ -130,7 +130,7 @@ class HttpHandler(WebHandler):
         except:
             self.req.write(self._write("error", shortError = "Error", error = traceback.format_exc()))
             return apache.OK
-        
+
     def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
 
@@ -155,7 +155,7 @@ class HttpHandler(WebHandler):
 
         if self._poolmode:
             self.repServer.reopen()
-            
+
         if not self.cmd:
             self.cmd = "main"
 
@@ -184,7 +184,7 @@ class HttpHandler(WebHandler):
         finally:
             if self._poolmode:
                 self.repServer.db.close()
-                
+
     def _requestAuth(self):
         self.req.err_headers_out['WWW-Authenticate'] = \
             'Basic realm="Conary Repository"'

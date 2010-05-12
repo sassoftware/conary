@@ -330,7 +330,7 @@ class _RpmHeader(object):
                 raise IOError, "bad header sha1"
 
         for i in range(entries):
-            (tag, dataType, offset, count) = struct.unpack("!iiii", 
+            (tag, dataType, offset, count) = struct.unpack("!iiii",
                                             entryTable[i * 16: i * 16 + 16])
 
             self.entries[tag] = (dataType, offset, count)
@@ -413,8 +413,8 @@ def readSignatureHeader(f):
     lead = f.read(96)
     leadMagic = struct.unpack("!i", lead[0:4])[0]
 
-    if (leadMagic & 0xffffffffl) != 0xedabeedbl: 
-	raise IOError, "file is not an RPM"
+    if (leadMagic & 0xffffffffl) != 0xedabeedbl:
+        raise IOError, "file is not an RPM"
 
     isSource = (struct.unpack('!H', lead[6:8])[0] == 1)
 
@@ -458,7 +458,7 @@ def verifySignatures(f, validKeys = None):
     matchingKeys = [ x for x in validKeys if x.hasKeyId(keyId) ]
     if not matchingKeys:
         raise PGPSignatureError("Signature generated with key %s does "
-              "not match valid keys %s" % 
+              "not match valid keys %s" %
               (keyId, ', '.join(x.getKeyId() for x in validKeys)))
 
     key = matchingKeys[0]

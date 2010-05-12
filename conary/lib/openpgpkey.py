@@ -121,9 +121,9 @@ class OpenPGPKey(object):
         key that signed the data.
 
         @param data: the data that has been signed
-	@type data: strint
-	@param sig: the digital signature to verify
-	@type sig: 4-tuple (fingerprint, timestamp, signature, K)
+        @type data: strint
+        @param sig: the digital signature to verify
+        @type sig: 4-tuple (fingerprint, timestamp, signature, K)
         @rtype int
         """
         # this function was not designed to throw an exception at this level

@@ -18,13 +18,13 @@ import weakref
 from conary.lib import misc, util, api
 from conary.errors import ParseError
 
-DEP_CLASS_ABI		= 0
-DEP_CLASS_IS		= 1
-DEP_CLASS_OLD_SONAME	= 2
-DEP_CLASS_FILES		= 3
-DEP_CLASS_TROVES	= 4
-DEP_CLASS_USE		= 5
-DEP_CLASS_SONAME	= 6
+DEP_CLASS_ABI           = 0
+DEP_CLASS_IS            = 1
+DEP_CLASS_OLD_SONAME    = 2
+DEP_CLASS_FILES         = 3
+DEP_CLASS_TROVES        = 4
+DEP_CLASS_USE           = 5
+DEP_CLASS_SONAME        = 6
 DEP_CLASS_USERINFO      = 7
 DEP_CLASS_GROUPINFO     = 8
 DEP_CLASS_CIL           = 9
@@ -51,9 +51,9 @@ FLAG_SENSE_DISALLOWED   = 4
 DEP_MERGE_TYPE_NORMAL         = 1    # conflicts are reported
 DEP_MERGE_TYPE_OVERRIDE       = 2    # new data wins
 DEP_MERGE_TYPE_PREFS          = 3    # like override, but a new !ssl loses
-                                     # to an old ~!ssl and a new ~!ssl 
+                                     # to an old ~!ssl and a new ~!ssl
                                      # loses to an old !ssl
-DEP_MERGE_TYPE_DROP_CONFLICTS = 4    # conflicting flags are removed 
+DEP_MERGE_TYPE_DROP_CONFLICTS = 4    # conflicting flags are removed
 
 senseMap = { FLAG_SENSE_REQUIRED   : "",
              FLAG_SENSE_PREFERRED  : "~",
@@ -133,27 +133,27 @@ class Dependency(BaseDependency):
     __slots__ = ( 'name', 'flags', )
 
     def __hash__(self):
-	val = hash(self.name)
-	for flag in self.flags.iterkeys():
-	    val ^= hash(flag)
-	return val
-	
+        val = hash(self.name)
+        for flag in self.flags.iterkeys():
+            val ^= hash(flag)
+        return val
+
     def __eq__(self, other):
-	return other.name == self.name and other.flags == self.flags
+        return other.name == self.name and other.flags == self.flags
 
     def __cmp__(self, other):
-	return (cmp(self.name, other.name) 
+        return (cmp(self.name, other.name)
                 or cmp(sorted(self.flags.iteritems()),
                        sorted(other.flags.iteritems())))
 
     def __str__(self):
-	if self.flags:
-	    flags = self.flags.items()
-	    flags.sort()
-	    return "%s(%s)" % (self.name, 
+        if self.flags:
+            flags = self.flags.items()
+            flags.sort()
+            return "%s(%s)" % (self.name,
                     " ".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
-	else:
-	    return self.name
+        else:
+            return self.name
 
     def __repr__(self):
         if self.flags:
@@ -169,11 +169,11 @@ class Dependency(BaseDependency):
 
         False is returned if the two dependencies conflict.
         """
-	if self.name != required.name: 
+        if self.name != required.name:
             return False
 
         score = 0
-	for (requiredFlag, requiredSense) in required.flags.iteritems():
+        for (requiredFlag, requiredSense) in required.flags.iteritems():
             thisSense = self.flags.get(requiredFlag, FLAG_SENSE_UNSPECIFIED)
             thisScore = flavorScores[(thisSense, requiredSense)]
             if thisScore is None:
@@ -183,7 +183,7 @@ class Dependency(BaseDependency):
         return score
 
     def emptyDepsScore(self):
-        """ 
+        """
         Like score where this trove is the "requires" and the other trove
         provides nothing.  If all the requires are negative, (!foo)
         this could return something other than False
@@ -194,7 +194,7 @@ class Dependency(BaseDependency):
             # then missing the base dep has to be enough to disqualify this
             # flavor
             return False
-	for (requiredFlag, requiredSense) in self.flags.iteritems():
+        for (requiredFlag, requiredSense) in self.flags.iteritems():
             thisScore = flavorScores[(FLAG_SENSE_UNSPECIFIED, requiredSense)]
             if thisScore is None:
                 return False
@@ -202,12 +202,12 @@ class Dependency(BaseDependency):
         return score
 
     def satisfies(self, required):
-	"""
-	Returns whether or not this dependency satisfies the argument
-	(which is a requires).
+        """
+        Returns whether or not this dependency satisfies the argument
+        (which is a requires).
 
-	@type required: Dependency
-	"""
+        @type required: Dependency
+        """
         return self.score(required) is not False
 
     def toStrongFlavor(self):
@@ -243,8 +243,8 @@ class Dependency(BaseDependency):
     def difference(self, other, strict=True):
         """
         Performs the difference between the two dependencies, returning
-        a dependency with only those flags in self but not in other. 
-        If strict is false, also remove flags that differ only in the 
+        a dependency with only those flags in self but not in other.
+        If strict is false, also remove flags that differ only in the
         strength of the sense, but not its direction (e.g. ~!foo and !foo).
         """
 
@@ -274,13 +274,13 @@ class Dependency(BaseDependency):
         return self.difference(other)
 
     def mergeFlags(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
-	"""
-	Returns a new Dependency which merges the flags from the two
-	existing dependencies. We don't want to merge in place as this
-	Dependency could be shared between many objects (via a 
-	DependencyGroup).  
-	"""
-	allFlags = self.flags.copy()
+        """
+        Returns a new Dependency which merges the flags from the two
+        existing dependencies. We don't want to merge in place as this
+        Dependency could be shared between many objects (via a
+        DependencyGroup).
+        """
+        allFlags = self.flags.copy()
         for (flag, otherSense) in other.flags.iteritems():
             if mergeType == DEP_MERGE_TYPE_OVERRIDE or flag not in allFlags:
                 allFlags[flag] = otherSense
@@ -333,13 +333,13 @@ class Dependency(BaseDependency):
         return (self.flags.items(),)
 
     def __init__(self, name, flags = []):
-	self.name = name
-	if type(flags) == dict:
-	    self.flags = flags
-	else:
-	    self.flags = {}
-	    for (flag, sense) in flags:
-		self.flags[flag] = sense
+        self.name = name
+        if type(flags) == dict:
+            self.flags = flags
+        else:
+            self.flags = {}
+            for (flag, sense) in flags:
+                self.flags[flag] = sense
 
 class DependencyClass(object):
 
@@ -354,7 +354,7 @@ class DependencyClass(object):
     depNameSignificant = True
     # if True, means that the name of the dependencies in the class hold
     # significance.  This is important for comparing a dep set with all
-    # negative flags for this dependency class (say use(!krb)) against 
+    # negative flags for this dependency class (say use(!krb)) against
     # no dependencies of this dependency class.  In the use flag case,
     # the dep name is not significant, for other dep classes, the dep name
     # does matter.
@@ -365,7 +365,7 @@ class DependencyClass(object):
     def compileRegexp(class_):
         """ Class method that takes the abstract information about the format
             of this dependency class and turns it into a regexp that will
-            match dep strings that can be parsed into a dependency of this 
+            match dep strings that can be parsed into a dependency of this
             class.
         """
         if not class_.allowParseDep:
@@ -374,13 +374,13 @@ class DependencyClass(object):
         d = dict(flagFormat=class_.flagFormat, depFormat=class_.depFormat,
                  WORD=class_.WORD, IDENT=class_.IDENT)
 
-        # zero or more space-separated flags 
-        flagFmt = '(?:\( *(%(flagFormat)s?(?: +%(flagFormat)s)*) *\))?' 
+        # zero or more space-separated flags
+        flagFmt = '(?:\( *(%(flagFormat)s?(?: +%(flagFormat)s)*) *\))?'
         # add ^ and $ to ensure we match the entire string passed in
         regexp = ('^ *(%(depFormat)s) *' + flagFmt + ' *$') % d
-        # word is a slightly larger group of chars than ident - 
-        # includes . and +, because those are used in paths and 
-        # sonames.  May need to be larger some day, and probably 
+        # word is a slightly larger group of chars than ident -
+        # includes . and +, because those are used in paths and
+        # sonames.  May need to be larger some day, and probably
         # could be more restrictive for some groups.  Should not contain
         # /, as that's used as a special char in many dep classes.
         regexp = regexp.replace('WORD', d['WORD'])
@@ -398,21 +398,21 @@ class DependencyClass(object):
 
         match = class_.regexp.match(s)
         if match is None:
-            raise ParseError, "Invalid %s dependency: '%s'" % (class_.tagName, 
+            raise ParseError, "Invalid %s dependency: '%s'" % (class_.tagName,
                                                                s)
 
         depName, flagStr = match.groups() # a dep is <depName>[(<flagStr>)]
-                                          # flagStr is None if () not 
+                                          # flagStr is None if () not
                                           # in the depStr
 
-        flags = [] 
+        flags = []
         if class_.flags == DEP_CLASS_NO_FLAGS:
-            if flagStr is not None: 
+            if flagStr is not None:
                 # the dep string specified at least () -
                 # not allowed when the dep has no flags
                 raise ParseError, ("bad %s dependency '%s':"
                                    " flags not allowed" % (class_.tagName, s))
-        elif flagStr: 
+        elif flagStr:
             flags = [ (x, FLAG_SENSE_REQUIRED) for x in flagStr.split()]
         elif class_.flags == DEP_CLASS_HAS_FLAGS:
             raise ParseError, ("bad %s dependency '%s':"
@@ -425,33 +425,33 @@ class DependencyClass(object):
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__.__name__ == self.depClass.__name__)
 
-	if dep.name in self.members:
-	    # this is a little faster then doing all of the work when
-	    # we could otherwise avoid it
-	    if dep == self.members[dep.name]: return
+        if dep.name in self.members:
+            # this is a little faster then doing all of the work when
+            # we could otherwise avoid it
+            if dep == self.members[dep.name]: return
 
-	    # merge the flags, and add the newly created dependency
-	    # into the class
-	    dep = self.members[dep.name].mergeFlags(dep, mergeType = mergeType)
+            # merge the flags, and add the newly created dependency
+            # into the class
+            dep = self.members[dep.name].mergeFlags(dep, mergeType = mergeType)
 
-	self.members[dep.name] = dep
-	assert(not self.justOne or len(self.members) == 1)
+        self.members[dep.name] = dep
+        assert(not self.justOne or len(self.members) == 1)
 
     def hasDep(self, name):
         return name in self.members
 
     def score(self, requirements):
-	if self.tag != requirements.tag:
-	    return False
-        
+        if self.tag != requirements.tag:
+            return False
+
         score = 0
-	for requiredDep in requirements.members.itervalues():
+        for requiredDep in requirements.members.itervalues():
             if requiredDep.name not in self.members:
                 if self.depNameSignificant:
-                    # dependency names are always 'requires', so if the 
-                    # dependency class name is significant (i.e. the dep 
+                    # dependency names are always 'requires', so if the
+                    # dependency class name is significant (i.e. the dep
                     # class is only defined by its flags) the empty deps cannot
-                    # match.  Otherwise, we use the empty deps score for the 
+                    # match.  Otherwise, we use the empty deps score for the
                     # flags
                     return False
                 thisScore = requiredDep.emptyDepsScore()
@@ -469,12 +469,12 @@ class DependencyClass(object):
     def emptyDepsScore(self):
         score = 0
         if self.depNameSignificant:
-            # dependency names are always 'requires', so if the 
-            # dependency class name is significant (i.e. the dep 
+            # dependency names are always 'requires', so if the
+            # dependency class name is significant (i.e. the dep
             # class is only defined by its flags) the empty deps cannot
             # match.  Otherwise, we use the empty deps score for the flags
             return False
-	for requiredDep in self.members.itervalues():
+        for requiredDep in self.members.itervalues():
             thisScore = requiredDep.emptyDepsScore()
             if thisScore is False:
                 return False
@@ -492,11 +492,11 @@ class DependencyClass(object):
         return self.score(requirements) is not False
 
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
-	if other is None: return
+        if other is None: return
         a = self.addDep
-	for otherdep in other.members.itervalues():
-	    # calling this for duplicates is a noop
-	    a(otherdep, mergeType = mergeType)
+        for otherdep in other.members.itervalues():
+            # calling this for duplicates is a noop
+            a(otherdep, mergeType = mergeType)
 
     def __and__(self, other):
         return self.intersection(other)
@@ -505,7 +505,7 @@ class DependencyClass(object):
         newDepClass = self.__class__()
         a = newDepClass.addDep
         found = False
-	for tag, dep in self.members.iteritems():
+        for tag, dep in self.members.iteritems():
             if tag in other.members:
                 dep = dep.intersection(other.members[tag], strict=strict)
                 if dep is None:
@@ -521,7 +521,7 @@ class DependencyClass(object):
         newDepClass = self.__class__()
         a = newDepClass.addDep
         found = False
-	for tag, dep in self.members.iteritems():
+        for tag, dep in self.members.iteritems():
             if tag in other.members:
                 diff = dep.difference(other.members[tag], strict=strict)
                 if diff is None:
@@ -569,17 +569,17 @@ class DependencyClass(object):
     thawDependency = staticmethod(thawDependency)
 
     def __hash__(self):
-	val = self.tag
-	for dep in self.members.itervalues():
-	    val ^= hash(dep)
+        val = self.tag
+        for dep in self.members.itervalues():
+            val ^= hash(dep)
 
-	return val
+        return val
 
     def __eq__(self, other):
         if other is None:
             return False
-	return self.tag == other.tag and \
-	       self.members == other.members
+        return self.tag == other.tag and \
+               self.members == other.members
 
     def __cmp__(self, other):
         rv = cmp(sorted(self.members), sorted(other.members))
@@ -595,13 +595,13 @@ class DependencyClass(object):
         return not self == other
 
     def __str__(self):
-	memberList = self.members.items()
-	memberList.sort()
-	return "\n".join([ "%s: %s" % (self.tagName, dep[1]) 
-		    for dep in memberList ])
+        memberList = self.members.items()
+        memberList.sort()
+        return "\n".join([ "%s: %s" % (self.tagName, dep[1])
+                    for dep in memberList ])
 
     def __init__(self):
-	self.members = {}
+        self.members = {}
 
 class AbiDependency(DependencyClass):
 
@@ -760,7 +760,7 @@ class TroveDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
-    depFormat = 'WORD(?::IDENT)?' # trove[:comp] 
+    depFormat = 'WORD(?::IDENT)?' # trove[:comp]
 
 _registerDepClass(TroveDependencies)
 
@@ -837,10 +837,10 @@ class DependencySet(object):
     members = property(_getMembers)
 
     def addDep(self, depClass, dep):
-	assert(isinstance(dep, Dependency))
+        assert(isinstance(dep, Dependency))
         self._hash = None
 
-	tag = depClass.tag
+        tag = depClass.tag
         c = self.members.setdefault(tag, depClass())
         c.addDep(dep)
 
@@ -884,11 +884,11 @@ class DependencySet(object):
         self.members.pop(depClass.tag, None)
 
     def addEmptyDepClass(self, depClass):
-        """ adds an empty dependency class, which for flavors has 
-            different semantics when merging than not having a dependency 
+        """ adds an empty dependency class, which for flavors has
+            different semantics when merging than not having a dependency
             class.  See mergeFlavors """
         self._hash = None
-	tag = depClass.tag
+        tag = depClass.tag
         assert(tag not in self.members)
         self.members[tag] = depClass()
 
@@ -929,22 +929,22 @@ class DependencySet(object):
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
         if other is None:
             return
-        assert(isinstance(other, self.__class__) 
+        assert(isinstance(other, self.__class__)
                 or isinstance(self, other.__class__))
         self._hash = None
         a = self.addDep
-	for tag, members in other.members.iteritems():
+        for tag, members in other.members.iteritems():
             c = members.__class__
             if tag in self.members:
-		self.members[tag].union(members, mergeType = mergeType)
+                self.members[tag].union(members, mergeType = mergeType)
 
                 # If we're dropping conflicts, we might drop this class
                 # of troves all together.
                 if (mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS
-                    and c.justOne and not 
+                    and c.justOne and not
                     self.members[tag].members.values()[0].flags):
                     del self.members[tag]
-	    else:
+            else:
                 for dep in members.members.itervalues():
                     a(c, dep)
 
@@ -988,16 +988,16 @@ class DependencySet(object):
         # instead of self.__class__
         assert(isinstance(other, DependencySet))
         score = 0
-	for tag in other.members:
+        for tag in other.members:
             # ignore empty dep classes when scoring
             if not other.members[tag].members:
                 continue
-	    if tag not in self.members:
+            if tag not in self.members:
                 thisScore = other.members[tag].emptyDepsScore()
             else:
                 thisScore = self.members[tag].score(other.members[tag])
             if thisScore is False:
-		return False
+                return False
 
             score += thisScore
 
@@ -1154,9 +1154,9 @@ def ThawFlavor(frz):
 
 @api.developerApi
 def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
-    """ 
-    Performs overrides of flavors as expected when the new flavor is 
-    specified by a user -- the user's flavor overrides use flags, and 
+    """
+    Performs overrides of flavors as expected when the new flavor is
+    specified by a user -- the user's flavor overrides use flags, and
     if the user specifies any instruction sets, only those instruction
     sets will be in the final flavor.  Flags for the specified instruction
     sets are merged with the old flavor.
@@ -1177,7 +1177,7 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
                 if dep.name not in arches:
                     oldArches.append(dep)
             flavor.removeDeps(depClass, oldArches)
-            
+
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor
 
@@ -1186,8 +1186,8 @@ def _mergeDeps(depList, mergeType):
     """
     Returns a new Dependency which merges the flags from the two
     existing dependencies. We don't want to merge in place as this
-    Dependency could be shared between many objects (via a 
-    DependencyGroup).  
+    Dependency could be shared between many objects (via a
+    DependencyGroup).
     """
     name = depList[0].name
 
@@ -1271,7 +1271,7 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
         for depList in depsByName.itervalues():
             dep = _mergeDeps(depList, mergeType)
             if (depClass.justOne
-                and mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS and 
+                and mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS and
                 not dep.flags):
                 continue
             a(depClass, dep)
@@ -1280,10 +1280,10 @@ def mergeFlavorList(flavors, mergeType=DEP_MERGE_TYPE_NORMAL):
 
 
 def mergeFlavor(flavor, mergeBase):
-    """ 
-    Merges the given flavor with the mergeBase - if flavor 
-    doesn't contain use flags, then include the mergeBase's 
-    use flags.  If flavor doesn't contain an instruction set, then 
+    """
+    Merges the given flavor with the mergeBase - if flavor
+    doesn't contain use flags, then include the mergeBase's
+    use flags.  If flavor doesn't contain an instruction set, then
     include the mergeBase's instruction set(s)
     """
     if flavor is None:
@@ -1394,9 +1394,9 @@ def getInstructionSetFlavor(flavor):
 
     # get just the arches, not any arch flags like mmx
     newFlavor.addDeps(ISD,
-                      [Dependency(x[1].name) for x in flavor.iterDeps() 
+                      [Dependency(x[1].name) for x in flavor.iterDeps()
                        if x[0] is ISD])
-    targetDeps = [ Dependency(x[1].name) for x in flavor.iterDeps() 
+    targetDeps = [ Dependency(x[1].name) for x in flavor.iterDeps()
                   if x[0] is targetISD ]
 
     if targetDeps:
@@ -1405,7 +1405,7 @@ def getInstructionSetFlavor(flavor):
 
 def formatFlavor(flavor):
     """
-    Formats a flavor and returns a string which parseFlavor can 
+    Formats a flavor and returns a string which parseFlavor can
     handle.
     """
     def _singleClass(deps):
@@ -1416,7 +1416,7 @@ def formatFlavor(flavor):
             if flags:
                 flags.sort()
                 l.append("%s(%s)" % (dep.getName()[0],
-                           ",".join([ "%s%s" % (senseMap[x[1]], x[0]) 
+                           ",".join([ "%s%s" % (senseMap[x[1]], x[0])
                                                 for x in flags])))
             else:
                 l.append(dep.getName()[0])
@@ -1506,7 +1506,7 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
             else:
                 insSetFlags = []
 
-            set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
+            set.addDep(InstructionSetDependency, Dependency(baseInsSet,
                                                             insSetFlags))
 
             if not nextGroup:
@@ -1519,7 +1519,7 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
 
     elif groups[2]:
         # mark that the user specified "is:" without any instruction set
-        # by adding a placeholder instruction set dep class here. 
+        # by adding a placeholder instruction set dep class here.
         set.addEmptyDepClass(InstructionSetDependency)
 
     # 8 is target: 9 is target architecture.  10 is target flags
@@ -1545,7 +1545,7 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
             baseInsSet, insSetFlags, nextGroup, _, _ = match.groups()
     elif groups[8]:
         # mark that the user specified "target:" without any instruction set
-        # by adding a placeholder instruction set dep class here. 
+        # by adding a placeholder instruction set dep class here.
         set.addEmptyDepClass(TargetInstructionSetDependency)
 
 
@@ -1558,19 +1558,19 @@ def parseFlavor(s, mergeBase = None, raiseError = False):
         set.addDep(UseDependency, Dependency("use", useFlags))
     elif groups[0]:
         # mark that the user specified "use:" without any instruction set
-        # by adding a placeholder instruction set dep class here. 
+        # by adding a placeholder instruction set dep class here.
         set.addEmptyDepClass(UseDependency)
 
     return mergeFlavor(set, mergeBase)
 
 def parseDep(s):
-    """ 
-    Parses dependency strings (not flavors) of the format 
+    """
+    Parses dependency strings (not flavors) of the format
     (<depClass>: dep[(flags)])* and returns a dependency set
     containing those dependencies.
     Raises ParseError if the parsing fails.
     """
-    
+
     depSet = DependencySet()
     while s:
         match = depRegexp.match(s)
@@ -1597,13 +1597,13 @@ def parseDep(s):
     return depSet
 
 def flavorDifferences(flavors, strict=True):
-    """ Takes a set of flavors, returns a dict of flavors such that 
-        the value of a flavor's dict entry is a flavor that includes 
+    """ Takes a set of flavors, returns a dict of flavors such that
+        the value of a flavor's dict entry is a flavor that includes
         only the information that differentiates that flavor from others
         in the set
-        
-        @param strict: if False, ignore differences between flags where the 
-                       difference is in strength of the flag, but not in 
+
+        @param strict: if False, ignore differences between flags where the
+                       difference is in strength of the flag, but not in
                        direction, e.g. ignore ~foo vs. foo, but not ~foo
                        vs. ~!foo.
     """
@@ -1626,7 +1626,7 @@ def flavorDifferences(flavors, strict=True):
 def compatibleFlavors(flavor1, flavor2):
     """
         Return True if flavor1 does not have any flavor that switches
-        polarity from ~foo to ~!foo, or foo to !foo, and flavor1 
+        polarity from ~foo to ~!foo, or foo to !foo, and flavor1
         does not have any architectures not in flavor2 and vice versa.
     """
     for depClass in flavor1.members.values():
@@ -1825,5 +1825,5 @@ flavorScores = {
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_REQUIRED ) :   -2,
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_DISALLOWED):    1,
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERRED) :   -1,
-      (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERNOT) :    1 
+      (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERNOT) :    1
 }

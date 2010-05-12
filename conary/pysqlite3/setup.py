@@ -44,7 +44,7 @@ elif os.name == "posix": # most Unixish platforms
 else:
     raise "UnknownPlatform", "sys.platform=%s, os.name=%s" % \
           (sys.platform, os.name)
-    
+
 long_description = \
 """Python interface to SQLite
 
@@ -58,7 +58,7 @@ def main():
     py_modules = ["sqlite3.main"]
     global extra_objects
     global libraries
-                          
+
     # patch distutils if it can't cope with the "classifiers" keyword
     if sys.version < '2.2.3':
         from distutils.dist import DistributionMetadata
@@ -70,7 +70,7 @@ def main():
     if os.path.exists('libsqlite3.a'):
         extra_objects = [ 'libsqlite3.a' ] + extra_objects
         libraries = []
-    
+
     setup ( # Distribution meta-data
             name = "pysqlite3",
             version = __version__,

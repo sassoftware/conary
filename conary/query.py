@@ -26,10 +26,10 @@ from conary.lib import util, api
 def displayTroves(db, cfg, troveSpecs = [], pathList = [],
                   whatProvidesList = [],
                   # trove options
-                  info = False, digSigs = False, showBuildReqs = False, 
+                  info = False, digSigs = False, showBuildReqs = False,
                   showDeps = False,
                   # file options
-                  ls = False, lsl = False, ids = False, sha1s = False, 
+                  ls = False, lsl = False, ids = False, sha1s = False,
                   tags = False, fileDeps = False, fileVersions = False,
                   fileFlavors = False, capsules = False,
                   # collection options
@@ -56,7 +56,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @param showBuildReqs: If true, display the versions and flavors of the
        build requirements that were used to build the given troves
        @type showBuildReqs: bool
-       @param showDeps: If true, display provides and requires information 
+       @param showDeps: If true, display provides and requires information
        for the trove.
        @type showDeps: bool
        @param ls: If true, list files in the trove
@@ -78,7 +78,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @type showTroves: bool
        @param recurse: display child troves of this trove, recursively
        @type recurse: bool
-       @param showAllTroves: If true, display all byDefault False child troves 
+       @param showAllTroves: If true, display all byDefault False child troves
        of this trove
        @type showAllTroves: bool
        @param weakRefs: display both weak and strong references of this trove.
@@ -88,7 +88,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
        @type showTroveFlags: bool
        @param pristine: If true, display the pristine version of this trove
        @type pristine: bool
-       @param alwaysDisplayHeaders: If true, display headers even when listing  
+       @param alwaysDisplayHeaders: If true, display headers even when listing
        files.
        @type alwaysDisplayHeaders: bool
        @rtype: None
@@ -105,7 +105,7 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
     # a source for affinity info, but it makes sure that all troves with a
     # particular name are looked at for flavor info
 
-    dcfg.setTroveDisplay(deps=showDeps, info=info, 
+    dcfg.setTroveDisplay(deps=showDeps, info=info,
                          showBuildReqs=showBuildReqs,
                          digSigs=digSigs, fullVersions=cfg.fullVersions,
                          showLabels=cfg.showLabels, fullFlavors=cfg.fullFlavors,
@@ -121,12 +121,12 @@ def displayTroves(db, cfg, troveSpecs = [], pathList = [],
 
     if recurse is None and not recurseOne and primary:
         # if we didn't explicitly set recurse and we're not recursing one
-        # level explicitly and we specified troves (so everything won't 
+        # level explicitly and we specified troves (so everything won't
         # show up at the top level anyway), guess at whether to recurse
-        recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps, 
+        recurse = True in (ls, lsl, ids, sha1s, tags, showDeps, fileDeps,
                            fileVersions, fileFlavors)
 
-    displayHeaders = alwaysDisplayHeaders or showTroveFlags 
+    displayHeaders = alwaysDisplayHeaders or showTroveFlags
 
     dcfg.setChildDisplay(recurseAll = recurse, recurseOne = recurseOne,
                          showNotByDefault = True,
@@ -154,19 +154,19 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
         @type db: local.database.Database
         @param troveSpecs: troves to search for
         @type troveSpecs: list of troveSpecs (n[=v][[f]])
-        @param pathList: paths which should be linked to some trove in this 
+        @param pathList: paths which should be linked to some trove in this
                          database.
         @type pathList: list of strings
         @param whatProvidesList: deps to search for providers of
         @type whatProvidesList: list of strings
-      
-        @raises TroveSpecError: Raised if one of the troveSpecs is of an 
+
+        @raises TroveSpecError: Raised if one of the troveSpecs is of an
                                 invalid format
 
         @note: This function calls database routines which could raise any
                errors defined in L{dbstore.sqlerrors}
- 
-        @rtype: troveTupleList (list of (name, version, flavor) tuples), 
+
+        @rtype: troveTupleList (list of (name, version, flavor) tuples),
                 and a boolean that stats whether the troves returned should
                 be considered primary (and therefore not compressed ever).
     """
@@ -185,7 +185,7 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
     troveTups = []
     for path in pathList:
         for trove in db.iterTrovesByPath(path):
-            troveTups.append((trove.getName(), trove.getVersion(), 
+            troveTups.append((trove.getName(), trove.getVersion(),
                               trove.getFlavor()))
 
     if whatProvidesList:

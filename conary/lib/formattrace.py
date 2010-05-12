@@ -152,10 +152,10 @@ def formatCode(frame, stream):
             frameInfo = inspect.getframeinfo(frame, context=0)
         fileName, lineNo, funcName, text, idx = frameInfo
 
-        stream.write('  File "%s", line %d, in %s\n' % 
+        stream.write('  File "%s", line %d, in %s\n' %
             (fileName, lineNo, funcName))
         if text is not None and len(text) > idx:
-            # If the source file is not available, we may not be able to get 
+            # If the source file is not available, we may not be able to get
             # the line
             stream.write('    %s\n' % text[idx].strip())
     finally:

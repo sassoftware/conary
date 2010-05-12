@@ -26,7 +26,7 @@ class SignatureCallback(callbacks.SignatureCallback, callbacks.LineOutput):
 
     def signTrove(self, got, need):
         if need != 0:
-            self._message("Signing trove (%d of %d)..." 
+            self._message("Signing trove (%d of %d)..."
                           % (got, need))
 
 def signTroves(cfg, specStrList, recurse = False, callback = None):
@@ -97,7 +97,7 @@ def signTroves(cfg, specStrList, recurse = False, callback = None):
             trv.getDigitalSignature(signatureKey)
             if not cfg.quiet:
                 print "\nTrove: %s=%s[%s] is already signed by key: %s" \
-                    % (trv.getName(), trv.getVersion(), 
+                    % (trv.getName(), trv.getVersion(),
                        deps.formatFlavor(trv.getFlavor()),
                        cfg.signatureKey)
                 continue

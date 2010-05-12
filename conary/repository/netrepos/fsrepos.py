@@ -79,7 +79,7 @@ class FilesystemChangeSetJob(ChangeSetJob):
                                               trv.troveInfo.troveVersion(),
                                               trove.TROVE_VERSION)
             else:
-                nvf = trv.getName(), trv.getVersion(), trv.getFlavor(), 
+                nvf = trv.getName(), trv.getVersion(), trv.getFlavor(),
                 err =  'Attempted to commit incomplete trove %s=%s[%s]' % nvf
                 raise errors.TroveIntegrityError(error=err, *nvf)
 
@@ -135,16 +135,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def __init__(self, serverNameList, troveStore, contentsDir, repositoryMap,
                  requireSigs = False, paranoidCommits = False):
-	self.serverNameList = serverNameList
+        self.serverNameList = serverNameList
         self.paranoidCommits = paranoidCommits
-	map = dict(repositoryMap)
+        map = dict(repositoryMap)
         for serverName in serverNameList:
             map[serverName] = self
         # XXX this client needs to die
         from conary import conarycfg
         self.reposSet = netclient.NetworkRepositoryClient(map,
                                     conarycfg.UserInformation())
-	self.troveStore = troveStore
+        self.troveStore = troveStore
 
         self.requireSigs = requireSigs
         for dir in contentsDir:
@@ -159,13 +159,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
             store = DataStoreSet(*storeList)
 
-	DataStoreRepository.__init__(self, dataStore = store)
-	AbstractRepository.__init__(self)
+        DataStoreRepository.__init__(self, dataStore = store)
+        AbstractRepository.__init__(self)
 
     def close(self):
-	if self.troveStore is not None:
-	    self.troveStore.db.close()
-	    self.troveStore = None
+        if self.troveStore is not None:
+            self.troveStore.db.close()
+            self.troveStore = None
 
     ### Package access functions
 
@@ -173,8 +173,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return deps.ThawFlavor(flavor)
 
     def hasTrove(self, pkgName, version, flavor):
-	return self.troveStore.hasTrove(pkgName, troveVersion = version,
-					troveFlavor = flavor)
+        return self.troveStore.hasTrove(pkgName, troveVersion = version,
+                                        troveFlavor = flavor)
 
     def getTrove(self, pkgName, version, flavor, pristine = True,
                  withFiles = True, hidden = False):
@@ -190,29 +190,29 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return self.troveStore.getParentTroves(troveList)
 
     def addTrove(self, trv, trvCs, hidden = False, oldTroveSpec = None):
-	return self.troveStore.addTrove(trv, trvCs, hidden = hidden)
+        return self.troveStore.addTrove(trv, trvCs, hidden = hidden)
 
     def addTroveDone(self, pkg, mirror=False):
-	self.troveStore.addTroveDone(pkg, mirror=mirror)
+        self.troveStore.addTroveDone(pkg, mirror=mirror)
 
     ### File functions
 
     def getFileVersion(self, pathId, fileId, fileVersion, withContents = 0):
-	# the get trove netclient provides doesn't work with a
-	# FilesystemRepository (it needs to create a change set which gets
-	# passed)
-	if fileVersion.getHost() not in self.serverNameList:
+        # the get trove netclient provides doesn't work with a
+        # FilesystemRepository (it needs to create a change set which gets
+        # passed)
+        if fileVersion.getHost() not in self.serverNameList:
             # XXX This code is not needed as of version 1.0.14 of the client.
-	    assert(not withContents)
-	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
+            assert(not withContents)
+            return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
 
         fileObj = self.troveStore.getFile(pathId, fileId)
-	if withContents:
+        if withContents:
             if fileObj.hasContents:
-		cont = filecontents.FromDataStore(self.contentsStore,
-						    file.contents.sha1())
-	    else:
-		cont = None
+                cont = filecontents.FromDataStore(self.contentsStore,
+                                                    file.contents.sha1())
+            else:
+                cont = None
 
             return (fileObj, cont)
 
@@ -263,7 +263,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         # postgres
         enableConstraints = True
 
-	# let's make sure commiting this change set is a sane thing to attempt
+        # let's make sure commiting this change set is a sane thing to attempt
         for trvCs in cs.iterNewTroveList():
             if trvCs.troveType() == trove.TROVE_TYPE_REMOVED:
                 enableConstraints = False
@@ -271,7 +271,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             v = trvCs.getNewVersion()
             if v.isOnLocalHost():
                 label = v.branch().label()
-		raise errors.CommitError('can not commit items on '
+                raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
         self.troveStore.begin(serialize)
 
@@ -347,7 +347,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
             else:
-                # XXX This code is not needed as of version 1.0.14 of the 
+                # XXX This code is not needed as of version 1.0.14 of the
                 # client.
                 #
                 # a bit of sleight of hand here... we look for this file in
@@ -367,14 +367,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         excludeCapsuleContents = False,
                         excludeAutoSource = False,
                         mirrorMode = False, roleIds = None):
-	"""
-	@param troveList: a list of (troveName, flavor, oldVersion, newVersion,
+        """
+        @param troveList: a list of (troveName, flavor, oldVersion, newVersion,
         absolute) tuples.
 
-	if oldVersion == None and absolute == 0, then the trove is assumed
-	to be new for the purposes of the change set
+        if oldVersion == None and absolute == 0, then the trove is assumed
+        to be new for the purposes of the change set
 
-	if newVersion == None then the trove is being removed
+        if newVersion == None then the trove is being removed
 
         if recurse is set, this yields one result for the entire troveList.
         If recurse is not set, it yields one result per troveList entry.
@@ -382,17 +382,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         @param excludeCapsuleContents: If True, troves which include capsules
         have all of their content excluded from the changeset no matter how
         withFileContents is set.
-	"""
-	cs = changeset.ChangeSet()
+        """
+        cs = changeset.ChangeSet()
         externalTroveList = []
         externalFileList = []
         removedTroveList = []
 
-	dupFilter = set()
+        dupFilter = set()
         resultList = []
 
-	# make a copy to remove things from
-	troveList = origTroveList[:]
+        # make a copy to remove things from
+        troveList = origTroveList[:]
 
         # def createChangeSet begins here
 
@@ -403,16 +403,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             (troveName, (oldVersion, oldFlavor),
                          (newVersion, newFlavor), absolute) = job
 
-	    # make sure we haven't already generated this changeset; since
-	    # troves can be included from other troves we could try
-	    # to generate quite a few duplicates
+            # make sure we haven't already generated this changeset; since
+            # troves can be included from other troves we could try
+            # to generate quite a few duplicates
             if job in dupFilter:
                 continue
             else:
                 dupFilter.add(job)
 
             done = False
-	    if not newVersion:
+            if not newVersion:
                 if oldVersion.getHost() not in self.serverNameList:
                     externalTroveList.append((troveName,
                                          (oldVersion, oldFlavor),
@@ -454,8 +454,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                 continue
 
-	    (troveChgSet, filesNeeded, pkgsNeeded) = \
-				new.diff(old, absolute = absolute)
+            (troveChgSet, filesNeeded, pkgsNeeded) = \
+                                new.diff(old, absolute = absolute)
 
             if recurse:
                 for refJob in pkgsNeeded:
@@ -463,7 +463,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     refNewVersion = refJob[2][0]
                     if (refNewVersion and
                            (refNewVersion.getHost() not in self.serverNameList)
-                        or (refOldVersion and 
+                        or (refOldVersion and
                             refOldVersion.getHost() not in self.serverNameList)
                        ):
                         # don't try to make changesets between repositories; the
@@ -472,7 +472,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     else:
                         troveWrapper.append(refJob, True)
 
-	    cs.newTrove(troveChgSet)
+            cs.newTrove(troveChgSet)
 
             if job in origTroveList and job[2][0] is not None:
                 # add the primary w/ timestamps on the version
@@ -484,13 +484,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     # which case they aren't primries
                     pass
 
-	    # sort the set of files we need into bins based on the server
-	    # name
-	    serverIdx = {}
+            # sort the set of files we need into bins based on the server
+            # name
+            serverIdx = {}
             getList = []
             localFilesNeeded = []
 
-	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
+            for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem
                 if (newFileVersion.getHost() not in self.serverNameList
@@ -517,16 +517,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             ptrTable = {}
             for (pathId, oldFileId, oldFileVersion, newFileId, \
                  newFileVersion) in localFilesNeeded:
-		oldFile = None
-		if oldFileVersion:
-		    #oldFile = idIdx[(pathId, oldFileId)]
-		    oldFile = files.ThawFile(streams[oldFileId], pathId)
+                oldFile = None
+                if oldFileVersion:
+                    #oldFile = idIdx[(pathId, oldFileId)]
+                    oldFile = files.ThawFile(streams[oldFileId], pathId)
 
-		oldCont = None
-		newCont = None
+                oldCont = None
+                newCont = None
 
-		#newFile = idIdx[(pathId, newFileId)]
-		newFile = files.ThawFile(streams[newFileId], pathId)
+                #newFile = idIdx[(pathId, newFileId)]
+                newFile = files.ThawFile(streams[newFileId], pathId)
 
                 if mirrorMode:
                     (filecs, contentsHash) = changeset.fileChangeSet(pathId,
@@ -537,7 +537,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                                                      oldFile,
                                                                      newFile)
 
-		cs.addFile(oldFileId, newFileId, filecs)
+                cs.addFile(oldFileId, newFileId, filecs)
 
                 if (excludeCapsuleContents and new.troveInfo.capsule.type and
                                new.troveInfo.capsule.type()):
@@ -547,21 +547,21 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     or newFile.flags.isEncapsulatedContent()):
                     continue
 
-		# this test catches files which have changed from not
-		# config files to config files; these need to be included
-		# unconditionally so we always have the pristine contents
-		# to include in the local database
-		if ((mirrorMode and newFile.hasContents) or contentsHash or
+                # this test catches files which have changed from not
+                # config files to config files; these need to be included
+                # unconditionally so we always have the pristine contents
+                # to include in the local database
+                if ((mirrorMode and newFile.hasContents) or contentsHash or
                              (oldFile and newFile.flags.isConfig()
                                       and not oldFile.flags.isConfig())):
-		    if oldFileVersion and oldFile.hasContents:
-			oldCont = self.getFileContents(
+                    if oldFileVersion and oldFile.hasContents:
+                        oldCont = self.getFileContents(
                             [ (oldFileId, oldFileVersion, oldFile) ])[0]
 
-		    newCont = self.getFileContents(
+                    newCont = self.getFileContents(
                             [ (newFileId, newFileVersion, newFile) ])[0]
 
-		    (contType, cont) = changeset.fileContentsDiff(oldFile,
+                    (contType, cont) = changeset.fileContentsDiff(oldFile,
                                                 oldCont, newFile, newCont,
                                                 mirrorMode = mirrorMode)
 
@@ -595,8 +595,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     if contType == changeset.ChangedFileTypes.ptr:
                         compressed = False
 
-		    cs.addFileContents(pathId, newFileId, contType, cont,
-				       newFile.flags.isConfig(),
+                    cs.addFileContents(pathId, newFileId, contType, cont,
+                                       newFile.flags.isConfig(),
                                        compressed = compressed)
 
             if not recurse:

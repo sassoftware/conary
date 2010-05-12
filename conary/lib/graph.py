@@ -55,7 +55,7 @@ class NodeData(object):
         data = self.data
         return sorted(((x, data[x]) for x in indexes), sortAlg,
                       reverse=reverse)
- 
+
     def getItemsByIndex(self, indexes):
         return [self.data[x] for x in indexes]
 
@@ -82,7 +82,7 @@ class NodeDataByHash(NodeData):
         return iter(self.hashedData)
 
     def sort(self, sortAlg=None):
-        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()), 
+        return sorted(((x[1], x[0]) for x in self.hashedData.iteritems()),
                       sortAlg)
 
     def copy(self):
@@ -131,7 +131,7 @@ class DirectedGraph:
         return self.data.get(idx)
 
     def addEdge(self, fromItem, toItem, value=1):
-        fromIdx, toIdx = (self.data.getIndex(fromItem), 
+        fromIdx, toIdx = (self.data.getIndex(fromItem),
                           self.data.getIndex(toItem))
         self.edges.setdefault(fromIdx, {})[toIdx] = value
         self.edges.setdefault(toIdx, {})
@@ -252,7 +252,7 @@ class DirectedGraph:
 
         nodeIds = [ x[0] for x in nodeData.sort(nodeSort) ]
 
- 
+
         trees = {}
         starts = {}
         finishes = {}
@@ -342,9 +342,9 @@ class DirectedGraph:
 
     def getTotalOrdering(self, nodeSort=None):
         """
-            Note: children are ordered after their parents. 
+            Note: children are ordered after their parents.
         """
-        # to sort correctly, we need the nodes the user wants first to 
+        # to sort correctly, we need the nodes the user wants first to
         # be picked _last_ by the selection algorithm.  That way they'll
         # have the latest possible finish times, and score better in the
         # nodeSelect below.
@@ -389,9 +389,9 @@ class DirectedGraph:
 
         finishesByTime = sorted(finishes.iteritems(), key=lambda x: x[1])
         starts, finished, trees = t.doDFS(
-                                        start=self.get(finishesByTime[-1][0]), 
+                                        start=self.get(finishesByTime[-1][0]),
                                         nodeSort=nodeSelect)
-        treeKeys = [ x[0] for x in self.data.sortSubset(trees.iterkeys(), 
+        treeKeys = [ x[0] for x in self.data.sortSubset(trees.iterkeys(),
                                                         nodeSelect) ]
         return [ frozenset(self.get(y) for y in trees[x]) for x in treeKeys ]
 
@@ -436,7 +436,7 @@ class DirectedGraph:
             @param out: file-like object we write to
             @param labelFormatFn: function that takes a node as a parameter
               and returns the output string
-            @param edgeFormatFn: function that takes fromNode, toNode, value as 
+            @param edgeFormatFn: function that takes fromNode, toNode, value as
                            parameters and returns a string for the edge.
             @param filterFn: if given, is a function that returns true if a node
             should be included in the graph.

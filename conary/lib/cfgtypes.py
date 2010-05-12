@@ -335,7 +335,7 @@ class CfgLineList(CfgType):
 
     def toStrings(self, value, displayOptions=None):
         if value:
-            separator = self.separator 
+            separator = self.separator
             if separator is None:
                 separator = ' '
             yield separator.join(
@@ -548,10 +548,10 @@ class ParseError(CfgError):
     Indicates that an error occurred parsing the config file.
     """
     def __str__(self):
-	return self.val
+        return self.val
 
     def __init__(self, val):
-	self.val = str(val)
+        self.val = str(val)
 
 class CfgEnvironmentError(CfgError):
 

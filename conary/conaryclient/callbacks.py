@@ -88,7 +88,7 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
         @see: callbacks.UpdateCallback.creatingDatabaseTransaction
         """
         self._message("Creating database transaction (%d of %d)" %
-		      (troveNum, troveCount))
+                      (troveNum, troveCount))
 
     # fixme: callbacks need to be refactored
     def updatingDatabase(self, step, stepNum, stepCount):

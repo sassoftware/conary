@@ -28,11 +28,11 @@ from conary.deps import deps
 
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
-	f = files.BlockDevice(None)
+        f = files.BlockDevice(None)
     elif devtype == "c":
-	f = files.CharacterDevice(None)
+        f = files.CharacterDevice(None)
     else:
-	raise AssertionError
+        raise AssertionError
 
     f.devt.major.set(major)
     f.devt.minor.set(minor)
@@ -55,7 +55,7 @@ def _getUseFlavor(recipe):
         return deps.Flavor()
     f = use.createFlavor(recipe.name, use.Use._iterUsed(),
                          recipe.Flags._iterUsed(),
-                         use.Arch._iterUsed(), 
+                         use.Arch._iterUsed(),
                          targetDep=recipe.isCrossCompileTool())
     if recipe.isCrossCompileTool():
         # there's no guarantee that a cross compiler tool will mention
@@ -77,10 +77,10 @@ class BuildComponent(dict):
         """
         # skip uid/gid lookups because packagepolicy will change the
         # ownerships according to Ownership settings anyway
-	(f, linkCount, inode) = files.FileFromFilesystem(realPath, None, 
+        (f, linkCount, inode) = files.FileFromFilesystem(realPath, None,
                                         inodeInfo = True, assumeRoot = True)
-	f.inode.perms.set(f.inode.perms() & 01777)
-	self[path] = (realPath, f)
+        f.inode.perms.set(f.inode.perms() & 01777)
+        self[path] = (realPath, f)
         if (f.inode.perms() & 0400) != 0400:
             # we can safely change the permissions now, the original
             # permissions have been recorded
@@ -107,7 +107,7 @@ class BuildComponent(dict):
         @param path: the destination of the device node in the component
         """
         f = BuildDeviceFile(devtype, major, minor, owner, group, perms)
-	self[path] = (None, f)
+        self[path] = (None, f)
         return f
 
     def getFile(self, path):
@@ -123,7 +123,7 @@ class BuildComponent(dict):
         @returns: name of the BuildComponent
         @rtype: str
         """
-	return self.name
+        return self.name
 
     def getUserMap(self):
         """
@@ -164,7 +164,7 @@ class BuildComponent(dict):
         self.hardlinkMap = {}
         self.badhardlinks = []
         self.recipe = recipe
-	dict.__init__(self)
+        dict.__init__(self)
 
 
 class AutoBuildPackage:
@@ -175,12 +175,12 @@ class AutoBuildPackage:
     """
     def __init__(self, pkgFilters, compFilters, recipe):
         """
-	@param pkgFilters: Filters used to add files to main packages
-	@type pkgFilters: sequence of Filter instances
-	@param compFilters: Filters used to add files to components
-	@type compFilters: sequence of Filter instances
-	"""
-	self.pkgFilters = pkgFilters
+        @param pkgFilters: Filters used to add files to main packages
+        @type pkgFilters: sequence of Filter instances
+        @param compFilters: Filters used to add files to components
+        @type compFilters: sequence of Filter instances
+        """
+        self.pkgFilters = pkgFilters
         self.compFilters = compFilters
         self.recipe = recipe
 
@@ -188,19 +188,19 @@ class AutoBuildPackage:
         self.components = {}
         # reverse map from the package:component combination to
         # the correct build package
-	self.packageMap = {}
-	for main in self.pkgFilters:
-	    for comp in self.compFilters:
-		name = self._getname(main.name, comp.name)
-		if name not in self.components:
-		    self.components[name] = BuildComponent(name, recipe)
-		if main not in self.packageMap:
-		    self.packageMap[main] = {}
-		self.packageMap[main][comp] = self.components[name]
-	# dictionary from pathnames to fileobjects
-	self.pathMap = {}
-	# dictionary from pathnames to packages
-	self.componentMap = {}
+        self.packageMap = {}
+        for main in self.pkgFilters:
+            for comp in self.compFilters:
+                name = self._getname(main.name, comp.name)
+                if name not in self.components:
+                    self.components[name] = BuildComponent(name, recipe)
+                if main not in self.packageMap:
+                    self.packageMap[main] = {}
+                self.packageMap[main][comp] = self.components[name]
+        # dictionary from pathnames to fileobjects
+        self.pathMap = {}
+        # dictionary from pathnames to packages
+        self.componentMap = {}
         # dictionary from pathnames to lists of packages (capsules)
         self.pathComponentMap = {}
 
@@ -209,22 +209,22 @@ class AutoBuildPackage:
 
     def findComponent(self, path, mode=None):
         """
-	Return the BuildComponent that matches the path.
-	"""
+        Return the BuildComponent that matches the path.
+        """
         if path in self.componentMap:
             return self.componentMap[path]
-	for main in self.pkgFilters:
-	    if main.match(path, mode=mode):
-		for comp in self.compFilters:
-		    if comp.match(path, mode=mode):
-			self.componentMap[path] = self.packageMap[main][comp]
+        for main in self.pkgFilters:
+            if main.match(path, mode=mode):
+                for comp in self.compFilters:
+                    if comp.match(path, mode=mode):
+                        self.componentMap[path] = self.packageMap[main][comp]
                         return self.componentMap[path]
         return None
 
     def findComponents(self, path, mode=None):
         """
-	Return the BuildComponents that match the path.
-	"""
+        Return the BuildComponents that match the path.
+        """
         if path in self.pathComponentMap:
             return self.pathComponentMap[path]
         pkg = self.findComponent(path, mode)
@@ -232,7 +232,7 @@ class AutoBuildPackage:
             return [pkg]
 
         return None
-    
+
     def updateFileContents(self, path, realPath):
         """
         Update contents information, including sha1 and contents
@@ -273,16 +273,16 @@ class AutoBuildPackage:
 
     def delFile(self, path):
         """
-	Remove a file from the package and from the caches.
+        Remove a file from the package and from the caches.
 
         @param path: path to remove from the BuildComponent
         @type path: str
         @rtype: None
         """
         assert(len(self.pathComponentMap[path]) == 1) # not payload
-	del self.componentMap[path][path]
-	del self.componentMap[path]
-	del self.pathMap[path]
+        del self.componentMap[path][path]
+        del self.componentMap[path]
+        del self.pathMap[path]
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660, package=None):
@@ -295,14 +295,14 @@ class AutoBuildPackage:
         else:
             pkg = self.findComponent(path, mode=perms)
         f = pkg.addDevice(path, devtype, major, minor, owner, group, perms)
-	self.componentMap[path] = pkg
+        self.componentMap[path] = pkg
         self._addPackageMaps(path, f, pkg)
 
     def getComponents(self):
         """
         Examine the BuildComponent instances that have been created and
         return a list that includes only those which have files
-        
+
         @return: list of BuildComponent instances
         @rtype: list
         """

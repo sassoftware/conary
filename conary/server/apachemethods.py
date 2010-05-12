@@ -286,7 +286,7 @@ def putFile(port, isSecure, repos, req):
     path = repos.tmpPath + "/" + req.args + "-in"
     size = os.stat(path).st_size
     if size != 0:
-	return apache.HTTP_UNAUTHORIZED
+        return apache.HTTP_UNAUTHORIZED
 
     retcode = apache.OK
     f = open(path, "w+")
