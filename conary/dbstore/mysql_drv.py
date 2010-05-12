@@ -118,15 +118,15 @@ class Cursor(BaseCursor):
                 raise sqlerrors.CursorError(
                     "Do not pass both positional and named bind arguments",
                     *args, **kw)
-            self._tryExecute(self._cursor.execute, sql, args)
+            ret = self._tryExecute(self._cursor.execute, sql, args)
         elif len(keys): # check that all keys used in the query appear in the kw
             if False in [kw.has_key(x) for x in keys]:
-                raise sqlerrors.CursorError(
+                raise CursorError(
                     "Query keys not defined in named argument dict",
                     sorted(keys), sorted(kw.keys()))
-            self._tryExecute(self._cursor.execute, sql, kw)
+            ret = self._tryExecute(self._cursor.execute, sql, kw)
         else:
-            self._tryExecute(self._cursor.execute, sql)
+            ret = self._tryExecute(self._cursor.execute, sql)
         # FIXME: the MySQL bindings are not consistent about returning
         # the number of affected rows on all operations
         return self
@@ -153,7 +153,7 @@ class Cursor(BaseCursor):
         # if this is not an insert...values() query, loop over the paramList
         if not m:
             for parms in paramList:
-                self.__parmsExecute(sql, parms)
+                ret = self.__parmsExecute(sql, parms)
             return self
         # build MySQL-optimized version of executemany for INSERT
         crtLen = startLen = m.start(1)
@@ -187,9 +187,9 @@ class Cursor(BaseCursor):
         return (sql, keys)
     def execstmt(self, (sql, keys), *args):
         if isinstance(args[0], (tuple, list)):
-            self._tryExecute(self._cursor.execute, sql, *args)
+            ret = self._tryExecute(self._cursor.execute, sql, *args)
         else:
-            self._tryExecute(self._cursor.execute, sql, args)
+            ret = self._tryExecute(self._cursor.execute, sql, args)
         return self
 
 

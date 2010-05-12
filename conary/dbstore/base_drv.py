@@ -487,7 +487,7 @@ class BaseDatabase:
         self._dropIndexSql(table, name)
         try:
             self.tables[table].remove(name)
-        except ValueError:
+        except ValueError, e:
             pass
         return True
 

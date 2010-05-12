@@ -130,6 +130,7 @@ class TroveAdder:
 # we need to call this from the schema migration as well, which is why
 # we extracted it from the TroveStore class
 def addPrefixesFromList(db, dirnameList):
+    prefixList = []
     # all the new dirnames need to be processed for Prefixes links
     def _getPrefixes(dirname):
         # note: we deliberately do not insert '/' as a prefix for

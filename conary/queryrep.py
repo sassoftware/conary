@@ -379,6 +379,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
 
         # do post processing for VERSION_FILTER_LATEST, FLAVOR_FILTER_BEST,
         # and FLAVOR_FILTER_AVAIL
+        leavesFilter = {}
         troveTups = []
         for name, versionDict in resultsDict.iteritems():
             if affinityDb:
@@ -397,6 +398,7 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
                     if flavorFilter == FLAVOR_FILTER_BEST:
                         best = None
                         for systemFlavor in defaultFlavor:
+                            mathing = []
                             matchScores = []
                             if localFlavors:
                                 matchFlavors = [ deps.overrideFlavor(systemFlavor, x) for x in localFlavors]
@@ -523,9 +525,8 @@ def diffTroves(cfg, troveSpec, withTroveDeps = False, withFileTags = False,
     sNewTroves = set(newTroves)
     # trvAdded and trvRemoved are ignored here, we'll catch changes at the
     # toplevel compornent level anyway
-
-    # trvAdded = sNewTroves.difference(sOldTroves)
-    # trvRemoved = sOldTroves.difference(sNewTroves)
+    trvAdded = sNewTroves.difference(sOldTroves)
+    trvRemoved = sOldTroves.difference(sNewTroves)
     trvChanged = sNewTroves.intersection(sOldTroves)
 
     trvDepsKeys = DiffDisplay.troveDependencyLabels

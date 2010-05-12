@@ -21,7 +21,7 @@ from conary import conarycfg, versions
 from conary.repository import errors
 from conary.lib import digestlib, sha1helper, tracelog
 from conary.dbstore import sqlerrors
-from conary.repository.netrepos import items, accessmap
+from conary.repository.netrepos import items, versionops, accessmap
 from conary.server.schema import resetTable
 
 # FIXME: remove these compatibilty error classes later
@@ -243,7 +243,7 @@ class EntitlementAuthorization:
             try:
                 f = urllib2.urlopen(url)
                 xmlResponse = f.read()
-            except Exception:
+            except Exception, e:
                 return set()
 
             p = conarycfg.EntitlementParser()
@@ -741,7 +741,7 @@ class NetworkAuthorization:
         self._checkValidName(user)
         cu = self.db.transaction()
         try:
-            self.userAuth.addUserByMD5(cu, user, salt, password)
+            uid = self.userAuth.addUserByMD5(cu, user, salt, password)
         except:
             self.db.rollback()
             raise
@@ -779,7 +779,7 @@ class NetworkAuthorization:
             if cu.fetchone()[0] == 0:
                 try:
                     self.deleteRole(user, False)
-                except errors.RoleNotFound:
+                except errors.RoleNotFound, e:
                     pass
         self.userAuth.deleteUser(cu, user)
         self.db.commit()

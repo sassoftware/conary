@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import _sqlite3
-import os, tempfile
+import os, tempfile, unittest
 
 class TestSupport:
     def getfilename(self):

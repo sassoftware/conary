@@ -190,7 +190,7 @@ class CfgInt(CfgType):
     def parseString(self, val):
         try:
             return int(val)
-        except ValueError:
+        except ValueError, msg:
             raise ParseError, 'expected integer'
 
 class CfgBool(CfgType):

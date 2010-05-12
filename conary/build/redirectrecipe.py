@@ -296,6 +296,7 @@ class _RedirectRecipe(Recipe):
 
             # XXX the repository operations should be pulled out of all of
             # these loops
+            additionalNames = set()
             for rule in targetRules:
                 # get all of the flavors this rule specifies redirecting to
                 targetFlavors = rule.findAvailableTargetFlavors(self.repos)

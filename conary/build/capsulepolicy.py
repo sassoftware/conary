@@ -15,16 +15,22 @@
 Module used to override and augment packagepolicy specifically for Capsule
 Recipes
 """
+import codecs
+import imp
+import itertools
 import os
 import re
+import site
 import sre_constants
 import stat
+import sys
 
-from conary import files, rpmhelper
-from conary.build import filter, policy, packagepolicy
+from conary import files, trove, rpmhelper
+from conary.build import buildpackage, filter, policy, packagepolicy
+from conary.build import tags, use
 from conary.deps import deps
-from conary.lib import util
-
+from conary.lib import elf, magic, util, pydeps, fixedglob, graph
+from conary.local import database
 
 class ComponentSpec(packagepolicy.ComponentSpec):
     # normal packages need Config before ComponentSpec to enable the
@@ -80,6 +86,7 @@ class InitialContents(packagepolicy.InitialContents):
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
+        recipe = self.recipe
         if not os.path.isdir(fullpath) or os.path.islink(fullpath):
             for pkg in self.recipe.autopkg.findComponents(filename):
                 f = pkg.getFile(filename)
@@ -102,6 +109,7 @@ class Transient(packagepolicy.Transient):
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
+            recipe = self.recipe
             for pkg in self.recipe.autopkg.findComponents(filename):
                 f = pkg.getFile(filename)
                 # config or initialContents wins in capsule packages

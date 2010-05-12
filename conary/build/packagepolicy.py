@@ -29,6 +29,7 @@ from conary import files, trove
 from conary.build import buildpackage, filter, policy, recipe, tags, use
 from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
+from conary.local import database
 
 try:
     from xml.etree import ElementTree
@@ -595,6 +596,7 @@ class PackageSpec(_filterSpec):
 
     def preProcess(self):
         self.pkgFilters = []
+        recipe = self.recipe
         self.destdir = recipe.macros.destdir
         if self.exceptions:
             self.warn('PackageSpec does not honor exceptions')
@@ -721,6 +723,7 @@ class InitialContents(policy.Policy):
 
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
+        recipe = self.recipe
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
             self.info(filename)
             f = recipe.autopkg.pathMap[filename]
@@ -1438,6 +1441,7 @@ class _UserGroup(policy.Policy):
 	if path not in componentMap:
 	    return
 	pkg = componentMap[path]
+	f = pkg.getFile(path)
         if path not in pkg.requiresMap:
             pkg.requiresMap[path] = deps.DependencySet()
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, []))
@@ -2145,7 +2149,7 @@ class _dependency(policy.Policy):
                     newName = soDep.getName()[0]
                     if newName in nameMap:
                         oldName = nameMap[newName]
-                        recipe.Requires(_privateDepMap=(oldName, soDep))
+                        recipe.Requires(_privateDepMap=(oldname, soDep))
 
         return depSet
 
@@ -2301,7 +2305,7 @@ class _dependency(policy.Policy):
         perlIncPath = p.readlines()
         # make sure that the command completed successfully
         try:
-            p.close()
+            rc = p.close()
             perlIncPath = [x.strip() for x in perlIncPath if not x.startswith('.')]
             return [self._recurseSymlink(x, destdir)[0] for x in perlIncPath]
         except RuntimeError:
@@ -2592,6 +2596,9 @@ class Provides(_dependency):
         fullpath = macros.destdir + path
         basepath = os.path.basename(path)
         dirpath = os.path.dirname(path)
+
+        if os.path.exists(fullpath):
+            mode = os.lstat(fullpath)[stat.ST_MODE]
 
         # First, add in the manual provisions
         self.addExplicitProvides(path, fullpath, pkgFiles, macros, m)
@@ -3619,7 +3626,7 @@ class Requires(_addInfo, _dependency):
             else:
                 try:
                     self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, libdir, sysPath, self.error)
-                except pydeps.ModuleFinderInitializationError:
+                except pydeps.ModuleFinderInitializationError, e:
                     if bootstrapPython:
                         # another case, like isCrossCompiling, where we cannot
                         # run pythonPath -- ModuleFinderInitializationError

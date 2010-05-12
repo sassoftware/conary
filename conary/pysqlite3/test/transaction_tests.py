@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import testsupport
-import unittest
+import os, string, sys, types, unittest
 import sqlite3 as sqlite
 
 class TransactionTests(unittest.TestCase, testsupport.TestSupport):

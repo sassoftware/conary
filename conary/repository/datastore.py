@@ -37,6 +37,7 @@ class AbstractDataStore:
     def _writeFile(fileObj, outFds, precompressed, computeSha1):
         if precompressed and hasattr(fileObj, '_fdInfo'):
             (fd, start, size) = fileObj._fdInfo()
+            pid = os.getpid()
             realHash = misc.sha1Copy((fd, start, size), outFds)
             for x in outFds:
                 os.close(x)
@@ -157,7 +158,8 @@ class DataStore(AbstractDataStore):
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
 	path = self.hashToPath(hash)
-	open(path, "r")
+	f = open(path, "r")
+
 	gzfile = gzip.GzipFile(path, mode)
 	return gzfile
 

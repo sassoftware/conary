@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import testsupport
-import sys, types, unittest
+import os, string, sys, types, unittest
 import sqlite3 as sqlite
 
 def intreturner(x):
@@ -145,6 +145,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
                         "The result should have been None.")
 
     def CheckFunctionWithNullArgument(self):
+        mystr = "test"
         self.cur.execute("select nullreturner(NULL) as a")
         res = self.cur.fetchone()
         self.failUnlessEqual(res.a, None,
@@ -157,9 +158,9 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
         self.cur.execute("insert into test(a) values (?)", mystr)
         try:
             self.cur.execute("select exceptionreturner(a) as a from test")
-        except sqlite.DatabaseError:
+        except sqlite.DatabaseError, reason:
             pass
-        except Exception:
+        except Exception, reason:
             self.fail("Wrong exception raised: %s", sys.exc_info()[0])
 
     def CheckAggregateBasic(self):
@@ -185,9 +186,9 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
         self.cur.executemany("insert into test(a) values (?)", [(10,), (20,), (30,)])
         try:
             self.cur.execute("select mysumstepexception(a) as sum from test")
-        except sqlite.DatabaseError:
+        except sqlite.DatabaseError, reason:
             pass
-        except Exception:
+        except Exception, reason:
             self.fail("Wrong exception raised: %s" % sys.exc_info()[0])
 
     def CheckAggregateFinalizeException(self):
@@ -195,9 +196,9 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
         self.cur.executemany("insert into test(a) values (?)", [(10,), (20,), (30,)])
         try:
             self.cur.execute("select mysumfinalizeexception(a) as sum from test")
-        except sqlite.DatabaseError:
+        except sqlite.DatabaseError, reason:
             pass
-        except Exception:
+        except Exception, reason:
             self.fail("Wrong exception raised: %s", sys.exc_info()[0])
 
     def CheckAggregateStepNullArgument(self):

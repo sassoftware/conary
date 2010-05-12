@@ -74,6 +74,7 @@ class MainHandler(object):
         """
         thisCommand = self.abstractCommand()
         params, cfgMap = thisCommand.prepare()
+        defaultGroup = thisCommand.defaultGroup
         kwargs = self._getParserFlags(thisCommand)
         argSet, otherArgs, parser, optionSet = options._processArgs(
                                                     params, {}, cfg,
@@ -136,8 +137,8 @@ class MainHandler(object):
                                     ignoreErrors=self._ignoreConfigErrors)
         return ccfg
 
-    def getParser(self, commandName):
-        commandClass = self._supportedCommands[commandName]
+    def getParser(self, command):
+        thisCommand = self._supportedCommands[command]
         return self.getParserByClass(commandClass)
 
     def getParserByClass(self, commandClass, commandName=None):
@@ -191,7 +192,7 @@ class MainHandler(object):
 
         commandName = argv[1]
         if commandName not in self._supportedCommands:
-            self.usage()
+            rc = self.usage()
             raise errors.ParseError("%s: unknown command: '%s'" % (self.name, commandName))
         return self._supportedCommands[commandName]
 
@@ -203,6 +204,7 @@ class MainHandler(object):
         if argv is None:
             argv=sys.argv
         from conary import versions
+        supportedCommands = self._supportedCommands
 
         if '--version' in argv:
             print self.version

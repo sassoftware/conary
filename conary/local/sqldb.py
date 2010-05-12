@@ -1228,6 +1228,7 @@ order by
                         WHERE isPresent = 1 %s
                         ORDER BY path""" % dirClause)
 
+        lastId = None
         for instanceId, path, stream in cu:
             yield trvByInstanceId[instanceId], path, stream
 

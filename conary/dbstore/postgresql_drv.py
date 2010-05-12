@@ -110,7 +110,7 @@ class Cursor(BaseCursor):
             ret = self._tryExecute(self._cursor.execute, sql, args)
         elif len(keys): # check that all keys used in the query appear in the kw
             if False in [kw.has_key(x) for x in keys]:
-                raise sqlerrors.CursorError(
+                raise CursorError(
                     "Query keys not defined in named argument dict",
                     sorted(keys), sorted(kw.keys()))
             # need to transform kw into pozitional args
@@ -403,6 +403,8 @@ class Database(BaseDatabase):
             if value is None:
                 usedVal = False
                 value = 1
+            else:
+                values = int(value)
         cu.execute("select setval(?, ?, ?)", (seqName, value, usedVal))
         ret = cu.fetchall()
         assert (ret[0][0] == value)

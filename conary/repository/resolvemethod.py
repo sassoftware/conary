@@ -143,6 +143,11 @@ class DepResolutionMethod(object):
         # in an older version for some troves)
         # 2. only leave the latest version for each trove
         # 3. pick the best flavor out of the remaining
+        affinityMatches = []
+        affinityFlavors = []
+        otherMatches = []
+        otherFlavors = []
+
 
         troveNames = set([x[0] for x in troveTups])
         allAffinityTroves = list(itertools.chain(*[affFlavorDict[x] or []

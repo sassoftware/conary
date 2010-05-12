@@ -152,6 +152,7 @@ type ".quit" to exit, ".help" for help"""
             if col in self.manual_widths:
                 widths[col] = self.manual_widths[col]
         # the total width is the sum of widths plus | for each col
+        total = sum(widths) + (len(widths) - 1)
         # draw a bar like ---+---+---
         bar = '+'.join('-' * (x + 2) for x in widths)
         # surround it with + to make +---+---+---+

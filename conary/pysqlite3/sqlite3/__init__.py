@@ -49,8 +49,8 @@ UNICODESTRING = DBAPITypeObject(_sqlite.UNICODESTRING)
 # Exceptions
 #------------------------------------------------------------------------------
 
-from conary._sqlite3 import Warning, InterfaceError, \
-    OperationalError, IntegrityError, InternalError, \
+from conary._sqlite3 import Warning, Error, InterfaceError, \
+    DatabaseError, DataError, OperationalError, IntegrityError, InternalError, \
     ProgrammingError, NotSupportedError
 
 #------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ from conary._sqlite3 import Warning, InterfaceError, \
 def connect(*args, **kwargs):
     return Connection(*args, **kwargs)
 
-from conary._sqlite3 import decode
+from conary._sqlite3 import encode, decode
 
 __all__ = ['connect','IntegrityError', 'InterfaceError', 'InternalError',
            'NotSupportedError', 'OperationalError',

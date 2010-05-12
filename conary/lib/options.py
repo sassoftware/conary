@@ -15,6 +15,7 @@
 Command-line option handling
 """
 
+import inspect
 import optparse
 try:
     from cStringIO import StringIO

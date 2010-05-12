@@ -12,6 +12,7 @@
 # full details.
 
 from conary.deps import deps
+from conary.lib import api
 from conary.repository import changeset
 from conary import errors
 from conary import versions
@@ -98,6 +99,8 @@ class ClientBranch:
         newLabel = versions.Label(newLabel)
 
 	while troveList:
+            leavesByLabelOps = {}
+
             troves = self.repos.getTroves(troveList)
             troveList = set()
             branchedTroves = {}
@@ -208,6 +211,7 @@ cannot shadow earlier trove
             # check for duplicates
             hasTroves = self.repos.hasTroves(branchedTroves)
 
+            queryDict = {}
             for (name, version, flavor), troveCs in branchedTroves.iteritems():
                 if hasTroves[name, version, flavor]:
                     dupList.append((name, version.branch()))

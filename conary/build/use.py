@@ -463,19 +463,19 @@ class ArchCollection(Collection):
     def _getMacro(self, key):
         """ return the given macro value, as determined by the active arch flags
         """
-        currentArch = self.getCurrentArch()
-        if currentArch is None:
+        arch = self.getCurrentArch()
+        if arch is None:
             return None
-        return currentArch._getMacro(key)
+        return arch._getMacro(key)
 
 
     def _getMacros(self):
         """ return the macros defined by the current architecture 
         """
-        currentArch = self.getCurrentArch()
-        if currentArch is None:
+        arch = self.getCurrentArch()
+        if arch is None:
             return None
-        return currentArch._getMacros()
+        return arch._getMacros()
 
     def getCurrentArch(self):
         for majarch in self.itervalues():
@@ -550,6 +550,7 @@ class MajorArch(CollectionWithFlag):
 
     def _toDependency(self, depType=deps.InstructionSetDependency):
         set = deps.Flavor()
+        sense = self._getDepSense()
         dep = deps.Dependency(self._name, [])
         set.addDep(depType, dep)
         return set
@@ -783,6 +784,10 @@ def createFlavor(recipeName, *flagIterables, **kw):
         depType = deps.TargetInstructionSetDependency
     else:
         depType = deps.InstructionSetDependency
+    majArch = None
+    archFlags = {}
+    subsumed = {}
+    useFlags = []
     set = deps.Flavor()
     for flag in itertools.chain(*flagIterables):
         flagType = type(flag)
@@ -861,6 +866,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True, warn=False,
             elif not useCross:
                 continue
 
+            found = False
             try:
                 majorArch = arch.getMajorArch(depGroup.getDeps())
             except arch.IncompatibleInstructionSets, e:

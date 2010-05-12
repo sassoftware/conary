@@ -63,8 +63,7 @@ class DatabasePathConflictError(UpdateError):
 class PathConflictError(UpdateError):
 
     def __str__(self):
-        return "path conflict for %s (%s on head)" % (self.fsPath,
-                                                      self.headPath)
+        return "path conflict for %s (%s on head)" % (self.fsPath, headPath)
 
     def __init__(self, fsPath, headPath):
         self.fsPath = fsPath

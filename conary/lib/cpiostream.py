@@ -167,6 +167,25 @@ class CpioStream(object):
 
     def read(self, amt):
         return self._readExact(amt)
+        out = StringIO.StringIO()
+        buf = self.stream.read(size)
+        if not buf:
+            return
+        bufLen = len(buf)
+        offset = self._nextHeader
+        while offset < bufLen:
+            headerRemainder = CpioHeader.HeaderLength - bufLen + offset
+            if headerRemainder > 0:
+                nbuf = self.stream.read(headerRemainder)
+                bufLen += len(nbuf)
+                buf += nbuf
+            header = self.readHeader(buf[offset:])
+            self.transformHeader(header)
+            out.write(header.serialize())
+            out.write(buf[offset + CpioHeader.HeaderLength:offset + header.skip])
+            offset += header.skip
+        self._nextHeader = offset - bufLen
+        return buf
 
     @classmethod
     def readHeader(cls, buf):
@@ -225,3 +244,5 @@ class CpioExploder(CpioStream):
             if not stat.S_ISLNK(ent.header.mode):
                 os.chmod(target, ent.header.mode & 0777)
 
+if __name__ == '__main__':
+    sys.exit(main())

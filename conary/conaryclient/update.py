@@ -150,6 +150,7 @@ class ClientUpdate:
         redirections.
         """
 
+        troveSet = {}
         redirectHack = {}
 
         jobsToRemove = []
@@ -1088,6 +1089,9 @@ followLocalChanges: %s
                         if replaced[0] and respectFlavorAffinity:
                             if replacedInfo in localUpdatesByPresent:
                                 notInstalledFlavor = localUpdatesByPresent[replacedInfo][1]
+                                # create alreadyBranchSwitch variable for 
+                                # readability
+                                alreadyFlavorSwitch = True
                             elif replacedInfo in sameBranchLocalUpdates:
                                 notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
                             else:
@@ -1330,6 +1334,7 @@ followLocalChanges: %s
                                              newInfo)
 
         log.lowlevel('old and new versions are compatible')
+        replaced = (None, None)
         if not force:
             name = replacedInfo[0]
             self.updateCallback.warning(
@@ -1562,7 +1567,7 @@ conary erase '%s=%s[%s]'
                 try:
                     newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
                                                   withFiles = False)
-                except (TroveMissing, OpenError):
+                except (TroveMissing, OpenError), err:
                     # In the case where we're getting transitive closure
                     # for a relative changeset and hit a trove that is
                     # not included in the relative changeset (because it's
@@ -2095,6 +2100,7 @@ conary erase '%s=%s[%s]'
         byDefaultFalse = []
         byDefaultTrue = []
         count = 0
+        notByDefault = []
         for trv in toBeMigrated:
             if not recurse:
                 continue
@@ -2222,6 +2228,7 @@ conary erase '%s=%s[%s]'
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         troveSource.addChangeSet(cs)
 
+        rollbackFence = None
         # XXX this is horrible; we probablt have everything we need already,
         # I just don't know how to find it
         infoCs = troveSource.createChangeSet(finalJobs, withFiles = False)
@@ -2400,6 +2407,8 @@ conary erase '%s=%s[%s]'
                     exists.addTrove(presentOkay=True, *info)
                 else:
                     refd.addTrove(presentOkay=True, *info)
+
+            updateJobs = [  ]
 
             for job in exists.diff(refd)[2]:
                 if not job[2][0]:
@@ -2823,7 +2832,7 @@ conary erase '%s=%s[%s]'
                     criticalUpdateInfo = criticalUpdateInfo,
                     resolveSource = resolveSource,
                     updateJob = updJob, exactFlavors = exactFlavors)
-        except DependencyFailure:
+        except DependencyFailure, e:
             raise
         except:
             if restartChangeSets:

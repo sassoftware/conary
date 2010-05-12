@@ -95,8 +95,8 @@ def main():
     cust_id = createCustomer("Jane", "Doe", "JD0001")
 
     # Create two orders for the customer
-    createOrder(cust_id, "White Towel", 2)
-    createOrder(cust_id, "Blue Cup", 5)
+    ord_id = createOrder(cust_id, "White Towel", 2)
+    ord_id = createOrder(cust_id, "Blue Cup", 5)
 
     # Delete the customer, and all her orders.
     deleteCustomer(cust_id)
