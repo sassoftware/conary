@@ -3473,7 +3473,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         if oldCompatibilityClass == thisCompatClass:
             return False
 
-        postRollback = self.getPostRollbackScript()
+        postRollback = self._getScriptObj(_TROVESCRIPTS_POSTROLLBACK)
 
         if postRollback is None or not postRollback.script():
             # there is no rollback script; use a strict compatibility class
