@@ -18,6 +18,8 @@ Changes in @NEW@:
     * For locale RPM dependencies, RPM flags are now properly converted 
       to conary dep flags (CNY-3411)
     * Clone operations no longer print an error in the callback. (CNY-3413)
+    * The lookaside now properly handles URLs that include arguments.
+      (CNY-3218)
 
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the
