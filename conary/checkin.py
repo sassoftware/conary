@@ -24,11 +24,10 @@ import re
 import stat
 import sys
 import time
-import re
 
 from conary import callbacks
 from conary import changelog
-from conary import conarycfg, conaryclient
+from conary import conaryclient
 from conary import deps
 from conary import errors
 from conary import files
@@ -38,8 +37,6 @@ from conary.build import derivedrecipe, recipe
 from conary.build import loadrecipe, lookaside
 from conary.build import errors as builderrors
 from conary.build.macros import Macros
-from conary.build.packagerecipe import loadMacros
-from conary.build.cook import signAbsoluteChangeset
 from conary.build import cook, use
 from conary.conarycfg import selectSignatureKey
 from conary.conaryclient import cmdline
@@ -182,7 +179,7 @@ def checkout(repos, cfg, workDir, nameList, callback=None):
         try:
             trvList = repos.findTrove(cfg.buildLabel,
                                       (sourceName, versionStr, None))
-        except errors.TroveNotFound, e:
+        except errors.TroveNotFound:
             if not versionStr and not cfg.buildLabel:
                 raise errors.CvcError('buildLabel is not set.  Use '
                                       '--build-label or set buildLabel in '
@@ -502,8 +499,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
     recipeVersionStr = recipeClass.version
 
-    branch = state.getBranch()
-
     if (state.getLastMerged()
           and recipeVersionStr == state.getLastMerged().trailingRevision().getVersion()):
         # If we've merged, and our changes did not affect the original
@@ -702,7 +697,6 @@ def annotate(repos, filename):
     # sort verList into ascending order (first commit is first in list)
     labelVerList.sort()
 
-    switchedBranches = False
     branchVerList = {}
     for ver in labelVerList:
         b = ver.branch()
@@ -778,7 +772,6 @@ def annotate(repos, filename):
                 s.set_seqs(oldLines, newLines)
                 blocks = s.get_matching_blocks()
                 laststartnew = 0
-                laststartold = 0
                 for (startold, startnew, lines) in blocks:
                     # range (laststartnew, startnew) is the list of all
                     # lines in the newer of the two files being diffed
@@ -835,9 +828,7 @@ def annotate(repos, filename):
         # there are still unmatched lines, and there is a parent branch,
         # so search the parent branch for matches
         if not verList and branch.hasParentBranch():
-            switchedBranches = True
             branch = branch.parentBranch()
-            label = branch.label()
             if branch not in branchVerList:
                 labelVerList = repos.getTroveVersionsByBranch(
                         { troveName : { branch : None }})[troveName]
@@ -875,7 +866,6 @@ def annotate(repos, filename):
         name = line[1][1]
         date = time.strftime('%Y-%m-%d', time.localtime(tv.timeStamp))
         info = '(%-*s %s):' % (maxN, name, date)
-        versionStr = version.asString(defaultBranch=branch)
         # since the line is not necessary starting at a tabstop,
         # lines might not line up
         line[0] = line[0].replace('\t', ' ' * 8)
@@ -1760,7 +1750,6 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
     # t-sort the graph
     # We cannot have symlink loops at this point, it turns out that, for the
     # case l1 -> l2 -> l3 -> l1, os.path.exists(l1) will return False
-    nodeList = reversed(grph.getTotalOrdering())
     for deref in reversed(grph.getTotalOrdering()):
         if deref not in tlinks:
             # This is a source with nothing referencing it
@@ -2171,7 +2160,6 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     # allows us to search that source component for files that are
     # not in the current directory or lookaside cache.
     recipeClass._trove = srcPkg
-    srcFiles = {}
 
     # don't download sources for groups or filesets
     if not recipeClass.getType() in (recipe.RECIPE_TYPE_PACKAGE, recipe.RECIPE_TYPE_CAPSULE):
@@ -2202,8 +2190,8 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     # Get rid of the negative cache entries (CNY-3157)
     lcache.clearCacheDir(recipeObj.name, negative = True)
     try:
-        srcFiles = recipeObj.fetchAllSources(refreshFilter = refreshFilter,
-                                             skipFilter = skipFilter)
+        recipeObj.fetchAllSources(refreshFilter = refreshFilter,
+                                  skipFilter = skipFilter)
     except OSError, e:
         if e.errno == errno.ENOENT:
             raise errors.CvcError('Source file %s does not exist' %

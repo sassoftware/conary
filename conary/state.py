@@ -21,7 +21,6 @@ import os
 
 from conary import errors, trove
 from conary.deps import deps
-from conary.lib import api
 from conary.lib import sha1helper
 from conary import versions
 
@@ -326,7 +325,6 @@ class SourceStateFromLines(SourceState):
                'version'    : (True,  True ) }
 
     def _readFileList(self, lines, stateVersion, repos):
-        fileCount = int(lines[0][:-1])
         configFlagNeeded = []
         autoSourceFlagNeeded = []
 
@@ -339,7 +337,6 @@ class SourceStateFromLines(SourceState):
 
             isConfig = False
             refresh = False
-            isAutoSource = False
 
             if stateVersion >= 2:
                 info = FileInfo(str = fields.pop())
