@@ -14,6 +14,9 @@ Changes in @NEW@:
   o Bug Fixes:
     * For locale RPM dependencies, RPM flags are now properly converted 
       to conary dep flags (CNY-3411)
+    * Requests to a capsule-injecting proxy no longer fail if they
+      contain a mix of uncached capsule and non-capsule troves.
+      (CNY-3417)
 
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the
