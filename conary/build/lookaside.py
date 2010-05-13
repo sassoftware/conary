@@ -94,7 +94,7 @@ class laUrl(object):
         else:
             fragment = self.fragment or ''
             port = self.port or ''
-            path = self.path + ('?%s' % self.params or '')
+            path = self.path + (self.params and '?%s' % self.params or '')
             host = self.host
         if self.extension:
             path += '.' + self.extension
