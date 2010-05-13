@@ -18,9 +18,9 @@ import os.path
 #conary
 from conary.build import use
 from conary.deps import deps
-from conary.lib.cfg import *
+from conary.lib import cfg
 
-class CfgFlagSense(CfgType):
+class CfgFlagSense(cfg.CfgType):
     @staticmethod
     def parseString(val):
         val = val.lower()
@@ -33,7 +33,7 @@ class CfgFlagSense(CfgType):
         elif val == "required":
             sense = deps.FLAG_SENSE_REQUIRED
         else:
-            raise ParseError, ("unknown use value '%s'") % val
+            raise cfg.ParseError, ("unknown use value '%s'") % val
         return sense
 
     @staticmethod
@@ -47,25 +47,25 @@ class CfgFlagSense(CfgType):
         elif val == deps.FLAG_SENSE_REQUIRED:
             return "required"
 
-class SubArchConfig(ConfigFile):
+class SubArchConfig(cfg.ConfigFile):
     name             = None
     buildName        = None
     subsumes         = ''
-    buildRequired    = CfgBool
-    shortDoc         = CfgString
-    longDoc          = CfgString
-    macro            = CfgDict(CfgString)
+    buildRequired    = cfg.CfgBool
+    shortDoc         = cfg.CfgString
+    longDoc          = cfg.CfgString
+    macro            = cfg.CfgDict(cfg.CfgString)
 
-class ArchConfig(ConfigFile):
+class ArchConfig(cfg.ConfigFile):
 
     _requiredArchProps = ['bits32', 'bits64', 'LE', 'BE']
 
-    name             = CfgString
-    buildName        = CfgString
-    shortDoc         = CfgString
-    longDoc          = CfgString
-    archProp         = CfgDict(CfgBool)
-    macro            = CfgDict(CfgString)
+    name             = cfg.CfgString
+    buildName        = cfg.CfgString
+    shortDoc         = cfg.CfgString
+    longDoc          = cfg.CfgString
+    archProp         = cfg.CfgDict(cfg.CfgBool)
+    macro            = cfg.CfgDict(cfg.CfgString)
 
     def configLine(self, line, file = "override", lineno = '<No line>'):
         line = line.strip()
@@ -82,7 +82,7 @@ class ArchConfig(ConfigFile):
             self._sections[self._section].configLine(line, file, lineno)
         else:
 
-            ConfigFile.configLine(self, line, file, lineno)
+            cfg.ConfigFile.configLine(self, line, file, lineno)
 
 
     def setSection(self, sectionName):
@@ -91,13 +91,13 @@ class ArchConfig(ConfigFile):
         self._section = sectionName
 
     def __init__(self, name):
-        ConfigFile.__init__(self)
+        cfg.ConfigFile.__init__(self)
         self._section = ''
         self._sections = {}
         self.name = name
 
     def read(self, path):
-        ConfigFile.read(self, path)
+        cfg.ConfigFile.read(self, path)
         if sorted(self.archProp.iterkeys()) != sorted(self._requiredArchProps):
             raise RuntimeError, \
                     ('Arch %s must specify arch properties %s using the'
@@ -131,18 +131,18 @@ class ArchConfig(ConfigFile):
 
 
 
-class UseFlagConfig(ConfigFile):
+class UseFlagConfig(cfg.ConfigFile):
 
-    name             = CfgString
-    buildName        = CfgString
-    buildRequired    = (CfgBool, True)
+    name             = cfg.CfgString
+    buildName        = cfg.CfgString
+    buildRequired    = (cfg.CfgBool, True)
     sense            = (CfgFlagSense, deps.FLAG_SENSE_PREFERRED)
-    shortDoc         = CfgString
-    longDoc          = CfgString
-    platform         = (CfgBool, False)
+    shortDoc         = cfg.CfgString
+    longDoc          = cfg.CfgString
+    platform         = (cfg.CfgBool, False)
 
     def __init__(self, name):
-        ConfigFile.__init__(self)
+        cfg.ConfigFile.__init__(self)
         self.name = name
         self.path = None
 
@@ -154,7 +154,7 @@ class UseFlagConfig(ConfigFile):
                                                            'required'):
             self.configLine('sense %s' % contents, path, 1)
         else:
-            ConfigFile.read(self, path)
+            cfg.ConfigFile.read(self, path)
 
     def toDepFlag(self):
         return (self.name, self.sense)

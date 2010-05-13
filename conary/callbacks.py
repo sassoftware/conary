@@ -17,7 +17,7 @@ import traceback
 import types
 
 from conary import errors
-from conary.lib import log, api
+from conary.lib import log
 
 def passExceptions(f):
     f._passExceptions = True

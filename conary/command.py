@@ -15,8 +15,8 @@
 import os, sys, optparse
 
 from conary.conaryclient import cmdline
-from conary.lib import options, log
-from conary import state, versions
+from conary.lib import options
+from conary import versions
 
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)

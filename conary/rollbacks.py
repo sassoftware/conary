@@ -15,9 +15,7 @@
 import os
 import sys
 
-from conary import deps, versions
-
-from conary.lib import log, util
+from conary.lib import log
 from conary.local import database
 from conaryclient import cmdline
 
@@ -462,7 +460,7 @@ class _RollbackScripts(object):
         if g is not None:
             try:
                 scfile = file(cls._getScriptFileName(dir, idx))
-            except IOError, e:
+            except IOError:
                 # If a script is missing, oh well...
                 return
         rbs.add(g[0], scfile.read(), g[1], g[2], index=idx)
