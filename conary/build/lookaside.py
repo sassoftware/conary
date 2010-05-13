@@ -35,7 +35,7 @@ from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
 
 NETWORK_SCHEMES = ('http', 'https', 'ftp', 'mirror')
 
-NEGATIVE_CACHE_TTL = 60*60 # The TTL for negative cache entries (seconds)
+NEGATIVE_CACHE_TTL = 60 * 60  # The TTL for negative cache entries (seconds)
 
 
 class laUrl(object):
@@ -63,7 +63,7 @@ class laUrl(object):
         if parent:
             self.path = os.sep.join((self.path, parent.path))
             self.path = self.path.replace('//', '/')
-            self.extension=parent.extension
+            self.extension = parent.extension
         self.parent = parent
         assert self.parent is not self
         self.extension = extension
@@ -91,7 +91,8 @@ class laUrl(object):
         if self.parent and useParentPath:
             fragment = self.parent.fragment or ''
             port = self.parent.port or ''
-            path = self.parent.path + (self.parent.params or '')
+            path = self.parent.path + (self.parent.params and '?%s'
+                                       % self.parent.params or '')
             host = self.parent.host
         else:
             fragment = self.fragment or ''
@@ -139,7 +140,7 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False,
 def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
             httpHeaders={}, localOnly=False, guessName=None, suffixes=None,
             allowNone=False, refreshFilter=None, multiurlMap=None,
-            unifiedSourcePath = None):
+            unifiedSourcePath=None):
     # this is a bw compatible findAll method.
     if guessName:
         name = name + guessName
@@ -160,7 +161,6 @@ def findAll(cfg, repCache, name, location, srcdirs, autoSource=False,
         searchMethod = ff.SEARCH_REPOSITORY_ONLY
     else:
         searchMethod = ff.SEARCH_ALL
-
 
     results = ff.fetch(name, suffixes=suffixes, archivePath=unifiedSourcePath,
                        allowNone=allowNone, searchMethod=searchMethod,
@@ -188,7 +188,7 @@ class FileFinder(object):
     SEARCH_LOCAL_ONLY = 2
 
     def __init__(self, recipeName, repositoryCache, localDirs=None,
-                 multiurlMap=None, refreshFilter=None, mirrorDirs = None,
+                 multiurlMap=None, refreshFilter=None, mirrorDirs=None,
                  cfg=None):
         self.cfg = cfg
         self.recipeName = recipeName
@@ -203,7 +203,7 @@ class FileFinder(object):
         self.noproxyFilter = util.noproxyFilter()
 
     def fetch(self, urlStr, suffixes=None, archivePath=None, headers=None,
-              allowNone=False, searchMethod=0, # SEARCH_ALL
+              allowNone=False, searchMethod=0,  # SEARCH_ALL
               refreshFilter=None):
 
         urlList = self._getPathsToSearch(urlStr, suffixes)
@@ -237,7 +237,7 @@ class FileFinder(object):
             elif refresh:
                 self.searchNetworkSources(url, headers)
             self.searchRepository(url)
-        else: #SEARCH_ALL
+        else:  # SEARCH_ALL
             self.searchFilesystem(url)
             if archivePath:
                 self.searchArchive(archivePath, url)
@@ -323,7 +323,7 @@ class FileFinder(object):
             for url in urlObjList:
                 for suffix in suffixes:
                     newurl = copy.copy(url)
-                    newurl.extension=suffix
+                    newurl.extension = suffix
                     newUrlObjList.append(newurl)
             urlObjList = newUrlObjList
         return urlObjList
@@ -489,7 +489,7 @@ class RepositoryCache(object):
                 csCallback = ChangesetCallback()
 
             f = self.repos.getFileContents(
-                [(fileId, troveFileVersion)], callback = csCallback)[0].get()
+                [(fileId, troveFileVersion)], callback=csCallback)[0].get()
             util.copyfileobj(f, open(cachePath, "w"))
             fileObj = self.repos.getFileVersion(
                 pathId, fileId, troveFileVersion)
@@ -520,8 +520,8 @@ class RepositoryCache(object):
             wrapper = callbacks.CallbackRateWrapper(callback, callback.fetch,
                                                     contentLength)
             util.copyfileobj(infile, f, bufSize=BLOCKSIZE,
-                             rateLimit = self.downloadRateLimit,
-                             callback = wrapper.callback)
+                             rateLimit=self.downloadRateLimit,
+                             callback=wrapper.callback)
 
             f.close()
             infile.close()
@@ -548,18 +548,18 @@ class RepositoryCache(object):
 
     def getCachePath(self, cachePrefix, url, negative=False):
         if isinstance(url, str):
-            url=laUrl(url)
+            url = laUrl(url)
         cacheDir = self.getCacheDir(cachePrefix, negative=negative)
         cachePath = os.sep.join((cacheDir, url.filePath(not negative)))
         return os.path.normpath(cachePath)
 
     def clearCacheDir(self, cachePrefix, negative=False):
-        negativeCachePath = self.getCacheDir(cachePrefix, negative = negative)
-        util.rmtree(os.path.dirname(negativeCachePath), ignore_errors = True)
+        negativeCachePath = self.getCacheDir(cachePrefix, negative=negative)
+        util.rmtree(os.path.dirname(negativeCachePath), ignore_errors=True)
 
     def createNegativeCacheEntry(self, cachePrefix, url):
         if isinstance(url, str):
-            url=laUrl(url)
+            url = laUrl(url)
         cachePath = self.getCachePath(cachePrefix, url, negative=True)
         util.mkdirChain(os.path.dirname(cachePath))
         open(cachePath, 'w+')
