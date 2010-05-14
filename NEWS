@@ -17,6 +17,8 @@ Changes in @NEW@:
     * Requests to a capsule-injecting proxy no longer fail if they
       contain a mix of uncached capsule and non-capsule troves.
       (CNY-3417)
+    * Pluggable policy can now override internal policy of the same
+      name.  (CNY-3419)
 
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the
