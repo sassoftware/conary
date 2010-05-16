@@ -794,6 +794,29 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
     # name -> policy classes
     policyNameMap = {}
 
+    # Load conary internal policy. Note that these are now loaded first, 
+    # so that pluggable policy may override internal policy.  Also note
+    # that the order of the internalPolicyModules list matters, as the
+    # *last* module of a given name which is loaded wins.  This is
+    # also true of pluggable policy, so the policyDirs config option must
+    # be carefully constructed in reverse order of preference.
+
+    import conary.build.destdirpolicy
+    import conary.build.derivedpolicy
+    import conary.build.derivedcapsulepolicy
+    import conary.build.infopolicy
+    import conary.build.packagepolicy
+    import conary.build.capsulepolicy
+    import conary.build.grouppolicy
+    for pt in internalPolicyModules:
+        m = sys.modules['conary.build.'+pt]
+        for symbolName in m.__dict__.keys():
+            policyCls = m.__dict__[symbolName]
+            if type(policyCls) is not classType:
+                continue
+            if symbolName[0] != '_' and issubclass(policyCls, basePolicy):
+                policyNameMap[symbolName] = policyCls
+
     # Load pluggable policy
     for policyDir in recipeObj.cfg.policyDirs:
         if not os.path.isdir(policyDir):
@@ -819,23 +842,6 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
                 if symbolName[0].isupper() and issubclass(policyCls,
                         basePolicy):
                     policyNameMap[symbolName] = policyCls
-
-    # Load conary internal policy
-    import conary.build.destdirpolicy
-    import conary.build.derivedpolicy
-    import conary.build.derivedcapsulepolicy
-    import conary.build.infopolicy
-    import conary.build.packagepolicy
-    import conary.build.capsulepolicy
-    import conary.build.grouppolicy
-    for pt in internalPolicyModules:
-        m = sys.modules['conary.build.'+pt]
-        for symbolName in m.__dict__.keys():
-            policyCls = m.__dict__[symbolName]
-            if type(policyCls) is not classType:
-                continue
-            if symbolName[0] != '_' and issubclass(policyCls, basePolicy):
-                policyNameMap[symbolName] = policyCls
 
     # Enforce dependencies
     missingDeps = []
