@@ -834,9 +834,6 @@ def loadPolicy(recipeObj, policySet = None, internalPolicyModules = (),
             policyCls = m.__dict__[symbolName]
             if type(policyCls) is not classType:
                 continue
-            # Let pluggable policy override internal policy (CNY-3419)
-            if policyNameMap.has_key(symbolName):
-                continue
             if symbolName[0] != '_' and issubclass(policyCls, basePolicy):
                 policyNameMap[symbolName] = policyCls
 
