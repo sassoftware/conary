@@ -874,15 +874,15 @@ class ChangesetFilter(BaseProxy):
                                                          suffix = ".ccs-temp")
                         os.unlink(tmppath)
                         fobj = os.fdopen(fd, "w+")
-                        size = cs.appendToFile(fobj)
-                        fobj.seek(0)
-                        csInfo.size = size
+                        csInfo.size = cs.appendToFile(fobj)
+                        csInfo.rawSize = fobj.tell()
                         csInfo.fingerprint = fprint
+                        fobj.seek(0)
 
                         # Cache the changeset
                         csPath = self.csCache.set(
                             (csInfo.fingerprint, csInfo.version),
-                            (csInfo, fobj, size))
+                            (csInfo, fobj, csInfo.rawSize))
                         fobj.close()
                         csInfo.path = csPath
                         # save csInfo
