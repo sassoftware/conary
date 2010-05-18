@@ -593,6 +593,7 @@ def extractFilesFromCpio(fileIn, fileList, tmpDir = '/tmp'):
         results.append(inodeMap.get(key))
     return results
 
+
 def UncompressedRpmPayload(fileIn):
     """
     Given a (seekable) file object containing an RPM package, return
@@ -602,32 +603,38 @@ def UncompressedRpmPayload(fileIn):
     header = readHeader(fileIn)
     # check to make sure that this is a cpio archive (though most rpms
     # are cpio).  If the tag does not exist, assume it's cpio
-    if header.has_key(PAYLOADFORMAT):
+    if PAYLOADFORMAT in header:
         if header[PAYLOADFORMAT] != 'cpio':
             raise UnknownPayloadFormat(header[PAYLOADFORMAT])
 
     # check to see how the payload is compressed.  Again, if the tag
-    # does not exist, assume that it's gzip.
-    if header.has_key(PAYLOADCOMPRESSOR):
+    # does not exist, check if it is gzip, if not it is uncompressed
+    if PAYLOADCOMPRESSOR in header:
         compression = header[PAYLOADCOMPRESSOR]
     else:
-        compression = 'gzip'
-
+        b = fileIn.read(4096)
+        if len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
+            compression = 'gzip'
+        else:
+            compression = 'uncompressed'
     # rewind the file to let seekToData do its job
     fileIn.seek(0)
     seekToData(fileIn)
 
     if compression == 'gzip':
-        uncompressed = util.GzipFile(fileobj=fileIn, mode = "r")
+        uncompressed = util.GzipFile(fileobj=fileIn, mode="r")
         #uncompressed._new_member = False
     elif compression == 'bzip2':
         uncompressed = util.BZ2File(fileIn)
     elif compression in ['lzma', 'xz']:
         uncompressed = util.LZMAFile(fileIn)
+    elif compression == 'uncompressed':
+        uncompressed = fileIn
     else:
         raise UnknownCompressionType(compression)
 
     return uncompressed
+
 
 class NEVRA(object):
     _re = re.compile("^(.*)-([^-]*)-([^-]*)\.([^.]*)$")
