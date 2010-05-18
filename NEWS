@@ -23,6 +23,7 @@ Changes in @NEW@:
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the
       check doesn't match a group component.
+    * The "recreatedb" script is now installed as part of "make install".
 
 Changes in 2.1.15:
   o New Features:
