@@ -19,7 +19,7 @@ extra_dist = Makefile \
 	     perlreqs.pl findmissingbuildreqs
 
 bin_scripts = rpm2cpio dbsh conary-debug ccs2tar
-util_scripts = dumpcontainer localupdateinfo mirror md5pw showchangeset logcat listcachedir
+util_scripts = dumpcontainer localupdateinfo mirror md5pw showchangeset logcat listcachedir recreatedb
 
 dist_files = $(python_files) $(extra_dist) $(bin_scripts) $(util_scripts)
 

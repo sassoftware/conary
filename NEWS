@@ -25,10 +25,13 @@ Changes in @NEW@:
       (CNY-3417)
     * Pluggable policy can now override internal policy of the same
       name.  (CNY-3419)
+    * Tags now only execute the "handler update" command if the
+      tag handler script is installed.  (CNY-3422)
 
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the
       check doesn't match a group component.
+    * The "recreatedb" script is now installed as part of "make install".
 
 Changes in 2.1.15:
   o New Features:

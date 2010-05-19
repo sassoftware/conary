@@ -652,7 +652,9 @@ class FilesystemJob:
             if self.tagUpdates.has_key(tagInfo.tag):
                 del self.tagUpdates[tagInfo.tag]
 
-            if "handler update" in tagInfo.implements:
+            # Only fire "handler update" if the handler exists 
+            if ("handler update" in tagInfo.implements and
+                self.db.iterTrovesByPath(tagInfo.file)):
                 tagCommands.addCommand(tagInfo, 'handler', 'update',
                     [x for x in self.db.iterFilesWithTag(tagInfo.tag)])
             elif "files update" in tagInfo.implements:
