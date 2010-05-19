@@ -1,4 +1,4 @@
-Changes in @NEW@:
+Changes in 2.1.16:
   o New Features:
     * RPM capsule packages can now derived.  In addition, capsule 
       recipes can now be used to modify the contents of a capsule or add
