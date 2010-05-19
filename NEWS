@@ -1,5 +1,16 @@
 Changes in @NEW@:
   o New Features:
+    * The addCapsule source action now takes a ignoreAllConflictingTimes
+      boolean argument which causes it to not raise errors when overlapping
+      paths otherwise allowed have conflicting mtimes. (CNY-3415)
+
+  o Bug Fixes:
+
+  o Internal Changes:
+
+
+Changes in 2.1.16:
+  o New Features:
     * RPM capsule packages can now derived.  In addition, capsule 
       recipes can now be used to modify the contents of a capsule or add
       files to the capsule component in the non-derived case as well. 
@@ -10,9 +21,12 @@ Changes in @NEW@:
     * Some unhandled tags will cause errors at build time, to
       ensure that any necessary handling is done before such
       packages are built into a repository. (CNY-3404)
-    * The addCapsule source action now takes a ignoreAllConflictingTimes
-      boolean argument which causes it to not raise errors when overlapping
-      paths otherwise allowed have conflicting mtimes. (CNY-3415)
+    * Allow automatic sharing of InitialContents files, including ghost
+      files for encapsulated RPMs
+    * Allow encapsulated files in /usr/share/doc to silently replace each
+      other. This mirrors a feature in the patched version of RPM Red Hat
+      shipped in RHEL4 and RHEL5 which is used for biarch packages.
+      (CNY-3420)
 
   o Bug Fixes:
     * For locale RPM dependencies, RPM flags are now properly converted 
@@ -25,10 +39,13 @@ Changes in @NEW@:
       (CNY-3417)
     * Pluggable policy can now override internal policy of the same
       name.  (CNY-3419)
+    * Tags now only execute the "handler update" command if the
+      tag handler script is installed.  (CNY-3422)
 
   o Internal Changes:
     * Tests for 'group-' in a name now check for :, ensuring that the
       check doesn't match a group component.
+    * The "recreatedb" script is now installed as part of "make install".
 
 Changes in 2.1.15:
   o New Features:

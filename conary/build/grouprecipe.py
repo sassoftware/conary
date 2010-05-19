@@ -3124,6 +3124,10 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
 
             paths = []
             for path, fileInfo in pathList:
+                if path.startswith('/usr/share/doc/'):
+                    # gross hack from rhel4/rhel5 patched rpm
+                    continue
+
                 fileIdAndObj = list(set([ (x[2], filesByFileId[x[2]])
                                             for x in fileInfo ]))
                 # these pathIds might be compatible with each other despite
