@@ -1082,6 +1082,10 @@ order by
                     # "existing" is better than "added"
                     continue
 
+                if path.startswith('/usr/share/doc/'):
+                    # gross. following a hack in a rhel4/rhel5 patch to rpm.
+                    continue
+
             if replaceFiles:
                 replaceExisting = True
 

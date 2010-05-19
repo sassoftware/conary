@@ -12,6 +12,10 @@ Changes in @NEW@:
       packages are built into a repository. (CNY-3404)
     * Allow automatic sharing of InitialContents files, including ghost
       files for encapsulated RPMs
+    * Allow encapsulated files in /usr/share/doc to silently replace each
+      other. This mirrors a feature in the patched version of RPM Red Hat
+      shipped in RHEL4 and RHEL5 which is used for biarch packages.
+      (CNY-3420)
 
   o Bug Fixes:
     * For locale RPM dependencies, RPM flags are now properly converted 

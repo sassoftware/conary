@@ -287,6 +287,10 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                         self.fsJob.sharedFile(info[0], info[1], info[2],
                                               info[3])
                     action = ACTION_RESTORE
+                elif path.startswith('/usr/share/doc/'):
+                    # Mirror badness Red Hat patches into RPM for rhel4
+                    # and rhel5
+                    action = ACTION_RESTORE
                 else:
                     existingFiles = [ files.ThawFile(x[5], pathId) for x
                                         in existingOwners ]
