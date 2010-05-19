@@ -584,8 +584,10 @@ class RegularFile(File):
     hasContents = True
 
     def compatibleWith(self, other):
-        return (File.compatibleWith(self, other) and
-                self.contents == other.contents)
+        return ( (File.compatibleWith(self, other) and
+                  self.contents == other.contents)
+                or (self.flags.isInitialContents() and
+                    other.flags.isInitialContents()) )
 
     def sizeString(self):
 	return "%8d" % self.contents.size()
