@@ -1,5 +1,8 @@
 Changes in @NEW@:
   o New Features:
+    * The addCapsule source action now takes a ignoreAllConflictingTimes
+      boolean argument which causes it to not raise errors when overlapping
+      paths otherwise allowed have conflicting mtimes. (CNY-3415)
 
   o Bug Fixes:
 
@@ -28,6 +31,9 @@ Changes in 2.1.16:
   o Bug Fixes:
     * For locale RPM dependencies, RPM flags are now properly converted 
       to conary dep flags (CNY-3411)
+    * Clone operations no longer print an error in the callback. (CNY-3413)
+    * The lookaside now properly handles URLs that include arguments.
+      (CNY-3418)
     * Requests to a capsule-injecting proxy no longer fail if they
       contain a mix of uncached capsule and non-capsule troves.
       (CNY-3417)

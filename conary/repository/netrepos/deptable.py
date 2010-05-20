@@ -90,7 +90,7 @@ class DependencyTables:
         self.db.analyze("tmpDeps")
         self.db.analyze("tmpDepNum")
         return depNums
-    
+
     def resolve(self, groupIds, label, depList, troveList=[], leavesOnly = False):
         """ Determine troves that provide the given dependencies,
             restricting by label and limiting to latest version for
@@ -118,11 +118,11 @@ class DependencyTables:
             Items.item, flavor, version, Nodes.timeStamps,
             Nodes.finalTimestamp as finalTimestamp
         from tmpDepNum
-        join ( 
-            select 
-                tmpDeps.idx as idx, 
+        join (
+            select
+                tmpDeps.idx as idx,
                 tmpDeps.depNum as depNum,
-                Provides.instanceId as instanceid, 
+                Provides.instanceId as instanceid,
                 count(*) as flagCount
             from tmpDeps
             join Dependencies using(class, name, flag)
@@ -131,7 +131,7 @@ class DependencyTables:
         ) as DepSelect using(idx, depNum, flagCount)
         join Instances on
             Instances.instanceId = DepSelect.instanceId
-        join Nodes using(itemId, versionId) """    
+        join Nodes using(itemId, versionId) """
 
         where = ["ugi.userGroupId in (%s)" % (
             ",".join("%d" % x for x in groupIds),)]
@@ -179,7 +179,7 @@ class DependencyTables:
             retList = sorted(cu, key = lambda a: (a[0], a[1], -a[6]))
         else:
             retList = cu
-            
+
         ret = {}
         for (depId, depNum, troveName, flavorStr, versionStr, timeStamps, ft) in retList:
             retd = ret.setdefault(depId, [{} for x in xrange(depNums[depId])])

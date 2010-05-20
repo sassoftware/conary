@@ -13,7 +13,7 @@
 #
 
 """ XMLRPC transport class that uses urllib to allow for proxies
-    Unfortunately, urllib needs some touching up to allow 
+    Unfortunately, urllib needs some touching up to allow
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
@@ -435,7 +435,7 @@ class URLOpener(urllib.FancyURLopener):
                     selector = rest
                 else:
                     self.usedProxy = True
-                    # To make it visible for users of this object 
+                    # To make it visible for users of this object
                     # that we're going through a proxy
                     self.proxyHost = host
                     if useConaryProxy:
@@ -453,7 +453,7 @@ class URLOpener(urllib.FancyURLopener):
             ipOrHost = getIPAddress(host)
         else:
             ipOrHost = host
-        
+
         if user_passwd:
             auth = util.ProtectedString(base64.b64encode(user_passwd))
         else:
@@ -541,8 +541,8 @@ class URLOpener(urllib.FancyURLopener):
 
     def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
-	   one magic string -- the content type --
-	   which is hardcoded in (this version also supports https)"""
+           one magic string -- the content type --
+           which is hardcoded in (this version also supports https)"""
         # Splitting some of the functionality so we can reuse this code with
         # PUT requests too
         h, urlstr, selector, headers = self.createConnection(url, ssl=ssl)
@@ -606,7 +606,7 @@ class URLOpener(urllib.FancyURLopener):
             pt = 'HTTP'
         else:
             pt = 'Conary'
-        error.args = (error[0], "%s (via %s proxy %s)" % 
+        error.args = (error[0], "%s (via %s proxy %s)" %
             (error[1], pt, self.proxyHost))
 
     def _wait(self, h):
@@ -689,9 +689,9 @@ def getrealhost(host):
     atpoint = host.find('@') + 1
     colpoint = host.rfind(':')
     if colpoint == -1 or colpoint < atpoint:
-	return host[atpoint:]
+        return host[atpoint:]
     else:
-	return host[atpoint:colpoint]
+        return host[atpoint:colpoint]
 
 
 class Transport(xmlrpclib.Transport):
@@ -754,7 +754,7 @@ class Transport(xmlrpclib.Transport):
         return 'http'
 
     def request(self, host, handler, body, verbose=0):
-	self.verbose = verbose
+        self.verbose = verbose
 
         protocol = self._protocol()
 
@@ -762,13 +762,13 @@ class Transport(xmlrpclib.Transport):
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 
-	opener.addheaders = []
-	host, extra_headers, x509 = self.get_host_info(host)
-	if extra_headers:
-	    if isinstance(extra_headers, dict):
-		extra_headers = extra_headers.items()
-	    for key, value in extra_headers:
-		opener.addheader(key,value)
+        opener.addheaders = []
+        host, extra_headers, x509 = self.get_host_info(host)
+        if extra_headers:
+            if isinstance(extra_headers, dict):
+                extra_headers = extra_headers.items()
+            for key, value in extra_headers:
+                opener.addheader(key,value)
 
         if self.entitlement:
             opener.addheader('X-Conary-Entitlement', self.entitlement)
@@ -829,7 +829,7 @@ class Transport(xmlrpclib.Transport):
             self.responseProtocol = response.protocolVersion
         resp = self.parse_response(response)
         rc = ( [ usedAnonymous ] + resp[0], )
-	return rc
+        return rc
 
     def getparser(self):
         return util.xmlrpcGetParser()

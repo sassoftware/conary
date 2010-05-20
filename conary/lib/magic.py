@@ -32,24 +32,24 @@ class Magic(object):
     __slots__ = ['path', 'basedir', 'contents', 'name']
     # The file type is a generic string for a specific file type
     def __init__(self, path, basedir):
-	self.path = path
-	self.basedir = basedir
+        self.path = path
+        self.basedir = basedir
         if not hasattr(self, 'contents'):
             self.contents = {}
-	self.name = self.__class__.__name__
+        self.name = self.__class__.__name__
 
 
 class ELF(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
         fullpath = basedir+path
-	self.contents['stripped'] = elf.stripped(fullpath)
+        self.contents['stripped'] = elf.stripped(fullpath)
         if self.__class__ is ELF:
             # ar doesn't deal with hasDebug or RPATH
             self.contents['hasDebug'] = elf.hasDebug(fullpath)
             self.contents['RPATH'] = elf.getRPATH(fullpath)
             self.contents['Type'] = elf.getType(fullpath)
-	requires, provides = elf.inspect(fullpath)
+        requires, provides = elf.inspect(fullpath)
         # Filter None abi flags
         requires = [ x for x in requires
                      if x[0] != 'abi' or x[2][0] is not None ]
@@ -65,9 +65,9 @@ class ELF(Magic):
 
 class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):
-	ELF.__init__(self, path, basedir)
-	# no point in looking for __.SYMDEF because GNU ar always keeps
-	# symbol table up to date
+        ELF.__init__(self, path, basedir)
+        # no point in looking for __.SYMDEF because GNU ar always keeps
+        # symbol table up to date
         # ar archives, like ELF files, are investigated by our elf module.
         # We do still want to be able to distinguish between them via magic,
         # thus the two classes.
@@ -79,13 +79,13 @@ class tar(Magic):
 
 class gzip(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
-	if buffer[3] == '\x08':
-	    self.contents['name'] = _string(buffer[10:])
-	if buffer[8] == '\x02':
-	    self.contents['compression'] = '9'
-	else:
-	    self.contents['compression'] = '1'
+        Magic.__init__(self, path, basedir)
+        if buffer[3] == '\x08':
+            self.contents['name'] = _string(buffer[10:])
+        if buffer[8] == '\x02':
+            self.contents['compression'] = '9'
+        else:
+            self.contents['compression'] = '1'
 
 class tar_gz(gzip, tar):
     def __init__(self, path, basedir = '', gzipBuffer = '', tarBuffer = ''):
@@ -94,8 +94,8 @@ class tar_gz(gzip, tar):
 
 class bzip(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
-	self.contents['compression'] = buffer[3]
+        Magic.__init__(self, path, basedir)
+        self.contents['compression'] = buffer[3]
 
 class tar_bz2(bzip, tar):
     def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
@@ -104,7 +104,7 @@ class tar_bz2(bzip, tar):
 
 class xz(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
 
 class tar_xz(bzip, tar):
     def __init__(self, path, basedir = '', bzipBuffer = '', tarBuffer = ''):
@@ -113,7 +113,7 @@ class tar_xz(bzip, tar):
 
 class changeset(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
 
 class deb(Magic):
     "Debian package"
@@ -140,7 +140,7 @@ class deb(Magic):
 
 class jar(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
         self.contents['files'] = filesMap = {}
         self.contents['provides'] = set()
         self.contents['requires'] = set()
@@ -197,12 +197,12 @@ class EAR(WAR):
 
 class ZIP(Magic):
     def __init__(self, path, basedir='', zipFileObj = None, fileList = []):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
 
 
 class java(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
         fullpath = basedir+path
         prov, req = javadeps.getDeps(file(fullpath).read())
         if prov:
@@ -216,7 +216,7 @@ class script(Magic):
     interpreterRe = re.compile(r'^#!\s*([^\s]*)')
     lineRe = re.compile(r'^#!\s*(.*)')
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
         m = self.interpreterRe.match(buffer)
         self.contents['interpreter'] = m.group(1)
         m = self.lineRe.match(buffer)
@@ -225,12 +225,12 @@ class script(Magic):
 
 class ltwrapper(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
 
 
 class CIL(Magic):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
 
 class RPM(Magic):
     _tagMap = [
@@ -244,7 +244,7 @@ class RPM(Magic):
         ("license", rpmhelper.LICENSE, str),
     ]
     def __init__(self, path, basedir=''):
-	Magic.__init__(self, path, basedir)
+        Magic.__init__(self, path, basedir)
         try:
             f = file(path)
         except:
@@ -279,11 +279,11 @@ def magic(path, basedir=''):
     Returns a magic class with information about the file mentioned
     """
     if basedir and not basedir.endswith('/'):
-	basedir += '/'
+        basedir += '/'
 
     n = basedir+path
     if not util.exists(n) or not util.isregular(n):
-	return None
+        return None
 
     oldmode = None
     mode = os.lstat(n)[stat.ST_MODE]
@@ -299,11 +299,11 @@ def magic(path, basedir=''):
     f.close()
 
     if len(b) > 4 and b[0] == '\x7f' and b[1:4] == "ELF":
-	return ELF(path, basedir, b)
+        return ELF(path, basedir, b)
     elif len(b) > 14 and b[0:14] == '!<arch>\ndebian':
-	return deb(path, basedir)
+        return deb(path, basedir)
     elif len(b) > 7 and b[0:7] == "!<arch>":
-	return ar(path, basedir, b)
+        return ar(path, basedir, b)
     elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
         try:
             uncompressedBuffer = gzip_module.GzipFile(n).read(4096)
@@ -330,7 +330,7 @@ def magic(path, basedir=''):
         # http://tukaani.org/xz/xz-file-format.txt
         return xz(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
-	return changeset(path, basedir, b)
+        return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":
         # Zip file. Peek inside the file to extract the file list
         try:
@@ -382,11 +382,11 @@ def magic(path, basedir=''):
 
 class magicCache(dict):
     def __init__(self, basedir=''):
-	self.basedir = basedir
+        self.basedir = basedir
     def __getitem__(self, name):
-	if name not in self:
-	    self[name] = magic(name, self.basedir)
-	return dict.__getitem__(self, name)
+        if name not in self:
+            self[name] = magic(name, self.basedir)
+        return dict.__getitem__(self, name)
 
 # internal helpers
 

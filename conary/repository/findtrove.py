@@ -190,8 +190,8 @@ class QuerySetFactory(object):
             return [flavor]
         flavors = []
         for defaultFlavor in queryOptions.defaultFlavorPath:
-            flavors.append(deps.overrideFlavor(defaultFlavor, flavor, 
-                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)) 
+            flavors.append(deps.overrideFlavor(defaultFlavor, flavor,
+                                        mergeType = deps.DEP_MERGE_TYPE_PREFS))
         return flavors
 
     def mergeFlavors(self, queryOptions, flavor, defaultFlavorPath=None):
@@ -216,7 +216,7 @@ class QuerySetFactory(object):
             (like labels, branch, etc) that should be queried successively
             and a list of flavors that should be checked for those items.
 
-            At the end of this process a search queue is added to the 
+            At the end of this process a search queue is added to the
             query object.
         """
         if not isinstance(searchKey, (tuple,set,list)):
@@ -249,7 +249,7 @@ class QuerySetFactory(object):
                     queue.append([ (name, item, x) for x in flavorList ])
                 return queue
             else:
-                # search (item a, flavor 1), (item a, flavor 2), 
+                # search (item a, flavor 1), (item a, flavor 2),
                 #        (item b, flavor 1), (item b, flavor 2))
                 queue = []
                 for flavor in flavorList:
@@ -298,9 +298,9 @@ class TroveFinder(object):
         self.setQueryOptions(*args, **kw)
         self.queries = []
 
-    def setQueryOptions(self, troveSource, labelPath, defaultFlavorPath, 
-                        acrossLabels, acrossFlavors, affinityDatabase, 
-                        getLeaves=True, bestFlavor=True, allowNoLabel=False, 
+    def setQueryOptions(self, troveSource, labelPath, defaultFlavorPath,
+                        acrossLabels, acrossFlavors, affinityDatabase,
+                        getLeaves=True, bestFlavor=True, allowNoLabel=False,
                         troveTypes=None, exactFlavors=False,
                         requireLatest=False):
         self.queryOptions = QueryOptions(troveSource=troveSource,
@@ -318,7 +318,7 @@ class TroveFinder(object):
 
     def findTroves(self, troveSpecs, allowMissing=False):
         """
-            Creates the required query classes and then executes 
+            Creates the required query classes and then executes
             the queries, either raising a raising errors.TroveNotFound
             or returning a dict of results.
         """
@@ -464,7 +464,7 @@ class TroveFinder(object):
     def getFactory(self, troveSpec, affinityTroves):
         """
         Return a string that describes this troveSpec's versionStr
-        The string returned corresponds to a function name for sorting on 
+        The string returned corresponds to a function name for sorting on
         that versionStr type.
         """
         name = troveSpec[0]
@@ -472,7 +472,7 @@ class TroveFinder(object):
         if not versionStr:
             labelPath = self._getLabelPath(troveSpec, self.queryOptions,
                                            affinityTroves, versionStr)
-            if (not labelPath and not self.queryOptions.allowNoLabel 
+            if (not labelPath and not self.queryOptions.allowNoLabel
                 and not self.queryOptions.allowMissing):
                 message = ("No search label path given and no label specified"
                            " for trove %s - set the installLabelPath" % name)
@@ -502,7 +502,7 @@ class TroveFinder(object):
             # /, only one / is allowed
             raise errors.TroveNotFound, \
                     "incomplete version string %s not allowed" % versionStr
-        labelPath = self._getLabelPath(troveSpec, self.queryOptions, 
+        labelPath = self._getLabelPath(troveSpec, self.queryOptions,
                                        affinityTroves, versionStr)
         newLabelPath, remainder = self._convertLabelPath(name, labelPath,
                                                          versionStr)
@@ -510,7 +510,7 @@ class TroveFinder(object):
             return QueryByRevisionByLabelPathSetFactory, newLabelPath
         return QueryByLabelPathSetFactory, newLabelPath
 
-    def _getLabelPath(self, troveSpec, queryOptions, affinityTroves, 
+    def _getLabelPath(self, troveSpec, queryOptions, affinityTroves,
                       versionStr):
         """
             Returns the labelPath to use when searching for this troveSpec,
@@ -545,7 +545,7 @@ class TroveFinder(object):
         else:
             labelPart, remainder = versionStr, ''
         firstChar = labelPart[0]
-        repoInfo = [(x.getHost(), x.getNamespace(), x.getLabel()) 
+        repoInfo = [(x.getHost(), x.getNamespace(), x.getLabel())
                      for x in labelPath ]
         if firstChar == ':':
             for serverName, namespace, tag in repoInfo:
@@ -773,13 +773,13 @@ def getAlternateFlavorMessage(query):
         minimalMatches = archPartialMatches
     if minimalMatches:
         minimalMatches = set(minimalMatches)
-        matchesByLength = sorted(((_getFlavorLength(x), x) 
+        matchesByLength = sorted(((_getFlavorLength(x), x)
                                    for x in minimalMatches),
                                   key = lambda x: x[0])
         shortestMatchLength = matchesByLength[0][0]
         # only return the flavors that require the least amount of change
         # to our current query.
-        minimalMatches = [ x[1] for x in matchesByLength 
+        minimalMatches = [ x[1] for x in matchesByLength
                            if x[0] == shortestMatchLength ]
         flavorStrs = '], ['.join([str(x) for x in sorted(minimalMatches)])
         return ' (Closest alternate flavors found: [%s])' % flavorStrs

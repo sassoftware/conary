@@ -23,7 +23,7 @@ def pointConverter(s):
 # Ensure we have an empty database
 if os.path.exists("db"): os.remove("db")
 
-cx = sqlite.connect("db", converters={"point": pointConverter}) 
+cx = sqlite.connect("db", converters={"point": pointConverter})
 cu = cx.cursor()
 cu.execute("create table test(p point, n int)")
 cu.execute("insert into test(p, n) values (%s, %s)", (Point(-3.2, 4.5), 25))
@@ -35,5 +35,5 @@ cu.execute("select p, n from test")
 row = cu.fetchone()
 
 print "p:", row.p       # .columnname instead of [0] is a PySQLite
-print "n:", row.n       # extension to the DB-API! 
+print "n:", row.n       # extension to the DB-API!
 cx.close()

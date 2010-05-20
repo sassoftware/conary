@@ -38,7 +38,7 @@ from conary.lib.cfgtypes import *
 __developer_api__ = True
 
 class _Config(object):
-    """ Base configuration class.  Supports defining a configuration object, 
+    """ Base configuration class.  Supports defining a configuration object,
         and displaying that object, but has no knowledge of how the input.
 
         Values that are supported in this configuration object are defined
@@ -62,11 +62,11 @@ class _Config(object):
     # keyLocation determines where key lists are defined
 
     _optionParams = ('type', 'default', 'doc')
-    # option params defines the meaning of the variables in the tuple 
-    # to the left of the 
+    # option params defines the meaning of the variables in the tuple
+    # to the left of the
 
     _cfgTypes = cfgtypes.CfgType,
-    
+
     def __init__(self):
         self._options = {}
         self._lowerCaseMap = {}
@@ -84,7 +84,7 @@ class _Config(object):
 
     @classmethod
     def _getConfigOptions(class_):
-        """ 
+        """
         Scrape the supported configuration items from a class definition.
         Yields (name, CfgType, default) tuples.
 
@@ -119,7 +119,7 @@ class _Config(object):
 
     def addConfigOption(self, key, type, default=None, doc=None):
         """
-        Defines a Configuration Item for this configuration.  
+        Defines a Configuration Item for this configuration.
         This config item defines an available configuration setting.
         """
         self._options[key] = ConfigOption(key, type, default, doc)
@@ -129,15 +129,15 @@ class _Config(object):
         self._options[key].setIsDefault(True)
 
     def addListener(self, key, fn):
-        """ 
-        Add a listener function that will be called when the given key is 
+        """
+        Add a listener function that will be called when the given key is
         updated.  The function will be called with key as a single parameter.
         """
         self._options[key].addListener(fn)
 
     def addDirective(self, key, fn):
         """
-        Add a directive that acts as a config option.  When that config 
+        Add a directive that acts as a config option.  When that config
         option is read in, the function will be called with (key, value)
         where value is whatever was after the directive in the config file.
         """
@@ -162,7 +162,7 @@ class _Config(object):
             return self._displayOptions.get(key)
 
     # --- accessing/setting values ---
-    
+
     def __getitem__(self, name):
         """ Provide a dict-list interface to config items """
         # getitem should not be used to access internal values
@@ -251,7 +251,7 @@ class _Config(object):
     @api.publicApi
     def storeKey(self, key, out):
         self._writeKey(out, self._options[key], self[key], dict(prettyPrint=False))
-        
+
     def writeToFile(self, path, includeDocs=True):
         util.mkdirChain(os.path.dirname(path))
         self.store(open(path, 'w'), includeDocs)
@@ -329,7 +329,7 @@ class ConfigFile(_Config):
                     # handle \ at the end of the config line.
                     # keep track of the lines we use so that we can
                     # give accurate line #s for errors.  This config line
-                    # will be considered to live on its first line even 
+                    # will be considered to live on its first line even
                     # though it spans multiple lines.
 
                     line = line[:-2] + f.readline()
@@ -358,7 +358,7 @@ class ConfigFile(_Config):
                     return
         elif exception:
             raise CfgEnvironmentError(
-                          "No such file or directory: '%s'" % path, 
+                          "No such file or directory: '%s'" % path,
                           path)
 
     @api.publicApi
@@ -528,7 +528,7 @@ class ConfigFile(_Config):
                 self.read(cfgfile)
 
 class ConfigSection(ConfigFile):
-    """ A Config Section.  
+    """ A Config Section.
         Basically a separate config file, except that it knows who its
         parent config file is.
     """
@@ -558,11 +558,11 @@ class ConfigSection(ConfigFile):
 
 
 class SectionedConfigFile(ConfigFile):
-    """ 
-        A SectionedConfigFile allows the definition of sections 
+    """
+        A SectionedConfigFile allows the definition of sections
         using [foo] to delineate sections.
 
-        When a new section is discovered, a new section with type 
+        When a new section is discovered, a new section with type
         self._sectionType is assigned.
     """
 
@@ -578,7 +578,7 @@ class SectionedConfigFile(ConfigFile):
 
     def addConfigOption(self, key, type, default=None, doc=None):
         """
-        Defines a Configuration Item for this configuration.  
+        Defines a Configuration Item for this configuration.
         This config item defines an available configuration setting.
         """
         if inspect.isclass(type) and issubclass(type, ConfigSection):
@@ -617,7 +617,7 @@ class SectionedConfigFile(ConfigFile):
 
     @api.publicApi
     def configLine(self, line, file = "override", lineno = '<No line>'):
-	line = line.strip()
+        line = line.strip()
         if line and line[0] == '[' and line[-1] == ']':
             self.setSection(line[1:-1])
             return
@@ -682,9 +682,9 @@ class SectionedConfigFile(ConfigFile):
 #----------------------------------------------------------
 
 class ConfigOption:
-    """ A name, value Type pair that knows how to display itself and 
-        parse values for itself.  
-        
+    """ A name, value Type pair that knows how to display itself and
+        parse values for itself.
+
         Note that a config option doesn't have any particular value associated
         with it.
     """
@@ -695,7 +695,7 @@ class ConfigOption:
         # CfgTypes must be instantiated to parse values, because they
         # optionally store data that helps them parse.
 
-        if (inspect.isclass(valueType) 
+        if (inspect.isclass(valueType)
             and issubclass(valueType, cfgtypes.CfgType)):
             valueType = valueType()
 
@@ -708,9 +708,9 @@ class ConfigOption:
 
     def parseString(self, curVal, str,
                     path=None, lineNum=None):
-        """ 
+        """
         Takes the current value for this option, and a string to update that
-        value, and returns an updated value (which may either overwrite the 
+        value, and returns an updated value (which may either overwrite the
         current value or update it depending on the valueType)
         """
         self._callListeners()
@@ -726,7 +726,7 @@ class ConfigOption:
         return self.valueType.set(curVal, newVal)
 
     def __deepcopy__(self, memo):
-        # we implement deepcopy because this object keeps track of a 
+        # we implement deepcopy because this object keeps track of a
         # set of listener functions, and copy.__deepcopy__ doesn't
         # handle copying functions.  Since we don't particularly care
         # about that use case (if you're modifying code in a function object,
@@ -791,7 +791,7 @@ class ConfigOption:
         """
         if displayOptions is None:
             displayOptions = {}
-        tw = textwrap.TextWrapper(initial_indent='# ', 
+        tw = textwrap.TextWrapper(initial_indent='# ',
                                   subsequent_indent='# ', width=70)
         out.write('# %s (Default: %s)\n' % (self.name, ', '.join(self.valueType.toStrings(self.default, displayOptions))))
         if self.__doc__:

@@ -37,41 +37,41 @@ class Flavors:
                                depClass.tag, sense, flag)
 
     def createFlavor(self, flavor):
-	cu = self.db.cursor()
-	cu.execute("INSERT INTO Flavors (flavor) VALUES (?)",
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO Flavors (flavor) VALUES (?)",
                    flavor.freeze())
-	flavorId = cu.lastrowid
+        flavorId = cu.lastrowid
         self.createFlavorMap(flavorId, flavor, cu)
         return flavorId
-        
+
     def __getitem__(self, flavor):
-	val = self.get(flavor, None)
+        val = self.get(flavor, None)
 
         if val is None:
             raise KeyError, flavor
 
-	return val
+        return val
 
     def get(self, flavor, defValue):
-	if flavor is None:
-	    return None
+        if flavor is None:
+            return None
 
-	cu = self.db.cursor()
-	cu.execute("SELECT flavorId FROM Flavors WHERE flavor = ?",
-		   flavor.freeze())
-	item = cu.fetchone()
-	if item is None:
-	    return defValue
-	return item[0]
+        cu = self.db.cursor()
+        cu.execute("SELECT flavorId FROM Flavors WHERE flavor = ?",
+                   flavor.freeze())
+        item = cu.fetchone()
+        if item is None:
+            return defValue
+        return item[0]
 
     def getId(self, flavorId):
-	if flavorId == 0:
-	    return deps.Flavor()
+        if flavorId == 0:
+            return deps.Flavor()
 
-	cu = self.db.cursor()
-	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?",
-		   flavorId)
-	try:
-	    return deps.ThawFlavor(cu.next()[0])
-	except StopIteration:
+        cu = self.db.cursor()
+        cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?",
+                   flavorId)
+        try:
+            return deps.ThawFlavor(cu.next()[0])
+        except StopIteration:
             raise KeyError, flavorId

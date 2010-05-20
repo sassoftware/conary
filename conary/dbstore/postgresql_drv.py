@@ -202,7 +202,7 @@ class Database(BaseDatabase):
             self.dbh = pgsql.connect(**cdb)
         except pgsql.InternalError:
             raise sqlerrors.DatabaseError("Could not connect to database", cdb)
-            
+
         # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
         self.closed = False
@@ -380,7 +380,7 @@ class Database(BaseDatabase):
         cu = self.cursor()
         assert (isinstance(table, str))
         cu.execute("ANALYZE %s" %table)
-        
+
     def _bulkload(self, tableName, rows, columnNames, start_transaction = True):
         # first, make sure we do this in a transaction so we can roll it back
         if not self.inTransaction():

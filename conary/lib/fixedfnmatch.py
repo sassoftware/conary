@@ -1,6 +1,6 @@
 #
 # This file is a modified copy of the fnmatch.py module distributed as part of
-# python 2.4. As such, it is licensed under the Python Software Foundation 
+# python 2.4. As such, it is licensed under the Python Software Foundation
 # license agreement, which can be found at www.python.org.
 #
 """Filename matching with shell patterns."""

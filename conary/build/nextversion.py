@@ -12,7 +12,7 @@
 # full details.
 #
 
-def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor, 
+def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
                 targetLabel=None, alwaysBumpCount=False):
     """
     Calculates the version to use for a newly built trove which is about
@@ -26,9 +26,9 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
     @type sourceVersion: Version
     @param troveFlavor: flavor of the trove being built
     @type troveFlavor: deps.Flavor
-    @param alwaysBumpCount: if True, then do not return a version that 
-    matches an existing trove, even if their flavors would differentiate 
-    them, instead, increase the appropriate count.  
+    @param alwaysBumpCount: if True, then do not return a version that
+    matches an existing trove, even if their flavors would differentiate
+    them, instead, increase the appropriate count.
     @type alwaysBumpCount: bool
     """
     if not isinstance(troveNames, (list, tuple, set)):
@@ -51,7 +51,7 @@ def nextVersion(repos, db, troveNames, sourceVersion, troveFlavor,
         # we look at binary numbers on the target label.
         sourceVersion = sourceVersion.createShadow(targetLabel)
 
-    # search for all the packages that are being created by this cook - 
+    # search for all the packages that are being created by this cook -
     # we take the max of all of these versions as our latest.
     query = dict.fromkeys(pkgNames,
                   {sourceVersion.getBinaryVersion().trailingLabel() : None })
@@ -171,7 +171,7 @@ def _nextVersionFromQuery(query, db, troveNames, sourceVersion,
             latest.incrementBuildCount()
 
     if not latest:
-        # case 4.  There is no binary trove derived from this source 
+        # case 4.  There is no binary trove derived from this source
         # version.
         latest = defaultLatest
     if latest.isOnLocalHost():
@@ -196,7 +196,7 @@ def nextLocalVersion(db, troveNames, latest, troveFlavorSet):
         if troveName in results:
             for version in results[troveName]:
                 if version.getSourceVersion() == latest.getSourceVersion():
-                    relVersions.append((version, 
+                    relVersions.append((version,
                                         results[troveName][version]))
     if not relVersions:
         return latest
@@ -212,11 +212,11 @@ def nextSourceVersion(targetBranch, revision, existingVersionList):
     """
         Returns the correct source version on the branch given
         with the revision number specified given the list of
-        existing versions. 
+        existing versions.
         @param targetBranch: the branch to create the version on
-        @param revision: a revision object that contains the desired upstream 
-        version and source count to use in the version.  
-        This may be or modified to fit the target branch (for example, 
+        @param revision: a revision object that contains the desired upstream
+        version and source count to use in the version.
+        This may be or modified to fit the target branch (for example,
         if it has too many .'s in it for the branch it is being moved to).
         @param existingVersionList: list of version objects that are the other
         source versions for this package on this branch.

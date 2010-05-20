@@ -109,7 +109,7 @@ def logAndEmail(req, cfg, header, msg):
     body += '\nConnection Information:\n'
     body += formatRequestInfo(req)
 
-    sendMail(cfg.bugsFromEmail, cfg.bugsEmailName, cfg.bugsToEmail, 
+    sendMail(cfg.bugsFromEmail, cfg.bugsEmailName, cfg.bugsToEmail,
              cfg.bugsEmailSubject, body)
 
 def logErrorAndEmail(req, cfg, exception, e, bt):
@@ -155,7 +155,7 @@ def _handler(req):
                         (req.server.server_hostname) + baseUri
 
         if not cfg.repositoryDB and not cfg.proxyContentsDir:
-            log.error("repositoryDB or proxyContentsDir is required in %s" % 
+            log.error("repositoryDB or proxyContentsDir is required in %s" %
                       req.filename)
             return apache.HTTP_INTERNAL_SERVER_ERROR
         elif cfg.repositoryDB and cfg.proxyContentsDir:

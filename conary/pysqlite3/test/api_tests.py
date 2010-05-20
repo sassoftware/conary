@@ -405,7 +405,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
                             self.cur.rowcount)
         except StandardError, msg:
             self.fail(msg)
-    
+
     def CheckRowCountAfterUpdate(self):
         return
         try:
@@ -522,7 +522,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
         self.cur.execute('insert into test(a) values (?)', False)
         self.cur.execute('insert into test(a) values (1)')
         self.cur.execute('insert into test(a) values (0)')
-        self.cur.execute('insert into test(a) values (100)')        
+        self.cur.execute('insert into test(a) values (100)')
         self.cur.execute('select * from test')
         r = self.cur.fetchone()
         self.assertEqual(r[0], True,

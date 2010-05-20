@@ -41,7 +41,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         assert(not hidden), "This code pathway does not accept hidden trove commits"
         info = trove.getNameVersionFlavor()
         pin = self.autoPinList.match(trove.getName())
-	return (info, self.repos.addTrove(trove, pin = pin,
+        return (info, self.repos.addTrove(trove, pin = pin,
                                           oldTroveSpec = oldTroveSpec))
 
     def addFileVersion(self, troveId, pathId, path, fileId,
@@ -60,7 +60,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         # while we're here, trove change sets may mark some files as removed;
         # we need to remember to remove those files, and make the paths for
-        # those files candidates for removal. trove change sets also know 
+        # those files candidates for removal. trove change sets also know
         # when file paths have changed, and those old paths are also candidates
         # for removal
         if trvCs:
@@ -78,30 +78,30 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
                 self.removeFile(pathId, fileId)
 
     def oldTroveList(self):
-	return self.oldTroves
+        return self.oldTroves
 
     def oldFile(self, pathId, fileId, sha1):
-	self.oldFiles.append((pathId, fileId, sha1))
+        self.oldFiles.append((pathId, fileId, sha1))
 
     def oldFileList(self):
-	return self.oldFiles
+        return self.oldFiles
 
     def addFile(self, troveId, pathId, fileObj, path, fileId, version,
                 oldFileId = None):
-	repository.ChangeSetJob.addFile(self, troveId, pathId, fileObj, path, 
-					fileId, version)
+        repository.ChangeSetJob.addFile(self, troveId, pathId, fileObj, path,
+                                        fileId, version)
 
-	if oldFileId:
+        if oldFileId:
             self.removeFile(pathId, oldFileId)
 
     def addFileContents(self, sha1, fileContents, restoreContents,
-			isConfig, precompressed = False):
-	if isConfig:
-	    repository.ChangeSetJob.addFileContents(self, sha1,
-			     fileContents, restoreContents, isConfig, 
+                        isConfig, precompressed = False):
+        if isConfig:
+            repository.ChangeSetJob.addFileContents(self, sha1,
+                             fileContents, restoreContents, isConfig,
                              precompressed = precompressed)
 
-    # remove the specified file 
+    # remove the specified file
     def removeFile(self, pathId, fileId):
         stream = self.repos.getFileStream(fileId)
         sha1 = None
@@ -119,23 +119,23 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def __init__(self, repos, cs, callback, autoPinList,
                  allowIncomplete = False, replaceFiles = False,
                  userReplaced = None, sharedFiles = {}):
-	assert(not cs.isAbsolute())
+        assert(not cs.isAbsolute())
 
-	self.cs = cs
-	self.repos = repos
-	self.oldTroves = []
-	self.oldFiles = []
+        self.cs = cs
+        self.repos = repos
+        self.oldTroves = []
+        self.oldFiles = []
         self.trovesAdded = []
         self.autoPinList = autoPinList
 
-	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
+        repository.ChangeSetJob.__init__(self, repos, cs, callback = callback,
                                          allowIncomplete=allowIncomplete)
 
         for name, version, flavor in self.oldTroveList():
             self.repos.eraseTrove(name, version, flavor)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
-	    self.repos.eraseFileVersion(pathId, fileVersion)
+            self.repos.eraseFileVersion(pathId, fileVersion)
 
         if userReplaced:
             self.repos.db.db.markUserReplacedFiles(userReplaced)
@@ -147,7 +147,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         for (pathId, fileVersion, sha1) in self.oldFileList():
             if sha1 is not None:
-		self.repos._removeFileContents(sha1)
+                self.repos._removeFileContents(sha1)
 
 class SqlDataStore(datastore.AbstractDataStore):
 
@@ -162,10 +162,10 @@ class SqlDataStore(datastore.AbstractDataStore):
         return (cu.next()[0] != 0)
 
     def decrementCount(self, hash):
-	"""
-	Decrements the count by one; it it becomes 1, the count file
-	is removed. If it becomes zero, the contents are removed.
-	"""
+        """
+        Decrements the count by one; it it becomes 1, the count file
+        is removed. If it becomes zero, the contents are removed.
+        """
         cu = self.db.cursor()
         cu.execute("SELECT count FROM DataStore WHERE hash=?", hash)
         count = cu.next()[0]
@@ -173,14 +173,14 @@ class SqlDataStore(datastore.AbstractDataStore):
             cu.execute("DELETE FROM DataStore WHERE hash=?", hash)
         else:
             count -= 1
-            cu.execute("UPDATE DataStore SET count=? WHERE hash=?", 
+            cu.execute("UPDATE DataStore SET count=? WHERE hash=?",
                        count, hash)
 
     def incrementCount(self, hash, fileObj = None, precompressed = True):
-	"""
-	Increments the count by one.  If it becomes one (the file is
+        """
+        Increments the count by one.  If it becomes one (the file is
         new), the contents of fileObj are stored into that path.
-	"""
+        """
         cu = self.db.cursor()
         cu.execute("SELECT COUNT(*) FROM DataStore WHERE hash=?", hash)
         exists = cu.next()[0]
@@ -210,12 +210,12 @@ class SqlDataStore(datastore.AbstractDataStore):
     # add one to the reference count for a file which already exists
     # in the archive
     def addFileReference(self, hash):
-	self.incrementCount(hash)
+        self.incrementCount(hash)
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
     def addFile(self, f, hash, precompressed = True):
-	self.incrementCount(hash, fileObj = f, precompressed = precompressed)
+        self.incrementCount(hash, fileObj = f, precompressed = precompressed)
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
@@ -226,7 +226,7 @@ class SqlDataStore(datastore.AbstractDataStore):
         return StringIO(data)
 
     def removeFile(self, hash):
-	self.decrementCount(hash)
+        self.decrementCount(hash)
 
     def __init__(self, db):
         self.db = db

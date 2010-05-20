@@ -62,9 +62,9 @@ class IdTable:
     """
     def __init__(self, db, tableName, keyName, strName):
         self.db = db
-	self.tableName = tableName
-	self.keyName = keyName
-	self.strName = strName
+        self.tableName = tableName
+        self.keyName = keyName
+        self.strName = strName
 
     def getOrAddId(self, item):
         id = self.get(item, None)
@@ -89,9 +89,9 @@ class IdTable:
         cu = self.db.cursor()
         cu.execute("SELECT %s FROM %s WHERE %s=?"
                    %(self.strName, self.tableName, self.keyName), (theId,))
-	try:
-	    return cu.next()[0]
-	except StopIteration:
+        try:
+            return cu.next()[0]
+        except StopIteration:
             raise KeyError, theId
 
     def __select(self):
@@ -101,7 +101,7 @@ class IdTable:
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute(self.__select(), (item,))
-	return not(cu.fetchone() == None)
+        return not(cu.fetchone() == None)
 
     def __delitem__(self, item):
         assert(type(item) is str)
@@ -112,25 +112,25 @@ class IdTable:
     def __getitem__(self, item):
         cu = self.db.cursor()
         cu.execute(self.__select(), (item,))
-	try:
-	    return cu.next()[0]
-	except StopIteration:
+        try:
+            return cu.next()[0]
+        except StopIteration:
             raise KeyError, item
 
     def get(self, item, defValue):
         cu = self.db.cursor()
         cu.execute(self.__select(), (item,))
-	item = cu.fetchone()
-	if not item:
-	    return defValue
-	return item[0]
+        item = cu.fetchone()
+        if not item:
+            return defValue
+        return item[0]
 
     def getItemDict(self, itemSeq):
-	cu = self.db.cursor()
+        cu = self.db.cursor()
         cu.execute("SELECT %s, %s FROM %s WHERE %s in (%s)"
                    % (self.strName, self.keyName, self.tableName, self.strName,
-		      ",".join(["'%s'" % x for x in itemSeq])))
-	return dict(cu)
+                      ",".join(["'%s'" % x for x in itemSeq])))
+        return dict(cu)
 
     def iterkeys(self):
         cu = self.db.cursor()
@@ -146,19 +146,19 @@ class IdTable:
 
     def iteritems(self):
         cu = self.db.cursor()
-        cu.execute("SELECT %s, %s FROM %s" 
-		   %(self.strName, self.keyName, self.tableName))
+        cu.execute("SELECT %s, %s FROM %s"
+                   %(self.strName, self.keyName, self.tableName))
         for row in cu:
             yield row
 
     def keys(self):
-	return [ x for x in self.iterkeys() ]
+        return [ x for x in self.iterkeys() ]
 
     def values(self):
-	return [ x for x in self.itervalues() ]
+        return [ x for x in self.itervalues() ]
 
     def items(self):
-	return [ x for x in self.iteritems() ]
+        return [ x for x in self.iteritems() ]
 
 class CachedIdTable(IdTable):
     """
@@ -168,42 +168,42 @@ class CachedIdTable(IdTable):
     """
 
     def __init__(self, db, tableName, keyName, strName):
-	IdTable.__init__(self, db, tableName, keyName, strName)
-	cu = db.cursor()
-	self.cache = {}
-	self.revCache = {}
-	cu.execute("SELECT %s, %s from %s" % (keyName, strName, tableName))
-	for (idNum, s) in cu:
-	    self.cache[s] = idNum
-	    self.revCache[idNum] = s
+        IdTable.__init__(self, db, tableName, keyName, strName)
+        cu = db.cursor()
+        self.cache = {}
+        self.revCache = {}
+        cu.execute("SELECT %s, %s from %s" % (keyName, strName, tableName))
+        for (idNum, s) in cu:
+            self.cache[s] = idNum
+            self.revCache[idNum] = s
 
     def getId(self, theId):
-	return self.revCache[theId]
+        return self.revCache[theId]
 
     def __getitem__(self, item):
-	v = self.get(item, None)
-	if v is not None:
-	    return v
+        v = self.get(item, None)
+        if v is not None:
+            return v
 
-	return self.addId(item)
+        return self.addId(item)
 
     def get(self, item, defValue):
-	return self.cache.get(item, defValue)
+        return self.cache.get(item, defValue)
 
     def addId(self, item):
-	newId = IdTable.addId(self, item)
-	self.cache[item] = newId
-	self.revCache[newId] = item
-	return newId
+        newId = IdTable.addId(self, item)
+        self.cache[item] = newId
+        self.revCache[newId] = item
+        return newId
 
     def getItemDict(self, itemSeq):
-	raise NotImplementedError
+        raise NotImplementedError
 
     def delId(self, theId):
-	raise NotImplementedError
+        raise NotImplementedError
 
     def __delitem__(self, item):
-	raise NotImplementedError
+        raise NotImplementedError
 
 class IdPairMapping:
     """
@@ -212,13 +212,13 @@ class IdPairMapping:
     """
     def __init__(self, db, tableName, tup1, tup2, item):
         self.db = db
-	self.tup1 = tup1
-	self.tup2 = tup2
-	self.item = item
-	self.tableName = tableName
+        self.tup1 = tup1
+        self.tup2 = tup2
+        self.item = item
+        self.tableName = tableName
 
     def __setitem__(self, key, val):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s (%s, %s, %s) "
                    "VALUES (?, ?, ?)"
@@ -230,36 +230,36 @@ class IdPairMapping:
             self.item, self.tableName, self.tup1, self.tup2)
 
     def __getitem__(self, key):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute(self.__select(), (first, second))
-	try:
-	    return cu.next()[0]
-	except StopIteration:
+        try:
+            return cu.next()[0]
+        except StopIteration:
             raise KeyError, key
 
     def get(self, key, defValue):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute(self.__select(), (first, second))
-	item = cu.fetchone()
-	if not item:
-	    return defValue
-	return item[0]
+        item = cu.fetchone()
+        if not item:
+            return defValue
+        return item[0]
 
     def has_key(self, key):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute(self.__select(), (first, second))
-	item = cu.fetchone()
-	return item != None
+        item = cu.fetchone()
+        return item != None
 
     def __delitem__(self, key):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute("DELETE FROM %s WHERE %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2),
-		   (first, second))
+                   (first, second))
 
 class IdMapping:
     """
@@ -267,15 +267,15 @@ class IdMapping:
     """
     def __init__(self, db, tableName, key, item):
         self.db = db
-	self.key = key
-	self.item = item
-	self.tableName = tableName
+        self.key = key
+        self.item = item
+        self.tableName = tableName
 
     def __setitem__(self, key, val):
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s (%s, %s) "
                    "VALUES (?, ?)"
-		   % (self.tableName, self.key, self.item),
+                   % (self.tableName, self.key, self.item),
                    (key, val))
 
     def __select(self):
@@ -285,30 +285,30 @@ class IdMapping:
     def __getitem__(self, key):
         cu = self.db.cursor()
         cu.execute(self.__select(), key)
-	try:
-	    return cu.next()[0]
-	except StopIteration:
+        try:
+            return cu.next()[0]
+        except StopIteration:
             raise KeyError, key
 
     def get(self, key, defValue):
         cu = self.db.cursor()
         cu.execute(self.__select(), key)
-	item = cu.fetchone()
-	if not item:
-	    return defValue
-	return item[0]
+        item = cu.fetchone()
+        if not item:
+            return defValue
+        return item[0]
 
     def has_key(self, key):
         cu = self.db.cursor()
         cu.execute(self.__select(), key)
-	item = cu.fetchone()
-	return (item != None)
+        item = cu.fetchone()
+        return (item != None)
 
     def __delitem__(self, key):
         cu = self.db.cursor()
         cu.execute("DELETE FROM %s WHERE %s=?"
                    % (self.tableName, self.key),
-		   key)
+                   key)
 
 class IdPairSet(IdPairMapping):
 
@@ -317,53 +317,53 @@ class IdPairSet(IdPairMapping):
     ids.
     """
     def _getitemgen(self, first, cu):
-	yield first[0]
+        yield first[0]
 
-	for match in cu:
-	    yield match[0]
+        for match in cu:
+            yield match[0]
 
     def __select(self):
         return "SELECT %s FROM %s WHERE %s=? AND %s=?" % (
             self.item, self.tableName, self.tup1, self.tup2)
 
     def __getitem__(self, key):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute(self.__select(), (first, second))
-	first = cu.fetchone()
-	if not first:
-	    raise KeyError, key
-	return self._getitemgen(first, cu)
+        first = cu.fetchone()
+        if not first:
+            raise KeyError, key
+        return self._getitemgen(first, cu)
 
     def get(self, key, default):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute(self.__select(), (first, second))
-	first = cu.fetchone()
-	if not first:
+        first = cu.fetchone()
+        if not first:
             return default
 
-	return self._getitemgen(first, cu)
+        return self._getitemgen(first, cu)
 
     def getByFirst(self, first):
         cu = self.db.cursor()
         cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.tup1),
-		   first)
-	first = cu.fetchone()
-	if not first:
-	    raise KeyError, first
-	return self._getitemgen(first, cu)
+                   first)
+        first = cu.fetchone()
+        if not first:
+            raise KeyError, first
+        return self._getitemgen(first, cu)
 
     def __setitem__(self, key, value):
-	raise AttributeError
+        raise AttributeError
 
     def addItem(self, key, val):
-	IdPairMapping.__setitem__(self, key, val)
+        IdPairMapping.__setitem__(self, key, val)
 
     def delItem(self, key, val):
-	(first, second) = key
+        (first, second) = key
         cu = self.db.cursor()
         cu.execute("DELETE FROM %s WHERE %s=? AND %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2, self.item),
-		   (first, second, val))
+                   (first, second, val))

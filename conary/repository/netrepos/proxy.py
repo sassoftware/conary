@@ -487,7 +487,7 @@ class ChangesetFilter(BaseProxy):
             trvNewFlavor = tcs.getNewFlavor()
             if ti.flags.isMissing():
                 # this was a missing trove for which we
-                # synthesized a removed trove object. 
+                # synthesized a removed trove object.
                 # The client would have a much easier time
                 # updating if we just made it a regular trove.
                 missingOldVersion = tcs.getOldVersion()
@@ -599,7 +599,7 @@ class ChangesetFilter(BaseProxy):
             f = os.fdopen(fd, 'w')
 
             for csInfo in changeSetList:
-                # the hard-coded 1 means it's a changeset and needs to be walked 
+                # the hard-coded 1 means it's a changeset and needs to be walked
                 # looking for files to include by reference
                 f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size,
                 csInfo.cached))

@@ -11,7 +11,7 @@ def suite():
     suite = unittest.TestSuite((lowlevel_tests.suite(), api_tests.suite(),
             type_tests.suite(), userfunction_tests.suite(),
             transaction_tests.suite(), pgresultset_tests.suite(),
-	    logging_tests.suite(), concurrency_tests.suite()))
+            logging_tests.suite(), concurrency_tests.suite()))
     return suite
 
 def main():

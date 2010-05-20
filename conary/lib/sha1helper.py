@@ -32,8 +32,8 @@ def sha1FileBin(path):
     m = digestlib.sha1()
     buf = os.read(fd, 40960)
     while len(buf):
-	m.update(buf)
-	buf = os.read(fd, 40960)
+        m.update(buf)
+        buf = os.read(fd, 40960)
     os.close(fd)
 
     return m.digest()
@@ -49,9 +49,9 @@ def sha1ToString(buf):
 
 def sha1FromString(val):
     assert(len(val) == 40)
-    return struct.pack("!5I", int(val[ 0: 8], 16), 
-			int(val[ 8:16], 16), int(val[16:24], 16), 
-			int(val[24:32], 16), int(val[32:40], 16))
+    return struct.pack("!5I", int(val[ 0: 8], 16),
+                        int(val[ 8:16], 16), int(val[16:24], 16),
+                        int(val[24:32], 16), int(val[32:40], 16))
 
 def nonstandardSha256String(buf):
     m = digestlib.sha256_nonstandard()
@@ -81,6 +81,6 @@ def md5ToString(buf):
 
 def md5FromString(val):
     assert(len(val) == 32)
-    return struct.pack("!4I", int(val[ 0: 8], 16), 
-			int(val[ 8:16], 16), int(val[16:24], 16), 
-			int(val[24:32], 16))
+    return struct.pack("!4I", int(val[ 0: 8], 16),
+                        int(val[ 8:16], 16), int(val[16:24], 16),
+                        int(val[24:32], 16))

@@ -205,7 +205,7 @@ def rebuildLatest(db, recreate=False):
            "latest" : versionops.LATEST_TYPE_PRESENT,
            "trove" : trove.TROVE_TYPE_NORMAL, })
     return True
-    
+
 class MigrateTo_15(SchemaMigration):
     Version = (15, 10)
     def updateLatest(self):
@@ -472,7 +472,7 @@ class MigrateTo_15(SchemaMigration):
     def migrate10(self):
         # we make this a noop because the same will be done at schema 16.1
         return True
-    
+
 # populate the CheckTroveCache table
 def createCheckTroveCache(db):
     db.loadSchema()
@@ -510,7 +510,7 @@ def _prefix(dirname):
     ret = _prefix(d)
     ret.append(dirname)
     return ret
-                                
+
 class MigrateTo_16(SchemaMigration):
     Version = (16,1)
     # migrate to 16.0
@@ -518,7 +518,7 @@ class MigrateTo_16(SchemaMigration):
         cu = self.db.cursor()
         self.db.loadSchema()
 
-        self._buildPermissions(cu) 
+        self._buildPermissions(cu)
         self._buildTroveFiles(cu)
         self._buildUserGroupInstances(cu)
         self._buildLabelMap(cu)
@@ -555,7 +555,7 @@ class MigrateTo_16(SchemaMigration):
                                   "Permissions", "permissionId")
         self.db.loadSchema()
         return True
-        
+
     def _buildFlavorMap(self, cu):
         # need to rebuild flavormap
         logMe(2, "Recreating the FlavorMap table...")
@@ -568,7 +568,7 @@ class MigrateTo_16(SchemaMigration):
             flavor = deps.ThawFlavor(flavorStr)
             flavTable.createFlavorMap(flavorId, flavor, cu)
         return True
-    
+
     def _buildTroveFiles(self, cu):
         # need to rebuild the TroveFiles and FilesPath tables
         logMe(2, "creating the FilePaths table...")
@@ -594,7 +594,7 @@ class MigrateTo_16(SchemaMigration):
         # attempt to keep the relative ordering of the stuff we had in the
         # old TroveFiles
         cu.execute("""
-        create table newTroveFiles as 
+        create table newTroveFiles as
             select instanceId, streamId, versionId, filePathId
             from TroveFiles join FilePaths using(pathId,path)
             order by instanceId, streamId, versionId """)
@@ -625,7 +625,7 @@ class MigrateTo_16(SchemaMigration):
         cu.execute("drop table OldLabelMap")
         self.db.loadSchema()
         return True
-    
+
     # populate the UserGroupInstances map
     def _buildUserGroupInstances(self, cu):
         self.db.loadSchema()
@@ -716,7 +716,7 @@ class MigrateTo_17(SchemaMigration):
         select distinct basename from tmpDirnames
         order by basename """)
         self.db.analyze("Basenames")
-        
+
         logMe(2, "generating the new FilePaths table...")
         cu.execute("""insert into FilePaths(filePathId, dirnameId, basenameId, pathId)
         select fp.filePathId, d.dirnameId, b.basenameId, fp.pathId
@@ -738,11 +738,11 @@ class MigrateTo_17(SchemaMigration):
         self.db.addForeignKey("TroveFiles", "filePathId", "FilePaths", "filePathId")
         self.db.analyze("TroveFiles")
         schema.createTroves(self.db)
-    
+
     # migrate to 17.0
     def migrate(self):
         logMe(1, "WARNING: this migration takes a LONG time. Do not interupt!")
-        schema.setupTempTables(self.db)       
+        schema.setupTempTables(self.db)
         # migrate FilesPath to a dirnames-based setup
         self._createFilePaths()
         # prefixes will be created by the migration to schema version 17.1
@@ -788,7 +788,7 @@ class MigrateTo_17(SchemaMigration):
             self.db.setAutoIncrement("Dirnames", "dirnameId")
             self.db.setAutoIncrement("Basenames", "basenameId")
         # fix the missing dirnames/prefixes links
-        schema.setupTempTables(self.db)       
+        schema.setupTempTables(self.db)
         logMe(2, "looking for missing dirnames/prefixes links")
         cu = self.db.cursor()
         cu.execute("""select distinct d.dirnameId, d.dirname

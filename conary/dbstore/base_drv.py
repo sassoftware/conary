@@ -259,7 +259,7 @@ class BaseDatabase:
     driver = "base"
     keywords = BaseKeywordDict()
     poolmode = False    # indicates if connections are pooled and can be open/closed cheaply
-    
+
     # schema caching
     tables = None
     views = None
@@ -533,7 +533,7 @@ class BaseDatabase:
         Get the current schema version. If the version table is not
         present, return a zero version.
 
-        @param raiseOnError: If set, raise instead of returning zero if 
+        @param raiseOnError: If set, raise instead of returning zero if
                 the table is missing.
         @type  raiseOnError: C{bool}
         @rtype L{DBversion<conary.dbstore.sqllib.DBversion>}
@@ -636,7 +636,7 @@ class BaseDatabase:
         cu = self.cursor()
         for table in tables:
             cu.execute("DELETE FROM " + table)
-        
+
     # foreign key constraint management
     def addForeignKey(self, table, column, refTable, refColumn,
                       cascade = False, name = None):
@@ -671,4 +671,4 @@ class BaseDatabase:
     # resetting the auto increment values of primary keys
     def setAutoIncrement(self, table, column, value):
         raise NotImplementedError("This function should be provided by the SQL drivers")
-    
+

@@ -40,10 +40,10 @@ def doCommit(cfg, changeSetFile, targetLabel):
     callback = CheckinCallback()
 
     try:
-	cs = changeset.ChangeSetFromFile(changeSetFile)
+        cs = changeset.ChangeSetFromFile(changeSetFile)
     except filecontainer.BadContainer:
-	log.error("invalid changeset %s", changeSetFile)
-	return 1
+        log.error("invalid changeset %s", changeSetFile)
+        return 1
 
     if cs.isLocal():
         if not targetLabel:
@@ -72,7 +72,7 @@ def doCommit(cfg, changeSetFile, targetLabel):
 def doLocalCommit(db, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)
     if not cs.isLocal():
-	log.error("repository changesets must be applied with update instead")
+        log.error("repository changesets must be applied with update instead")
     else:
         db.commitChangeSet(cs, set(), rollbackPhase = db.ROLLBACK_PHASE_LOCAL,
                            updateDatabase = False)

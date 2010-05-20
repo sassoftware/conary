@@ -117,7 +117,7 @@ class RoleTroves(RoleTable):
             # this was a full rebuild
             self.db.analyze("UserGroupAllTroves")
         return True
-    
+
     # grant access on a troveList to role
     def add(self, roleId, troveList, recursive=True):
         """
@@ -403,7 +403,7 @@ class RoleInstances(RoleTable):
         insert into tmpInstances(instanceId)
         select instanceId from UserGroupAllPermissions
         where permissionId = ? """, permissionId, start_transaction=False)
-        # re-add 
+        # re-add
         self.rp.deleteId(cu, permissionId = permissionId)
         self.rp.addId(cu, permissionId = permissionId)
         # remove from consideration troves for which we still have access
@@ -477,7 +477,7 @@ class RoleInstances(RoleTable):
         where ugi.userGroupId = ?
           and not exists (
               select 1 from UserGroupAllPermissions as ugap
-              where ugap.userGroupId = ? 
+              where ugap.userGroupId = ?
                 and ugap.instanceId = ugi.instanceId
                 and ugap.permissionId != ? )
           and not exists (

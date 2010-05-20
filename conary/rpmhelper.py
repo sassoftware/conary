@@ -20,7 +20,6 @@ import itertools
 import os
 import re
 import struct
-import subprocess
 import tempfile
 from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util
 from conary.deps import deps
@@ -192,9 +191,7 @@ class _RpmHeader(object):
         depset = deps.DependencySet()
         flagre = re.compile('\((.*?)\)')
         depnamere = re.compile('(.*?)\(.*')
-        localere = re.compile('locale\((.*):(.*)\)')
-        packageName = self.get(NAME, '')
-
+        localere = re.compile('locale\((.*)\)')
         for dep in self.get(tag, []):
             if dep.startswith('/'):
                 depset.addDep(deps.FileDependencies, deps.Dependency(dep))
@@ -226,12 +223,17 @@ class _RpmHeader(object):
                 elif localere.match(dep):
                     # locale RPM flags get translated to conary dep flags
                     m = localere.match(dep)
-                    name = m.group(1)
-                    rpmflags = m.group(2).split(';')
+                    nf = m.group(1).split(':')
+                    if len(nf) == 1:
+                        name = ''
+                        flags = nf[0].split(';')
+                    else:
+                        name = ':' + ':'.join(nf[0:-1])
+                        flags = nf[-1].split(';')
                     flags = [ (x, deps.FLAG_SENSE_REQUIRED)
-                              for x in rpmflags if x ]
+                              for x in flags if x ]
                     depset.addDep(deps.RpmDependencies,
-                                  deps.Dependency('locale:%s' % name, flags))
+                                  deps.Dependency('locale%s' % name, flags))
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
@@ -328,7 +330,7 @@ class _RpmHeader(object):
                 raise IOError, "bad header sha1"
 
         for i in range(entries):
-            (tag, dataType, offset, count) = struct.unpack("!iiii", 
+            (tag, dataType, offset, count) = struct.unpack("!iiii",
                                             entryTable[i * 16: i * 16 + 16])
 
             self.entries[tag] = (dataType, offset, count)
@@ -411,8 +413,8 @@ def readSignatureHeader(f):
     lead = f.read(96)
     leadMagic = struct.unpack("!i", lead[0:4])[0]
 
-    if (leadMagic & 0xffffffffl) != 0xedabeedbl: 
-	raise IOError, "file is not an RPM"
+    if (leadMagic & 0xffffffffl) != 0xedabeedbl:
+        raise IOError, "file is not an RPM"
 
     isSource = (struct.unpack('!H', lead[6:8])[0] == 1)
 
@@ -456,7 +458,7 @@ def verifySignatures(f, validKeys = None):
     matchingKeys = [ x for x in validKeys if x.hasKeyId(keyId) ]
     if not matchingKeys:
         raise PGPSignatureError("Signature generated with key %s does "
-              "not match valid keys %s" % 
+              "not match valid keys %s" %
               (keyId, ', '.join(x.getKeyId() for x in validKeys)))
 
     key = matchingKeys[0]
@@ -591,6 +593,7 @@ def extractFilesFromCpio(fileIn, fileList, tmpDir = '/tmp'):
         results.append(inodeMap.get(key))
     return results
 
+
 def UncompressedRpmPayload(fileIn):
     """
     Given a (seekable) file object containing an RPM package, return
@@ -600,32 +603,38 @@ def UncompressedRpmPayload(fileIn):
     header = readHeader(fileIn)
     # check to make sure that this is a cpio archive (though most rpms
     # are cpio).  If the tag does not exist, assume it's cpio
-    if header.has_key(PAYLOADFORMAT):
+    if PAYLOADFORMAT in header:
         if header[PAYLOADFORMAT] != 'cpio':
             raise UnknownPayloadFormat(header[PAYLOADFORMAT])
 
     # check to see how the payload is compressed.  Again, if the tag
-    # does not exist, assume that it's gzip.
-    if header.has_key(PAYLOADCOMPRESSOR):
+    # does not exist, check if it is gzip, if not it is uncompressed
+    if PAYLOADCOMPRESSOR in header:
         compression = header[PAYLOADCOMPRESSOR]
     else:
-        compression = 'gzip'
-
+        b = fileIn.read(4096)
+        if len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
+            compression = 'gzip'
+        else:
+            compression = 'uncompressed'
     # rewind the file to let seekToData do its job
     fileIn.seek(0)
     seekToData(fileIn)
 
     if compression == 'gzip':
-        uncompressed = util.GzipFile(fileobj=fileIn, mode = "r")
+        uncompressed = util.GzipFile(fileobj=fileIn, mode="r")
         #uncompressed._new_member = False
     elif compression == 'bzip2':
         uncompressed = util.BZ2File(fileIn)
     elif compression in ['lzma', 'xz']:
         uncompressed = util.LZMAFile(fileIn)
+    elif compression == 'uncompressed':
+        uncompressed = fileIn
     else:
         raise UnknownCompressionType(compression)
 
     return uncompressed
+
 
 class NEVRA(object):
     _re = re.compile("^(.*)-([^-]*)-([^-]*)\.([^.]*)$")

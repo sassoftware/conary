@@ -26,7 +26,7 @@ class MainHandler(object):
     """
 
     abstractCommand = None   # class to grab generic options from.  These
-                             # can be used in front of 
+                             # can be used in front of
     commandList = []         # list of commands to support.
     name = None              # name to use when showing usage messages.
     version = '<no version>' # version to return to --version
@@ -243,7 +243,7 @@ class MainHandler(object):
 
         try:
             newArgSet, otherArgs, parser, optionSet = options._processArgs(
-                                        params, {}, cfg, 
+                                        params, {}, cfg,
                                         usage=self._getUsage(commandName),
                                         argv=argv, **kwargs)
         except debuggerException, e:

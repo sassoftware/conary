@@ -88,7 +88,7 @@ class ChangesetCallback(callbacks.LineOutput, callbacks.ChangesetCallback):
         @see: callbacks.UpdateCallback.creatingDatabaseTransaction
         """
         self._message("Creating database transaction (%d of %d)" %
-		      (troveNum, troveCount))
+                      (troveNum, troveCount))
 
     # fixme: callbacks need to be refactored
     def updatingDatabase(self, step, stepNum, stepCount):
@@ -165,13 +165,12 @@ class CloneCallback(ChangesetCallback, callbacks.CloneCallback):
         if total:
             self._message('Targeting Sources (%s/%s)' % (current, total))
         else:
-            self._message('Targeting Sources' % (current, total))
+            self._message('Targeting Sources')
 
     def targetBinaries(self, current=0, total=0):
         self.prefix = 'Step 2/5: '
         if total:
-            self._message('Targeting Binaries (%s/%s)' % (current,
-                                                                    total))
+            self._message('Targeting Binaries (%s/%s)' % (current, total))
         else:
             self._message('Targeting Binaries')
 

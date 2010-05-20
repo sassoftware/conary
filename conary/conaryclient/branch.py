@@ -27,17 +27,17 @@ class ClientBranch:
 
     __developer_api__ = True
 
-    def createBranchChangeSet(self, newLabel, 
+    def createBranchChangeSet(self, newLabel,
                               troveList = [], branchType=BRANCH_ALL,
                               sigKeyId = None):
-        return self._createBranchOrShadow(newLabel, troveList, shadow = False, 
+        return self._createBranchOrShadow(newLabel, troveList, shadow = False,
                                           branchType = branchType,
                                           sigKeyId = sigKeyId)
 
-    def createShadowChangeSet(self, newLabel, troveList = [], 
+    def createShadowChangeSet(self, newLabel, troveList = [],
                               branchType=BRANCH_ALL,
                               sigKeyId = None):
-        return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
+        return self._createBranchOrShadow(newLabel, troveList, shadow = True,
                                           branchType = branchType,
                                           sigKeyId = sigKeyId)
 
@@ -91,14 +91,14 @@ class ClientBranch:
     def _createBranchOrShadow(self, newLabel, troveList, shadow,
                               branchType=BRANCH_ALL, sigKeyId = None):
         cs = changeset.ChangeSet()
-        
+
         seen = set(troveList)
         dupList = []
         needsCommit = False
 
         newLabel = versions.Label(newLabel)
 
-	while troveList:
+        while troveList:
             leavesByLabelOps = {}
 
             troves = self.repos.getTroves(troveList)
@@ -121,12 +121,12 @@ cannot shadow earlier trove
 ''' % (n, shadowedVer, f, n, v, f))
                     raise BranchError('\n\n'.join(msg))
 
-	    for trove in troves:
+            for trove in troves:
                 if trove.isRedirect():
                     raise errors.ShadowRedirect(*trove.getNameVersionFlavor())
 
                 # add contained troves to the todo-list
-                newTroves = [ x for x in 
+                newTroves = [ x for x in
                         trove.iterTroveList(strongRefs=True,
                                             weakRefs=True) if x not in seen ]
                 troveList.update(newTroves)
@@ -139,7 +139,7 @@ cannot shadow earlier trove
                         continue
 
                 elif branchType & self.BRANCH_SOURCE:
-                    # name doesn't end in :source - if we want 
+                    # name doesn't end in :source - if we want
                     # to shadow the listed troves' sources, do so now
 
                     # XXX this can go away once we don't care about
@@ -152,7 +152,7 @@ cannot shadow earlier trove
                         sourceName = trove.getSourceName()
 
                     key  = (sourceName,
-                            trove.getVersion().getSourceVersion(False), 
+                            trove.getVersion().getSourceVersion(False),
                             deps.Flavor())
                     if key not in seen:
                         troveList.add(key)
@@ -168,7 +168,7 @@ cannot shadow earlier trove
                                                                withVerRel = 1)
 
                 branchedTrove = trove.copy()
-		branchedTrove.changeVersion(branchedVersion)
+                branchedTrove.changeVersion(branchedVersion)
                 #this clears the digital signatures from the shadow
                 branchedTrove.troveInfo.sigs.reset()
                 # this flattens the old metadata and removes signatures
@@ -176,18 +176,18 @@ cannot shadow earlier trove
                 # FIXME we should add a new digital signature in cases
                 # where we can (aka user is at kb and can provide secret key
 
-		for ((name, version, flavor), byDefault, isStrong) \
+                for ((name, version, flavor), byDefault, isStrong) \
                                             in trove.iterTroveListInfo():
                     if shadow:
                         branchedVersion = version.createShadow(newLabel)
                     else:
                         branchedVersion = version.createBranch(newLabel,
                                                                withVerRel = 1)
-		    branchedTrove.delTrove(name, version, flavor,
+                    branchedTrove.delTrove(name, version, flavor,
                                            missingOkay = False,
                                            weakRef=not isStrong)
-		    branchedTrove.addTrove(name, branchedVersion, flavor,
-                                           byDefault=byDefault, 
+                    branchedTrove.addTrove(name, branchedVersion, flavor,
+                                           byDefault=byDefault,
                                            weakRef=not isStrong)
 
                 key = (trove.getName(), branchedTrove.getVersion(),
@@ -221,7 +221,7 @@ cannot shadow earlier trove
                     needsCommit = True
 
         if not needsCommit:
-            cs = None 
+            cs = None
 
-	return dupList, cs
+        return dupList, cs
 

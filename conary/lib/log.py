@@ -79,7 +79,7 @@ class SysLog:
     def open(self):
         from conary.lib import util
         self.f = None
-        logList = [ os.path.normpath(os.path.sep.join((self.root, x))) 
+        logList = [ os.path.normpath(os.path.sep.join((self.root, x)))
                                 for x in self.path ]
         for pathElement in logList:
             try:
@@ -165,7 +165,7 @@ def getVerbosity():
 def setMinVerbosity(val):
     """
         Ensures that the log level is at least the given log level.
-        Returns the log level before this call if a change was made 
+        Returns the log level before this call if a change was made
         otherwise None
     """
     oldVal = getVerbosity()
@@ -177,7 +177,7 @@ class ErrorCheckingHandler(logging.StreamHandler):
     def __init__(self, *args, **keywords):
         self.error = False
         logging.StreamHandler.__init__(self, *args, **keywords)
-    
+
     def emit(self, record):
         logging.StreamHandler.emit(self, record)
 

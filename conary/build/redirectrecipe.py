@@ -179,7 +179,7 @@ class _RedirectRecipe(Recipe):
         l = []
         for name, d in searchResult.iteritems():
             for version, flavorList in d.iteritems():
-                l += [ (name, (None, None), (version, x), True) 
+                l += [ (name, (None, None), (version, x), True)
                                 for x in flavorList ]
 
         trvCsDict = {}
@@ -197,7 +197,7 @@ class _RedirectRecipe(Recipe):
     @staticmethod
     def _getTargetRules(rules, name):
         # return the rules for troves with this name; if it's a component of
-        # a package we alrady built reuse the rule which we used for that 
+        # a package we alrady built reuse the rule which we used for that
         # package
         targetRules = rules.get(name, None)
         if targetRules is None:
@@ -288,7 +288,7 @@ class _RedirectRecipe(Recipe):
 
         redirRuleMap = {}
 
-        # sourceTroveVersions is all of the versions/flavors which 
+        # sourceTroveVersions is all of the versions/flavors which
         # currently exist for this trove
         for sourceName, sourceTroveVersions in sourceTroveMatches.iteritems():
             # set of rules for where this trove should redirect to
@@ -345,7 +345,7 @@ class _RedirectRecipe(Recipe):
                                 # at the front)
                                 previousRule = redirRuleMap[(sourceName,
                                                              sourceFlavor)]
-                                if (previousRule.sourceFlavor 
+                                if (previousRule.sourceFlavor
                                                     is not None and
                                     rule.sourceFlavor is None):
                                     # the default rule should be skipped

@@ -85,7 +85,7 @@ class InitialContents(packagepolicy.InitialContents):
         policy.Policy.updateArgs(self, *args, **keywords)
 
     def doFile(self, filename):
-	fullpath = self.macros.destdir + filename
+        fullpath = self.macros.destdir + filename
         recipe = self.recipe
         if not os.path.isdir(fullpath) or os.path.islink(fullpath):
             for pkg in self.recipe.autopkg.findComponents(filename):
@@ -107,8 +107,8 @@ class Transient(packagepolicy.Transient):
     processUnmodified = True
 
     def doFile(self, filename):
-	fullpath = self.macros.destdir + filename
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
+        fullpath = self.macros.destdir + filename
+        if os.path.isfile(fullpath) and util.isregular(fullpath):
             recipe = self.recipe
             for pkg in self.recipe.autopkg.findComponents(filename):
                 f = pkg.getFile(filename)

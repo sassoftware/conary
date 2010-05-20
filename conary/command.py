@@ -15,8 +15,8 @@
 import os, sys, optparse
 
 from conary.conaryclient import cmdline
-from conary.lib import options, log
-from conary import state, versions
+from conary.lib import options
+from conary import versions
 
 (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
 (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
@@ -27,21 +27,21 @@ class ConaryCommand(options.AbstractCommand):
                                     ' loc', 'LABEL'),
             'components'         : (options.VERBOSE_HELP,
                                     'Do not hide components'),
-            'config'             : (options.VERBOSE_HELP, 
+            'config'             : (options.VERBOSE_HELP,
                                     'Set config KEY to VALUE', '"KEY VALUE"'),
-            'config-file'        : (options.VERBOSE_HELP, 
+            'config-file'        : (options.VERBOSE_HELP,
                                     'Read PATH config file', 'PATH'),
             'context'            : (options.VERBOSE_HELP,
                                     'Set the current context'),
             'exclude-troves'     : (options.VERBOSE_HELP,
-                                    'Do not install troves matching REGEXP', 
+                                    'Do not install troves matching REGEXP',
                                     'REGEXP'),
-            'install-label'      : (options.VERBOSE_HELP, 
+            'install-label'      : (options.VERBOSE_HELP,
                                     'Set the install label', 'LABEL'),
-            'interactive'        : (options.VERBOSE_HELP, 
+            'interactive'        : (options.VERBOSE_HELP,
                                     'ask questions before performing actions '
                                     'that change system or repository state'),
-            'flavors'            : (options.VERBOSE_HELP, 
+            'flavors'            : (options.VERBOSE_HELP,
                                     'Display complete flavors where applicable'),
             'full-versions'      : (options.VERBOSE_HELP,
                                     'Always display complete version strings'),
@@ -50,7 +50,7 @@ class ConaryCommand(options.AbstractCommand):
             'profile'            : optparse.SUPPRESS_HELP,
             'lsprof'             : optparse.SUPPRESS_HELP,
             'pubring'            : (options.VERBOSE_HELP, ''),
-            'skip-default-config': (options.VERBOSE_HELP, 
+            'skip-default-config': (options.VERBOSE_HELP,
                                     "Don't read default configs"),
             'quiet'              : (options.VERBOSE_HELP,
                                     'do not display extra information when '

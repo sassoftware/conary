@@ -84,7 +84,7 @@ class AbstractCommand(object):
 
     def addDocs(self, argDef):
         """ Parse a docs dict assigned at the class level
-            and add those docs to the parameters being sent to 
+            and add those docs to the parameters being sent to
             parseOptions.
         """
         d = {}
@@ -119,9 +119,9 @@ class AbstractCommand(object):
 
     def processConfigOptions(self, cfg, cfgMap, argSet):
         """
-            Manage any config maps we've set up, converting 
+            Manage any config maps we've set up, converting
             assigning them to the config object.
-        """ 
+        """
         for (arg, data) in cfgMap.items():
             cfgName, paramType = data[0:2]
             value = argSet.pop(arg, None)
@@ -163,7 +163,7 @@ class AbstractCommand(object):
             raise errors.ParseError('%s takes %s arguments, received %s' % (command, numParams, len(args)-1))
 
         if appendExtra:
-            # final parameter is list 
+            # final parameter is list
             return args[:len(expected)-1] + [args[len(expected)-1:]]
         elif allowExtra:
             return args[:len(expected)] + [args[len(expected):]]

@@ -16,7 +16,7 @@
 Basic error types for all things conary.
 
 The base of the conary error hierarchy is defined here.
-Other errors hook into these base error classes, but are 
+Other errors hook into these base error classes, but are
 defined in places closer to where they are used.
 
 The cvc error hierarchy is defined in the cvc build dir.
@@ -32,7 +32,7 @@ class InternalConaryError(Exception):
        Can be used instead of asserts, e.g., when there is a > normal
        chance of it being hit.
 
-       Also reasonable to use as a mix-in, so, that an exception can be in 
+       Also reasonable to use as a mix-in, so, that an exception can be in
        its correct place in the hierarchy, while still being internal.
     """
 

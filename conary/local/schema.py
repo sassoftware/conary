@@ -356,7 +356,7 @@ def setupTempDepTables(db, cu=None, skipCommit=False):
     if "RemovedTroveIds" not in db.tempTables:
         cu.execute("""
             CREATE TEMPORARY TABLE RemovedTroveIds(
-		rowId %(PRIMARYKEY)s,
+                rowId %(PRIMARYKEY)s,
                 troveId INTEGER,
                 nodeId INTEGER
             )""" % db.keywords, start_transaction=False)
@@ -761,14 +761,14 @@ class MigrateTo_17(SchemaMigration):
         for instanceId, data in rows:
             frzn = PathHashes(data).freeze()
             if frzn != data:
-                neededChanges.append((instanceId, frzn)) 
+                neededChanges.append((instanceId, frzn))
 
         cu = self.cu
         for instanceId, frzn in neededChanges:
-            cu.execute('''DELETE FROM TroveInfo 
-                          WHERE instanceId=? AND infoType=?''', instanceId, 
+            cu.execute('''DELETE FROM TroveInfo
+                          WHERE instanceId=? AND infoType=?''', instanceId,
                         trove._TROVEINFO_TAG_SIGS)
-            cu.execute('''UPDATE TroveInfo SET data=? 
+            cu.execute('''UPDATE TroveInfo SET data=?
                           WHERE instanceId=? AND infoType=?
                        ''', frzn, instanceId, trove._TROVEINFO_TAG_PATH_HASHES)
         return self.Version
@@ -795,15 +795,15 @@ class MigrateTo_18(SchemaMigration):
         cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
                    "Instances(troveName, versionId, flavorId)")
 
-        cu.execute('''DELETE FROM TroveInfo WHERE instanceId 
+        cu.execute('''DELETE FROM TroveInfo WHERE instanceId
                       NOT IN (SELECT instanceId FROM Instances)''')
 
         # delete BuildDeps, Loaded troves, label path, and policy tups
         # from components (they shouldn't have had them in the first place)
-        cu.execute('''DELETE FROM TroveInfo 
+        cu.execute('''DELETE FROM TroveInfo
                         WHERE infoType in (4,5,11,12) AND
                                instanceId IN (
-                                SELECT instanceId FROM Instances 
+                                SELECT instanceId FROM Instances
                                     WHERE troveName LIKE '%:%')''')
         return self.Version
 

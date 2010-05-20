@@ -90,7 +90,7 @@ class DependencyWorkTables:
 
         if len(dependencyTables) > 1:
             self.cu.execute("""
-            select count(*) from 
+            select count(*) from
                 TmpDependencies join dependencies using (class, name, flag)
             """)
             count = self.cu.next()[0]
@@ -101,7 +101,7 @@ class DependencyWorkTables:
                            % (depTable, multiplier), start_transaction = False)
             if len(dependencyTables) > 1:
                 self.cu.execute("""
-                select count(*) from 
+                select count(*) from
                     TmpDependencies where depId > 0
                 """)
                 count = self.cu.next()[0]
@@ -141,7 +141,7 @@ class DependencyWorkTables:
         FROM %(tmpName)s """ % substDict
         repQuery += selectClause
         repQuery += """
-        WHERE %(tmpName)s.isProvides = 0 AND 
+        WHERE %(tmpName)s.isProvides = 0 AND
               %(tmpName)s.merged = 0""" % substDict
         self.cu.execute(repQuery, start_transaction = False)
 
@@ -158,7 +158,7 @@ class DependencyWorkTables:
         WHERE %(tmpName)s.isProvides = 1 AND
               %(tmpName)s.merged = 0""" % substDict
         self.cu.execute(repQuery, start_transaction = False)
-        self.cu.execute("UPDATE %(tmpName)s SET merged = 1" % substDict, 
+        self.cu.execute("UPDATE %(tmpName)s SET merged = 1" % substDict,
                         start_transaction=False)
 
     def _populateTmpTable(self, depList, troveNum, requires,
@@ -1305,7 +1305,7 @@ class DependencyTables:
         JOIN Nodes ON
             Instances.itemId = Nodes.itemId AND
             Instances.versionId = Nodes.versionId
-        
+
         JOIN LabelMap ON
             LabelMap.itemId = Nodes.itemId AND
             LabelMap.branchId = Nodes.branchId
@@ -1344,7 +1344,7 @@ class DependencyTables:
         cu = self.db.cursor()
         workTables = DependencyWorkTables(self.db, cu)
 
-	cu.execute("BEGIN")
+        cu.execute("BEGIN")
 
         depList = [ None ]
         for i, depSet in enumerate(depSetList):
@@ -1498,7 +1498,7 @@ class DependencyTables:
 
         workTables = DependencyWorkTables(self.db, cu)
 
-	cu.execute("BEGIN")
+        cu.execute("BEGIN")
 
         depList = [ None ]
         for i, depSet in enumerate(depSetList):
@@ -1543,7 +1543,7 @@ class DependencyDatabase(DependencyTables):
         for managing dependencies
     """
     def __init__(self, path=":memory:", driver="sqlite"):
-	db = dbstore.connect(path, driver=driver, timeout=30000)
+        db = dbstore.connect(path, driver=driver, timeout=30000)
         db.loadSchema()
         schema.setupTempDepTables(db)
         schema.createDependencies(db)

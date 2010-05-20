@@ -18,7 +18,7 @@ if sys.version_info[:2] >= (2,2):
     MyStopIteration = StopIteration
 else:
     MyStopIteration = IndexError
-    
+
 class DBAPITypeObject:
     def __init__(self,*values):
         self.values = values
@@ -46,7 +46,7 @@ class Row:
         if isinstance(idx, str):
             return self.__getattr__(idx)
         return self.data[idx]
-        
+
     def __getattr__(self, attr):
         attr = attr.upper()
         if self.col_names.has_key(attr):
@@ -136,13 +136,13 @@ class Cursor:
                 "%s failed - the cursor is closed." % (methodname or "")
 
     def compile(self, SQL):
-	return self.con.db.prepare(SQL)
+        return self.con.db.prepare(SQL)
 
     def execstmt(self, stmt, *parms):
-	stmt.reset()
+        stmt.reset()
         for i, parm in enumerate(parms):
             stmt.bind(i + 1, parm)
-	self.current_row = stmt.step()
+        self.current_row = stmt.step()
 
     def _preExecute(self, funcName, SQL, kwargs):
         start_transaction = kwargs.pop('start_transaction', True)
@@ -243,7 +243,7 @@ class Cursor:
 
         self._reset()
         self.closed = 1
-        
+
         # Disassociate ourselves from our connection.
         try:
             cursors = self.con.cursors

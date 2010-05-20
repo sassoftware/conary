@@ -98,7 +98,7 @@ def loadMacros(paths):
 class _sourceHelper:
     def __init__(self, theclass, recipe):
         self.theclass = theclass
-	self.recipe = recipe
+        self.recipe = recipe
     def __call__(self, *args, **keywords):
         self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
         self.recipe.populateLcache()
@@ -619,7 +619,7 @@ class Recipe(object):
         else:
             kw = {}
 
-        inRepos, f = self.fileFinder.fetch(sourceName, 
+        inRepos, f = self.fileFinder.fetch(sourceName,
                                            refreshFilter=refreshFilter,
                                            allowNone=True, **kw)
         return f
@@ -707,7 +707,7 @@ class Recipe(object):
             return reqMap, missingReqs
 
 
-	db = database.Database(cfg.root, cfg.dbPath)
+        db = database.Database(cfg.root, cfg.dbPath)
 
 
         if self.needsCrossFlags() and self.crossRequires:
@@ -777,8 +777,8 @@ class Recipe(object):
                 return True
             return trove.getName() in targets
 
-	db = database.Database(self.cfg.root, self.cfg.dbPath)
-        
+        db = database.Database(self.cfg.root, self.cfg.dbPath)
+
         reqList =  [ req for req in self.getBuildRequirementTroves(db)
                      if isTroveTarget(req) ]
         reqNames = set(req.getName() for req in reqList)
@@ -816,7 +816,7 @@ class Recipe(object):
         buildReqs = self.getBuildRequirementTroves(db)
         buildReqs = set((x.getName(), x.getVersion(), x.getFlavor())
                         for x in buildReqs)
-        packageReqs = [ x for x in self.buildReqMap.itervalues() 
+        packageReqs = [ x for x in self.buildReqMap.itervalues()
                         if trove.troveIsCollection(x.getName()) ]
         for package in packageReqs:
             childPackages = [ x for x in package.iterTroveList(strongRefs=True,
@@ -835,7 +835,7 @@ class Recipe(object):
             for trv in db.getTroves(list(troveList), withFiles=False):
                 required = deps.DependencySet()
                 oldRequired = trv.getRequires()
-                [ required.addDep(*x) for x in oldRequired.iterDeps() 
+                [ required.addDep(*x) for x in oldRequired.iterDeps()
                   if x[0] != deps.AbiDependency ]
                 depSetList.append(required)
             seen.update(troveList)
@@ -845,7 +845,7 @@ class Recipe(object):
                 for depSols in depSetSols:
                     bestChoices = []
                     # if any solution for a dep is satisfied by the installFlavor
-                    # path, then choose the solutions that are satisfied as 
+                    # path, then choose the solutions that are satisfied as
                     # early as possible on the flavor path.  Otherwise return
                     # all solutions.
                     for flavor in flavorPath:

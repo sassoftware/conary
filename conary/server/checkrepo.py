@@ -46,7 +46,7 @@ class Checker:
         self._postinit()
     def _postinit(self):
         pass
-    
+
     def getDB(self):
         if self._db:
             return self._db
@@ -55,7 +55,7 @@ class Checker:
         schema.setupTempTables(self._db)
         depSchema.setupTempDepTables(self._db)
         return self._db
-    
+
     def commit(self, db = None):
         if db is None:
             db = self._db
@@ -71,7 +71,7 @@ class Checker:
         return self.fix()
     def fix(self):
         return True
-    
+
     def run(self):
         log.info("Running:  %s", self.__doc__)
         ret = self.check()
@@ -193,7 +193,7 @@ class CheckLatest(Checker):
         self.commit()
         return True
 
-    
+
 class CheckTroveInfo(Checker):
     """ checks for extra/erroneous troveinfo records """
     def check(self):
@@ -287,7 +287,7 @@ class CheckCTC(Checker):
                        ((p,i) for (p,i) in self._status))
         self.commit()
         return self.check()
-    
+
 # main program
 class ServerConfig(netserver.ServerConfig):
     port                    = (CfgInt,  8000)
@@ -295,8 +295,8 @@ class ServerConfig(netserver.ServerConfig):
     sslKey                  = CfgPath
     useSSL                  = CfgBool
     def __init__(self, path="serverrc"):
-	netserver.ServerConfig.__init__(self)
-	self.read(path, exception=False)
+        netserver.ServerConfig.__init__(self)
+        self.read(path, exception=False)
         if self.tmpDir.endswith('/'):
             self.tmpDir = self.tmpDir[:-1]
     def check(self):
@@ -316,7 +316,7 @@ class ServerConfig(netserver.ServerConfig):
             log.error("tmpDir cannot include symbolic links")
             return False
         return True
-    
+
 def startLogging():
     import logging
     # set a format which is simpler for console use
@@ -325,7 +325,7 @@ def startLogging():
     log.logger.handlers[0].setFormatter(formatter)
     log.setVerbosity(log.DEBUG)
     log.info("Logging system started")
-    
+
 def usage(name = sys.argv[0]):
     print """checks repository for data consistency
     Usage:
@@ -338,11 +338,11 @@ def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
     cfg = ServerConfig()
     cfgMap.update({
         'contents-dir'  : 'contentsDir',
-	'db'	        : 'repositoryDB',
-	'tmp-dir'       : 'tmpDir',
+        'db'            : 'repositoryDB',
+        'tmp-dir'       : 'tmpDir',
         'server-name'   : 'serverName'
         })
-    
+
     opts["config"] = options.MULT_PARAM
     opts["config-file"] = options.ONE_PARAM
 
@@ -355,7 +355,7 @@ def getServer(opts = {}, argv = sys.argv, cfgMap = {}):
     if "help" in argSet:
         usage(argv[0])
         sys.exit(0)
-        
+
     startLogging()
 
     if not cfg.check():
@@ -377,7 +377,7 @@ def main():
     opts =  {}
     opts["fix"] = options.NO_PARAM
     cfg, opts, args = getServer(opts)
-    
+
     doFix = opts.has_key("fix")
     if not args:
         usage()

@@ -38,9 +38,9 @@ from conary.repository import errors as repoerrors
 
 crossMacros = {
     'crossdir'          : 'cross-target-%(target)s',
-    'crossprefix'	: '/opt/%(crossdir)s',
-    'sysroot'		: '%(crossprefix)s/sys-root',
-    'headerpath'	: '%(sysroot)s%(includedir)s'
+    'crossprefix'       : '/opt/%(crossdir)s',
+    'sysroot'           : '%(crossprefix)s/sys-root',
+    'headerpath'        : '%(sysroot)s%(includedir)s'
 }
 
 
@@ -48,7 +48,7 @@ class _recipeHelper:
     def __init__(self, list, recipe, theclass):
         self.list = list
         self.theclass = theclass
-	self.recipe = recipe
+        self.recipe = recipe
     def __call__(self, *args, **keywords):
         self.list.append(self.theclass(self.recipe, *args, **keywords))
 
@@ -146,64 +146,64 @@ class AbstractPackageRecipe(Recipe):
     basePolicyClass = policy.Policy
 
     def mainDir(self, new=None, explicit=True):
-	if new:
-	    self.theMainDir = new % self.macros
-	    self.macros.maindir = self.theMainDir
+        if new:
+            self.theMainDir = new % self.macros
+            self.macros.maindir = self.theMainDir
             self.explicitMainDir |= explicit
             if explicit:
                 if self.buildinfo:
                     self.buildinfo.maindir = self.theMainDir
-	return self.theMainDir
+        return self.theMainDir
 
     def nameVer(self):
-	return '-'.join((self.name, self.version))
+        return '-'.join((self.name, self.version))
 
     def cleanup(self, builddir, destdir):
-	if self.cfg.cleanAfterCook:
-	    util.rmtree(builddir)
+        if self.cfg.cleanAfterCook:
+            util.rmtree(builddir)
 
     def processResumeList(self, resume):
-	resumelist = []
-	if resume:
-	    lines = resume.split(',')
-	    for line in lines:
-		if ':' in line:
-		    begin, end = line.split(':')
-		    if begin:
-			begin = int(begin)
-		    if end:
-			end = int(end)
-		    resumelist.append([begin, end])
-		else:
+        resumelist = []
+        if resume:
+            lines = resume.split(',')
+            for line in lines:
+                if ':' in line:
+                    begin, end = line.split(':')
+                    if begin:
+                        begin = int(begin)
+                    if end:
+                        end = int(end)
+                    resumelist.append([begin, end])
+                else:
                     if len(lines) == 1:
                         resumelist.append([int(line), False])
                     else:
                         resumelist.append([int(line), int(line)])
-	self.resumeList = resumelist
+        self.resumeList = resumelist
 
     def iterResumeList(self, actions):
-	resume = self.resumeList
-	resumeBegin = resume[0][0]
-	resumeEnd = resume[0][1]
-	for action in actions:
-	    if not resumeBegin or action.linenum >= resumeBegin:
-		if not resumeEnd or action.linenum <= resumeEnd:
-		    yield action
-		elif resumeEnd:
-		    resume = resume[1:]
-		    if not resume:
-			return
-		    resumeBegin = resume[0][0]
-		    resumeEnd = resume[0][1]
-		    if action.linenum == resumeBegin:
-			yield action
+        resume = self.resumeList
+        resumeBegin = resume[0][0]
+        resumeEnd = resume[0][1]
+        for action in actions:
+            if not resumeBegin or action.linenum >= resumeBegin:
+                if not resumeEnd or action.linenum <= resumeEnd:
+                    yield action
+                elif resumeEnd:
+                    resume = resume[1:]
+                    if not resume:
+                        return
+                    resumeBegin = resume[0][0]
+                    resumeEnd = resume[0][1]
+                    if action.linenum == resumeBegin:
+                        yield action
 
     def extraBuild(self, action):
-	"""
-	extraBuild allows you to append a build list item that is
-	not a part of build.py.  Be aware when writing these build
-	list items that you are writing conary internals!
-	"""
+        """
+        extraBuild allows you to append a build list item that is
+        not a part of build.py.  Be aware when writing these build
+        list items that you are writing conary internals!
+        """
         self._build.append(action)
 
     def doBuild(self, buildPath, resume=None):
@@ -252,19 +252,19 @@ class AbstractPackageRecipe(Recipe):
         self.macros._override('parallelmflags', '')
 
     def __delattr__(self, name):
-	"""
-	Allows us to delete policy items from their respective lists
-	by deleting a name in the recipe self namespace.  For example,
-	to remove the AutoDoc package policy from the package policy
-	list, one could do::
+        """
+        Allows us to delete policy items from their respective lists
+        by deleting a name in the recipe self namespace.  For example,
+        to remove the AutoDoc package policy from the package policy
+        list, one could do::
          del r.AutoDoc
-	This would prevent the AutoDoc package policy from being
-	executed.
+        This would prevent the AutoDoc package policy from being
+        executed.
 
-	In general, delete policy only as a last resort; you can
-	usually disable policy entirely with the keyword argument::
-	 exceptions='.*'
-	"""
+        In general, delete policy only as a last resort; you can
+        usually disable policy entirely with the keyword argument::
+         exceptions='.*'
+        """
         if name in self._policyMap:
             policyObj = self._policyMap[name]
             bucket = policyObj.bucket
@@ -279,7 +279,7 @@ class AbstractPackageRecipe(Recipe):
             del self._policyMap[policyObj.__class__.__name__]
             del self.externalMethods[name]
             return
-	del self.__dict__[name]
+        del self.__dict__[name]
 
     def setCrossCompile(self, (crossHost, crossTarget, isCrossTool)):
         """ Tell conary it should cross-compile, or build a part of a
@@ -408,7 +408,7 @@ class AbstractPackageRecipe(Recipe):
             if setEnviron:
                 os.environ['CONFIG_SITE'] = siteConfig
 
-        self.macros.update(dict(x for x in crossMacros.iteritems() 
+        self.macros.update(dict(x for x in crossMacros.iteritems()
                                  if x[0] not in self.macros))
 
         tmpArch = use.Arch.copy()
@@ -517,7 +517,7 @@ class AbstractPackageRecipe(Recipe):
                                            multiurlMap=self.multiurlMap,
                                            mirrorDirs=cfg.mirrorDirs,
                                            cfg=cfg)
-	self._build = []
+        self._build = []
 
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
@@ -534,9 +534,9 @@ class AbstractPackageRecipe(Recipe):
         self.byDefaultExcludeSet = frozenset()
         self.cfg = cfg
         self._repos = None
-	self.macros = macros.Macros(ignoreUnknown=lightInstance)
+        self.macros = macros.Macros(ignoreUnknown=lightInstance)
         baseMacros = loadMacros(cfg.defaultMacros)
-	self.macros.update(baseMacros)
+        self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
         # Mapping from trove name to scripts
@@ -547,19 +547,19 @@ class AbstractPackageRecipe(Recipe):
 
         # allow for architecture not to be set -- this could happen
         # when storing the recipe e.g.
- 	for key in cfg.macros:
- 	    self.macros._override(key, cfg['macros'][key])
+        for key in cfg.macros:
+            self.macros._override(key, cfg['macros'][key])
 
-	self.macros.name = self.name
-	self.macros.version = self.version
+        self.macros.name = self.name
+        self.macros.version = self.version
         if '.' in self.version:
             self.macros.major_version = '.'.join(self.version.split('.')[0:2])
         else:
             self.macros.major_version = self.version
         self.packages = { self.name : True }
         self.manifests = set()
-	if extraMacros:
-	    self.macros.update(extraMacros)
+        if extraMacros:
+            self.macros.update(extraMacros)
 
         self._isCrossCompileTool = False
         self._isCrossCompiling = False
@@ -578,13 +578,13 @@ class AbstractPackageRecipe(Recipe):
         if self.needsCrossFlags() and self.keepBuildReqs is not True:
             crossSuffixes = ['devel', 'devellib']
             crossTools = ['gcc', 'libgcc', 'binutils']
-            if (not hasattr(self, 'keepBuildReqs') 
+            if (not hasattr(self, 'keepBuildReqs')
                 or not hasattr(self.keepBuildReqs, '__iter__')):
-                # if we're in the "lightReference" mode, this might 
+                # if we're in the "lightReference" mode, this might
                 # return some bogus object...
                 self.keepBuildReqs = set()
             newCrossRequires = \
-                [ x for x in self.buildRequires 
+                [ x for x in self.buildRequires
                    if (':' in x and x.split(':')[-1] in crossSuffixes
                        and x.split(':')[0] not in crossTools
                        and x not in self.keepBuildReqs) ]

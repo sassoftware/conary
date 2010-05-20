@@ -12,7 +12,7 @@
 #
 """ Defines an on-demand importer that only actually loads modules when their
     attributes are accessed.  NOTE: if the ondemand module is viewed using
-    introspection, like dir(), isinstance, etc, it will appear as a 
+    introspection, like dir(), isinstance, etc, it will appear as a
     ModuleProxy, not a module, and will not have the correct attributes.
     Barring introspection, however, the module will behave as normal.
 """
@@ -21,12 +21,12 @@ import imp
 import types
 
 def makeImportedModule(name, pathname, desc, scope):
-    """ Returns a ModuleProxy that has access to a closure w/ 
-        information about the module to load, but is otherwise 
+    """ Returns a ModuleProxy that has access to a closure w/
+        information about the module to load, but is otherwise
         empty.  On an attempted access of any member of the module,
         the module is loaded.
     """
-        
+
     def _loadModule():
         """ Load the given module, and insert it into the parent
             scope, and also the original importing scope.
@@ -60,10 +60,10 @@ def makeImportedModule(name, pathname, desc, scope):
         names = [ '.'.join(moduleParts[-x:]) for x in range(len(moduleParts)) ]
         for modulePart in names:
             if modulePart in local_scope:
-                if (hasattr(local_scope[modulePart], '__class__') 
+                if (hasattr(local_scope[modulePart], '__class__')
                     and local_scope[modulePart].__class__.__name__ == 'ModuleProxy'):
                     # FIXME: this makes me cringe, but I haven't figured out a
-                    # better way to ensure that the module proxy we're 
+                    # better way to ensure that the module proxy we're
                     # looking at is actually a proxy for this module
                     if pathname in repr(local_scope[modulePart]):
                         local_scope[modulePart] = mod
@@ -77,7 +77,7 @@ def makeImportedModule(name, pathname, desc, scope):
 
     class ModuleProxy(object):
         __slots__ = []
-        # we don't add any docs for the module in case the 
+        # we don't add any docs for the module in case the
         # user tries accessing '__doc__'
         def __hasattr__(self, key):
             mod = _loadModule()
@@ -97,8 +97,8 @@ def makeImportedModule(name, pathname, desc, scope):
     return ModuleProxy()
 
 class OnDemandLoader(object):
-    """ The loader takes a name and info about the module to load and 
-        "loads" it - in this case returning loading a proxy that 
+    """ The loader takes a name and info about the module to load and
+        "loads" it - in this case returning loading a proxy that
         will only load the class when an attribute is accessed.
     """
     def __init__(self, name, file, pathname, desc, scope):
@@ -111,7 +111,7 @@ class OnDemandLoader(object):
     def load_module(self, fullname):
         if fullname in __builtins__:
             try:
-                mod = imp.load_module(self.name, self.file, 
+                mod = imp.load_module(self.name, self.file,
                                       self.pathname, self.desc)
             finally:
                 if self.file:
@@ -120,14 +120,14 @@ class OnDemandLoader(object):
         else:
             if self.file:
                 self.file.close()
-            mod = makeImportedModule(self.name, self.pathname, self.desc, 
+            mod = makeImportedModule(self.name, self.pathname, self.desc,
                                      self.scope)
             sys.modules[fullname] = mod
         return mod
-    
+
 class OnDemandImporter(object):
-    """ The on-demand importer imports a module proxy that 
-        inserts the desired module into the calling scope only when 
+    """ The on-demand importer imports a module proxy that
+        inserts the desired module into the calling scope only when
         an attribute from the module is actually used.
     """
 
@@ -146,7 +146,7 @@ class OnDemandImporter(object):
             head, fullname = fullname.rsplit('.', 1)
 
             # this import protocol works such that if I am going to be
-            # able to import fullname, then everything in front of the 
+            # able to import fullname, then everything in front of the
             # last . in fullname must already be loaded into sys.modules.
             mod = sys.modules.get(head,None)
             if mod is None:
@@ -159,7 +159,7 @@ class OnDemandImporter(object):
             file, pathname, desc = imp.find_module(fullname, path)
             return OnDemandLoader(origName, file, pathname, desc, global_scope)
         except ImportError:
-            # don't return an import error.  That will stop 
+            # don't return an import error.  That will stop
             # the automated search mechanism from working.
             return None
 

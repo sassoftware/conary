@@ -101,7 +101,7 @@ def _printFrame(f, output=sys.stderr):
     globals = f.f_globals
     output.write(">> %s:%s: %s.%s(%s)\n" % ( c.co_filename, f.f_lineno, globals['__name__'], c.co_name, ', '.join(args) ))
 
-    localkeys = [ l for l in f.f_locals.keys() if not inspect.ismodule(locals[l] ) ] 
+    localkeys = [ l for l in f.f_locals.keys() if not inspect.ismodule(locals[l] ) ]
     if argcount > 0:
         output.write("  Params: \n")
         for var in varnames[:argcount]:

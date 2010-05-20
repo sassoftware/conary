@@ -111,14 +111,14 @@ class Tee:
 class DataStore(AbstractDataStore):
 
     def hashToPath(self, hash):
-	if (len(hash) < 5):
-	    raise KeyError, ("invalid hash %s" % hash)
+        if (len(hash) < 5):
+            raise KeyError, ("invalid hash %s" % hash)
 
-	return os.sep.join((self.top, hash[0:2], hash[2:4], hash[4:]))
+        return os.sep.join((self.top, hash[0:2], hash[2:4], hash[4:]))
 
     def hasFile(self, hash):
-	path = self.hashToPath(hash)
-	return os.path.exists(path)
+        path = self.hashToPath(hash)
+        return os.path.exists(path)
 
     def addFileReference(self, hash):
         # this is for file reference counting, which we don't support
@@ -126,7 +126,7 @@ class DataStore(AbstractDataStore):
 
     def makeDir(self, path):
         d = os.path.dirname(path)
-	shortPath = d[:-3]
+        shortPath = d[:-3]
 
         for _dir in (shortPath, d):
             try:
@@ -137,13 +137,13 @@ class DataStore(AbstractDataStore):
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
-    def addFile(self, fileObj, hash, precompressed = False, 
+    def addFile(self, fileObj, hash, precompressed = False,
                 integrityCheck = True):
-	path = self.hashToPath(hash)
+        path = self.hashToPath(hash)
         self.makeDir(path)
         if os.path.exists(path): return
 
-        tmpFd, tmpName = tempfile.mkstemp(suffix = ".new", 
+        tmpFd, tmpName = tempfile.mkstemp(suffix = ".new",
                                           dir = os.path.dirname(path))
 
         realHash = self._writeFile(fileObj, [ tmpFd ], precompressed,
@@ -157,27 +157,27 @@ class DataStore(AbstractDataStore):
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
-	path = self.hashToPath(hash)
-	f = open(path, "r")
+        path = self.hashToPath(hash)
+        f = open(path, "r")
 
-	gzfile = gzip.GzipFile(path, mode)
-	return gzfile
+        gzfile = gzip.GzipFile(path, mode)
+        return gzfile
 
     # returns a python file object for the file requested
     def openRawFile(self, hash):
-	path = self.hashToPath(hash)
-	f = open(path, "r")
-	return f
+        path = self.hashToPath(hash)
+        f = open(path, "r")
+        return f
 
     def removeFile(self, hash):
         path = self.hashToPath(hash)
         os.unlink(path)
 
     def __init__(self, topPath):
-	self.top = topPath
+        self.top = topPath
 
-	if (not os.path.isdir(self.top)):
-	    raise IOError, ("path is not a directory: %s" % topPath)
+        if (not os.path.isdir(self.top)):
+            raise IOError, ("path is not a directory: %s" % topPath)
 
 class OverlayDataStoreSet:
 
@@ -187,38 +187,38 @@ class OverlayDataStoreSet:
     """
 
     def hashToPath(self, hash):
- 	for store in self.stores:
- 	    if store.hasFile(hash):
- 		return store.hashToPath(hash)
+        for store in self.stores:
+            if store.hasFile(hash):
+                return store.hashToPath(hash)
 
         return False
 
     def hasFile(self, hash):
- 	for store in self.stores:
- 	    if store.hasFile(hash):
- 		return True
- 
- 	return False
+        for store in self.stores:
+            if store.hasFile(hash):
+                return True
+
+        return False
 
     def addFile(self, f, hash, precompressed = False):
- 	self.stores[0].addFile(f, hash, precompressed = precompressed)
+        self.stores[0].addFile(f, hash, precompressed = precompressed)
 
     def addFileReference(self, hash):
- 	self.stores[0].addFileReference(hash)
+        self.stores[0].addFileReference(hash)
 
     def openFile(self, hash, mode = "r"):
- 	for store in self.stores:
- 	    if store.hasFile(hash):
- 		return store.openFile(hash, mode = mode)
- 
- 	assert(0)
+        for store in self.stores:
+            if store.hasFile(hash):
+                return store.openFile(hash, mode = mode)
+
+        assert(0)
 
     def openRawFile(self, hash):
- 	for store in self.stores:
- 	    if store.hasFile(hash):
- 		return store.openRawFile(hash)
- 
- 	assert(0)
+        for store in self.stores:
+            if store.hasFile(hash):
+                return store.openRawFile(hash)
+
+        assert(0)
 
     def removeFile(self, hash):
         assert(0)
@@ -248,7 +248,7 @@ class DataStoreSet(AbstractDataStore):
             store.makeDir(path)
             if os.path.exists(path): return
 
-            tmpFd, tmpPath = tempfile.mkstemp(suffix = ".new", 
+            tmpFd, tmpPath = tempfile.mkstemp(suffix = ".new",
                                               dir = os.path.dirname(path))
             tmpFileList.append((tmpFd, tmpPath, path))
 
@@ -295,26 +295,26 @@ class DataStoreRepository:
 
     def _storeFileFromContents(self, contents, sha1, restoreContents,
                                precompressed = False):
-	if restoreContents:
-	    self.contentsStore.addFile(contents.get(), 
-				       sha1helper.sha1ToString(sha1),
+        if restoreContents:
+            self.contentsStore.addFile(contents.get(),
+                                       sha1helper.sha1ToString(sha1),
                                        precompressed = precompressed)
-	else:
-	    # the file doesn't have any contents, so it must exist
-	    # in the data store already; we still need to increment
-	    # the reference count for it
-	    self.contentsStore.addFileReference(sha1helper.sha1ToString(sha1))
+        else:
+            # the file doesn't have any contents, so it must exist
+            # in the data store already; we still need to increment
+            # the reference count for it
+            self.contentsStore.addFileReference(sha1helper.sha1ToString(sha1))
 
-	return 1
+        return 1
 
     def _removeFileContents(self, sha1):
-	self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+        self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
 
     def _getFileObject(self, sha1):
-	return self.contentsStore.openFile(sha1helper.sha1ToString(sha1))
+        return self.contentsStore.openFile(sha1helper.sha1ToString(sha1))
 
     def _hasFileContents(self, sha1):
-	return self.contentsStore.hasFile(sha1helper.sha1ToString(sha1))
+        return self.contentsStore.hasFile(sha1helper.sha1ToString(sha1))
 
     def getFileContents(self, fileList):
         contentList = []
@@ -340,5 +340,5 @@ class DataStoreRepository:
         return contentList
 
     def __init__(self, dataStore = None):
-	self.contentsStore = dataStore
+        self.contentsStore = dataStore
 

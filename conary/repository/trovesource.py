@@ -30,8 +30,8 @@ class AbstractTroveSource:
     """ Provides the interface necessary for performing
         findTrove operations on arbitrary sets of troves.
         As long as the subclass provides the following methods,
-        findTrove will be able to search it.  You can set the 
-        type of searching findTrove will default to here as 
+        findTrove will be able to search it.  You can set the
+        type of searching findTrove will default to here as
         well.
     """
 
@@ -70,11 +70,11 @@ class AbstractTroveSource:
     def searchableByType(self):
         return self._searchableByType
 
-    def getTroveLeavesByLabel(self, query, bestFlavor=True, 
+    def getTroveLeavesByLabel(self, query, bestFlavor=True,
                               troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
-    def getTroveLatestByLabel(self, query, bestFlavor=True, 
+    def getTroveLatestByLabel(self, query, bestFlavor=True,
                               troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
 
@@ -133,10 +133,10 @@ class AbstractTroveSource:
         versionList = self.getTroveVersionList(name, troveTypes=troveTypes)
         return set(x.trailingLabel() for x in versionList)
 
-    def findTroves(self, labelPath, troves, defaultFlavor=None, 
-                   acrossLabels=False, acrossFlavors=False, 
-                   affinityDatabase=None, allowMissing=False, 
-                   bestFlavor=None, getLeaves=None, 
+    def findTroves(self, labelPath, troves, defaultFlavor=None,
+                   acrossLabels=False, acrossFlavors=False,
+                   affinityDatabase=None, allowMissing=False,
+                   bestFlavor=None, getLeaves=None,
                    troveTypes=TROVE_QUERY_PRESENT, exactFlavors=False,
                    **kw):
         """
@@ -149,7 +149,7 @@ class AbstractTroveSource:
             bestFlavor = self._bestFlavor
         if getLeaves is None:
             getLeaves = self._getLeavesOnly
-        troveFinder = findtrove.TroveFinder(self, labelPath, 
+        troveFinder = findtrove.TroveFinder(self, labelPath,
                                             defaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=self._allowNoLabel,
@@ -160,10 +160,10 @@ class AbstractTroveSource:
                                             **kw)
         return troveFinder.findTroves(troves, allowMissing)
 
-    def findTrove(self, labelPath, (name, versionStr, flavor), 
-                  defaultFlavor=None, acrossLabels = False, 
+    def findTrove(self, labelPath, (name, versionStr, flavor),
+                  defaultFlavor=None, acrossLabels = False,
                   acrossFlavors = False, affinityDatabase = None,
-                  bestFlavor = None, getLeaves = None, 
+                  bestFlavor = None, getLeaves = None,
                   troveTypes=TROVE_QUERY_PRESENT, **kw):
         """
         See L{repository.trovesource.AbstractTroveSource.findTroves}
@@ -228,29 +228,29 @@ class AbstractTroveSource:
 
             return
 
-	yield topTrove
-	seen = { topTrove.getName() : [ (topTrove.getVersion(),
-				         topTrove.getFlavor()) ] }
+        yield topTrove
+        seen = { topTrove.getName() : [ (topTrove.getVersion(),
+                                         topTrove.getFlavor()) ] }
 
-	troveList = [x for x in sorted(topTrove.iterTroveList(strongRefs=True))]
+        troveList = [x for x in sorted(topTrove.iterTroveList(strongRefs=True))]
 
-	while troveList:
-	    (name, version, flavor) = troveList[0]
-	    del troveList[0]
+        while troveList:
+            (name, version, flavor) = troveList[0]
+            del troveList[0]
 
-	    if seen.has_key(name):
-		match = False
-		for (ver, fla) in seen[name]:
-		    if version == ver and fla == flavor:
-			match = True
-			break
-		if match: continue
+            if seen.has_key(name):
+                match = False
+                for (ver, fla) in seen[name]:
+                    if version == ver and fla == flavor:
+                        match = True
+                        break
+                if match: continue
 
-		seen[name].append((version, flavor))
-	    else:
-		seen[name] = [ (version, flavor) ]
+                seen[name].append((version, flavor))
+            else:
+                seen[name] = [ (version, flavor) ]
 
-	    try:
+            try:
                 trv = self.getTrove(name, version, flavor, withFiles=withFiles)
 
                 yield trv
@@ -258,12 +258,12 @@ class AbstractTroveSource:
                 troveList = ([ x for x in
                                 sorted(trv.iterTroveList(strongRefs=True)) ]
                               + troveList)
-	    except errors.TroveMissing:
-		if not ignoreMissing:
-		    raise
-	    except KeyError:
-		if not ignoreMissing:
-		    raise
+            except errors.TroveMissing:
+                if not ignoreMissing:
+                    raise
+            except KeyError:
+                if not ignoreMissing:
+                    raise
 
 
     def mergeDepSuggestions(self, allSuggs, newSugg):
@@ -296,7 +296,7 @@ _GET_TROVE_ALL_FLAVORS        = 2     # all flavors (no scoring)
 _GET_TROVE_BEST_FLAVOR        = 3     # the best flavor for flavorFilter
 _GET_TROVE_ALLOWED_FLAVOR     = 4     # all flavors which are legal
 
-_CHECK_TROVE_REG_FLAVOR    = 1          # use exact flavor and ensure trove 
+_CHECK_TROVE_REG_FLAVOR    = 1          # use exact flavor and ensure trove
                                         # flavor is satisfied by query flavor
 _CHECK_TROVE_STRONG_FLAVOR = 2          # use strong flavors and reverse sense
 
@@ -307,9 +307,9 @@ _GTL_VERSION_TYPE_BRANCH  = 3
 _GTL_VERSION_TYPE_LABEL_LATEST = 4
 
 class SearchableTroveSource(AbstractTroveSource):
-    """ A simple implementation of most of the methods needed 
+    """ A simple implementation of most of the methods needed
         for findTrove - all of the methods are implemplemented
-        in terms of trovesByName, which is left for subclasses to 
+        in terms of trovesByName, which is left for subclasses to
         implement.
     """
 
@@ -354,7 +354,7 @@ class SearchableTroveSource(AbstractTroveSource):
     def isSearchAsDatabase(self):
         return self._allowNoLabel
 
-    def getTroveVersionList(self, name, withFlavors=False, 
+    def getTroveVersionList(self, name, withFlavors=False,
                             troveTypes=TROVE_QUERY_PRESENT):
         if withFlavors:
             return [ x[1:] for x in self.trovesByName(name) ]
@@ -383,9 +383,9 @@ class SearchableTroveSource(AbstractTroveSource):
                              troveTypes, splitByBranch=splitByBranch)
 
 
-    def _getTrovesByType(self, troveSpecs, 
+    def _getTrovesByType(self, troveSpecs,
                          versionType=_GTL_VERSION_TYPE_NONE,
-                         latestFilter=_GET_TROVE_ALL_VERSIONS, 
+                         latestFilter=_GET_TROVE_ALL_VERSIONS,
                          bestFlavor=False, troveTypes=TROVE_QUERY_PRESENT):
         if isinstance(troveSpecs, dict):
             troveSpecList = []
@@ -424,23 +424,23 @@ class SearchableTroveSource(AbstractTroveSource):
                 versionDict[version] = list(set(versionDict[version]))
         return resultDict
 
-    def _getTrovesByTypeTuples(self, troveSpecs, 
+    def _getTrovesByTypeTuples(self, troveSpecs,
                          versionType=_GTL_VERSION_TYPE_NONE,
-                         latestFilter=_GET_TROVE_ALL_VERSIONS, 
+                         latestFilter=_GET_TROVE_ALL_VERSIONS,
                          bestFlavor=False, troveTypes=TROVE_QUERY_PRESENT):
         """ Implements the various getTrove methods by grabbing
-            information from trovesByName.  Note it takes an 
-            extra parameter over the netrepos/netserver version - 
+            information from trovesByName.  Note it takes an
+            extra parameter over the netrepos/netserver version -
             flavorCheck - which, if set to _GET_TROVE_STRONG_FLAVOR,
-            does a strong comparison against the listed troves - 
-            the specified flavor _must_ exist in potentially matching 
-            troves, and sense reversal is not allowed - e.g. 
-            ~!foo is not an acceptable match for a flavor request of 
+            does a strong comparison against the listed troves -
+            the specified flavor _must_ exist in potentially matching
+            troves, and sense reversal is not allowed - e.g.
+            ~!foo is not an acceptable match for a flavor request of
             ~foo.  The mode is useful when the troveSpec is specified
             by the user and is matching against a limited set of troves.
         """
-        # some cases explained: 
-        # if latestFilter ==  _GET_TROVE_ALL_VERSIONS and 
+        # some cases explained:
+        # if latestFilter ==  _GET_TROVE_ALL_VERSIONS and
         # flavorFilter == _GET_TROVE_BEST_FLAVOR,
         # for each version, return the best flavor for that version.
 
@@ -450,7 +450,7 @@ class SearchableTroveSource(AbstractTroveSource):
         # only the best one of the flavors at that latest version
 
         # we don't handle queries for non-present troves at this moment.
-        # doing so may be impossible and/or expensive - for example, we would 
+        # doing so may be impossible and/or expensive - for example, we would
         # have to instantiate matching troves from changesets before we could
         # filter by flavor.
 
@@ -597,7 +597,7 @@ class SearchableTroveSource(AbstractTroveSource):
         versionFlavorDicts = []
         for versionList in versionsByBranch.values():
             versionFlavorDicts.append(
-                    dict((x, versionFlavorDict[x]) for x in 
+                    dict((x, versionFlavorDict[x]) for x in
                             versionList))
         return versionFlavorDicts
 
@@ -733,7 +733,7 @@ class SearchableTroveSource(AbstractTroveSource):
                   and preferenceScore == currentPreferenceScore
                   and queryResults):
                 # we match all flavors associated w/ one version
-                # at the same time.  So if we're trying to grab the 
+                # at the same time.  So if we're trying to grab the
                 # latest viable troves, and we've already got a
                 # preference score of 2 for some later version,
                 # there's no point finding earlier versions that
@@ -744,20 +744,20 @@ class SearchableTroveSource(AbstractTroveSource):
             elif preferenceScore < currentPreferenceScore:
                 currentPreferenceScore = preferenceScore
                 # We matched something that was preferred according
-                # to the flavorPreference list, for example, 
+                # to the flavorPreference list, for example,
                 # if our preferenceList is "is: x86", "ix: x86_64",
-                # adn we just matched an older x86_64 trove when we'd 
-                # already matched a newer x86 trove.  In that case, 
+                # adn we just matched an older x86_64 trove when we'd
+                # already matched a newer x86 trove.  In that case,
                 # throw out the x86 trove - it's no longer a valid result.
                 queryResults = {}
                 usedFlavors = set()
                 for emptyVersion, emptyFlavorList in newerEmptyMatches:
-                    self._addFilteredFlavorsToResults(emptyVersion, 
+                    self._addFilteredFlavorsToResults(emptyVersion,
                                 emptyFlavorList, flavorQuery, usedFlavors,
                                 queryResults, latestFilter,
                                 flavorFilter, scoreCache)
                 if latestFilter != _GET_TROVE_VERY_LATEST or not newerEmptyMatches:
-                    self._addFilteredFlavorsToResults(version, flavorList, 
+                    self._addFilteredFlavorsToResults(version, flavorList,
                                 flavorQuery, usedFlavors, queryResults,
                                 latestFilter, flavorFilter, scoreCache)
             else:
@@ -789,7 +789,7 @@ class SearchableTroveSource(AbstractTroveSource):
             results.setdefault(version, set()).update(flavorList)
         return results, altFlavors
 
-    def _filterByPreferences(self, flavorList, scoreToMatch, 
+    def _filterByPreferences(self, flavorList, scoreToMatch,
                              preferenceList):
         if not preferenceList:
             return 0, flavorList, []
@@ -838,7 +838,7 @@ class SearchableTroveSource(AbstractTroveSource):
                 bestMatching = matching
         return bestMatching + list(matchingNone)
 
-    def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList, 
+    def _calculateFlavorScores(self, flavorCheck, flavorQuery, flavorList,
                                scoreCache):
         assert(flavorQuery is not None)
         toCalc = [ x for x in flavorList
@@ -860,7 +860,7 @@ class SearchableTroveSource(AbstractTroveSource):
                                    flavorFilter, scoreCache):
         troveFlavors = set()
         if flavorFilter == _GET_TROVE_BEST_FLAVOR:
-            bestFlavor = max([(scoreCache[flavorQuery, x], x) 
+            bestFlavor = max([(scoreCache[flavorQuery, x], x)
                                 for x in flavorList ])[1]
             troveFlavors.add(bestFlavor)
         elif flavorFilter == _GET_TROVE_ALLOWED_FLAVOR:
@@ -901,16 +901,16 @@ class SearchableTroveSource(AbstractTroveSource):
 
     def getTroveVersionsByBranch(self, troveSpecs, bestFlavor=True,
                                  troveTypes=TROVE_QUERY_PRESENT):
-        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH, 
+        return self._getTrovesByType(troveSpecs, _GTL_VERSION_TYPE_BRANCH,
                                      _GET_TROVE_ALL_VERSIONS, bestFlavor,
                                      troveTypes=troveTypes)
 
     def getTroveVersionFlavors(self, troveSpecs, bestFlavor=True,
                                troveTypes=TROVE_QUERY_PRESENT):
         """ Takes {n : { Version : [f,...]}} dict """
-        return self._getTrovesByType(troveSpecs, 
-                                     _GTL_VERSION_TYPE_VERSION, 
-                                     _GET_TROVE_ALL_VERSIONS, 
+        return self._getTrovesByType(troveSpecs,
+                                     _GTL_VERSION_TYPE_VERSION,
+                                     _GET_TROVE_ALL_VERSIONS,
                                      bestFlavor, troveTypes=troveTypes)
 
 class SimpleTroveSource(SearchableTroveSource):
@@ -951,7 +951,7 @@ class TroveListTroveSource(SimpleTroveSource):
         self.sourceTups = troveTups[:]
 
         foundTups = set()
-        
+
         # recurse into the given trove tups to include all child troves
         for (n,v,f) in troveTups:
             self._trovesByName.setdefault(n, set()).add((n,v,f))
@@ -973,11 +973,11 @@ class TroveListTroveSource(SimpleTroveSource):
 
     def resolveDependenciesByGroups(self, troveList, deps):
         return self.source.resolveDependenciesByGroups(troveList, deps)
-        
+
 
 
 class GroupRecipeSource(SearchableTroveSource):
-    """ A TroveSource that contains all the troves in a cooking 
+    """ A TroveSource that contains all the troves in a cooking
         (but not yet committed) recipe.  Useful for modifying a recipe
         in progress using findTrove.
     """
@@ -1000,7 +1000,7 @@ class GroupRecipeSource(SearchableTroveSource):
         return self.source.hasTroves(troveTups)
 
     def trovesByName(self, name):
-        return self._trovesByName.get(name, []) 
+        return self._trovesByName.get(name, [])
 
     def delTrove(self, name, version, flavor):
         self._trovesByName[name].remove((name, version, flavor))
@@ -1073,11 +1073,11 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         for idx, trvCs in enumerate(cs.iterNewTroveList()):
             troveId = idx + startId
-            info = (trvCs.getName(), trvCs.getNewVersion(), 
+            info = (trvCs.getName(), trvCs.getNewVersion(),
                     trvCs.getNewFlavor())
             self.providesMap.setdefault(trvCs.getProvides(), []).append(info)
             if self.storeDeps:
-                self.depDb.add(troveId, trvCs.getProvides(), 
+                self.depDb.add(troveId, trvCs.getProvides(),
                                trvCs.getRequires())
             self.idMap[troveId] = info
 
@@ -1098,7 +1098,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         for info in cs.getOldTroveList():
             self.erasuresMap[info] = cs
-            
+
         if self.storeDeps:
             self.depDb.commit()
 
@@ -1114,7 +1114,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                         # Refer to the older one, it's more complete
                         continue
                 if not self.db.hasTrove(*trvCs.getOldNameVersionFlavor()):
-                    # we don't has the old version of this trove, don't 
+                    # we don't has the old version of this trove, don't
                     # use this changeset when updating this trove.
                     continue
                 self.troveCsMap[info] = cs
@@ -1154,7 +1154,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         trvCs = cs.getNewTroveVersion(n,v,f)
         fileList = trvCs.getNewFileList()
-        if not fileList:    
+        if not fileList:
             return
 
         if capsules:
@@ -1173,7 +1173,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         if sortByPath:
             # files stored in changesets are sorted by pathId, and must be
-            # retrieved in that order.  But we want to display them by 
+            # retrieved in that order.  But we want to display them by
             # path.  So, retrieve the info from the changeset by pathId
             # and stored it in a dict to be retrieved after sorting by
             # path
@@ -1250,7 +1250,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                     for pathId, path, fileId, version in trvCs.getNewFileList():
                         newTrove.addFile(pathId, path, version, fileId)
             else:
-                newTrove = self.db.getTrove(trvCs.getName(), 
+                newTrove = self.db.getTrove(trvCs.getName(),
                                             trvCs.getOldVersion(),
                                             trvCs.getOldFlavor(),
                                             withFiles=withFiles)
@@ -1269,7 +1269,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             if newVer:
                 info = (name, newVer, newFla)
                 trvCs = self.troveCsMap[info].getNewTroveVersion(*info)
-                assert((trvCs.getOldVersion(), trvCs.getOldFlavor()) == 
+                assert((trvCs.getOldVersion(), trvCs.getOldFlavor()) ==
                        (oldVer, oldFla))
                 trvCsList.append(trvCs)
             else:
@@ -1350,7 +1350,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
             inDatabase = [ False ] * len(troves)
 
         asChangeset = [ info in self.troveCsMap for info in troves ]
-        trovesAvailable = dict((x[0], (x[1], x[2])) for x in 
+        trovesAvailable = dict((x[0], (x[1], x[2])) for x in
                             itertools.izip(troves, inDatabase, asChangeset))
 
         remainder = []
@@ -1440,12 +1440,12 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
                 keep = False
                 for trvCs in subCs.iterNewTroveList():
                     if trvCs.getOldVersion() is None:
-                        job = (trvCs.getName(), 
+                        job = (trvCs.getName(),
                                   (None, None),
                                   (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 trvCs.isAbsolute())
                     else:
-                        job = (trvCs.getName(), 
+                        job = (trvCs.getName(),
                                   (trvCs.getOldVersion(), trvCs.getOldFlavor()),
                                   (trvCs.getNewVersion(), trvCs.getNewFlavor()),
                                 trvCs.isAbsolute())
@@ -1508,7 +1508,7 @@ class SourceStack(object):
     def hasTroves(self, troveList):
         results = [False] * len(troveList)
 
-        troveList = list(enumerate(troveList)) 
+        troveList = list(enumerate(troveList))
 
         for source in self.sources:
             newTroveList = []
@@ -1518,7 +1518,7 @@ class SourceStack(object):
             except errors.OpenError:
                 hasTroves = [ False] * len(troveList)
             if isinstance(hasTroves, list):
-                hasTroves = dict(itertools.izip([x[1] for x in troveList], 
+                hasTroves = dict(itertools.izip([x[1] for x in troveList],
                                                 hasTroves))
 
             for (index, troveTup) in troveList:
@@ -1576,7 +1576,7 @@ class SourceStack(object):
             newTroveList = []
             newIndexes = []
             try:
-                troves = source.getTroves([x[1] for x in troveList], 
+                troves = source.getTroves([x[1] for x in troveList],
                                           withFiles=withFiles,
                                           callback=callback)
             except NotImplementedError:
@@ -1606,11 +1606,11 @@ class SourceStack(object):
                 res = source.createChangeSet(jobList,
                                            withFiles = withFiles,
                                            withFileContents = withFileContents,
-                                           recurse = recurse, 
+                                           recurse = recurse,
                                            callback = callback)
                 if isinstance(res, (list, tuple)):
                     newCs, jobList = res
-                else: 
+                else:
                     newCs, jobList = res, None
             except errors.OpenError:
                 newCs = changeset.ReadOnlyChangeSet()
@@ -1674,7 +1674,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                 return False
         return True
 
-    def findTroves(self, labelPath, troveSpecs, defaultFlavor=None, 
+    def findTroves(self, labelPath, troveSpecs, defaultFlavor=None,
                    acrossLabels=False, acrossFlavors=False,
                    affinityDatabase=None, allowMissing=False,
                    bestFlavor=None, getLeaves=None,
@@ -1689,7 +1689,7 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
         for source in self.sources[:-1]:
             # FIXME: it should be possible to reuse the trove finder
             # but the bestFlavr and getLeaves data changes per source
-            # and is passed into several TroveFinder sub objects.  
+            # and is passed into several TroveFinder sub objects.
             # TroveFinder should be cleaned up
             if source._allowNoLabel:
                 sourceLabelPath = None
@@ -1709,13 +1709,13 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                 sourceBestFlavor = source._bestFlavor
             if getLeaves is None:
                 sourceGetLeaves = source._getLeavesOnly
-            troveFinder = findtrove.TroveFinder(source, sourceLabelPath, 
+            troveFinder = findtrove.TroveFinder(source, sourceLabelPath,
                                             sourceDefaultFlavor, acrossLabels,
                                             acrossFlavors, affinityDatabase,
                                             allowNoLabel=source._allowNoLabel,
                                             bestFlavor=sourceBestFlavor,
                                             getLeaves=sourceGetLeaves,
-                                            troveTypes=sourceTroveTypes, 
+                                            troveTypes=sourceTroveTypes,
                                             exactFlavors=exactFlavors,
                                             **kw)
 
@@ -1781,17 +1781,17 @@ class TroveSourceStack(SourceStack, SearchableTroveSource):
                 if [ x for x in troves if x ]:
                     # only consider this depSet 'solved' if at least
                     # on of the deps had a trove suggested for it.
-                    # FIXME: We _could_ manipulate the depSet and send 
+                    # FIXME: We _could_ manipulate the depSet and send
                     # it back to get more responses from other trove sources.
                     depList.remove(depSet)
                     results[depSet] = troves
         return results
-    
+
     def resolveDependenciesByGroups(self, troveList, depList):
         allSugg = {}
         for source in self.sources:
             sugg = source.resolveDependenciesByGroups(troveList, depList)
-            # there's no ordering of suggestions when you're doing 
+            # there's no ordering of suggestions when you're doing
             # resolveDependencies by groups
             self.mergeDepSuggestions(allSugg, sugg)
         return allSugg
@@ -1810,7 +1810,7 @@ def stack(*sources):
 
     if source1 is source2:
         # trove source stacks may have different behavior than
-        # individual trove sources, so always return a 
+        # individual trove sources, so always return a
         # stack even when there's nothing to stack
         if isinstance(source1, TroveSourceStack):
             return source1
@@ -1832,7 +1832,7 @@ def stack(*sources):
 
 class AbstractJobSource(AbstractTroveSource):
 
-    # new, modified and old files.  Used to describe the files returned 
+    # new, modified and old files.  Used to describe the files returned
     # by iterFilesInJob
 
     NEW_F = 0
@@ -1841,7 +1841,7 @@ class AbstractJobSource(AbstractTroveSource):
 
     def iterAllJobs(self):
         raise NotImplementedError
-    
+
     def findJob(self, name, oldVer, oldFla, newVer, newFla):
         raise NotImplementedError
 
@@ -1926,7 +1926,7 @@ class JobSource(AbstractJobSource):
                 if newVS or newFS:
                     newTroves.append((n, newVS, newFS))
 
-        newTroves = self.newTroveList.findTroves(None, newTroves, 
+        newTroves = self.newTroveList.findTroves(None, newTroves,
                                                  allowMissing=True)
         oldTroves = self.oldTroveList.findTroves(None, oldTroves,
                                                  allowMissing=True)
@@ -1955,7 +1955,7 @@ class JobSource(AbstractJobSource):
                     if job in self.jobMap:
                         results.append(job)
             else:
-                for newTup in newTups:  
+                for newTup in newTups:
                     job = self.jobsByNew[newTup]
                     for oldTup in oldTups:
                         if job[1] == oldTup[1:]:
@@ -1970,16 +1970,16 @@ class JobSource(AbstractJobSource):
         # basically needs to call createChangeSet, which defeats the
         # purpose of this class.
         raise NotImplementedError
-            
+
 class ChangeSetJobSource(JobSource):
     def __init__(self, newTroveSource, oldTroveSource):
         self.csSource = ChangesetFilesTroveSource(oldTroveSource)
-        JobSource.__init__(self, stack(self.csSource, newTroveSource), 
+        JobSource.__init__(self, stack(self.csSource, newTroveSource),
                                  stack(self.csSource, oldTroveSource))
 
     def addChangeSet(self, cs):
         self.csSource.addChangeSet(cs)
-        
+
         for trvCs in cs.iterNewTroveList():
             name = trvCs.getName()
             newVer, newFla = trvCs.getNewVersion(), trvCs.getNewFlavor()
@@ -2008,7 +2008,7 @@ class ChangeSetJobSource(JobSource):
         assert(not erasures)
 
         return self.csSource.getTroveChangeSets(jobList, withFiles=withFiles)
-        
+
     def getTrove(self, n, v, f, withFiles=False):
         return self.csSource.getTrove(n, v, f, withFiles=withFiles)
 
@@ -2020,7 +2020,7 @@ class ChangeSetJobSource(JobSource):
             return sorted(iter, key=lambda x: x[1])
         else:
             return iter
-                            
+
     def _iterFilesInJob(self, job, withFiles=False, withOldFiles=False):
         def _getOldFile(pathId, fileId, version):
             return self.oldTroveSource.getFileVersion(pathId, fileId, version)
@@ -2045,7 +2045,7 @@ class ChangeSetJobSource(JobSource):
         if not withFiles:
             if isDel:
                 return
-            for fileInfo in itertools.chain(trvCs.getNewFileList(), 
+            for fileInfo in itertools.chain(trvCs.getNewFileList(),
                                             trvCs.getChangedFileList()):
                 yield fileInfo
             return
@@ -2061,7 +2061,7 @@ class ChangeSetJobSource(JobSource):
                 oldFiles = trvCs.getOldFileList()
 
                 fileList = []
-                fileList += [(x, self.NEW_F) for x in newFiles] 
+                fileList += [(x, self.NEW_F) for x in newFiles]
                 fileList += [(x, self.MOD_F) for x in modFiles]
                 fileList += [((x, None, None, None), self.OLD_F) for x in oldFiles]
 
@@ -2081,7 +2081,7 @@ class ChangeSetJobSource(JobSource):
 
             # sort files by pathId
             # FIXME this is job-wide, it probably needs to be changeset wide
-            fileList.sort() 
+            fileList.sort()
 
             for (pathId, path, fileId, version), modType in fileList:
                 oldFileObj = None
@@ -2121,7 +2121,7 @@ class ChangeSetJobSource(JobSource):
                     yield (pathId, path, fileId, version, fileObj, oldPath,
                            oldFileId, oldVersion, oldFileObj, modType)
                 elif modType == self.OLD_F:
-                    yield (pathId, oldPath, oldFileId, 
+                    yield (pathId, oldPath, oldFileId,
                            oldVersion, oldFileObj, modType)
                 else:
                     yield pathId, path, fileId, version, fileObj, modType

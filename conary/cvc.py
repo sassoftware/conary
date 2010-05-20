@@ -16,14 +16,12 @@
 Provides the output for the "cvc" subcommands
 """
 
-import inspect
 import optparse
 import os
 import sys
 
 from conary import branch
 from conary import checkin
-from conary import callbacks
 from conary import command
 from conary import commit
 from conary import conarycfg
@@ -32,7 +30,6 @@ from conary import constants
 from conary import deps
 from conary import errors, keymgmt
 from conary import state
-from conary import updatecmd
 from conary import versions
 from conary.build import cook, use, signtrove, derive, explain
 from conary.build import errors as builderrors
@@ -78,7 +75,7 @@ class AddCommand(CvcCommand):
         argDef["binary"] = NO_PARAM
         argDef["text"] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos=None):
         args = args[1:]
         text = argSet.pop('text', False)
@@ -105,7 +102,7 @@ class AnnotateCommand(CvcCommand):
     paramHelp = '<file>'
     help = 'Show version information for each line in a file'
     hidden = True
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet or len(args) != 2: return self.usage()
@@ -135,7 +132,7 @@ class BranchShadowCommand(CvcCommand):
         argDef["info"] = '-i', NO_PARAM
         argDef["to-file"] = ONE_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         makeShadow =  (args[0] == "shadow")
@@ -150,7 +147,7 @@ class BranchShadowCommand(CvcCommand):
         target = args[1]
         troveSpecs = args[2:]
 
-        branch.branch(repos, cfg, target, troveSpecs, makeShadow = makeShadow, 
+        branch.branch(repos, cfg, target, troveSpecs, makeShadow = makeShadow,
                       sourceOnly = sourceOnly, binaryOnly = binaryOnly,
                       info = info, targetFile = targetFile)
 _register(BranchShadowCommand)
@@ -167,7 +164,7 @@ class CheckoutCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef["dir"] = ONE_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet.has_key("dir"):
@@ -212,7 +209,7 @@ class CloneCommand(CvcCommand):
         argDef["full-recurse"] = NO_PARAM
         argDef["test"] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if len(args) < 3:
@@ -227,7 +224,7 @@ class CloneCommand(CvcCommand):
         fullRecurse = argSet.pop('full-recurse', False)
         if argSet: return self.usage()
         clone.CloneTrove(cfg, args[1], args[2:], not skipBuildInfo, info = info,
-                         cloneSources=cloneSources, message = message, 
+                         cloneSources=cloneSources, message = message,
                          test = test, fullRecurse = fullRecurse)
 _register(CloneCommand)
 
@@ -280,7 +277,7 @@ class PromoteCommand(CvcCommand):
         argDef["exact-flavors"] = NO_PARAM
         argDef["exclude-groups"] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[2:]
         troveSpecs = []
@@ -334,14 +331,13 @@ class CommitCommand(CvcCommand):
         argDef["test"] = NO_PARAM
         argDef["log-file"] = '-l', ONE_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         level = log.getVerbosity()
         message = argSet.pop("message", None)
         test = argSet.pop("test", False)
         logfile = argSet.pop("log-file", None)
-        sourceCheck = True
 
         if argSet or len(args) != 1: return self.usage()
 
@@ -358,7 +354,7 @@ class CommitCommand(CvcCommand):
                 except IOError, e:
                     raise errors.ConaryError("While opening %s: %s" % (
                         e.filename, e.strerror))
-            # Get rid of trailing white spaces, they're probably not 
+            # Get rid of trailing white spaces, they're probably not
             # intended to be there anyway
             message = message.rstrip()
 
@@ -380,7 +376,7 @@ class ContextCommand(CvcCommand):
     docs = {'ask' : 'If not defined, create CONTEXT by answering questions',
             'show-passwords' : 'do not mask passwords'}
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if len(args) > 2:
@@ -409,7 +405,7 @@ class CookCommand(CvcCommand):
     help = 'Build binary package and groups from a recipe'
     commandGroup = 'Recipe Building'
 
-    docs = {'cross'   : (VERBOSE_HELP, 'set macros for cross-compiling', 
+    docs = {'cross'   : (VERBOSE_HELP, 'set macros for cross-compiling',
                          '[(local|HOST)--]TARGET'),
             'debug-exceptions' : 'Enter debugger if a recipe fails in conary',
             'flavor'  : 'build the trove with flavor FLAVOR',
@@ -422,9 +418,9 @@ class CookCommand(CvcCommand):
             'show-buildreqs': (VERBOSE_HELP,'show build requirements for recipe'),
             'prep'    : 'unpack, but do not build',
             'download': 'download, but do not unpack or build',
-            'resume'  : ('resume building at given loc (default at failure)', 
+            'resume'  : ('resume building at given loc (default at failure)',
                          '[LINENO|policy]'),
-            'unknown-flags' : (VERBOSE_HELP, 
+            'unknown-flags' : (VERBOSE_HELP,
                     'Set all unknown flags that are used in the recipe to False')
            }
 
@@ -445,7 +441,7 @@ class CookCommand(CvcCommand):
         argDef['unknown-flags'] = NO_PARAM
         argDef['allow-flavor-change'] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         level = log.getVerbosity()
@@ -453,7 +449,6 @@ class CookCommand(CvcCommand):
         prep = 0
         downloadOnly = False
         resume = None
-        buildBranch = None
         if argSet.has_key('flavor'):
             buildFlavor = deps.deps.parseFlavor(argSet['flavor'],
                                                 raiseError=True)
@@ -521,7 +516,7 @@ class CookCommand(CvcCommand):
             cfg.debugRecipeExceptions = True
 
         crossCompile = argSet.pop('cross', None)
-        if crossCompile:   
+        if crossCompile:
             parts = crossCompile.split('--')
             isCrossTool = False
 
@@ -548,8 +543,6 @@ class CookCommand(CvcCommand):
         if not items:
             # if nothing was specified, try to build the package in the current
             # directory
-            name = os.path.basename(os.getcwd())
-
             if os.path.isfile('CONARY'):
                 conaryState = state.ConaryStateFromFile('CONARY', repos)
                 items = [ conaryState ]
@@ -560,7 +553,7 @@ class CookCommand(CvcCommand):
                 return self.usage()
 
         try:
-            cook.cookCommand(cfg, items, prep, macros, resume=resume, 
+            cook.cookCommand(cfg, items, prep, macros, resume=resume,
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
                          crossCompile=crossCompile, downloadOnly=downloadOnly,
@@ -595,7 +588,6 @@ class DeriveCommand(CvcCommand):
         checkoutDir = argSet.pop('dir', None)
         extract = argSet.pop('extract', False)
         targetLabel = argSet.pop('target', None)
-        info = prep = False
 
         if argSet or len(args) != 2:
             return self.usage()
@@ -623,12 +615,12 @@ _register(DeriveCommand)
 class DiffCommand(CvcCommand):
     commands = ['diff']
     help = 'Show uncommitted changes'
-    
+
     def addParameters(self, argDef):
         CvcCommand.addParameters(self, argDef)
         argDef['revision'] = ONE_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         if not args or len(args) < 2: return self.usage()
 
@@ -636,7 +628,7 @@ class DiffCommand(CvcCommand):
         diffArgs.append(argSet.pop('revision', None));
         if len(args) > 2:
             diffArgs.append(args[2:]);
-        
+
         return checkin.diff(*diffArgs)
 _register(DiffCommand)
 
@@ -650,7 +642,7 @@ class LogCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef['newer'] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         newer = argSet.pop('newer', False)
@@ -668,7 +660,7 @@ class RdiffCommand(CvcCommand):
     paramHelp = "<name> [<oldver>|-<num>] <newver>"
     help = 'Show changes between two versions of a trove in a repository'
     hidden = True
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet or len(args) != 4: return self.usage()
@@ -695,7 +687,7 @@ class RemoveCommand(CvcCommand):
     help = 'Remove a file from Conary control'
     commandGroup = 'File Operations'
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if len(args) < 2: return self.usage()
@@ -710,7 +702,7 @@ class RenameCommand(CvcCommand):
     commandGroup = 'File Operations'
     hidden = True
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if len(args) != 3: return self.usage()
@@ -729,7 +721,7 @@ class AddKeyCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef['server'] = ONE_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         if len(args) == 3:
             user = args[2]
@@ -754,7 +746,7 @@ class GetKeyCommand(CvcCommand):
         CvcCommand.addParameters(self, argDef)
         argDef['server'] = ONE_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         if len(args) != 3:
             return self.usage()
@@ -779,7 +771,7 @@ class ListKeysCommand(CvcCommand):
         argDef['server'] = ONE_PARAM
         argDef['fingerprints'] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         if len(args) > 3:
             return self.usage()
@@ -885,7 +877,7 @@ class MarkRemovedCommand(CvcCommand):
     commandGroup = 'Hidden Commands'
     hidden = True
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet or not args or len(args) != 2: return self.usage()
@@ -907,7 +899,7 @@ class SetCommand(CvcCommand):
         argDef["binary"] = NO_PARAM
         argDef["text"] = NO_PARAM
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         binary = argSet.pop('binary', False)
@@ -924,10 +916,10 @@ class SetCommand(CvcCommand):
 _register(SetCommand)
 
 class StatCommand(CvcCommand):
-    
+
     commands = ['stat', 'st']
     help = 'Show changed files in the working directory'
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet or not args or len(args) > 2: return self.usage()
@@ -937,10 +929,10 @@ class StatCommand(CvcCommand):
 _register(StatCommand)
 
 class StatCommand(CvcCommand):
-    
+
     commands = ['status', 'stat', 'st']
     help = 'Show changed files in the working directory'
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet or not args or len(args) > 1: return self.usage()
@@ -955,7 +947,7 @@ class UpdateCommand(CvcCommand):
     help = 'Update files in one or more directories to a different version'
     commandGroup = 'File Operations'
 
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[2:]
         if argSet: return self.usage()
@@ -969,7 +961,7 @@ class FactoryCommand(CvcCommand):
     paramHelp = '[<newfactory>]'
     help = 'Show or change the factory for the working directory'
     commandGroup = 'Information Display'
-    def runCommand(self, cfg, argSet, args, profile = False, 
+    def runCommand(self, cfg, argSet, args, profile = False,
                    callback = None, repos = None):
         args = args[1:]
         if argSet or len(args) > 2: return self.usage()
@@ -1013,7 +1005,7 @@ class CvcMain(command.MainHandler):
         log.setMinVerbosity(log.INFO)
         log.resetErrorOccurred()
 
-        # set the build flavor here, just to set architecture information 
+        # set the build flavor here, just to set architecture information
         # which is used when initializing a recipe class
         use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
 
@@ -1095,7 +1087,7 @@ def main(argv=None):
                                             debugCtrlC=debugAll)
         return cvcMain.main(argv, debuggerException, debugAll=debugAll,
                             cfg=ccfg)
-    except debuggerException, err:
+    except debuggerException:
         raise
     except (errors.ConaryError, errors.CvcError, cfg.CfgError,
             openpgpfile.PGPError), e:

@@ -24,15 +24,15 @@ def x86flags(archTag, baseArch, extraFlags, ofInterest):
     rc = [ (x, deps.FLAG_SENSE_PREFERRED) for x in extraFlags ]
 
     for line in lines:
-	if not line.startswith("flags"): continue
-	fields = line.split()
-	if fields[0] != "flags": continue
+        if not line.startswith("flags"): continue
+        fields = line.split()
+        if fields[0] != "flags": continue
 
-	for flag in fields[2:]:
-	    if ofInterest.has_key(flag): 
+        for flag in fields[2:]:
+            if ofInterest.has_key(flag):
                 rc.append((flag, deps.FLAG_SENSE_PREFERRED))
 
-	return deps.Dependency(archTag, rc)
+        return deps.Dependency(archTag, rc)
 
     return deps.Dependency(archTag)
 
@@ -40,7 +40,7 @@ def flags_ix86(baseArch):
     baseFlagMap = [ 'i686', 'i586', 'i486' ]
     i = baseFlagMap.index(baseArch)
 
-    ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'mmx', 'mmxext', 'sse', 
+    ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'mmx', 'mmxext', 'sse',
                                'sse2', 'sse3', 'cmov', 'nx'])
     return [ [ x86flags('x86', baseArch, baseFlagMap[i:], ofInterest) ] ]
 

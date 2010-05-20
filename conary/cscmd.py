@@ -11,14 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import itertools, sys
-
 from conary import conaryclient
-from conary import versions
 from conary.conaryclient import cmdline
 from conary.lib import log
-from conary.local import update
-from conary.repository import errors, trovesource
 
 def computeTroveList(client, applyList):
     # As dumb as this may sound, the same trove may be present multiple times
@@ -41,7 +36,7 @@ def computeTroveList(client, applyList):
             toFind.add((n, None, None))
 
     repos = client.getRepos()
-    results = repos.findTroves(client.cfg.installLabelPath, toFind, 
+    results = repos.findTroves(client.cfg.installLabelPath, toFind,
                                client.cfg.flavor)
 
     for troveSpec, trovesFound in results.iteritems():
@@ -54,7 +49,7 @@ def computeTroveList(client, applyList):
     for (n, (oldVer, oldFla), (newVer, newFla), isAbs) in applyList:
         if n[0] == '-':
             updateByDefault = False
-        else: 
+        else:
             updateByDefault = True
 
         if n[0] in ('-', '+'):
@@ -86,6 +81,6 @@ def ChangeSetCommand(cfg, troveSpecs, outFileName, recurse = True,
 
     primaryCsList = computeTroveList(client, applyList)
 
-    client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 
-                               callback = callback, 
+    client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse,
+                               callback = callback,
                                excludeList = cfg.excludeTroves)

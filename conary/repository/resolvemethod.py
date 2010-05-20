@@ -48,7 +48,7 @@ class DepResolutionMethod(object):
 
     def resolveDependencies(self):
         """
-            Attempts to resolve the dependencies passed into 
+            Attempts to resolve the dependencies passed into
             prepareForResolution.
         """
         raise NotImplementedError
@@ -109,7 +109,7 @@ class DepResolutionMethod(object):
                         if len(depSet) > 5:
                             depSet = depSet[0:5] + ['...']
                         depSet = '\n               '.join(depSet)
-                        log.debug('Resolved:\n' 
+                        log.debug('Resolved:\n'
                                   '    %s=%s/%s[%s]\n'
                                   '    Required:  %s\n'
                                   '    Adding: %s=%s/%s[%s]',
@@ -124,10 +124,10 @@ class DepResolutionMethod(object):
 
     def selectResolutionTrove(self, requiredBy, dep, depClass,
                               troveTups, installFlavor, affFlavorDict):
-        """ determine which of the given set of troveTups is the 
+        """ determine which of the given set of troveTups is the
             best choice for installing on this system.  Because the
-            repository didn't try to determine which flavors are best for 
-            our system, we have to filter the troves locally.  
+            repository didn't try to determine which flavors are best for
+            our system, we have to filter the troves locally.
         """
         # we filter the troves in the following ways:
         # 1. prefer troves that match affinity flavor + are on the affinity
@@ -136,7 +136,7 @@ class DepResolutionMethod(object):
 
         # If we don't match an affinity flavor + label, then use flavor
         # preferences and flavor scoring to select the best flavor.
-        # We'll have to check 
+        # We'll have to check
 
         # Within these two categories:
         # 1. filter via flavor preferences for each trove (this may result
@@ -292,7 +292,7 @@ RESOLVE_LEAVES_ONLY = 2
 
 
 class DepResolutionByLabelPath(DepResolutionMethod):
-    def __init__(self, cfg, db, installLabelPath, flavor=None, 
+    def __init__(self, cfg, db, installLabelPath, flavor=None,
                  searchMethod=RESOLVE_ALL):
         DepResolutionMethod.__init__(self, cfg, db, flavor)
         self.index = 0

@@ -123,14 +123,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # as a standalone server or not without having to touch
         # rMake code
         self.standalone = hasattr(cfg, 'port')
-	self.map = cfg.repositoryMap
-	self.tmpPath = cfg.tmpDir
-	self.basicUrl = basicUrl
+        self.map = cfg.repositoryMap
+        self.tmpPath = cfg.tmpDir
+        self.basicUrl = basicUrl
         if isinstance(cfg.serverName, str):
             self.serverNameList = [ cfg.serverName ]
         else:
             self.serverNameList = cfg.serverName
-	self.commitAction = cfg.commitAction
+        self.commitAction = cfg.commitAction
         self.troveStore = None
         self.logFile = cfg.logFile
         self.callLog = None
@@ -184,12 +184,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         dbVer = schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
-	self.troveStore = trovestore.TroveStore(self.db, self.log)
+        self.troveStore = trovestore.TroveStore(self.db, self.log)
         self.repos = fsrepos.FilesystemRepository(
             self.serverNameList, self.troveStore, self.contentsDir,
             self.map, requireSigs = self.requireSigs,
             paranoidCommits = self.paranoidCommits)
-	self.auth = NetworkAuthorization(
+        self.auth = NetworkAuthorization(
             self.db, self.serverNameList, log = self.log,
             cacheTimeout = self.authCacheTimeout,
             passwordURL = self.externalPasswordURL,
@@ -237,7 +237,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # not reached
             assert(0)
 
-    def callWrapper(self, protocol, port, methodname, authToken, 
+    def callWrapper(self, protocol, port, methodname, authToken,
                     orderedArgs, kwArgs,
                     remoteIp = None, rawUrl = None, isSecure = False):
         """
@@ -263,8 +263,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     '%s call only supports protocol versions %s '
                     'and later' % (methodname, method._minimumClientProtocol))
 
-	# reopens the database as needed (if changed on disk or lost connection)
-	self.reopen()
+        # reopens the database as needed (if changed on disk or lost connection)
+        self.reopen()
 
         exceptionOverride = None
         start = time.time()
@@ -678,7 +678,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
         self.ri.deleteTroveAccess(role, troveList)
         return ""
-    
+
     @accessReadOnly
     def listTroveAccess(self, authToken, clientVersion, role):
         if not self.auth.authCheck(authToken, admin = True):
@@ -686,7 +686,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ret = self.ri.listTroveAccess(role)
         # strip off the recurse flag; return just the name,version,flavor tuple
         return [ x[0] for x in ret ]
-    
+
     @accessReadWrite
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
@@ -895,7 +895,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             where.append("Instances.troveType %s" % (s,))
         coreQdict["where"] = """
           AND """.join(where)
-        
+
         coreQuery = """
         SELECT DISTINCT
             Nodes.nodeId as nodeId,
@@ -1219,7 +1219,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             Versions.version as version,
             Flavors.flavor as flavor,
             Nodes.timeStamps as timeStamps
-        from LatestCache 
+        from LatestCache
         join Instances using (itemId, versionId, flavorId)
         join Nodes on
             LatestCache.itemId = Nodes.itemId and
@@ -1323,7 +1323,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                  troveName, version, flavor, pathList):
         self.log(2, troveName, version, flavor, pathList)
         if not self.auth.check(authToken,
-                               label=self.toVersion(version).trailingLabel(), 
+                               label=self.toVersion(version).trailingLabel(),
                                trove=troveName):
             raise errors.InsufficientPermission
         pathList = [ base64.decodestring(x) for x in pathList ]
@@ -1337,7 +1337,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         #self.db.analyze("tmpFilePaths")
 
         sql = '''
-                SELECT row, fileId,FileVersions.version FROM 
+                SELECT row, fileId,FileVersions.version FROM
                 Versions
                 JOIN Flavors ON (Flavors.flavor=?)
                 JOIN Items ON (Items.item=?)
@@ -1356,7 +1356,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            tfp.basename = b.basename ) AS blah
                      USING(filePathId)
                 JOIN FileStreams ON (TroveFiles.streamId=FileStreams.streamId)
-                JOIN Versions AS FileVersions 
+                JOIN Versions AS FileVersions
                     ON (TroveFiles.versionId=FileVersions.versionId)
                 WHERE Versions.version=?'''
         sql = cu.execute(sql, flavor, troveName, version)
@@ -1364,7 +1364,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         for row, fileId, fileVer in cu:
             fileList[row] = (fileId, fileVer)
         if None in fileList:
-            missingPaths = [ pathList[idx] 
+            missingPaths = [ pathList[idx]
                              for (idx, x) in enumerate(fileList)
                              if x is None ]
             raise errors.PathsNotFound(missingPaths)
@@ -1822,19 +1822,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList,
                           leavesOnly = False):
-	if not self.auth.check(authToken, write = False,
-			       label = self.toLabel(label)):
-	    raise errors.InsufficientPermission
+        if not self.auth.check(authToken, write = False,
+                               label = self.toLabel(label)):
+            raise errors.InsufficientPermission
         self.log(2, label, requiresList)
         cu = self.db.cursor()
         roleIds = self.auth.getAuthRoles(cu, authToken)
         if not roleIds:
-	    raise errors.InsufficientPermission
+            raise errors.InsufficientPermission
         ret = self.deptable.resolve(roleIds, label,
                                     depList = requiresList,
                                     leavesOnly = leavesOnly)
         return ret
-    
+
     @accessReadOnly
     def getDepSuggestionsByTroves(self, authToken, clientVersion, requiresList,
                                   troveList):
@@ -1844,7 +1844,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
         roleIds = self.auth.getAuthRoles(cu, authToken)
         if not roleIds:
-	    raise errors.InsufficientPermission
+            raise errors.InsufficientPermission
         ret = self.deptable.resolve(roleIds, label = None,
                                     depList = requiresList,
                                     troveList = troveList)
@@ -1891,9 +1891,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                          mirror, False)
 
         self.log(2, authToken[0])
-  	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
-  	os.close(fd)
-	fileName = os.path.basename(path)
+        (fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
+        os.close(fd)
+        fileName = os.path.basename(path)
 
         # this needs to match up exactly with the parsing of the url we do
         # in commitChangeSet.
@@ -1924,9 +1924,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 'uploaded to a URL on this server.  The url is "%s", this '
                 'server is "%s".'
                 %(url, base))
-	# +1 strips off the ? from the query url
+        # +1 strips off the ? from the query url
         fileName = url[len(base) + 1:] + '-in'
-	path = "%s/%s" % (self.tmpPath, fileName)
+        path = "%s/%s" % (self.tmpPath, fileName)
         statusPath = path + '-status'
         self.log(2, authToken[0], url, 'mirror=%s' % (mirror,))
         attempt = 1
@@ -1968,8 +1968,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def _commitChangeSet(self, authToken, cs, mirror = False,
                          hidden = False, statusPath = None):
-	# walk through all of the branches this change set commits to
-	# and make sure the user has enough permissions for the operation
+        # walk through all of the branches this change set commits to
+        # and make sure the user has enough permissions for the operation
         verList = ((x.getName(), x.getOldVersion(), x.getNewVersion())
                     for x in cs.iterNewTroveList())
         self._checkCommitPermissions(authToken, verList, mirror, hidden)
@@ -1996,15 +1996,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.log(2, authToken[0], 'mirror=%s' % (mirror,),
                  [ (x[1], x[0][0].asString(), x[0][1]) for x in items.iteritems() ])
-	self.repos.commitChangeSet(cs, mirror = mirror,
+        self.repos.commitChangeSet(cs, mirror = mirror,
                                    hidden = hidden,
                                    serialize = self.serializeCommits,
                                    excludeCapsuleContents =
                                        self.excludeCapsuleContents,
                                    statusPath=statusPath)
 
-	if not self.commitAction:
-	    return True
+        if not self.commitAction:
+            return True
 
         userName = authToken[0]
         if not isinstance(userName, basestring):
@@ -2032,7 +2032,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                              'commitaction: %s\n' %e)
             sys.stderr.flush()
 
-	return True
+        return True
 
     @accessReadOnly
     def getCommitProgress(self, authToken, clientVersion, url):
@@ -2305,7 +2305,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     " union ".join(selectQlist),))
             self.db.analyze("tmpId")
             return """join tmpId on fp.dirnameId = tmpId.id """
-            
+
         prefixQuery = ""
         if dirnames:
             if clientVersion < 62: # dirnames are in fact filePrefixes
@@ -2509,10 +2509,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getCollectionMembers(self, authToken, clientVersion, troveName,
                              branch):
-	if not self.auth.check(authToken, write = False,
+        if not self.auth.check(authToken, write = False,
                                trove = troveName,
-			       label = self.toBranch(branch).label()):
-	    raise errors.InsufficientPermission
+                               label = self.toBranch(branch).label()):
+            raise errors.InsufficientPermission
         self.log(2, troveName, branch)
         cu = self.db.cursor()
         query = """
@@ -2540,7 +2540,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def getTrovesBySource(self, authToken, clientVersion, sourceName,
                           sourceVersion):
-        # You should be able to get all the troves associated with a source 
+        # You should be able to get all the troves associated with a source
         # even if you cannot get the source itself.   This is important
         # for derived recipes.  Thus, we don't check access until
         # we've calculated a result.
@@ -2573,7 +2573,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         hasAccess = self.auth.batchCheck(authToken, troveList, write=False, cu=cu)
         if False in hasAccess:
             # don't return a partial answer to this question.
-	    raise errors.InsufficientPermission
+            raise errors.InsufficientPermission
         return troveList
 
     @accessReadOnly
@@ -2639,9 +2639,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addDigitalSignature(self, authToken, clientVersion, name, version,
                             flavor, encSig):
         version = self.toVersion(version)
-	if not self.auth.check(authToken, write = True, trove = name,
+        if not self.auth.check(authToken, write = True, trove = name,
                                label = version.branch().label()):
-	    raise errors.InsufficientPermission
+            raise errors.InsufficientPermission
         flavor = self.toFlavor(flavor)
         self.log(2, name, version, flavor)
 
@@ -2828,8 +2828,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getMirrorMark(self, authToken, clientVersion, host):
-	if not self.auth.authCheck(authToken, mirror = True):
-	    raise errors.InsufficientPermission
+        if not self.auth.authCheck(authToken, mirror = True):
+            raise errors.InsufficientPermission
         self.log(2, host)
         cu = self.db.cursor()
         cu.execute("select mark from LatestMirror where host=?", host)
@@ -2845,8 +2845,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-	if not self.auth.authCheck(authToken, mirror = True):
-	    raise errors.InsufficientPermission
+        if not self.auth.authCheck(authToken, mirror = True):
+            raise errors.InsufficientPermission
         self.log(2, authToken[0], host, mark)
         cu = self.db.cursor()
         cu.execute("select mark from LatestMirror where host=?", host)
@@ -2898,7 +2898,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute(query, (mark, mark))
         l = [ (m, (n,v,f)) for n,v,f,m in cu ]
         return list(set(l))
-    
+
     @accessReadOnly
     def getNewTroveInfo(self, authToken, clientVersion, mark, infoTypes,
                         labels):
@@ -3142,8 +3142,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-	if not self.auth.authCheck(authToken, mirror = True):
-	    raise errors.InsufficientPermission
+        if not self.auth.authCheck(authToken, mirror = True):
+            raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
         cu = self.db.cursor()
 
@@ -3152,8 +3152,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addPGPKeyList(self, authToken, clientVersion, keyList):
-	if not self.auth.authCheck(authToken, mirror = True):
-	    raise errors.InsufficientPermission
+        if not self.auth.authCheck(authToken, mirror = True):
+            raise errors.InsufficientPermission
 
         for encKey in keyList:
             key = base64.decodestring(encKey)
@@ -3168,8 +3168,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-	if not self.auth.authCheck(authToken, mirror = True):
-	    raise errors.InsufficientPermission
+        if not self.auth.authCheck(authToken, mirror = True):
+            raise errors.InsufficientPermission
         self.log(2, authToken[0], mark)
         # only show troves the user is allowed to see
         cu = self.db.cursor()
@@ -3204,7 +3204,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """ % (",".join("%d" % x for x in roleIds),))
         roleCount = cu.fetchall()[0][0]
         if roleCount == 0:
-	    raise errors.InsufficientPermission
+            raise errors.InsufficientPermission
         if roleCount is None:
             roleCount = 1
 
@@ -3322,7 +3322,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 continue
 
             # else, we have a value we need to return
-            if (infoType == trove._TROVEINFO_TAG_METADATA and 
+            if (infoType == trove._TROVEINFO_TAG_METADATA and
                 clientVersion <= 64):
                 # ugly, but just instantiates a metadata object
                 md = trove.TroveInfo.streamDict[
@@ -3400,18 +3400,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
         roleIds = self.auth.getAuthRoles(cu, authToken)
         cu.execute('''
-             SELECT branch FROM 
-                (SELECT DISTINCT branchId 
-                    FROM LatestCache 
-                    WHERE userGroupId IN (%s) 
-                    AND latestType=1) AS AvailBranches 
-             JOIN Branches USING(branchId)''' 
+             SELECT branch FROM
+                (SELECT DISTINCT branchId
+                    FROM LatestCache
+                    WHERE userGroupId IN (%s)
+                    AND latestType=1) AS AvailBranches
+             JOIN Branches USING(branchId)'''
                 % (", ".join("%d" % x for x in roleIds),))
         # NOTE: this is faster than joining against the LabelMap,
-        # as there is no direct branchId -> labelId mapping (you 
+        # as there is no direct branchId -> labelId mapping (you
         # must also use the itemId.)  The python done below is
         # going to be faster than SQL until we add such an table.
-        # And in general neither number of labels or number of branches is 
+        # And in general neither number of labels or number of branches is
         # likely to go beyond thousands.
         labelList = (versions.VersionFromString(x[0]).label() for x in cu)
         labelList = (str(x) for x in labelList if x.getHost() == serverName)
@@ -3468,12 +3468,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def checkVersion(self, authToken, clientVersion):
         """
-        Check the repository's protocol version to see that it's compatible with 
+        Check the repository's protocol version to see that it's compatible with
         the client
 
         @raises errors.InvalidClientVersion: raised if the client is either too
                                              old or too new.
-        @raises errors.InsufficientPermission: raised if the authToken is 
+        @raises errors.InsufficientPermission: raised if the authToken is
                                                invalid
         """
         if clientVersion > 50:
@@ -3481,8 +3481,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     'checkVersion call only supports protocol versions 50 '
                     'and lower')
 
-	if not self.auth.check(authToken):
-	    raise errors.InsufficientPermission
+        if not self.auth.check(authToken):
+            raise errors.InsufficientPermission
         self.log(2, authToken[0], "clientVersion=%s" % clientVersion)
         # cut off older clients entirely, no negotiation
         if clientVersion < SERVER_VERSIONS[0]:
@@ -3493,7 +3493,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return SERVER_VERSIONS
 
 # this has to be at the end to get the publicCalls list correct; the proxy
-# uses the publicCalls list, so maintaining it 
+# uses the publicCalls list, so maintaining it
 NetworkRepositoryServer.publicCalls = set()
 for attr, val in NetworkRepositoryServer.__dict__.iteritems():
     if type(val) == types.FunctionType:
