@@ -7,7 +7,7 @@ Changes in @NEW@:
   o Bug Fixes:
 
   o Internal Changes:
-
+    * Combined TroveCache and TroveCacheWrapper objects in build code
 
 Changes in 2.1.16:
   o New Features:
