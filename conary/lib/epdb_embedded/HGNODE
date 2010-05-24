@@ -1,0 +1,5 @@
+changeset:   66:db81d40b72a5
+tag:         tip
+user:        Michael Tharp <mtharp@rpath.com>
+date:        Mon May 24 12:58:37 2010 -0400
+summary:     Fix bug in doc command and some unused imports

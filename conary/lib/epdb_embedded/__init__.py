@@ -1,7 +1,8 @@
+#!/usr/bin/env python
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2005 rPath, Inc.
 #
-# This program is distributed under the terms of the MIT License as found
+# This program is distributed under the terms of the MIT License as found 
 # in a file called LICENSE. If it is not present, the license
 # is always available at http://www.opensource.org/licenses/mit-license.php.
 #
@@ -11,7 +12,6 @@
 
 
 """ Extended pdb """
-import bdb
 import inspect
 import pdb
 import os
@@ -29,7 +29,14 @@ import sys
 import tempfile
 import traceback
 
-from conary.lib import stackutil
+try:
+    import epdb_server
+    import epdb_client
+    import epdb_stackutil
+    hasTelnet = True
+except ImportError:
+    hasTelnet = False
+
 from pdb import _saferepr
 
 class Epdb(pdb.Pdb):
@@ -46,7 +53,7 @@ class Epdb(pdb.Pdb):
     _displayList = {}
     # used to track the number of times a set_trace has been seen
     trace_counts = {'default' : [ True, 0 ]}
-
+    _server = None
 
     def __init__(self):
         self._exc_type = None
@@ -99,9 +106,46 @@ class Epdb(pdb.Pdb):
             else:
                 readline.clear_history()
 
+    if hasTelnet:
+        # telnet server support.
+        # if enabled, you can serve a epdb session.
+        def serve(self, port=8080):
+            if not Epdb._server:
+                print 'Serving on port %s' % port
+                Epdb._server = epdb_server.InvertedTelnetServer(('', port))
+                Epdb._server.handle_request()
+                Epdb._port = port
+            self.set_trace(skip=2)
+
+        def serve_post_mortem(self, t, exc_type=None, exc_msg=None, port=8080):
+            if not Epdb._server:
+                print 'Serving on port %s' % port
+                Epdb._server = epdb_server.InvertedTelnetServer(('', port))
+                Epdb._server.handle_request()
+            self.post_mortem(t, exc_type, exc_msg)
+
+        def do_detach(self, arg):
+            if Epdb._server:
+                print ('Leaving process in debug state - use "close" to'
+                       ' stop debug session')
+                Epdb._server.close_request()
+                Epdb._server = epdb_server.InvertedTelnetServer(('', Epdb._port))
+                Epdb._server.handle_request()
+            else:
+                print "Not attached via telnet"
+
+        def do_close(self, arg):
+            if Epdb._server:
+                print 'Ending epdb session - use "detach" to stop serving'
+                Epdb._server.close_request()
+                Epdb._server = None
+                return self.do_continue('')
+            else:
+                print "Not attached via telnet"
+
     def do_savestack(self, path):
         if 'stack' in self.__dict__:
-            # when we're saving we always
+            # when we're saving we always 
             # start from the top
             frame = self.stack[-1][0]
         else:
@@ -113,14 +157,14 @@ class Epdb(pdb.Pdb):
             output = os.fdopen(tbfd, 'w')
         else:
             output = open(path, 'w')
-        stackutil.printStack(frame, output)
+        epdb_stackutil.printStack(frame, output)
         print "Stack saved to %s" % path
 
     def do_mailstack(self, arg):
         tolist = arg.split()
         subject = '[Conary Stacktrace]'
         if 'stack' in self.__dict__:
-            # when we're saving we always
+            # when we're saving we always 
             # start from the top
             frame = self.stack[-1][0]
         else:
@@ -131,10 +175,10 @@ class Epdb(pdb.Pdb):
         host = socket.getfqdn()
         extracontent = None
         if self._tb:
-            lines = traceback.format_exception(self._exc_type, self._exc_msg,
+            lines = traceback.format_exception(self._exc_type, self._exc_msg, 
                                                self._tb)
             extracontent = string.joinfields(lines, "")
-        stackutil.mailStack(frame, tolist, sender + '@' + host, subject,
+        epdb_stackutil.mailStack(frame, tolist, sender + '@' + host, subject,
                             extracontent)
         print "Mailed stack to %s" % tolist
 
@@ -147,7 +191,7 @@ class Epdb(pdb.Pdb):
             frame = sys._getframe(1)
             while frame.f_globals['__name__'] in ('epdb', 'pdb', 'bdb', 'cmd'):
                 frame = frame.f_back
-        stackutil.printStack(frame, sys.stderr)
+        epdb_stackutil.printStack(frame, sys.stderr)
 
     def do_printframe(self, arg):
         if not arg:
@@ -169,12 +213,12 @@ class Epdb(pdb.Pdb):
                 frame = frame.f_back
             for i in xrange(0, depth):
                 frame = frame.f_back
-        stackutil.printFrame(frame, sys.stderr)
+        epdb_stackutil.printFrame(frame, sys.stderr)
 
     def do_file(self, arg):
         frame, lineno = self.stack[self.curindex]
         filename = self.canonic(frame.f_code.co_filename)
-        print "%s:%s" % (filename, lineno)
+        print "%s:%s" % (filename, lineno) 
     do_f = do_file
 
     def do_until(self, arg):
@@ -218,7 +262,7 @@ class Epdb(pdb.Pdb):
             marker = 'default'
         else:
             marker, cond = args
-        if cond == 'None':
+        if cond == 'None': 
             cond = None
             self.set_trace_cond(marker, cond)
             return
@@ -230,8 +274,8 @@ class Epdb(pdb.Pdb):
             locals = self.curframe.f_locals
             globals = self.curframe.f_globals
             try:
-                cond = eval(cond + '\n', globals, locals)
-                # test to be sure that what we code is a
+                cond = eval(cond + '\n', globals, locals) 
+                # test to be sure that what we code is a 
                 # function that can take one arg and return a bool
                 rv = (type(cond) == bool) or bool(cond(1))
                 self.set_trace_cond(marker, cond)
@@ -304,8 +348,6 @@ class Epdb(pdb.Pdb):
             return sys.modules[origFileName].__file__
         return None
 
-
-
     def default(self, line):
         if line[0] == '!': line = line[1:]
         if self.handle_directive(line):
@@ -327,7 +369,6 @@ class Epdb(pdb.Pdb):
             return pdb.Pdb.default(self, origLine)
         finally:
             self.read_history()
-
 
     def multiline(self, firstline=''):
         full_input = []
@@ -459,7 +500,7 @@ class Epdb(pdb.Pdb):
         locals = self.curframe.f_locals
         globals = self.curframe.f_globals
         try:
-            result = eval(arg + '\n', globals, locals)
+            result = eval(arg + '\n', globals, locals) 
             if fn is None:
                 return True, result
             return True, fn(result)
@@ -486,7 +527,7 @@ class Epdb(pdb.Pdb):
             if self._objtype(member) == objType:
                 members.append((n, member))
         return members
-
+    
     def do_showmethods(self, arg):
         self._eval(arg, self._showmethods)
 
@@ -580,13 +621,13 @@ class Epdb(pdb.Pdb):
             if bases:
                 bases = ' -- Bases (' + ', '.join(bases) + ')'
             else:
-                bases = ''
+                bases = '' 
             if hasattr(obj, '__init__') and inspect.isroutine(obj.__init__):
                 try:
                     initfn = obj.__init__.im_func
                     argspec = inspect.getargspec(initfn)
                     # get rid of self from arg list...
-                    fnargs = argspec[0][1:]
+                    fnargs = argspec[0][1:] 
                     newArgSpec = (fnargs, argspec[1], argspec[2], argspec[3])
                     argspec = inspect.formatargspec(*newArgSpec)
                 except TypeError:
@@ -640,10 +681,10 @@ class Epdb(pdb.Pdb):
             print "\"\"\"%s\"\"\"" % docstr
             if docloc:
                 print "(Found doc in %s)" % docloc
-
+            
         if inspect.isclass(result):
             if hasattr(result, '__init__'):
-                self.do_define(arg + '.__init__')
+                self._define(result)
                 if hasattr(result.__init__, '__doc__'):
                     print "\"\"\"%s\"\"\"" % result.__init__.__doc__
             else:
@@ -669,17 +710,26 @@ class Epdb(pdb.Pdb):
         self.save_history(restoreOldHistory=True)
         self.restore_input_output()
 
+    def post_mortem(self, t, exc_type, exc_msg):
+        self._exc_type = exc_type
+        self._exc_msg = exc_msg
+        self._tb = t
+        self.reset()
+        while t.tb_next is not None:
+            t = t.tb_next
+        self.interaction(t.tb_frame, t)
+
     def switch_input_output(self):
         self.switch_stdout()
         self.switch_stdin()
         self.switch_pgid()
 
     def restore_input_output(self):
-        if not self.__old_stdout is None:
+        if self.__old_stdout is not None:
             sys.stdout.flush()
             # now we reset stdout to be the whatever it was before
             sys.stdout = self.__old_stdout
-        if not self.__old_stdin is None:
+        if self.__old_stdin is not None:
             sys.stdin = self.__old_stdin
         if self.__old_pgid is not None:
             os.setpgid(0, self.__old_pgid)
@@ -762,9 +812,9 @@ class Epdb(pdb.Pdb):
     reset_trace_count = classmethod(reset_trace_count)
 
     def set_trace_cond(klass, marker='default', cond=None):
-        """ Sets a condition for set_trace statements that have the
+        """ Sets a condition for set_trace statements that have the 
             specified marker.  A condition can either callable, in
-            which case it should take one argument, which is the
+            which case it should take one argument, which is the 
             number of times set_trace(marker) has been called,
             or it can be a number, in which case the break will
             only be called.
@@ -792,9 +842,9 @@ class Epdb(pdb.Pdb):
             try:
                 rv = cond(curCount)
             except TypeError:
-                # assume that if the condition
-                # is not callable, it is an
-                # integer above which we are
+                # assume that if the condition 
+                # is not callable, it is an 
+                # integer above which we are 
                 # supposed to break
                 rv = curCount >= cond
         if rv:
@@ -864,7 +914,7 @@ class Epdb(pdb.Pdb):
             return matches
         else:
             return pdb.Pdb.complete(self, text, state)
-
+        
 def beingTraced():
     frame = sys._getframe(0)
     while frame:
@@ -874,9 +924,9 @@ def beingTraced():
     return False
 
 def set_trace_cond(*args, **kw):
-    """ Sets a condition for set_trace statements that have the
+    """ Sets a condition for set_trace statements that have the 
         specified marker.  A condition can either callable, in
-        which case it should take one argument, which is the
+        which case it should take one argument, which is the 
         number of times set_trace(marker) has been called,
         or it can be a number, in which case the break will
         only be called.
@@ -888,14 +938,14 @@ def set_trace_cond(*args, **kw):
 stc = set_trace_cond
 
 def reset_trace_count(marker='default'):
-    """ Resets the number a set_trace for a marker has been
+    """ Resets the number a set_trace for a marker has been 
         seen to 0. """
     Epdb.reset_trace_count(marker)
 
 def set_trace(marker='default'):
     """ Starts the debugger at the current location.  Takes an
-        optional argument 'marker' (default 'default'), that
-        can be used with the set_trace_cond function to support
+        optional argument 'marker' (default 'default'), that 
+        can be used with the set_trace_cond function to support 
         turning on and off tracepoints based on conditionals
     """
 
@@ -903,15 +953,19 @@ def set_trace(marker='default'):
 
 st = set_trace
 
+if hasTelnet:
+    def serve(port=8080):
+        Epdb().serve(port)
+    
+    def serve_post_mortem(t, exc_type=None, exc_msg=None, port=8080):
+        Epdb().serve_post_mortem(t, exc_type, exc_msg, port)
+
+    def connect(host='localhost', port=8080):
+        t = epdb_client.TelnetClient(host, port)
+        t.interact()
+
 def post_mortem(t, exc_type=None, exc_msg=None):
-    p = Epdb()
-    p._exc_type = exc_type
-    p._exc_msg = exc_msg
-    p._tb = t
-    p.reset()
-    while t.tb_next is not None:
-        t = t.tb_next
-    p.interaction(t.tb_frame, t)
+    Epdb().post_mortem(t, exc_type=None, exc_msg=None)
 
 def matchFileOnDirPath(curpath, pathdir):
     """Find match for a file by slicing away its directory elements
@@ -935,7 +989,7 @@ def matchFileOnDirPath(curpath, pathdir):
     lp = len(pathdirs)
     # Cut off matching file elements from the ends of the two paths
     for x in range(1, min(len(filedirs), len(pathdirs))):
-        # XXX this will not work if you have
+        # XXX this will not work if you have 
         # /usr/foo/foo/filename.py
         if filedirs[-1] == pathdirs[-x]:
             filedirs = filedirs[:-1]
@@ -944,7 +998,7 @@ def matchFileOnDirPath(curpath, pathdir):
 
     # Now cut try cuting off incorrect initial elements of curpath
     while filedirs:
-        tmppath = '/' + '/'.join(pathdirs + filedirs + [filename])
+        tmppath = '/' + '/'.join(pathdirs + filedirs + [filename]) 
         if os.path.exists(tmppath):
             return tmppath
         filedirs = filedirs[1:]
@@ -969,9 +1023,9 @@ def _removeQuotes(line):
 def _removeQuoteSet(line, quote1, quote2):
     ln = len(quote1)
     while True:
-        a = line.find(quote1), quote1
+        a = line.find(quote1), quote1   
         b = line.find(quote2), quote2
-        if a[0] == -1 and b[0] == -1:
+        if a[0] == -1 and b[0] == -1:             
             return line
         if b[0] == -1 or (b[0] < a[0]):
             firstPoint = a[0]
@@ -984,4 +1038,27 @@ def _removeQuoteSet(line, quote1, quote2):
             return None
         secondPoint += firstPoint
         line = line[:firstPoint] + line[(secondPoint+2*ln):]
+
+def main(argv):
+    if len(argv) == 1:
+        set_trace()
+        return
+    command = argv[1]
+    if command == 'connect':
+        if len(argv) > 2:
+            host = argv[2]
+        else:
+            host = 'localhost'
+        if len(argv) > 3:
+            port = int(argv[3])
+        else:
+            port = 8080
+        connect(host=host, port=port)
+    else:
+        print "usage: connect [host] [port]"
+        return 1
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
 
