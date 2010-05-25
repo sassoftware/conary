@@ -8,9 +8,12 @@ Changes in @NEW@:
       in order to select which troves will be mirrored (CNY-3334)
 
   o Bug Fixes:
+    * Shared library RPATH entries with a double leading slash (//)
+      no longer cause paths to be recorded in soname dependencies
+      in certain circumstances. (CNY-3425)
 
   o Internal Changes:
-
+    * Combined TroveCache and TroveCacheWrapper objects in build code
 
 Changes in 2.1.16:
   o New Features:

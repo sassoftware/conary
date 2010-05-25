@@ -1900,11 +1900,12 @@ class GroupReference:
         """
         return self.getTroves(self.sourceTups, withFiles=False)
 
-
-class TroveCacheWrapper(object):
-    def __init__(self, cache):
-        self.repos = cache.repos
-        self.cache = cache
+class TroveCache(dict):
+    def __init__(self, repos, callback = None):
+        self.repos = repos
+        if not callback:
+            callback = callbacks.CookCallback()
+        self.callback = callback
 
     def __getattr__(self, key):
         return getattr(self.repos, key)
@@ -1917,18 +1918,31 @@ class TroveCacheWrapper(object):
         return [ x.getPathHashes() for x in self.getTroves(troveList) ]
 
     def getTroves(self, troveList, *args, **kw):
-        self.cache.cacheTroves(troveList)
-        return [self.cache[x] for x in troveList]
+        self.cacheTroves(troveList)
+        return [self[x] for x in troveList]
 
     def getTrove(self, troveTup, *args, **kw):
-        self.cache.cacheTroves([troveTup])
-        return self.cache[troveTup]
+        self.cacheTroves([troveTup])
+        return self[troveTup]
+
+    def cacheTroves(self, troveTupList):
+        troveTupList = [x for x in troveTupList if x not in self]
+        if not troveTupList:
+            return
+        self.callback.gettingTroveDefinitions(len(troveTupList))
+        troves = self.repos.getTroves(troveTupList, withFiles=False,
+                                      callback = self.callback)
+        # cache first, descend later
+        for troveTup, trv in izip(troveTupList, troves):
+            self[troveTup] = trv
+        for trv in troves:
+            self.getChildren(trv)
 
     def hasTroves(self, troveList):
         d = {}
         needed = []
         for troveTup in troveList:
-            if troveTup in self.cache:
+            if troveTup in self:
                 d[troveTup] = True
             else:
                 needed.append(troveTup)
@@ -1955,12 +1969,12 @@ class TroveCacheWrapper(object):
                 raise RuntimeError("Cannot use TroveWrapper cache for recursive"
                                    " jobs")
             troveTup = job[0], job[2][0], job[2][1]
-            if troveTup in self.cache:
-                troves.append(self.cache[troveTup])
+            if troveTup in self:
+                troves.append(self[troveTup])
             else:
                 needed.append(troveTup)
         if needed:
-            troves.extend(self.cache.getTroves(needed))
+            troves.extend(self.getTroves(needed))
         cs = changeset.ChangeSet()
         for trove in troves:
             troveCs = trove.diff(None, absolute = True)[0]
@@ -1968,37 +1982,6 @@ class TroveCacheWrapper(object):
         if primaryTroveList:
             cs.setPrimaryTroveList(primaryTroveList)
         return cs
-
-class TroveCache(dict):
-    """ Simple cache for relevant information about troves needed for
-        recipes in case they are needed again for other recipes.
-    """
-    def __init__(self, repos, callback=None):
-        self.repos = repos
-        if not callback:
-            callback = callbacks.CookCallback()
-        self.callback = callback
-
-    def getTroves(self, troveList, *args, **kw):
-        self.cacheTroves(troveList)
-        return [self[x] for x in troveList]
-
-    def getTrove(self, troveTup, *args, **kw):
-        self.cacheTroves([troveTup])
-        return self[troveTup]
-
-    def cacheTroves(self, troveTupList):
-        troveTupList = [x for x in troveTupList if x not in self]
-        if not troveTupList:
-            return
-        self.callback.gettingTroveDefinitions(len(troveTupList))
-        troves = self.repos.getTroves(troveTupList, withFiles=False,
-                                      callback = self.callback)
-        # cache first, descend later
-        for troveTup, trv in izip(troveTupList, troves):
-            self[troveTup] = trv
-        for trv in troves:
-            self.getChildren(trv)
 
     def getChildren(self, trv):
         """ Retrieve children,  and, if necessary, children's children)
@@ -2932,7 +2915,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
         if resetVerbosity:
             log.setVerbosity(log.DEBUG)
         oldRepos = client.getRepos()
-        client.setRepos(TroveCacheWrapper(cache))
+        client.setRepos(cache)
         try:
             updJob = client.newUpdateJob()
             suggMap = client.prepareUpdateJob(updJob, troves, recurse = False,
@@ -3026,7 +3009,7 @@ def checkGroupDependencies(group, cfg, cache, callback):
 
     client = conaryclient.ConaryClient(cfg)
 
-    checker = client.db.getDepStateClass(TroveCacheWrapper(cache),
+    checker = client.db.getDepStateClass(cache,
                     findOrdering = False,
                     ignoreDepClasses = [ deps.AbiDependency,
                                          deps.RpmLibDependencies ])

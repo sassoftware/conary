@@ -12,7 +12,5 @@
 # full details.
 #
 
-try:
-    from epdb import *
-except:
-    from pdb import *
+# pyflakes=ignore
+from conary.lib.epdb_embedded import *

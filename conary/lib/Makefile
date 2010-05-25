@@ -12,6 +12,8 @@
 # full details.
 #
 
+SUBDIRS = epdb_embedded
+
 python_files=$(wildcard *.py)
 python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so
 wrapper_libs=filename_wrapper.so
@@ -35,7 +37,7 @@ else \
 fi)
 
 
-all: $(python_modules) $(wrapper_libs)
+all: default-subdirs $(python_modules) $(wrapper_libs)
 
 elf.o: elf.c
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
@@ -61,13 +63,13 @@ filename_wrapper.so: filename_wrapper.c
 	$(CC) -Wall -fPIC -rdynamic -c filename_wrapper.c
 	$(CC) $(LDFLAGS) -shared -rdynamic -o filename_wrapper.so filename_wrapper.o -lc -ldl
 
-install: pyfiles-install
+install: all install-subdirs pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
 	install -m 755 $(python_modules) $(DESTDIR)$(sitedir)/$(DIR)
 	mkdir -p $(DESTDIR)$(conarylibdir)
 	install -m 755 $(wrapper_libs) $(DESTDIR)$(conarylibdir)/
 
-clean: default-clean
+clean: clean-subdirs default-clean
 
 dist: default-dist
 
