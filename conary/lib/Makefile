@@ -33,9 +33,9 @@ elif [ -d /usr/include/libelf-lgpl ]; then \
 elif [ -d ${SYSROOT}/usr/include/libelf-lgpl ]; then \
     echo "-I${SYSROOT}/usr/include/libelf-lgpl -lelf-lgpl"; \
 elif [ -d /usr/include/libelf ] && grep 'GNU Library General Public' /usr/include/libelf/libelf.h >/dev/null; then\
-    echo "-I/usr/include/libelf -Lelf-lgpl"; \
+    echo "-I/usr/include/libelf -lelf"; \
 elif [ -d ${SYSROOT}/usr/include/libelf ] && grep 'GNU Library General Public' ${SYSROOT}/usr/include/libelf/libelf.h >/dev/null; then\
-    echo "-I${SYSROOT}/usr/include/libelf -Lelf-lgpl"; \
+    echo "-I${SYSROOT}/usr/include/libelf -lelf"; \
 else \
     echo 'No appropriate libelf found' >&2 ;\
 fi)
