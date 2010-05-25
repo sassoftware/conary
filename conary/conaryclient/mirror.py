@@ -97,7 +97,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     entitlementDirectory = cfg.CfgPath
     labels = conarycfg.CfgInstallLabelPath
     matchTroves = cfg.CfgSignedRegExpList
-    matchTroveSpecs = cfg.CfgRegExpList
+    matchTroveSpecs = cfg.CfgSignedRegExpList
 
     recurseGroups = (cfg.CfgBool, False)
     uploadRateLimit = (conarycfg.CfgInt, 0,
@@ -433,13 +433,11 @@ def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCa
 # filter a trove tuple based on cfg
 def _filterTup(troveTup, cfg):
     (n, v, f) = troveTup
-    # if we have a trovespec list, use it exclusively
-    if cfg.matchTroveSpecs:
-        troveSpec = cmdline.toTroveSpec(n, str(v), f)
-        if cfg.matchTroveSpecs.match(troveSpec):
-            return True
+    troveSpec = cmdline.toTroveSpec(n, str(v), f)
+    # filter by trovespec 
+    if cfg.matchTroveSpecs and cfg.matchTroveSpecs.match(troveSpec) <= 0:
         return False
-    # if we're matching troves, filter by name first
+    # if we're matching troves
     if cfg.matchTroves and cfg.matchTroves.match(n) <= 0:
         return False
     # filter by host/label
