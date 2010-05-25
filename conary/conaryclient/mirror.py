@@ -22,9 +22,11 @@ import sys
 import time
 
 from conary.conaryclient import callbacks as clientCallbacks
+from conary.conaryclient import cmdline
 from conary import conarycfg, callbacks, trove
 from conary.lib import cfg, util, log
 from conary.repository import errors, changeset, netclient
+from conary.deps.deps import parseFlavor
 
 class OptionError(Exception):
     def __init__(self, errcode, errmsg, *args):
@@ -89,22 +91,28 @@ class MirrorConfigurationSection(cfg.ConfigSection):
     user                  =  conarycfg.CfgUserInfo
     entitlement           =  conarycfg.CfgEntitlement
 
-class MirrorFileConfiguration(cfg.SectionedConfigFile):
-    host                  =  cfg.CfgString
-    entitlementDirectory  =  cfg.CfgPath
-    labels                =  conarycfg.CfgInstallLabelPath
-    matchTroves           =  cfg.CfgSignedRegExpList
-    recurseGroups         =  (cfg.CfgBool, False)
-    uploadRateLimit       =  (conarycfg.CfgInt, 0,
-            "Upload rate limit, in bytes per second")
-    downloadRateLimit     =  (conarycfg.CfgInt, 0,
-            "Download rate limit, in bytes per second")
-    lockFile              =  cfg.CfgString
-    useHiddenCommits      =  (cfg.CfgBool, True)
-    absoluteChangesets    =  (cfg.CfgBool, False)
 
-    _allowNewSections   = True
+class MirrorFileConfiguration(cfg.SectionedConfigFile):
+    host = cfg.CfgString
+    entitlementDirectory = cfg.CfgPath
+    labels = conarycfg.CfgInstallLabelPath
+    matchTroves = cfg.CfgSignedRegExpList
+    matchTroveSpecs = cfg.CfgRegExpList
+    troveList = cfg.CfgList(cfg.CfgList(cfg.CfgString, []))
+
+    recurseGroups = (cfg.CfgBool, False)
+    uploadRateLimit = (conarycfg.CfgInt, 0,
+            "Upload rate limit, in bytes per second")
+    downloadRateLimit = (conarycfg.CfgInt, 0,
+            "Download rate limit, in bytes per second")
+    lockFile = cfg.CfgString
+    useHiddenCommits = (cfg.CfgBool, True)
+    absoluteChangesets = (cfg.CfgBool, False)
+    includeSources = (cfg.CfgBool, False)
+
+    _allowNewSections = True
     _defaultSectionType = MirrorConfigurationSection
+
 
 # for compatibility with older code base that requires a source and a
 # target to de defined
@@ -422,9 +430,16 @@ def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCa
         i += 1
     return
 
+
 # filter a trove tuple based on cfg
 def _filterTup(troveTup, cfg):
     (n, v, f) = troveTup
+    # if we have a trovespec list, use it exclusively
+    if cfg.matchTroveSpecs:
+        troveSpec = cmdline.toTroveSpec(n, str(v), f)
+        if cfg.matchTroveSpecs.match(troveSpec):
+            return True
+        return False
     # if we're matching troves, filter by name first
     if cfg.matchTroves and cfg.matchTroves.match(n) <= 0:
         return False
@@ -434,6 +449,7 @@ def _filterTup(troveTup, cfg):
     if cfg.labels and v.branch().label() not in cfg.labels:
         return False
     return True
+
 
 # get all the trove info to be synced
 def _getAllInfo(src, cfg):
@@ -777,13 +793,24 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         troveSetList = set([x[1] for x in troveList])
         for mark, (name, version, flavor) in troveList:
             if trove.troveIsGroup(name):
-                recTroves, rmTroves = recurseTrove(sourceRepos, name, version, flavor,
-                                                   callback = callback)
+                recTroves, rmTroves = recurseTrove(sourceRepos, name, version,
+                                                   flavor, callback=callback)
+
+                # add sources here:
+                if cfg.includeSources:
+                    troveInfo = sourceRepos.getTroveInfo(
+                        trove._TROVEINFO_TAG_SOURCENAME, recTroves)
+                    sourceComps = set()
+                    for nvf, source in itertools.izip(recTroves, troveInfo):
+                        sourceComps.add((source(), nvf[1].getSourceVersion(),
+                                         parseFlavor('')))
+                    recTroves.extend(sourceComps)
+
                 # add the results at the end with the current mark
-                for (n,v,f) in recTroves:
-                    if (n,v,f) not in troveSetList:
-                        troveList.append((mark, (n,v,f)))
-                        troveSetList.add((n,v,f))
+                for (n, v, f) in recTroves:
+                    if (n, v, f) not in troveSetList:
+                        troveList.append((mark, (n, v, f)))
+                        troveSetList.add((n, v, f))
                 for x in rmTroves:
                     removedSet.add(x)
         log.debug("after group recursion %d troves are needed", len(troveList))
