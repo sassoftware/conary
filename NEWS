@@ -8,6 +8,7 @@ Changes in @NEW@:
 
   o Internal Changes:
     * Combined TroveCache and TroveCacheWrapper objects in build code
+    * Hotspot profiling hooks have been removed. (CNY-3250)
 
 Changes in 2.1.16:
   o New Features:
