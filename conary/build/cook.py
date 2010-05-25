@@ -2219,10 +2219,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof = cProfile.Profile()
                 prof.enable()
                 lsprof = True
-            elif profile:
-                import hotshot
-                prof = hotshot.Profile('conary-cook.prof')
-                prof.start()
             # child, set ourself to be the foreground process
             os.setpgrp()
 
@@ -2282,8 +2278,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof.disable()
                 prof.dump_stats('conary-cook.lsprof')
                 prof.print_stats()
-            elif profile:
-                prof.stop()
             os._exit(0)
         else:
             # parent process, no need for the write side of the pipe
