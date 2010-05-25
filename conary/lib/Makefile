@@ -44,7 +44,7 @@ fi)
 all: default-subdirs $(python_modules) $(wrapper_libs)
 
 elf.o: elf.c
-	if [ -z "$(libelf)" ] ; then \
+	@if [ -z "$(libelf)" ] ; then \
 	    echo 'Stopping build due to missing libelf' ; exit 1 ; fi
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
