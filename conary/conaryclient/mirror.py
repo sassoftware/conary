@@ -98,7 +98,6 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     labels = conarycfg.CfgInstallLabelPath
     matchTroves = cfg.CfgSignedRegExpList
     matchTroveSpecs = cfg.CfgRegExpList
-    troveList = cfg.CfgList(cfg.CfgList(cfg.CfgString, []))
 
     recurseGroups = (cfg.CfgBool, False)
     uploadRateLimit = (conarycfg.CfgInt, 0,

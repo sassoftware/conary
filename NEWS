@@ -3,6 +3,9 @@ Changes in @NEW@:
     * The addCapsule source action now takes a ignoreAllConflictingTimes
       boolean argument which causes it to not raise errors when overlapping
       paths otherwise allowed have conflicting mtimes. (CNY-3415)
+    * Added a new option to the mirror configuration, matchTroveSpecs which
+      is a list of regular expressions that are matched against full troveSpecs
+      in order to select which troves will be mirrored (CNY-3334)
 
   o Bug Fixes:
 
