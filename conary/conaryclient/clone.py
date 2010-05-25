@@ -1620,6 +1620,7 @@ class LeafMap(object):
             missingList = [ i for i, x in enumerate(infoList)
                                     if x is None ]
 
+            cfList = []
             try:
                 cfList = troveCache.getTroveInfo(
                                 trove._TROVEINFO_TAG_CLONEDFROM,
