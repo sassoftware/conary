@@ -13,6 +13,9 @@ Changes in @NEW@:
       in certain circumstances. (CNY-3425)
     * Output text for the conary update command has been changed to more
       clearly describe dependency resolution problems (CNY-3154)
+    * Allow an RPM packages to create /etc/passwd and /etc/group properly,
+      even if the files already exist (due to a info- package, for example)
+      (CNY-3428)
 
   o Internal Changes:
     * Combined TroveCache and TroveCacheWrapper objects in build code
