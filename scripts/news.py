@@ -64,7 +64,7 @@ def preview(repo, modifiedOK=True):
         path = 'news/' + filename
         if filename[0] == '.' or '.' not in filename:
             continue
-        issue, kind = filename.split('.')
+        issue, kind = filename.rsplit('.', 1)
         if kind not in KINDS:
             print >> sys.stderr, "Ignoring '%s' due to unknown type '%s'" % (
                     filename, kind)
@@ -79,7 +79,8 @@ def preview(repo, modifiedOK=True):
                         (path,))
         elif path not in ok:
             if modifiedOK:
-                print >> sys.stderr, "warning: '%s' is not checked in."
+                print >> sys.stderr, "warning: '%s' is not checked in." % (
+                        path,)
                 modified = time.time()
             else:
                 sys.exit("File '%s' is not checked in and must be "
@@ -88,10 +89,11 @@ def preview(repo, modifiedOK=True):
             files.add(path)
             modified = _lastModified(repo, path)
 
-        for line in codecs.open(path, 'r', 'utf8'):
+        for n, line in enumerate(codecs.open(path, 'r', 'utf8')):
             entry = line.strip()
             if entry:
-                kind_map.setdefault(kind, []).append((modified, issue, entry))
+                kind_map.setdefault(kind, []).append((modified, issue, n,
+                    entry))
 
     out = ['Changes in %s:' % _getVersion()]
     for kind, heading in HEADINGS:
@@ -99,7 +101,7 @@ def preview(repo, modifiedOK=True):
         if not entries:
             continue
         out.append('  o %s:' % heading)
-        for _, issue, entry in sorted(entries):
+        for _, issue, _, entry in sorted(entries):
             if not issue.startswith('misc-'):
                 entry += ' (%s)' % issue
             lines = textwrap.wrap(entry, 66)
