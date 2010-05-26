@@ -1,25 +1,3 @@
-Changes in @NEW@:
-  o New Features:
-    * The addCapsule source action now takes a ignoreAllConflictingTimes
-      boolean argument which causes it to not raise errors when overlapping
-      paths otherwise allowed have conflicting mtimes. (CNY-3415)
-    * Added a new option to the mirror configuration, matchTroveSpecs which
-      is a list of regular expressions that are matched against full troveSpecs
-      in order to select which troves will be mirrored (CNY-3334)
-
-  o Bug Fixes:
-    * Shared library RPATH entries with a double leading slash (//)
-      no longer cause paths to be recorded in soname dependencies
-      in certain circumstances. (CNY-3425)
-    * Output text for the conary update command has been changed to more
-      clearly describe dependency resolution problems (CNY-3154)
-    * Allow an RPM packages to create /etc/passwd and /etc/group properly,
-      even if the files already exist (due to a info- package, for example)
-      (CNY-3428)
-
-  o Internal Changes:
-    * Combined TroveCache and TroveCacheWrapper objects in build code
-
 Changes in 2.1.16:
   o New Features:
     * RPM capsule packages can now derived.  In addition, capsule 
