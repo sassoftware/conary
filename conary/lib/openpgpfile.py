@@ -3480,6 +3480,8 @@ class PublicKeyring(object):
         if mtime0 == mtime1:
             # Cheat, and set the mtime to be a second larger
             os.utime(self._tsDbPath, (mtime1, mtime1 + self._timeIncrement))
+        elif self._timeIncrement > 1:
+            os.utime(self._tsDbPath, (mtime1, mtime1 + self._timeIncrement))
         # We know for a fact we've touched the file.
         # In order to prevent sub-second updates from not being noticed, reset
         # the mtime.
