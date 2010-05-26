@@ -32,14 +32,20 @@ elif [ -d /usr/include/libelf-lgpl ]; then \
     echo "-I/usr/include/libelf-lgpl -lelf-lgpl"; \
 elif [ -d ${SYSROOT}/usr/include/libelf-lgpl ]; then \
     echo "-I${SYSROOT}/usr/include/libelf-lgpl -lelf-lgpl"; \
+elif [ -d /usr/include/libelf ] && grep 'GNU Library General Public' /usr/include/libelf/libelf.h >/dev/null; then\
+    echo "-I/usr/include/libelf -lelf"; \
+elif [ -d ${SYSROOT}/usr/include/libelf ] && grep 'GNU Library General Public' ${SYSROOT}/usr/include/libelf/libelf.h >/dev/null; then\
+    echo "-I${SYSROOT}/usr/include/libelf -lelf"; \
 else \
-    echo -lelf; \
+    echo 'No appropriate libelf found' >&2 ;\
 fi)
 
 
 all: default-subdirs $(python_modules) $(wrapper_libs)
 
 elf.o: elf.c
+	@if [ -z "$(libelf)" ] ; then \
+	    echo 'Stopping build due to missing libelf' ; exit 1 ; fi
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
 elf.so: $(elfmodule_objs)

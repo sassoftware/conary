@@ -3912,6 +3912,7 @@ class DepResolutionFailure(DependencyFailure):
                         "\n\t".join(str(depSet).split("\n"))))
         return '\n'.join(res)
 
+
 class EraseDepFailure(DepResolutionFailure):
     """ Unable to resolve dependencies due to erase """
 
@@ -3932,37 +3933,40 @@ class EraseDepFailure(DepResolutionFailure):
                 if job[2][0]:
                     packagesByInstall[newInfo] = oldInfo
 
-        res.append('The following dependencies would not be met after this update:\n')
+        res.append(
+            'The following dependencies would not be met after this update:\n')
         for (reqBy, depSet, providedBy) in self.getFailures():
-            requiredPackages = []
             providers = []
             for oldInfo in providedBy:
                 newInfo = packagesByErase[oldInfo]
                 if not newInfo[1]:
-                    status = 'Erased'
+                    status = 'Would be erased'
                 else:
-                    status = 'Updated to %s' % self.formatVF(newInfo)
+                    status = 'Would be updated to %s' % self.formatVF(newInfo)
                 providedInfo = '%s (%s)' % (self.formatNVF(oldInfo), status)
                 providers.append(providedInfo)
             if reqBy in packagesByInstall:
                 oldInfo = packagesByInstall[reqBy]
                 if oldInfo[1]:
-                    reqByInfo = '%s (Updated from %s)' % (
+                    reqByInfo = '%s (Would be updated from %s)' % (
                                             self.formatNVF(reqBy),
                                                 self.formatVF(oldInfo))
                 elif reqBy in resolved:
-                    reqByInfo = '%s (Added due to resolution)' % self.formatNVF(reqBy)
+                    reqByInfo = '%s (Would be added due to resolution)' \
+                        % self.formatNVF(reqBy)
                 else:
-                    reqByInfo = '%s (Newly Installed)' % self.formatNVF(reqBy)
+                    reqByInfo = '%s (Would be newly installed)' \
+                        % self.formatNVF(reqBy)
             else:
-                reqByInfo = '%s (Already Installed)' % self.formatNVF(reqBy)
+                reqByInfo = '%s (Already installed)' % self.formatNVF(reqBy)
 
             res.append("  %s requires:\n"
-                       "    %s\n  which was provided by:\n"
+                       "    %s\n  which is provided by:\n"
                        "    %s" % (reqByInfo,
                                    "\n    ".join(str(depSet).split("\n")),
                                ' or '.join(providers)))
         return '\n'.join(res)
+
 
 class NeededTrovesFailure(DependencyFailure):
     """ Dependencies needed and resolve wasn't used """

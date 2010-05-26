@@ -3495,7 +3495,7 @@ class Requires(_addInfo, _dependency):
 
         def _canonicalRPATH(rpath, glob=False):
             # normalize all elements of RPATH
-            l = [ os.path.normpath(x) for x in rpath.split(':') ]
+            l = [ util.normpath(x) for x in rpath.split(':') ] # CNY-3425
             # prune system paths and relative paths from RPATH
             l = [ x for x in l
                   if x not in self.systemLibPaths and x.startswith('/') ]
