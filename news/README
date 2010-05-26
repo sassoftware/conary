@@ -1,0 +1,28 @@
+To add a NEWS entry, create a file in the "news" directory in the format
+<issue>.<type>.
+e.g. CNY-1234.bugfix
+
+If you don't have an issue ID, use the prefix "misc-" with some short
+identifier that won't collide with others' work.
+e.g. misc-pickle-flavors.feature
+e.g. misc-refactored-frobnicator.internal
+
+These are the supported types, in the order in which they will appear:
+
+    Type        NEWS Header
+------------------------------------
+    feature     New Features
+    bugfix      Bug Fixes
+    internal    Internal Changes
+
+When writing the NEWS entry, put the entire entry on one line. If you
+wish to make multiple entries for the same issue, put one on each line
+with a blank line between them.
+
+Do not repeat the issue ID in the entry -- it will be appended
+automatically (if applicable)
+
+For example:
+echo Clone operations no longer print an error in the callback. \
+    > news/CNY-3413.bugfix
+hg add news/CNY-3413.bugfix

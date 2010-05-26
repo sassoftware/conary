@@ -51,6 +51,7 @@ class Callback:
         # the chroot and the cwd.
         thisRoot = os.open("/", os.O_RDONLY)
         thisDir = os.open(".", os.O_RDONLY)
+        concats = []
 
         try:
             os.fchdir(self.rootFd)
@@ -61,7 +62,14 @@ class Callback:
                 if not line:
                     continue
 
-                if line.startswith('error:'):
+                # this passwd/group stuff is for CNY-3428. Basically group
+                # info packages can create users before Red Hat's setup
+                # package is installed. this fixes things up.
+                if '/etc/passwd.rpmnew' in line:
+                    concats.append( ('/etc/passwd', '/etc/passwd.rpmnew') )
+                elif '/etc/group.rpmnew' in line:
+                    concats.append( ('/etc/group', '/etc/group.rpmnew') )
+                elif line.startswith('error:'):
                     line = line[6:].strip()
                     self.callback.error(line)
                 elif line.startswith('warning:'):
@@ -75,6 +83,19 @@ class Callback:
             os.chroot(".")
             os.fchdir(thisDir)
             os.close(thisDir)
+
+        for (keepPath, fromPath) in concats:
+            finalLines = open(fromPath).readlines() + open(keepPath).readlines()
+            finalLines = [ (x.split(':')[0], x) for x in finalLines ]
+            seen = set()
+            f = open(keepPath, "w")
+            for (name, line) in finalLines:
+                if name not in seen:
+                    seen.add(name)
+                    f.write(line)
+
+            f.close()
+            os.unlink(fromPath)
 
     def __call__(self, what, amount, total, mydata, wibble):
         self.flushRpmLog()
