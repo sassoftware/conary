@@ -46,22 +46,30 @@ class ELF(Magic):
         self.contents['stripped'] = elf.stripped(fullpath)
         if self.__class__ is ELF:
             # ar doesn't deal with hasDebug or RPATH
-            self.contents['hasDebug'] = elf.hasDebug(fullpath)
-            self.contents['RPATH'] = elf.getRPATH(fullpath)
-            self.contents['Type'] = elf.getType(fullpath)
-        requires, provides = elf.inspect(fullpath)
-        # Filter None abi flags
-        requires = [ x for x in requires
-                     if x[0] != 'abi' or x[2][0] is not None ]
-        self.contents['requires'] = requires
-        self.contents['provides'] = provides
-        for req in requires:
-            if req[0] == 'abi':
-                self.contents['abi'] = req[1:]
-                self.contents['isnset'] = req[2][1]
-        for prov in provides:
-            if prov[0] == 'soname':
-                self.contents['soname'] = prov[1]
+            try:
+                self.contents['hasDebug'] = elf.hasDebug(fullpath)
+            except elf.error: pass
+            try:
+                self.contents['RPATH'] = elf.getRPATH(fullpath)
+            except elf.error: pass
+            try:
+                self.contents['Type'] = elf.getType(fullpath)
+            except elf.error: pass
+        try:
+            requires, provides = elf.inspect(fullpath)
+            # Filter None abi flags
+            requires = [ x for x in requires
+                         if x[0] != 'abi' or x[2][0] is not None ]
+            self.contents['requires'] = requires
+            self.contents['provides'] = provides
+            for req in requires:
+                if req[0] == 'abi':
+                    self.contents['abi'] = req[1:]
+                    self.contents['isnset'] = req[2][1]
+            for prov in provides:
+                if prov[0] == 'soname':
+                    self.contents['soname'] = prov[1]
+        except elf.error: pass
 
 class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):
