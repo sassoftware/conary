@@ -89,7 +89,9 @@ def preview(repo, modifiedOK=True):
             files.add(path)
             modified = _lastModified(repo, path)
 
-        for n, line in enumerate(codecs.open(path, 'r', 'utf8')):
+        entries = [x.replace('\n', ' ') for x in
+                   codecs.open(path, 'r', 'utf8').read().split('\n\n')]
+        for n, line in enumerate(entries):
             entry = line.strip()
             if entry:
                 kind_map.setdefault(kind, []).append((modified, issue, n,

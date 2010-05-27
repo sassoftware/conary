@@ -15,9 +15,9 @@ These are the supported types, in the order in which they will appear:
     bugfix      Bug Fixes
     internal    Internal Changes
 
-When writing the NEWS entry, put the entire entry on one line. If you
-wish to make multiple entries for the same issue, put one on each line
-with a blank line between them.
+When writing the NEWS entry, put the entire entry on one line or
+immediately adjacent lines. If you wish to make multiple entries for
+the same issue, put one on each line with a blank line between them.
 
 Do not repeat the issue ID in the entry -- it will be appended
 automatically (if applicable)
