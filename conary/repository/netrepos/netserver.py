@@ -113,14 +113,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def __init__(self, cfg, basicUrl, db = None):
-        # FIXME: remove after deprecation period
-        if cfg.cacheDB:
-            import warnings
-            warnings.warn('cacheDB is deprecated.  changesetCacheDir '
-                          'should be used instead.  defaulting to %s/cscache '
-                          'for changesetCacheDir' %cfg.tmpDir,
-                          DeprecationWarning)
-            cfg.configLine('changesetCacheDir %s/cscache' %cfg.tmpDir)
         # this is a bit of a hack to determine if we're running
         # as a standalone server or not without having to touch
         # rMake code
@@ -3570,7 +3562,6 @@ class ServerConfig(ConfigFile):
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository')
     bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
-    cacheDB                 = dbstore.CfgDriver
     changesetCacheDir       = CfgPath
     closed                  = CfgString
     commitAction            = CfgString
