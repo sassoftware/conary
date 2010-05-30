@@ -14,6 +14,7 @@
 
 import base64
 import cPickle
+import errno
 import fnmatch
 import itertools
 import os
@@ -27,12 +28,13 @@ from conary import files, trove, versions, streams
 from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
-from conary.lib.cfg import *
+from conary.lib.cfg import ConfigFile
+from conary.lib.cfgtypes import (CfgInt, CfgString, CfgPath, CfgBool, CfgList,
+        CfgLineList)
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap, deptable
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
-from conary.trove import DigitalSignature
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -2176,8 +2178,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         uniqIdList = fileIdMap.keys()
 
         # now i+1 is how many items we shall return
-        # None in streams means the stream wasn't found.
-        streams = [ None ] * (i+1)
+        # None in streamMap means the stream wasn't found.
+        streamMap = [ None ] * (i+1)
 
         # use the list of uniqified fileIds to look up streams in the repo
         def _iterIdList(uniqIdList):
@@ -2209,13 +2211,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if stream is None:
                 continue
             for streamIdx in fileIdMap[fileId]:
-                streams[streamIdx] = stream
+                streamMap[streamIdx] = stream
             # mark as processed
             uniqIdList[i] = None
         # FIXME: the fact that we're not extracting the list ordered
         # makes it very hard to return an iterator out of this
         # function - for now, returning a list will do...
-        return streams
+        return streamMap
 
     @accessReadOnly
     def getFileVersions(self, authToken, clientVersion, fileList):
@@ -2231,14 +2233,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             fileId = self.toFileId(fileList[rawStreams.index(None)][1])
             raise errors.FileStreamMissing(fileId)
 
-        streams = [ None ] * len(fileList)
+        streamMap = [ None ] * len(fileList)
         for i,  (stream, (pathId, fileId)) in enumerate(itertools.izip(rawStreams, fileList)):
             # XXX the only thing we use the pathId for is to set it in
             # the file object; we should just pass the stream back and
             # let the client set it to avoid sending it back and forth
             # for no particularly good reason
-            streams[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
-        return streams
+            streamMap[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
+        return streamMap
 
     @accessReadOnly
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
