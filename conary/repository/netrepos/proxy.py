@@ -12,7 +12,13 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib, urllib2, urlparse
+import cPickle
+import itertools
+import os
+import tempfile
+import urllib
+import urllib2
+import urlparse
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, util
@@ -418,21 +424,6 @@ class ChangesetFilter(BaseProxy):
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
         self.csCache = cache
-
-    def _cvtJobEntry(self, authToken, jobEntry):
-        (name, (old, oldFlavor), (new, newFlavor), mbsolute) = jobEntry
-
-        newVer = self.toVersion(new)
-
-        if old == 0:
-            l = (name, (None, None),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        else:
-            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        return l
 
     @staticmethod
     def _getChangeSetVersion(clientVersion):
