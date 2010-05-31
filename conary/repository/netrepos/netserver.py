@@ -3563,6 +3563,7 @@ class ServerConfig(ConfigFile):
     bugsEmailName           = (CfgString, 'Conary Repository')
     bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
     changesetCacheDir       = CfgPath
+    changesetCacheLogFile   = CfgPath
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
