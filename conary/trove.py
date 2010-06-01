@@ -645,6 +645,10 @@ _METADATA_ITEM_TAG_LANGUAGE = 10
 _METADATA_ITEM_ORIG_ITEMS = 10
 _METADATA_ITEM_TAG_KEY_VALUE = 11
 _METADATA_ITEM_TAG_NEW_SIGNATURES = 12
+# this exists in order to correct a previous error in calculating the size of
+# troves which contain a capsule
+_METADATA_ITEM_TAG_SIZE_OVERRIDE = 13
+
 
 _METADATA_ITEM_SIG_VER_ALL = [ 0, 1 ]
 
@@ -740,6 +744,8 @@ class MetadataItem(streams.StreamSet):
                 (DYNAMIC, KeyValueItemsStream,    'keyValue'     ),
         _METADATA_ITEM_TAG_NEW_SIGNATURES:
                 (DYNAMIC, VersionedSignaturesSet, 'signatures'   ),
+        _METADATA_ITEM_TAG_SIZE_OVERRIDE:
+                (DYNAMIC, streams.LongLongStream, 'sizeOverride'),
         }
 
     _skipSet = { 'id' : True, 'signatures': True, 'oldSignatures' : True }
@@ -2907,6 +2913,10 @@ class Trove(streams.StreamSet):
         return self.troveInfo
 
     def getSize(self):
+        sizeOverrides = [x.sizeOverride() for x in
+                         self.troveInfo.metadata.flatten() if x.sizeOverride()]
+        if sizeOverrides:
+            return sizeOverrides[-1]
         return self.troveInfo.size()
 
     def setSize(self, sz):

@@ -70,7 +70,6 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
                           newVersion, fileObj.fileId(), m.hdr)
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
-        size += fileObj.contents.size()
 
     linkGroups = {}
     for pathList in bldPkg.linkGroups.itervalues():
