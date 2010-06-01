@@ -1,1 +1,0 @@
-Allow RPM packages to create /etc/passwd and /etc/group properly, even if the files already exist (due to a info- package, for example)

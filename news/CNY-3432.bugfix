@@ -1,3 +1,0 @@
-Size stored in troveInfo now excludes any capsules
-
-The sizeOverride metadata field can be used to override the reported total file size of a trove.

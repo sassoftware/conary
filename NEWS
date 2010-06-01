@@ -1,3 +1,34 @@
+Changes in 2.1.17:
+  o New Features:
+    * Added a new option to the mirror configuration, matchTroveSpecs
+      which is a list of regular expressions that are matched against
+      full troveSpecs in order to select which troves will be mirrored.
+      (CNY-3334)
+    * The addCapsule source action now takes a ignoreAllConflictingTimes
+      boolean argument which causes it to not raise errors when
+      overlapping paths otherwise allowed have conflicting mtimes.
+      (CNY-3415)
+    * Made conary.lib.magic more resiliant to errors that show up only
+      with certain implementations of libelf. (CNY-3430)
+
+  o Bug Fixes:
+    * Output text for the conary update command has been changed to more
+      clearly describe dependency resolution problems. (CNY-3154)
+    * Shared library RPATH entries with a double leading slash (//) no
+      longer cause paths to be recorded in soname dependencies in
+      certain circumstances. (CNY-3425)
+    * Allow RPM packages to create /etc/passwd and /etc/group properly,
+      even if the files already exist (due to a info- package, for
+      example) (CNY-3428)
+    * Running Conary updates in single-threaded mode correctly execute
+      group trove scripts. (CNY-3431)
+    * Size stored in troveInfo now excludes any capsules (CNY-3432)
+    * The sizeOverride metadata field can be used to override the
+      reported total file size of a trove. (CNY-3432)
+
+  o Internal Changes:
+    * Combined TroveCache and TroveCacheWrapper objects in build code.
+
 Changes in 2.1.16:
   o New Features:
     * RPM capsule packages can now derived.  In addition, capsule 

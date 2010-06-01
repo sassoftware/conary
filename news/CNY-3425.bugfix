@@ -1,1 +1,0 @@
-Shared library RPATH entries with a double leading slash (//) no longer cause paths to be recorded in soname dependencies in certain circumstances.
