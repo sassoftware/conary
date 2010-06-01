@@ -3555,6 +3555,58 @@ class GlobListType(list):
 
         return False
 
+
+class AuthToken(list):
+    __slots__ = ()
+
+    _user, _password, _entitlements, _remote_ip = range(4)
+
+    def __init__(self, user='anonymous', password='anonymous', entitlements=(),
+            remote_ip=None):
+        if not (user == password == 'anonymous'):
+            password = util.ProtectedString(password)
+        list.__init__(self, (user, password, list(entitlements), remote_ip))
+
+    def _get_user(self):
+        return self[self._user]
+    def _set_user(self, user):
+        self[self._user] = user
+    user = property(_get_user, _set_user)
+
+    def _get_password(self):
+        return self[self._password]
+    def _set_password(self, password):
+        if not (self[self._user] == password == 'anonymous'):
+            password = util.ProtectedString(password)
+        self[self._password] = password
+    password = property(_get_password, _set_password)
+
+    def _get_entitlements(self):
+        return self[self._entitlements]
+    def _set_entitlements(self, entitlements):
+        self[self._entitlements] = entitlements
+    entitlements = property(_get_entitlements, _set_entitlements)
+
+    def _get_remote_ip(self):
+        return self[self._remote_ip]
+    def _set_remote_ip(self, remote_ip):
+        self[self._remote_ip] = remote_ip
+    remote_ip = property(_get_remote_ip, _set_remote_ip)
+
+    def __repr__(self):
+        out = '<AuthToken'
+        if self.user != 'anonymous' or not self.entitlements:
+            out += ' user=%s' % (self.user,)
+        if self.entitlements:
+            ents = []
+            for ent in self.entitlements:
+                ents.append('%s...' % ent[:6])
+            out += ' entitlements=[%s]' % (', '.join(ents))
+        if self.remote_ip:
+            out += ' remote_ip=%s' % self.remote_ip
+        return out + '>'
+
+
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
     baseUri                 = (CfgString, None)
