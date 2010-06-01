@@ -1010,12 +1010,6 @@ class CvcMain(command.MainHandler):
         use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
 
         profile = False
-        if argSet.has_key('profile'):
-            import hotshot
-            prof = hotshot.Profile('conary.prof')
-            prof.start()
-            profile = True
-            del argSet['profile']
         if argSet.has_key('lsprof'):
             import cProfile
             prof = cProfile.Profile()
