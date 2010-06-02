@@ -1472,6 +1472,10 @@ class addCapsule(_Source):
         destDir = self.recipe.macros.destdir
 
         f = self.doDownload()
+        if f in self.recipe.capsuleFileSha1s:
+            raise SourceError('cannot add the same capsule multiple times: '
+                              '%s' % f)
+
         # If we just now figured out the package:component, we need to
         # initialize the manifest
         self._initManifest()
@@ -1576,6 +1580,7 @@ class addCapsule(_Source):
 
         if len(MissingOkay):
             self.recipe.MissingOkay(filter.PathSet(MissingOkay))
+
 
         assert f not in self.recipe.capsuleFileSha1s
         self.recipe.capsuleFileSha1s[f] = sha1Map
