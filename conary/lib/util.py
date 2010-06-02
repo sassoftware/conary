@@ -2447,3 +2447,34 @@ class AtomicFile(object):
             self.fObj.close()
     __del__ = close
 
+
+def statFile(pathOrFile, missingOk=False, inodeOnly=False):
+    """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
+
+    Accepts paths, file descriptors, and file-like objects with a C{fileno()}
+    method.
+
+    @param pathOrFile: A file path or file-like object
+    @type  pathOrFile: C{basestring} or file-like object or C{int}
+    @param missingOk: If C{True}, return C{None} if the file is missing.
+    @type  missingOk: C{bool}
+    @param inodeOnly: If C{True}, return just (dev, inode).
+    @type  inodeOnly: C{bool}
+    @rtype: C{tuple}
+    """
+    try:
+        if isinstance(pathOrFile, basestring):
+            st = os.stat(pathOrFile)
+        else:
+            if hasattr(pathOrFile, 'fileno'):
+                pathOrFile = pathOrFile.fileno()
+            st = os.fstat(pathOrFile)
+    except OSError, err:
+        if err.errno == errno.ENOENT and missingOk:
+            return None
+        raise
+
+    if inodeOnly:
+        return (st.st_dev, st.st_ino)
+    else:
+        return (st.st_dev, st.st_ino, st.st_size, st.st_mtime, st.st_ctime)
