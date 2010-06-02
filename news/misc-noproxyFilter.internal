@@ -1,0 +1,1 @@
+transport.URLOpener now shares no_proxy support with the lookaside cache

@@ -337,20 +337,9 @@ class URLOpener(urllib.FancyURLopener):
         if useConaryProxy:
             return False
 
-        # From python 2.6's urllib (lynx also seems to obey NO_PROXY)
-        no_proxy = os.environ.get('no_proxy', '') or os.environ.get('NO_PROXY', '')
-        # '*' is special case for always bypass
-        if no_proxy == '*':
-            return True
-        # check if the host ends with any of the DNS suffixes
-        for name in no_proxy.split(','):
-            # urllib does not handle the case where the separator is ", ", the
-            # way the example in the following URL shows no_proxy to be set
-            # http://lynx.isc.org/lynx2.8.5/lynx2-8-5/lynx_help/keystrokes/environments.html
-            name = name.strip()
-            if name and destHost.endswith(name):
-                return True
-        return False
+        # filter based on the no_proxy env var
+        npFilt = util.noproxyFilter()
+        return npFilt.bypassProxy(destHost)
 
     def createConnection(self, url, ssl=False, withProxy=False):
         """Return a HTTP/S connection suitable for use by open_http().
