@@ -95,7 +95,7 @@ class BasePolicy(action.RecipeAction):
         if exceptions:
             if not self.exceptions:
                 self.exceptions = []
-            if type(exceptions) in (list, tuple, set):
+            if type(exceptions) in (list, filter.PathSet): # Not tuple: CNY-3437
                 self.exceptions.extend(exceptions)
                 if not allowUnusedFilters:
                     for item in exceptions:
@@ -119,7 +119,7 @@ class BasePolicy(action.RecipeAction):
             self.inclusions = []
 
         if inclusions:
-            if isinstance(inclusions, (tuple, list, set)):
+            if isinstance(inclusions, (list, filter.PathSet)): # Not tuple: CNY-3437
                 self.inclusions.extend(inclusions)
                 if not allowUnusedFilters:
                     for item in inclusions:

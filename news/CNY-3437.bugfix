@@ -1,0 +1,4 @@
+An optimization introduced in Conary 2.1.0 (CNY-3282) caused
+filter expressions using tuples to express required or forbidden
+file mode bits to traceback at build time.  This regression has
+been fixes.
