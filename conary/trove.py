@@ -1667,10 +1667,14 @@ class Trove(streams.StreamSet):
         not be copied.
         @type filteredKeyValues: iterable
         """
+        skipSet = set(skipSet or [])
+        skipSet.add('sizeOverride')
         items = metadata.flatten(skipSet=skipSet,
                                  filteredKeyValues=filteredKeyValues)
-        self.troveInfo.metadata = Metadata()
-        self.troveInfo.metadata.addItems(items)
+        # we only copy the metadata if acutally has some data in it
+        if [x for x in items if x.keys()]:
+            self.troveInfo.metadata = Metadata()
+            self.troveInfo.metadata.addItems(items)
 
     def getFactory(self):
         return self.troveInfo.factory()
