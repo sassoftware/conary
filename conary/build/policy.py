@@ -95,14 +95,14 @@ class BasePolicy(action.RecipeAction):
         if exceptions:
             if not self.exceptions:
                 self.exceptions = []
-            if type(exceptions) in (list, filter.PathSet): # Not tuple: CNY-3437
+            if type(exceptions) in (list, set): # Not tuple: CNY-3437
                 self.exceptions.extend(exceptions)
                 if not allowUnusedFilters:
                     for item in exceptions:
                         if not callable(item):
                             self.unusedFilters['exceptions'].add(item)
             else:
-                self.exceptions.append(exceptions)
+                self.exceptions.append(exceptions) # PathSet here
                 if not allowUnusedFilters and not callable(exceptions):
                     self.unusedFilters['exceptions'].add(exceptions)
         subtrees = keywords.pop('subtrees', None)
@@ -119,14 +119,14 @@ class BasePolicy(action.RecipeAction):
             self.inclusions = []
 
         if inclusions:
-            if isinstance(inclusions, (list, filter.PathSet)): # Not tuple: CNY-3437
+            if isinstance(inclusions, (list, set)): # Not tuple: CNY-3437
                 self.inclusions.extend(inclusions)
                 if not allowUnusedFilters:
                     for item in inclusions:
                         if not callable(item):
                             self.unusedFilters['inclusions'].add(item)
             else:
-                self.inclusions.append(inclusions)
+                self.inclusions.append(inclusions) # PathSet here
                 if not allowUnusedFilters and not callable(inclusions):
                     self.unusedFilters['inclusions'].add(inclusions)
 
@@ -385,7 +385,7 @@ class Policy(BasePolicy):
         self.exceptionFilters = []
         self.compileFilters(self.invariantexceptions, self.exceptionFilters)
         if self.exceptions:
-            if not isinstance(self.exceptions, (tuple, list)):
+            if not isinstance(self.exceptions, (tuple, list, set)):
                 # turn a plain string into a sequence
                 self.exceptions = (self.exceptions,)
             self.compileFilters(self.exceptions, self.exceptionFilters, self.unusedFilters['exceptions'])
@@ -398,10 +398,10 @@ class Policy(BasePolicy):
             self.compileFilters(self.invariantinclusions, self.inclusionFilters)
         if not self.inclusions:
             # an empty list, as opposed to None, means nothing is included
-            if isinstance(self.inclusions, (tuple, list)):
+            if isinstance(self.inclusions, (tuple, list, set)):
                 return
         else:
-            if not isinstance(self.inclusions, (tuple, list)):
+            if not isinstance(self.inclusions, (tuple, list, set)):
                 # turn a plain string into a sequence
                 self.inclusions = (self.inclusions,)
             self.compileFilters(self.inclusions, self.inclusionFilters, self.unusedFilters['inclusions'])
