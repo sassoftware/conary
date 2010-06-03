@@ -32,10 +32,14 @@ elif [ -d /usr/include/libelf-lgpl ]; then \
     echo "-I/usr/include/libelf-lgpl -lelf-lgpl"; \
 elif [ -d ${SYSROOT}/usr/include/libelf-lgpl ]; then \
     echo "-I${SYSROOT}/usr/include/libelf-lgpl -lelf-lgpl"; \
-elif [ -d /usr/include/libelf ] && grep 'GNU Library General Public' /usr/include/libelf/libelf.h >/dev/null; then\
+elif [ -d /usr/include/libelf ] && grep 'GNU \(Library\|Lesser\) General Public' /usr/include/libelf/libelf.h >/dev/null; then\
     echo "-I/usr/include/libelf -lelf"; \
-elif [ -d ${SYSROOT}/usr/include/libelf ] && grep 'GNU Library General Public' ${SYSROOT}/usr/include/libelf/libelf.h >/dev/null; then\
+elif [ -d ${SYSROOT}/usr/include/libelf ] && grep 'GNU \(Library\|Lesser\) General Public' ${SYSROOT}/usr/include/libelf/libelf.h >/dev/null; then\
     echo "-I${SYSROOT}/usr/include/libelf -lelf"; \
+elif [ -d /usr/include ] && grep 'GNU \(Library\|Lesser\) General Public' /usr/include/libelf.h >/dev/null; then\
+    echo "-lelf"; \
+elif [ -d ${SYSROOT}/usr/include ] && grep 'GNU \(Library\|Lesser\) General Public' ${SYSROOT}/usr/include/libelf.h >/dev/null; then\
+    echo "-lelf"; \
 else \
     echo 'No appropriate libelf found' >&2 ;\
 fi)
