@@ -27,13 +27,13 @@ HEADINGS = [
         ('internal', 'Internal Changes'),
         ]
 KINDS = set(x[0] for x in HEADINGS)
-
+NEWSDIR = 'NEWS.src'
 
 def main():
     rootdir = os.path.realpath(__file__ + '/../..')
     os.chdir(rootdir)
 
-    if not os.path.isdir('news'):
+    if not os.path.isdir(NEWSDIR):
         sys.exit("Can't find news directory")
 
     repo = hg.repository(ui.ui(), '.')
@@ -60,8 +60,8 @@ def preview(repo, modifiedOK=True):
 
     kind_map = {}
     files = set()
-    for filename in os.listdir('news'):
-        path = 'news/' + filename
+    for filename in os.listdir(NEWSDIR):
+        path = '/'.join(NEWSDIR, filename)
         if filename[0] == '.' or '.' not in filename:
             continue
         issue, kind = filename.rsplit('.', 1)
