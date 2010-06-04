@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -10,7 +10,6 @@
 # without any warranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-#
 
 """
 Implements the logging facility for conary.
@@ -33,6 +32,15 @@ from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOWLEVEL=DEBUG - 5
 from conary import constants
 from conary.lib import xmllog
+
+
+FORMATS = {
+        'apache': ('[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s',
+            '%a %b %d %T %Y'),
+        'apache_short': ('(%(name)s) %(message)s', None),
+        'console': ('%(levelname)s: %(message)s', None),
+        'file': ('%(asctime)s %(levelname)s %(name)s : %(message)s', None),
+        }
 
 syslog = None
 
@@ -235,3 +243,39 @@ if not globals().has_key('fmtLogger'):
     fmtLogger = logging.getLogger(LOGGER_CONARY_FORMATTED)
     # all messages should be emitted by the formatted logger.
     fmtLogger.setLevel(1)
+
+
+# Alternate logging setup
+def setupLogging(logPath=None, consoleLevel=logging.WARNING,
+        consoleFormat='console', fileLevel=logging.INFO, fileFormat='file',
+        logger=''):
+
+    logger = logging.getLogger(logger)
+    logger.handlers = []
+    logger.propagate = False
+    level = 100
+
+    # Console handler
+    if consoleLevel is not None:
+        if consoleFormat in FORMATS:
+            consoleFormat = FORMATS[consoleFormat]
+        consoleFormatter = logging.Formatter(*consoleFormat)
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(consoleFormatter)
+        consoleHandler.setLevel(consoleLevel)
+        logger.addHandler(consoleHandler)
+        level = min(level, consoleLevel)
+
+    # File handler
+    if logPath and fileLevel is not None:
+        if fileFormat in FORMATS:
+            fileFormat = FORMATS[fileFormat]
+        logfileFormatter = logging.Formatter(*fileFormat)
+        logfileHandler = logging.FileHandler(logPath)
+        logfileHandler.setFormatter(logfileFormatter)
+        logfileHandler.setLevel(fileLevel)
+        logger.addHandler(logfileHandler)
+        level = min(level, fileLevel)
+
+    logger.setLevel(level)
+    return logger

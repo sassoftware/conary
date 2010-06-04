@@ -1284,14 +1284,6 @@ class ConaryMain(command.MainHandler):
 
         cfg.initializeFlavors()
 
-        profile = False
-        if argSet.has_key('profile'):
-            import hotshot
-            prof = hotshot.Profile('conary.prof')
-            prof.start()
-            profile = True
-            del argSet['profile']
-
         lsprof = False
         if argSet.has_key('lsprof'):
             import cProfile
@@ -1304,8 +1296,6 @@ class ConaryMain(command.MainHandler):
             rv = options.MainHandler.runCommand(self, thisCommand, cfg,
                                                  argSet, args)
         finally:
-            if profile:
-                prof.stop()
             if lsprof:
                 prof.disable()
                 prof.dump_stats('conary.lsprof')

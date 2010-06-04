@@ -1,0 +1,105 @@
+#!/usr/bin/python
+
+import optparse, os, sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+from conary import dbstore, files, streams, trove, versions
+from conary.deps import deps
+from conary.server import schema
+from conary.repository.netrepos import netserver, trovestore
+
+labels = []
+def labelCallback(option, opt, val, parser):
+    labels.append(val)
+
+parser = optparse.OptionParser(usage = "usage: %prog <servercfg>")
+parser.add_option('--fix', action = "store_true",
+                  help ="fix bad signatures")
+parser.add_option('--label', action = "callback", type = "string",
+                  callback = labelCallback,
+                  help ="label to check signatures on")
+(options, args) = parser.parse_args()
+
+fixSigs = options.fix
+
+if len(args) != 1:
+    parser.error("Not enough arguments")
+
+cfg = netserver.ServerConfig()
+cfg.read(args[0])
+
+db = dbstore.connect(cfg.repositoryDB[1], driver = cfg.repositoryDB[0])
+cu = db.cursor()
+cu2 = db.cursor()
+
+schema.setupTempTables(db)
+ts = trovestore.TroveStore(db)
+
+if labels:
+    cu.execute("""
+        create temporary table tmpLabels (label VARCHAR(254))
+    """)
+
+    for label in labels:
+        cu.execute("insert into tmpLabels values (?)", label)
+
+    cu.execute("""
+        select item, version, flavor, instanceId from tmpLabels
+           join labels using (label)
+           join labelmap using (labelid)
+           join nodes using (branchId, itemId)
+           join instances using (itemId, versionId)
+           join items using (itemid)
+           join versions using (versionid)
+           join flavors using (flavorid)
+    """)
+else:
+    cu.execute("""
+        select item, version, flavor, instanceId from instances
+           join items using (itemid)
+           join versions using (versionid)
+           join flavors using (flavorid)
+    """)
+
+troveTups = [ ((x[0], versions.VersionFromString(x[1]),
+                deps.ThawFlavor(x[2])), x[3]) for x in cu ]
+
+sys.stdout.flush()
+
+seen = 0
+total = len(troveTups)
+fixList = []
+fixed = False
+while seen < total:
+    here = troveTups[seen:seen+500]
+    for instanceId, trv in zip([ x[1] for x in here],
+                                 ts.iterTroves([ x[0] for x in here ],
+                                               hidden = True)):
+        seen += 1
+        if seen % 10 == 0:
+            print "%d/%d\r" % (seen, total),
+            sys.stdout.flush()
+        if not trv.verifyDigests():
+            print "%s=%s[%s]" % trv.getNameVersionFlavor()
+            if fixSigs:
+                fixed = True
+                trv.computeDigests()
+                cu2.execute(
+                    "update troveinfo set data=? where instanceId = ? "
+                    "and infoType = 9", trv.troveInfo.sigs.freeze(),
+                    instanceId)
+
+    if fixSigs and fixed:
+	db.commit()
+    else:
+	db.rollback()
+
+
+print "%d/%d" % (total, total)
