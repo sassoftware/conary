@@ -61,7 +61,7 @@ def preview(repo, modifiedOK=True):
     kind_map = {}
     files = set()
     for filename in os.listdir(NEWSDIR):
-        path = '/'.join(NEWSDIR, filename)
+        path = '/'.join((NEWSDIR, filename))
         if filename[0] == '.' or '.' not in filename:
             continue
         issue, kind = filename.rsplit('.', 1)

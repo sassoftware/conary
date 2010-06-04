@@ -1,3 +1,22 @@
+Changes in 2.1.18:
+  o Bug Fixes:
+    * An optimization introduced in Conary 2.1.0 (CNY-3282) caused
+      filter expressions using tuples to express required or forbidden
+      file mode bits at build time.  This regression has
+      been fixed. (CNY-3437)
+    * sizeOverride metadata is now never copied when a new version of a
+      trove is created. (CNY-3438)
+    * addCapsule now fails with a clear error when the same file is
+      added multiple times.
+
+  o Internal Changes:
+    * When looking for an LGPL libelf, the Conary build process wil now
+      look for either "Library" or "Lesser" in the name of the license,
+      and will consider /usr/include/libelf.h as a candidate LGPL
+      header.
+    * transport.URLOpener now shares no_proxy support with the lookaside
+      cache.
+
 Changes in 2.1.17:
   o New Features:
     * Added a new option to the mirror configuration, matchTroveSpecs
