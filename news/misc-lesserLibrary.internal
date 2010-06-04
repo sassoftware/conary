@@ -1,3 +1,0 @@
-When looking for an LGPL libelf, the Conary build process wil now
-look for either "Library" or "Lesser" in the name of the license,
-and will consider /usr/include/libelf.h as a candidate LGPL header.
