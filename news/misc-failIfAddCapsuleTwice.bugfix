@@ -1,1 +1,0 @@
-addCapsule now fails with a clear error when the same file is added multiple times
