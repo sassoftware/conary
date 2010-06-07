@@ -747,6 +747,9 @@ class MetadataItem(streams.StreamSet):
         _METADATA_ITEM_TAG_SIZE_OVERRIDE:
                 (DYNAMIC, streams.LongLongStream, 'sizeOverride'),
         }
+    # define a set of metadata fields in which 0 is a valid value and should be
+    # distingished from None
+    _zeroIsValidSet = set(('sizeOverride',))
 
     _skipSet = { 'id' : True, 'signatures': True, 'oldSignatures' : True }
     _keys = [ x[2] for x in streamDict.itervalues() if x[2] not in _skipSet ]
@@ -863,7 +866,7 @@ class MetadataItem(streams.StreamSet):
                 if attr.keys():
                     ret.append(x)
             elif hasattr(attr, '__call__') and (attr() or
-                                                (x == 'sizeOverride' and
+                                                (x in self._zeroIsValidSet and
                                                 attr() is not None)):
                 ret.append(x)
         return ret
