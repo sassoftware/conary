@@ -1769,6 +1769,7 @@ order by
                           Flavors.flavorId = Instances.flavorId
                       WHERE
                           %s
+                          TroveTroves.inPristine = 1 AND
                           IncVersion.version = ftc.version AND
                           (IncFlavor.flavor = ftc.flavor OR
                            (IncFlavor.flavor IS NULL AND ftc.flavor = "")) AND
