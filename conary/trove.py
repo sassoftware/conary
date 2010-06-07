@@ -862,7 +862,9 @@ class MetadataItem(streams.StreamSet):
             if hasattr(attr, 'keys'):
                 if attr.keys():
                     ret.append(x)
-            elif hasattr(attr, '__call__') and attr():
+            elif hasattr(attr, '__call__') and (attr() or
+                                                (x == 'sizeOverride' and
+                                                attr() is not None)):
                 ret.append(x)
         return ret
 
@@ -871,6 +873,7 @@ class MetadataItem(streams.StreamSet):
         if hasattr(attr, '__call__'):
             return attr()
         return attr
+
 
 class Metadata(streams.OrderedStreamCollection):
     streamDict = { 1: MetadataItem }
@@ -2918,7 +2921,8 @@ class Trove(streams.StreamSet):
 
     def getSize(self):
         sizeOverrides = [x.sizeOverride() for x in
-                         self.troveInfo.metadata.flatten() if x.sizeOverride()]
+                         self.troveInfo.metadata.flatten()
+                         if x.sizeOverride() is not None]
         if sizeOverrides:
             return sizeOverrides[-1]
         return self.troveInfo.size()
