@@ -405,10 +405,11 @@ _register(ListRollbackCommand)
 class RollbackCommand(ConaryCommand):
     commands = ['rollback', 'rb']
     paramHelp = "<rollback>"
-    help = ("Roll back operations stored in the rollback stack. Either a "
-            "specific rollback\ncan be specified ('conary rollback r.151') "
-            "or the number of items to rollback\ncan be given ('conary "
-            "rollback 1' will rollback the most recent operation).")
+    help = ("Roll back operations stored in the rollback stack (see 'conary "
+            "rblist'). Either\na specific rollback can be specified ('conary "
+            "rollback r.151') or the number\nof items to rollback can be "
+            "given ('conary rollback 1' will rollback the most\nrecent "
+            "operation).")
     commandGroup = 'System Modification'
 
     docs = {'just-db'       : (VERBOSE_HELP,
