@@ -670,7 +670,7 @@ class TroveFormatter(TroveTupFormatter):
         else:
             buildTime = "(unknown)"
 
-        if trove.getSize():
+        if trove.getSize() is not None:
             size = "%s" % trove.getSize()
         else:
             size = "(unknown)"
