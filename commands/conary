@@ -868,6 +868,8 @@ class _UpdateCommand(ConaryCommand):
     docs = {
         'apply-critical'  : (VERBOSE_HELP, 
                              'apply any critical conary updates and then stop'),
+        'disconnected'  : (VERBOSE_HELP,
+                           'apply change without using the network connection'),
         'from-file'     : 'search changeset(s) for given troves',
         'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
@@ -915,6 +917,7 @@ class _UpdateCommand(ConaryCommand):
         ConaryCommand.addParameters(self, argDef)
         d = {}
         d["apply-critical"] = NO_PARAM
+        d["disconnected"] = NO_PARAM
         d["from-file"] = MULT_PARAM
         d["just-db"] = NO_PARAM
         d["keep-existing"] = NO_PARAM
@@ -984,6 +987,7 @@ class _UpdateCommand(ConaryCommand):
             kwargs['replaceModifiedConfigFiles'] = True
 
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
+        kwargs['disconnected'] = argSet.pop('disconnected', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])
         kwargs['recurse'] = not argSet.pop('no-recurse', False)
         kwargs['checkPathConflicts'] = \
