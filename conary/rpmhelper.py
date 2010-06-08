@@ -255,7 +255,7 @@ class _RpmHeader(object):
                     flags = []
                     if ver and (len(ver) == 40 or len(ver) == 16):
                         modname = "%s:%s" % (modname, ver)
-                        flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
+                    flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
                     depset.addDep(deps.RpmDependencies,
                                   deps.Dependency('kernel', flags))
                 else:
