@@ -1705,7 +1705,8 @@ order by
         Return the troves which include the troves listed in l as strong
         references.
         """
-        return self._getTroveInclusions(l, False, weakRefs = False)
+        return self._getTroveInclusions(l, False, weakRefs = False,
+                                        pristineOnly = False)
 
     def getTroveReferences(self, l, weakRefs = False, justPresent = False,
                            pristineOnly = True):
