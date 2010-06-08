@@ -251,9 +251,9 @@ class _RpmHeader(object):
                 elif self.kmodre.match(dep):
                     m = self.kmodre.match(dep)
                     modname = m.group(1)
-                    # add the version if it is a 40 char sha1
+                    # add the version if it is a 40 or 16 char hash
                     flags = []
-                    if ver and len(ver) == 40:
+                    if ver and (len(ver) == 40 or len(ver) == 16):
                         modname = "%s:%s" % (modname, ver)
                         flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
                     depset.addDep(deps.RpmDependencies,
