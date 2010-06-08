@@ -179,14 +179,20 @@ def getTrovesToDisplay(db, troveSpecs, pathList=[], whatProvidesList=[],
     else:
         troveSpecs = []
 
-    pathList = [ util.realpath(os.path.abspath(util.normpath(x)))
-                 for x in pathList ]
+    normPathList = [ util.realpath(os.path.abspath(util.normpath(x)))
+                     for x in pathList ]
 
     troveTups = []
-    for path in pathList:
-        for trove in db.iterTrovesByPath(path):
-            troveTups.append((trove.getName(), trove.getVersion(),
-                              trove.getFlavor()))
+    for path, origPath in itertools.izip(normPathList, pathList):
+        if origPath.endswith('/'):
+            allPaths = [ path + '/' + x for x in os.listdir(db.root + path) ]
+        else:
+            allPaths = [ path ]
+
+        for thisPath in allPaths:
+            for trove in db.iterTrovesByPath(thisPath):
+                troveTups.append((trove.getName(), trove.getVersion(),
+                                  trove.getFlavor()))
 
     if whatProvidesList:
         results = db.getTrovesWithProvides(whatProvidesList)
