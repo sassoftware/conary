@@ -200,7 +200,8 @@ class _RpmHeader(object):
             assert len(tags) == 2
             rpmdeps = self.get(tags[0], [])
             rpmvers = self.get(tags[1], [])
-            assert len(rpmdeps) == len(rpmvers)
+            if len(rpmdeps) != len(rpmvers):
+                rpmvers = itertools.repeat(None, len(rpmdeps))
         else:
             rpmdeps = self.get(tags, [])
             rpmvers = itertools.repeat(None, len(rpmdeps))
