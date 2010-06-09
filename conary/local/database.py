@@ -1291,9 +1291,11 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def getTroveContainers(self, l):
         return self.db.getTroveContainers(l)
 
-    def getTroveReferences(self, l, weakRefs = False, justPresent = False):
+    def getTroveReferences(self, l, weakRefs = False, justPresent = False,
+                           pristineOnly = True):
         return self.db.getTroveReferences(l, weakRefs = weakRefs,
-                                          justPresent = justPresent)
+                                          justPresent = justPresent,
+                                          pristineOnly = pristineOnly)
 
     def findTroveContainers(self, names):
         return self.db.findTroveContainers(names)

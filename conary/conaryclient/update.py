@@ -359,7 +359,8 @@ class ClientUpdate:
                             itertools.izip(present, pinnedList))
 
                     referenceList = self.db.getTroveReferences(
-                                                present, weakRefs = False)
+                                                present, weakRefs = False,
+                                                pristineOnly = False)
                     self.referencesCache.update(
                             itertools.izip(present, referenceList))
 
