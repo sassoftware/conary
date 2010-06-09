@@ -1653,7 +1653,10 @@ def addFiles(fileList, ignoreExisting=False, text=False, binary=False,
 
         sb = os.lstat(filename)
 
-        if not(stat.S_ISREG(sb.st_mode)) or binary or nonCfgRe.match(filename):
+        if filename.endswith('.recipe'):
+            isConfig = True
+        elif (not(stat.S_ISREG(sb.st_mode)) or binary or
+              nonCfgRe.match(filename)):
             isConfig = False
         elif text or cfgRe.match(filename) or (
             fileMagic and isinstance(fileMagic, magic.script)):
