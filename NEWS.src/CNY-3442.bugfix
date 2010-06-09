@@ -1,1 +1,0 @@
-RPM kernel deps now include the symbol hash if it is defined within the RPM

@@ -1,3 +1,24 @@
+Changes in 2.1.19:
+  o New Features:
+    * added --disconnected option as an advanced option for updates
+      (CNY-3105)
+    * conary q --path /dir/ (with the ending /) now displays the owners
+      of all files in /dir. The list of files is sorted before the
+      owning troves are looked up. (CNY-610)
+    * The Requires policy can now take an removeFlagsByDependencyClass
+      keyword argument to customize the set of flags to match platform
+      behavior. (CNY-3443)
+
+  o Bug Fixes:
+    * Walking troves on the local system no longer walks implied
+      linkages (CNY-3440)
+    * sizeOverride metadata has no any effect if it is set to zero.
+      (CNY-3441)
+    * cvc now adds recipes as text files even if --binary is specified.
+      (CNY-3200)
+    * RPM kernel deps now include the symbol hash if it is defined
+      within the RPM. (CNY-3442)
+
 Changes in 2.1.18:
   o Bug Fixes:
     * An optimization introduced in Conary 2.1.0 (CNY-3282) caused
