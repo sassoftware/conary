@@ -485,6 +485,108 @@ class CfgSearchPathItem(CfgType):
         return item
 CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
+
+class CfgProxyMapEntry(CfgType):
+
+    def parseString(self, str):
+        val = str.split()
+        if len(val) != 2:
+            raise ParseError("expected <hostglob> <url>")
+
+        match = re.match('https?://([^:]*):[^@]*@([^/:]*)(?::.*)?/.*', val[1])
+        if match is not None:
+            user, server = match.groups()
+            raise ParseError('repositoryMap entries should not contain '
+                             'user names and passwords; use '
+                             '"user %s %s <password>" instead' %
+                             (server, user))
+
+        return (val[0], val[1])
+
+    def format(self, val, displayOptions=None):
+        return '%-25s %s' % (val[0], val[1])
+
+
+class ProxyMap(ServerGlobList):
+
+    # Pretend to be a dict; repositorymap's used to be dicts and this should
+    # ease the transition.
+
+    def __setitem__(self, key, val):
+        if type(key) is int:
+            return ServerGlobList.__setitem__(self, key, val)
+
+        self.append((key, val))
+
+    def __getitem__(self, key):
+        if type(key) is int:
+            return ServerGlobList.__getitem__(self, key)
+
+        return self.find(key)
+
+    def has_key(self, key):
+        r = self.find(key)
+        if r is None:
+            return False
+        return True
+
+    def __contains__(self, key):
+        return key in self
+
+    def clear(self):
+        del self[:]
+
+    def update(self, other):
+        for key, val in other.iteritems():
+            self.append((key, val))
+
+    def iteritems(self):
+        return iter(self)
+
+    def items(self):
+        return self
+
+    def keys(self):
+        return [x[0] for x in self]
+
+    def iterkeys(self):
+        return (x[0] for x in self)
+
+    def values(self):
+        return [x[1] for x in self]
+
+    def itervalues(self):
+        return (x[1] for x in self)
+
+    def get(self, key, default):
+        r = self.find(key)
+        if r is None:
+            return default
+
+        return r
+
+    def __init__(self, repoMap=[]):
+        if hasattr(repoMap, 'iteritems'):
+            ServerGlobList.__init__(self)
+            self.update(repoMap)
+        else:
+            ServerGlobList.__init__(self, repoMap)
+
+
+class CfgProxyMap(CfgList):
+    def __init__(self, default=[]):
+        CfgList.__init__(self, CfgProxyMapEntry, ProxyMap, default=default)
+
+    def set(self, curVal, newVal):
+        curVal.extend(newVal)
+        return curVal
+
+    def getDefault(self, default=[]):
+        if hasattr(default, 'iteritems'):
+            return CfgList.getDefault(self, default.iteritems())
+        return CfgList.getDefault(self, default)
+
+
 def _getDefaultPublicKeyrings():
     publicKeyrings = []
     # If we are root, don't use the keyring in $HOME, since a process started
@@ -569,6 +671,7 @@ class ConaryContext(ConfigSection):
     conaryProxy           =  CfgProxy
     # HTTP proxy
     proxy                 =  CfgProxy
+    proxyMap         =  CfgProxyMap
     # The first keyring in the list is writable, and is used for storing the
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
