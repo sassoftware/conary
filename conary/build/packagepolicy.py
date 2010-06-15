@@ -1547,9 +1547,10 @@ class _Utilize(_UserGroup):
         general; the filespecs will be matched in the order that
         you provide them.
         """
+        item = args[0] % self.recipe.macros
         if args:
             for filespec in args[1:]:
-                self.filespecs.append((filespec, args[0]))
+                self.filespecs.append((filespec, item))
         policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):

@@ -485,6 +485,7 @@ class CfgSearchPathItem(CfgType):
         return item
 CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
+
 def _getDefaultPublicKeyrings():
     publicKeyrings = []
     # If we are root, don't use the keyring in $HOME, since a process started
