@@ -21,7 +21,7 @@ import os
 import re
 import struct
 import tempfile
-from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util
+from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util, log
 from conary.deps import deps
 
 # Note that all per-file tags must be listed in _RpmHeader:_tagListValues
@@ -193,7 +193,7 @@ class _RpmHeader(object):
     flagre = re.compile('\((.*?)\)')
     depnamere = re.compile('(.*?)\(.*')
     localere = re.compile('locale\((.*)\)')
-    kmodre = re.compile('kernel\((.*)\)')
+    kmodre = re.compile('(kernel|ksym)\((.*)\)')
 
     def _getDepsetFromHeader(self, tags):
         if isinstance(tags, tuple):
@@ -251,14 +251,27 @@ class _RpmHeader(object):
                                   deps.Dependency('locale%s' % name, flags))
                 elif self.kmodre.match(dep):
                     m = self.kmodre.match(dep)
-                    modname = m.group(1)
-                    # add the version if it is a 40 or 16 char hash
-                    flags = []
-                    if ver and (len(ver) == 40 or len(ver) == 16):
+                    modname = m.group(2)
+                    # add the version if it is a hex string with at least
+                    # 8 chars
+                    l = None
+                    if ver and len(ver) >= 8:
+                        try:
+                            l = long(ver, 16)
+                        except ValueError:
+                            pass
+                    if l:
                         modname = "%s:%s" % (modname, ver)
+                    else:
+                        log.warning("dependency '%s' is expected to have "
+                                    "a hexidecimal hash >= 8 characters "
+                                    "for a version. Instead it has a "
+                                    "version of '%s' which will be "
+                                    "ignored." % (dep, ver))
+
                     flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
                     depset.addDep(deps.RpmDependencies,
-                                  deps.Dependency('kernel', flags))
+                                  deps.Dependency(m.group(1), flags))
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
