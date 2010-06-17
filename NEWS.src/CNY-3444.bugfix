@@ -1,2 +1,0 @@
-Injector code for relative changesets creates the new trove once instead of
-once for every file being merged.
