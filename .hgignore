@@ -4,3 +4,4 @@
 conary/constants.py$
 conary/pysqlite3/build
 conary/sqlite3
+NEWS.html
