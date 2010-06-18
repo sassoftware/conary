@@ -57,7 +57,6 @@ static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyObject * pyfchmod(PyObject *self, PyObject *args);
 static PyObject * py_fopen(PyObject *self, PyObject *args);
 static PyObject * py_struct_flock(PyObject *self, PyObject *args);
-static PyObject * filetype(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -90,9 +89,6 @@ static PyMethodDef MiscMethods[] = {
     { "fchmod", pyfchmod, METH_VARARGS },
     { "fopenIfExists", py_fopen, METH_VARARGS },
     { "structFlock", py_struct_flock, METH_VARARGS },
-    { "filetype", filetype, METH_VARARGS,
-        "Return the given paths 8 bit file type, or None if the file is "
-        "not present." },
     {NULL}  /* Sentinel */
 };
 
@@ -1620,21 +1616,6 @@ static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
     fl.l_len = (pylen == Py_None) ? 0 : PYLONG_AS_ULL(pylen);
     fl.l_pid = (pypid == Py_None) ? 0 : PYINT_AS_LONG(pypid);
     return PyString_FromStringAndSize((char *)&fl, sizeof(struct flock));
-}
-
-static PyObject * filetype(PyObject *self, PyObject *args) {
-    char * path;
-    struct stat sb;
-
-    if (!PyArg_ParseTuple(args, "s", &path))
-        return NULL;
-
-    if (lstat(path, &sb)) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-
-    return PYINT_FromLong(sb.st_mode);
 }
 
 #define MODULE_DOCSTR "miscellaneous low-level C functions for conary"

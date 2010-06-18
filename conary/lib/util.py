@@ -74,13 +74,8 @@ def _mkdirs(path, mode=0777):
     Recursive helper to L{mkdirChain}. Internal use only.
     """
     head, tail = os.path.split(path)
-    if head and tail:
-        ft = misc.filetype(head)
-        if ft is None:
-            _mkdirs(head, mode)
-        elif not stat.S_ISDIR(ft):
-            os.unlink(head)
-            _mkdirs(head, mode)
+    if head and tail and not os.path.exists(head):
+        _mkdirs(head, mode)
 
     # Make the directory while ignoring errors about it existing.
     misc.mkdirIfMissing(path)
@@ -96,11 +91,7 @@ def mkdirChain(*paths):
     """
     for path in paths:
         path = normpath(os.path.abspath(path))
-        ft = misc.filetype(path)
-        if ft is None:
-            _mkdirs(path)
-        elif not stat.S_ISDIR(ft):
-            os.unlink(path)
+        if not os.path.exists(path):
             _mkdirs(path)
 
 def searchPath(filename, basepath):
