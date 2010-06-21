@@ -1087,7 +1087,6 @@ class MigrateCommand(_UpdateCommand):
         d = argDef.pop('Update Options')
         del d['keep-existing']
         del d['sync-to-parents']
-        del d['no-recurse']
         argDef['Migrate Options'] = d
 _register(MigrateCommand)
 
