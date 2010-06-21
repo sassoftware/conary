@@ -420,7 +420,7 @@ class Revision(AbstractRevision):
                 self.buildCount = SerialNumber(buildCount)
             except:
                 raise ParseError("build count numbers must be all"
-                                 "numeric: %s" % buildCount)
+                                 " numeric: %s" % buildCount)
 
         if self.sourceCount is None:
             raise ParseError("bad release string: %s" % value)
