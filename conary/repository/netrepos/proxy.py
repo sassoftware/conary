@@ -1595,7 +1595,7 @@ class ChangesetCache(object):
             csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
 
         written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
-        if written != sizeLimit:
+        if sizeLimit is not None and written != sizeLimit:
             raise errors.RepositoryError("Changeset was truncated in transit "
                     "(expected %d bytes, got %d bytes for subchangeset)" %
                     (sizeLimit, written))
