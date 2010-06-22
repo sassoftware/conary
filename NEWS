@@ -1,3 +1,14 @@
+Changes in 2.1.20:
+  o Bug Fixes:
+    * Injector code for relative changesets creates the new trove once
+      instead of once for every file being merged. (CNY-3444)
+    * symbol hashes found in RPMs are used by ksym deps as well as
+      kernel deps (CNY-3442)
+    * UtilizeUser and UtilizeGroup policies now support macros in the
+      user and group argument (CNY-3445)
+    * Make negative openpgp key cache entries to avoid repeated server
+      queries for keys which don't exist (CNY-3450)
+
 Changes in 2.1.19:
   o New Features:
     * added --disconnected option as an advanced option for updates

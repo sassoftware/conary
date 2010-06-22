@@ -255,10 +255,18 @@ class OpenPGPKeyFileCache(OpenPGPKeyCache):
         """
         # if we have this key cached, return it immediately
         if keyId in self.publicDict:
+            if self.publicDict[keyId] is None:
+                raise _KeyNotFound(keyId)
+
             return self.publicDict[keyId]
 
         # otherwise search for it
-        key = self._getPublicKey(keyId, label = label, warn = warn)
+        try:
+            key = self._getPublicKey(keyId, label = label, warn = warn)
+        except _KeyNotFound:
+            self.publicDict[keyId] = None
+            raise
+
         # Everything is trusted for now
         if self.callback.cfg and self.callback.cfg.trustThreshold > 0:
             krc = lambda x: self._getPublicKey(x, label=label, warn=warn)
