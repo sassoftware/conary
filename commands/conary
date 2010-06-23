@@ -80,11 +80,10 @@ class ConaryCommand(command.ConaryCommand):
 
 class ChangeSetCommand(ConaryCommand):
     commands = ['changeset', 'cs' ]
-    paramHelp = '''\
-<pkg>[=[<oldver>--]<newver>]+ <outfile>
-
-Creates a changeset with the specified troves and stores it in <outfile>'''
     help = 'Request a changeset from one or more Conary repositories'
+    paramHelp = "<pkg>[=[<oldver>--]<newver>]+ <outfile>"
+    description = """\
+Creates a changeset with the specified troves and stores it in <outfile>"""
     commandGroup = 'Repository Access'
     docs = {'no-recurse' : (VERBOSE_HELP, 
                             "Don't include child troves in changeset")}
@@ -404,12 +403,17 @@ _register(ListRollbackCommand)
 
 class RollbackCommand(ConaryCommand):
     commands = ['rollback', 'rb']
-    paramHelp = "<rollback>"
-    help = ("Roll back operations stored in the rollback stack (see 'conary "
-            "rblist'). Either\na specific rollback can be specified ('conary "
-            "rollback r.151') or the number\nof items to rollback can be "
-            "given ('conary rollback 1' will rollback the most\nrecent "
-            "operation).")
+    help = "Roll back operations stored in the rollback stack"
+    paramHelp = "[<num changes>|r.<rollback point>]"
+    description = """\
+conary rollback 1       # Roll back the most recent change
+conary rollback r.151   # Roll back a specific operation
+
+See "conary rblist" for a list of changes to roll back.
+The argument can be either a number of changes to rollback
+("conary rollback 1" will rollback the most recent operation) or a
+specific item in the rollback list ("conary rollback r.151" will
+rollback operation #151 and all later operations)."""
     commandGroup = 'System Modification'
 
     docs = {'just-db'       : (VERBOSE_HELP,
@@ -1087,7 +1091,6 @@ class MigrateCommand(_UpdateCommand):
         d = argDef.pop('Update Options')
         del d['keep-existing']
         del d['sync-to-parents']
-        del d['no-recurse']
         argDef['Migrate Options'] = d
 _register(MigrateCommand)
 

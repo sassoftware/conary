@@ -124,13 +124,30 @@ class Callback:
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
+    def _CheckRPMDBContents(self, testNvras, ts, errStr):
+        mi = ts.dbMatch()
+        installedNvras = set([(h['name'], h['version'], h['release'], h['arch'])
+                              for h in mi])
+        missingNvras = testNvras.difference(installedNvras)
+        if missingNvras:
+            missingSpecs = sorted(["%s-%s-%s.%s" % nvra
+                                  for nvra in missingNvras])
+            raise errors.UpdateError(errStr + ' '.join(missingSpecs))
+
     def doApply(self, fileDict, justDatabase = False):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
-        rpmList = []
-
         ts = rpm.TransactionSet(self.root, rpm._RPMVSF_NOSIGNATURES)
+
+        installNvras = set()
+        removeNvras = set([(trv.troveInfo.capsule.rpm.name(),
+                            trv.troveInfo.capsule.rpm.version(),
+                            trv.troveInfo.capsule.rpm.release(),
+                            trv.troveInfo.capsule.rpm.arch())
+                           for trv in self.removes])
+        self._CheckRPMDBContents(removeNvras, ts,
+            'RPM database missing packages for removal: ')
 
         if justDatabase:
             ts.setFlags(rpm.RPMTRANS_FLAG_JUSTDB)
@@ -147,6 +164,8 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             localPath = fileDict[(pathId, fileId)]
             fd = os.open(localPath, os.O_RDONLY)
             hdr = ts.hdrFromFdno(fd)
+            installNvras.add(
+                (hdr['name'], hdr['version'], hdr['release'], hdr['arch']))
             os.close(fd)
             ts.addInstall(hdr, (hdr, localPath), "i")
             hasTransaction = True
@@ -159,7 +178,6 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
             self.fsJob.addToRestoreSize(thisSize)
 
-        removeList = []
         for trv in self.removes:
             ts.addErase("%s-%s-%s.%s" % (
                     trv.troveInfo.capsule.rpm.name(),
@@ -189,6 +207,9 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         if probs:
             raise ValueError(str(probs))
+
+        self._CheckRPMDBContents(installNvras, ts,
+            'RPM failed to install requested packages: ')
 
     def install(self, flags, troveCs):
         ACTION_RESTORE = 1

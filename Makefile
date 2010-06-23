@@ -65,6 +65,7 @@ archive:
 
 version:
 	sed -i 's/@NEW@/$(VERSION)/g' NEWS
+	sed -i 's/@NEW@/$(VERSION)/g' PROTOCOL.versions
 	$(MAKE) -C extra VERSION=$(VERSION)
 
 show-version:

@@ -1,0 +1,1 @@
+Fixed a repository crash when converting a cached changeset for an older client.
