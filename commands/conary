@@ -416,6 +416,7 @@ class RollbackCommand(ConaryCommand):
                           'Update db only - Do not modify rest of file system'),
             'replace-files' : ('Replace files on system with files from'
                                ' rollback if conflict'),
+            'no-scripts': ('Do not run trove scripts'),
             'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
             'abort-on-error' : ('Abort the rollback if any prerollback script '
                                 'fails'),
@@ -426,6 +427,7 @@ class RollbackCommand(ConaryCommand):
         argDef["just-db"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
         argDef["info"] = NO_PARAM
+        argDef["no-scripts"] = NO_PARAM
         argDef["tag-script"] = ONE_PARAM
         argDef["abort-on-error"] = NO_PARAM
 
@@ -437,6 +439,7 @@ class RollbackCommand(ConaryCommand):
 
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
+        kwargs['noScripts'] = argSet.pop('no-scripts', False)
         kwargs['showInfoOnly'] = argSet.pop('info', False)
         kwargs['abortOnError'] = argSet.pop('abort-on-error', False)
 
@@ -892,6 +895,8 @@ class _UpdateCommand(ConaryCommand):
         'no-restart'    : (VERBOSE_HELP,
                            'Do not restart after applying a critical update. '
                            'Requires --root'),
+        'no-scripts'    : (VERBOSE_HELP,
+                           'Do not run trove scripts'),
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found '
                           '(equivalent to --replace-managed-files '
@@ -932,6 +937,7 @@ class _UpdateCommand(ConaryCommand):
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
         d["no-restart"] = NO_PARAM
+        d["no-scripts"] = NO_PARAM
         d["no-conflict-check"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["replace-files"] = NO_PARAM
@@ -1001,6 +1007,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
+        kwargs['noScripts'] = argSet.pop('no-scripts', False)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
         kwargs['updateOnly'] = argSet.pop('update-only', False)
