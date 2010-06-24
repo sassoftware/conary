@@ -1079,6 +1079,8 @@ class ChangesetFilter(BaseProxy):
                 oldChangeset = absOldChangeSetMap[oldTrv]
                 oldTrvCs = oldChangeset.getNewTroveVersion(*oldTrv)
                 oldTrove = trove.Trove(oldTrvCs)
+                newTrove = oldTrove.copy()
+                newTrove.applyChangeSet(trvCs)
             else:
                 oldChangeset = None
                 oldTrvCs = None
@@ -1113,9 +1115,7 @@ class ChangesetFilter(BaseProxy):
                     # the old version too.
                     if path is None:
                         # relative changeset, so grab path from the new trove
-                        trv = oldTrove.copy()
-                        trv.applyChangeSet(trvCs)
-                        path = trv.getFile(pathId)[0]
+                        path = newTrove.getFile(pathId)[0]
 
                     fileObj = self._getFileObject(pathId, fileId, oldTrove,
                         oldChangeset, newCs)
@@ -1595,7 +1595,7 @@ class ChangesetCache(object):
             csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
 
         written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
-        if written != sizeLimit:
+        if sizeLimit is not None and written != sizeLimit:
             raise errors.RepositoryError("Changeset was truncated in transit "
                     "(expected %d bytes, got %d bytes for subchangeset)" %
                     (sizeLimit, written))

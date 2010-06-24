@@ -21,6 +21,7 @@ import time
 from mercurial import hg, ui
 
 
+PRODUCT_NAME = "Conary"
 HEADINGS = [
         ('feature', 'New Features'),
         ('bugfix', 'Bug Fixes'),
@@ -47,7 +48,12 @@ def main():
     if command == 'generate':
         generate(repo)
     elif command == 'preview':
-        for line in preview(repo)[0]:
+        out, htmlOut, _ = preview(repo)
+        print 'Text Version:\n'
+        for line in out:
+            print line
+        print 'Html Version:\n'
+        for line in htmlOut:
             print line
     else:
         sys.exit("Usage: %s <preview|generate>" % sys.argv[0])
@@ -98,20 +104,29 @@ def preview(repo, modifiedOK=True):
                     entry))
 
     out = ['Changes in %s:' % _getVersion()]
+    htmlOut = ['<p>%s %s is a maintainence release</p>' % (PRODUCT_NAME,
+                                                           _getVersion())]
     for kind, heading in HEADINGS:
         entries = kind_map.get(kind, ())
         if not entries:
             continue
         out.append('  o %s:' % heading)
+        htmlOut.append('<strong>%s:</strong>' % heading)
+        htmlOut.append("<ul>")
         for _, issue, _, entry in sorted(entries):
+            htmlEntry = '    <li>' + entry
             if not issue.startswith('misc-'):
                 entry += ' (%s)' % issue
+                htmlEntry += ' (<a href="https://issues.rpath.com/browse/%s">%s</a>)' % (issue,issue)
             lines = textwrap.wrap(entry, 66)
             out.append('    * %s' % (lines.pop(0),))
             for line in lines:
                 out.append('      %s' % (line,))
+            htmlEntry += '</li>'
+            htmlOut.append(htmlEntry)
         out.append('')
-    return out, files
+        htmlOut.append('</ul>')
+    return out, htmlOut, files
 
 
 def generate(repo):
@@ -122,14 +137,17 @@ def generate(repo):
     elif ('Changes in %s:' % version) in old:
         sys.exit("error: NEWS already contains a %s section" % version)
 
-    lines, files = preview(repo, modifiedOK=False)
+    lines, htmlLines, files = preview(repo, modifiedOK=False)
     new = '\n'.join(lines) + '\n'
+    newHtml = '\n'.join(htmlLines) + '\n'
 
     doc = new + old
     open('NEWS', 'w').write(doc)
+    open('NEWS.html', 'w').write(newHtml)
 
     sys.stdout.write(new)
     print >> sys.stderr, "Updated NEWS"
+    print >> sys.stderr, "Wrote NEWS.html"
 
     repo.remove(files, unlink=True)
     print >> sys.stderr, "Deleted %s news fragments" % len(files)

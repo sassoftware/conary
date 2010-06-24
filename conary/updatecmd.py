@@ -501,6 +501,8 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     client = conaryclient.ConaryClient(cfg)
     client.setUpdateCallback(callback)
+    if kwargs.pop('disconnected', False):
+        client.disconnectRepos()
     migrate = kwargs.get('migrate', False)
     # even though we no longer differentiate forceMigrate, we still
     # remove it from kwargs to avoid confusing prepareUpdateJob

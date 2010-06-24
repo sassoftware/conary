@@ -1547,9 +1547,10 @@ class _Utilize(_UserGroup):
         general; the filespecs will be matched in the order that
         you provide them.
         """
+        item = args[0] % self.recipe.macros
         if args:
             for filespec in args[1:]:
-                self.filespecs.append((filespec, args[0]))
+                self.filespecs.append((filespec, item))
         policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):
@@ -1862,6 +1863,21 @@ class _dependency(policy.Policy):
         self.bootstrapPythonFlags = None
         self.bootstrapSysPath = []
         self.bootstrapPerlIncPath = []
+        self.removeFlagsByDependencyClass = None # pre-transform
+        self.removeFlagsByDependencyClassMap = {}
+
+    def updateArgs(self, *args, **keywords):
+        removeFlagsByDependencyClass = keywords.pop(
+            'removeFlagsByDependencyClass', None)
+        if removeFlagsByDependencyClass is not None:
+            clsName, ignoreFlags = removeFlagsByDependencyClass
+            cls = deps.dependencyClassesByName[clsName]
+            l = self.removeFlagsByDependencyClassMap.setdefault(cls, [])
+            if isinstance(ignoreFlags, (list, set, tuple)):
+                l.append(set(ignoreFlags))
+            else:
+                l.append(re.compile(ignoreFlags))
+        policy.Policy.updateArgs(self, **keywords)
 
     def preProcess(self):
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
@@ -2546,8 +2562,10 @@ class Provides(_dependency):
         bootstrapPerlIncPath = keywords.pop('_bootstrapPerlIncPath', None)
         if bootstrapPerlIncPath is not None:
             self.bootstrapPerlIncPath = bootstrapPerlIncPath
+        if keywords.get('removeFlagsByDependencyClass', None):
+            self.error('removeFlagsByDependencyClass not currently implemented for Provides (CNY-3443)')
 
-        policy.Policy.updateArgs(self, **keywords)
+        _dependency.updateArgs(self, **keywords)
 
     def preProcess(self):
         macros = self.macros
@@ -3317,6 +3335,7 @@ class Requires(_addInfo, _dependency):
             self.recipe._reqExceptDeps = []
         self.recipe._reqExceptDeps.extend(self.exceptDeps)
 
+        _dependency.updateArgs(self, *args, **keywords)
         _addInfo.updateArgs(self, *args, **keywords)
 
     def preProcess(self):
@@ -3995,6 +4014,17 @@ class Requires(_addInfo, _dependency):
             flagindex = info.index('(')
             flags = set(info[flagindex+1:-1].split() + list(flags))
             info = info.split('(')[0]
+
+        # CNY-3443
+        if depClass in self.removeFlagsByDependencyClassMap:
+            flags = set(flags)
+            for ignoreItem in self.removeFlagsByDependencyClassMap[depClass]:
+                if isinstance(ignoreItem, set):
+                    ignoreFlags = ignoreItem
+                else:
+                    ignoreFlags = set(f for f in flags if ignoreItem.match(f))
+                flags -= ignoreFlags
+
         if flags:
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 
