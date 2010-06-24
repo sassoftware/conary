@@ -134,7 +134,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                   for nvra in missingNvras])
             raise errors.UpdateError(errStr + ' '.join(missingSpecs))
 
-    def doApply(self, fileDict, justDatabase = False):
+    def doApply(self, fileDict, justDatabase = False, noScripts = False):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
@@ -149,8 +149,12 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         self._CheckRPMDBContents(removeNvras, ts,
             'RPM database missing packages for removal: ')
 
+        tsFlags = 0
         if justDatabase:
-            ts.setFlags(rpm.RPMTRANS_FLAG_JUSTDB)
+            tsFlags |= rpm.RPMTRANS_FLAG_JUSTDB
+        if noScripts:
+            tsFlags |= rpm.RPMTRANS_FLAG_NOSCRIPTS
+        ts.setFlags(tsFlags)
 
         # we use a pretty heavy hammer
         ts.setProbFilter(rpm.RPMPROB_FILTER_IGNOREOS        |

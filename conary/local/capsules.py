@@ -30,7 +30,7 @@ class CapsuleOperation(object):
         self.errors = []
         self.skipCapsuleOps = skipCapsuleOps
 
-    def apply(self, fileDict, justDatabase = False):
+    def apply(self, fileDict, justDatabase = False, noScripts = False):
         raise NotImplementedException
 
     def install(self, troveCs):
@@ -72,10 +72,10 @@ class SingleCapsuleOperation(CapsuleOperation):
     def preservePath(self, path):
         self.preserveSet.add(path)
 
-    def doApply(self, justDatabase = False):
+    def doApply(self, justDatabase = False, noScripts = False):
         raise NotImplementedError
 
-    def apply(self, fileDict, justDatabase = False):
+    def apply(self, fileDict, justDatabase = False, noScripts = False):
         if not justDatabase and self.preserveSet:
             capsuleJournal = ConaryOwnedJournal(self.root)
             for path in self.preserveSet:
@@ -87,7 +87,7 @@ class SingleCapsuleOperation(CapsuleOperation):
             capsuleJournal = None
 
         try:
-            self.doApply(fileDict, justDatabase = justDatabase)
+            self.doApply(fileDict, justDatabase = justDatabase, noScripts = noScripts)
         finally:
             if capsuleJournal:
                 capsuleJournal.revert()
@@ -142,7 +142,7 @@ class MetaCapsuleOperations(CapsuleOperation):
         CapsuleOperation.__init__(self, root, *args, **kwargs)
         self.capsuleClasses = {}
 
-    def apply(self, justDatabase = False):
+    def apply(self, justDatabase = False, noScripts = False):
         fileDict = {}
         for kind, obj in sorted(self.capsuleClasses.items()):
             fileDict.update(
@@ -164,7 +164,7 @@ class MetaCapsuleOperations(CapsuleOperation):
                 fileDict[(pathId, fileId)] = tmpname
 
             for kind, obj in sorted(self.capsuleClasses.items()):
-                obj.apply(fileDict, justDatabase = justDatabase)
+                obj.apply(fileDict, justDatabase = justDatabase, noScripts = noScripts)
         finally:
             for tmpPath in fileDict.values():
                 try:
