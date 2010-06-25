@@ -304,11 +304,12 @@ class FilesystemJob:
             return False
         return True
 
-    def apply(self, journal = None, opJournal = None, justDatabase = False):
+    def apply(self, journal = None, opJournal = None, justDatabase = False,
+              noScripts = False):
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
 
-        self.capsules.apply(justDatabase = justDatabase)
+        self.capsules.apply(justDatabase = justDatabase, noScripts = noScripts)
 
         if justDatabase:
             return
@@ -375,6 +376,19 @@ class FilesystemJob:
             log.debug(msg, target)
 
         restoreIndex = 0
+        while restoreIndex < len(restores):
+            # handle things which are becoming directories first; this moves
+            # things which may be in the way out of the way
+            (pathId, fileId, fileObj, target, override, msg) = \
+                                                restores[restoreIndex]
+            restoreIndex += 1
+
+            if isinstance(fileObj, files.Directory):
+                self.restoreFile(fileObj, None, self.root,
+                                 target, journal, opJournal,
+                                 self.isSourceTrove)
+
+        restoreIndex = 0
         j = 0
         lastRestored = LastRestored()
         while restoreIndex < len(restores):
@@ -382,6 +396,9 @@ class FilesystemJob:
                                                 restores[restoreIndex]
             restoreIndex += 1
             ptrId = pathId + fileId
+
+            if isinstance(fileObj, files.Directory):
+                continue
 
             if not fileObj:
                 # this means we've reached some contents that are the

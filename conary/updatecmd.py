@@ -486,6 +486,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                         info = False,
                         keepJournal = False,
                         noRestart = False,
+                        noScripts = False,
     )
     applyKwargs = {}
     for k in applyDefaults:
