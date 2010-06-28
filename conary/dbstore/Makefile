@@ -14,7 +14,7 @@
 
 TOPDIR	= ../..
 
-python_files	= *.py
+python_files = $(wildcard *.py)
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)
