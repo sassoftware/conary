@@ -16,7 +16,7 @@ import itertools, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
 from conary.deps import deps
-from conary.lib import util
+from conary.lib import util, log
 from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors, update
 from conary.repository import filecontents
@@ -191,6 +191,18 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         ts.check()
         ts.order()
+
+        # record RPM's chosen transaction ordering for future debugging
+        orderedKeys = []
+        for te in ts:
+            key = te.Key()
+            if key is not None:
+                # install, not erase
+                h, _ = te.Key()
+                orderedKeys.append("%s-%s-%s.%s" %(
+                    h['name'], h['version'], h['release'], h['arch']))
+        if orderedKeys:
+            log.syslog('RPM install order: ' + ' '.join(orderedKeys))
 
         # redirect RPM messages into a temporary file; we harvest them from
         # there and send them on to the callback via the rpm callback
