@@ -15,10 +15,9 @@
 import itertools, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
-from conary.deps import deps
 from conary.lib import util, log
 from conary.local.capsules import SingleCapsuleOperation
-from conary.local import errors, update
+from conary.local import errors
 from conary.repository import filecontents
 
 def rpmkey(hdr):
