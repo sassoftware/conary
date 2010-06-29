@@ -2472,3 +2472,6 @@ class TimestampedMap(object):
             ts = time.time() + self.delta
         self._map[key] = (value, ts)
         return self
+
+    def clear(self):
+        self._map.clear()
