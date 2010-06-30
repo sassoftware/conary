@@ -16,8 +16,6 @@ import os
 from conary.build import nextversion
 from conary.deps import deps
 from conary.repository import changeset
-from conary.repository import filecontents
-from conary import files
 from conary import trove
 from conary import versions
 
@@ -31,9 +29,9 @@ class ClientNewTrove:
         troveList = [ x[0] for x in troveAndPathList ]
         previousVersionMap = self._targetNewTroves(troveList)
         self._addAllNewFiles(cs, troveAndPathList, previousVersionMap)
-        for trove in troveList:
-            trove.computeDigests()
-            trvCs = trove.diff(None, absolute=True)[0]
+        for trv in troveList:
+            trv.computeDigests()
+            trvCs = trv.diff(None, absolute=True)[0]
             cs.newTrove(trvCs)
         return cs
 
@@ -80,7 +78,6 @@ class ClientNewTrove:
         # to pre-existing troves
         repos = self.getRepos()
         previousVersionMap = {}
-        versionDict = {}
         troveSpecs = {}
         trovesSeen = set()
         for troveObj in troveList:
@@ -129,7 +126,6 @@ class ClientNewTrove:
 
     def _addNewFiles(self, cs, trove, pathDict, existingTrove):
         existingPaths = {}
-        pathIds = {}
         if existingTrove:
             for pathId, path, fileId, fileVer in existingTrove.iterFileList():
                 existingPaths[path] = (fileId, pathId, fileVer)

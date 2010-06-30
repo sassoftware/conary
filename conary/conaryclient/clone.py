@@ -50,9 +50,8 @@ from conary.build import nextversion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import api, log
-from conary.repository import changeset, filecontents
+from conary.repository import changeset
 from conary.repository import trovesource
-from conary.repository import errors as neterrors
 
 V_LOADED = 0
 V_BREQ = 1
@@ -433,11 +432,11 @@ class ClientClone:
         primaries = chooser.getPrimaryTroveList()
         troves = troveCache.getTroves(primaries, withFiles = False)
         byDefaultDict = dict.fromkeys(primaries, True)
-        for trove in troves:
+        for trv in troves:
             # add all the troves that are byDefault True.
             # byDefault False ones we don't need to have in the dict.
             defaults = ((x[0], x[1]) for x in
-                        trove.iterTroveListInfo() if x[1])
+                        trv.iterTroveListInfo() if x[1])
             byDefaultDict.update(defaults)
         chooser.setByDefaultMap(byDefaultDict)
 
@@ -940,7 +939,6 @@ class ClientClone:
         # make a copy so we don't corrupt the copy in the trove cache
         trv = trv.copy()
 
-        filesNeeded = []
         troveName, troveVersion, troveFlavor = trv.getNameVersionFlavor()
         troveBranch = troveVersion.branch()
         targetBranch = newVersion.branch()
@@ -1165,8 +1163,6 @@ class TroveCache(object):
         theDict = self.troves[withFiles]
         needed = [ x for x in troveTups if x not in theDict ]
         if needed:
-            theOtherDict = self.troves[not withFiles]
-            msg = getattr(self.callback, 'lastMessage', None)
             _logMe('getting %s troves from repos' % len(needed))
 
             self._get(troveTups, withFiles)
@@ -1277,8 +1273,7 @@ class CloneChooser(object):
         name, version, flavor = troveTup
         if name.endswith(':source'):
             return (name, version, flavor) in self.primaryTroveList
-        if not sourceName:
-            sourceName = trv.getName().split(':')[0] + ':source'
+        assert(sourceName)
         sourcePackage = sourceName.split(':')[0]
         parentPackage = (sourcePackage, version, flavor)
         if parentPackage not in self.primaryTroveList:
@@ -1592,8 +1587,6 @@ class LeafMap(object):
         # is very generic.
         clonedFromInfo = dict((x, set([x[1]])) for x in tupList)
 
-        newToGet = {}
-        hasTroves = {}
         trovesByHost = {}
         # sort by host so that if a particular repository is down
         # we can continue to look at the rest of the clonedFrom info.

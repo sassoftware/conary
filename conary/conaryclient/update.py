@@ -150,7 +150,6 @@ class ClientUpdate:
         redirections.
         """
 
-        troveSet = {}
         redirectHack = {}
 
         jobsToRemove = []
@@ -1092,7 +1091,8 @@ followLocalChanges: %s
                                 notInstalledFlavor = localUpdatesByPresent[replacedInfo][1]
                                 # create alreadyBranchSwitch variable for
                                 # readability
-                                alreadyFlavorSwitch = True
+                                #alreadyFlavorSwitch = True
+                                pass
                             elif replacedInfo in sameBranchLocalUpdates:
                                 notInstalledFlavor = sameBranchLocalUpdates[replacedInfo][1]
                             else:
@@ -1335,7 +1335,6 @@ followLocalChanges: %s
                                              newInfo)
 
         log.lowlevel('old and new versions are compatible')
-        replaced = (None, None)
         if not force:
             name = replacedInfo[0]
             self.updateCallback.warning(
@@ -1568,7 +1567,7 @@ conary erase '%s=%s[%s]'
                 try:
                     newTrv = troveSource.getTrove(job[0], job[2][0], job[2][1],
                                                   withFiles = False)
-                except (TroveMissing, OpenError), err:
+                except (TroveMissing, OpenError):
                     # In the case where we're getting transitive closure
                     # for a relative changeset and hit a trove that is
                     # not included in the relative changeset (because it's
@@ -2101,7 +2100,6 @@ conary erase '%s=%s[%s]'
         byDefaultFalse = []
         byDefaultTrue = []
         count = 0
-        notByDefault = []
         for trv in toBeMigrated:
             if not recurse:
                 continue
@@ -2229,7 +2227,6 @@ conary erase '%s=%s[%s]'
         self._replaceIncomplete(cs, csSource, self.db, self.repos)
         troveSource.addChangeSet(cs)
 
-        rollbackFence = None
         # XXX this is horrible; we probablt have everything we need already,
         # I just don't know how to find it
         infoCs = troveSource.createChangeSet(finalJobs, withFiles = False)
@@ -2346,7 +2343,6 @@ conary erase '%s=%s[%s]'
         parentIds = {}      # name -> [parents of troves w/ name, troveIds]
         childIds = {}       # troveId -> childIds
 
-        TROVEINFO = 0
         ISPRESENT = 1
         HASPARENT = 2
         ISWEAK = 3
@@ -2408,8 +2404,6 @@ conary erase '%s=%s[%s]'
                     exists.addTrove(presentOkay=True, *info)
                 else:
                     refd.addTrove(presentOkay=True, *info)
-
-            updateJobs = [  ]
 
             for job in exists.diff(refd)[2]:
                 if not job[2][0]:
@@ -2833,7 +2827,7 @@ conary erase '%s=%s[%s]'
                     criticalUpdateInfo = criticalUpdateInfo,
                     resolveSource = resolveSource,
                     updateJob = updJob, exactFlavors = exactFlavors)
-        except DependencyFailure, e:
+        except DependencyFailure:
             raise
         except:
             if restartChangeSets:
@@ -3069,7 +3063,6 @@ conary erase '%s=%s[%s]'
         # avoid it, and the component name is close enough for now. this looks
         # for the first :rpm, and combines all jobs which remain into a single
         # one. more simple than elegant
-        firstRpmJob = None
         for i, jobList in enumerate(combinedJobs):
             if [ x for x in jobList if ':rpm' in x[0] ]:
                 combinedJobs = (combinedJobs[:i] +
@@ -3294,7 +3287,7 @@ conary erase '%s=%s[%s]'
         if resolveDeps or split:
             (depList, suggMap, cannotResolve, splitJob, keepList,
              criticalUpdates) = \
-            info = self._resolveDependencies(uJob, jobSet, split = split,
+            self._resolveDependencies(uJob, jobSet, split = split,
                                       resolveDeps = resolveDeps,
                                       useRepos = resolveRepos,
                                       resolveSource = resolveSource,
@@ -3652,7 +3645,6 @@ conary erase '%s=%s[%s]'
         kwargs = dict(
             commitFlags=commitFlags, tagScript=tagScript,
             journal=journal, autoPinList=autoPinList)
-        hosts = []
 
         if len(allJobs) == 1 and not uJob.getChangesetsDownloaded():
             # this handles change sets which include change set files
@@ -4089,7 +4081,7 @@ def _storeJobInfo(remainingJobs, updJob):
     extraDir = restartDir + "misc"
     try:
         os.mkdir(extraDir)
-    except OSError, e:
+    except OSError:
         # restartDir was a temporary directory, the likelyhood of extraDir
         # existing is close to zero
         # Just in case, remove the existing directory and re-create it

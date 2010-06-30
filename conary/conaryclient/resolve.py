@@ -328,10 +328,10 @@ class DependencySolver(object):
 
         try:
             newJob = self.client.newUpdateJob(closeDatabase = False)
-            suggMap = self.client.prepareUpdateJob(newJob, updateJobs,
-                                                     keepExisting=False,
-                                                     resolveDeps=False,
-                                                     split=False)
+            self.client.prepareUpdateJob(newJob, updateJobs,
+                                         keepExisting=False,
+                                         resolveDeps=False,
+                                         split=False)
             newJobSet = newJob.getJobs()
 
             # ignore updates where updating this trove would update
