@@ -23,7 +23,7 @@ def makePathId():
     """returns 16 random bytes, for use as a pathId"""
     return os.urandom(16)
 
-class ClientNewTrove:
+class ClientNewTrove(object):
     def _createTroves(self, troveAndPathList):
         cs = changeset.ChangeSet()
         troveList = [ x[0] for x in troveAndPathList ]

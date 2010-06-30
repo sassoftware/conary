@@ -101,7 +101,7 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
         self.contents = []
         self.empty = True
 
-class ClientUpdate:
+class ClientUpdate(object):
 
     @staticmethod
     def revertJournal(cfg):

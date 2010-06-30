@@ -16,7 +16,7 @@ import pickle
 
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
-from conary.conaryclient import clone, resolve, update
+from conary.conaryclient import clone, cmdline, password, resolve, update
 from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
@@ -25,9 +25,7 @@ from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
-from conary.conaryclient import cmdline
 from conary.conaryclient.clone import ClientClone
-from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
 from conary.conaryclient.newtrove import ClientNewTrove
 

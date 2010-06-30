@@ -19,7 +19,7 @@ from conary import versions
 class BranchError(errors.ClientError):
     pass
 
-class ClientBranch:
+class ClientBranch(object):
     BRANCH_SOURCE = 1 << 0
     BRANCH_BINARY = 1 << 1
     BRANCH_ALL = BRANCH_SOURCE | BRANCH_BINARY

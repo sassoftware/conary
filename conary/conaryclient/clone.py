@@ -93,7 +93,7 @@ MAX_CLONE_FILES  = 5000
 # threshhold for using a changeset instead of getting individual files
 CHANGESET_MULTIPLE = 3
 
-class ClientClone:
+class ClientClone(object):
     __developer_api__ = True
 
     def createCloneChangeSet(self, targetBranch, troveList,
