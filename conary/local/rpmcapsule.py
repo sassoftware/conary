@@ -208,9 +208,17 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         # record RPM's chosen transaction ordering for future debugging
         orderedKeys = []
-        for h, _ in ts.getKeys():
-            orderedKeys.append("%s-%s-%s.%s" %(
-                h['name'], h['version'], h['release'], h['arch']))
+        # We must use getKeys() rather than iterating over ts to avoid
+        # a refcounting bug in RPM's python bindings
+        transactionKeys = ts.getKeys()
+        # ts.getKeys() returns *either* a list of te's *or* None.
+        if transactionKeys is not None:
+            for te in transactionKeys:
+                if te is not None:
+                    # install has a header; erase is an entry of None
+                    h = te[0]
+                    orderedKeys.append("%s-%s-%s.%s" %(
+                        h['name'], h['version'], h['release'], h['arch']))
         if orderedKeys:
             log.syslog('RPM install order: ' + ' '.join(orderedKeys))
 
