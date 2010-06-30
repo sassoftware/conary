@@ -208,13 +208,9 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         # record RPM's chosen transaction ordering for future debugging
         orderedKeys = []
-        for te in ts:
-            key = te.Key()
-            if key is not None:
-                # install, not erase
-                h, _ = te.Key()
-                orderedKeys.append("%s-%s-%s.%s" %(
-                    h['name'], h['version'], h['release'], h['arch']))
+        for h, _ in ts.getKeys():
+            orderedKeys.append("%s-%s-%s.%s" %(
+                h['name'], h['version'], h['release'], h['arch']))
         if orderedKeys:
             log.syslog('RPM install order: ' + ' '.join(orderedKeys))
 
