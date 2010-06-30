@@ -22,10 +22,9 @@ from conary.repository.resolvemethod import DepResolutionByTroveList, \
 
 class DependencySolver(object):
 
-    def __init__(self, client, cfg, repos, db):
+    def __init__(self, client, cfg, db):
         self.client = client
         self.cfg = cfg
-        self.repos = repos
         self.db = db
 
     def _findCriticalJobInfo(self, jobSet, updateSettings):
@@ -71,7 +70,6 @@ class DependencySolver(object):
 
         ineligible = set()
 
-        from conary.deps import deps
         check = self.db.getDepStateClass(uJob.getTroveSource(),
            findOrdering = split, ignoreDepClasses = self.cfg.ignoreDependencies)
 

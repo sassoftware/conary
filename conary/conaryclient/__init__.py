@@ -95,7 +95,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         if not resolverClass:
             resolverClass = resolve.DependencySolver
 
-        self.resolver = resolverClass(self, cfg, self.repos, self.db)
+        self.resolver = resolverClass(self, cfg, self.db)
 
         # Set up the callbacks for the PGP key cache
         keyCache = openpgpkey.getKeyCache()
