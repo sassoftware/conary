@@ -20,11 +20,10 @@ PYINCLUDE = /usr/include/python${PYVER}
 PYFLAKES = /usr/bin/pyflakes
 
 pyfiles-install:
-	mkdir -p $(DESTDIR)$(conarydir)
-	for f in $(python_files); do \
-		mkdir -p `dirname $(DESTDIR)/$(sitedir)/$(DIR)/$$f`; \
-		cp -a $$f $(DESTDIR)/$(sitedir)/$(DIR)/$$f; \
-	done
+ifdef python_files
+	mkdir -p $(DESTDIR)/$(sitedir)/$(DIR)
+	cp -a $(python_files) $(DESTDIR)/$(sitedir)/$(DIR)/
+endif
 
 check:
 	$(if $(python_files),PYTHONPATH=$(TOPDIR) $(PYFLAKES) $(python_files),:)

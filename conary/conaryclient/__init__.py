@@ -437,7 +437,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     def applyRollback(self, rollbackSpec, replaceFiles = None,
             callback = None, tagScript = None, justDatabase = None,
             transactionCounter = None, showInfoOnly = False,
-            abortOnError = False):
+            abortOnError = False, noScripts = False):
         """
         Apply a rollback.
 
@@ -460,6 +460,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         @param justDatabase: Change only the database, do not revert the
         filesystem.
         @type justDatabase: bool
+
+        @param noScripts: Do not run trove scripts, including rpm scripts.
+        @type noScripts: bool
 
         @param transactionCounter: The Conary database contains a counter that
         gets incremented with every change. This argument is the counter's value
@@ -494,6 +497,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         # to document the keyword arguments.
         d = dict(tagScript = tagScript,
             justDatabase = justDatabase,
+            noScripts = noScripts,
             transactionCounter = transactionCounter,
             callback = callback,
             replaceFiles = replaceFiles,
