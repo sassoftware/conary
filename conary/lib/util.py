@@ -2458,10 +2458,6 @@ class TimestampedMap(object):
         self.delta = delta
         self._map = dict()
 
-
-def statFile(pathOrFile, missingOk=False, inodeOnly=False):
-    """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
-=======
     def get(self, key, default = None, stale = False):
         v = self._map.get(key, None)
         if v is not None:
@@ -2470,9 +2466,6 @@ def statFile(pathOrFile, missingOk=False, inodeOnly=False):
                 return v
         return default
 
-    Accepts paths, file descriptors, and file-like objects with a C{fileno()}
-    method.
-
     def set(self, key, value):
         if self.delta is None:
             ts = None
@@ -2480,6 +2473,16 @@ def statFile(pathOrFile, missingOk=False, inodeOnly=False):
             ts = time.time() + self.delta
         self._map[key] = (value, ts)
         return self
+
+    def clear(self):
+        self._map.clear()
+
+
+def statFile(pathOrFile, missingOk=False, inodeOnly=False):
+    """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
+
+    Accepts paths, file descriptors, and file-like objects with a C{fileno()}
+    method.
 
     @param pathOrFile: A file path or file-like object
     @type  pathOrFile: C{basestring} or file-like object or C{int}
@@ -2505,7 +2508,3 @@ def statFile(pathOrFile, missingOk=False, inodeOnly=False):
         return (st.st_dev, st.st_ino)
     else:
         return (st.st_dev, st.st_ino, st.st_size, st.st_mtime, st.st_ctime)
-
-    def clear(self):
-        self._map.clear()
-
