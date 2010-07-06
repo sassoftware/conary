@@ -2447,3 +2447,31 @@ class AtomicFile(object):
             self.fObj.close()
     __del__ = close
 
+class TimestampedMap(object):
+    """
+    A map that timestamps entries, to cycle them out after delta seconds.
+    If delta is set to None, new entries will never go stale.
+    """
+    __slots__ = [ 'delta', '_map' ]
+    def __init__(self, delta = None):
+        self.delta = delta
+        self._map = dict()
+
+    def get(self, key, default = None, stale = False):
+        v = self._map.get(key, None)
+        if v is not None:
+            v, ts = v
+            if stale or ts is None or time.time() <= ts:
+                return v
+        return default
+
+    def set(self, key, value):
+        if self.delta is None:
+            ts = None
+        else:
+            ts = time.time() + self.delta
+        self._map[key] = (value, ts)
+        return self
+
+    def clear(self):
+        self._map.clear()

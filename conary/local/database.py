@@ -41,7 +41,7 @@ class CommitChangeSetFlags(util.Flags):
     __slots__ = [ 'replaceManagedFiles', 'replaceUnmanagedFiles',
                   'replaceModifiedFiles', 'justDatabase', 'localRollbacks',
                   'test', 'keepJournal', 'replaceModifiedConfigFiles',
-                  'skipCapsuleOps' ]
+                  'skipCapsuleOps', 'noScripts' ]
 
 class Rollback:
 
@@ -1695,7 +1695,8 @@ class Database(SqlDbRepository):
                   updateDatabase, callback, tagScript, dbCache,
                   autoPinList, flags, journal, directoryCandidates,
                   storeRollback = True):
-        if not (commitFlags.justDatabase or commitFlags.test):
+        if not (commitFlags.justDatabase or commitFlags.test or
+                (commitFlags.noScripts and not tagScript)):
             # run preremove scripts before updating the database, otherwise
             # the file lists which get sent to them are incorrect. skipping
             # this makes --test a little inaccurate, but life goes on
@@ -1832,7 +1833,8 @@ class Database(SqlDbRepository):
                 opJournal.tryCleanupDir(self.root + relativePath)
 
         fsJob.apply(journal, opJournal = opJournal,
-                    justDatabase = commitFlags.justDatabase)
+                    justDatabase = commitFlags.justDatabase,
+                    noScripts = commitFlags.noScripts)
 
         if (updateDatabase and not localChanges):
             for (name, version, flavor) in fsJob.getOldTroveList():
@@ -2134,7 +2136,8 @@ class Database(SqlDbRepository):
 
         #del opJournal
 
-        if not (commitFlags.justDatabase or commitFlags.test):
+        if not (commitFlags.justDatabase or commitFlags.test or 
+                (commitFlags.noScripts and not tagScript)):
             fsJob.runPostTagScripts(tagSet, tagScript)
 
         if rollbackPhase is None and updateDatabase and invalidateRollbacks:
@@ -2143,15 +2146,14 @@ class Database(SqlDbRepository):
         if rollbackPhase is not None:
             return fsJob
 
-        if not commitFlags.justDatabase:
+        if not (commitFlags.justDatabase or 
+                (commitFlags.noScripts and not tagScript)):
             fsJob.orderPostScripts(uJob)
             fsJob.runPostScripts(tagScript)
 
     def runPreScripts(self, uJob, callback, tagScript = None,
                       justDatabase = False, tmpDir = '/', jobIdx = None,
                       abortOnError = False):
-        if justDatabase:
-           return True
 
         if jobIdx is not None:
             actionLists = [ uJob.iterJobPreScriptsForJobSet(jobIdx) ]
@@ -2458,7 +2460,8 @@ class Database(SqlDbRepository):
     def _applyRollbackList(self, repos, names, replaceFiles = False,
                           callback = UpdateCallback(), tagScript = None,
                           justDatabase = False, transactionCounter = None,
-                          lazyCache = None, abortOnError = False):
+                          lazyCache = None, abortOnError = False,
+                          noScripts = False):
         assert transactionCounter is not None, ("The transactionCounter "
             "argument is mandatory")
         if transactionCounter != self.getTransactionCounter():
@@ -2543,12 +2546,14 @@ class Database(SqlDbRepository):
                         replaceManagedFiles = replaceFiles,
                         replaceUnmanagedFiles = replaceFiles,
                         replaceModifiedFiles = replaceFiles,
-                        justDatabase = justDatabase)
+                        justDatabase = justDatabase,
+                        noScripts = noScripts)
 
-                    self.runPreScripts(updJob, callback = callback,
-                                       tagScript = tagScript,
-                                       justDatabase = justDatabase,
-                                       abortOnError = abortOnError)
+                    if not (justDatabase or (noScripts and not tagScript)):
+                        self.runPreScripts(updJob, callback = callback,
+                                           tagScript = tagScript,
+                                           justDatabase = justDatabase,
+                                           abortOnError = abortOnError)
 
                     fsUpdateJob = UpdateJob(None, lazyCache = lazyCache)
                     if not reposCs.isEmpty():
@@ -2583,8 +2588,9 @@ class Database(SqlDbRepository):
                         # Because of the two phase update for rollbacks, we
                         # run postscripts by hand instead of commitChangeSet
                         # doing it automatically
-                        fsJob.orderPostScripts(updJob)
-                        fsJob.runPostScripts(tagScript)
+                        if (tagScript or not commitFlags.noScripts):
+                            fsJob.orderPostScripts(updJob)
+                            fsJob.runPostScripts(tagScript)
                     fsUpdateJob.close()
 
                     rb.removeLast()
@@ -2598,7 +2604,8 @@ class Database(SqlDbRepository):
             # Run post-rollback scripts at the very end of the rollback, when
             # all other operations have been performed
             if lastFsJob:
-                if postRollbackScripts:
+                if (postRollbackScripts and
+                    (tagScript or not commitFlags.noScripts)):
                     lastFsJob.clearPostScripts()
                     # Add the post-rollback scripts
                     for scriptData in postRollbackScripts:

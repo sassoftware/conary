@@ -304,11 +304,12 @@ class FilesystemJob:
             return False
         return True
 
-    def apply(self, journal = None, opJournal = None, justDatabase = False):
+    def apply(self, journal = None, opJournal = None, justDatabase = False,
+              noScripts = False):
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
 
-        self.capsules.apply(justDatabase = justDatabase)
+        self.capsules.apply(justDatabase = justDatabase, noScripts = noScripts)
 
         if justDatabase:
             return
