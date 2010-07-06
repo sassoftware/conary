@@ -15,10 +15,9 @@
 import itertools, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
-from conary.deps import deps
-from conary.lib import util
+from conary.lib import util, log
 from conary.local.capsules import SingleCapsuleOperation
-from conary.local import errors, update
+from conary.local import errors
 from conary.repository import filecontents
 
 def rpmkey(hdr):
@@ -34,6 +33,7 @@ class Callback:
         self.logFd = logFd
         self.lastAmount = 0
         self.rootFd = os.open("/", os.O_RDONLY)
+        self.unpackFailures = []
 
     def flushRpmLog(self):
         s = os.read(self.logFd, 50000)
@@ -116,6 +116,9 @@ class Callback:
             self.callback.restoreFiles(amount - self.lastAmount,
                                        self.totalSize)
             self.lastAmount = amount
+        elif what == rpm.RPMCALLBACK_UNPACK_ERROR:
+            hdr, path = mydata
+            self.unpackFailures.append(hdr)
 
     def __del__(self):
         assert(not self.fdnos)
@@ -124,17 +127,28 @@ class Callback:
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
-    def _CheckRPMDBContents(self, testNvras, ts, errStr):
+    @staticmethod
+    def _canonicalNvra(n, v, r, a):
+        return "%s-%s-%s.%s" % (n, v, r, a)
+
+    def _CheckRPMDBContents(self, testNvras, ts, errStr,
+            unpackFailures=None, enforceUnpackFailures=None):
         mi = ts.dbMatch()
         installedNvras = set([(h['name'], h['version'], h['release'], h['arch'])
                               for h in mi])
         missingNvras = testNvras.difference(installedNvras)
+
+        if unpackFailures and not enforceUnpackFailures:
+            missingNvras -= unpackFailures
+            self.callback.warning('RPM failed to unpack ' + ' '.join(
+                self._canonicalNvra(*nvra) for nvra in unpackFailures))
+
         if missingNvras:
-            missingSpecs = sorted(["%s-%s-%s.%s" % nvra
+            missingSpecs = sorted([self._canonicalNvra(*nvra)
                                   for nvra in missingNvras])
             raise errors.UpdateError(errStr + ' '.join(missingSpecs))
 
-    def doApply(self, fileDict, justDatabase = False):
+    def doApply(self, fileDict, justDatabase = False, noScripts = False):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
@@ -149,8 +163,12 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         self._CheckRPMDBContents(removeNvras, ts,
             'RPM database missing packages for removal: ')
 
+        tsFlags = 0
         if justDatabase:
-            ts.setFlags(rpm.RPMTRANS_FLAG_JUSTDB)
+            tsFlags |= rpm.RPMTRANS_FLAG_JUSTDB
+        if noScripts:
+            tsFlags |= rpm.RPMTRANS_FLAG_NOSCRIPTS
+        ts.setFlags(tsFlags)
 
         # we use a pretty heavy hammer
         ts.setProbFilter(rpm.RPMPROB_FILTER_IGNOREOS        |
@@ -188,6 +206,22 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         ts.check()
         ts.order()
 
+        # record RPM's chosen transaction ordering for future debugging
+        orderedKeys = []
+        # We must use getKeys() rather than iterating over ts to avoid
+        # a refcounting bug in RPM's python bindings
+        transactionKeys = ts.getKeys()
+        # ts.getKeys() returns *either* a list of te's *or* None.
+        if transactionKeys is not None:
+            for te in transactionKeys:
+                if te is not None:
+                    # install has a header; erase is an entry of None
+                    h = te[0]
+                    orderedKeys.append("%s-%s-%s.%s" %(
+                        h['name'], h['version'], h['release'], h['arch']))
+        if orderedKeys:
+            log.syslog('RPM install order: ' + ' '.join(orderedKeys))
+
         # redirect RPM messages into a temporary file; we harvest them from
         # there and send them on to the callback via the rpm callback
         tmpfd, tmpPath = tempfile.mkstemp()
@@ -198,6 +232,8 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         cb = Callback(self.callback, self.fsJob.getRestoreSize(), readFile)
         probs = ts.run(cb, '')
+        unpackFailures = set((h['name'], h['version'], h['release'], h['arch'])
+                             for h in cb.unpackFailures)
 
         # flush the RPM log
         del cb
@@ -208,8 +244,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         if probs:
             raise ValueError(str(probs))
 
+        enforceUnpackFailures = not os.geteuid()
         self._CheckRPMDBContents(installNvras, ts,
-            'RPM failed to install requested packages: ')
+            'RPM failed to install requested packages: ',
+            unpackFailures=unpackFailures,
+            enforceUnpackFailures=enforceUnpackFailures)
 
     def install(self, flags, troveCs):
         ACTION_RESTORE = 1

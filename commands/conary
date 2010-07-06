@@ -80,11 +80,10 @@ class ConaryCommand(command.ConaryCommand):
 
 class ChangeSetCommand(ConaryCommand):
     commands = ['changeset', 'cs' ]
-    paramHelp = '''\
-<pkg>[=[<oldver>--]<newver>]+ <outfile>
-
-Creates a changeset with the specified troves and stores it in <outfile>'''
     help = 'Request a changeset from one or more Conary repositories'
+    paramHelp = "<pkg>[=[<oldver>--]<newver>]+ <outfile>"
+    description = """\
+Creates a changeset with the specified troves and stores it in <outfile>"""
     commandGroup = 'Repository Access'
     docs = {'no-recurse' : (VERBOSE_HELP, 
                             "Don't include child troves in changeset")}
@@ -404,14 +403,24 @@ _register(ListRollbackCommand)
 
 class RollbackCommand(ConaryCommand):
     commands = ['rollback', 'rb']
-    paramHelp = "<rollback>"
-    help = 'Roll back operations stored in the rollback stack'
+    help = "Roll back operations stored in the rollback stack"
+    paramHelp = "[<num changes>|r.<rollback point>]"
+    description = """\
+conary rollback 1       # Roll back the most recent change
+conary rollback r.151   # Roll back a specific operation
+
+See "conary rblist" for a list of changes to roll back.
+The argument can be either a number of changes to rollback
+("conary rollback 1" will rollback the most recent operation) or a
+specific item in the rollback list ("conary rollback r.151" will
+rollback operation #151 and all later operations)."""
     commandGroup = 'System Modification'
 
     docs = {'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
             'replace-files' : ('Replace files on system with files from'
                                ' rollback if conflict'),
+            'no-scripts': ('Do not run trove scripts'),
             'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
             'abort-on-error' : ('Abort the rollback if any prerollback script '
                                 'fails'),
@@ -422,6 +431,7 @@ class RollbackCommand(ConaryCommand):
         argDef["just-db"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
         argDef["info"] = NO_PARAM
+        argDef["no-scripts"] = NO_PARAM
         argDef["tag-script"] = ONE_PARAM
         argDef["abort-on-error"] = NO_PARAM
 
@@ -433,6 +443,7 @@ class RollbackCommand(ConaryCommand):
 
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
+        kwargs['noScripts'] = argSet.pop('no-scripts', False)
         kwargs['showInfoOnly'] = argSet.pop('info', False)
         kwargs['abortOnError'] = argSet.pop('abort-on-error', False)
 
@@ -868,6 +879,8 @@ class _UpdateCommand(ConaryCommand):
     docs = {
         'apply-critical'  : (VERBOSE_HELP, 
                              'apply any critical conary updates and then stop'),
+        'disconnected'  : (VERBOSE_HELP,
+                           'apply change without using the network connection'),
         'from-file'     : 'search changeset(s) for given troves',
         'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
@@ -886,6 +899,8 @@ class _UpdateCommand(ConaryCommand):
         'no-restart'    : (VERBOSE_HELP,
                            'Do not restart after applying a critical update. '
                            'Requires --root'),
+        'no-scripts'    : (VERBOSE_HELP,
+                           'Do not run trove scripts'),
         'recurse'       : optparse.SUPPRESS_HELP,
         'replace-files' : 'Replace existing files if file conflict found '
                           '(equivalent to --replace-managed-files '
@@ -915,6 +930,7 @@ class _UpdateCommand(ConaryCommand):
         ConaryCommand.addParameters(self, argDef)
         d = {}
         d["apply-critical"] = NO_PARAM
+        d["disconnected"] = NO_PARAM
         d["from-file"] = MULT_PARAM
         d["just-db"] = NO_PARAM
         d["keep-existing"] = NO_PARAM
@@ -925,6 +941,7 @@ class _UpdateCommand(ConaryCommand):
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
         d["no-restart"] = NO_PARAM
+        d["no-scripts"] = NO_PARAM
         d["no-conflict-check"] = NO_PARAM
         d["recurse"] = NO_PARAM
         d["replace-files"] = NO_PARAM
@@ -984,6 +1001,7 @@ class _UpdateCommand(ConaryCommand):
             kwargs['replaceModifiedConfigFiles'] = True
 
         kwargs['depCheck'] = not argSet.pop('no-deps', False)
+        kwargs['disconnected'] = argSet.pop('disconnected', False)
         kwargs['fromFiles'] = argSet.pop('from-file', [])
         kwargs['recurse'] = not argSet.pop('no-recurse', False)
         kwargs['checkPathConflicts'] = \
@@ -993,6 +1011,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['keepExisting'] = argSet.pop('keep-existing', False)
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
+        kwargs['noScripts'] = argSet.pop('no-scripts', False)
         kwargs['test'] = argSet.pop('test', False)
         kwargs['sync'] = argSet.pop('sync-to-parents', False)
         kwargs['updateOnly'] = argSet.pop('update-only', False)
@@ -1079,7 +1098,6 @@ class MigrateCommand(_UpdateCommand):
         d = argDef.pop('Update Options')
         del d['keep-existing']
         del d['sync-to-parents']
-        del d['no-recurse']
         argDef['Migrate Options'] = d
 _register(MigrateCommand)
 

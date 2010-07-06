@@ -747,6 +747,9 @@ class MetadataItem(streams.StreamSet):
         _METADATA_ITEM_TAG_SIZE_OVERRIDE:
                 (DYNAMIC, streams.LongLongStream, 'sizeOverride'),
         }
+    # define a set of metadata fields in which 0 is a valid value and should be
+    # distingished from None
+    _zeroIsValidSet = set(('sizeOverride',))
 
     _skipSet = { 'id' : True, 'signatures': True, 'oldSignatures' : True }
     _keys = [ x[2] for x in streamDict.itervalues() if x[2] not in _skipSet ]
@@ -862,7 +865,9 @@ class MetadataItem(streams.StreamSet):
             if hasattr(attr, 'keys'):
                 if attr.keys():
                     ret.append(x)
-            elif hasattr(attr, '__call__') and attr():
+            elif hasattr(attr, '__call__') and (attr() or
+                                                (x in self._zeroIsValidSet and
+                                                attr() is not None)):
                 ret.append(x)
         return ret
 
@@ -871,6 +876,7 @@ class MetadataItem(streams.StreamSet):
         if hasattr(attr, '__call__'):
             return attr()
         return attr
+
 
 class Metadata(streams.OrderedStreamCollection):
     streamDict = { 1: MetadataItem }
@@ -2918,7 +2924,8 @@ class Trove(streams.StreamSet):
 
     def getSize(self):
         sizeOverrides = [x.sizeOverride() for x in
-                         self.troveInfo.metadata.flatten() if x.sizeOverride()]
+                         self.troveInfo.metadata.flatten()
+                         if x.sizeOverride() is not None]
         if sizeOverrides:
             return sizeOverrides[-1]
         return self.troveInfo.size()

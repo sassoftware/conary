@@ -1705,20 +1705,24 @@ order by
         Return the troves which include the troves listed in l as strong
         references.
         """
-        return self._getTroveInclusions(l, False, weakRefs = False)
+        return self._getTroveInclusions(l, False, weakRefs = False,
+                                        pristineOnly = False)
 
-    def getTroveReferences(self, l, weakRefs = False, justPresent = False):
+    def getTroveReferences(self, l, weakRefs = False, justPresent = False,
+                           pristineOnly = True):
         """
         Return the troves which the troves in l include as strong references.
         If weakRefs is True, also include the troves included as weak
         references. If justPresent is True, only include troves present
-        in the database.
+        in the database. If pristineOnly is True, inferred references aren't
+        included.
         """
         return self._getTroveInclusions(l, True, weakRefs = weakRefs,
-                                        justPresent = justPresent)
+                                        justPresent = justPresent,
+                                        pristineOnly = pristineOnly)
 
     def _getTroveInclusions(self, l, included, weakRefs = False,
-                            justPresent = False):
+                            justPresent = False, pristineOnly = True):
         cu = self.db.cursor()
         cu.execute("""
         CREATE TEMPORARY TABLE ftc(
@@ -1745,6 +1749,11 @@ order by
         else:
             presentFilter = ""
 
+        if pristineOnly:
+            pristineFilter = "TroveTroves.inPristine = 1 AND"
+        else:
+            pristineFilter = ""
+
         if weakRefs:
             weakRefsFilter = 0
         else:
@@ -1769,11 +1778,13 @@ order by
                           Flavors.flavorId = Instances.flavorId
                       WHERE
                           %s
+                          %s
                           IncVersion.version = ftc.version AND
                           (IncFlavor.flavor = ftc.flavor OR
                            (IncFlavor.flavor IS NULL AND ftc.flavor = "")) AND
                           (TroveTroves.flags & %d) == 0
-                   """ % (sense + (presentFilter, weakRefsFilter))
+                   """ % (sense + (presentFilter, pristineFilter,
+                                   weakRefsFilter))
         cu.execute(sql)
         for (idx, name, version, flavor, ts, flags) in cu:
             ts = [ float(x) for x in ts.split(":") ]
@@ -2059,6 +2070,12 @@ order by
             Returns the pathHashes for the given trove list.
         """
         return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_PATH_HASHES)
+
+    def getCapsulesTroveList(self, troveList):
+        """ 
+            Returns the capsule data for the given trove list.
+        """
+        return self._getTroveInfo(troveList, trove._TROVEINFO_TAG_CAPSULE)
 
     def getTroveScripts(self, troveList):
         """

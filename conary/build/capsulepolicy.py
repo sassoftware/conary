@@ -287,7 +287,7 @@ class RPMProvides(policy.Policy):
             if capsule and capsule[0] == 'rpm':
                 path = capsule[1]
                 h = rpmhelper.readHeader(file(path))
-                prov = h._getDepsetFromHeader(rpmhelper.PROVIDENAME)
+                prov = h.getProvides()
                 comp[1].provides.union(prov)
 
                 if self.provisions:
@@ -436,8 +436,8 @@ class RPMRequires(policy.Policy):
                     continue
 
                 h = rpmhelper.readHeader(file(path))
-                rReqs = h._getDepsetFromHeader(rpmhelper.REQUIRENAME)
-                rProv = h._getDepsetFromHeader(rpmhelper.PROVIDENAME)
+                rReqs, rProv = h.getDeps()
+
                 # integrate user specified requirements
                 if self.requirements:
                     userReqs = self.requirements.get(comp[0])
