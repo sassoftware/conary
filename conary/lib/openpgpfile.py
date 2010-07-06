@@ -14,7 +14,6 @@
 
 import base64
 import binascii
-import errno
 import fcntl
 import itertools
 import os
@@ -2954,20 +2953,21 @@ class PGP_SecretAnyKey(PGP_Key):
         # Fetch the crypto key
         cryptoKey = self.makePgpKey(passPhrase = passwordCallback())
 
-        if isinstance(cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
+        # See comment in OpenPGPKey.getType
+        if type(cryptoKey.key).__name__ == 'dsaKey':
             pkAlg = PK_ALGO_DSA
             # Pick a random number that is relatively prime with the crypto
             # key's q
             relprime = cryptoKey.q + 1
             while relprime > cryptoKey.q:
                 relprime = num_getRelPrime(cryptoKey.q)
-        elif isinstance(cryptoKey, (RSA.RSAobj_c, RSA.RSAobj)):
+        if type(cryptoKey.key).__name__ == 'rsaKey':
             pkAlg = PK_ALGO_RSA
             # RSA doesn't need a prime for signing
             relprime = 0
         else:
             # Maybe we need a different exception?
-            raise UnsupportedEncryptionAlgorithm(cryptoKey.__class__.__name__)
+            raise UnsupportedEncryptionAlgorithm(type(cryptoKey.key).__name__)
 
         hashAlg = 2 # sha
 

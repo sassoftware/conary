@@ -23,7 +23,6 @@ from conary.lib.util import log
 from conary.lib import graph, util, api
 
 import openpgpfile
-from Crypto.PublicKey import DSA
 from openpgpfile import BadPassPhrase
 from openpgpfile import KeyNotFound
 from openpgpfile import num_getRelPrime
@@ -86,6 +85,23 @@ class OpenPGPKey(object):
                     trustRegex = trustRegex)
         self.signatures = sorted(sigs.values(), key = lambda x: x.signer)
 
+    def getType(self):
+        # pycrypto's API has no consistent way to tell what kind of key we
+        # have. This is apparently the least awful way to do it.
+        keyType = type(self.cryptoKey.key).__name__
+        if keyType == 'rsaKey':
+            return 'RSA'
+        elif keyType == 'dsaKey':
+            return 'DSA'
+        else:
+            raise TypeError("Unrecognized key type")
+
+    def isRSA(self):
+        return self.getType() == 'RSA'
+
+    def isDSA(self):
+        return self.getType() == 'DSA'
+
     def getTrustLevel(self):
         return self.trustLevel
 
@@ -102,7 +118,7 @@ class OpenPGPKey(object):
         return self.timestamp
 
     def signString(self, data):
-        if isinstance(self.cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
+        if self.isDSA():
             K = self.cryptoKey.q + 1
             while K > self.cryptoKey.q:
                 K = num_getRelPrime(self.cryptoKey.q)
