@@ -1993,7 +1993,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
              emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,
-             downloadOnly = False, groupOptions = None):
+             downloadOnly = False, groupOptions = None, changeSetFile=None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -2015,8 +2015,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @type downloadOnly: boolean
     @param macros: set of macros for the build
     @type macros: dict
+    @param changeSetFile: file to write changeset out to.
+    @type changeSetFile: str
     """
-    changeSetFile = None
     targetLabel = None
 
     use.track(True)
