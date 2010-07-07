@@ -28,6 +28,7 @@ import urllib
 import warnings
 import zlib
 
+from conary import errors
 from conary.lib import util
 
 log = logging.getLogger(__name__)
@@ -155,9 +156,13 @@ class ConnectionManager(object):
                     self._timer.sleep()
                 self._retryCount += 1
                 return (self.connSpec, None)
+            except errors.ProxyListExhausted:
+                ei = sys.exc_info()
+                raise TransportError, ei[1], ei[2]
             return (self.connSpec, proxy)
 
         def markFailedProxy(self, proxy):
+            log.info("Marking proxy %r as failed" % proxy.asString(withAuth=True))
             self.proxyMap.blacklistUrl(proxy)
 
     class Connection(object):
@@ -567,7 +572,12 @@ class URLOpener(urllib.FancyURLopener):
                 for args in itertools.chain(data.iterheaders(),
                                             conn.headers, self.addheaders):
                     h.putheader(*args)
-                h.endheaders()
+                try:
+                    h.endheaders()
+                except socket.error, e:
+                    if e.errno == errno.ECONNREFUSED and connSpec[1]:
+                        raise ProxyError(e, host=connSpec[1])
+                    raise
                 data.writeTo(h)
                 # wait for a response
                 self._wait(h)
@@ -658,7 +668,10 @@ class URLOpener(urllib.FancyURLopener):
         msgTempl =  "%s (via %s proxy %s)"
         proxyType = self.proxyHost.requestProtocol
         ppType = self.ProxyTypeName.get(proxyType, proxyType)
-        error.args = (error[0], msgTempl % (error[1], ppType, self.proxyHost.hostport))
+        msgError = msgTempl % (error[1], ppType, self.proxyHost.hostport)
+        error.args = (error[0], msgError)
+        if hasattr(error, 'strerror'):
+            error.strerror = msgError
 
     def _wait(self, h):
         # wait for data if abortCheck is set
