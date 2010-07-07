@@ -2962,7 +2962,7 @@ class PGP_SecretAnyKey(PGP_Key):
             relprime = cryptoKey.q + 1
             while relprime > cryptoKey.q:
                 relprime = num_getRelPrime(cryptoKey.q)
-        if keyType == 'RSA':
+        elif keyType == 'RSA':
             pkAlg = PK_ALGO_RSA
             # RSA doesn't need a prime for signing
             relprime = 0
