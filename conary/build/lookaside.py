@@ -31,7 +31,7 @@ from conary.lib import util
 from conary import callbacks
 from conary.build.mirror import Mirror
 from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
-
+from conary.repository import transport
 
 NETWORK_SCHEMES = ('http', 'https', 'ftp', 'mirror')
 
@@ -347,9 +347,11 @@ class FileFinder(object):
         if isinstance(url, str):
             url = laUrl(url)
 
-        retries = 0
+        retries = 3
+        if self.cfg.proxy and not self.noproxyFilter.bypassProxy(url.host):
+            retries = 7
         inFile = None
-        while retries < 5:
+        for i in range(retries):
             try:
                 # set up a handler that tracks cookies to handle
                 # sites like Colabnet that want to set a session cookie
@@ -402,7 +404,7 @@ class FileFinder(object):
             except socket.error, err:
                 num, msg = err
                 if num == errno.ECONNRESET:
-                    log.info('Connection Reset by FTP server'
+                    log.info('Connection Reset by server'
                              'while retrieving %s.'
                              '  Retrying in 10 seconds.', urlStr, msg)
                     time.sleep(10)

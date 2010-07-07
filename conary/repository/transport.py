@@ -32,6 +32,8 @@ import xmlrpclib
 import urllib
 import warnings
 import zlib
+import errors
+
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -52,10 +54,12 @@ LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
 from conary.lib import util
 from conary.lib import log as clog
 
+
 class InfoURL(urllib.addinfourl):
     def __init__(self, fp, headers, url, protocolVersion):
         urllib.addinfourl.__init__(self, fp, headers, url)
         self.protocolVersion = protocolVersion
+
 
 class DecompressFileObj:
     "implements a wrapper file object that decompress()s data on the fly"
@@ -196,6 +200,8 @@ class HTTPSConnection(httplib.HTTPConnection):
 
 
 _ipCache = {}
+
+
 def getIPAddress(hostAndPort):
     host, port = urllib.splitport(hostAndPort)
     if host in LocalHosts:
@@ -203,7 +209,7 @@ def getIPAddress(hostAndPort):
         return hostAndPort
     try:
         ret = socket.gethostbyname(host)
-    except (IOError, socket.error), err:
+    except (IOError, socket.error):
         util.res_init()
         # error looking up the host.  If this fails,
         # the we fall back to the cache
@@ -217,8 +223,10 @@ def getIPAddress(hostAndPort):
         ret = "%s:%s" % (ret, port)
     return ret
 
+
 def clearIPCache():
     _ipCache.clear()
+
 
 class URLOpener(urllib.FancyURLopener):
     '''Replacement class for urllib.FancyURLopener'''
@@ -236,6 +244,8 @@ class URLOpener(urllib.FancyURLopener):
         self.usedProxy = False
         self.proxyHost = None
         self.proxyProtocol = None
+        self.retries = kw.pop('retries', 3)
+        self.proxyRetries = max(kw.pop('proxyRetries', 7), self.retries)
         # FIXME: this should go away in a future release.
         # forceProxy is used to ensure that if the proxy returns some
         # bogus address like "localhost" from a URL fetch, we can
@@ -270,7 +280,6 @@ class URLOpener(urllib.FancyURLopener):
         try:
             sock.connect((host, port))
         except socket.error, e:
-            self._processSocketError(e)
             raise
 
         sock.sendall("CONNECT %s:%s HTTP/1.0\r\n" %
@@ -351,9 +360,9 @@ class URLOpener(urllib.FancyURLopener):
         # Return an HTTP or HTTPS class suitable for use by open_http
         self.usedProxy = False
         if ssl:
-            protocol='https'
+            protocol = 'https'
         else:
-            protocol='http'
+            protocol = 'http'
 
         if withProxy:
             # DEPRECATED: Check self.proxies again to see if a proxy should be
@@ -428,16 +437,17 @@ class URLOpener(urllib.FancyURLopener):
                     # that we're going through a proxy
                     self.proxyHost = host
                     if useConaryProxy:
-                        # override ssl setting to talk the right protocol to the
-                        # proxy - the proxy will take the real url and communicate
-                        # either ssl or not as appropriate
+                        # override ssl setting to talk the right protocol to
+                        # the proxy - the proxy will take the real url and
+                        # communicate either ssl or not as appropriate
 
                         # Other proxies will not support proxying ssl over !ssl
                         # or vice versa.
                         ssl = (proxyUrlType == 'conarys')
             urlstr = selector
 
-        if not host: raise IOError, ('http error', 'no host given')
+        if not host:
+            raise IOError(('http error', 'no host given'))
         if not self.usedProxy:
             ipOrHost = getIPAddress(host)
         else:
@@ -463,33 +473,7 @@ class URLOpener(urllib.FancyURLopener):
 
             if host != realhost and not useConaryProxy:
                 # Target: HTTPS proxy, origin server may or may not be SSL
-
-                # Retry the connection if the remote end closes the connection
-                # without sending a response. This may happen after shutting
-                # down the SSL stream (BadStatusLine), or without doing so
-                # (socket.sslerror)
-                timer = BackoffTimer()
-                for i in range(7):
-                    if i:
-                        log.debug("SSL proxy hung up unexpectedly, retrying.")
-                        timer.sleep()
-
-                    try:
-                        h = self.proxy_ssl(host, realhost, proxyAuth)
-                        break
-                    except socket.sslerror, e:
-                        # Proxy closed connection without shutting down SSL.
-                        if e.args[0] != 8:
-                            raise
-                    except httplib.BadStatusLine:
-                        # Proxy closed connection without sending a response.
-                        pass
-
-                    # Sleep and try again, per RFC 2626 s. 8.2.4
-
-                else:
-                    # Out of retries so rethrow the original error.
-                    raise
+                h = self.proxy_ssl(host, realhost, proxyAuth)
 
             elif self.caCerts and SSL:
                 # Target: HTTPS origin server or conary proxy
@@ -498,7 +482,7 @@ class URLOpener(urllib.FancyURLopener):
                 # uses m2crypto)
                 commonName = urllib.splitport(host)[0]
                 h = HTTPSConnection(ipOrHost, caCerts=self.caCerts,
-                        commonName=commonName)
+                                    commonName=commonName)
             else:
                 # Target: HTTPS origin server or conary proxy
 
@@ -508,6 +492,7 @@ class URLOpener(urllib.FancyURLopener):
         else:
             # Target: HTTP proxy or conary proxy or origin server
             h = httplib.HTTPConnection(ipOrHost)
+
             if host != realhost and not useConaryProxy and proxyAuth:
                 headers.append(("Proxy-Authorization",
                                 "Basic " + proxyAuth))
@@ -534,33 +519,86 @@ class URLOpener(urllib.FancyURLopener):
            which is hardcoded in (this version also supports https)"""
         # Splitting some of the functionality so we can reuse this code with
         # PUT requests too
-        h, urlstr, selector, headers = self.createConnection(url, ssl=ssl)
-        if data is not None:
-            h.putrequest('POST', selector)
-            if self.compress:
-                h.putheader('Content-encoding', 'deflate')
-                data = zlib.compress(data, 9)
-            h.putheader('Content-type', self.contentType)
-            h.putheader('Content-length', '%d' % len(data))
-            h.putheader('Accept-encoding', 'deflate')
-        else:
-            h.putrequest('GET', selector)
-        for args in itertools.chain(headers, self.addheaders):
-            h.putheader(*args)
-        try:
-            h.endheaders()
-        except socket.error, e:
-            self._processSocketError(e)
-            raise
 
-        if data is not None:
-            h.send(data)
-        # wait for a response
-        self._wait(h)
-        response = h.getresponse()
-        errcode, errmsg = response.status, response.reason
-        headers = response.msg
-        fp = response.fp
+        # Retry the connection if the remote end closes the connection
+        # without sending a response. This may happen after shutting
+        # down the SSL stream (BadStatusLine), or without doing so
+        # (socket.sslerror)
+        resetResolv = False
+        if isinstance(url, tuple):
+            retryCount = self.proxyRetries
+            connection = url[1] + ' using ' + url[0] + ' as a proxy'
+        else:
+            retryCount = self.retries
+            connection = url
+        timer = BackoffTimer()
+        connectFailed = False
+        for i in range(retryCount):
+            try:
+                h, urlstr, selector, headers = self.createConnection(
+                    url, ssl=ssl)
+                if data is not None:
+                    h.putrequest('POST', selector)
+                    if self.compress:
+                        h.putheader('Content-encoding', 'deflate')
+                        data = zlib.compress(data, 9)
+                    h.putheader('Content-type', self.contentType)
+                    h.putheader('Content-length', '%d' % len(data))
+                    h.putheader('Accept-encoding', 'deflate')
+                else:
+                    h.putrequest('GET', selector)
+                for args in itertools.chain(headers, self.addheaders):
+                    h.putheader(*args)
+                h.endheaders()
+                if data is not None:
+                    h.send(data)
+                # wait for a response
+                self._wait(h)
+                response = h.getresponse()
+                errcode, errmsg = response.status, response.reason
+                headers = response.msg
+                fp = response.fp
+                break
+            except (socket.sslerror, socket.gaierror), e:
+                if e.args[0] == 'socket error':
+                    e = e.args[1]
+                self._processSocketError(e)
+                if isinstance(e, socket.gaierror):
+                    if e.args[0] == socket.EAI_AGAIN:
+                        pass
+                    else:
+                        connectFailed = True
+                        break
+                elif isinstance(e, socket.sslerror):
+                    pass
+                else:
+                    connectFailed = True
+                    break
+            except httplib.BadStatusLine:
+                # closed connection without sending a response.
+                pass
+            except socket.error, e:
+                self._processSocketError(e)
+                raise e
+            # try resetting the resolver - /etc/resolv.conf
+            # might have changed since this process started.
+            if not resetResolv:
+                util.res_init()
+                resetResolv = True
+
+            # Sleep and try again, per RFC 2616 s. 8.2.4
+            timer.sleep()
+        else:
+            # we've run out of tries and so we've failed
+            connectFailed = True
+        if connectFailed:
+            log.info("Failed to connect to %s. Aborting after "
+                      "%i of %i tries." % (connection, i + 1, retryCount))
+            raise e
+        elif i:
+            log.info("Suceeded to connect to %s after "
+                      "%i of %i tries." % (connection, i + 1, retryCount))
+
         if errcode == 200:
             encoding = headers.get('Content-encoding', None)
             if encoding == 'deflate':
@@ -638,10 +676,12 @@ class URLOpener(urllib.FancyURLopener):
     def http_error_default(self, url, fp, errcode, errmsg, headers, data=None):
         raise TransportError("Unable to open %s: %s" % (url, errmsg))
 
+
 class ConaryURLOpener(URLOpener):
     """An opener aware of the conary:// protocol"""
     open_conary = URLOpener.open_http
     open_conarys = URLOpener.open_https
+
 
 class XMLOpener(URLOpener):
     contentType = 'text/xml'
@@ -686,14 +726,16 @@ def getrealhost(host):
 class Transport(xmlrpclib.Transport):
 
     # override?
-    user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by rPath, Inc.)" % xmlrpclib.__version__
-    # make this a class variable so that across all attempts to transport we'll only
+    user_agent = "xmlrpclib.py/%s (www.pythonware.com modified by " \
+        "rPath, Inc.)" % xmlrpclib.__version__
+    # make this a class variable so that across all attempts to transport
+    # we'll only
     # spew messages once per host.
     failedHosts = set()
     UrlOpenerFactory = XMLOpener
 
-    def __init__(self, https = False, proxies = None, serverName = None,
-                 extraHeaders = None, caCerts=None):
+    def __init__(self, https=False, proxies=None, serverName=None,
+                 extraHeaders=None, caCerts=None):
         self.https = https
         self.compress = False
         self.abortCheck = None
@@ -757,7 +799,7 @@ class Transport(xmlrpclib.Transport):
             if isinstance(extra_headers, dict):
                 extra_headers = extra_headers.items()
             for key, value in extra_headers:
-                opener.addheader(key,value)
+                opener.addheader(key, value)
 
         if self.entitlement:
             opener.addheader('X-Conary-Entitlement', self.entitlement)
@@ -769,60 +811,29 @@ class Transport(xmlrpclib.Transport):
         for k, v in self.extraHeaders.items():
             opener.addheader(k, v)
 
-        tries = 0
-        resetResolv = False
         url = ''.join([protocol, '://', host, handler])
-        while tries < 5:
-            try:
-                # Make sure we capture some useful information from the
-                # opener, even if we failed
-                try:
-                    usedAnonymous, response = opener.open(url, body)
-                finally:
-                    self.usedProxy = getattr(opener, 'usedProxy', False)
-                    self.proxyHost = getattr(opener, 'proxyHost', None)
-                    self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
-                break
-            except (IOError, socket.sslerror), e:
-                # try resetting the resolver - /etc/resolv.conf
-                # might have changed since this process started.
-                util.res_init()
-                if not resetResolv:
-                    # first time through this loop, don't sleep or
-                    # print a warning - just try again immediately
-                    resetResolv = True
-                    continue
-                tries += 1
-                if tries >= 5 or host in self.failedHosts:
-                    self.failedHosts.add(host)
-                    raise
-                if e.args[0] == 'socket error':
-                    e = e.args[1]
-                if isinstance(e, socket.gaierror):
-                    if e.args[0] == socket.EAI_AGAIN:
-                        clog.warning('got "%s" when trying to '
-                                    'resolve %s.  Retrying in '
-                                    '500 ms.' %(e.args[1], host))
-                        time.sleep(.5)
-                    else:
-                        raise
-                elif isinstance(e, socket.sslerror):
-                    clog.warning('got "%s" when trying to '
-                                'make an SSL connection to %s.'
-                                'Retrying in 500 ms.' %(e.args[1], host))
-                    time.sleep(.5)
-                else:
-                    raise
+        # Make sure we capture some useful information from the
+        # opener, even if we failed
+        try:
+            usedAnonymous, response = opener.open(url, body)
+        finally:
+            self.usedProxy = getattr(opener, 'usedProxy', False)
+            self.proxyHost = getattr(opener, 'proxyHost', None)
+            self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
         if hasattr(response, 'headers'):
             self.responseHeaders = response.headers
             self.responseProtocol = response.protocolVersion
         resp = self.parse_response(response)
-        rc = ( [ usedAnonymous ] + resp[0], )
+        rc = ([usedAnonymous] + resp[0], )
         return rc
 
     def getparser(self):
         return util.xmlrpcGetParser()
 
-class AbortError(Exception): pass
 
-class TransportError(Exception): pass
+class AbortError(Exception):
+    pass
+
+
+class TransportError(Exception):
+    pass
