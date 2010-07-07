@@ -44,7 +44,7 @@ import xmlrpclib
 import zlib
 
 from conary import errors
-from conary.lib import fixedglob, graph, log, api
+from conary.lib import fixedglob, log, api
 
 # Imported for the benefit of older code,
 from conary.lib.formattrace import formatTrace
