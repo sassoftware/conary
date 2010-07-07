@@ -2458,6 +2458,7 @@ class TimestampedMap(object):
     If delta is set to None, new entries will never go stale.
     """
     __slots__ = [ 'delta', '_map' ]
+    _MISSING = object()
     def __init__(self, delta = None):
         self.delta = delta
         self._map = dict()
@@ -2480,6 +2481,13 @@ class TimestampedMap(object):
 
     def clear(self):
         self._map.clear()
+
+    def iteritems(self, stale=False):
+        now = time.time()
+        ret = sorted(self._map.items(), key = lambda x: x[1][1])
+        ret = [ (k, v[0]) for (k, v) in ret
+            if stale or now <= v[1] ]
+        return ret
 
 class URL(object):
     __slots__ = [ '_comps', ]
@@ -2564,12 +2572,26 @@ class URL(object):
             self.__class__.__module__, self.__class__.__name__,
             id(self), urlUnsplit(self._comps))
 
+    # Make the URL objects hashable
+    def _hash_repr(self):
+        return self._comps
+
+    def __eq__(self, other):
+        return (issubclass(other.__class__, self.__class__) and
+            self._hash_repr() == other._hash_repr())
+
+    def __hash__(self):
+        return self._hash_repr().__hash__()
+
 class ProxyURL(URL):
     __slots__ = [ 'requestProtocol' ]
 
     def __init__(self, url, defaultPort=None, requestProtocol=None):
         URL.__init__(self, url, defaultPort=defaultPort)
         self.requestProtocol = requestProtocol or self.protocol
+
+    def _hash_repr(self):
+        return (self._comps, self.requestProtocol)
 
 class ProxyMap(dict):
     BLACKLIST_TTL = 60 * 60  # The TTL for server blacklist entries (seconds)
@@ -2582,6 +2604,9 @@ class ProxyMap(dict):
                                                    portGlobClass))
     ipv4Re = re.compile(r'(\d+)\.(\d+)\.(\d+)\.(\d+)(/?)(\d*)(:?)(%s*)$'
                         % portGlobClass)
+
+    ProxyURL = ProxyURL
+    _MISSING = object()
 
     def __init__(self, default={}):
         self.sortedKeys = []
@@ -2717,12 +2742,12 @@ class ProxyMap(dict):
         map = dict(conary='http', conarys='https')
         ret = cls()
         for reqProto, proxyHost in d.items():
-            url = ProxyURL(proxyHost)
+            url = cls.ProxyURL(proxyHost)
             proto = url.protocol
             url.protocol = map.get(proto, proto)
             # If there was no protocol in the proxy URL, assume original one
             url.requestProtocol = proto or reqProto
-            ret.update('*', { reqProto : [ url ] })
+            ret.update('*', { url.requestProtocol : [ url ] })
         return ret
 
     def update(self, host, protoMap):
@@ -2731,11 +2756,9 @@ class ProxyMap(dict):
         for proto in protoMap:
             if len(self.sortedKeys):
                 number = self.sortedKeys[-1][0] + 1
-            sUrls = []
             key = (number, serverObj, proto)
-            self[key] = sUrls
-            for u in protoMap[proto]:
-                sUrls.append(u)
+            self[key] = sUrls = []
+            sUrls.extend(self._newProxyUrl(x, proto) for x in protoMap[proto])
             self.sortedKeys.append(key)
 
     def remove(self, host, scheme=None):
@@ -2749,20 +2772,25 @@ class ProxyMap(dict):
     def clear(self):
         dict.clear(self)
         self._updateSortedKeys()
+        self.clearBlacklist()
 
-    def blacklistUrl(self, url):
-        if hasattr(url, 'asString'):
-            url = url.asString(withAuth=True)
-        self._blacklist.set(url, True)
+    def blacklistUrl(self, url, error=None):
+        assert isinstance(url, ProxyURL)
+        self._blacklist.set(url, error)
 
     def isUrlBlacklisted(self, url):
-        if hasattr(url, 'asString'):
-            url = url.asString(withAuth=True)
-        return self._blacklist.get(url, False)
+        error = self._blacklist.get(url, self._MISSING)
+        return error is not self._MISSING
+
+    def clearBlacklist(self):
+        self._blacklist.clear()
+
+    def iterBlacklist(self, stale=False):
+        return self._blacklist.iteritems(stale=stale)
 
     def getProxyIter(self, url, schemes):
         if isinstance(url, str):
-            us = ProxyURL(url)
+            us = URL(url)
         else:
             us = url
         if not us.protocol:
@@ -2789,9 +2817,10 @@ class ProxyMap(dict):
                 for proxy in self._nextProxy(proxyList):
                     yield proxy
             # If we got this far, everything we tried has failed
-            raise errors.ProxyListExhausted("All proxies for protocol '%s' "
-                                            "have failed or have been "
-                                            "previously blacklisted." % scheme)
+            failedProxies = set()
+            for proxyList in proxyProxyList:
+                failedProxies.update(proxyList)
+            raise errors.ProxyListExhausted(scheme, failedProxies)
 
     def _matchObjectAndScheme(self, obj, scheme):
         # Return a list of shuffled lists of proxies
@@ -2847,8 +2876,11 @@ class ProxyMap(dict):
         self.sortedKeys = self.keys()
         self.sortedKeys.sort()
 
-
-
+    @classmethod
+    def _newProxyUrl(cls, url, requestProtocol):
+        if isinstance(url, cls.ProxyURL):
+            return url
+        return cls.ProxyURL(url, requestProtocol=requestProtocol)
 
 
 def statFile(pathOrFile, missingOk=False, inodeOnly=False):

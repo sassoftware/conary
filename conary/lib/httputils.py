@@ -156,14 +156,40 @@ class ConnectionManager(object):
                     self._timer.sleep()
                 self._retryCount += 1
                 return (self.connSpec, None)
-            except errors.ProxyListExhausted:
+            except errors.ProxyListExhausted, e:
                 ei = sys.exc_info()
-                raise TransportError, ei[1], ei[2]
+                proxyErrors = [ x[1]
+                    for x in self.proxyMap.iterBlacklist(stale=True)
+                        if x[1].host in e.failedProxies ]
+                proxyError = proxyErrors[-1]
+                if len(proxyErrors) > 1:
+                    errMsg = " %d proxies failed. Last error:" % (
+                        len(proxyErrors), )
+                else:
+                    errMsg = ""
+                errMsg = "Proxy error:%s %s" % (errMsg,
+                    self._formatProxyError(proxyError))
+                raise TransportError, errMsg, ei[2]
             return (self.connSpec, proxy)
 
-        def markFailedProxy(self, proxy):
-            log.info("Marking proxy %r as failed" % proxy.asString(withAuth=True))
-            self.proxyMap.blacklistUrl(proxy)
+        def markFailedProxy(self, proxy, error=None):
+            if error:
+                errorMsg = " (%s)" % str(error)
+            else:
+                errorMsg = ""
+            log.info("Marking proxy %r as failed%s" % (
+                proxy.asString(withAuth=True), errorMsg))
+            self.proxyMap.blacklistUrl(proxy, error=error)
+
+        def _formatProxyError(self, proxyError):
+            tmpl = "Proxy type: %s; url=%r: %s"
+            if proxyError.exception:
+                errMsg = str(proxyError.exception)
+            else:
+                errMsg = "(unknown)"
+            return tmpl % (proxyError.host.requestProtocol,
+                proxyError.host.asString(withAuth=True), errMsg)
+
 
     class Connection(object):
         __slots__ = [ 'url', 'selector', 'connection', 'headers' ]
@@ -588,7 +614,7 @@ class URLOpener(urllib.FancyURLopener):
                 break
             except ProxyError, e:
                 lastProxyError = e
-                connIterator.markFailedProxy(connSpec[1])
+                connIterator.markFailedProxy(connSpec[1], e)
                 continue
             except (socket.sslerror, socket.gaierror), e:
                 if e.args[0] == 'socket error':

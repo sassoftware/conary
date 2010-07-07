@@ -205,6 +205,10 @@ class ProxyListExhausted(ConaryError):
     This exception is raised when all proxy instances in a list have been
     blacklisted, so no additional proxies are available.
     """
+    def __init__(self, scheme, failedProxies, *args, **kwargs):
+        self.scheme = scheme
+        self.failedProxies = failedProxies
+        ConaryError.__init__(self, *args, **kwargs)
 
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 
