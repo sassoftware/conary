@@ -14,6 +14,7 @@
 
 import bdb
 import bz2
+import copy
 import debugger
 import errno
 import fcntl
@@ -23,10 +24,12 @@ import itertools
 import log
 import misc
 import os
+import random
 import re
 import select
 import shutil
 import signal
+import socket
 import stat
 import string
 import StringIO
@@ -42,6 +45,7 @@ import weakref
 import xmlrpclib
 import zlib
 
+from conary import errors
 from conary.lib import fixedglob, graph, log, api
 
 # Imported for the benefit of older code,
@@ -1718,6 +1722,7 @@ def urlUnsplit(urlTuple):
         return urlTempl
     return ProtectedTemplate(urlTempl, passwd = ProtectedString(urllib.quote(passwd)))
 
+
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
     """Marshaller for XMLRPC data"""
     dispatch = xmlrpclib.Marshaller.dispatch.copy()
@@ -2481,6 +2486,15 @@ class URL(object):
     __slots__ = [ '_comps', ]
     def __init__(self, url, defaultPort=None):
         self._comps = urlSplit(url, defaultPort)
+        if ( (not self._comps[0] and not self._comps[3]) or
+             (self._comps[0] and not self._comps[3] and self._comps[5]) ):
+            if url.startswith('/'):
+                self._comps = (None, ) + self._comps[1:]
+            else:
+                # No host; protocol was missing, so add a :// which we drop
+                # later
+                url = 'a://' + url
+                self._comps = (None, ) + urlSplit(url, defaultPort)[1:]
 
     def _getProtocol(self):
         return self._comps[0]
@@ -2531,10 +2545,20 @@ class URL(object):
     def asString(self, withAuth=False):
         arr = self._comps
         if withAuth or (arr[1] is None and arr[2] is None):
-            return urlUnsplit(arr)
+            return self._unsplit(arr)
         arr = list(arr)
         arr[1] = arr[2] = None
-        return urlUnsplit(arr)
+        return self._unsplit(arr)
+
+    @classmethod
+    def _unsplit(cls, arr):
+        ret = urlUnsplit(arr)
+        if arr[0] is not None or (not arr[3] and arr[5]):
+            # If no protocol, or no host but with path
+            # (we want /path to be properly split)
+            return ret
+        # If no protocol, strip out leading //
+        return ret[2:]
 
     def __repr__(self):
         return "<%s.%s instance at %#x; url=%s>" % (
@@ -2547,6 +2571,284 @@ class ProxyURL(URL):
     def __init__(self, url, defaultPort=None, requestProtocol=None):
         URL.__init__(self, url, defaultPort=defaultPort)
         self.requestProtocol = requestProtocol or self.protocol
+
+class ProxyMap(dict):
+    BLACKLIST_TTL = 60 * 60  # The TTL for server blacklist entries (seconds)
+    _blacklist = TimestampedMap(BLACKLIST_TTL)
+
+    hostClass = r'[\w\-.]'
+    hostGlobClass = r'[\w.*!?[\]\-]'
+    portGlobClass = r'[\d*!?[\]\-]'
+    hostRe = re.compile(r'(%s*)(%s*)(:?)(%s*)$' % (hostClass, hostGlobClass,
+                                                   portGlobClass))
+    ipv4Re = re.compile(r'(\d+)\.(\d+)\.(\d+)\.(\d+)(/?)(\d*)(:?)(%s*)$'
+                        % portGlobClass)
+
+    def __init__(self, default={}):
+        self.sortedKeys = []
+
+    class hostStr(object):
+        def __init__(self, hostname):
+            m = ProxyMap.hostRe.match(hostname)
+            self.value = m.group(1)
+            assert(self.value)
+            self.port = m.group(4) or None
+            self.ip = None
+
+        def getIp(self):
+            if not self.ip:
+                from conary.lib import httputils
+                ipStr = httputils.IPCache.get(self.value)
+                self.ip = struct.unpack('!L', socket.inet_aton(ipStr))[0]
+            return self.ip
+
+        def match(self, other):
+            if isinstance(other, self.__class__):
+                return self.value == other.value and \
+                    (self.port == None or
+                     fnmatch.fnmatch(other.port, self.port))
+            if isinstance(other, ProxyMap.ipAddr):
+                return self.getIp() == other.value
+            return NotImplemented
+
+        def __str__(self):
+            if self.port:
+                return self.value + ":" + self.port
+            return self.value
+
+        def __hash__(self):
+            return hash(self.value)
+
+    class hostGlob(object):
+        def __init__(self, hostglob):
+            m = ProxyMap.hostRe.match(hostglob)
+            self.value = m.group(1) + m.group(2)
+            assert(self.value)
+            self.port = m.group(4) or None
+            self.ip = None
+
+        def match(self, other):
+            if isinstance(other, self.__class__):
+                return self.value == other.value and \
+                    (self.port == None or
+                     fnmatch.fnmatch(other.port, self.port))
+            if isinstance(other, ProxyMap.hostStr):
+                return fnmatch.fnmatch(other.value, self.value) and \
+                    (self.port == None or
+                     fnmatch.fnmatch(other.port, self.port))
+            if isinstance(other, ProxyMap.ipAddr):
+                return False
+            return NotImplemented
+
+        def __str__(self):
+            if self.port:
+                return '%s:%s' % (self.value, self.port)
+            return self.value
+
+        def __hash__(self):
+            return hash(str(self))
+
+    class ipAddr(object):
+        def __init__(self, ipStr):
+            m = ProxyMap.ipv4Re.match(ipStr)
+            ipStr = '%s.%s.%s.%s' % m.groups()[0:4]
+            self.value = long(struct.unpack('!L', socket.inet_aton(ipStr))[0])
+            self.port = m.group(8) or None
+
+        def match(self, other):
+            if isinstance(other, self.__class__):
+                return self.value == other.value and \
+                    (self.port == None
+                     or fnmatch.fnmatch(other.port, self.port))
+            if isinstance(other, ProxyMap.hostStr):
+                return self.value == other.getIp() and \
+                    (self.port == None or \
+                         fnmatch.fnmatch(other.port, self.port))
+            return NotImplemented
+
+        def __str__(self):
+            addrStr = socket.inet_ntoa(struct.pack('!L', self.value))
+            if self.port:
+                addrStr = '%s:%s' % (addrStr, self.port)
+            return addrStr
+
+        def __hash__(self):
+            return hash(str(self))
+
+    class ipBlock(object):
+        def __init__(self, ipStr):
+            m = ProxyMap.ipv4Re.match(ipStr)
+            ipStr = '%s.%s.%s.%s' % m.groups()[0:4]
+            self.value = long(struct.unpack('!L', socket.inet_aton(ipStr))[0])
+            self.allocSize = int(m.group(6))
+            self.mask = ~((1L << self.allocSize) - 1)
+            self.port = m.group(8) or None
+
+        def match(self, other):
+            if isinstance(other, self.__class__):
+                return self.value == other.value and \
+                    self.mask == other.mask and \
+                    (self.port == None or
+                     fnmatch.fnmatch(other.port, self.port))
+            if isinstance(other, ProxyMap.ipAddr):
+                return self.value == (other.value & self.mask) and \
+                    (self.port == None or
+                     fnmatch.fnmatch(other.port, self.port))
+            if isinstance(other, ProxyMap.hostStr):
+                return self.value == (other.getIp() & self.mask) and \
+                    (self.port == None
+                     or fnmatch.fnmatch(other.port, self.port))
+            return NotImplemented
+
+        def __str__(self):
+            addrStr = socket.inet_ntoa(struct.pack('!L', self.value))
+            if self.port:
+                addrStr = '%s/%s:%s' % \
+                    (addrStr, self.allocSize, self.port)
+            else:
+                addrStr = '%s/%s' % (addrStr, self.allocSize)
+            return addrStr
+
+        def __hash__(self):
+            return hash(str(self))
+
+    @classmethod
+    def fromDict(cls, d):
+        # Convert old-style proxy dicts to an object
+        map = dict(conary='http', conarys='https')
+        ret = cls()
+        for reqProto, proxyHost in d.items():
+            url = ProxyURL(proxyHost)
+            proto = url.protocol
+            url.protocol = map.get(proto, proto)
+            # If there was no protocol in the proxy URL, assume original one
+            url.requestProtocol = proto or reqProto
+            ret.update('*', { reqProto : [ url ] })
+        return ret
+
+    def update(self, host, protoMap):
+        number = 0
+        serverObj = self._identify(host)
+        for proto in protoMap:
+            if len(self.sortedKeys):
+                number = self.sortedKeys[-1][0] + 1
+            sUrls = []
+            key = (number, serverObj, proto)
+            self[key] = sUrls
+            for u in protoMap[proto]:
+                sUrls.append(u)
+            self.sortedKeys.append(key)
+
+    def remove(self, host, scheme=None):
+        serverObj = self._identify(host)
+        for k in self.keys():
+            if str(k[1]) == str(serverObj) and \
+                    (scheme == k[2] or scheme == None):
+                del self[k]
+        self._updateSortedKeys()
+
+    def clear(self):
+        dict.clear(self)
+        self._updateSortedKeys()
+
+    def blacklistUrl(self, url):
+        if hasattr(url, 'asString'):
+            url = url.asString(withAuth=True)
+        self._blacklist.set(url, True)
+
+    def isUrlBlacklisted(self, url):
+        if hasattr(url, 'asString'):
+            url = url.asString(withAuth=True)
+        return self._blacklist.get(url, False)
+
+    def getProxyIter(self, url, schemes):
+        if isinstance(url, str):
+            us = ProxyURL(url)
+        else:
+            us = url
+        if not us.protocol:
+            raise ValueError('%s does not contain a scheme' % url)
+        if not us.host:
+            raise ValueError('%s does not contain a hostname' % url)
+
+        serverObj = self._identify(us)
+        if isinstance(serverObj, self.ipBlock) or\
+                isinstance(serverObj, self.hostGlob):
+            raise ValueError(
+                    '%s does not specify a unique host' % str(us))
+
+        assert(isinstance(serverObj, self.hostStr) or
+               isinstance(serverObj, self.ipAddr))
+
+        for scheme in schemes:
+            proxyProxyList = self._matchObjectAndScheme(serverObj, scheme)
+            if not proxyProxyList:
+                # This scheme did not match, move to the next one
+                continue
+            # Go through each list in order.
+            for proxyList in proxyProxyList:
+                for proxy in self._nextProxy(proxyList):
+                    yield proxy
+            # If we got this far, everything we tried has failed
+            raise errors.ProxyListExhausted("All proxies for protocol '%s' "
+                                            "have failed or have been "
+                                            "previously blacklisted." % scheme)
+
+    def _matchObjectAndScheme(self, obj, scheme):
+        # Return a list of shuffled lists of proxies
+        ret = []
+        for k in self.sortedKeys:
+            _, pattern, proto = k
+            if proto != scheme or not pattern.match(obj):
+                continue
+            proxies = self[k][:]
+            random.shuffle(proxies)
+            ret.append(proxies)
+        return ret
+
+    def _nextProxy(self, proxyList):
+        while 1:
+            proxyFound = False
+            for proxy in proxyList:
+                if self.isUrlBlacklisted(proxy):
+                    continue
+                proxyFound = True
+                yield copy.copy(proxy)
+            if not proxyFound:
+                break
+
+    def _identify(self, obj):
+        if type(obj) is not str:
+            host = obj.host
+            if obj.port:
+                host += ':' + str(obj.port)
+        else:
+            host = obj
+        m = self.ipv4Re.match(host)
+        if m:
+            # we have an ip addr or block
+            if m.group(6) and m.group(6) != '32':
+                # we have a block
+                return self.ipBlock(host)
+            else:
+                # we have an ip address
+                return self.ipAddr(host)
+
+        m = self.hostRe.match(host)
+        if m.group(1) and not m.group(2):
+            # we have a plain hostname
+            return self.hostStr(host)
+        elif m.group(2):
+            # we have a hostname glob
+            return self.hostGlob(host)
+        else:
+            raise errors.ParseError('%s is an invalid hostname')
+
+    def _updateSortedKeys(self):
+        self.sortedKeys = self.keys()
+        self.sortedKeys.sort()
+
+
 
 
 

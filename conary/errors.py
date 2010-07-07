@@ -200,6 +200,12 @@ class CancelOperationException(Exception):
     want a callback to stop an update at the end of the job"""
     cancelOperation = True
 
+class ProxyListExhausted(ConaryError):
+    """
+    This exception is raised when all proxy instances in a list have been
+    blacklisted, so no additional proxies are available.
+    """
+
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 
 def exceptionIsUncatchable(e):
