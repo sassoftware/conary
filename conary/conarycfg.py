@@ -520,8 +520,8 @@ class CfgProxyMapEntry(CfgType):
 
 
 class CfgProxyMap(CfgDict):
-    def __init__(self, default=ProxyMap()):
-        CfgDict.__init__(self, CfgProxyMapEntry, ProxyMap, default=default)
+    def __init__(self, default=util.ProxyMap()):
+        CfgDict.__init__(self, CfgProxyMapEntry, util.ProxyMap, default=default)
 
     def updateFromString(self, val, string):
         strs = string.split(None, 1)

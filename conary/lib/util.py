@@ -1712,7 +1712,7 @@ def urlUnsplit(urlTuple):
         else:
             userpass = urllib.quote(user)
     hostport = host
-    if port:
+    if port is not None:
         hostport = urllib.quote("%s:%s" % (host, port), safe = ':')
     netloc = hostport
     if userpass:

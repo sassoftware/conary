@@ -1471,7 +1471,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return jobSizes
 
     def _clearHostCache(self):
-        transport.clearIPCache()
+        transport.httputils.IPCache.clear()
 
     def _cacheHostLookups(self, hosts):
         if self.proxies:
@@ -1483,7 +1483,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 mappedHost = urllib.splithost(urllib.splittype(url)[1])[0]
             else:
                 mappedHost = host
-            transport.httputils.getIPAddress(mappedHost)
+            transport.httputils.IPCache.get(mappedHost)
 
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
@@ -3071,14 +3071,9 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     that has a callback() method which takes amount, total, rate
     """
 
-    protocol, uri = urllib.splittype(url)
-    assert(protocol in ('http', 'https'))
-
-    opener = transport.XMLOpener(proxies=proxies)
-    c, urlstr, selector, headers = opener.createConnection(uri,
-        ssl = (protocol == 'https'), withProxy=True)
-
-    BUFSIZE = 8192
+    url = util.URL(url)
+    assert(url.protocol in ('http', 'https'))
+    ssl = (url.protocol == 'https')
 
     callbackFn = None
     if callback:
@@ -3086,6 +3081,15 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                                                 callback.sendingChangeset,
                                                 size)
         callbackFn = wrapper.callback
+
+    opener = transport.XMLOpener(proxies=proxies)
+    data = transport.httputils.HttpData(inFile, bufferSize=8192,
+        callback=callbackFn, size=size, chunked=chunked, method='PUT')
+
+    usedAnonymous, infourl = opener.open_http(url, data, ssl=ssl)
+    return infourl.code, infourl.msg
+
+    c = conn.connection
 
     c.putrequest("PUT", selector)
     for k, v in headers:

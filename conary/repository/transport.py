@@ -26,24 +26,58 @@ AbortError = httputils.AbortError
 URLOpener = httputils.URLOpener
 
 class ConaryURLOpener(URLOpener):
-    """An opener aware of the conary:// protocol"""
-    open_conary = URLOpener.open_http
-    open_conarys = URLOpener.open_https
+    """An opener aware of the conary proxies"""
 
+    ProxyTypeName = URLOpener.ProxyTypeName.copy()
+    ProxyTypeName.update(dict(conary = 'Conary', conarys = 'Conary'))
 
-class XMLOpener(URLOpener):
+    class ConnectionManager(URLOpener.ConnectionManager):
+        ConaryProxyProtocols = set([ 'conary', 'conarys' ])
+        ProtocolMaps = dict(http = [ 'conary', 'http' ],
+            https = [ 'conarys', 'https' ])
+        # For debugging purposes only
+        _sendConaryProxyHostHeader = True
+        def proxyBypassEnv(self, endpoint, proxy):
+            if proxy.requestProtocol in self.ConaryProxyProtocols:
+                return False
+            return URLOpener.ConnectionManager.proxyBypassEnv(self, endpoint, proxy)
+
+        def openConnection(self, connSpec):
+            conn = URLOpener.ConnectionManager.openConnection(self, connSpec)
+            endpoint, proxy = connSpec
+            if (proxy is not None and
+                    proxy.requestProtocol in self.ConaryProxyProtocols and
+                    self._sendConaryProxyHostHeader):
+                # Add a custom header to tell the proxy which name
+                # we contacted it on
+                conn.headers.append(('X-Conary-Proxy-Host', proxy.hostport))
+            return conn
+
+        def _getConnectionTypelEndpointProxy(self, endpoint, proxy):
+            m =  URLOpener.ConnectionManager._getConnectionTypelEndpointProxy
+            connType, selector = m(self, endpoint, proxy)
+            if proxy.requestProtocol in self.ConaryProxyProtocols:
+                if connType & self.CONN_TUNNEL:
+                    # Conary proxies don't implement tunneling, so clear the bit
+                    connType = connType ^ self.CONN_TUNNEL
+                if connType & self.CONN_SSL and proxy.requestProtocol == 'conary':
+                    # Endpoint is SSL, but we're mapping to a plain Conary
+                    # proxy
+                    connType = connType ^ self.CONN_SSL
+                if connType & self.CONN_PROXY:
+                    selector = endpoint.url
+            return connType, selector
+
+class XMLOpener(ConaryURLOpener):
     contentType = 'text/xml'
 
     def open_http(self, *args, **kwargs):
-        fp = URLOpener.open_http(self, *args, **kwargs)
+        fp = ConaryURLOpener.open_http(self, *args, **kwargs)
         usedAnonymous = 'X-Conary-UsedAnonymous' in fp.headers
         return usedAnonymous, fp
 
     def http_error(self, url, fp, errcode, errmsg, headers, data=None):
         raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
-
-    open_conary = open_http
-    open_conarys = URLOpener.open_https
 
 class Transport(xmlrpclib.Transport):
 
@@ -69,6 +103,7 @@ class Transport(xmlrpclib.Transport):
         self.responseProtocol = None
         self.usedProxy = False
         self.entitlement = None
+        self._proxyHost = None # Can be a URL object
         self.proxyHost = None
         self.proxyProtocol = None
 
@@ -140,8 +175,10 @@ class Transport(xmlrpclib.Transport):
             usedAnonymous, response = opener.open(url, body)
         finally:
             self.usedProxy = getattr(opener, 'usedProxy', False)
-            self.proxyHost = getattr(opener, 'proxyHost', None)
-            self.proxyProtocol = getattr(opener, 'proxyProtocol', None)
+            self._proxyHost = getattr(opener, 'proxyHost', None)
+            if self._proxyHost:
+                self.proxyHost = self._proxyHost.hostport
+                self.proxyProtocol = self._proxyHost.requestProtocol
         if hasattr(response, 'headers'):
             self.responseHeaders = response.headers
             self.responseProtocol = response.protocolVersion
