@@ -1483,7 +1483,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 mappedHost = urllib.splithost(urllib.splittype(url)[1])[0]
             else:
                 mappedHost = host
-            transport.getIPAddress(mappedHost)
+            transport.httputils.getIPAddress(mappedHost)
 
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,

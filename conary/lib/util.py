@@ -1943,6 +1943,7 @@ def decompressStream(src, bufferSize = 8092):
             break
         sio.write(z.decompress(buf))
     sio.write(z.flush())
+    sio.seek(0)
     return sio
 
 def compressStream(src, level = 5, bufferSize = 16384):
