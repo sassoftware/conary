@@ -21,14 +21,12 @@ import fcntl
 import fnmatch
 import gzip
 import itertools
-import log
 import misc
 import os
 import random
 import re
 import select
 import shutil
-import signal
 import socket
 import stat
 import string

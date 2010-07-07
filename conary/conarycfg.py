@@ -20,10 +20,6 @@ import xml
 import re
 import traceback
 import pwd
-import socket
-import struct
-import random
-import copy
 
 from conary.deps import deps, arch
 from conary.lib import util, api
