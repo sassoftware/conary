@@ -86,15 +86,7 @@ class OpenPGPKey(object):
         self.signatures = sorted(sigs.values(), key = lambda x: x.signer)
 
     def getType(self):
-        # pycrypto's API has no consistent way to tell what kind of key we
-        # have. This is apparently the least awful way to do it.
-        keyType = type(self.cryptoKey.key).__name__
-        if keyType == 'rsaKey':
-            return 'RSA'
-        elif keyType == 'dsaKey':
-            return 'DSA'
-        else:
-            raise TypeError("Unrecognized key type")
+        return openpgpfile.key_type(self.cryptoKey)
 
     def isRSA(self):
         return self.getType() == 'RSA'
@@ -647,4 +639,3 @@ class Trust(object):
             trust[node] = (ntlev, ntamt, tramt)
 
         return gt.edges[nodeIdx]
-
