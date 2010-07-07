@@ -2477,6 +2477,78 @@ class TimestampedMap(object):
     def clear(self):
         self._map.clear()
 
+class URL(object):
+    __slots__ = [ '_comps', ]
+    def __init__(self, url, defaultPort=None):
+        self._comps = urlSplit(url, defaultPort)
+
+    def _getProtocol(self):
+        return self._comps[0]
+
+    def _setProtocol(self, protocol):
+        self._comps = (protocol, ) + self._comps[1:]
+
+    protocol = property(_getProtocol, _setProtocol)
+
+    @property
+    def host(self):
+        return self._comps[3]
+
+    @property
+    def port(self):
+        return self._comps[4]
+
+    @property
+    def hostport(self):
+        arr = self._comps
+        arr = (None, None, None, arr[3], arr[4], '', None, None)
+        return urllib.splithost(urlUnsplit(arr))[0]
+
+    @property
+    def userpass(self):
+        username, passwd = self._comps[1], self._comps[2]
+        if username is None:
+            if passwd is None:
+                return None
+            return ProtectedTemplate(':${passwd}',
+                passwd = passwd)
+        if passwd is None:
+            return username
+        return ProtectedTemplate(username + ':${passwd}',
+            passwd = passwd)
+
+    @property
+    def selector(self):
+        arr = self._comps
+        arr = (None, None, None, None, None, arr[5], arr[6], arr[7])
+        return urlUnsplit(arr)
+
+    @property
+    def url(self):
+        # Return the original url, minus user/pass
+        return self.asString(withAuth=False)
+
+    def asString(self, withAuth=False):
+        arr = self._comps
+        if withAuth or (arr[1] is None and arr[2] is None):
+            return urlUnsplit(arr)
+        arr = list(arr)
+        arr[1] = arr[2] = None
+        return urlUnsplit(arr)
+
+    def __repr__(self):
+        return "<%s.%s instance at %#x; url=%s>" % (
+            self.__class__.__module__, self.__class__.__name__,
+            id(self), urlUnsplit(self._comps))
+
+class ProxyURL(URL):
+    __slots__ = [ 'requestProtocol' ]
+
+    def __init__(self, url, defaultPort=None, requestProtocol=None):
+        URL.__init__(self, url, defaultPort=defaultPort)
+        self.requestProtocol = requestProtocol or self.protocol
+
+
 
 def statFile(pathOrFile, missingOk=False, inodeOnly=False):
     """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
