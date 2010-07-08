@@ -2737,7 +2737,10 @@ class ProxyMap(dict):
             return hash(str(self))
 
     @classmethod
-    def fromDict(cls, d):
+    def fromDict(cls, d, readEnvironment=False):
+        if d is None:
+            # Attempt to get proxies from the environment too
+            d = (readEnvironment and urllib.getproxies()) or {}
         # Convert old-style proxy dicts to an object
         map = dict(conary='http', conarys='https')
         ret = cls()
@@ -2768,6 +2771,10 @@ class ProxyMap(dict):
                     (scheme == k[2] or scheme == None):
                 del self[k]
         self._updateSortedKeys()
+
+    def isEmpty(self):
+        # Technically we can return not bool(self)
+        return not bool(len(self))
 
     def clear(self):
         dict.clear(self)

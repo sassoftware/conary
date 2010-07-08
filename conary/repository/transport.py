@@ -90,12 +90,14 @@ class Transport(xmlrpclib.Transport):
     failedHosts = set()
     UrlOpenerFactory = XMLOpener
 
-    def __init__(self, https=False, proxies=None, serverName=None,
-                 extraHeaders=None, caCerts=None):
+    def __init__(self, https=False, proxies=None, proxyMap=None,
+                 serverName=None, extraHeaders=None, caCerts=None):
         self.https = https
         self.compress = False
         self.abortCheck = None
-        self.proxies = proxies
+        if proxyMap is None:
+            proxyMap = self.UrlOpenerFactory.newProxyMapFromDict(proxies)
+        self.proxyMap = proxyMap
         self.serverName = serverName
         self.setExtraHeaders(extraHeaders)
         self.caCerts = caCerts
@@ -146,7 +148,8 @@ class Transport(xmlrpclib.Transport):
 
         protocol = self._protocol()
 
-        opener = self.UrlOpenerFactory(self.proxies, caCerts=self.caCerts)
+        opener = self.UrlOpenerFactory(proxyMap=self.proxyMap,
+            caCerts=self.caCerts)
         opener.setCompress(self.compress)
         opener.setAbortCheck(self.abortCheck)
 

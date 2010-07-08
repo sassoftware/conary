@@ -533,10 +533,7 @@ class URLOpener(urllib.FancyURLopener):
             proxies = args[0]
             args = ()
         if proxyMap is None:
-            if proxies is None:
-                # Attempt to get proxies from the environment too
-                proxies = urllib.getproxies()
-            proxyMap = self.ProxyMap.fromDict(proxies)
+            proxyMap = self.newProxyMapFromDict(proxies)
         self.connmgr = self.ConnectionManager(proxyMap,
             retries=kw.pop('retries', None),
             proxyRetries=kw.pop('proxyRetries', None),
@@ -551,6 +548,11 @@ class URLOpener(urllib.FancyURLopener):
     @property
     def usedProxy(self):
         return self.proxyHost is not None
+
+    @classmethod
+    def newProxyMapFromDict(cls, proxies):
+        proxyMap = cls.ProxyMap.fromDict(proxies, readEnvironment=True)
+        return proxyMap
 
     def setCompress(self, compress):
         self.compress = compress

@@ -131,7 +131,7 @@ class ProxyCaller:
 class ProxyCallFactory:
 
     @staticmethod
-    def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
+    def createCaller(protocol, port, rawUrl, proxyMap, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
                      remoteIp, isSecure, baseUrl):
         entitlementList = authToken[2][:]
@@ -167,7 +167,7 @@ class ProxyCallFactory:
         addSSL = ':' not in urlHost and (bool(injEntList) or bool(userOverride))
         withSSL = urlProtocol == 'https' or addSSL
         transporter = transport.Transport(https = withSSL,
-                                          proxies = proxies,
+                                          proxyMap = proxyMap,
                                           serverName = targetServerName)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
@@ -215,7 +215,7 @@ class RepositoryCallFactory:
         self.repos = repos
         self.log = logger
 
-    def createCaller(self, protocol, port, rawUrl, proxies, authToken,
+    def createCaller(self, protocol, port, rawUrl, proxyMap, authToken,
                      localAddr, protocolString, headers, cfg,
                      targetServerName, remoteIp, isSecure, baseUrl):
         if 'via' in headers:
@@ -239,7 +239,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
         util.mkdirChain(self.tmpPath)
-        self.proxies = conarycfg.getProxyFromConfig(cfg)
+        self.proxyMap = conarycfg.getProxyMap(cfg)
         self.repositoryVersionCache = RepositoryVersionCache()
 
         self.log = tracelog.getLog(None)
@@ -282,7 +282,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
-                                               self.proxies, authToken,
+                                               self.proxyMap, authToken,
                                                localAddr, protocolString,
                                                headers, self.cfg,
                                                targetServerName,
@@ -991,7 +991,7 @@ class ChangesetFilter(BaseProxy):
 
     def _cacheChangeSet(self, url, neededHere, csInfoList, changeSetList):
         try:
-            inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            inF = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
         except transport.TransportError, e:
             raise errors.RepositoryError(e.args[0])
 
@@ -1360,7 +1360,7 @@ class ProxyRepositoryServer(ChangesetFilter):
         dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
         os.close(fd)
         os.unlink(tmpPath)
-        inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+        inUrl = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
         size = util.copyfileobj(inUrl, dest)
         inUrl.close()
         dest.seek(0)
@@ -1493,7 +1493,7 @@ class ProxyRepositoryServer(ChangesetFilter):
             dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
             os.close(fd)
             os.unlink(tmpPath)
-            inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            inUrl = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
             size = util.copyfileobj(inUrl, dest)
             inUrl.close()
             dest.seek(0)

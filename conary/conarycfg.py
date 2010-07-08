@@ -1109,3 +1109,12 @@ def getProxyFromConfig(cfg):
     if proxy:
         return proxy
     return cfg.proxy
+
+def getProxyMap(cfg):
+    cpMap = dict(http = 'conary', https = 'conarys')
+    if cfg.proxyMap.isEmpty():
+        proxies = dict((k, [ v ]) for (k, v) in cfg.proxy.iteritems())
+        proxies.update((cpMap[k], [ v ])
+            for (k, v) in cfg.conaryProxy.iteritems())
+        cfg.proxyMap.update("*", proxies)
+    return cfg.proxyMap
