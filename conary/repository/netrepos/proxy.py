@@ -19,10 +19,9 @@ import tempfile
 import time
 import urllib
 import urllib2
-import urlparse
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
-from conary.lib import digestlib, sha1helper, tracelog, util
+from conary.lib import digestlib, sha1helper, tracelog, urlparse, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
