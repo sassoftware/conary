@@ -38,13 +38,12 @@ import tempfile
 import time
 import types
 import urllib
-import urlparse
 import weakref
 import xmlrpclib
 import zlib
 
 from conary import errors
-from conary.lib import fixedglob, log, api
+from conary.lib import fixedglob, log, api, urlparse
 
 # Imported for the benefit of older code,
 from conary.lib.formattrace import formatTrace
@@ -2492,15 +2491,20 @@ class TimestampedMap(object):
 class URL(object):
     __slots__ = [ '_comps', ]
     def __init__(self, url, defaultPort=None):
+        if url == "":
+            # Special-case this, python 2.4 produces empty strings for the
+            # scheme
+            self._comps = (None, None, None, '', None, '', None, None)
+            return
         self._comps = urlSplit(url, defaultPort)
         if ( (not self._comps[0] and not self._comps[3]) or
              (self._comps[0] and not self._comps[3] and self._comps[5]) ):
             if url.startswith('/'):
                 self._comps = (None, ) + self._comps[1:]
-            else:
+            elif url:
                 # No host; protocol was missing, so add a :// which we drop
                 # later
-                url = 'a://' + url
+                url = 'http://' + url
                 self._comps = (None, ) + urlSplit(url, defaultPort)[1:]
 
     def _getProtocol(self):
