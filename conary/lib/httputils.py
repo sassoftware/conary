@@ -655,7 +655,7 @@ class URLOpener(urllib.FancyURLopener):
                       connIterator.retryCount, connIterator.retries))
             raise e
         elif connIterator.retryCount > 1:
-            log.info("Suceeded to connect to %s after "
+            log.info("Successfully connected to %s after "
                       "%i of %i tries." % (connection,
                       connIterator.retryCount, connIterator.retries))
 
