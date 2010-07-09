@@ -603,7 +603,7 @@ class URLOpener(urllib.FancyURLopener):
                 try:
                     h.endheaders()
                 except socket.error, e:
-                    if e.errno == errno.ECONNREFUSED and connSpec[1]:
+                    if e.args[0] == errno.ECONNREFUSED and connSpec[1]:
                         raise ProxyError(e, host=connSpec[1])
                     raise
                 data.writeTo(h)
