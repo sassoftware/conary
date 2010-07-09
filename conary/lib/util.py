@@ -2599,7 +2599,6 @@ class ProxyURL(URL):
 
 class ProxyMap(dict):
     BLACKLIST_TTL = 60 * 60  # The TTL for server blacklist entries (seconds)
-    _blacklist = TimestampedMap(BLACKLIST_TTL)
 
     hostClass = r'[\w\-.]'
     hostGlobClass = r'[\w.*!?[\]\-]'
@@ -2614,6 +2613,7 @@ class ProxyMap(dict):
 
     def __init__(self, default={}):
         self.sortedKeys = []
+        self._blacklist = TimestampedMap(self.BLACKLIST_TTL)
 
     class hostStr(object):
         def __init__(self, hostname):
