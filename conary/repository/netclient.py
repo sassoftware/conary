@@ -3013,7 +3013,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             status, reason = httpPutFile(url, inFile, size, callback = callback,
                                          rateLimit = self.uploadRateLimit,
-                                         proxies = self.c.proxyMap,
+                                         proxyMap = self.c.proxyMap,
                                          chunked = chunked)
 
             # give a slightly more helpful message for 403

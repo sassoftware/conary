@@ -24,6 +24,7 @@ from conary.lib import util, httputils
 # For compatibility
 AbortError = httputils.AbortError
 URLOpener = httputils.URLOpener
+TransportError = httputils.TransportError
 
 class ConaryURLOpener(URLOpener):
     """An opener aware of the conary proxies"""
