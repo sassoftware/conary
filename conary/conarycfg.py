@@ -742,8 +742,8 @@ class ConaryConfiguration(SectionedConfigFile):
 
         util.settempdir(self.tmpDir)
 
-    def _getProxies(self):
-        return self.proxy
+    def getProxyMap(self):
+        return getProxyMap(self)
 
     def readEntitlementDirectory(self):
         if not os.path.isdir(self.entitlementDirectory):
@@ -1111,9 +1111,17 @@ def getProxyFromConfig(cfg):
     return cfg.proxy
 
 def getProxyMap(cfg):
+    """
+    Return the proxyMap, or create it from old-style proxy/conaryProxy
+    entries.
+    As a side-effect, cfg.proxyMap gets filled in from the old-style
+    proxy/conaryProxy entries.
+    """
     cpMap = dict(http = 'conary', https = 'conarys')
     if cfg.proxyMap.isEmpty():
-        proxies = dict((k, [ v ]) for (k, v) in cfg.proxy.iteritems())
+        proxyDict = util.urllib.getproxies()
+        proxyDict.update(cfg.proxy)
+        proxies = dict((k, [ v ]) for (k, v) in proxyDict.iteritems())
         proxies.update((cpMap[k], [ v ])
             for (k, v) in cfg.conaryProxy.iteritems())
         cfg.proxyMap.update("*", proxies)
