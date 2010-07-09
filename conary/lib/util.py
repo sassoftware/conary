@@ -2858,32 +2858,32 @@ class ProxyMap(dict):
             if not proxyFound:
                 break
 
-    def _identify(self, obj):
+    @classmethod
+    def _identify(cls, obj):
         if type(obj) is not str:
             host = obj.host
             if obj.port:
                 host += ':' + str(obj.port)
         else:
             host = obj
-        m = self.ipv4Re.match(host)
+        m = cls.ipv4Re.match(host)
         if m:
             # we have an ip addr or block
             if m.group(6) and m.group(6) != '32':
                 # we have a block
-                return self.ipBlock(host)
+                return cls.ipBlock(host)
             else:
                 # we have an ip address
-                return self.ipAddr(host)
+                return cls.ipAddr(host)
 
-        m = self.hostRe.match(host)
+        m = cls.hostRe.match(host)
         if m.group(1) and not m.group(2):
             # we have a plain hostname
-            return self.hostStr(host)
+            return cls.hostStr(host)
         elif m.group(2):
             # we have a hostname glob
-            return self.hostGlob(host)
-        else:
-            raise errors.ParseError('%s is an invalid hostname')
+            return cls.hostGlob(host)
+        raise errors.ParseError('%s is an invalid hostname')
 
     def _updateSortedKeys(self):
         self.sortedKeys = self.keys()
