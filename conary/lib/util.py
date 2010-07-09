@@ -2633,7 +2633,7 @@ class ProxyMap(dict):
         def match(self, other):
             if isinstance(other, self.__class__):
                 return self.value == other.value and \
-                    (self.port == None or
+                    (self.port is None or
                      fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.ipAddr):
                 return self.getIp() == other.value
@@ -2658,14 +2658,16 @@ class ProxyMap(dict):
         def match(self, other):
             if isinstance(other, self.__class__):
                 return self.value == other.value and \
-                    (self.port == None or
+                    (self.port is None or
                      fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.hostStr):
                 return fnmatch.fnmatch(other.value, self.value) and \
-                    (self.port == None or
+                    (self.port is None or
                      fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.ipAddr):
-                return False
+                return fnmatch.fnmatch(str(other), self.value) and \
+                    (self.port is None or
+                     (other.port is None or fnmatch.fnmatch(other.port, self.port)))
             return NotImplemented
 
         def __str__(self):
@@ -2686,11 +2688,11 @@ class ProxyMap(dict):
         def match(self, other):
             if isinstance(other, self.__class__):
                 return self.value == other.value and \
-                    (self.port == None
+                    (self.port is None
                      or fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.hostStr):
                 return self.value == other.getIp() and \
-                    (self.port == None or \
+                    (self.port is None or \
                          fnmatch.fnmatch(other.port, self.port))
             return NotImplemented
 
@@ -2716,15 +2718,15 @@ class ProxyMap(dict):
             if isinstance(other, self.__class__):
                 return self.value == other.value and \
                     self.mask == other.mask and \
-                    (self.port == None or
+                    (self.port is None or
                      fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.ipAddr):
                 return self.value == (other.value & self.mask) and \
-                    (self.port == None or
+                    (self.port is None or
                      fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.hostStr):
                 return self.value == (other.getIp() & self.mask) and \
-                    (self.port == None
+                    (self.port is None
                      or fnmatch.fnmatch(other.port, self.port))
             return NotImplemented
 
