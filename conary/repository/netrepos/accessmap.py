@@ -131,29 +131,34 @@ class RoleTroves(RoleTable):
         # avoid inserting duplicates
         cu = self.db.cursor()
         cu.execute("""
-        select distinct tmpInstanceId.instanceId, ugt.ugtId, ugt.recursive
+        select distinct tmpInstanceId.instanceId, ugt.userGroupId, ugt.ugtId, ugt.recursive
         from tmpInstanceId
         left join UserGroupTroves as ugt using(instanceId)
         """)
         # record the new permissions
-        rtList = []
-        for instanceId, rtId, recflag in cu.fetchall():
-            # new instanceId, left join returned a NULL rt record, or
-            # another role has access to this instanceId
-            if rtId != roleId:
+        ugtList = []
+        results = cu.fetchall()
+        instanceIds = set([ x[0] for x in results ])
+        for instanceId in instanceIds:
+            # if there's more than one result here, a DB constraint has been broken
+            permissions = [ x[2:] for x in results if x[0] == instanceId and x[1] == roleId ]
+            if len(permissions) == 0:
+                # This is a new role for this instanceId
                 cu.execute("insert into UserGroupTroves(userGroupId, instanceId, recursive) "
                            "values (?,?,?)", (roleId, instanceId, recursive))
-                rtId = cu.lastrowid
-            elif recursive and not recflag:
-                # granting recursive access to something that wasn't recursive before
-                cu.execute("update UserGroupTroves set recursive = ? where rtId = ?",
-                           (recursive, rtId))
-            else: # not worth bothering with a rebuild
-                rtId = None
-            if rtId: # we have a new (or changed) acl
-                self.rebuild(cu, rtId, roleId)
-                rtList.append(rtId)
-        return rtList
+                ugtId = cu.lastrowid
+            else:
+                ugtId, recflag = permissions[0]
+                if recursive and not recflag:
+                    # granting recursive access to something that wasn't recursive before
+                    cu.execute("update UserGroupTroves set recursive = ? where ugtId = ?",
+                           (recursive, ugtId))
+                else:
+                    ugtId = None
+            if ugtId:
+                self.rebuild(cu, ugtId, roleId)
+                ugtList.append(ugtId)
+        return ugtList      
 
     # remove trove access grants
     def delete(self, roleId, troveList):
