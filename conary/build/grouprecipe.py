@@ -32,7 +32,7 @@ from conary import callbacks
 from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
-from conary.repository import changeset, trovesource, searchsource
+from conary.repository import changeset, netclient, trovesource, searchsource
 from conary import trove
 from conary import versions
 from conary import files
@@ -1906,13 +1906,53 @@ class TroveCache(dict):
         if not callback:
             callback = callbacks.CookCallback()
         self.callback = callback
+        self.depCache = {}
 
     def __getattr__(self, key):
         return getattr(self.repos, key)
 
-    def getDepsForTroveList(self, troveList):
-        return [ (x.getProvides(), x.getRequires())
-                 for x in self.getTroves(troveList) ]
+    def getDepsForTroveList(self, troveTupList):
+        # look in the dep cache and trove cache
+        result = [ None ] * len(troveTupList)
+        for i, tup in enumerate(troveTupList):
+            result[i] = self.depCache.get(tup)
+            if result[i] is None and self.troveIsCached(tup):
+                trv = self.getTrove(tup)
+                result[i] = (trv.getProvides(), trv.getRequires())
+            elif result[i] is None and trove.troveIsPackage(tup[0]):
+                # packages provide only themselves; querying the repository
+                # to figure that out seems unnecessarily complicated
+                result[i] = deps.parseDep('trove: %s' % tup[0])
+
+        needed = [ (i, troveTup) for i, (troveTup, depSet) in
+                            enumerate(izip(troveTupList, result))
+                            if depSet is None ]
+        if not needed:
+            return result
+
+        # use the getDepsForTroveList call; it raises an error if it needs
+        # to access some repositories which don't support it
+        try:
+            depList = self.repos.getDepsForTroveList([ x[1] for x in needed ])
+        except netclient.PartialResultsError, e:
+            # we can't use this call everywhere; handle what we can and we'll
+            # deal with the None's later
+            depList = e.partialResults
+
+        for (i, troveTup), depInfo in izip(needed, depList):
+            self.depCache[troveTup] = depInfo
+            result[i] = depInfo
+
+        # see if anything else is None; if so, we need to cache the complete
+        needed = [ (i, troveTup) for i, troveTup in
+                            enumerate(troveTupList) if result[i] is None ]
+
+        trvs = self.getTroves([ x[1] for x in needed])
+        for (i, troveTup), trv in izip(needed, trvs):
+            result[i] = (trv.getProvides(), trv.getRequires())
+
+        return result
+
 
     def getPathHashesForTroveList(self, troveList):
         return [ x.getPathHashes() for x in self.getTroves(troveList) ]
@@ -1924,6 +1964,9 @@ class TroveCache(dict):
     def getTrove(self, troveTup, *args, **kw):
         self.cacheTroves([troveTup])
         return self[troveTup]
+
+    def troveIsCached(self, troveTup):
+        return troveTup in self
 
     def cacheTroves(self, troveTupList):
         troveTupList = [x for x in troveTupList if x not in self]
