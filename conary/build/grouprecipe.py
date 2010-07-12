@@ -1907,6 +1907,7 @@ class TroveCache(dict):
             callback = callbacks.CookCallback()
         self.callback = callback
         self.depCache = {}
+        self.troveInfoCache = {}
 
     def __getattr__(self, key):
         return getattr(self.repos, key)
@@ -1953,9 +1954,38 @@ class TroveCache(dict):
 
         return result
 
+    def getSizes(self, troveTupList):
+        return [ x() for x in
+                 self.getTroveInfo(trove._TROVEINFO_TAG_SIZE, troveTupList) ]
+
+    def getTroveInfo(self, infoType, troveTupList):
+        troveTupList = list(troveTupList)
+        infoCache = self.troveInfoCache.setdefault(infoType, {})
+
+        result = [ None ] * len(troveTupList)
+        for i, tup in enumerate(troveTupList):
+            result[i] = infoCache.get(tup)
+            if result[i] is None and self.troveIsCached(tup):
+                trv = self.getTrove(tup)
+                result[i] = getattr(trv.troveInfo,
+                                    trv.troveInfo.streamDict[infoType][2])
+
+        needed = [ (i, troveTup) for i, (troveTup, depSet) in
+                            enumerate(izip(troveTupList, result))
+                            if depSet is None ]
+        if not needed:
+            return result
+
+        troveInfoList = self.repos.getTroveInfo(infoType,
+                                                [ x[1] for x in needed ])
+        for (i, troveTup), troveInfo in izip(needed, troveInfoList):
+            infoCache[troveTup] = troveInfo
+            result[i] = troveInfo
+
+        return result
 
     def getPathHashesForTroveList(self, troveList):
-        return [ x.getPathHashes() for x in self.getTroves(troveList) ]
+        return self.getTroveInfo(trove._TROVEINFO_TAG_PATH_HASHES, troveList)
 
     def getTroves(self, troveList, *args, **kw):
         self.cacheTroves(troveList)
@@ -2065,9 +2095,6 @@ class TroveCache(dict):
                                  weakRef=True, *childChildTup)
 
 
-    def getSize(self, troveTup):
-        return self[troveTup].getSize()
-
     def isRedirect(self, troveTup):
         return self[troveTup].isRedirect()
 
@@ -2081,9 +2108,6 @@ class TroveCache(dict):
 
     def iterTroveListInfo(self, troveTup):
         return(self[troveTup].iterTroveListInfo())
-
-    def getPathHashes(self, troveTup):
-        return self[troveTup].getPathHashes()
 
     def includeByDefault(self, troveTup, childTrove):
         return self[troveTup].includeTroveByDefault(*childTrove)
@@ -3062,13 +3086,14 @@ def checkGroupDependencies(group, cfg, cache, callback):
     return failedDeps
 
 def calcSizeAndCheckHashes(group, troveCache, callback):
-    def _getHashConflicts(group, troveCache):
+    def _getHashConflicts(group, troveCache, callback):
         # Get troveTup and pathHashes for all components that are
         # byDefault True.
         isColl = trove.troveIsCollection
-        neededInfo = [ (x[0], troveCache.getPathHashes(x[0]))
-                       for x in group.iterTroveListInfo()
+        neededInfo = [ x[0] for x in group.iterTroveListInfo()
                             if x[2] and not isColl(x[0][0]) ]
+        neededInfo = zip(neededInfo,
+                         troveCache.getPathHashesForTroveList(neededInfo))
 
         # Get set of conflicting pathHashes
         allPaths = set()
@@ -3078,6 +3103,7 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
                 continue
             conflictPaths.update(pathHashes & allPaths)
             allPaths.update(pathHashes)
+            callback.groupCheckingPaths(len(allPaths))
 
         # Find all troves that have conflicting pathHashes
         conflictLists = {}
@@ -3086,6 +3112,8 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
                 continue
             for pathHash in conflictPaths & pathHashes:
                 conflictLists.setdefault(pathHash, set()).add(troveTup)
+
+        callback.groupDeterminingPathConflicts(len(conflictLists))
 
         # We've got the sets of conflicting troves, now
         # determine the set of conflicting files.
@@ -3188,6 +3216,8 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
             if paths:
                 finalConflicts.append((conflictSet, paths))
 
+        callback.done()
+
         return finalConflicts
 
     size = 0
@@ -3204,44 +3234,21 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
     neededInfo = [ x for x in group.iterTroveListInfo() \
                             if (x[1] or x[2]) and not isColl(x[0][0]) ]
 
-    troveCache.cacheTroves(x[0] for x in neededInfo)
-
-    if checkPathConflicts:
-        count = 0
-        callback.groupCheckingPaths(count)
-
-    for troveTup, explicit, byDefault, comps, requireLatest in neededInfo:
-        trvSize = troveCache.getSize(troveTup)
+    trvSizes = troveCache.getSizes(x[0] for x in neededInfo)
+    for (troveTup, explicit, byDefault, comps, requireLatest), trvSize \
+                in izip(neededInfo, trvSizes):
         if trvSize is None:
             validSize = False
             size = None
         elif validSize and byDefault:
             size += trvSize
 
-        if checkPathConflicts:
-            pathHashes = troveCache.getPathHashes(troveTup)
-            allPathHashes.extend(pathHashes)
-
-            count += 1
-            if count % 10 == 0:
-                callback.groupCheckingPaths(len(allPathHashes))
-
-
     group.setSize(size)
 
     if checkPathConflicts:
-        callback.groupCheckingPaths(len(allPathHashes))
-        pathHashCount = len(allPathHashes)
-        allPathHashes = set(allPathHashes)
-        uniquePathHashCount = len(allPathHashes)
-        if pathHashCount != uniquePathHashCount:
-            numConflicts = pathHashCount - uniquePathHashCount
-            callback.groupDeterminingPathConflicts(numConflicts)
-            conflicts = _getHashConflicts(group, troveCache)
+        conflicts = _getHashConflicts(group, troveCache, callback)
+        if conflicts:
             return conflicts
-        else:
-            callback.done()
-
 
 def findSourcesForGroup(repos, recipeObj, callback=None):
     """
