@@ -1114,15 +1114,16 @@ def getProxyMap(cfg):
     """
     Return the proxyMap, or create it from old-style proxy/conaryProxy
     entries.
-    As a side-effect, cfg.proxyMap gets filled in from the old-style
-    proxy/conaryProxy entries.
     """
     cpMap = dict(http = 'conary', https = 'conarys')
-    if cfg.proxyMap.isEmpty():
-        proxyDict = util.urllib.getproxies()
-        proxyDict.update(cfg.proxy)
-        proxies = dict((k, [ v ]) for (k, v) in proxyDict.iteritems())
-        proxies.update((cpMap[k], [ v ])
-            for (k, v) in cfg.conaryProxy.iteritems())
-        cfg.proxyMap.update("*", proxies)
-    return cfg.proxyMap
+    if not cfg.proxyMap.isEmpty():
+        return cfg.proxyMap
+
+    proxyMap = cfg.proxyMap.__class__()
+    proxyDict = util.urllib.getproxies()
+    proxyDict.update(cfg.proxy)
+    proxies = dict((k, [ v ]) for (k, v) in proxyDict.iteritems())
+    proxies.update((cpMap[k], [ v ])
+        for (k, v) in cfg.conaryProxy.iteritems())
+    proxyMap.update("*", proxies)
+    return proxyMap
