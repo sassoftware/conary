@@ -29,13 +29,11 @@ TransportError = httputils.TransportError
 class ConaryURLOpener(URLOpener):
     """An opener aware of the conary proxies"""
 
-    ProxyTypeName = URLOpener.ProxyTypeName.copy()
-    ProxyTypeName.update(dict(conary = 'Conary', conarys = 'Conary'))
-
     class ConnectionManager(URLOpener.ConnectionManager):
         ConaryProxyProtocols = set([ 'conary', 'conarys' ])
         ProtocolMaps = dict(http = [ 'conary', 'http' ],
             https = [ 'conarys', 'https' ])
+
         # For debugging purposes only
         _sendConaryProxyHostHeader = True
         def proxyBypassEnv(self, endpoint, proxy):
@@ -68,6 +66,11 @@ class ConaryURLOpener(URLOpener):
                 if connType & self.CONN_PROXY:
                     selector = endpoint.url
             return connType, selector
+
+        class _ConnectionIterator(URLOpener.ConnectionManager._ConnectionIterator):
+            ProxyTypeName = URLOpener.ConnectionManager._ConnectionIterator.ProxyTypeName.copy()
+            ProxyTypeName.update(dict(conary = 'Conary', conarys = 'Conary'))
+
 
 class XMLOpener(ConaryURLOpener):
     contentType = 'text/xml'

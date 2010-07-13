@@ -127,6 +127,7 @@ class ConnectionManager(object):
         __slots__ = [ 'connSpec', 'proxyMap', 'protocols',
             'retries', 'proxyRetries',
             'proxyLists', '_listIndex', '_retryCount', '_timer', '_iter', ]
+        ProxyTypeName = dict(http = 'HTTP', https = 'HTTP')
 
         def __init__(self, connSpec, proxyMap, protocols, retries, proxyRetries):
             self.connSpec = connSpec
@@ -182,13 +183,15 @@ class ConnectionManager(object):
             self.proxyMap.blacklistUrl(proxy, error=error)
 
         def _formatProxyError(self, proxyError):
-            tmpl = "Proxy type: %s; url=%r: %s"
+            tmpl = "%s (via %s proxy %r)"
             if proxyError.exception:
                 errMsg = str(proxyError.exception)
             else:
                 errMsg = "(unknown)"
-            return tmpl % (proxyError.host.requestProtocol,
-                proxyError.host.asString(withAuth=True), errMsg)
+            proxyType =  proxyError.host.requestProtocol
+            ppType = self.ProxyTypeName.get(proxyType, proxyType)
+            return tmpl % (errMsg, ppType,
+                proxyError.host.asString(withAuth=True))
 
 
     class Connection(object):
@@ -513,8 +516,6 @@ class URLOpener(urllib.FancyURLopener):
 
     user_agent = 'conary-http-client/0.1'
 
-    ProxyTypeName = dict(http = 'HTTP', https = 'HTTP')
-
     def __init__(self, *args, **kw):
         self.compress = False
         self.abortCheck = None
@@ -695,7 +696,7 @@ class URLOpener(urllib.FancyURLopener):
             return
         msgTempl =  "%s (via %s proxy %s)"
         proxyType = self.proxyHost.requestProtocol
-        ppType = self.ProxyTypeName.get(proxyType, proxyType)
+        ppType = self.connmgr._ConnectionIterator.ProxyTypeName.get(proxyType, proxyType)
         msgError = msgTempl % (error[1], ppType, self.proxyHost.hostport)
         error.args = (error[0], msgError)
         if hasattr(error, 'strerror'):
