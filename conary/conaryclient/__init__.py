@@ -16,7 +16,8 @@ import pickle
 
 #conary imports. the unused imports of filetypes, mirror, and callbacks
 #are part of the conaryclient api
-from conary import conarycfg, errors, metadata, rollbacks, trove
+from conary import conarycfg, errors, trove
+from conary.cmds import metadata, rollbacks
 from conary.conaryclient import clone, cmdline, password, resolve, update
 from conary.conaryclient import filetypes, mirror, callbacks  # pyflakes=ignore
 from conary.lib import log, util, openpgpkey, api

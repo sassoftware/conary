@@ -26,8 +26,8 @@ from conary.lib import api
 from conary.lib import util
 from conary.local import database
 from conary.repository import changeset
-from conaryclient import cmdline
-from conaryclient.cmdline import parseTroveSpec
+from conary.conaryclient import cmdline
+from conary.conaryclient.cmdline import parseTroveSpec
 
 # FIXME client should instantiated once per execution of the command line
 # conary client

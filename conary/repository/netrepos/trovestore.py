@@ -15,7 +15,8 @@
 import os
 import itertools
 
-from conary import files, metadata, trove, versions, changelog, callbacks
+from conary import files, trove, versions, changelog, callbacks
+from conary.cmds import metadata
 from conary.deps import deps
 from conary.lib import util, tracelog
 from conary.local import deptable

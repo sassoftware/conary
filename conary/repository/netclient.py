@@ -27,7 +27,7 @@ import xmlrpclib
 from conary import callbacks
 from conary import conarycfg
 from conary import files
-from conary import metadata
+from conary.cmds import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util, api

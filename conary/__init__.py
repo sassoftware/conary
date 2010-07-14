@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2008 rPath, Inc.
+# Copyright (c) 2004-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -26,3 +26,9 @@ The Conary Repository System
 @group Files: files, repository.filecontainer
 @group Misc: *
 """
+
+# For backward compatibility
+import conary.cmds.cvccmd as cvc
+from conary.cmds import branch, fmtroves, metadata, query, queryrep
+from conary.cmds import rollbacks, updatecmd, verify
+from conary.cmds import commit, clone, cscmd, showchangeset
