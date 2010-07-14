@@ -2587,8 +2587,9 @@ class URL(object):
     def __hash__(self):
         return self._hash_repr().__hash__()
 
+
 class ProxyURL(URL):
-    __slots__ = [ 'requestProtocol' ]
+    __slots__ = ['requestProtocol']
 
     def __init__(self, url, defaultPort=None, requestProtocol=None):
         URL.__init__(self, url, defaultPort=defaultPort)
@@ -2596,6 +2597,7 @@ class ProxyURL(URL):
 
     def _hash_repr(self):
         return (self._comps, self.requestProtocol)
+
 
 class ProxyMap(dict):
     BLACKLIST_TTL = 60 * 60  # The TTL for server blacklist entries (seconds)
@@ -2666,8 +2668,8 @@ class ProxyMap(dict):
                      fnmatch.fnmatch(other.port, self.port))
             if isinstance(other, ProxyMap.ipAddr):
                 return fnmatch.fnmatch(str(other), self.value) and \
-                    (self.port is None or
-                     (other.port is None or fnmatch.fnmatch(other.port, self.port)))
+                    (self.port is None or (other.port is None or
+                    fnmatch.fnmatch(other.port, self.port)))
             return NotImplemented
 
         def __str__(self):
@@ -2756,25 +2758,28 @@ class ProxyMap(dict):
             url.protocol = map.get(proto, proto)
             # If there was no protocol in the proxy URL, assume original one
             url.requestProtocol = proto or reqProto
-            ret.update('*', { url.requestProtocol : [ url ] })
+            ret.update(reqProto, '*', [url])
         return ret
 
-    def update(self, host, protoMap):
+    def update(self, proto, pattern, urlList):
         number = 0
-        serverObj = self._identify(host)
-        for proto in protoMap:
-            if len(self.sortedKeys):
-                number = self.sortedKeys[-1][0] + 1
-            key = (number, serverObj, proto)
-            self[key] = sUrls = []
-            sUrls.extend(self._newProxyUrl(x, proto) for x in protoMap[proto])
-            self.sortedKeys.append(key)
+        serverObj = self._identify(pattern)
+        proto, shortProto = self._expandScheme(proto)
+        if len(self.sortedKeys):
+            number = self.sortedKeys[-1][0] + 1
+        key = (number, serverObj, proto)
+        self[key] = sUrls = []
+        sUrls.extend([self._newProxyUrl(x, shortProto) for x in urlList])
+        self.sortedKeys.append(key)
 
-    def remove(self, host, scheme=None):
-        serverObj = self._identify(host)
+    def remove(self, proto, pattern=None):
+        proto, shortProto = self._expandScheme(proto)
+        serverObj = None
+        if pattern:
+            serverObj = self._identify(pattern)
         for k in self.keys():
-            if str(k[1]) == str(serverObj) and \
-                    (scheme == k[2] or scheme == None):
+            if (str(k[1]) == str(serverObj) or serverObj == None) and \
+                    (proto == k[2]):
                 del self[k]
         self._updateSortedKeys()
 
@@ -2821,6 +2826,7 @@ class ProxyMap(dict):
                isinstance(serverObj, self.ipAddr))
 
         for scheme in schemes:
+            scheme, shortScheme = self._expandScheme(scheme)
             proxyProxyList = self._matchObjectAndScheme(serverObj, scheme)
             if not proxyProxyList:
                 # This scheme did not match, move to the next one
@@ -2835,12 +2841,19 @@ class ProxyMap(dict):
                 failedProxies.update(proxyList)
             raise errors.ProxyListExhausted(scheme, failedProxies)
 
+    def _expandScheme(self, scheme):
+        pl = list(scheme.split(':'))
+        if len(pl) < 2:
+            pl.append('http*')
+        scheme = ':'.join(pl)
+        return (scheme, pl[0])
+
     def _matchObjectAndScheme(self, obj, scheme):
         # Return a list of shuffled lists of proxies
         ret = []
         for k in self.sortedKeys:
             _, pattern, proto = k
-            if proto != scheme or not pattern.match(obj):
+            if not fnmatch.fnmatch(proto, scheme) or not pattern.match(obj):
                 continue
             proxies = self[k][:]
             random.shuffle(proxies)
@@ -2892,6 +2905,7 @@ class ProxyMap(dict):
     @classmethod
     def _newProxyUrl(cls, url, requestProtocol):
         if isinstance(url, cls.ProxyURL):
+            url.requestProtocol = requestProtocol
             return url
         return cls.ProxyURL(url, requestProtocol=requestProtocol)
 

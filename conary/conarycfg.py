@@ -492,20 +492,25 @@ class CfgProxyMapEntry(CfgType):
         l = len(val)
         if l == 1:
             if val[0] != '[]':
-                raise ParseError("expected <HOSTMAP> []")
-            return None
+                raise ParseError("expected http|conary []")
+            return (None, None)
 
-        proto = val[0]
+        pattern = val[0]
+        if l == 2 and val[1] == '[]':
+            if val[1] != '[]':
+                raise ParseError("expected http|conary hostname|ip []")
+            return (pattern, None)
+
         urls = val[1:]
         urlObjs = []
         for u in urls:
             if u == 'direct':
                 # direct is special, we want to make it a special protocol
                 u = u + ':'
-            us = util.ProxyURL(u, requestProtocol = proto)
+            us = util.ProxyURL(u)
             urlObjs.append(us)
 
-        return {proto: urlObjs}
+        return (pattern, urlObjs)
 
     def format(self, val, displayOptions=None):
         strs = []
@@ -517,7 +522,8 @@ class CfgProxyMapEntry(CfgType):
 
 class CfgProxyMap(CfgDict):
     def __init__(self, default=util.ProxyMap()):
-        CfgDict.__init__(self, CfgProxyMapEntry, util.ProxyMap, default=default)
+        CfgDict.__init__(self, CfgProxyMapEntry, util.ProxyMap,
+                         default=default)
 
     def updateFromString(self, val, string):
         strs = string.split(None, 1)
@@ -530,11 +536,15 @@ class CfgProxyMap(CfgDict):
             val.clear()
             return val
 
-        values = self.valueType.parseString(valueStr)
-        if values:
-            val.update(key, values)
+        proto = key
+        pattern, urlObjs = self.valueType.parseString(valueStr)
+        if pattern:
+            if urlObjs:
+                val.update(proto, pattern, urlObjs)
+            else:
+                val.remove(proto, pattern)
         else:
-            val.remove(key)
+            val.remove(proto)
         return val
 
     def parseString(self, string):
@@ -550,7 +560,7 @@ class CfgProxyMap(CfgDict):
             val = value[key]
             for item in self.valueType.toStrings(val, displayOptions):
                 if displayOptions and displayOptions.get('prettyPrint', False):
-                    key = '%-25s' % ' '.join((str(key[1]),key[2]))
+                    key = '%-25s' % ' '.join((key[2], str(key[1])))
                 yield ' '.join((key, item))
 
 
@@ -1125,5 +1135,5 @@ def getProxyMap(cfg):
     proxies = dict((k, [ v ]) for (k, v) in proxyDict.iteritems())
     proxies.update((cpMap[k], [ v ])
         for (k, v) in cfg.conaryProxy.iteritems())
-    proxyMap.update("*", proxies)
+    proxyMap.update('conary', "*", proxies)
     return proxyMap
