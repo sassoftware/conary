@@ -121,7 +121,7 @@ class ConnectionManager(object):
     URL = util.URL
     ProxyURL = util.ProxyURL
 
-    ProtocolMaps = dict(http = [ 'http' ], https = [ 'https' ])
+    ProtocolMaps = dict(http = [ 'http:http' ], https = [ 'http:https' ])
 
     class _ConnectionIterator(object):
         __slots__ = [ 'connSpec', 'proxyMap', 'protocols',

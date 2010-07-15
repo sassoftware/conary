@@ -30,9 +30,9 @@ class ConaryURLOpener(URLOpener):
     """An opener aware of the conary proxies"""
 
     class ConnectionManager(URLOpener.ConnectionManager):
-        ConaryProxyProtocols = set([ 'conary', 'conarys' ])
-        ProtocolMaps = dict(http = [ 'conary', 'http' ],
-            https = [ 'conarys', 'https' ])
+        ConaryProxyProtocols = set([ 'conary' ])
+        ProtocolMaps = dict(http = [ 'conary:http', 'http:http' ],
+            https = [ 'conary:https', 'http:https' ])
 
         # For debugging purposes only
         _sendConaryProxyHostHeader = True

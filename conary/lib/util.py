@@ -2750,15 +2750,21 @@ class ProxyMap(dict):
             # Attempt to get proxies from the environment too
             d = (readEnvironment and urllib.getproxies()) or {}
         # Convert old-style proxy dicts to an object
-        map = dict(conary='http', conarys='https')
+        map = dict(http='http:http', https='http:https',
+            conary='conary:http', conarys='conary:https')
         ret = cls()
         for reqProto, proxyHost in d.items():
             url = cls.ProxyURL(proxyHost)
             proto = url.protocol
-            url.protocol = map.get(proto, proto)
+            if proto and proto in map:
+                # Extract the real portion of the protocol (after :)
+                url.protocol = map[proto].split(':', 1)[1]
             # If there was no protocol in the proxy URL, assume original one
             url.requestProtocol = proto or reqProto
-            ret.update(reqProto, '*', [url])
+            key = map.get(url.requestProtocol)
+            if not key:
+                continue
+            ret.update(key, '*', [url])
         return ret
 
     def update(self, proto, pattern, urlList):
