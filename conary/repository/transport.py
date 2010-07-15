@@ -594,7 +594,7 @@ class URLOpener(urllib.FancyURLopener):
         if connectFailed:
             log.info("Failed to connect to %s. Aborting after "
                       "%i of %i tries." % (connection, i + 1, retryCount))
-            raise e
+            raise
         elif i:
             log.info("Suceeded to connect to %s after "
                       "%i of %i tries." % (connection, i + 1, retryCount))
