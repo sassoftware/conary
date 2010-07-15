@@ -1125,15 +1125,19 @@ def getProxyMap(cfg):
     Return the proxyMap, or create it from old-style proxy/conaryProxy
     entries.
     """
-    cpMap = dict(http = 'conary', https = 'conarys')
+    pMap = dict(http='http:http', https='http:https')
+    cpMap = dict(http='conary:http', https='conary:https')
     if not cfg.proxyMap.isEmpty():
         return cfg.proxyMap
 
-    proxyMap = cfg.proxyMap.__class__()
+    proxyMap = cfg.proxyMap
     proxyDict = util.urllib.getproxies()
     proxyDict.update(cfg.proxy)
-    proxies = dict((k, [ v ]) for (k, v) in proxyDict.iteritems())
-    proxies.update((cpMap[k], [ v ])
-        for (k, v) in cfg.conaryProxy.iteritems())
-    proxyMap.update('conary', "*", proxies)
+    proxies = dict((pMap[scheme], [server])
+                   for (scheme, server) in proxyDict.iteritems())
+    proxies = dict((cpMap[scheme], [server])
+                   for (scheme, server) in cfg.conaryProxy.iteritems())
+    for key in proxies:
+        proxyMap.update(key, "*", proxies[key])
+
     return proxyMap
