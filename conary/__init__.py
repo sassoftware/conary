@@ -27,8 +27,13 @@ The Conary Repository System
 @group Misc: *
 """
 
-# For backward compatibility
-import conary.cmds.cvccmd as cvc
-from conary.cmds import branch, fmtroves, metadata, query, queryrep
-from conary.cmds import rollbacks, updatecmd, verify
-from conary.cmds import commit, clone, cscmd, showchangeset
+# For backward compatibility, provide interfaces in old locations
+try:
+    import conary.cmds.cvccmd as cvc
+    from conary.cmds import branch, clone
+except ImportError:
+    # conary-build not installed
+    pass
+
+from conary.cmds import commit, cscmd, fmtroves, metadata, query, queryrep
+from conary.cmds import rollbacks, showchangeset, updatecmd, verify
