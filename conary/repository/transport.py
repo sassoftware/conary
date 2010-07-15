@@ -59,7 +59,7 @@ class ConaryURLOpener(URLOpener):
                 if connType & self.CONN_TUNNEL:
                     # Conary proxies don't implement tunneling, so clear the bit
                     connType = connType ^ self.CONN_TUNNEL
-                if connType & self.CONN_SSL and proxy.requestProtocol == 'conary':
+                if connType * self.CONN_SSL and proxy.protocol == 'http':
                     # Endpoint is SSL, but we're mapping to a plain Conary
                     # proxy
                     connType = connType ^ self.CONN_SSL
