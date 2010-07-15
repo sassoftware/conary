@@ -52,8 +52,8 @@ class ConaryURLOpener(URLOpener):
                 conn.headers.append(('X-Conary-Proxy-Host', proxy.hostport))
             return conn
 
-        def _getConnectionTypelEndpointProxy(self, endpoint, proxy):
-            m =  URLOpener.ConnectionManager._getConnectionTypelEndpointProxy
+        def _getConnectionTypeEndpointProxy(self, endpoint, proxy):
+            m =  URLOpener.ConnectionManager._getConnectionTypeEndpointProxy
             connType, selector = m(self, endpoint, proxy)
             if proxy.requestProtocol in self.ConaryProxyProtocols:
                 if connType & self.CONN_TUNNEL:

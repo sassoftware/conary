@@ -318,14 +318,14 @@ class ConnectionManager(object):
         if proxy is None:
             return self._getConnectionTypeEndpoint(endpoint)
 
-        return self._getConnectionTypelEndpointProxy(endpoint, proxy)
+        return self._getConnectionTypeEndpointProxy(endpoint, proxy)
 
     def _getConnectionTypeEndpoint(self, endpoint):
         if endpoint.protocol == 'https':
             return self.CONN_SSL, endpoint.selector
         return self.CONN_PLAIN, endpoint.selector
 
-    def _getConnectionTypelEndpointProxy(self, endpoint, proxy):
+    def _getConnectionTypeEndpointProxy(self, endpoint, proxy):
         connType, selector = self._getConnectionTypeEndpoint(endpoint)
         if self.proxyBypass(endpoint, proxy):
             return connType, selector
