@@ -48,7 +48,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 69 + 1)
+SERVER_VERSIONS = range(36, 70 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -3262,6 +3262,78 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in ret ]
         return ret
+
+    @accessReadOnly
+    def getDepsForTroveList(self, authToken, clientVersion, troveList):
+        """
+        Returns list of (provides, requires) for troves. For troves which
+        are missing or we do not have access to, None is returned.
+        """
+        self.log(2, troveList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                         [ [i,] + tup for i, tup in enumerate(troveList) ],
+                         ["idx","name","version", "flavor"],
+                         start_transaction=False)
+
+        req = []
+        prov = []
+        for tup in troveList:
+            req.append(deps.DependencySet())
+            prov.append(deps.DependencySet())
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+
+        for tableName, dsList in ( ('Requires', req), ('Provides', prov) ):
+            cu.execute("""
+                SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
+                    JOIN Items ON
+                        Items.item = tmpNVF.name
+                    JOIN Versions ON
+                        Versions.version = tmpNVF.version
+                    JOIN Flavors ON
+                        Flavors.flavor = tmpNVF.flavor
+                    JOIN Instances ON
+                        Items.itemId = Instances.itemId AND
+                        Versions.versionId = Instances.versionId AND
+                        Flavors.flavorId = Instances.flavorId
+                    JOIN UserGroupInstancesCache AS ugi
+                        USING (instanceId)
+                    JOIN %s USING (InstanceId)
+                    JOIN Dependencies AS D USING (depId)
+                WHERE
+                    ugi.userGroupId in (%s)
+                ORDER BY tmpNVF.idx, D.class
+            """ %  (tableName, ",".join("%d" % x for x in roleIds) ))
+
+            last = None
+            flags = []
+            for idx, depClassId, depName, depFlag in cu:
+                this = (idx, depClassId, depName)
+
+                if this != last:
+                    if last:
+                        depClass = deps.dependencyClasses[depClassId]
+                        depSet = dsList[last[0]]
+                        depSet.addDep(deps.dependencyClasses[last[1]],
+                                      deps.Dependency(last[2], flags))
+
+                    last = this
+                    flags = []
+
+                if depFlag != deptable.NO_FLAG_MAGIC:
+                    flags.append((depFlag, deps.FLAG_SENSE_REQUIRED))
+
+            if last:
+                depClass = deps.dependencyClasses[depClassId]
+                depSet = dsList[last[0]]
+                depSet.addDep(deps.dependencyClasses[last[1]],
+                              deps.Dependency(last[2], flags))
+
+        return zip([ self.fromDepSet(x) for x in prov ],
+                   [ self.fromDepSet(x) for x in req ])
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):

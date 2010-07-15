@@ -29,8 +29,8 @@ import textwrap
 import time
 import traceback
 
-from conary import (callbacks, conaryclient, constants, files, trove, versions,
-                    updatecmd)
+from conary import callbacks, conaryclient, constants, files, trove, versions
+from conary.cmds import updatecmd
 from conary.build import buildinfo, buildpackage, lookaside, policy, use
 from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory, capsulerecipe
 from conary.build import errors as builderrors

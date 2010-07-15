@@ -20,10 +20,8 @@ import optparse
 import os
 import sys
 
-from conary import branch
 from conary import checkin
 from conary import command
-from conary import commit
 from conary import conarycfg
 from conary import conaryclient
 from conary import constants
@@ -33,6 +31,8 @@ from conary import state
 from conary import versions
 from conary.build import cook, use, signtrove, derive, explain
 from conary.build import errors as builderrors
+from conary.cmds import branch
+from conary.cmds import commit
 from conary.lib import cfg
 from conary.lib import log
 from conary.lib import openpgpfile
@@ -215,7 +215,7 @@ class CloneCommand(CvcCommand):
         if len(args) < 3:
             return self.usage()
 
-        from conary import clone
+        from conary.cmds import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
@@ -290,7 +290,7 @@ class PromoteCommand(CvcCommand):
         if not labelList or not troveSpecs:
             return self.usage()
 
-        from conary import clone
+        from conary.cmds import clone
         skipBuildInfo = argSet.pop('skip-build-info', False)
         info = argSet.pop('info', False)
         message = argSet.pop("message", None)
