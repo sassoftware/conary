@@ -29,11 +29,12 @@ The Conary Repository System
 
 # For backward compatibility, provide interfaces in old locations
 try:
-    import conary.cmds.cvccmd as cvc
-    from conary.cmds import branch, clone
+    import conary.cmds.cvccmd as cvc # pyflakes=ignore
+    from conary.cmds import branch, clone # pyflakes=ignore
 except ImportError:
     # conary-build not installed
     pass
 
-from conary.cmds import commit, cscmd, fmtroves, metadata, query, queryrep
-from conary.cmds import rollbacks, showchangeset, updatecmd, verify
+from conary.cmds import commit, cscmd, fmtroves, metadata # pyflakes=ignore
+from conary.cmds import query, queryrep, rollbacks # pyflakes=ignore
+from conary.cmds import showchangeset, updatecmd, verify # pyflakes=ignore
