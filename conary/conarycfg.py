@@ -1135,6 +1135,10 @@ def getProxyMap(cfg):
     # settings and expect things to continue to work.
     proxyMap = cfg.proxyMap.__class__()
     proxyDict = util.urllib.getproxies()
+    # We're only interested in a limited set of proxies
+    proxyDict = dict((x, y) for (x, y) in proxyDict.items()
+        if x in pMap)
+    proxyDict.pop('conary', None)
     proxyDict.update(cfg.proxy)
     proxies = [(pMap[scheme], [server])
                    for (scheme, server) in proxyDict.iteritems()]
