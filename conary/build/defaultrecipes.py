@@ -233,6 +233,18 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
     internalAbstractBaseClass = 1
 '''
 
+GroupSetRecipe = '''
+class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
+    """
+    NAME
+    ====
+
+    B{C{r.GroupSetRecipe()}} - Provides a new recipe for creating groups
+    """
+    name = 'groupset'
+    internalAbstractBaseClass = 1
+'''
+
 
 BuildPackageRecipe = '''class BuildPackageRecipe(PackageRecipe):
     """
@@ -620,6 +632,7 @@ recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'groupinfo': 'GroupInfoRecipe',
                'derivedpackage': 'DerivedPackageRecipe',
                'group': 'GroupRecipe',
+               'groupset': 'GroupSetRecipe',
                'redirect': 'RedirectRecipe',
                'fileset': 'FilesetRecipe',
                'capsule': 'CapsuleRecipe',
