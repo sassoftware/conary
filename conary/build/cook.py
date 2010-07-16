@@ -744,7 +744,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         use.track(True)
         policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
-        _callSetup(cfg, recipeObj)
+        setupReturn = _callSetup(cfg, recipeObj)
 
         use.track(False)
         log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -755,7 +755,8 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         recipeObj.unpackSources()
         grouprecipe.buildGroups(recipeObj, cfg, repos, callback,
-                                troveCache=troveCache)
+                                troveCache=troveCache,
+                                setupReturn = setupReturn)
 
         callback.buildingChangeset()
 
@@ -2413,6 +2414,8 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
         linenum = lastRecipeFrame.tb_frame.f_lineno
         del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))
+
+    return rv
 
 def _copyForwardTroveMetadata(repos, troveList, recipeObj):
     """

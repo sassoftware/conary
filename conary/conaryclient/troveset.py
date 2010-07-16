@@ -42,12 +42,26 @@ class TroveSet(object):
 
 class TroveTupleSet(TroveSet):
 
-    def addTuples(self, l):
-        self.l.extend(l)
+    def _setInstall(self, l):
+        self.installSet.update(l)
+        self.optionalSet.difference_update(set(l))
+
+    def _setOptional(self, l):
+        self.optionalSet.update(l)
+        self.installSet.difference_update(set(l))
+
+    def _getInstallSet(self):
+        assert(self.realized)
+        return self.installSet
+
+    def _getOptionalSet(self):
+        assert(self.realized)
+        return self.optionalSet
 
     def __init__(self, *args, **kwargs):
         TroveSet.__init__(self, *args, **kwargs)
-        self.l = []
+        self.installSet = set()
+        self.optionalSet = set()
 
 class DelayedTupleSet(TroveTupleSet):
 
@@ -131,7 +145,7 @@ class FindAction(ParallelAction):
         for inSet, searchList in troveSpecsByInSet.iteritems():
             d = inSet._findTroves([ x[1] for x in searchList ])
             for outSet, troveSpec in searchList:
-                outSet.addTuples(d[troveSpec])
+                outSet._setInstall(d[troveSpec])
 
     def __str__(self):
         n1 = self.troveSpecs[0].split('=')[0]
@@ -153,8 +167,13 @@ class UnionAction(DelayedTupleSetAction):
         self.troveSets = [ primaryTroveSet ] + list(args)
 
     def __call__(self):
+        # this ordering means that if it's in the install set anywhere, it
+        # will be in the install set in the union
         for troveSet in self.troveSets:
-            self.outSet.addTuples(troveSet.l)
+            self.outSet._setOptional(troveSet._getOptionalSet())
+
+        for troveSet in self.troveSets:
+            self.outSet._setInstall(troveSet._getInstallSet())
 
 class OperationGraph(graph.DirectedGraph):
 

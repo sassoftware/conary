@@ -2126,10 +2126,22 @@ class TroveCache(dict):
         return self[troveTup].includeTroveByDefault(*childTrove)
 
 
-def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
+def buildGroups(recipeObj, cfg, repos, callback, troveCache=None,
+                setupReturn=None):
     """
         Main function for finding, adding, and checking the troves requested
         for the the groupRecipe.
+
+        @param recipeObj: Instantiated recipe
+        @type recipeObj: _BaseGroupRecipe
+        @param repos: Repository object (why do we need this and a troveCache)
+        @type repos: netclient.NetworkRepositoryClient
+        @param troveCache: Caching repository object
+        @type repos: troveSource
+        @param callback: Callback for progress information
+        @type callback: callbacks.CookCallback
+        @param setupReturn: Return value from when recipeObj.setup() was called
+        @type setupReturn: object
     """
     def _sortGroups(groupList):
         """
@@ -2172,6 +2184,9 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         cache = TroveCache(repos, callback)
     else:
         cache = troveCache
+
+    if hasattr(recipeObj, "_realizeGraph"):
+        recipeObj._realizeGraph(cache, callback, setupReturn)
 
     labelPath = recipeObj.getLabelPath()
     flavor = recipeObj.getSearchFlavor()

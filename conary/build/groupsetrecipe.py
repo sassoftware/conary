@@ -22,6 +22,20 @@ from conary.deps import deps
 
 class GroupTupleSetMethods(object):
 
+    def getInstall(self):
+        return self._action(ActionClass = GetInstalledAction)
+
+    def getOptional(self):
+        return self._action(ActionClass = GetOptionalAction)
+
+    def makeInstall(self, installTroveSet = None):
+        return self._action(ActionClass = MakeInstallAction,
+                            installTroveSet = installTroveSet)
+
+    def makeOptional(self, optionalTroveSet = None):
+        return self._action(ActionClass = MakeOptionalAction,
+                            optionalTroveSet = optionalTroveSet)
+
     def union(self, *troveSetList):
         return self._action(*troveSetList, ActionClass = GroupUnionAction)
 
@@ -50,9 +64,55 @@ class GroupFindAction(troveset.FindAction):
 
     resultClass = GroupDelayedTroveTupleSet
 
+class GroupDelayedTupleSetAction(troveset.DelayedTupleSetAction):
+
+    resultClass = GroupDelayedTroveTupleSet
+
 class GroupUnionAction(troveset.UnionAction):
 
     resultClass = GroupDelayedTroveTupleSet
+
+class GetInstalledAction(GroupDelayedTupleSetAction):
+
+    def __call__(self):
+        self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+
+class GetOptionalAction(GroupDelayedTupleSetAction):
+
+    def __call__(self):
+        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+class MakeInstallAction(GroupDelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, installTroveSet = None):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.installTroveSet = installTroveSet
+
+    def __call__(self):
+        if self.installTroveSet:
+            self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+            self.outSet._setInstall(
+                    (self.installTroveSet._getInstallSet() |
+                     self.installTroveSet._getOptionalSet()))
+        else:
+            self.outSet._setInstall(self.primaryTroveSet._getInstallSet() |
+                                    self.primaryTroveSet._getOptionalSet())
+
+class MakeOptionalAction(GroupDelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, optionalTroveSet = None):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.optionalTroveSet = optionalTroveSet
+
+    def __call__(self):
+        if self.optionalTroveSet:
+            self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+            self.outSet._setOptional(
+                    (self.optionalTroveSet._getInstallSet() |
+                     self.optionalTroveSet._getOptionalSet()))
+        else:
+            self.outSet._setOptional(self.primaryTroveSet._getInstallSet() |
+                                     self.primaryTroveSet._getOptionalSet())
 
 class SG(_SingleGroup):
 
@@ -135,6 +195,15 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self._addGroup(self.name, newGroup)
         self._setDefaultGroup(newGroup)
 
+    def _realizeGraph(self, cache, callback, defaultTroveSet):
+        self.g.realize()
+
+        for troveInfo in defaultTroveSet._getInstallSet():
+            self.defaultGroup.addTrove(troveInfo, True, True, [])
+
+        for troveInfo in defaultTroveSet._getOptionalSet():
+            self.defaultGroup.addTrove(troveInfo, True, False, [])
+
     def getLabelPath(self):
         return self.labelPath
 
@@ -158,16 +227,6 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
     def getSearchPath(self):
         return [ ]
-
-    def install(self, troveSet):
-        self.g.realize()
-        for troveInfo in troveSet.l:
-            self.defaultGroup.addTrove(troveInfo, True, True, [])
-
-    def available(self, troveSet):
-        self.g.realize()
-        for troveInfo in troveSet.l:
-            self.defaultGroup.addTrove(troveInfo, True, False, [])
 
     def writeDotGraph(self, path):
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
