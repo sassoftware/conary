@@ -2748,7 +2748,11 @@ class ProxyMap(dict):
     def fromDict(cls, d, readEnvironment=False):
         if d is None:
             # Attempt to get proxies from the environment too
-            d = (readEnvironment and urllib.getproxies()) or {}
+            if readEnvironment:
+                d = dict((k, v) for (k, v) in urllib.getproxies().items()
+                    if k in set(['http', 'https']))
+            else:
+                d = {}
         # Convert old-style proxy dicts to an object
         map = dict(http='http:http', https='http:https',
             conary='conary:http', conarys='conary:https')
