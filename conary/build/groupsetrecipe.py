@@ -35,8 +35,8 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
 
 class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
 
-    def find(self, troveSpec):
-        return self._action(troveSpec, ActionClass = GroupFindAction)
+    def find(self, *troveSpecs):
+        return self._action(*troveSpecs, ActionClass = GroupFindAction)
 
     __getitem__ = find
 

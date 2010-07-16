@@ -56,7 +56,7 @@ class DelayedTupleSet(TroveTupleSet):
         self.action = action
 
     def __str__(self):
-        return self.action.__class__.__name__[:-6]
+        return str(self.action)
 
     def beenRealized(self):
         self.realized = True
@@ -67,8 +67,8 @@ class DelayedTupleSet(TroveTupleSet):
 
 class SearchSourceTroveSet(TroveSet):
 
-    def _find(self, troveTuple):
-        return self.searchSource.findTrove(troveTuple, requireLatest = True)
+    def _findTroves(self, troveTuple):
+        return self.searchSource.findTroves(troveTuple, requireLatest = True)
 
     def __init__(self, searchSource, graph = graph):
         TroveSet.__init__(self, graph = graph)
@@ -77,7 +77,8 @@ class SearchSourceTroveSet(TroveSet):
 
 class Action(object):
 
-    pass
+    def __str__(self):
+        return self.__class__.__name__[:-6]
 
 class DelayedTupleSetAction(Action):
 
@@ -90,16 +91,41 @@ class DelayedTupleSetAction(Action):
         self.outSet = self.resultClass(action = self, graph = graph)
         return self.outSet
 
-class FindAction(DelayedTupleSetAction):
+class ParallelAction(DelayedTupleSetAction):
 
-    def __init__(self, primaryTroveSet, troveSpec):
-        DelayedTupleSetAction.__init__(self, primaryTroveSet)
-        self.troveSpec = troveSpec
+    pass
 
-    def __call__(self):
-        from conary.conaryclient.cmdline import parseTroveSpec
-        self.outSet.addTuples(
-            self.primaryTroveSet._find(parseTroveSpec(self.troveSpec)))
+class FindAction(ParallelAction):
+
+    def __init__(self, primaryTroveSet, *troveSpecs):
+        ParallelAction.__init__(self, primaryTroveSet)
+        self.troveSpecs = troveSpecs
+
+    def __call__(self, actionList):
+        troveSpecsByInSet = {}
+        for action in actionList:
+            l = troveSpecsByInSet.setdefault(action.primaryTroveSet, [])
+            from conary.conaryclient.cmdline import parseTroveSpec
+            l.extend([ (action.outSet, parseTroveSpec(troveSpec))
+                            for troveSpec in action.troveSpecs ] )
+
+        for inSet, searchList in troveSpecsByInSet.iteritems():
+            d = inSet._findTroves([ x[1] for x in searchList ])
+            for outSet, troveSpec in searchList:
+                outSet.addTuples(d[troveSpec])
+
+    def __str__(self):
+        n1 = self.troveSpecs[0].split('=')[0]
+        n2 = self.troveSpecs[-1].split('=')[0]
+
+        if len(self.troveSpecs) == 1:
+            s =  n1
+        elif len(self.troveSpecs) == 2:
+            s =  n1 + r' ,\n' + n2
+        else:
+            s =  n1 + r' ...\n' + n2
+
+        return r'Find\n' + s
 
 class UnionAction(DelayedTupleSetAction):
 
@@ -114,8 +140,42 @@ class UnionAction(DelayedTupleSetAction):
 class OperationGraph(graph.DirectedGraph):
 
     def realize(self):
+        transpose = self.transpose()
         ordering = self.getTotalOrdering()
-        for node in ordering:
-            if not node.realized:
-                node.realize()
+
+        while True:
+            # grab as many bits as we can whose parents have been realized
+            layer = []
+            needWork = False
+            for node in ordering:
+                if node.realized: continue
+
+                needWork = True
+                parents = transpose.getChildren(node)
+                if len([ x for x in parents if x.realized ]) == len(parents):
+                    layer.append(node)
+
+            if not needWork:
+                assert(not layer)
+                break
+
+            assert(layer)
+            byAction = {}
+
+            for node in layer:
+                if not node.realized:
+                    if isinstance(node, DelayedTupleSet):
+                        byAction.setdefault(
+                            node.action.__class__, []).append(node)
+                    else:
+                        node.realize(self.getParents(node), node)
+
+            for action, nodeList in byAction.iteritems():
+                if issubclass(action, ParallelAction):
+                    nodeList[0].action([ node.action for node in nodeList ])
+                    for node in nodeList:
+                        node.beenRealized()
+                else:
+                    for node in nodeList:
+                        node.realize()
 
