@@ -185,7 +185,14 @@ class ConnectionManager(object):
         def _formatProxyError(self, proxyError):
             tmpl = "%s (via %s proxy %r)"
             if proxyError.exception:
-                errMsg = str(proxyError.exception)
+                if isinstance(proxyError.exception, socket.error) and \
+                            not hasattr(proxyError.exception, 'errno') and \
+                            len(proxyError.exception.args) >= 2:
+                    # python 2.4
+                    errMsg = "[Errno %s] %s" % (proxyError.exception.args[0],
+                        " ".join(proxyError.exception.args[1:]))
+                else:
+                    errMsg = str(proxyError.exception)
             else:
                 errMsg = "(unknown)"
             proxyType =  proxyError.host.requestProtocol
