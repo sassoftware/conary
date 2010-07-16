@@ -15,6 +15,8 @@
 from conary.build import defaultrecipes, macros, use
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
+from conary.conaryclient import troveset
+from conary.repository import searchsource
 from conary.deps import deps
 
 class SG(_SingleGroup):
@@ -22,7 +24,6 @@ class SG(_SingleGroup):
     def __init__(self, *args, **kwargs):
         _SingleGroup.__init__(self, *args, **kwargs)
         self.autoResolve = False
-        self.checkPathConflicts = False
         self.depCheck = False
         self.imageGroup = False
 
@@ -86,8 +87,10 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         self.labelPath = [ label ]
         self.flavor = flavor
-        self.searchSource = self.troveSource
+        self.searchSource = searchsource.NetworkSearchSource(
+                repos, self.labelPath, flavor)
         self.macros = macros.Macros(ignoreUnknown=lightInstance)
+        self.world = troveset.SearchSourceTroveSet(self.searchSource)
 
         baseMacros = loadMacros(cfg.defaultMacros)
         self.macros.update(baseMacros)
@@ -130,12 +133,13 @@ class _GroupSetRecipe(_BaseGroupRecipe):
     def getSearchPath(self):
         return [ ]
 
-    def add(self, troveSpec):
-        from conary.updatecmd import parseTroveSpec
-        ts = parseTroveSpec(troveSpec)
-        troveInfo = self.troveSource.findTrove(self.labelPath, ts,
-                                               defaultFlavor = self.flavor)[0]
-        self.defaultGroup.addTrove(troveInfo, True, True, [])
+    def install(self, troveSet):
+        for troveInfo in troveSet.l:
+            self.defaultGroup.addTrove(troveInfo, True, True, [])
+
+    def available(self, troveSet):
+        for troveInfo in troveSet.l:
+            self.defaultGroup.addTrove(troveInfo, True, True, [])
 
 from conary.build.packagerecipe import BaseRequiresRecipe
 exec defaultrecipes.GroupSetRecipe

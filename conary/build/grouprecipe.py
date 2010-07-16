@@ -63,6 +63,7 @@ class _BaseGroupRecipe(Recipe):
     internalPolicyModules = ('grouppolicy',)
     basePolicyClass = policy.GroupPolicy
     _recipeType = RECIPE_TYPE_GROUP
+    checkPathConflicts = True
 
     def __init__(self, laReposCache = None, srcdirs = None,
                  lightInstance = None, cfg = None):
@@ -141,7 +142,6 @@ class _GroupRecipe(_BaseGroupRecipe):
     autoResolve = None
     imageGroup = True
     checkOnlyByDefaultDeps = True
-    checkPathConflicts = True
     requireLatest = True
 
     def __init__(self, repos, cfg, label, flavor, laReposCache, srcdirs=None,
@@ -1487,7 +1487,7 @@ class _GroupRecipe(_BaseGroupRecipe):
 
 class _SingleGroup(object):
 
-    def __init__(self, groupName):
+    def __init__(self, groupName, checkPathConflicts = False):
         if not groupName.startswith('group-'):
             raise RecipeFileError, 'group names must start with "group-"'
 
@@ -1503,6 +1503,7 @@ class _SingleGroup(object):
         self.postRollbackScripts = None
         self.size = None
         self.compatibilityClass = None
+        self.checkPathConflicts = checkPathConflicts
         self.troves = {}
         self.reasons = {}
 
@@ -1601,6 +1602,9 @@ class _SingleGroup(object):
 
     def getReasonString(self, name, version, flavor):
         reason = self.reasons[name, version, flavor]
+        if reason is None:
+            return "Added for an unknown reason"
+
         reasonType = reason[0]
         if reasonType == ADD_REASON_ADDED:
             return "Added directly"
@@ -1651,12 +1655,12 @@ class SingleGroup(_SingleGroup):
     def __init__(self, name, depCheck, autoResolve, checkOnlyByDefaultDeps,
                  checkPathConflicts, byDefault = True, imageGroup = False,
                  cache = None):
-        _SingleGroup.__init__(self, name)
+        _SingleGroup.__init__(self, name,
+                              checkPathConflicts = checkPathConflicts)
         assert(isinstance(byDefault, bool))
         self.depCheck = depCheck
         self.autoResolve = autoResolve
         self.checkOnlyByDefaultDeps = checkOnlyByDefaultDeps
-        self.checkPathConflicts = checkPathConflicts
         self.byDefault = byDefault
         self.cache = cache
         self.imageGroup = imageGroup
