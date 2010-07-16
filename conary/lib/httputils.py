@@ -147,11 +147,18 @@ class ConnectionManager(object):
             return self._retryCount
 
         def next(self):
+            if self._retryCount > self.retries:
+                raise StopIteration
+
             try:
                 proxy = self._iter.next()
+                # XXX It is most certainly not enough to increment the retry
+                # count in the proxy case. It will make sure that we don't
+                # iterate indefinitely, but it will not sleep at all.
+                self._retryCount += 1
             except StopIteration:
-                if self._retryCount == self.retries:
-                    raise StopIteration
+                if self._retryCount > self.retries:
+                    raise
                 if self._retryCount != 0:
                     # Sleep and try again, per RFC 2616 s. 8.2.4
                     self._timer.sleep()
