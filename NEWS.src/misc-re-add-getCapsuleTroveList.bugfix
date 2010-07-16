@@ -1,0 +1,2 @@
+The getCapsulesTroveList function was restored to sqldb for
+use in recreatedb.

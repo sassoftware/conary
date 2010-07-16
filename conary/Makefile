@@ -17,36 +17,7 @@ all: subdirs constants.py
 SUBDIRS=build local repository server lib pysqlite3 deps web \
         conaryclient dbstore ScanDeps
 
-python_files = __init__.py	\
-	branch.py		\
-	callbacks.py		\
-	changelog.py		\
-	checkin.py		\
-	clone.py		\
-	command.py		\
-	commit.py		\
-	conarycfg.py		\
-	constants.py		\
-	cvc.py			\
-	cscmd.py		\
-	display.py		\
-	errors.py		\
-	files.py		\
-	flavorcfg.py		\
-        fmtroves.py             \
-        keymgmt.py              \
-        metadata.py             \
-	query.py		\
-	queryrep.py		\
-	rollbacks.py		\
-	rpmhelper.py		\
-        showchangeset.py        \
-	state.py		\
-	streams.py		\
-	trove.py		\
-	updatecmd.py		\
-	verify.py		\
-	versions.py
+python_files = $(wildcard *.py) constants.py
 
 extra_files = \
 	Makefile		\
@@ -63,7 +34,7 @@ subdirs: default-subdirs
 constants.py: constants.py.in ../Makefile
 	sed -e s,@version@,$(VERSION),g -e s,@changeset@,$(CHANGESET),g $< > $@
 
-install: all install-subdirs pyfiles-install
+install: all install-subdirs pyfiles-install constants.py
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 
@@ -73,5 +44,6 @@ clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
 	rm -rf sqlite sqlite3
 	rm -f constants.py
+	rm -rf pysqlite3-0.0.0-py2.6.egg-info
 
 include ../Make.rules
