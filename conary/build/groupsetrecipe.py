@@ -33,6 +33,11 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
 
     pass
 
+class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
+
+    def find(self, *troveSpecs):
+        return self._action(*troveSpecs, ActionClass = GroupFindAction)
+
 class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
 
     def find(self, *troveSpecs):
@@ -185,6 +190,9 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         searchSource = searchsource.NetworkSearchSource(
                                             self.repos, labelList, flavor)
         return GroupSearchSourceTroveSet(searchSource, graph = self.g)
+
+    def SearchPath(self, *troveSets):
+        return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
 from conary.build.packagerecipe import BaseRequiresRecipe
 exec defaultrecipes.GroupSetRecipe

@@ -13,7 +13,9 @@
 #
 
 import itertools
+
 from conary.lib import graph
+from conary.repository import searchsource
 
 class TroveSet(object):
 
@@ -70,10 +72,27 @@ class SearchSourceTroveSet(TroveSet):
     def _findTroves(self, troveTuple):
         return self.searchSource.findTroves(troveTuple, requireLatest = True)
 
+    def _getSearchSource(self):
+        return self.searchSource
+
     def __init__(self, searchSource, graph = graph):
         TroveSet.__init__(self, graph = graph)
-        self.realized = True
+        self.realized = (searchSource is not None)
         self.searchSource = searchSource
+
+class SearchPathTroveSet(SearchSourceTroveSet):
+
+    def __init__(self, troveSetList, graph = None):
+        self.troveSetList = troveSetList
+        SearchSourceTroveSet.__init__(self, None, graph = graph)
+
+        for i, troveSet in enumerate(troveSetList):
+            graph.addEdge(troveSet, self, value = str(i + 1))
+
+    def realize(self):
+        sourceList = [ ts._getSearchSource() for ts in self.troveSetList ]
+        self.searchSource = searchsource.SearchSourceStack(*sourceList)
+        self.realized = True
 
 class Action(object):
 
@@ -168,7 +187,7 @@ class OperationGraph(graph.DirectedGraph):
                         byAction.setdefault(
                             node.action.__class__, []).append(node)
                     else:
-                        node.realize(self.getParents(node), node)
+                        node.realize()
 
             for action, nodeList in byAction.iteritems():
                 if issubclass(action, ParallelAction):
