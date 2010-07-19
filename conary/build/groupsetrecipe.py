@@ -37,7 +37,7 @@ class GroupTupleSetMethods(object):
                             optionalTroveSet = optionalTroveSet)
 
     def union(self, *troveSetList):
-        return self._action(*troveSetList, ActionClass = GroupUnionAction)
+        return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
     __add__ = union
     __or__ = union
@@ -50,12 +50,12 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
 class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
 
     def find(self, *troveSpecs):
-        return self._action(*troveSpecs, ActionClass = GroupFindAction)
+        return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
 class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
 
     def find(self, *troveSpecs):
-        return self._action(*troveSpecs, ActionClass = GroupFindAction)
+        return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     __getitem__ = find
 
