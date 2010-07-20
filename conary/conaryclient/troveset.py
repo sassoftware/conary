@@ -14,12 +14,14 @@
 
 import itertools
 
-from conary.lib import graph
+from conary import trove, versions
+from conary.lib import graph, util
 from conary.repository import searchsource
 
 class TroveSet(object):
 
     def __init__(self, graph = None):
+        assert(graph)
         self.realized = False
         self.g = graph
 
@@ -61,6 +63,100 @@ class TroveTupleSet(TroveSet):
         TroveSet.__init__(self, *args, **kwargs)
         self.installSet = set()
         self.optionalSet = set()
+
+    def _walk(self, troveCache, newGroups = True, descendNewGroups = False,
+              recurse = False):
+        """
+        Return ((name, version, flavor), inInstallSet, explicit) tuples
+        for the troves referenced by this TroveSet. inInstallSet is True
+        if this trove is included in the installSet (byDefault True) for
+        any of the troves which include it. It is considered explicit
+        iff it is included directly by this TroveSet.
+
+        @param troveCache: TroveCache to use for iterating trove contents
+        @type troveCache: TroveSource
+        @param newGroups: Return newly created groups. Version will
+        be NewVersion().
+        @type newGroups: bool
+        @param descendNewGroups: Descend into newly created groups. Orthogonal
+        too newGroups, implied by recurse.
+        @type descendNewGroups: bool
+        @param recurse: Return full recursive closure. When possible, implicit
+        includes are used to generate this information.
+        @type recurse: bool
+        @rtype: ((str, versions.Version, deps.Flavor), isInstall, isExplicit)
+        """
+
+        # we use weakrefs instead of explicit recursion wherever we can.
+        # everything except this troveset ought to have proper weakrefs
+        # since troves from the repository have them already, and newly
+        # created groups get them thanks to populate()
+        # 
+        # results is indexed by troveTuple, and contains our best idea
+        # on explict and byDefault status for troves we've seen. they're
+        # stored in a (depth, isInstall) tuple, where depth is the
+        # depth in the graph we discovered the values, allowing more
+        # specific ideas replace less specific ones. depth == 0 means it
+        # was an explicit reference from the trovetuple
+        #
+        # recurse list is a list of troves we need to recurse through.
+        # it's a set of (depth, troveTuple, installMap) tuples
+        # where depth is as above and installMap gives a dict of bools
+        # describing the weakRef isInstall values from the trove which
+        # caused the recursion
+        results = dict()
+        recurseList = []
+        for (troveTuple, inInstallSet) in \
+                       ( [ (x, True) for x in self.installSet ] +
+                         [ (x, False) for x in  self.optionalSet ] ):
+            if isinstance(troveTuple[1], versions.NewVersion):
+                if newGroups:
+                    results[troveTuple] = (0, inInstallSet)
+
+                if recurse or descendNewGroups:
+                    recurseList.append((0, troveTuple,
+                                        { troveTuple : inInstallSet } ))
+            else:
+                results[troveTuple] = (0, inInstallSet)
+                if recurse and trove.troveIsCollection(troveTuple[0]):
+                    recurseList.append((0, troveTuple,
+                                        { troveTuple : inInstallSet } ))
+
+        while recurseList:
+            depth, troveTuple, installMap = recurseList.pop(0)
+            depth += 1
+
+            installThis = installMap[troveTuple]
+
+            # gather byDefault mappings
+            newInstallMap = {}
+            for subTuple, subDoInstall, subExplicit in \
+                        troveCache.iterTroveListInfo(troveTuple):
+                newInstallMap[subTuple] = installMap.get(
+                                subTuple, subDoInstall and installThis)
+
+            # handle strongrefs
+            for subTuple, subDoInstall, subExplicit in \
+                        troveCache.iterTroveListInfo(troveTuple):
+                if not subExplicit:
+                    continue
+
+                if trove.troveIsCollection(subTuple[0]):
+                    recurseList.append((depth, subTuple, newInstallMap))
+
+                installSub = newInstallMap[subTuple]
+
+                if subTuple not in results:
+                    results[subTuple] = (depth, installSub)
+                else:
+                    if results[subTuple][0] > depth:
+                        results[subTuple] = (depth, installSub)
+                    if results[subTuple][0] == depth:
+                        results[subTuple] = (depth,
+                                             installSub or results[subTuple][1])
+
+        for (troveTup), (depth, isInstall) in results.iteritems():
+            yield (troveTup, isInstall, depth == 0)
 
 class DelayedTupleSet(TroveTupleSet):
 
@@ -161,7 +257,7 @@ class DifferenceAction(DelayedTupleSetAction):
         self.outSet._setOptional(left._getOptionalSet().difference(all))
 
     def __init__(self, primaryTroveSet, other):
-        DelayedTupleSetAction.__init__(self, primaryTroveSet)
+        DelayedTupleSetAction.__init__(self, primaryTroveSet, other)
         self.right = other
 
 class FetchAction(ParallelAction):
@@ -182,25 +278,13 @@ class FetchAction(ParallelAction):
             action.outSet._setInstall(action.primaryTroveSet._getInstallSet())
             allInputSets.append(self.primaryTroveSet)
 
-        while allInputSets:
-            inSet = allInputSets.pop(0)
-            if isinstance(inSet, _SingleGroup):
-                sg = inSet
-                for x in sg.iterTroveListInfo():
-                    troveTuples.add(x[0])
-
-                for name, byDefault, explicit in sg.iterNewGroupList():
-                    allInputSets.append(
-                          (name, versions.NewVersion(),
-                           data.groupRecipe.flavor))
-            else:
-                for troveTup in itertools.chain(inSet._getInstallSet(),
-                                                inSet._getOptionalSet()):
-                    if isinstance(troveTup[1], versions.NewVersion):
-                        allInputSets.append(
-                            data.groupRecipe._getGroup(troveTup[0]))
-                    else:
-                        troveTuples.add(troveTup)
+        for action in actionList:
+            # repository calls) because the recurse arg to _walk is False;
+            # if it were True, it would cause fetchs (inefficiently)
+            troveTuples.update(x[0] for x in
+                                 action.primaryTroveSet._walk(data.troveCache,
+                                                 newGroups = False,
+                                                 descendNewGroups = True))
 
         troveTuples = [ x for x in troveTuples
                             if not isinstance(x[1], versions.NewVersion) ]

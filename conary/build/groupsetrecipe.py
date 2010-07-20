@@ -77,6 +77,14 @@ class GroupTupleSetMethods(object):
     def union(self, *troveSetList):
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
+    def createGroup(self, name, checkPathConflicts = True):
+        return self._action(name, checkPathConflicts = checkPathConflicts,
+                            ActionClass = CreateNewGroupAction)
+
+    def _createGroup(self, name, checkPathConflicts = True):
+        return self._action(name, ActionClass = CreateGroupAction,
+                            checkPathConflicts = checkPathConflicts)
+
     __add__ = union
     __or__ = union
 
@@ -113,6 +121,45 @@ class GroupDifferenceAction(troveset.DifferenceAction):
 class GroupUnionAction(troveset.UnionAction):
 
     resultClass = GroupDelayedTroveTupleSet
+
+class CreateGroupAction(GroupDelayedTupleSetAction):
+
+    prefilter = troveset.FetchAction
+
+    def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.name = name
+        self.checkPathConflicts = checkPathConflicts
+
+    def __call__(self, data):
+        grp = SG(data.groupRecipe.name,
+                 checkPathConflicts = self.checkPathConflicts)
+        data.groupRecipe._addGroup(self.name, grp)
+        data.groupRecipe._setDefaultGroup(grp)
+
+        self._create(data.groupRecipe.defaultGroup,
+                     self.primaryTroveSet, self.outSet, data)
+
+    def _create(self, sg, ts, outSet, data):
+        sg.populate(ts, data.troveCache)
+
+        outSet._setInstall([ (sg.name, versions.NewVersion(),
+                              data.groupRecipe.flavor) ])
+        outSet.realized = True
+
+    def __str__(self):
+        return self.name
+
+class CreateNewGroupAction(CreateGroupAction):
+
+    def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
+        CreateGroupAction.__init__(self, primaryTroveSet, name,
+                                   checkPathConflicts = checkPathConflicts)
+
+    def __call__(self, data):
+        newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
+        data.groupRecipe._addGroup(self.name, newGroup)
+        self._create(newGroup, self.primaryTroveSet, self.outSet, data)
 
 class GetInstalledAction(GroupDelayedTupleSetAction):
 
@@ -166,6 +213,36 @@ class SG(_SingleGroup):
         self.depCheck = False
         self.imageGroup = False
 
+    def populate(self, troveSet, troveCache):
+        seen = set()
+
+        for troveTup, byDefault, explicit in troveSet._walk(troveCache):
+            if not explicit:
+                continue
+
+            seen.add(troveTup)
+            if isinstance(troveTup[1], versions.NewVersion):
+                self.addNewGroup(troveTup[0], byDefault = byDefault,
+                                 explicit = True)
+            else:
+                self.addTrove(troveTup, explicit = True, byDefault = byDefault,
+                              components = [])
+
+        for troveTup, byDefault, explicit in troveSet._walk(troveCache,
+                                                            recurse = True):
+            if troveTup in seen:
+                # if it's explicit, it's already been seen
+                continue
+
+            seen.add(troveTup)
+
+            if isinstance(troveTup[1], versions.NewVersion):
+                self.addNewGroup(troveTup[0], byDefault = byDefault,
+                                 explicit = False)
+            else:
+                self.addTrove(troveTup, explicit = False, byDefault = byDefault,
+                              components = [])
+
     def iterAddSpecs(self):
         return []
 
@@ -176,9 +253,6 @@ class SG(_SingleGroup):
         return []
 
     def iterDifferenceSpecs(self):
-        return []
-
-    def iterNewGroupList(self):
         return []
 
     def iterNewGroupDifferenceList(self):
@@ -192,9 +266,6 @@ class SG(_SingleGroup):
 
     def getRequires(self):
         return deps.DependencySet()
-
-    def isEmpty(self):
-        return not self.troves
 
 class _GroupSetRecipe(_BaseGroupRecipe):
 
@@ -235,20 +306,10 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         if extraMacros:
             self.macros.update(extraMacros)
 
-        newGroup = SG(self.name)
-        self._addGroup(self.name, newGroup)
-        self._setDefaultGroup(newGroup)
-
-    def _realizeGraph(self, cache, callback, defaultTroveSet):
+    def _realizeGraph(self, cache, callback):
         data = GroupActionData(troveCache = GroupSetTroveCache(self, cache),
                                groupRecipe = self)
         self.g.realize(data)
-
-        for troveInfo in defaultTroveSet._getInstallSet():
-            self.defaultGroup.addTrove(troveInfo, True, True, [])
-
-        for troveInfo in defaultTroveSet._getOptionalSet():
-            self.defaultGroup.addTrove(troveInfo, True, False, [])
 
     def getLabelPath(self):
         return self.labelPath
@@ -276,6 +337,10 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
     def writeDotGraph(self, path):
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
+
+    def Group(self, ts, checkPathConflicts = True):
+        return ts._createGroup(self.name,
+                               checkPathConflicts = checkPathConflicts)
 
     def Repository(self, labelList, flavor):
         if type(labelList) == tuple:

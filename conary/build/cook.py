@@ -744,7 +744,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         use.track(True)
         policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
-        setupReturn = _callSetup(cfg, recipeObj)
+        _callSetup(cfg, recipeObj)
 
         use.track(False)
         log.info('Building %s=%s[%s]' % ( recipeClass.name,
@@ -755,8 +755,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         recipeObj.unpackSources()
         grouprecipe.buildGroups(recipeObj, cfg, repos, callback,
-                                troveCache=troveCache,
-                                setupReturn = setupReturn)
+                                troveCache=troveCache)
 
         callback.buildingChangeset()
 

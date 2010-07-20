@@ -1506,6 +1506,7 @@ class _SingleGroup(object):
         self.checkPathConflicts = checkPathConflicts
         self.troves = {}
         self.reasons = {}
+        self.newGroupList = {}
 
     def setSize(self, size):
         self.size = size
@@ -1650,6 +1651,34 @@ class _SingleGroup(object):
     def hasTrove(self, name, version, flavor):
         return (name, version, flavor) in self.troves
 
+    def isEmpty(self):
+        return bool(not self.troves and not self.newGroupList)
+
+    def addNewGroup(self, name, byDefault = None, explicit = True,
+                    childDefaults=None):
+        if name == self.name:
+            raise CookError('Tried to add %s to itself.  This would create a cycle.')
+        if not childDefaults:
+            childDefaults = []
+        elif not isinstance(childDefaults, list):
+            childDefaults = [ childDefaults ]
+
+        if name in self.newGroupList:
+            (oldByDefault, oldExplicit,
+             oldChildDefaults) = self.newGroupList[name]
+            byDefault = oldByDefault or byDefault
+            explicit = oldExplicit or explicit
+            childDefaults = childDefaults + oldChildDefaults
+
+        self.newGroupList[name] = (byDefault, explicit, childDefaults)
+
+    def iterNewGroupList(self):
+        for (name, (byDefault, explicit, childDefaults)) \
+                                            in self.newGroupList.iteritems():
+            yield name, byDefault, explicit
+
+    def hasNewGroup(self, name):
+        return name in self.newGroupList
 
 class SingleGroup(_SingleGroup):
     def __init__(self, name, depCheck, autoResolve, checkOnlyByDefaultDeps,
@@ -1670,7 +1699,6 @@ class SingleGroup(_SingleGroup):
         self.removeComponentList = set()
         self.addReferenceList = []
         self.replaceTroveList = []
-        self.newGroupList = {}
         self.addAllTroveList = []
         self.newGroupDifferenceList = []
         self.differenceSpecs = []
@@ -1802,32 +1830,6 @@ class SingleGroup(_SingleGroup):
     def iterAddAllSpecs(self):
         return iter(self.addReferenceList)
 
-    def addNewGroup(self, name, byDefault = None, explicit = True,
-                    childDefaults=None):
-        if name == self.name:
-            raise CookError('Tried to add %s to itself.  This would create a cycle.')
-        if not childDefaults:
-            childDefaults = []
-        elif not isinstance(childDefaults, list):
-            childDefaults = [ childDefaults ]
-
-        if name in self.newGroupList:
-            (oldByDefault, oldExplicit,
-             oldChildDefaults) = self.newGroupList[name]
-            byDefault = oldByDefault or byDefault
-            explicit = oldExplicit or explicit
-            childDefaults = childDefaults + oldChildDefaults
-
-        self.newGroupList[name] = (byDefault, explicit, childDefaults)
-
-    def iterNewGroupList(self):
-        for (name, (byDefault, explicit, childDefaults)) \
-                                            in self.newGroupList.iteritems():
-            yield name, byDefault, explicit
-
-    def hasNewGroup(self, name):
-        return name in self.newGroupList
-
     def setByDefault(self, byDefault):
         self.byDefault = byDefault
 
@@ -1861,9 +1863,6 @@ class SingleGroup(_SingleGroup):
                 if includeByDefault:
                     return True
         return includeByDefault
-
-    def isEmpty(self):
-        return bool(not self.troves and not self.newGroupList)
 
     def addCopiedFrom(self, name, version, flavor):
         self.copiedFrom.add((name, version, flavor))
@@ -2126,8 +2125,7 @@ class TroveCache(dict):
         return self[troveTup].includeTroveByDefault(*childTrove)
 
 
-def buildGroups(recipeObj, cfg, repos, callback, troveCache=None,
-                setupReturn=None):
+def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
     """
         Main function for finding, adding, and checking the troves requested
         for the the groupRecipe.
@@ -2140,8 +2138,6 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None,
         @type repos: troveSource
         @param callback: Callback for progress information
         @type callback: callbacks.CookCallback
-        @param setupReturn: Return value from when recipeObj.setup() was called
-        @type setupReturn: object
     """
     def _sortGroups(groupList):
         """
@@ -2186,7 +2182,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None,
         cache = troveCache
 
     if hasattr(recipeObj, "_realizeGraph"):
-        recipeObj._realizeGraph(cache, callback, setupReturn)
+        recipeObj._realizeGraph(cache, callback)
 
     labelPath = recipeObj.getLabelPath()
     flavor = recipeObj.getSearchFlavor()
