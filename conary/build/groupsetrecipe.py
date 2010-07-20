@@ -22,6 +22,12 @@ from conary.deps import deps
 
 class GroupTupleSetMethods(object):
 
+    def difference(self, other):
+        return self._action(other, ActionClass = GroupDifferenceAction)
+
+    __sub__ = difference
+    remove = difference
+
     def getInstall(self):
         return self._action(ActionClass = GetInstalledAction)
 
@@ -65,6 +71,10 @@ class GroupFindAction(troveset.FindAction):
     resultClass = GroupDelayedTroveTupleSet
 
 class GroupDelayedTupleSetAction(troveset.DelayedTupleSetAction):
+
+    resultClass = GroupDelayedTroveTupleSet
+
+class GroupDifferenceAction(troveset.DifferenceAction):
 
     resultClass = GroupDelayedTroveTupleSet
 

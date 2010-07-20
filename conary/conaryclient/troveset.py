@@ -128,6 +128,20 @@ class ParallelAction(DelayedTupleSetAction):
 
     pass
 
+class DifferenceAction(DelayedTupleSetAction):
+
+    def __call__(self):
+        left = self.primaryTroveSet
+        right = self.right
+        all = right._getInstallSet().union(right._getInstallSet())
+
+        self.outSet._setInstall(left._getInstallSet().difference(all))
+        self.outSet._setOptional(left._getOptionalSet().difference(all))
+
+    def __init__(self, primaryTroveSet, other):
+        DelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.right = other
+
 class FindAction(ParallelAction):
 
     def __init__(self, primaryTroveSet, *troveSpecs):
