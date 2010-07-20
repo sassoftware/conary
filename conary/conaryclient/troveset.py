@@ -30,13 +30,12 @@ class TroveSet(object):
         ActionClass = kwargs.pop('ActionClass')
         action = ActionClass(self, *args, **kwargs)
         troveSet = action.getResultTupleSet(graph = self.g)
+        inputSets = action.getInputSets(graph = self.g)
 
         self.g.addNode(troveSet)
-        self.g.addEdge(self, troveSet, value = None)
 
-        for arg in itertools.chain(args, kwargs.itervalues()):
-            if isinstance(arg, TroveSet):
-                self.g.addEdge(arg, troveSet, value = None)
+        for inputSet in inputSets:
+            self.g.addEdge(inputSet, troveSet, value = None)
 
         return troveSet
 
@@ -120,10 +119,28 @@ class Action(object):
 
 class DelayedTupleSetAction(Action):
 
+    prefilter = None
     resultClass = DelayedTupleSet
 
-    def __init__(self, primaryTroveSet):
+    def __init__(self, primaryTroveSet, *args):
         self.primaryTroveSet = primaryTroveSet
+        self._inputSets = [ self.primaryTroveSet ]
+        self._inputSets += [ x for x in args if isinstance(x, TroveTupleSet) ]
+
+    def _applyFilters(self, l, graph = None):
+        r = []
+        for (ts, filterAction) in l:
+            newTs = ts._action(ActionClass = filterAction)
+            r.append(newTs)
+
+        return r
+
+    def getInputSets(self, graph = None):
+        if self.prefilter is None:
+            return self._inputSets
+
+        return self._applyFilters(
+                [ (ts, self.prefilter) for ts in self._inputSets ] )
 
     def getResultTupleSet(self, graph = None):
         self.outSet = self.resultClass(action = self, graph = graph)
@@ -224,16 +241,17 @@ class FindAction(ParallelAction):
 class UnionAction(DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, *args):
-        DelayedTupleSetAction.__init__(self, primaryTroveSet)
+        DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
         self.troveSets = [ primaryTroveSet ] + list(args)
 
     def __call__(self, data):
         # this ordering means that if it's in the install set anywhere, it
         # will be in the install set in the union
-        for troveSet in self.troveSets:
+        tsList = self._inputSets
+        for troveSet in tsList:
             self.outSet._setOptional(troveSet._getOptionalSet())
 
-        for troveSet in self.troveSets:
+        for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
 class OperationGraph(graph.DirectedGraph):

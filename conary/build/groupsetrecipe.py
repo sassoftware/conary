@@ -127,7 +127,8 @@ class GetOptionalAction(GroupDelayedTupleSetAction):
 class MakeInstallAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, installTroveSet = None):
-        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                            installTroveSet)
         self.installTroveSet = installTroveSet
 
     def __call__(self, data):
@@ -143,7 +144,8 @@ class MakeInstallAction(GroupDelayedTupleSetAction):
 class MakeOptionalAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, optionalTroveSet = None):
-        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                            optionalTroveSet)
         self.optionalTroveSet = optionalTroveSet
 
     def __call__(self, data):
