@@ -77,8 +77,8 @@ class DelayedTupleSet(TroveTupleSet):
     def beenRealized(self):
         self.realized = True
 
-    def realize(self):
-        self.action()
+    def realize(self, data):
+        self.action(data)
         self.beenRealized()
 
 class SearchSourceTroveSet(TroveSet):
@@ -103,10 +103,15 @@ class SearchPathTroveSet(SearchSourceTroveSet):
         for i, troveSet in enumerate(troveSetList):
             graph.addEdge(troveSet, self, value = str(i + 1))
 
-    def realize(self):
+    def realize(self, data):
         sourceList = [ ts._getSearchSource() for ts in self.troveSetList ]
         self.searchSource = searchsource.SearchSourceStack(*sourceList)
         self.realized = True
+
+class ActionData(object):
+
+    def __init__(self, repos):
+        self.troveCache = repos
 
 class Action(object):
 
@@ -130,7 +135,7 @@ class ParallelAction(DelayedTupleSetAction):
 
 class DifferenceAction(DelayedTupleSetAction):
 
-    def __call__(self):
+    def __call__(self, data):
         left = self.primaryTroveSet
         right = self.right
         all = right._getInstallSet().union(right._getInstallSet())
@@ -142,13 +147,55 @@ class DifferenceAction(DelayedTupleSetAction):
         DelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.right = other
 
+class FetchAction(ParallelAction):
+
+    # this is somewhat recursive because troveCache.getTroves() is
+    # somewhat recursive; we need to mimic that for created subgroups
+    #
+    # it would be awfully nice if this used iterTroveListInfo(), but
+    # the whole point is to cache troves so iterTroveListInfo() can assume
+    # they're already there
+
+    def __call__(self, actionList, data):
+        troveTuples = set()
+        allInputSets = []
+
+        for action in actionList:
+            action.outSet._setOptional(action.primaryTroveSet._getOptionalSet())
+            action.outSet._setInstall(action.primaryTroveSet._getInstallSet())
+            allInputSets.append(self.primaryTroveSet)
+
+        while allInputSets:
+            inSet = allInputSets.pop(0)
+            if isinstance(inSet, _SingleGroup):
+                sg = inSet
+                for x in sg.iterTroveListInfo():
+                    troveTuples.add(x[0])
+
+                for name, byDefault, explicit in sg.iterNewGroupList():
+                    allInputSets.append(
+                          (name, versions.NewVersion(),
+                           data.groupRecipe.flavor))
+            else:
+                for troveTup in itertools.chain(inSet._getInstallSet(),
+                                                inSet._getOptionalSet()):
+                    if isinstance(troveTup[1], versions.NewVersion):
+                        allInputSets.append(
+                            data.groupRecipe._getGroup(troveTup[0]))
+                    else:
+                        troveTuples.add(troveTup)
+
+        troveTuples = [ x for x in troveTuples
+                            if not isinstance(x[1], versions.NewVersion) ]
+        data.troveCache.getTroves(troveTuples, withFiles = False)
+
 class FindAction(ParallelAction):
 
     def __init__(self, primaryTroveSet, *troveSpecs):
         ParallelAction.__init__(self, primaryTroveSet)
         self.troveSpecs = troveSpecs
 
-    def __call__(self, actionList):
+    def __call__(self, actionList, data):
         troveSpecsByInSet = {}
         for action in actionList:
             l = troveSpecsByInSet.setdefault(action.primaryTroveSet, [])
@@ -180,7 +227,7 @@ class UnionAction(DelayedTupleSetAction):
         DelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.troveSets = [ primaryTroveSet ] + list(args)
 
-    def __call__(self):
+    def __call__(self, data):
         # this ordering means that if it's in the install set anywhere, it
         # will be in the install set in the union
         for troveSet in self.troveSets:
@@ -191,7 +238,7 @@ class UnionAction(DelayedTupleSetAction):
 
 class OperationGraph(graph.DirectedGraph):
 
-    def realize(self):
+    def realize(self, data):
         transpose = self.transpose()
         ordering = self.getTotalOrdering()
 
@@ -220,14 +267,15 @@ class OperationGraph(graph.DirectedGraph):
                         byAction.setdefault(
                             node.action.__class__, []).append(node)
                     else:
-                        node.realize()
+                        node.realize(data)
 
             for action, nodeList in byAction.iteritems():
                 if issubclass(action, ParallelAction):
-                    nodeList[0].action([ node.action for node in nodeList ])
+                    nodeList[0].action([ node.action for node in nodeList ],
+                                       data)
                     for node in nodeList:
                         node.beenRealized()
                 else:
                     for node in nodeList:
-                        node.realize()
+                        node.realize(data)
 
