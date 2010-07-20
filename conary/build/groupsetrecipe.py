@@ -57,10 +57,19 @@ class GroupActionData(troveset.ActionData):
 class GroupTupleSetMethods(object):
 
     def difference(self, other):
+        if type(other) == str:
+            findSet = self.find(other)
+            return self._action(findSet, ActionClass = GroupDifferenceAction)
+
         return self._action(other, ActionClass = GroupDifferenceAction)
 
     __sub__ = difference
     remove = difference
+
+    def find(self, *troveSpecs):
+        return self._action(ActionClass = GroupFindAction, *troveSpecs)
+
+    __getitem__ = find
 
     def flatten(self):
         return self._action(ActionClass = FlattenAction)
@@ -106,13 +115,14 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     def find(self, *troveSpecs):
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
+    __getitem__ = find
+
 class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
 
     def find(self, *troveSpecs):
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     __getitem__ = find
-
 
 class GroupFindAction(troveset.FindAction):
 

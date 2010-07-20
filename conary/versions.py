@@ -574,6 +574,14 @@ class CookLabel(StaticLabel):
 
     name = "local@local:COOK"
 
+class NewLabel(StaticLabel):
+
+    """
+    Returned by NewLabel.trailingLabel(); not a legal label!
+    """
+
+    name = "NEW@NEW:LABEL"
+
 staticLabelTable[LocalLabel.name] = LocalLabel
 staticLabelTable[EmergeLabel.name] = EmergeLabel
 staticLabelTable[CookLabel.name] = CookLabel
@@ -866,6 +874,9 @@ class NewVersion(AbstractVersion):
 
     def onRollbackLabel(self):
         return False
+
+    def trailingLabel(self):
+        return NewLabel()
 
     def __hash__(self):
         return hash("@NEW@")

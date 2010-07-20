@@ -16,7 +16,51 @@ import itertools
 
 from conary import trove, versions
 from conary.lib import graph, util
-from conary.repository import searchsource
+from conary.repository import searchsource, trovesource
+
+class TroveTupleSetTroveSource(trovesource.SearchableTroveSource):
+
+    def __init__(self, troveCache, troveSet):
+        trovesource.SearchableTroveSource.__init__(self)
+        self.troveCache = troveCache
+        self.searchAsDatabase()
+        self.deps = {}
+        self._trovesByName = {}
+        for troveTup in itertools.chain(troveSet._getInstallSet(),
+                                        troveSet._getOptionalSet()):
+            self._trovesByName.setdefault(troveTup[0], []).append(troveTup)
+
+    def getTroves(self, troveTups, withFiles=False, callback=None):
+        return self.troveCache.getTroves(troveTups, withFiles = withFiles,
+                                         callback = callback)
+
+    def hasTroves(self, troveTups, withFiles=False, callback=None):
+        return self.troveCache.hasTroves(troveTups, withFiles = withFiles,
+                                         callback = callback)
+
+    def trovesByName(self, name):
+        return self._trovesByName.get(name, [])
+
+class TroveTupleSetSearchSource(searchsource.SearchSource):
+    """
+        Search source using a list of troves.  Accepts either
+        a list of trove tuples or a list of trove objects.
+    """
+    def __init__(self, troveSource, troveSet, flavor=None, db=None):
+        troveTups = tuple(troveSet._getInstallSet() |
+                          troveSet._getOptionalSet())
+        newTroveSource = trovesource.TroveListTroveSource(troveSource,
+                                                          troveTups,
+                                                          recurse=False)
+        newTroveSource.searchWithFlavor()
+        newTroveSource.setFlavorPreferenceList(
+                                    troveSource.getFlavorPreferenceList())
+        newTroveSource.searchLeavesOnly()
+        searchsource.SearchSource.__init__(self, newTroveSource, flavor, db)
+        self.troveSet = troveSet
+
+    def getSearchPath(self):
+        return self.troveSet._getInstallSet() | self.troveSet._getOptionalSet()
 
 class TroveSet(object):
 
@@ -43,6 +87,23 @@ class TroveSet(object):
 
 class TroveTupleSet(TroveSet):
 
+    def _findTroves(self, troveTuple):
+        return self._getSearchSource().findTroves(troveTuple)
+
+    def _getTroveSource(self):
+        if self._troveSource is None:
+            self._troveSource = TroveTupleSetTroveSource(
+                        self.g.actionData.troveCache, self)
+
+        return self._troveSource
+
+    def _getSearchSource(self):
+        if self._searchSource is None:
+            self._searchSource = TroveTupleSetSearchSource(
+                                        self._getTroveSource(), self)
+
+        return self._searchSource
+
     def _setInstall(self, l):
         self.installSet.update(l)
         self.optionalSet.difference_update(set(l))
@@ -61,6 +122,8 @@ class TroveTupleSet(TroveSet):
 
     def __init__(self, *args, **kwargs):
         TroveSet.__init__(self, *args, **kwargs)
+        self._troveSource = None
+        self._searchSource = None
         self.installSet = set()
         self.optionalSet = set()
 
@@ -341,6 +404,9 @@ class UnionAction(DelayedTupleSetAction):
 class OperationGraph(graph.DirectedGraph):
 
     def realize(self, data):
+        # this is a hack
+        self.actionData = data
+
         transpose = self.transpose()
         ordering = self.getTotalOrdering()
 

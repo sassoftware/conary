@@ -945,7 +945,7 @@ class SimpleTroveSource(SearchableTroveSource):
 
 
 class TroveListTroveSource(SimpleTroveSource):
-    def __init__(self, source, troveTups):
+    def __init__(self, source, troveTups, recurse=True):
         SimpleTroveSource.__init__(self, troveTups)
         self.source = source
         self.sourceTups = troveTups[:]
@@ -956,11 +956,12 @@ class TroveListTroveSource(SimpleTroveSource):
         for (n,v,f) in troveTups:
             self._trovesByName.setdefault(n, set()).add((n,v,f))
 
-        newTroves = source.getTroves(troveTups, withFiles=False)
-        for newTrove in newTroves:
-            for tup in newTrove.iterTroveList(strongRefs=True,
-                                              weakRefs=True):
-                self._trovesByName.setdefault(tup[0], set()).add(tup)
+        if recurse:
+            newTroves = source.getTroves(troveTups, withFiles=False)
+            for newTrove in newTroves:
+                for tup in newTrove.iterTroveList(strongRefs=True,
+                                                  weakRefs=True):
+                    self._trovesByName.setdefault(tup[0], set()).add(tup)
 
     def getSourceTroves(self):
         return self.getTroves(self.sourceTups)
