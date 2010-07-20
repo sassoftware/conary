@@ -12,6 +12,8 @@
 # full details.
 #
 
+import itertools
+
 from conary import versions
 from conary.build import defaultrecipes, macros, use
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
@@ -60,6 +62,9 @@ class GroupTupleSetMethods(object):
     __sub__ = difference
     remove = difference
 
+    def flatten(self):
+        return self._action(ActionClass = FlattenAction)
+
     def getInstall(self):
         return self._action(ActionClass = GetInstalledAction)
 
@@ -73,6 +78,9 @@ class GroupTupleSetMethods(object):
     def makeOptional(self, optionalTroveSet = None):
         return self._action(ActionClass = MakeOptionalAction,
                             optionalTroveSet = optionalTroveSet)
+
+    def members(self):
+        return self._action(ActionClass = MembersAction)
 
     def union(self, *troveSetList):
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
@@ -204,6 +212,37 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
         else:
             self.outSet._setOptional(self.primaryTroveSet._getInstallSet() |
                                      self.primaryTroveSet._getOptionalSet())
+
+class MembersAction(GroupDelayedTupleSetAction):
+
+    prefilter = troveset.FetchAction
+    justStrong = True
+
+    def __call__(self, data):
+        for (troveTuple, installSet) in itertools.chain(
+                itertools.izip(self.primaryTroveSet._getInstallSet(),
+                               itertools.repeat(True)),
+                itertools.izip(self.primaryTroveSet._getOptionalSet(),
+                               itertools.repeat(False))):
+            installs = []
+            available = []
+
+            for (refTrove, byDefault, isStrong) in \
+                        data.troveCache.iterTroveListInfo(troveTuple):
+                if self.justStrong and not isStrong:
+                    continue
+
+                if byDefault:
+                    installs.append(refTrove)
+                elif not byDefault:
+                    available.append(refTrove)
+
+            self.outSet._setInstall(installs)
+            self.outSet._setOptional(available)
+
+class FlattenAction(MembersAction):
+
+    justStrong = False
 
 class SG(_SingleGroup):
 
