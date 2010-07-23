@@ -1130,14 +1130,21 @@ def getProxyMap(cfg):
     if not cfg.proxyMap.isEmpty():
         return cfg.proxyMap
 
-    proxyMap = cfg.proxyMap
+    # This creates a new proxyMap instance. We don't want to override the
+    # config's proxyMap, since old consumers of the API may modify the old
+    # settings and expect things to continue to work.
+    proxyMap = cfg.proxyMap.__class__()
     proxyDict = util.urllib.getproxies()
+    # We're only interested in a limited set of proxies
+    proxyDict = dict((x, y) for (x, y) in proxyDict.items()
+        if x in pMap)
+    proxyDict.pop('conary', None)
     proxyDict.update(cfg.proxy)
-    proxies = dict((pMap[scheme], [server])
-                   for (scheme, server) in proxyDict.iteritems())
-    proxies = dict((cpMap[scheme], [server])
+    proxies = [(pMap[scheme], [server])
+                   for (scheme, server) in proxyDict.iteritems()]
+    proxies.extend((cpMap[scheme], [server])
                    for (scheme, server) in cfg.conaryProxy.iteritems())
-    for key in proxies:
-        proxyMap.update(key, "*", proxies[key])
+    for key, value in proxies:
+        proxyMap.update(key, "*", value)
 
     return proxyMap

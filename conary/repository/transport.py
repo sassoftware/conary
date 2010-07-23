@@ -30,9 +30,9 @@ class ConaryURLOpener(URLOpener):
     """An opener aware of the conary proxies"""
 
     class ConnectionManager(URLOpener.ConnectionManager):
-        ConaryProxyProtocols = set([ 'conary', 'conarys' ])
-        ProtocolMaps = dict(http = [ 'conary', 'http' ],
-            https = [ 'conarys', 'https' ])
+        ConaryProxyProtocols = set([ 'conary' ])
+        ProtocolMaps = dict(http = [ 'conary:http', 'http:http' ],
+            https = [ 'conary:https', 'http:https' ])
 
         # For debugging purposes only
         _sendConaryProxyHostHeader = True
@@ -52,14 +52,14 @@ class ConaryURLOpener(URLOpener):
                 conn.headers.append(('X-Conary-Proxy-Host', proxy.hostport))
             return conn
 
-        def _getConnectionTypelEndpointProxy(self, endpoint, proxy):
-            m =  URLOpener.ConnectionManager._getConnectionTypelEndpointProxy
+        def _getConnectionTypeEndpointProxy(self, endpoint, proxy):
+            m =  URLOpener.ConnectionManager._getConnectionTypeEndpointProxy
             connType, selector = m(self, endpoint, proxy)
             if proxy.requestProtocol in self.ConaryProxyProtocols:
                 if connType & self.CONN_TUNNEL:
                     # Conary proxies don't implement tunneling, so clear the bit
                     connType = connType ^ self.CONN_TUNNEL
-                if connType & self.CONN_SSL and proxy.requestProtocol == 'conary':
+                if connType & self.CONN_SSL and proxy.protocol == 'http':
                     # Endpoint is SSL, but we're mapping to a plain Conary
                     # proxy
                     connType = connType ^ self.CONN_SSL

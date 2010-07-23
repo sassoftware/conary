@@ -121,7 +121,7 @@ class ConnectionManager(object):
     URL = util.URL
     ProxyURL = util.ProxyURL
 
-    ProtocolMaps = dict(http = [ 'http' ], https = [ 'https' ])
+    ProtocolMaps = dict(http = [ 'http:http' ], https = [ 'http:https' ])
 
     class _ConnectionIterator(object):
         __slots__ = [ 'connSpec', 'proxyMap', 'protocols',
@@ -147,11 +147,18 @@ class ConnectionManager(object):
             return self._retryCount
 
         def next(self):
+            if self._retryCount > self.retries:
+                raise StopIteration
+
             try:
                 proxy = self._iter.next()
+                # XXX It is most certainly not enough to increment the retry
+                # count in the proxy case. It will make sure that we don't
+                # iterate indefinitely, but it will not sleep at all.
+                self._retryCount += 1
             except StopIteration:
-                if self._retryCount == self.retries:
-                    raise StopIteration
+                if self._retryCount > self.retries:
+                    raise
                 if self._retryCount != 0:
                     # Sleep and try again, per RFC 2616 s. 8.2.4
                     self._timer.sleep()
@@ -185,7 +192,14 @@ class ConnectionManager(object):
         def _formatProxyError(self, proxyError):
             tmpl = "%s (via %s proxy %r)"
             if proxyError.exception:
-                errMsg = str(proxyError.exception)
+                if isinstance(proxyError.exception, socket.error) and \
+                            not hasattr(proxyError.exception, 'errno') and \
+                            len(proxyError.exception.args) >= 2:
+                    # python 2.4
+                    errMsg = "[Errno %s] %s" % (proxyError.exception.args[0],
+                        " ".join(proxyError.exception.args[1:]))
+                else:
+                    errMsg = str(proxyError.exception)
             else:
                 errMsg = "(unknown)"
             proxyType =  proxyError.host.requestProtocol
@@ -318,14 +332,14 @@ class ConnectionManager(object):
         if proxy is None:
             return self._getConnectionTypeEndpoint(endpoint)
 
-        return self._getConnectionTypelEndpointProxy(endpoint, proxy)
+        return self._getConnectionTypeEndpointProxy(endpoint, proxy)
 
     def _getConnectionTypeEndpoint(self, endpoint):
         if endpoint.protocol == 'https':
             return self.CONN_SSL, endpoint.selector
         return self.CONN_PLAIN, endpoint.selector
 
-    def _getConnectionTypelEndpointProxy(self, endpoint, proxy):
+    def _getConnectionTypeEndpointProxy(self, endpoint, proxy):
         connType, selector = self._getConnectionTypeEndpoint(endpoint)
         if self.proxyBypass(endpoint, proxy):
             return connType, selector
