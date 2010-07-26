@@ -14,7 +14,7 @@
 
 import itertools
 
-from conary import versions
+from conary import trove, versions
 from conary.build import defaultrecipes, macros, use
 from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
@@ -95,6 +95,9 @@ class GroupTupleSetMethods(object):
 
     __getitem__ = find
 
+    def components(self, *componentList):
+        return self._action(ActionClass = ComponentsAction, *componentList)
+
     def flatten(self):
         return self._action(ActionClass = FlattenAction)
 
@@ -163,6 +166,31 @@ class GroupDifferenceAction(troveset.DifferenceAction):
 class GroupUnionAction(troveset.UnionAction):
 
     resultClass = GroupDelayedTroveTupleSet
+
+class ComponentsAction(GroupDelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, *componentNames):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.componentNames = set(componentNames)
+
+    def __call__(self, data):
+        installSet = set()
+        optionalSet = set()
+
+        for (troveTup), inInstall, explicit in \
+                        self.primaryTroveSet._walk(data.troveCache):
+            if not trove.troveIsComponent(troveTup[0]):
+                continue
+
+            componentName = troveTup[0].split(':')[1]
+            if componentName in self.componentNames:
+                if inInstall:
+                    installSet.add(troveTup)
+                else:
+                    optionalSet.add(troveTup)
+
+        self.outSet._setInstall(installSet)
+        self.outSet._setOptional(optionalSet)
 
 class CreateGroupAction(GroupDelayedTupleSetAction):
 
