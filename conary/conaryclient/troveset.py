@@ -60,6 +60,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                                                 newGroups = False,
                                                 descendNewGroups = True,
                                                 recurse = True) ]
+        self.inDepDb = [ False ] * len(self.troveTupList)
 
         SimpleFilteredTroveSource.__init__(self, troveCache,
                                               self.troveTupList)
@@ -69,16 +70,32 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.searchLeavesOnly()
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
+        def _depClassAndName(oneDep):
+            s = set()
+
+            for depClass, dep in oneDep.iterDeps():
+                s.add( ( (depClass, dep.getName()[0]) ) )
+
+            return s
+
+        reqNames = set()
+        for dep in depList:
+            reqNames.update(_depClassAndName(dep))
+
         emptyDep = deps.DependencySet()
-        if self.depDb is None:
-            self.depDb = deptable.DependencyDatabase()
+        self.depDb = deptable.DependencyDatabase()
 
-            for i, (troveTup, (p, r)) in enumerate(itertools.izip(
-                    self.troveTupList,
-                    self.troveCache.getDepsForTroveList(self.troveTupList))):
+        for i, (troveTup, (p, r)) in enumerate(itertools.izip(
+                self.troveTupList,
+                self.troveCache.getDepsForTroveList(self.troveTupList))):
+            if self.inDepDb[i]:
+                continue
+
+            if _depClassAndName(p) & reqNames:
                 self.depDb.add(i, p, emptyDep)
+                self.inDepDb[i] = True
 
-            self.depDb.commit()
+        self.depDb.commit()
 
         suggMap = self.depDb.resolve(label, depList, leavesOnly=leavesOnly)
         for depSet, solListList in suggMap.iteritems():
