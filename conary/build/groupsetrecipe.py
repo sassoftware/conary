@@ -20,6 +20,7 @@ from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient import troveset
+from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.repository import searchsource
 from conary.deps import deps
 
@@ -212,14 +213,8 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
         self.resolveTroveSet = resolveTroveSet
 
     def __call__(self, data):
-        from conary import conarycfg, conaryclient
-        cfg = conarycfg.ConaryConfiguration()
-        cfg.dbPath = ':memory:'
-        cfg.root   = ':memory:'
-        client = conaryclient.ConaryClient(cfg)
-        checker = client.db.getDepStateClass(
+        checker = PythonDependencyChecker(
                         data.troveCache,
-                        findOrdering = False,
                         ignoreDepClasses = [ deps.AbiDependency,
                                              deps.RpmLibDependencies ])
 
@@ -232,23 +227,11 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
 
         jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList ]
 
-        depResult = checker.depCheck(jobSet)
-        failedDeps = depResult.unsatisfiedList
+        checker.addJobs(jobSet)
         resolveMethod = (self.resolveTroveSet._getResolveSource().
                                     getResolveMethod())
 
-        suggMap = {}
-
-        while resolveMethod.prepareForResolution(failedDeps):
-            sugg = resolveMethod.resolveDependencies()
-            newJob = resolveMethod.filterSuggestions(failedDeps, sugg,
-                                                        suggMap)
-
-            if not newJob:
-                continue
-
-            depResult = checker.depCheck(newJob)
-            failedDeps = depResult.unsatisfiedList
+        failedDeps, suggMap = checker.resolve(resolveMethod)
 
         if self.failOnUnresolved and failedDeps:
             raise CookError("Unresolved Deps:\n" +
