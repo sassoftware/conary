@@ -1945,6 +1945,7 @@ class TroveCache(dict):
 
         # use the getDepsForTroveList call; it raises an error if it needs
         # to access some repositories which don't support it
+        log.info("Getting deps for %d troves" % len(needed))
         try:
             depList = self.repos.getDepsForTroveList([ x[1] for x in needed ])
         except netclient.PartialResultsError, e:

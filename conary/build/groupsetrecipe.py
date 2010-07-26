@@ -16,6 +16,7 @@ import itertools
 
 from conary import versions
 from conary.build import defaultrecipes, macros, use
+from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient import troveset
@@ -27,6 +28,7 @@ class GroupSetTroveCache(object):
     def __init__(self, groupRecipe, cache):
         self.cache = cache
         self.groupRecipe = groupRecipe
+        self.depCache = {}
 
     def __getattr__(self, name):
         return getattr(self.cache, name)
@@ -51,10 +53,30 @@ class GroupSetTroveCache(object):
 class GroupActionData(troveset.ActionData):
 
     def __init__(self, troveCache, groupRecipe):
-        troveset.ActionData.__init__(self, troveCache)
+        troveset.ActionData.__init__(self, troveCache, groupRecipe.flavor)
         self.groupRecipe = groupRecipe
 
 class GroupTupleSetMethods(object):
+
+    def depsNeeded(self, resolveSource, failOnUnresolved = True):
+        if isinstance(resolveSource, troveset.SearchPathTroveSet):
+            newList = []
+            for ts in resolveSource.troveSetList:
+                if isinstance(ts, troveset.TroveTupleSet):
+                    ts = ts._action(ActionClass = troveset.FetchAction)
+                newList.append(ts)
+
+            resolveSource = troveset.SearchPathTroveSet(newList,
+                                                        graph = self.g)
+        elif isinstance(resolveSource, troveset.TroveTupleSet):
+            resolveSource = resolveSource._action(
+                                    ActionClass = troveset.FetchAction)
+
+        fetched = self._action(ActionClass = troveset.FetchAction)
+
+        return fetched._action(resolveSource,
+                                     failOnUnresolved = failOnUnresolved,
+                                     ActionClass = DepsNeededAction)
 
     def difference(self, other):
         if type(other) == str:
@@ -179,6 +201,66 @@ class CreateNewGroupAction(CreateGroupAction):
         newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
         data.groupRecipe._addGroup(self.name, newGroup)
         self._create(newGroup, self.primaryTroveSet, self.outSet, data)
+
+class DepsNeededAction(GroupDelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, resolveTroveSet,
+                 failOnUnresolved = True):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                            resolveTroveSet)
+        self.failOnUnresolved = failOnUnresolved
+        self.resolveTroveSet = resolveTroveSet
+
+    def __call__(self, data):
+        from conary import conarycfg, conaryclient
+        cfg = conarycfg.ConaryConfiguration()
+        cfg.dbPath = ':memory:'
+        cfg.root   = ':memory:'
+        client = conaryclient.ConaryClient(cfg)
+        checker = client.db.getDepStateClass(
+                        data.troveCache,
+                        findOrdering = False,
+                        ignoreDepClasses = [ deps.AbiDependency,
+                                             deps.RpmLibDependencies ])
+
+        troveList = []
+        for (troveTuple, isInstall, isExplicit) in \
+                    self.primaryTroveSet._walk(data.troveCache,
+                                newGroups = False, recurse = True):
+            if isInstall:
+                troveList.append(troveTuple)
+
+        jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList ]
+
+        depResult = checker.depCheck(jobSet)
+        failedDeps = depResult.unsatisfiedList
+        resolveMethod = (self.resolveTroveSet._getResolveSource().
+                                    getResolveMethod())
+
+        suggMap = {}
+
+        while resolveMethod.prepareForResolution(failedDeps):
+            sugg = resolveMethod.resolveDependencies()
+            newJob = resolveMethod.filterSuggestions(failedDeps, sugg,
+                                                        suggMap)
+
+            if not newJob:
+                continue
+
+            depResult = checker.depCheck(newJob)
+            failedDeps = depResult.unsatisfiedList
+
+        if self.failOnUnresolved and failedDeps:
+            raise CookError("Unresolved Deps:\n" +
+                "\n".join(
+                [ "\t%s=%s[%s] requires %s" % (name, version, flavor, dep)
+                  for ((name, version, flavor), dep) in failedDeps ]))
+
+        installSet = set()
+        for requiredBy, requiredSet in suggMap.iteritems():
+            installSet.update(requiredSet)
+
+        self.outSet._setInstall(installSet)
 
 class GetInstalledAction(GroupDelayedTupleSetAction):
 

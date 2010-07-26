@@ -15,49 +15,89 @@
 import itertools
 
 from conary import trove, versions
+from conary.deps import deps
 from conary.lib import graph, util
+from conary.local import deptable
 from conary.repository import searchsource, trovesource
 
-class TroveTupleSetTroveSource(trovesource.SearchableTroveSource):
+class SimpleFilteredTroveSource(trovesource.SimpleTroveSource):
 
-    def __init__(self, troveCache, troveSet):
-        trovesource.SearchableTroveSource.__init__(self)
+    """
+    TroveSource based on a list of (n,v,f) tuples where contents are
+    available via another TroveSource (a cache for us).
+    """
+
+    def __init__(self, troveCache, troveTupList):
+        trovesource.SimpleTroveSource.__init__(self, troveTupList)
         self.troveCache = troveCache
         self.searchAsDatabase()
-        self.deps = {}
-        self._trovesByName = {}
-        for troveTup in itertools.chain(troveSet._getInstallSet(),
-                                        troveSet._getOptionalSet()):
-            self._trovesByName.setdefault(troveTup[0], []).append(troveTup)
 
-    def getTroves(self, troveTups, withFiles=False, callback=None):
-        return self.troveCache.getTroves(troveTups, withFiles = withFiles,
-                                         callback = callback)
+class TroveTupleSetTroveSource(SimpleFilteredTroveSource):
 
-    def hasTroves(self, troveTups, withFiles=False, callback=None):
-        return self.troveCache.hasTroves(troveTups, withFiles = withFiles,
-                                         callback = callback)
+    """
+    TroveSource based on the (n,v,f) in a TroveTupleSet. Newly added
+    groups are searchable, though the versions are not specified and
+    the flavor is the same as the flavor being built.
+    """
 
-    def trovesByName(self, name):
-        return self._trovesByName.get(name, [])
+    def __init__(self, troveCache, troveSet):
+        SimpleFilteredTroveSource.__init__(self, troveCache,
+                   itertools.chain(troveSet._getInstallSet(),
+                                   troveSet._getOptionalSet()))
+
+class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
+
+    """
+    Similar to TroveTupleSetTroveSource, but newly created groups are
+    not present; instead their members are included. This is designed
+    for dependency solving.
+    """
+
+    def __init__(self, troveCache, troveSet, flavor):
+        self.depDb = None
+
+        self.troveTupList = [ x[0] for x in troveSet._walk(troveCache,
+                                                newGroups = False,
+                                                descendNewGroups = True,
+                                                recurse = True) ]
+
+        SimpleFilteredTroveSource.__init__(self, troveCache,
+                                              self.troveTupList)
+
+        self.setFlavorPreferencesByFlavor(flavor)
+        self.searchWithFlavor()
+        self.searchLeavesOnly()
+
+    def resolveDependencies(self, label, depList, leavesOnly=False):
+        emptyDep = deps.DependencySet()
+        if self.depDb is None:
+            self.depDb = deptable.DependencyDatabase()
+
+            for i, (troveTup, (p, r)) in enumerate(itertools.izip(
+                    self.troveTupList,
+                    self.troveCache.getDepsForTroveList(self.troveTupList))):
+                self.depDb.add(i, p, emptyDep)
+
+            self.depDb.commit()
+
+        suggMap = self.depDb.resolve(label, depList, leavesOnly=leavesOnly)
+        for depSet, solListList in suggMap.iteritems():
+            newSolListList = []
+            for solList in solListList:
+                newSolListList.append([ self.troveTupList[x] for x in solList ])
+
+            suggMap[depSet] = newSolListList
+
+        return suggMap
 
 class TroveTupleSetSearchSource(searchsource.SearchSource):
     """
         Search source using a list of troves.  Accepts either
         a list of trove tuples or a list of trove objects.
     """
-    def __init__(self, troveSource, troveSet, flavor=None, db=None):
-        troveTups = tuple(troveSet._getInstallSet() |
-                          troveSet._getOptionalSet())
-        newTroveSource = trovesource.TroveListTroveSource(troveSource,
-                                                          troveTups,
-                                                          recurse=False)
-        newTroveSource.searchWithFlavor()
-        newTroveSource.setFlavorPreferenceList(
-                                    troveSource.getFlavorPreferenceList())
-        newTroveSource.searchLeavesOnly()
-        searchsource.SearchSource.__init__(self, newTroveSource, flavor, db)
-        self.troveSet = troveSet
+    def __init__(self, troveSource, troveSet, flavor):
+        assert(isinstance(troveSource, SimpleFilteredTroveSource))
+        searchsource.SearchSource.__init__(self, troveSource, flavor)
 
     def getSearchPath(self):
         return self.troveSet._getInstallSet() | self.troveSet._getOptionalSet()
@@ -106,10 +146,22 @@ class TroveTupleSet(TroveSet):
 
         return self._troveSource
 
+    def _getResolveSource(self):
+        if self._resolveSource is None:
+            resolveTroveSource = ResolveTroveTupleSetTroveSource(
+                                        self.g.actionData.troveCache, self,
+                                        self.g.actionData.flavor)
+            self._resolveSource = TroveTupleSetSearchSource(
+                                    resolveTroveSource, self,
+                                    self.g.actionData.flavor)
+
+        return self._resolveSource
+
     def _getSearchSource(self):
         if self._searchSource is None:
             self._searchSource = TroveTupleSetSearchSource(
-                                        self._getTroveSource(), self)
+                                    self._getTroveSource(), self,
+                                    self.g.actionData.flavor)
 
         return self._searchSource
 
@@ -132,6 +184,7 @@ class TroveTupleSet(TroveSet):
     def __init__(self, *args, **kwargs):
         TroveSet.__init__(self, *args, **kwargs)
         self._troveSource = None
+        self._resolveSource = None
         self._searchSource = None
         self.installSet = set()
         self.optionalSet = set()
@@ -253,6 +306,9 @@ class SearchSourceTroveSet(TroveSet):
     def _findTroves(self, troveTuple):
         return self.searchSource.findTroves(troveTuple, requireLatest = True)
 
+    def _getResolveSource(self):
+        return self.searchSource
+
     def _getSearchSource(self):
         return self.searchSource
 
@@ -270,6 +326,12 @@ class SearchPathTroveSet(SearchSourceTroveSet):
         for i, troveSet in enumerate(troveSetList):
             graph.addEdge(troveSet, self, value = str(i + 1))
 
+    def _getResolveSource(self):
+        # we search differently then we resolve; resolving is recursive
+        # while searching isn't
+        sourceList = [ ts._getResolveSource() for ts in self.troveSetList ]
+        return searchsource.SearchSourceStack(*sourceList)
+
     def realize(self, data):
         sourceList = [ ts._getSearchSource() for ts in self.troveSetList ]
         self.searchSource = searchsource.SearchSourceStack(*sourceList)
@@ -277,8 +339,9 @@ class SearchPathTroveSet(SearchSourceTroveSet):
 
 class ActionData(object):
 
-    def __init__(self, repos):
+    def __init__(self, repos, flavor):
         self.troveCache = repos
+        self.flavor = flavor
 
 class Action(object):
 
