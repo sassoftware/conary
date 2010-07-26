@@ -74,6 +74,10 @@ class TroveSet(object):
 
     def _action(self, *args, **kwargs):
         ActionClass = kwargs.pop('ActionClass')
+        edgeList = kwargs.pop('edgeList', None)
+        if isinstance(edgeList, (list, tuple, set)):
+            edgeList = iter(edgeList)
+
         action = ActionClass(self, *args, **kwargs)
         troveSet = action.getResultTupleSet(graph = self.g)
         inputSets = action.getInputSets(graph = self.g)
@@ -81,7 +85,12 @@ class TroveSet(object):
         self.g.addNode(troveSet)
 
         for inputSet in inputSets:
-            self.g.addEdge(inputSet, troveSet, value = None)
+            if edgeList:
+                edgeValue = edgeList.next()
+            else:
+                edgeValue = None
+
+            self.g.addEdge(inputSet, troveSet, value = edgeValue)
 
         return troveSet
 

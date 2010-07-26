@@ -59,7 +59,8 @@ class GroupTupleSetMethods(object):
     def difference(self, other):
         if type(other) == str:
             findSet = self.find(other)
-            return self._action(findSet, ActionClass = GroupDifferenceAction)
+            return self._action(findSet, ActionClass = GroupDifferenceAction,
+                                edgeList = [ None, '-' ] )
 
         return self._action(other, ActionClass = GroupDifferenceAction)
 
