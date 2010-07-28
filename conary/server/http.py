@@ -276,8 +276,8 @@ class HttpHandler(WebHandler):
         # We have to iterate through troves twice.  Since we have hundreds of troves,
         # not thousands, this isn't too big of a deal.  In any case this will be
         # removed soon when we move to a paginated browser
-        for trove in troves:
-            totals[trove[0].upper()] += 1
+        for trv in troves:
+            totals[trv[0].upper()] += 1
         if defaultPage:
             for x in string.uppercase:
                 if totals[x]:
@@ -290,13 +290,13 @@ class HttpHandler(WebHandler):
         else:
             filter = lambda x, char=char: x[0].upper() == char
 
-        for trove in troves:
-            if not filter(trove):
+        for trv in troves:
+            if not filter(trv):
                 continue
-            if ":" not in trove:
-                packages.append(trove)
+            if ":" not in trv:
+                packages.append(trv)
             else:
-                package, component = trove.split(":")
+                package, component = trv.split(":")
                 l = components.setdefault(package, [])
                 l.append(component)
 
@@ -343,14 +343,14 @@ class HttpHandler(WebHandler):
                                error = "Version %s of %s was not found on this server."
                                %(reqVer, t))
         troves = self.repos.getTroves(query, withFiles = False)
-        metadata = self.repos.getMetadata([t, reqVer.branch()], reqVer.branch().label())
-        if t in metadata:
-            metadata = metadata[t]
+        mdata = self.repos.getMetadata([t, reqVer.branch()], reqVer.branch().label())
+        if t in mdata:
+            mdata = mdata[t]
 
         return self._write("trove_info", troveName = t, troves = troves,
             versionList = versionList,
             reqVer = reqVer,
-            metadata = metadata)
+            metadata = mdata)
 
     @strFields(t = None, v = None, f = "")
     @checkAuth(write=False)
@@ -367,11 +367,11 @@ class HttpHandler(WebHandler):
         # the walkTroveSet() will request a changeset for every
         # trove in the chain.  then iterFilesInTrove() will
         # request it again just to retrieve the filelist.
-        for trove in self.repos.walkTroveSet(parentTrove, withFiles = False):
+        for trv in self.repos.walkTroveSet(parentTrove, withFiles = False):
             files = self.repos.iterFilesInTrove(
-                trove.getName(),
-                trove.getVersion(),
-                trove.getFlavor(),
+                trv[0],
+                trv[1],
+                trv[2],
                 withFiles = True,
                 sortByPath = True)
             fileIters.append(files)
