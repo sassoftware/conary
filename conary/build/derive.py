@@ -77,7 +77,7 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir=None,
         targetLabel = Label(targetLabel)
 
     nvfToDerive, = repos.findTrove(cfg.buildLabel, (troveName, versionSpec,
-                                                    flavor), cfg.flavor)
+                                                        flavor), cfg.flavor)
     troveToDerive = repos.getTrove(*nvfToDerive)
 
     if ":" in troveName:
@@ -123,6 +123,7 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir=None,
         removeText = ''
     else:
         derivedRecipeType = 'DerivedPackageRecipe'
+    shadowBranch = shadowedVersion.branch()
 
     checkoutDir = checkoutDir or troveName
     if os.path.exists(checkoutDir):
@@ -176,11 +177,8 @@ class %(className)sRecipe(%(recipeBaseClass)s):
     shadowedVersion.resetTimeStamps()
     sourceState = conaryState.getSourceState()
     sourceState.changeVersion(shadowedVersion)
-    shadowBranch = shadowedVersion.branch()
     sourceState.changeBranch(shadowBranch)
     conaryState.write('CONARY')
-
-    checkin.commit(repos, cfg, 'Initial checkin', forceNew=True)
 
     if extract:
         extractDir = os.path.join(os.getcwd(), '_ROOT_')

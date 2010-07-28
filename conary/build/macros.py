@@ -40,7 +40,7 @@ class Macros(dict):
         if isinstance(other, dict):
             for key, item in other.iteritems():
                 self[key] = item
-        elif other:
+        else:
             for key, item in other:
                 self[key] = item
 
