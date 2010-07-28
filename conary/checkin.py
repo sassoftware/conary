@@ -278,7 +278,9 @@ def _checkout(repos, cfg, workDirArg, trvList, callback):
     for spec in checkoutSpecs:
         spec.conaryState.write(spec.targetDir + "/CONARY")
 
-def commit(repos, cfg, message, callback=None, test=False, force=False):
+
+def commit(repos, cfg, message, callback=None, test=False, force=False,
+           forceNew=False):
     if not callback:
         callback = CheckinCallback()
 
@@ -292,7 +294,7 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
     troveName = state.getName()
     conflicts = []
 
-    if isinstance(state.getVersion(), versions.NewVersion):
+    if isinstance(state.getVersion(), versions.NewVersion) or forceNew:
         # new package, so it shouldn't exist yet
         # Don't add TROVE_QUERY_ALL here, removed packages could exist
         # and we'd still want newpkg to work
