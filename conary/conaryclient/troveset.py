@@ -490,6 +490,112 @@ class UnionAction(DelayedTupleSetAction):
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
+class ReplaceAction(DelayedTupleSetAction):
+
+    prefilter = FetchAction
+
+    def __init__(self, primaryTroveSet, updateTroveSet):
+        DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
+        self.updateTroveSet = updateTroveSet
+
+    def __call__(self, data):
+        before = trove.Trove("@tsupdate", versions.NewVersion(),
+                             deps.Flavor())
+        beforeInfo = {}
+        for troveTup, inInstallSet, explicit in \
+                  self.primaryTroveSet._walk(data.troveCache, recurse = True):
+            before.addTrove(troveTup[0], troveTup[1], troveTup[2])
+            beforeInfo[troveTup] = (inInstallSet, explicit)
+
+        after = trove.Trove("@tsupdate", versions.NewVersion(),
+                             deps.Flavor())
+        afterInfo = {}
+        for troveTup, inInstallSet, explicit in \
+                  self.updateTroveSet._walk(data.troveCache, recurse = True):
+            after.addTrove(troveTup[0], troveTup[1], troveTup[2])
+            afterInfo[troveTup] = (inInstallSet, explicit)
+
+        troveMapping = after.diff(before)[2]
+        installSet = set()
+        optionalSet = set()
+        for (trvName, (oldVersion, oldFlavor),
+                      (newVersion, newFlavor), isAbsolute) in troveMapping:
+            oldTuple = (trvName, oldVersion, oldFlavor)
+            newTuple = (trvName, newVersion, newFlavor)
+            self._handleTrove(beforeInfo, afterInfo, oldTuple, newTuple,
+                              installSet, optionalSet)
+
+        self.outSet._setInstall(installSet)
+        self.outSet._setOptional(optionalSet)
+
+    def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
+                     installSet, optionalSet):
+        oldVersion = oldTuple[1]
+        newVersion = newTuple[1]
+
+        if not oldVersion:
+            # something in the update doesn't map to something we
+            # had previously; make it optional
+            optionalSet.add(newTuple)
+        elif not newVersion:
+            # something we used to have doesn't map to anything in
+            # the update, keep it
+            wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
+            if wasExplicit:
+                if wasInInstallSet:
+                    installSet.add(oldTuple)
+                else:
+                    optionalSet.add(oldTuple)
+        else:
+            # we've mapped an update; turn off the old version (by
+            # marking it as optional) and include the new one with the
+            # same defaultness as the old one had
+            optionalSet.add(oldTuple)
+            wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
+            if wasInInstallSet:
+                installSet.add(newTuple)
+            else:
+                optionalSet.add(newTuple)
+
+class UpdateAction(ReplaceAction):
+
+    def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
+                     installSet, optionalSet):
+        oldVersion = oldTuple[1]
+        newVersion = newTuple[1]
+
+        if not oldVersion:
+            # something in the update doesn't map to something we
+            # had previously, include it if it is explicit in the
+            # new trove, and use the new trove's install/optional value
+            isInInstallSet, isExplicit = beforeInfo[oldTuple]
+            if isExplicit:
+                if isInInstallSet:
+                    installSet.add(newTuple)
+                else:
+                    optionalSet.add(newTuple)
+        elif not newVersion:
+            # something we used to have doesn't map to anything in
+            # the update, keep it if it was explicit
+            wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
+            if wasExplicit:
+                if wasInInstallSet:
+                    installSet.add(oldTuple)
+                else:
+                    optionalSet.add(oldTuple)
+        else:
+            # we've mapped an update; turn off the old version (by
+            # marking it as optional). include the new one if it's explictly
+            # and let the weakrefs come in automatically later
+            optionalSet.add(oldTuple)
+            inInstallSet, isExplicit = afterInfo[newTuple]
+            if isExplicit:
+                if inInstallSet:
+                    installSet.add(newTuple)
+                else:
+                    optionalSet.add(newTuple)
+
+
 class OperationGraph(graph.DirectedGraph):
 
     def realize(self, data):

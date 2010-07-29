@@ -125,6 +125,13 @@ class GroupTupleSetMethods(object):
     def union(self, *troveSetList):
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
+    def replace(self, replaceSet):
+        return self._action(replaceSet, ActionClass = GroupReplaceAction)
+
+    def update(self, updateSet):
+        return self._action(updateSet, ActionClass = GroupUpdateAction)
+
+
     def createGroup(self, name, checkPathConflicts = True):
         return self._action(name, checkPathConflicts = checkPathConflicts,
                             ActionClass = CreateNewGroupAction)
@@ -171,6 +178,14 @@ class GroupDifferenceAction(troveset.DifferenceAction):
     resultClass = GroupDelayedTroveTupleSet
 
 class GroupUnionAction(troveset.UnionAction):
+
+    resultClass = GroupDelayedTroveTupleSet
+
+class GroupReplaceAction(troveset.ReplaceAction):
+
+    resultClass = GroupDelayedTroveTupleSet
+
+class GroupUpdateAction(troveset.UpdateAction):
 
     resultClass = GroupDelayedTroveTupleSet
 
