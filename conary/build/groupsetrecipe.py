@@ -12,7 +12,7 @@
 # full details.
 #
 
-import itertools
+import itertools, re
 
 from conary import trove, versions
 from conary.build import defaultrecipes, macros, use
@@ -92,6 +92,10 @@ class GroupTupleSetMethods(object):
 
     def find(self, *troveSpecs):
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
+
+    def findByName(self, namePattern, emptyOkay = False):
+        return self._action(namePattern, emptyOkay = emptyOkay,
+                            ActionClass = FindByNameAction)
 
     __getitem__ = find
 
@@ -285,6 +289,32 @@ class GetOptionalAction(GroupDelayedTupleSetAction):
 
     def __call__(self, data):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+class FindByNameAction(GroupDelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, namePattern, emptyOkay = False):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.namePattern = namePattern
+        self.emptyOkay = emptyOkay
+
+    def __call__(self, data):
+
+        def _gather(troveTupleSet, nameRegex):
+            s = set()
+            for troveTup in troveTupleSet:
+                if nameRegex.match(troveTup[0]):
+                    s.add(troveTup)
+
+            return s
+
+        r = re.compile(self.namePattern + '\\Z')
+        install = _gather(self.primaryTroveSet._getInstallSet(), r)
+        self.outSet._setInstall(install)
+        optional = _gather(self.primaryTroveSet._getOptionalSet(), r)
+        self.outSet._setOptional(optional)
+
+        if (not self.emptyOkay and not install and not optional):
+            raise CookError("findByName() matched no trove names")
 
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
