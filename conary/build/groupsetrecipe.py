@@ -21,7 +21,7 @@ from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient import troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
-from conary.repository import searchsource
+from conary.repository import netclient, searchsource
 from conary.deps import deps
 
 class GroupSetTroveCache(object):
@@ -150,6 +150,9 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     __getitem__ = find
+
+    def latestPackages(self):
+        return self._action(ActionClass = LatestPackagesFromSearchSourceAction)
 
 class GroupFindAction(troveset.FindAction):
 
@@ -282,6 +285,48 @@ class GetOptionalAction(GroupDelayedTupleSetAction):
 
     def __call__(self, data):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
+
+    def __call__(self, data):
+        troveSource = self.primaryTroveSet.searchSource.getTroveSource()
+
+        # data hiding? what's that
+        flavor = self.primaryTroveSet.searchSource.flavor
+        labelList = self.primaryTroveSet.searchSource.installLabelPath
+
+        d = { None : {} }
+        for label in labelList:
+            d[None][label] = [ flavor ]
+
+        matches = troveSource.getTroveLatestByLabel(
+                                d, troveTypes = netclient.TROVE_QUERY_NORMAL,
+                                bestFlavor = True)
+
+        fullTupList = []
+        for name in matches:
+            if not (trove.troveIsPackage(name) or trove.troveIsFileSet(name)):
+                continue
+
+            for version in matches[name]:
+                for flavor in matches[name][version]:
+                    fullTupList.append( (name, version, flavor) )
+
+        sourceNames = data.troveCache.getTroveInfo(
+                                trove._TROVEINFO_TAG_SOURCENAME, fullTupList)
+        bySource = {}
+        for sourceName, troveTup in itertools.izip(sourceNames, fullTupList):
+            bySource.setdefault(sourceName(), []).append(troveTup)
+
+        resultTupList = []
+        for sourceName, tupList in bySource.iteritems():
+            if len(sourceName) > 2:
+                mostRecent = sorted([ x[1] for x in tupList ])[-1]
+                resultTupList += [ x for x in tupList if x[1] == mostRecent ]
+            else:
+                resultTupList += tupList
+
+        self.outSet._setInstall(resultTupList)
 
 class MakeInstallAction(GroupDelayedTupleSetAction):
 
