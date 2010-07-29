@@ -1,4 +1,4 @@
-# Copyright (c) 2007-2009 rPath, Inc.
+# Copyright (c) 2007-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,8 +15,9 @@ import sys
 import re
 import pydoc, types
 from conary import versions
+from conary.build import recipe
 from conary.build import packagerecipe, redirectrecipe
-from conary.build import filesetrecipe, grouprecipe, inforecipe
+from conary.build import filesetrecipe, grouprecipe, groupsetrecipe, inforecipe
 
 DELETE_CHAR = chr(8)
 
@@ -49,6 +50,16 @@ class DummyGroupRecipe(grouprecipe.GroupRecipe):
                                          None)
         self.loadPolicy()
 
+class DummyGroupSetRecipe(groupsetrecipe.GroupSetRecipe):
+    def __init__(self, cfg):
+        self.name = 'group-dummy'
+        self.version = '1.0'
+        repos = DummyRepos()
+        groupsetrecipe.GroupSetRecipe.__init__(self, repos, cfg,
+                                               versions.Label('a@b:c'), None,
+                                               None)
+        self.loadPolicy()
+
 class DummyFilesetRecipe(filesetrecipe.FilesetRecipe):
     def __init__(self, cfg):
         self.name = 'fileset'
@@ -78,7 +89,9 @@ class DummyGroupInfoRecipe(inforecipe.GroupInfoRecipe):
         inforecipe.GroupInfoRecipe.__init__(self, cfg, None, None)
 
 classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
-          DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe]
+          DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe,
+          DummyGroupSetRecipe, groupsetrecipe.GroupTupleSetMethods,
+          groupsetrecipe.GroupSearchSourceTroveSet ]
 
 def _formatString(msg):
     if msg[0] == 'B':
@@ -118,11 +131,14 @@ def _formatDoc(className, obj):
     _pageDoc('%s.%s' % (className, name), docString)
 
 def _parentName(klass):
+    if hasattr(klass, '_explainObjectName'):
+        return klass._explainObjectName
+
     return klass.__base__.__name__
 
 def docObject(cfg, what):
-    classList = sys.modules[__name__].classList
-    if what in [_parentName(x).replace('Dummy', '') for x in classList]:
+    inspectList = sys.modules[__name__].classList
+    if what in [_parentName(x).replace('Dummy', '') for x in inspectList]:
         return docClass(cfg, what)
     # see if a parent class was specified (to disambiguate)
     className = None
@@ -135,12 +151,18 @@ def docObject(cfg, what):
 
     # filter out by the parent class specified
     if className:
-        classList = [ x for x in classList if _parentName(x) == className ]
+        inspectList = [ x for x in inspectList if _parentName(x) == className ]
 
     # start looking for the object that implements the method
     found = []
-    for klass in classList:
-        r = klass(cfg)
+    inspectList = [ (x, True) for x in inspectList ]
+    while inspectList:
+        (klass, needsCfg) = inspectList.pop(0)
+        if isinstance(klass, recipe.Recipe):
+            r = klass(cfg)
+        else:
+            r = klass
+
         if not hasattr(r, what):
             continue
         if what in blacklist.get(_parentName(klass), []):
@@ -179,7 +201,7 @@ def docClass(cfg, recipeType):
     classType = 'Dummy' + recipeType
     r = sys.modules[__name__].__dict__[classType](cfg)
     display = {}
-    if recipeType in ('PackageRecipe', 'GroupRecipe'):
+    if recipeType in ('PackageRecipe', 'GroupRecipe', 'GroupSetRecipe'):
         display['Build'] = sorted(x for x in r.externalMethods if x[0] != '_' and x not in blacklist.get(recipeType, []))
     elif 'GroupInfoRecipe' in recipeType:
         display['Build'] = ['Group', 'SupplementalGroup']

@@ -240,6 +240,36 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     ====
 
     B{C{r.GroupSetRecipe()}} - Provides a new recipe for creating groups
+
+    USER COMMANDS
+    =============
+    The following user commands are applicable in Conary group recipes:
+
+        - L{Group}
+        - L{SearchPath}
+        - L{Repository} : Creates an object representing a respository
+        with a default search label and flavor.
+
+    The following user commands are available in trove set objects:
+
+        - L{components}
+        - L{createGroup}
+        - L{depsNeeded}
+        - L{difference}
+        - L{find}
+        - L{findByName}
+        - L{flatten}
+        - L{getInstall}
+        - L{getOptional}
+        - L{isEmpty}
+        - L{isNotEmpty}
+        - L{makeInstall}
+        - L{makeOptional}
+        - L{members}
+        - L{packages}
+        - L{replace}
+        - L{union}
+        - L{update}
     """
     name = 'groupset'
     internalAbstractBaseClass = 1

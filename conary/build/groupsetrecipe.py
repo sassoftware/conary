@@ -59,7 +59,17 @@ class GroupActionData(troveset.ActionData):
 
 class GroupTupleSetMethods(object):
 
+    _explainObjectName = 'TupleSet'
+
     def depsNeeded(self, resolveSource, failOnUnresolved = True):
+        """
+        troveset.depsNeeded(resolveSource, failOnUnresolved = True)
+
+        Looks for unresolved dependencies in the trove set. Missing
+        dependencies (and their dependencies) are looked for in
+        the resolveSource. If there are unresolvable dependencies,
+        an error is raised unless failOnUnresolved is specified.
+        """
         if isinstance(resolveSource, troveset.SearchPathTroveSet):
             newList = []
             for ts in resolveSource.troveSetList:
@@ -80,6 +90,15 @@ class GroupTupleSetMethods(object):
                                      ActionClass = DepsNeededAction)
 
     def difference(self, other):
+        """
+        troveset.difference(other)
+        trovset - other
+
+        A new trove set is return which includes the members of the original
+        set which are not in other. The install and optional split of
+        other is irrelevent for deciding if a trove should be included
+        in the result.
+        """
         if type(other) == str:
             findSet = self.find(other)
             return self._action(findSet, ActionClass = GroupDifferenceAction,
@@ -91,57 +110,205 @@ class GroupTupleSetMethods(object):
     remove = difference
 
     def find(self, *troveSpecs):
+        """
+        troveset.find(troveSpec1, troveSpec2, ..., troveSpecN)
+        troveset[findSpec]
+
+        The troveset is searched for troves which match the given troveSpecs.
+        The install/optional value is preserved from the troveset being
+        searched.
+        """
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     def findByName(self, namePattern, emptyOkay = False):
+        """
+        troveset.findByName(nameRegularExpression, emptyOkay = False)
+
+        The troveset is searched for troves whose name matches
+        nameRegularExpression. The install/optional value is preserved from the
+        troveset being searched.
+        """
         return self._action(namePattern, emptyOkay = emptyOkay,
                             ActionClass = FindByNameAction)
 
     __getitem__ = find
 
     def components(self, *componentList):
+        """
+        B{C{troveset.components()}} - Returns the components recursively
+        included in all members of the troveset. Components of packages
+        to be installed, which the package specifies should be installed,
+        are in the return set as installable. All other components are
+        marked as optional.
+
+        SYNOPSIS
+        ========
+
+        C{troveset.components()}
+
+        DESCRIPTION
+        ===========
+
+
+        PARAMETERS
+        ==========
+
+        None
+
+        EXAMPLES
+        ========
+
+        C{repos['glibc'].components()}
+
+        Returns the components of the default glibc found in the repos
+        object.
+        """
         return self._action(ActionClass = ComponentsAction, *componentList)
 
     def flatten(self):
+        """
+        troveset.flatten()
+
+        The troveset returned consists of any trove referenced by the original
+        troveset, directly or indirectly. The install/optioanl value is
+        inherited from the troveset called.
+        """
         return self._action(ActionClass = FlattenAction)
 
     def getInstall(self):
+        """
+        troveset.getInstall()
+
+        A new troveset is returned which includes only the members of
+        this troveset which are marked as install; optional members are
+        omitted. All members of the returned set are marked as install.
+        """
         return self._action(ActionClass = GetInstalledAction)
 
     def getOptional(self):
+        """
+        troveset.getOptional()
+
+        A new troveset is returned which includes only the members of
+        this troveset which are marked as optional; install members are
+        omitted. All members of the returned set are marked as optional.
+        """
         return self._action(ActionClass = GetOptionalAction)
 
     def isEmpty(self):
+        """
+        troveset.isEmpty()
+
+        An exception is raised if the troveset contains any members; otherwise
+        an identical troveset is created and returned (and may be ignored).
+        """
         return self._action(ActionClass = IsEmptyAction)
 
     def isNotEmpty(self):
+        """
+        troveset.isEmpty()
+
+        An exception is raised if the troveset contains no members; otherwise
+        an empty troveset is returned (and may be ignored).
+        """
         return self._action(ActionClass = IsNotEmptyAction)
 
     def makeInstall(self, installTroveSet = None):
+        """
+        troveset.makeInstall(installTroveSet = None)
+
+        If a troveset is given as an argument, all members of the argument
+        are included in the result as install members. Any members of this
+        troveset which are optional, and are not in the installTroveSet,
+        are also optional in the result.
+
+        If installTroveSet is not passed, the return value includes all
+        members of this troveset as install members.
+        """
         return self._action(ActionClass = MakeInstallAction,
                             installTroveSet = installTroveSet)
 
     def makeOptional(self, optionalTroveSet = None):
+        """
+        troveset.makeOptional(optionalTroveSet = None)
+
+        If a troveset is given as an argument, all members of the argument
+        are included in the result as optional members. Any members of this
+        troveset which are install, and are not in the optionalTroveSet,
+        are also included to install in the result.
+
+        If optionalTroveSet is not passed, the return value includes all
+        members of this troveset as optional members.
+        """
         return self._action(ActionClass = MakeOptionalAction,
                             optionalTroveSet = optionalTroveSet)
 
     def members(self):
+        """
+        troveset.members()
+
+        All troves directly included by the troves in this troveset
+        are returned as a new troveset. They are optional in the result
+        only if they are optional in every member of this troveset which
+        includes them.
+        """
         return self._action(ActionClass = MembersAction)
 
     def packages(self, *packageList):
+        """
+        troveset.packages()
+
+        Return all packages and filesets referenced directly or indirectly
+        by this troveset. They are optional in the result only if they
+        are optional in every member of this troveset which includes them.
+        """
         return self._action(ActionClass = PackagesAction, *packageList)
 
     def union(self, *troveSetList):
+        """
+        troveset.union(other1, other2, ..., otherN)
+        troveset + other1 + other2
+        troveset | other1 | other2
+
+        Return a troveset which includes all of the members of this trove
+        as well as all of the members of the arguments. Troves are optional
+        only if they are optional in all the trovesets they are part of.
+        """
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
     def replace(self, replaceSet):
+        """
+        troveset.replace(replaceSet)
+
+        Look for items in this troveset (recursively) which can reasonably
+        be replaced by members in replaceSet. The install/optional values
+        are inherited from replaceSet. Any items in replaceSet which do not
+        appear to replace members of this troveset are included as optioanl
+        in the result. Members of this troveset which are outdated are
+        included as optional in this group as well to prevent their
+        installation.
+        """
         return self._action(replaceSet, ActionClass = GroupReplaceAction)
 
     def update(self, updateSet):
+        """
+        troveset.replace(updateSet)
+
+        Look for items in this troveset (recursively) which are updated
+        by members in updateSet.
+        """
         return self._action(updateSet, ActionClass = GroupUpdateAction)
 
 
     def createGroup(self, name, checkPathConflicts = True):
+        """
+        troveset.createGroup(name, checkPathConflicts = True)
+
+        Create a new group in the repository whose members are defined
+        by this troveset, and call it name (which must begin with group-).
+        Returns a troveset which references the newly created group,
+        allowing it to be included in other trovesets (and hence, groups).
+        """
         return self._action(name, checkPathConflicts = checkPathConflicts,
                             ActionClass = CreateNewGroupAction)
 
@@ -166,12 +333,28 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
 
 class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
 
+    _explainObjectName = 'Repository'
+
     def find(self, *troveSpecs):
+        """
+        repos.find(troveSpec1, troveSpec2, ..., troveSpecN)
+        repos[findSpec]
+
+        The repository is searched for troves which match the given
+        troveSpecs. All matches are returned in the install portion
+        of the return value.
+        """
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     __getitem__ = find
 
     def latestPackages(self):
+        """
+        Returns a troveset consisting of the latest packages and filesets on
+        the default search label. The troves returned are those which best
+        match the default flavor. Any troves which have a redirect as their
+        latest version will be ignored.
+        """
         return self._action(ActionClass = LatestPackagesFromSearchSourceAction)
 
 class GroupFindAction(troveset.FindAction):
@@ -630,6 +813,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
 
     def Group(self, ts, checkPathConflicts = True):
+        """
+        r.Group(troveSet, checkPathConflicts = True)
+
+        Set the passed trove set as the contents of the primary group
+        being built. The return value is a trove set which references
+        the primary group (which can be used to create other groups
+        which reference the primary group).
+        """
         return ts._createGroup(self.name,
                                checkPathConflicts = checkPathConflicts)
 
@@ -653,6 +844,11 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         return GroupSearchSourceTroveSet(searchSource, graph = self.g)
 
     def SearchPath(self, *troveSets):
+        """
+        Build an object which searches multiple other objects in the
+        order specified. Troves can be looked up in the result, and the
+        result can also be used for resolving dependencies.
+        """
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
 from conary.build.packagerecipe import BaseRequiresRecipe
