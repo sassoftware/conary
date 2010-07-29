@@ -128,6 +128,10 @@ class HttpHandler(WebHandler):
         except apache.SERVER_RETURN:
             raise
         except:
+            self.req.log_error("Unhandled exception:")
+            traceback.print_exc()
+            sys.stderr.flush()
+            self.req.status = 500
             self.req.write(self._write("error", shortError = "Error", error = traceback.format_exc()))
             return apache.OK
 
