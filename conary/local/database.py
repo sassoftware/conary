@@ -60,7 +60,7 @@ class Rollback:
             # XXX We need to import rollbacks here to avoid a circular
             # import. We should refactor rollbacks.py to not import
             # local/database.py
-            from conary import rollbacks
+            from conary.cmds import rollbacks
             rbs = rollbacks._RollbackScripts()
             for job, sData, oldCompat, newCompat in rollbackScripts:
                 rbs.add(job, sData, oldCompat, newCompat)
@@ -111,7 +111,7 @@ class Rollback:
         if not self.count:
             return []
 
-        from conary import rollbacks
+        from conary.cmds import rollbacks
         try:
             rbs = rollbacks._RollbackScripts.load(self.dir)
         except rollbacks.RollbackScriptsError:

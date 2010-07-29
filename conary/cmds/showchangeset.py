@@ -20,7 +20,8 @@ import itertools, sys
 #conary
 from conary import conaryclient
 from conary.conaryclient import cmdline
-from conary import display, query
+from conary import display
+from conary.cmds import query
 from conary.lib import log
 from conary.repository import trovesource
 

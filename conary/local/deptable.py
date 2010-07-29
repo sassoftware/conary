@@ -1003,14 +1003,17 @@ class DependencyChecker:
         # indexing depList. depList is a list of (troveNum, depClass, dep)
         # tuples. Like for depNum, negative troveNum values mean the
         # dependency was part of a new trove.
+        allDeps = self.troveSource.getDepsForTroveList(
+                [ (job[0], job[2][0], job[2][1]) for job in jobSet
+                        if job[2][0] is not None ] )
+
         for job in jobSet:
             if job[2][0] is None:
                 nodeId = self._addJob(job)
                 self.workTables.removeTrove((job[0], job[1][0], job[1][1]),
                                             nodeId)
             else:
-                (provides, requires) = self.troveSource.getDepsForTroveList(
-                                        [ (job[0], job[2][0], job[2][1]) ])[0]
+                (provides, requires) = allDeps.pop(0)
 
                 newNodeId = self._addJob(job)
 

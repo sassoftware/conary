@@ -24,10 +24,10 @@ import textwrap
 import time
 import traceback
 
-from conary import metadata
 from conary import trove
 from conary import versions
 from conary import conarycfg
+from conary.cmds import metadata
 from conary.deps import deps
 from conary.repository import shimclient, errors
 from conary.repository.netrepos import netserver

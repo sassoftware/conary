@@ -113,7 +113,7 @@ class ResultMixin(object):
 try:
     from collections import namedtuple
 except ImportError:
-    from conary.lib.compat import namedtuple
+    from conary.lib.compat import namedtuple  # pyflakes=ignore
 
 class SplitResult(namedtuple('SplitResult', 'scheme netloc path query fragment'), ResultMixin):
 
@@ -449,7 +449,7 @@ def test():
         try:
             from cStringIO import StringIO
         except ImportError:
-            from StringIO import StringIO
+            from StringIO import StringIO  # pyflakes=ignore
         fp = StringIO(test_input)
     for line in fp:
         words = line.split()
