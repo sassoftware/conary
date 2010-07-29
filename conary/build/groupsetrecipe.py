@@ -111,6 +111,12 @@ class GroupTupleSetMethods(object):
     def getOptional(self):
         return self._action(ActionClass = GetOptionalAction)
 
+    def isEmpty(self):
+        return self._action(ActionClass = IsEmptyAction)
+
+    def isNotEmpty(self):
+        return self._action(ActionClass = IsNotEmptyAction)
+
     def makeInstall(self, installTroveSet = None):
         return self._action(ActionClass = MakeInstallAction,
                             installTroveSet = installTroveSet)
@@ -330,6 +336,27 @@ class FindByNameAction(GroupDelayedTupleSetAction):
 
         if (not self.emptyOkay and not install and not optional):
             raise CookError("findByName() matched no trove names")
+
+class IsEmptyAction(GroupDelayedTupleSetAction):
+
+    def __call__(self, data):
+        if (self.primaryTroveSet._getInstallSet() or
+            self.primaryTroveSet._getOptionalSet()):
+
+            raise CookError("Trove set is not empty")
+
+        # self.outSet is already empty
+
+class IsNotEmptyAction(GroupDelayedTupleSetAction):
+
+    def __call__(self, data):
+        if (not self.primaryTroveSet._getInstallSet() and
+            not self.primaryTroveSet._getOptionalSet()):
+
+            raise CookError("Trove set is empty")
+
+        self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
 
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
