@@ -128,6 +128,9 @@ class GroupTupleSetMethods(object):
     def members(self):
         return self._action(ActionClass = MembersAction)
 
+    def packages(self, *packageList):
+        return self._action(ActionClass = PackagesAction, *packageList)
+
     def union(self, *troveSetList):
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
@@ -464,6 +467,34 @@ class MembersAction(GroupDelayedTupleSetAction):
 class FlattenAction(MembersAction):
 
     justStrong = False
+
+class PackagesAction(GroupDelayedTupleSetAction):
+
+    prefilter = troveset.FetchAction
+
+    def __init__(self, primaryTroveSet):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+
+    def __call__(self, data):
+        installSet = set()
+        optionalSet = set()
+
+        for (troveTup), inInstall, explicit in \
+                        self.primaryTroveSet._walk(data.troveCache,
+                                                   newGroups = False,
+                                                   recurse = True):
+
+            if (not trove.troveIsPackage(troveTup[0]) and
+                not trove.troveIsFileSet(troveTup[0])):
+                continue
+
+            if inInstall:
+                installSet.add(troveTup)
+            else:
+                optionalSet.add(troveTup)
+
+        self.outSet._setInstall(installSet)
+        self.outSet._setOptional(optionalSet)
 
 class SG(_SingleGroup):
 
