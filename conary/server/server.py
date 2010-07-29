@@ -92,10 +92,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
-        def _writeNestedFile(outF, name, tag, size, f, sizeCb):
+        def _writeNestedFile(outF, name, tag, size, f, contentStore, sizeCb):
             if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
-                path = f.read()
-                size = os.stat(path).st_size
+                sha1, size = f.read().split(' ')
+                size = int(size)
+                path = contentStore.hashToPath(sha1)
                 f = open(path)
                 tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
 
@@ -166,6 +167,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                     cs.dump(self.wfile.write,
                             lambda name, tag, size, f, sizeCb:
                                 _writeNestedFile(self.wfile, name, tag, size, f,
+                                                 self.netRepos.repos.repos.contentsStore,
                                                  sizeCb))
 
                     del cs

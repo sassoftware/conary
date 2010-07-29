@@ -466,14 +466,15 @@ class ChangeSet(streams.StreamSet):
             if contType != ChangedFileTypes.diff:
                 if withReferences and \
                         isinstance(f, filecontents.CompressedFromDataStore):
-                    path = f.path()
-                    realSize = os.stat(path).st_size
-                    sizeCorrection += (realSize - len(path))
+                    sha1 = sha1helper.sha1ToString(f.getSha1())
+                    realSize = os.stat(f.path()).st_size
+                    nameEntry = sha1 + ' ' + str(realSize)
+                    sizeCorrection += (realSize - len(nameEntry))
                     if realSize >= 0x100000000:
                         # add 4 bytes to store a 64-bit size
                         sizeCorrection += 4
                     csf.addFile(hash,
-                                filecontents.FromString(path,
+                                filecontents.FromString(nameEntry,
                                                         compressed = True),
                                 tag + ChangedFileTypes.refr[4:],
                                 precompressed = True)
@@ -1652,14 +1653,14 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             last = name
 
             if tagInfo[2:] == ChangedFileTypes.refr[4:]:
-                path = f.read()
-                realSize = os.stat(path).st_size
-                correction += realSize - len(path)
+                entry = f.read()
+                sha1, realSize = entry.split(' ')
+                correction += realSize - len(entry)
                 if realSize >= 0x100000000:
                     # add 4 bytes to store a 64-bit size
                     correction += 4
                 f.seek(0)
-                contents = filecontents.FromString(path)
+                contents = filecontents.FromString(entry)
             else:
                 contents = filecontents.FromFile(f)
 

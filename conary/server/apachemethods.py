@@ -176,11 +176,12 @@ def sendfile(req, size, path):
         # otherwise we can use the handy sendfile method
         req.sendfile(path)
 
-def _writeNestedFile(req, name, tag, size, f, sizeCb):
+def _writeNestedFile(req, name, tag, size, f, contentsStore, sizeCb):
     if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
         # this is a reference to a compressed file in the contents store
-        path = f.read()
-        size = os.stat(path).st_size
+        sha1, size = f.read().split(' ')
+        size = int(size)
+        path = contentsStore.hashToPath(sha1)
         tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
         sizeCb(size, tag)
         sendfile(req, size, path)
@@ -251,6 +252,7 @@ def get(port, isSecure, repos, req, restHandler=None):
                     cs.dump(req.write,
                             lambda name, tag, size, f, sizeCb:
                                 _writeNestedFile(req, name, tag, size, f,
+                                                 repos.repos.repos.contentsStore,
                                                  sizeCb))
                 except IOError, e:
                     log.error('IOError dumping changeset: %s' % e)
