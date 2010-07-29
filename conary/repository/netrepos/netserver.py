@@ -1693,7 +1693,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         sigCount = 0
         finalFingerprints = []
-        fingerPrintsToCache = []
         for origJob, fullJob in itertools.izip(chgSetList, newJobList):
             if fullJob is None:
                 # uncachable job
