@@ -1282,7 +1282,7 @@ class SimpleRepositoryFilter(ChangesetFilter):
         if cfg.changesetCacheDir:
             util.mkdirChain(cfg.changesetCacheDir)
             csCache = ChangesetCache(
-                    datastore.DataStore(cfg.changesetCacheDir),
+                    datastore.ShallowDataStore(cfg.changesetCacheDir),
                     cfg.changesetCacheLogFile)
         else:
             csCache = None
@@ -1315,7 +1315,8 @@ class ProxyRepositoryServer(ChangesetFilter):
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)
-        csCache = ChangesetCache(datastore.DataStore(cfg.changesetCacheDir),
+        csCache = ChangesetCache(
+                datastore.ShallowDataStore(cfg.changesetCacheDir),
                 cfg.changesetCacheLogFile)
 
         util.mkdirChain(cfg.proxyContentsDir)
