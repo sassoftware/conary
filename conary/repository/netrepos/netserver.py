@@ -14,6 +14,7 @@
 
 import base64
 import cPickle
+import errno
 import fnmatch
 import itertools
 import os
@@ -24,15 +25,16 @@ import time
 import types
 
 from conary import files, trove, versions, streams
-from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
+from conary.conarycfg import CfgEntitlement, CfgProxy, CfgProxyMap, CfgRepoMap, CfgUserInfo, getProxyMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
-from conary.lib.cfg import *
+from conary.lib.cfg import ConfigFile
+from conary.lib.cfgtypes import (CfgInt, CfgString, CfgPath, CfgBool, CfgList,
+        CfgLineList)
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap, deptable
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
-from conary.trove import DigitalSignature
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -111,14 +113,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def __init__(self, cfg, basicUrl, db = None):
-        # FIXME: remove after deprecation period
-        if cfg.cacheDB:
-            import warnings
-            warnings.warn('cacheDB is deprecated.  changesetCacheDir '
-                          'should be used instead.  defaulting to %s/cscache '
-                          'for changesetCacheDir' %cfg.tmpDir,
-                          DeprecationWarning)
-            cfg.configLine('changesetCacheDir %s/cscache' %cfg.tmpDir)
         # this is a bit of a hack to determine if we're running
         # as a standalone server or not without having to touch
         # rMake code
@@ -2176,8 +2170,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         uniqIdList = fileIdMap.keys()
 
         # now i+1 is how many items we shall return
-        # None in streams means the stream wasn't found.
-        streams = [ None ] * (i+1)
+        # None in streamMap means the stream wasn't found.
+        streamMap = [ None ] * (i+1)
 
         # use the list of uniqified fileIds to look up streams in the repo
         def _iterIdList(uniqIdList):
@@ -2209,13 +2203,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if stream is None:
                 continue
             for streamIdx in fileIdMap[fileId]:
-                streams[streamIdx] = stream
+                streamMap[streamIdx] = stream
             # mark as processed
             uniqIdList[i] = None
         # FIXME: the fact that we're not extracting the list ordered
         # makes it very hard to return an iterator out of this
         # function - for now, returning a list will do...
-        return streams
+        return streamMap
 
     @accessReadOnly
     def getFileVersions(self, authToken, clientVersion, fileList):
@@ -2231,14 +2225,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             fileId = self.toFileId(fileList[rawStreams.index(None)][1])
             raise errors.FileStreamMissing(fileId)
 
-        streams = [ None ] * len(fileList)
+        streamMap = [ None ] * len(fileList)
         for i,  (stream, (pathId, fileId)) in enumerate(itertools.izip(rawStreams, fileList)):
             # XXX the only thing we use the pathId for is to set it in
             # the file object; we should just pass the stream back and
             # let the client set it to avoid sending it back and forth
             # for no particularly good reason
-            streams[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
-        return streams
+            streamMap[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
+        return streamMap
 
     @accessReadOnly
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
@@ -3561,6 +3555,58 @@ class GlobListType(list):
 
         return False
 
+
+class AuthToken(list):
+    __slots__ = ()
+
+    _user, _password, _entitlements, _remote_ip = range(4)
+
+    def __init__(self, user='anonymous', password='anonymous', entitlements=(),
+            remote_ip=None):
+        if not (user == password == 'anonymous'):
+            password = util.ProtectedString(password)
+        list.__init__(self, (user, password, list(entitlements), remote_ip))
+
+    def _get_user(self):
+        return self[self._user]
+    def _set_user(self, user):
+        self[self._user] = user
+    user = property(_get_user, _set_user)
+
+    def _get_password(self):
+        return self[self._password]
+    def _set_password(self, password):
+        if not (self[self._user] == password == 'anonymous'):
+            password = util.ProtectedString(password)
+        self[self._password] = password
+    password = property(_get_password, _set_password)
+
+    def _get_entitlements(self):
+        return self[self._entitlements]
+    def _set_entitlements(self, entitlements):
+        self[self._entitlements] = entitlements
+    entitlements = property(_get_entitlements, _set_entitlements)
+
+    def _get_remote_ip(self):
+        return self[self._remote_ip]
+    def _set_remote_ip(self, remote_ip):
+        self[self._remote_ip] = remote_ip
+    remote_ip = property(_get_remote_ip, _set_remote_ip)
+
+    def __repr__(self):
+        out = '<AuthToken'
+        if self.user != 'anonymous' or not self.entitlements:
+            out += ' user=%s' % (self.user,)
+        if self.entitlements:
+            ents = []
+            for ent in self.entitlements:
+                ents.append('%s...' % ent[:6])
+            out += ' entitlements=[%s]' % (', '.join(ents))
+        if self.remote_ip:
+            out += ' remote_ip=%s' % self.remote_ip
+        return out + '>'
+
+
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
     baseUri                 = (CfgString, None)
@@ -3568,8 +3614,8 @@ class ServerConfig(ConfigFile):
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository')
     bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
-    cacheDB                 = dbstore.CfgDriver
     changesetCacheDir       = CfgPath
+    changesetCacheLogFile   = CfgPath
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
@@ -3584,6 +3630,7 @@ class ServerConfig(ConfigFile):
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)
+    proxyMap                =  CfgProxyMap
     paranoidCommits         = (CfgBool, False)
     proxyContentsDir        = CfgPath
     readOnlyRepository      = CfgBool
@@ -3596,3 +3643,6 @@ class ServerConfig(ConfigFile):
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
     user                    = CfgUserInfo
+
+    def getProxyMap(self):
+        return getProxyMap(self)

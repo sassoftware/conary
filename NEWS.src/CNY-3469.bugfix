@@ -1,0 +1,1 @@
+Fixed a bug which caused an internal server error when the same trove permission was applied to more than two roles.

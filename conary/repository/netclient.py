@@ -14,11 +14,11 @@
 
 import base64
 import gzip
-import httplib
 import itertools
 import os
 import socket
-import sys, time
+import sys
+import time
 import urllib
 import xml
 import xmlrpclib
@@ -325,15 +325,19 @@ class ServerProxy(util.ServerProxy):
         self.__callLog = callLog
 
 class ServerCache:
+    TransportFactory = transport.Transport
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
-            callback=None, proxies=None, entitlementDir=None, caCerts=None):
+            callback=None, proxies=None, proxyMap=None, entitlementDir=None,
+            caCerts=None):
         self.cache = {}
         self.shareCache = {}
         self.map = repMap
         self.userMap = userMap
         self.pwPrompt = pwPrompt
         self.entitlements = entitlements
-        self.proxies = proxies
+        if proxyMap is None:
+            proxyMap = self.TransportFactory.UrlOpenerFactory.newProxyMapFromDict(proxies)
+        self.proxyMap = proxyMap
         self.entitlementDir = entitlementDir
         self.caCerts = caCerts
         self.callLog = None
@@ -469,8 +473,8 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         uri = util.ProtectedString(uri)
-        transporter = transport.Transport(https = (protocol == 'https'),
-                proxies=self.proxies, serverName=serverName,
+        transporter = self.TransportFactory(https = (protocol == 'https'),
+                proxyMap=self.proxyMap, serverName=serverName,
                 caCerts=self.caCerts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
@@ -545,7 +549,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     # fixme: take a cfg object instead of all these parameters
     def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
             entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
-            entitlements=None, proxy=None, caCerts=None):
+            entitlements=None, proxy=None, proxyMap=None, caCerts=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -556,9 +560,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.uploadRateLimit = uploadRateLimit
 
         if proxy:
-            self.proxies = proxy
+            proxies = proxy
         else:
-            self.proxies = None
+            proxies = None
 
         if entitlements is None:
             entitlements = conarycfg.EntitlementList()
@@ -569,8 +573,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             entitlements = newEnts
 
         self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
-                proxies=self.proxies, entitlementDir=entitlementDir,
-                caCerts=caCerts)
+                proxies=proxies, entitlementDir=entitlementDir,
+                caCerts=caCerts, proxyMap=proxyMap)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
@@ -1471,10 +1475,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return jobSizes
 
     def _clearHostCache(self):
-        transport.clearIPCache()
+        transport.httputils.IPCache.clear()
 
     def _cacheHostLookups(self, hosts):
-        if self.proxies:
+        if not self.c.proxyMap.isEmpty:
             return
         hosts = set(hosts)
         for host in hosts:
@@ -1483,7 +1487,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 mappedHost = urllib.splithost(urllib.splittype(url)[1])[0]
             else:
                 mappedHost = host
-            transport.getIPAddress(mappedHost)
+            transport.httputils.IPCache.get(mappedHost)
 
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
@@ -1749,7 +1753,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # by the proxy no matter what.
             forceProxy = server.usedProxy()
             try:
-                inF = transport.ConaryURLOpener(proxies = self.proxies,
+                inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap,
                                                 forceProxy=forceProxy).open(url)
             except transport.TransportError, e:
                 raise errors.RepositoryError(*e.args)
@@ -2348,7 +2352,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # how to handle that.  So, we force the url to be reinterpreted
         # by the proxy no matter what.
         forceProxy = self.c[server].usedProxy()
-        inF = transport.ConaryURLOpener(proxies = self.proxies,
+        inF = transport.ConaryURLOpener(proxyMap = self.c.proxyMap,
                                         forceProxy=forceProxy).open(url)
 
         if callback:
@@ -3009,7 +3013,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             status, reason = httpPutFile(url, inFile, size, callback = callback,
                                          rateLimit = self.uploadRateLimit,
-                                         proxies = self.proxies,
+                                         proxyMap = self.c.proxyMap,
                                          chunked = chunked)
 
             # give a slightly more helpful message for 403
@@ -3065,20 +3069,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             server.setAbortCheck(None)
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
-                proxies = None, chunked=False):
+                proxies = None, proxyMap=None, chunked=False):
     """
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
     """
 
-    protocol, uri = urllib.splittype(url)
-    assert(protocol in ('http', 'https'))
-
-    opener = transport.XMLOpener(proxies=proxies)
-    c, urlstr, selector, headers = opener.createConnection(uri,
-        ssl = (protocol == 'https'), withProxy=True)
-
-    BUFSIZE = 8192
+    url = util.URL(url)
+    assert(url.protocol in ('http', 'https'))
+    ssl = (url.protocol == 'https')
 
     callbackFn = None
     if callback:
@@ -3087,50 +3086,9 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                                                 size)
         callbackFn = wrapper.callback
 
-    c.putrequest("PUT", selector)
-    for k, v in headers:
-        c.putheader(k, v)
+    opener = transport.XMLOpener(proxies=proxies, proxyMap=proxyMap)
+    data = transport.httputils.HttpData(inFile, bufferSize=8192,
+        callback=callbackFn, size=size, chunked=chunked, method='PUT')
 
-    if chunked:
-        c.putheader('Transfer-Encoding', 'chunked')
-        try:
-            c.endheaders()
-        except socket.error, e:
-            opener._processSocketError(e)
-            raise
-
-        # keep track of the total amount of data sent so that the
-        # callback passed in to copyfileobj can report progress correctly
-        total = 0
-        while size:
-            # send in 256k chunks
-            chunk = 262144
-            if chunk > size:
-                chunk = size
-            # first send the hex-encoded size
-            c.send('%x\r\n' %chunk)
-            # then the chunk of data
-            util.copyfileobj(inFile, c, bufSize=chunk, callback=callbackFn,
-                             rateLimit = rateLimit, sizeLimit = chunk,
-                             total=total)
-            # send \r\n after the chunked data
-            c.send("\r\n")
-            total =+ chunk
-            size -= chunk
-        # terminate the chunked encoding
-        c.send('0\r\n\r\n')
-    else:
-        c.putheader('Content-length', str(size))
-        try:
-            c.endheaders()
-        except socket.error, e:
-            opener._processSocketError(e)
-            raise
-
-        util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
-                         rateLimit = rateLimit, sizeLimit = size)
-
-    resp = c.getresponse()
-    if resp.status != 200:
-        opener.handleProxyErrors(resp.status)
-    return resp.status, resp.reason
+    usedAnonymous, infourl = opener.open_http(url, data, ssl=ssl)
+    return infourl.code, infourl.msg

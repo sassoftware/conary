@@ -277,7 +277,7 @@ class RepoMap(ServerGlobList):
         return True
 
     def __contains__(self, key):
-        return self.has_key(key)
+        return key in self
 
     def clear(self):
         del self[:]
@@ -486,6 +486,84 @@ class CfgSearchPathItem(CfgType):
 CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
 
+class CfgProxyMapEntry(CfgType):
+    def parseString(self, string):
+        val = string.split()
+        l = len(val)
+        if l == 1:
+            if val[0] != '[]':
+                raise ParseError("expected http|conary []")
+            return (None, None)
+
+        pattern = val[0]
+        if l == 2 and val[1] == '[]':
+            if val[1] != '[]':
+                raise ParseError("expected http|conary hostname|ip []")
+            return (pattern, None)
+
+        urls = val[1:]
+        urlObjs = []
+        for u in urls:
+            if u == 'direct':
+                # direct is special, we want to make it a special protocol
+                u = u + ':'
+            us = util.ProxyURL(u)
+            urlObjs.append(us)
+
+        return (pattern, urlObjs)
+
+    def format(self, val, displayOptions=None):
+        strs = []
+        for u in val:
+            s = str(u.asString(withAuth=True))
+            strs.append(s)
+        return ' '.join(strs)
+
+
+class CfgProxyMap(CfgDict):
+    def __init__(self, default=util.ProxyMap()):
+        CfgDict.__init__(self, CfgProxyMapEntry, util.ProxyMap,
+                         default=default)
+
+    def updateFromString(self, val, string):
+        strs = string.split(None, 1)
+        if len(strs) == 1:
+            key, valueStr = strs[0], ''
+        else:
+            (key, valueStr) = strs
+
+        if key.strip() == '[]':
+            val.clear()
+            return val
+
+        proto = key
+        pattern, urlObjs = self.valueType.parseString(valueStr)
+        if pattern:
+            if urlObjs:
+                val.update(proto, pattern, urlObjs)
+            else:
+                val.remove(proto, pattern)
+        else:
+            val.remove(proto)
+        return val
+
+    def parseString(self, string):
+        return self.valueType.parseString(string)
+
+    def getDefault(self, default={}):
+        if hasattr(default, 'iteritems'):
+            return CfgDict.getDefault(self, default.iteritems())
+        return CfgDict.getDefault(self, default)
+
+    def toStrings(self, value, displayOptions):
+        for key in sorted(value.iterkeys()):
+            val = value[key]
+            for item in self.valueType.toStrings(val, displayOptions):
+                if displayOptions and displayOptions.get('prettyPrint', False):
+                    key = '%-25s' % ' '.join((key[2], str(key[1])))
+                yield ' '.join((key, item))
+
+
 def _getDefaultPublicKeyrings():
     publicKeyrings = []
     # If we are root, don't use the keyring in $HOME, since a process started
@@ -570,6 +648,7 @@ class ConaryContext(ConfigSection):
     conaryProxy           =  CfgProxy
     # HTTP proxy
     proxy                 =  CfgProxy
+    proxyMap              =  CfgProxyMap
     # The first keyring in the list is writable, and is used for storing the
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
@@ -673,8 +752,8 @@ class ConaryConfiguration(SectionedConfigFile):
 
         util.settempdir(self.tmpDir)
 
-    def _getProxies(self):
-        return self.proxy
+    def getProxyMap(self):
+        return getProxyMap(self)
 
     def readEntitlementDirectory(self):
         if not os.path.isdir(self.entitlementDirectory):
@@ -1040,3 +1119,32 @@ def getProxyFromConfig(cfg):
     if proxy:
         return proxy
     return cfg.proxy
+
+def getProxyMap(cfg):
+    """
+    Return the proxyMap, or create it from old-style proxy/conaryProxy
+    entries.
+    """
+    pMap = dict(http='http:http', https='http:https')
+    cpMap = dict(http='conary:http', https='conary:https')
+    if not cfg.proxyMap.isEmpty():
+        return cfg.proxyMap
+
+    # This creates a new proxyMap instance. We don't want to override the
+    # config's proxyMap, since old consumers of the API may modify the old
+    # settings and expect things to continue to work.
+    proxyMap = cfg.proxyMap.__class__()
+    proxyDict = util.urllib.getproxies()
+    # We're only interested in a limited set of proxies
+    proxyDict = dict((x, y) for (x, y) in proxyDict.items()
+        if x in pMap)
+    proxyDict.pop('conary', None)
+    proxyDict.update(cfg.proxy)
+    proxies = [(pMap[scheme], [server])
+                   for (scheme, server) in proxyDict.iteritems()]
+    proxies.extend((cpMap[scheme], [server])
+                   for (scheme, server) in cfg.conaryProxy.iteritems())
+    for key, value in proxies:
+        proxyMap.update(key, "*", value)
+
+    return proxyMap

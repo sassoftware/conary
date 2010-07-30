@@ -196,12 +196,34 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
             self.fsJob.addToRestoreSize(thisSize)
 
-        for trv in self.removes:
-            ts.addErase("%s-%s-%s.%s" % (
-                    trv.troveInfo.capsule.rpm.name(),
-                    trv.troveInfo.capsule.rpm.version(),
-                    trv.troveInfo.capsule.rpm.release(),
-                    trv.troveInfo.capsule.rpm.arch()))
+        # don't remove RPMs if we have another reference to that RPM
+        # in the conary database
+        #
+        # by the time we get here, the erase items have already been
+        # removed from the local database, so see if anything left needs
+        # these nevra's
+
+        # if we're installing the same nvra we're removing, don't remove
+        # that nvra after installing it. that would be silly, and it just
+        # makes our database ops more expensive anyway
+        removeNvras -= installNvras
+        # look for things with the same name
+        afterInstall = set(self.db.findByNames(
+                                [ x.getName() for x in self.removes ]))
+        # but not things we're just now installing
+        afterInstall -= set( x[0].getNewNameVersionFlavor()
+                             for x in self.installs )
+        # now find the RPMs those previously installed items need
+        neededNvras = set((trv.troveInfo.capsule.rpm.name(),
+                           trv.troveInfo.capsule.rpm.version(),
+                           trv.troveInfo.capsule.rpm.release(),
+                           trv.troveInfo.capsule.rpm.arch())
+               for trv in self.db.iterTroves(afterInstall)
+               if trv.troveInfo.capsule.type() == trove._TROVECAPSULE_TYPE_RPM)
+        # and don't remove those things
+        removeNvras -= neededNvras
+        for nvra in removeNvras:
+            ts.addErase("%s-%s-%s.%s" % nvra)
 
         ts.check()
         ts.order()
