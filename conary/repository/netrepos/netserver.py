@@ -1644,7 +1644,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return url, rc
 
-    @accessReadWrite
+    @accessReadOnly
     def getChangeSetFingerprints(self, authToken, clientVersion, chgSetList,
                     recurse, withFiles, withFileContents, excludeAutoSource,
                     mirrorMode = False):

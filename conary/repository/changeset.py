@@ -1655,6 +1655,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
             if tagInfo[2:] == ChangedFileTypes.refr[4:]:
                 entry = f.read()
                 sha1, realSize = entry.split(' ')
+                realSize = int(realSize)
                 correction += realSize - len(entry)
                 if realSize >= 0x100000000:
                     # add 4 bytes to store a 64-bit size
