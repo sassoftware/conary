@@ -382,7 +382,7 @@ class ChangeSet(streams.StreamSet):
         if cfgFile:
             if compressed:
                 s = util.decompressString(contents.get().read())
-                contents = filecontents.FromString(s)
+                newContents = filecontents.FromString(s)
                 compressed = False
             self.configCache[key] = ChangeSetFileContentsTuple((newContType,
                                                                 newContents,
