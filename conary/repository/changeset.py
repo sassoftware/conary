@@ -358,39 +358,26 @@ class ChangeSet(streams.StreamSet):
                         compressed = False):
 
         key = makeKey(pathId, fileId)
-        if key in self.configCache:
+        if cfgFile:
             cache = self.configCache
-        elif  key in self.fileContents:
-            cache = self.fileContents
+            if compressed:
+                s = util.decompressString(contents.get().read())
+                contents = filecontents.FromString(s)
+                compressed = False
         else:
-            cache = None
+            cache = self.fileContents
 
-        if compressed:
-            s = util.decompressString(contents.get().read())
-            contents = filecontents.FromString(s)
-            compressed = False
+        otherContType, otherContents, _ = cache.get(key,(None,None,None))
 
-        newContType = contType
-        newContents = contents
-        if cache:
-            otherContType, otherContents, _ = cache[key]
-
-            if (otherContType == ChangedFileTypes.diff and \
-                contType == ChangedFileTypes.diff) and \
+        if otherContents and otherContType == ChangedFileTypes.diff:
+            if contType == ChangedFileTypes.diff and \
                 contents.str != otherContents.str:
                 # two different diffs is an error
                 raise ChangeSetKeyConflictError(key)
-            elif otherContType == ChangedFileTypes.diff:
-                newContType = otherContType
-                newContents = otherContents
-
-        if cfgFile:
-            cache = self.configCache
         else:
-            cache = self.fileContents
-        cache[key] = ChangeSetFileContentsTuple((newContType,
-                                                 newContents,
-                                                 compressed))
+            cache[key] = ChangeSetFileContentsTuple((contType,
+                                                     contents,
+                                                     compressed))
 
     def getFileContents(self, pathId, fileId, compressed = False):
         key = makeKey(pathId, fileId)
