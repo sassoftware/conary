@@ -356,29 +356,40 @@ class ChangeSet(streams.StreamSet):
 
     def addFileContents(self, pathId, fileId, contType, contents, cfgFile,
                         compressed = False):
-        key = makeKey(pathId, fileId)
-        if key in self.configCache or key in self.fileContents:
-            if key in self.configCache:
-                otherContType = self.configCache[key]
-            else:
-                otherContType = self.fileContents[key]
 
-            if (contType == ChangedFileTypes.diff or
-                 otherContType == ChangedFileTypes.diff):
+        key = makeKey(pathId, fileId)
+        if key in self.configCache:
+            cache = self.configCache
+        elif  key in self.fileContents:
+            cache = self.fileContents
+        else:
+            cache = None
+
+        newContType = contType
+        newContents = contents
+        if cache:
+            otherContType, otherContents, _ = cache[key]
+
+            if (otherContType == ChangedFileTypes.diff and \
+                contType == ChangedFileTypes.diff) and \
+                contents != otherContents:
+                # two different diffs is an error
                 raise ChangeSetKeyConflictError(key)
+            elif otherContType == ChangedFileTypes.diff:
+                newContType = otherContType
+                newContents = otherContents
 
         if cfgFile:
             if compressed:
                 s = util.decompressString(contents.get().read())
                 contents = filecontents.FromString(s)
                 compressed = False
-
-            self.configCache[key] = ChangeSetFileContentsTuple((contType,
-                                                                contents,
+            self.configCache[key] = ChangeSetFileContentsTuple((newContType,
+                                                                newContents,
                                                                 compressed))
         else:
-            self.fileContents[key] = ChangeSetFileContentsTuple((contType,
-                                                                 contents,
+            self.fileContents[key] = ChangeSetFileContentsTuple((newContType,
+                                                                 newContents,
                                                                  compressed))
 
     def getFileContents(self, pathId, fileId, compressed = False):
