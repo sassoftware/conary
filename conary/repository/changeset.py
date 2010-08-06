@@ -365,6 +365,11 @@ class ChangeSet(streams.StreamSet):
         else:
             cache = None
 
+        if compressed:
+            s = util.decompressString(contents.get().read())
+            contents = filecontents.FromString(s)
+            compressed = False
+
         newContType = contType
         newContents = contents
         if cache:
@@ -372,7 +377,7 @@ class ChangeSet(streams.StreamSet):
 
             if (otherContType == ChangedFileTypes.diff and \
                 contType == ChangedFileTypes.diff) and \
-                contents != otherContents:
+                contents.str != otherContents.str:
                 # two different diffs is an error
                 raise ChangeSetKeyConflictError(key)
             elif otherContType == ChangedFileTypes.diff:
@@ -380,17 +385,12 @@ class ChangeSet(streams.StreamSet):
                 newContents = otherContents
 
         if cfgFile:
-            if compressed:
-                s = util.decompressString(contents.get().read())
-                newContents = filecontents.FromString(s)
-                compressed = False
-            self.configCache[key] = ChangeSetFileContentsTuple((newContType,
-                                                                newContents,
-                                                                compressed))
+            cache = self.configCache
         else:
-            self.fileContents[key] = ChangeSetFileContentsTuple((newContType,
-                                                                 newContents,
-                                                                 compressed))
+            cache = self.fileContents
+        cache[key] = ChangeSetFileContentsTuple((newContType,
+                                                 newContents,
+                                                 compressed))
 
     def getFileContents(self, pathId, fileId, compressed = False):
         key = makeKey(pathId, fileId)
