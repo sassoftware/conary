@@ -559,8 +559,9 @@ class CfgProxyMap(CfgDict):
         for key in sorted(value.iterkeys()):
             val = value[key]
             for item in self.valueType.toStrings(val, displayOptions):
+                key = ' '.join((key[2], str(key[1])))
                 if displayOptions and displayOptions.get('prettyPrint', False):
-                    key = '%-25s' % ' '.join((key[2], str(key[1])))
+                    key = '%-25s' % key
                 yield ' '.join((key, item))
 
 

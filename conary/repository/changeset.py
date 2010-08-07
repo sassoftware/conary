@@ -356,30 +356,28 @@ class ChangeSet(streams.StreamSet):
 
     def addFileContents(self, pathId, fileId, contType, contents, cfgFile,
                         compressed = False):
+
         key = makeKey(pathId, fileId)
-        if key in self.configCache or key in self.fileContents:
-            if key in self.configCache:
-                otherContType = self.configCache[key]
-            else:
-                otherContType = self.fileContents[key]
-
-            if (contType == ChangedFileTypes.diff or
-                 otherContType == ChangedFileTypes.diff):
-                raise ChangeSetKeyConflictError(key)
-
         if cfgFile:
+            cache = self.configCache
             if compressed:
                 s = util.decompressString(contents.get().read())
                 contents = filecontents.FromString(s)
                 compressed = False
-
-            self.configCache[key] = ChangeSetFileContentsTuple((contType,
-                                                                contents,
-                                                                compressed))
         else:
-            self.fileContents[key] = ChangeSetFileContentsTuple((contType,
-                                                                 contents,
-                                                                 compressed))
+            cache = self.fileContents
+
+        otherContType, otherContents, _ = cache.get(key,(None,None,None))
+
+        if otherContents and otherContType == ChangedFileTypes.diff:
+            if contType == ChangedFileTypes.diff and \
+                contents.str != otherContents.str:
+                # two different diffs is an error
+                raise ChangeSetKeyConflictError(key)
+        else:
+            cache[key] = ChangeSetFileContentsTuple((contType,
+                                                     contents,
+                                                     compressed))
 
     def getFileContents(self, pathId, fileId, compressed = False):
         key = makeKey(pathId, fileId)
