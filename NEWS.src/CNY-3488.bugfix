@@ -1,0 +1,2 @@
+Reduce database hysteresis between Conary and RPM databases when
+RPM fails to install a requested package.
