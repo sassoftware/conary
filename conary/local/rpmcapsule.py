@@ -266,11 +266,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         if probs:
             raise ValueError(str(probs))
 
-        enforceUnpackFailures = not os.geteuid()
+        # CNY-3488: it's potentially harmful to enforce this here
         self._CheckRPMDBContents(installNvras, ts,
             'RPM failed to install requested packages: ',
             unpackFailures=unpackFailures,
-            enforceUnpackFailures=enforceUnpackFailures)
+            enforceUnpackFailures=False)
 
     def install(self, flags, troveCs):
         ACTION_RESTORE = 1
