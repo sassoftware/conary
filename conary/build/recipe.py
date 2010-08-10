@@ -471,9 +471,8 @@ class Recipe(object):
         for path in pathMap:
             fullPath = None
             if path in sourcePaths:
-                fullPath = lookaside.laUrl(
-                    sourcePaths[path][0]).filePath()
-            elif path.find("/") == -1: # we might have a guessed name
+                fullPath = lookaside.laUrl(sourcePaths[path][0]).filePath()
+            elif path.find("/") == -1:  # we might have a guessed name
                 for k in sourcePaths:
                     if k and path.startswith(k) and sourcePaths[k][2]:
                         for sk in sourcePaths[k][2]:

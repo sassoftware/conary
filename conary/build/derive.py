@@ -24,18 +24,19 @@ from conary import checkin
 from conary import conaryclient
 from conary import errors
 from conary import state
-from conary import updatecmd
 from conary.lib import log, util
 from conary.versions import Label
 from conary.repository.changeset import ChangesetExploder
+
 
 class DeriveCallback(checkin.CheckinCallback):
     def setUpdateJob(self, *args, **kw):
         # stifle update announcement for extract
         pass
 
-def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir = None,
-           extract = False, info = False, callback = None):
+
+def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir=None,
+           extract=False, info=False, callback=None):
     """
         Creates a derived recipe. Note that is does not actually commit
         anything to the repository.
@@ -60,7 +61,7 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir = None,
 
     if callback is None:
         callback = DeriveCallback()
-    if isinstance(troveToDerive,tuple):
+    if isinstance(troveToDerive, tuple):
         troveName, versionSpec, flavor = troveToDerive
         versionSpec = str(versionSpec)
         #flavor = str(flavor)
@@ -72,7 +73,7 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir = None,
         troveName, versionSpec, flavor = conaryclient.cmdline.parseTroveSpec(
             troveSpec)
 
-    if isinstance(targetLabel,str):
+    if isinstance(targetLabel, str):
         targetLabel = Label(targetLabel)
 
     nvfToDerive, = repos.findTrove(cfg.buildLabel, (troveName, versionSpec,
@@ -83,7 +84,7 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir = None,
         raise errors.ParseError('Cannot derive individual components: %s' %
                                 troveName)
 
-    client = conaryclient.ConaryClient(cfg,repos=repos)
+    client = conaryclient.ConaryClient(cfg, repos=repos)
     laterShadows = client._checkForLaterShadows(targetLabel, [troveToDerive])
     if laterShadows:
         msg = []
@@ -108,8 +109,8 @@ def derive(repos, cfg, targetLabel, troveToDerive, checkoutDir = None,
     troveName = troveName.split(':')[0]
 
     nvfs = list(troveToDerive.iterTroveList(strongRefs=True))
-    trvs = repos.getTroves(nvfs,withFiles=False)
-    hasCapsule = [ x for x in trvs if x.troveInfo.capsule.type() ]
+    trvs = repos.getTroves(nvfs, withFiles=False)
+    hasCapsule = [x for x in trvs if x.troveInfo.capsule.type()]
     removeText = \
 """
         # This appliance uses PHP as a command interpreter but does
@@ -163,11 +164,11 @@ class %(className)sRecipe(%(recipeBaseClass)s):
            version=shadowedVersion.trailingRevision().getVersion(),
            recipeBaseClass=derivedRecipeType,
            removeText=removeText)
-    open(os.sep.join((checkoutDir,recipeName)), 'w').write(derivedRecipe)
+    open(os.sep.join((checkoutDir, recipeName)), 'w').write(derivedRecipe)
 
     oldBldLabel = cfg.buildLabel
     cfg.buildLabel = targetLabel
-    checkin.newTrove(repos,cfg,troveName,checkoutDir)
+    checkin.newTrove(repos, cfg, troveName, checkoutDir)
     cfg.buildLabel = oldBldLabel
     oldcwd = os.getcwd()
     os.chdir(checkoutDir)
@@ -182,10 +183,10 @@ class %(className)sRecipe(%(recipeBaseClass)s):
     if extract:
         extractDir = os.path.join(os.getcwd(), '_ROOT_')
         log.info('extracting files from %s=%s[%s]' % (nvfToDerive))
-        ts = [ (nvfToDerive[0], (None, None), (nvfToDerive[1], nvfToDerive[2]),
-                True) ]
-        cs = repos.createChangeSet(ts, recurse = True)
-        exploder = ChangesetExploder(cs, extractDir)
+        ts = [(nvfToDerive[0], (None, None), (nvfToDerive[1], nvfToDerive[2]),
+               True)]
+        cs = repos.createChangeSet(ts, recurse=True)
+        ChangesetExploder(cs, extractDir)
         secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
         shutil.copytree(extractDir, secondDir, symlinks=True)
 

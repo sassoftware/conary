@@ -15,11 +15,11 @@ from httplib import HTTPConnection
 from urllib2 import urlopen
 import textwrap
 import time
-import urlparse
 import xml.dom.minidom
 import xml.parsers.expat
 
 from conary.fmtroves import TroveCategories, LicenseCategories
+from conary.lib import urlparse
 from conary.local import schema
 
 class MDClass:

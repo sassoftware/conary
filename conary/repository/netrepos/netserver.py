@@ -25,7 +25,7 @@ import time
 import types
 
 from conary import files, trove, versions, streams
-from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
+from conary.conarycfg import CfgEntitlement, CfgProxy, CfgProxyMap, CfgRepoMap, CfgUserInfo, getProxyMap
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
 from conary.lib.cfg import ConfigFile
@@ -3630,6 +3630,7 @@ class ServerConfig(ConfigFile):
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)
+    proxyMap                =  CfgProxyMap
     paranoidCommits         = (CfgBool, False)
     proxyContentsDir        = CfgPath
     readOnlyRepository      = CfgBool
@@ -3642,3 +3643,6 @@ class ServerConfig(ConfigFile):
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
     user                    = CfgUserInfo
+
+    def getProxyMap(self):
+        return getProxyMap(self)
