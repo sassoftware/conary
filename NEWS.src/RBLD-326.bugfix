@@ -1,0 +1,1 @@
+Rewrite derived package shadow creation code because the prious attempt to support capsules was fragile and frankly a bad idea.
