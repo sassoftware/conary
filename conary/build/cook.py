@@ -40,6 +40,7 @@ from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util, magic
 from conary.local import database
 from conary.repository import changeset, errors, filecontents
+from conary.conaryclient import callbacks as client_callbacks
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
 
@@ -156,7 +157,7 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-class CookCallback(conaryclient.callbacks.ChangesetCallback, callbacks.CookCallback):
+class CookCallback(client_callbacks.ChangesetCallback, callbacks.CookCallback):
 
     def buildingChangeset(self):
         self._message('Building changeset...')
