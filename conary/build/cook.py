@@ -36,7 +36,6 @@ from conary.build import recipe, grouprecipe, loadrecipe, factory
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
-from conary.conaryclient import callbacks as client_callbacks
 from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util, magic
 from conary.local import database
