@@ -590,7 +590,7 @@ class DeriveCommand(CvcCommand):
         checkoutDir = argSet.pop('dir', None)
         extract = argSet.pop('extract', False)
         targetLabel = argSet.pop('target', None)
-        info = prep = False
+        info = False
         if argSet.has_key('info'):
             del argSet['info']
             info = True
