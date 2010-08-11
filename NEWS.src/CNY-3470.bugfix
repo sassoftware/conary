@@ -1,0 +1,1 @@
+When multiple installed conary components shared an underlying RPM capsule removing one of those components would result in the conary database becoming out of sync with the rpm database
