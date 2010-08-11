@@ -31,15 +31,15 @@ import traceback
 
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
-from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory, capsulerecipe
+from conary.build import buildinfo, buildpackage, lookaside, use
+from conary.build import recipe, grouprecipe, loadrecipe, factory
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util, magic
 from conary.local import database
-from conary.repository import changeset, errors, filecontents
+from conary.repository import changeset, errors
 from conary.conaryclient import callbacks as client_callbacks
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
