@@ -13,8 +13,10 @@
 
 from conary.deps import deps
 from conary.repository import changeset
+from conary.repository import errors as repoerrors
 from conary import errors
 from conary import versions
+from conary import trove
 
 class BranchError(errors.ClientError):
     pass
@@ -35,18 +37,20 @@ class ClientBranch(object):
 
     def createShadowChangeSet(self, newLabel, troveList = [],
                               branchType=BRANCH_ALL,
-                              sigKeyId = None):
-        return self._createBranchOrShadow(newLabel, troveList, shadow = True,
-                                          branchType = branchType,
-                                          sigKeyId = sigKeyId)
+                              sigKeyId=None,
+                              allowEmptyShadow=False):
+        return self._createBranchOrShadow(newLabel, troveList, shadow=True,
+                                          branchType=branchType,
+                                          sigKeyId=sigKeyId,
+                                          allowEmptyShadow=allowEmptyShadow)
 
     def _checkForLaterShadows(self, newLabel, troves):
         # check to see if we've already shadowed any versions later than
         # these versions to newLabel.
         query = {}
-        for trove in troves:
-            versionDict = query.setdefault(trove.getName(), {})
-            b = trove.getVersion().branch().createShadow(newLabel)
+        for trv in troves:
+            versionDict = query.setdefault(trv.getName(), {})
+            b = trv.getVersion().branch().createShadow(newLabel)
             versionDict[b] = None
         # get the latest version of the new branches
         results = self.repos.getTroveLeavesByBranch(query)
@@ -55,9 +59,9 @@ class ClientBranch(object):
             return []
 
         oldTroves = []
-        for trove in troves:
-            versionDict = results.get(trove.getName(), {})
-            b = trove.getVersion().branch().createShadow(newLabel)
+        for trv in troves:
+            versionDict = results.get(trv.getName(), {})
+            b = trv.getVersion().branch().createShadow(newLabel)
             versionList = [ x for x in versionDict if x.branch() == b and not x.isModifiedShadow() ]
             if not versionList:
                 continue
@@ -65,7 +69,7 @@ class ClientBranch(object):
             oldVersion = latestVersion.parentVersion()
             # now get the upstream timeStamps associated with the already
             # shadowed versions.
-            oldTroves.extend((trove.getName(), oldVersion, x) \
+            oldTroves.extend((trv.getName(), oldVersion, x) \
                              for x in versionDict[latestVersion])
 
         shadowedTroves = self.repos.getTroves(oldTroves, withFiles=False)
@@ -76,8 +80,8 @@ class ClientBranch(object):
             shadowed[n, v.branch(), f] = v
 
         laterShadows = []
-        for trove in troves:
-            (n,v,f) = trove.getNameVersionFlavor()
+        for trv in troves:
+            (n,v,f) = trv.getNameVersionFlavor()
             shadowedVer = shadowed.get((n, v.branch(), f), None)
             if not shadowedVer:
                 continue
@@ -88,10 +92,13 @@ class ClientBranch(object):
         return laterShadows
 
     def _createBranchOrShadow(self, newLabel, troveList, shadow,
-                              branchType=BRANCH_ALL, sigKeyId = None):
+                              branchType=BRANCH_ALL, sigKeyId=None,
+                              allowEmptyShadow=False):
         cs = changeset.ChangeSet()
 
         seen = set(troveList)
+        sourceTroveList = set()
+        troveList = set(troveList)
         dupList = []
         needsCommit = False
 
@@ -101,6 +108,19 @@ class ClientBranch(object):
             troves = self.repos.getTroves(troveList)
             troveList = set()
             branchedTroves = {}
+
+            if sourceTroveList:
+                for st in sourceTroveList:
+                    try:
+                        sourceTrove = self.repos.getTrove(*st)
+                    except repoerrors.TroveMissing:
+                        if allowEmptyShadow:
+                            st[1].resetTimeStamps()
+                            sourceTrove = trove.Trove(*st)
+                        else:
+                            raise
+                    troves.append(sourceTrove)
+                sourceTroveList = set()
 
             if shadow:
                 laterShadows = self._checkForLaterShadows(newLabel, troves)
@@ -118,18 +138,18 @@ cannot shadow earlier trove
 ''' % (n, shadowedVer, f, n, v, f))
                     raise BranchError('\n\n'.join(msg))
 
-            for trove in troves:
-                if trove.isRedirect():
-                    raise errors.ShadowRedirect(*trove.getNameVersionFlavor())
+            for trv in troves:
+                if trv.isRedirect():
+                    raise errors.ShadowRedirect(*trv.getNameVersionFlavor())
 
                 # add contained troves to the todo-list
                 newTroves = [ x for x in
-                        trove.iterTroveList(strongRefs=True,
+                        trv.iterTroveList(strongRefs=True,
                                             weakRefs=True) if x not in seen ]
                 troveList.update(newTroves)
                 seen.update(newTroves)
 
-                troveName = trove.getName()
+                troveName = trv.getName()
 
                 if troveName.endswith(':source'):
                     if not(branchType & self.BRANCH_SOURCE):
@@ -141,40 +161,40 @@ cannot shadow earlier trove
 
                     # XXX this can go away once we don't care about
                     # pre-troveInfo troves
-                    if not trove.getSourceName():
+                    if not trv.getSourceName():
                         from conary.lib import log
                         log.warning('%s has no source information' % troveName)
                         sourceName = troveName
                     else:
-                        sourceName = trove.getSourceName()
+                        sourceName = trv.getSourceName()
 
                     key  = (sourceName,
-                            trove.getVersion().getSourceVersion(False),
+                            trv.getVersion().getSourceVersion(False),
                             deps.Flavor())
                     if key not in seen:
-                        troveList.add(key)
                         seen.add(key)
+                        sourceTroveList.add(key)
 
                     if not(branchType & self.BRANCH_BINARY):
                         continue
 
                 if shadow:
-                    branchedVersion = trove.getVersion().createShadow(newLabel)
+                    branchedVersion = trv.getVersion().createShadow(newLabel)
                 else:
-                    branchedVersion = trove.getVersion().createBranch(newLabel,
+                    branchedVersion = trv.getVersion().createBranch(newLabel,
                                                                withVerRel = 1)
 
-                branchedTrove = trove.copy()
+                branchedTrove = trv.copy()
                 branchedTrove.changeVersion(branchedVersion)
                 #this clears the digital signatures from the shadow
                 branchedTrove.troveInfo.sigs.reset()
                 # this flattens the old metadata and removes signatures
-                branchedTrove.copyMetadata(trove)
+                branchedTrove.copyMetadata(trv)
                 # FIXME we should add a new digital signature in cases
                 # where we can (aka user is at kb and can provide secret key
 
                 for ((name, version, flavor), byDefault, isStrong) \
-                                            in trove.iterTroveListInfo():
+                                            in trv.iterTroveListInfo():
                     if shadow:
                         branchedVersion = version.createShadow(newLabel)
                     else:
@@ -187,8 +207,8 @@ cannot shadow earlier trove
                                            byDefault=byDefault,
                                            weakRef=not isStrong)
 
-                key = (trove.getName(), branchedTrove.getVersion(),
-                       trove.getFlavor())
+                key = (trv.getName(), branchedTrove.getVersion(),
+                       trv.getFlavor())
 
                 if sigKeyId is not None:
                     branchedTrove.addDigitalSignature(sigKeyId)
@@ -198,8 +218,8 @@ cannot shadow earlier trove
 
                 # use a relative changeset if we're staying on the same host
                 if branchedTrove.getVersion().trailingLabel().getHost() == \
-                   trove.getVersion().trailingLabel().getHost():
-                    branchedTroves[key] = branchedTrove.diff(trove,
+                   trv.getVersion().trailingLabel().getHost():
+                    branchedTroves[key] = branchedTrove.diff(trv,
                                                            absolute = False)[0]
                 else:
                     branchedTroves[key] = branchedTrove.diff(None,

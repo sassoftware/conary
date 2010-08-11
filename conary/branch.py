@@ -53,9 +53,10 @@ def displayBranchJob(cs, shadow=False):
                                         newInfo)
 
 
-def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
-           sourceOnly = False, binaryOnly = False, info = False,
-           forceBinary = False, ignoreConflicts = False, targetFile = None):
+def branch(repos, cfg, newLabel, troveSpecs, makeShadow=False,
+           sourceOnly=False, binaryOnly=False, allowEmptyShadow=True,
+           info=False, forceBinary=False, ignoreConflicts=False,
+           targetFile=None):
     branchType = _getBranchType(binaryOnly, sourceOnly)
 
     client = conaryclient.ConaryClient(cfg)
@@ -74,8 +75,9 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow = False,
 
     if makeShadow:
         dups, cs = client.createShadowChangeSet(newLabel, troveList,
+                                                allowEmptyShadow=True,
                                                 branchType=branchType,
-                                                sigKeyId = sigKey)
+                                                sigKeyId=sigKey)
     else:
         dups, cs = client.createBranchChangeSet(newLabel, troveList,
                                                 branchType=branchType,
