@@ -113,14 +113,14 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
             if userMap is None:
                 userMap = cfg.user
 
-        proxy = conarycfg.getProxyFromConfig(cfg)
+        proxyMap = cfg.getProxyMap()
 
         repos = NetworkRepositoryClient(cfg.repositoryMap, cfg.user,
                 pwPrompt=passwordPrompter, localRepository=db,
                 entitlementDir=cfg.entitlementDirectory,
                 downloadRateLimit=cfg.downloadRateLimit,
                 uploadRateLimit=cfg.uploadRateLimit,
-                entitlements=cfg.entitlement, proxy=proxy,
+                entitlements=cfg.entitlement, proxyMap=proxyMap,
                 caCerts=cfg.trustedCerts)
         repos.setFlavorPreferenceList(cfg.flavorPreferences)
         return repos
