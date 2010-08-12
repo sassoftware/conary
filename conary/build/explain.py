@@ -155,10 +155,8 @@ def docObject(cfg, what):
 
     # start looking for the object that implements the method
     found = []
-    inspectList = [ (x, True) for x in inspectList ]
-    while inspectList:
-        (klass, needsCfg) = inspectList.pop(0)
-        if isinstance(klass, recipe.Recipe):
+    for klass in inspectList:
+        if issubclass(klass, recipe.Recipe):
             r = klass(cfg)
         else:
             r = klass
@@ -180,6 +178,9 @@ def docObject(cfg, what):
         if isinstance(obj, types.InstanceType):
             obj = obj.__class__
         found.append((_parentName(klass), obj))
+
+    # collapse dups based on the doc string
+    found = dict( (x[1].__doc__, x) for x in found).values()
 
     if len(found) == 1:
         _formatDoc(found[0][0], found[0][1])
