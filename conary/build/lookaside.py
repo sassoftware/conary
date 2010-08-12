@@ -115,7 +115,7 @@ class laUrl(object):
         return (host, path, fragment)
 
     def filePath(self, useParentPath=True):
-        (host, path, fragment) = self.getHostAndPath()
+        (host, path, fragment) = self.getHostAndPath(useParentPath)
 
         if self.extension:
             path += '.' + self.extension
