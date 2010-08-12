@@ -1,1 +1,0 @@
-Fix exception when doing a repository cook when the recipe sources a multiurl of mirrors.

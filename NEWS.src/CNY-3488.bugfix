@@ -1,2 +1,0 @@
-Fix an inconsistency between Conary and RPM databases when
-RPM fails to install a requested package.
