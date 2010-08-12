@@ -25,7 +25,7 @@ from conary.cmds import branch
 from conary import checkin
 from conary import conaryclient
 from conary import state
-from conary import updatecmd
+from conary.cmds import updatecmd
 from conary.lib import log, util
 from conary.versions import Label
 
