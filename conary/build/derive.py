@@ -21,7 +21,7 @@ import os
 import stat
 import shutil
 
-from conary import branch
+from conary.cmds import branch
 from conary import checkin
 from conary import conaryclient
 from conary import state
