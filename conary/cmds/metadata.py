@@ -18,7 +18,7 @@ import time
 import xml.dom.minidom
 import xml.parsers.expat
 
-from conary.fmtroves import TroveCategories, LicenseCategories
+from conary.cmds.fmtroves import TroveCategories, LicenseCategories
 from conary.lib import urlparse
 from conary.local import schema
 

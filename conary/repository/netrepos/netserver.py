@@ -32,7 +32,8 @@ from conary.lib.cfg import ConfigFile
 from conary.lib.cfgtypes import (CfgInt, CfgString, CfgPath, CfgBool, CfgList,
         CfgLineList)
 from conary.repository import changeset, errors, xmlshims
-from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap, deptable
+from conary.repository.netrepos import fsrepos, instances, trovestore
+from conary.repository.netrepos import accessmap, deptable, fingerprints
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
@@ -48,7 +49,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 69 + 1)
+SERVER_VERSIONS = range(36, 70 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1647,115 +1648,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSetFingerprints(self, authToken, clientVersion, chgSetList,
                     recurse, withFiles, withFileContents, excludeAutoSource,
                     mirrorMode = False):
+        """
+        The fingerprints of old troves new troves are relative to doesn't
+        matter. If the old versions of a trove could change in a way which
+        would invalidate a relative changeset, clients wouldn't be able to
+        merge relative changesets against old troves stored in their databases!
+        """
 
-        def _troveFp(troveInfo, sig, meta):
-            if not sig and not meta:
-                return "otherrepo"
-
-            (sigPresent, sigBlock) = sig
-            l = []
-            if sigPresent >= 1:
-                l.append(base64.decodestring(sigBlock))
-            (metaPresent, metaBlock) = meta
-            if metaPresent >= 1:
-                l.append(base64.decodestring(metaBlock))
-            if sigPresent or metaPresent:
-                return tuple(l)
-            return ("missing", ) + troveInfo
-
-        if recurse:
-            # We mark old groups (ones without weak references) as uncachable
-            # because they're expensive to flatten (and so old that it
-            # hardly matters).
-            cu = self.db.cursor()
-            schema.resetTable(cu, "tmpNVF")
-
-            foundGroups = set()
-            foundWeak = set()
-            foundCollections = set()
-
-            newJobList = [ [] for x in range(len(chgSetList)) ]
-
-            for jobId, job in enumerate(chgSetList):
-                if trove.troveIsGroup(job[0]):
-                    foundGroups.add(jobId)
-
-                newJobList[jobId].append(job)
-
-                if job[1][0]:
-                    # Record the troves in the old trove this job is
-                    # relative to so if any of the old troves change
-                    # the fingerprints won't match.
-                    #
-                    # The weird math on jobId here avoids conflicts in that
-                    # row, which is a primary key. Seems easier than
-                    # declaring a new table.
-                    cu.execute("""
-                        INSERT INTO tmpNVF(idx, name, version, flavor)
-                        VALUES (?, ?, ?, ?)
-                    """, (-1 * (jobId + 1), job[0], job[1][0], job[1][1]),
-                               start_transaction=False)
-
-                cu.execute("""
-                    INSERT INTO tmpNVF(idx, name, version, flavor)
-                    VALUES (?, ?, ?, ?)
-                """, (jobId, job[0], job[2][0], job[2][1]),
-                           start_transaction=False)
-
-            self.db.analyze("tmpNVF")
-            cu.execute("""SELECT
-                    tmpNVF.idx, I_Items.item, I_Versions.version,
-                    I_Flavors.flavor, TroveTroves.flags
-                FROM tmpNVF JOIN Items ON tmpNVF.name = Items.item
-                JOIN Versions ON (tmpNVF.version = Versions.version)
-                JOIN Flavors ON (tmpNVF.flavor = Flavors.flavor)
-                JOIN Instances ON
-                    Items.itemId = Instances.itemId AND
-                    Versions.versionId = Instances.versionId AND
-                    Flavors.flavorId = Instances.flavorId
-                JOIN TroveTroves USING (instanceId)
-                JOIN Instances AS I_Instances ON
-                    TroveTroves.includedId = I_Instances.instanceId
-                JOIN Items AS I_Items ON
-                    I_Instances.itemId = I_Items.itemId
-                JOIN Versions AS I_Versions ON
-                    I_Instances.versionId = I_Versions.versionId
-                JOIN Flavors AS I_Flavors ON
-                    I_Instances.flavorId = I_Flavors.flavorId
-                ORDER BY
-                    I_Items.item, I_Versions.version, I_Flavors.flavor
-            """)
-
-            for (idx, name, version, flavor, flags) in cu:
-                idx = abs(idx) - 1
-
-                newJobList[idx].append( (name, (None, None),
-                                               (version, flavor), True) )
-                if flags & schema.TROVE_TROVES_WEAKREF > 0:
-                    foundWeak.add(idx)
-                if not ':' in name and not name.startswith('fileset-'):
-                    foundCollections.add(idx)
-
-            for idx in ((foundGroups & foundCollections) - foundWeak):
-                # groups which contain collections but no weak refs
-                # are uncachable
-                newJobList[idx] = None
-
-            newJobList = newJobList
-        else:
-            newJobList = [ [ x ] for x in chgSetList ]
-
+        newJobList = fingerprints.expandJobList(self.db, chgSetList, recurse)
         sigItems = []
 
         for fullJob in newJobList:
             for job in fullJob:
-                if job[1][0]:
-                    version = versions.VersionFromString(job[1][0])
-                    if version.trailingLabel().getHost() in self.serverNameList:
-                        sigItems.append((job[0], job[1][0], job[1][1]))
-                    else:
-                        sigItems.append(None)
-
                 version = versions.VersionFromString(job[2][0])
                 if version.trailingLabel().getHost() in self.serverNameList:
                     sigItems.append((job[0], job[2][0], job[2][1]))
@@ -1788,11 +1692,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             header += '2'
 
         sigCount = 0
-        fingerprints = []
+        finalFingerprints = []
         for origJob, fullJob in itertools.izip(chgSetList, newJobList):
             if fullJob is None:
                 # uncachable job
-                fingerprints.append('')
+                finalFingerprints.append('')
                 continue
 
             fpList = [ header ]
@@ -1800,18 +1704,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         origJob[2][0], origJob[2][1], "%d" % origJob[3] ]
             for job in fullJob:
                 if job[1][0]:
-                    fpList += _troveFp(sigItems[sigCount], sigList[sigCount],
-                                       metaList[sigCount])
-                    sigCount += 1
+                    troveTup = (job[0], job[1][0], job[1][1])
+                    fpList.append(fingerprints._troveFp(troveTup, None, None))
 
-                fpList += _troveFp(sigItems[sigCount], sigList[sigCount],
-                                   metaList[sigCount])
+                fp = fingerprints._troveFp(sigItems[sigCount],
+                                        sigList[sigCount],
+                                        metaList[sigCount])
                 sigCount += 1
 
-            fp = sha1helper.sha1String("\0".join(fpList))
-            fingerprints.append(sha1helper.sha1ToString(fp))
+                fpList.append(fp)
 
-        return fingerprints
+            fp = sha1helper.sha1String("\0".join(fpList))
+            finalFingerprints.append(sha1helper.sha1ToString(fp))
+
+        return finalFingerprints
 
     @accessReadOnly
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList,
@@ -3262,6 +3168,78 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in ret ]
         return ret
+
+    @accessReadOnly
+    def getDepsForTroveList(self, authToken, clientVersion, troveList):
+        """
+        Returns list of (provides, requires) for troves. For troves which
+        are missing or we do not have access to, None is returned.
+        """
+        self.log(2, troveList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                         [ [i,] + tup for i, tup in enumerate(troveList) ],
+                         ["idx","name","version", "flavor"],
+                         start_transaction=False)
+
+        req = []
+        prov = []
+        for tup in troveList:
+            req.append(deps.DependencySet())
+            prov.append(deps.DependencySet())
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+
+        for tableName, dsList in ( ('Requires', req), ('Provides', prov) ):
+            cu.execute("""
+                SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
+                    JOIN Items ON
+                        Items.item = tmpNVF.name
+                    JOIN Versions ON
+                        Versions.version = tmpNVF.version
+                    JOIN Flavors ON
+                        Flavors.flavor = tmpNVF.flavor
+                    JOIN Instances ON
+                        Items.itemId = Instances.itemId AND
+                        Versions.versionId = Instances.versionId AND
+                        Flavors.flavorId = Instances.flavorId
+                    JOIN UserGroupInstancesCache AS ugi
+                        USING (instanceId)
+                    JOIN %s USING (InstanceId)
+                    JOIN Dependencies AS D USING (depId)
+                WHERE
+                    ugi.userGroupId in (%s)
+                ORDER BY tmpNVF.idx, D.class
+            """ %  (tableName, ",".join("%d" % x for x in roleIds) ))
+
+            last = None
+            flags = []
+            for idx, depClassId, depName, depFlag in cu:
+                this = (idx, depClassId, depName)
+
+                if this != last:
+                    if last:
+                        depClass = deps.dependencyClasses[depClassId]
+                        depSet = dsList[last[0]]
+                        depSet.addDep(deps.dependencyClasses[last[1]],
+                                      deps.Dependency(last[2], flags))
+
+                    last = this
+                    flags = []
+
+                if depFlag != deptable.NO_FLAG_MAGIC:
+                    flags.append((depFlag, deps.FLAG_SENSE_REQUIRED))
+
+            if last:
+                depClass = deps.dependencyClasses[depClassId]
+                depSet = dsList[last[0]]
+                depSet.addDep(deps.dependencyClasses[last[1]],
+                              deps.Dependency(last[2], flags))
+
+        return zip([ self.fromDepSet(x) for x in prov ],
+                   [ self.fromDepSet(x) for x in req ])
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):

@@ -16,9 +16,10 @@ Provides the output for the "conary verify" command
 """
 import itertools, os, stat, sys
 
-from conary import showchangeset, trove
+from conary import trove
 from conary import versions
 from conary import conaryclient, files
+from conary.cmds import showchangeset
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import dirset, log, sha1helper, util
