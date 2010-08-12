@@ -1,2 +1,0 @@
-A bug introduced in Conary 2.1.21 that prevented `cvc cook` from functioning
-has been corrected. (CNY-3490)
