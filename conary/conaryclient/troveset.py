@@ -311,12 +311,12 @@ class DelayedTupleSet(TroveTupleSet):
     def __str__(self):
         return str(self.action)
 
-    def beenRealized(self):
+    def beenRealized(self, data):
         self.realized = True
 
     def realize(self, data):
         self.action(data)
-        self.beenRealized()
+        self.beenRealized(data)
 
 class SearchSourceTroveSet(TroveSet):
 
@@ -637,7 +637,7 @@ class OperationGraph(graph.DirectedGraph):
                     nodeList[0].action([ node.action for node in nodeList ],
                                        data)
                     for node in nodeList:
-                        node.beenRealized()
+                        node.beenRealized(data)
                 else:
                     for node in nodeList:
                         node.realize(data)

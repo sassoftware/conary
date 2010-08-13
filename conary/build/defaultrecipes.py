@@ -249,6 +249,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{SearchPath}
         - L{Repository} : Creates an object representing a respository
         with a default search label and flavor.
+        - L{dumpAll}
 
     The following user commands are available in trove set objects:
 
@@ -256,6 +257,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{createGroup}
         - L{depsNeeded}
         - L{difference}
+        - L{dump}
         - L{find}
         - L{findByName}
         - L{flatten}
@@ -268,6 +270,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{members}
         - L{packages}
         - L{replace}
+        - L{track}
         - L{union}
         - L{update}
     """

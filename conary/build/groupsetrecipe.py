@@ -19,10 +19,11 @@ from conary.build import defaultrecipes, macros, use
 from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
+from conary.conaryclient.cmdline import parseTroveSpec
 from conary.conaryclient import troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.lib import log
-from conary.repository import netclient, searchsource
+from conary.repository import errors, netclient, searchsource
 from conary.deps import deps
 
 class GroupSetTroveCache(object):
@@ -339,7 +340,7 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
     def __str__(self):
         return troveset.DelayedTupleSet.__str__(self) + self._lineNumStr
 
-    def beenRealized(self):
+    def beenRealized(self, data):
         def display(tupleSet):
             if not tupleSet:
                 log.info("\t\t(empty)")
@@ -353,15 +354,31 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
                                     % (name, version.trailingLabel(),
                                        version.trailingRevision(), flavor))
 
-        troveset.DelayedTupleSet.beenRealized(self)
+        troveset.DelayedTupleSet.beenRealized(self, data)
 
-        if self._dump:
+        if self._dump or data.groupRecipe._dumpAll:
             log.info("TroveSet contents for action %s" % str(self.action) +
                      self._lineNumStr)
             log.info("\tInstall")
             display(self._getInstallSet())
             log.info("\tOptional")
             display(self._getOptionalSet())
+
+        matches = []
+        foundMatch = False
+
+        try:
+            matches = self._findTroves(data.groupRecipe._trackDict.keys())
+        except errors.TroveNotFound:
+            matches = {}
+
+        if matches:
+            log.info("Tracking matches found in results for action %s"
+                     % str(self.action) + self._lineNumStr)
+            for (parsedSpec, matchList) in matches.iteritems():
+                log.info("\tMatches for %s"
+                                % data.groupRecipe._trackDict[parsedSpec])
+                display(matchList)
 
     def dump(self):
         self._dump = True
@@ -827,6 +844,9 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.world = GroupSearchSourceTroveSet(self.searchSource)
         self.g = troveset.OperationGraph()
 
+        self._dumpAll = False
+        self._trackDict = {}
+
         baseMacros = loadMacros(cfg.defaultMacros)
         self.macros.update(baseMacros)
         for key in cfg.macros:
@@ -844,6 +864,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         data = GroupActionData(troveCache = GroupSetTroveCache(self, cache),
                                groupRecipe = self)
         self.g.realize(data)
+
+    def dumpAll(self):
+        """
+        r.dumpAll()
+
+        Dump the contents of trove sets as they're populated.
+        """
+        self._dumpAll = True
 
     def getLabelPath(self):
         return self.labelPath
@@ -910,6 +938,9 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         result can also be used for resolving dependencies.
         """
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
+
+    def track(self, troveSpec):
+        self._trackDict[parseTroveSpec(troveSpec)] = troveSpec
 
 from conary.build.packagerecipe import BaseRequiresRecipe
 exec defaultrecipes.GroupSetRecipe
