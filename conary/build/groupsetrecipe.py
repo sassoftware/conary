@@ -12,7 +12,7 @@
 # full details.
 #
 
-import itertools, re
+import inspect, itertools, re, time
 
 from conary import trove, versions
 from conary.build import defaultrecipes, macros, use
@@ -21,6 +21,7 @@ from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient import troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
+from conary.lib import log
 from conary.repository import netclient, searchsource
 from conary.deps import deps
 
@@ -322,7 +323,60 @@ class GroupTupleSetMethods(object):
 class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
                                 troveset.DelayedTupleSet):
 
-    pass
+    def __init__(self, *args, **kwargs):
+        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
+        self._dump = False
+        self._lineNum = None
+        self._lineNumStr = ''
+
+        # caller's caller
+        for frame in inspect.stack():
+            if frame[1].endswith('.recipe'):
+                self._lineNum = frame[2]
+                self._lineNumStr = ':' + str(self._lineNum)
+                break
+
+    def __str__(self):
+        return troveset.DelayedTupleSet.__str__(self) + self._lineNumStr
+
+    def beenRealized(self):
+        def display(tupleSet):
+            if not tupleSet:
+                log.info("\t\t(empty)")
+                return
+
+            for (name, version, flavor) in sorted(tupleSet):
+                if isinstance(version, versions.NewVersion):
+                    log.info("\t\t%s (newly created)")
+                else:
+                    log.info("\t\t%s=%s/%s[%s]"
+                                    % (name, version.trailingLabel(),
+                                       version.trailingRevision(), flavor))
+
+        troveset.DelayedTupleSet.beenRealized(self)
+
+        if self._dump:
+            log.info("TroveSet contents for action %s" % str(self.action) +
+                     self._lineNumStr)
+            log.info("\tInstall")
+            display(self._getInstallSet())
+            log.info("\tOptional")
+            display(self._getOptionalSet())
+
+    def dump(self):
+        self._dump = True
+        return self
+
+class GroupLoggingDelayedTroveTupleSet(GroupDelayedTroveTupleSet):
+
+    def realize(self, *args):
+        mark = time.time()
+
+        log.info("Running action %s" % str(self.action) + self._lineNumStr)
+        GroupDelayedTroveTupleSet.realize(self, *args)
+        runtime = time.time() - mark
+        if runtime > 0.1:
+            log.info("\ttook %.1fs" % runtime)
 
 class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
 
@@ -436,6 +490,8 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
 class CreateNewGroupAction(CreateGroupAction):
 
+    resultClass = GroupLoggingDelayedTroveTupleSet
+
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
         CreateGroupAction.__init__(self, primaryTroveSet, name,
                                    checkPathConflicts = checkPathConflicts)
@@ -446,6 +502,8 @@ class CreateNewGroupAction(CreateGroupAction):
         self._create(newGroup, self.primaryTroveSet, self.outSet, data)
 
 class DepsNeededAction(GroupDelayedTupleSetAction):
+
+    resultClass = GroupLoggingDelayedTroveTupleSet
 
     def __init__(self, primaryTroveSet, resolveTroveSet,
                  failOnUnresolved = True):
@@ -545,6 +603,8 @@ class IsNotEmptyAction(GroupDelayedTupleSetAction):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
 
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
+
+    resultClass = GroupLoggingDelayedTroveTupleSet
 
     def __call__(self, data):
         troveSource = self.primaryTroveSet.searchSource.getTroveSource()
