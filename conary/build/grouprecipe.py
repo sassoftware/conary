@@ -1968,8 +1968,13 @@ class TroveCache(dict):
         return result
 
     def getSizes(self, troveTupList):
-        return [ x() for x in
-                 self.getTroveInfo(trove._TROVEINFO_TAG_SIZE, troveTupList) ]
+        tiList = self.getTroveInfo(trove._TROVEINFO_TAG_SIZE, troveTupList)
+        rc = [ None ] * len(tiList)
+        for i, x in enumerate(tiList):
+            if x:
+                tiList[i] = x()
+
+        return tiList
 
     def getTroveInfo(self, infoType, troveTupList):
         troveTupList = list(troveTupList)
@@ -3266,6 +3271,8 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
     for (troveTup, explicit, byDefault, comps, requireLatest), trvSize \
                 in izip(neededInfo, trvSizes):
         if trvSize is None:
+            raise CookError, ('Cannot include redirect %s=%s[%s] in a group'
+                                % troveTup)
             validSize = False
             size = None
         elif validSize and byDefault:
