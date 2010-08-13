@@ -3264,7 +3264,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return ret
 
     @accessReadOnly
-    def getDepsForTroveList(self, authToken, clientVersion, troveList):
+    def getDepsForTroveList(self, authToken, clientVersion, troveList,
+                            provides = True, requires = True):
         """
         Returns list of (provides, requires) for troves. For troves which
         are missing or we do not have access to, None is returned.
@@ -3281,12 +3282,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         req = []
         prov = []
         for tup in troveList:
-            req.append(deps.DependencySet())
-            prov.append(deps.DependencySet())
+            req.append({})
+            prov.append({})
 
         roleIds = self.auth.getAuthRoles(cu, authToken)
 
-        for tableName, dsList in ( ('Requires', req), ('Provides', prov) ):
+        tblList = []
+
+        if requires:
+            tblList.append( ('Requires', req) )
+        else:
+            req = [ '' ] * len(troveList)
+
+        if provides:
+            tblList.append( ('Provides', prov) )
+        else:
+            prov = [ '' ] * len(troveList)
+
+        for tableName, dsList in tblList:
+            start = time.time()
             cu.execute("""
                 SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
                     JOIN Items ON
@@ -3305,20 +3319,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     JOIN Dependencies AS D USING (depId)
                 WHERE
                     ugi.userGroupId in (%s)
-                ORDER BY tmpNVF.idx, D.class
             """ %  (tableName, ",".join("%d" % x for x in roleIds) ))
 
+            l = [ x for x in cu ]
             last = None
             flags = []
-            for idx, depClassId, depName, depFlag in cu:
+            for idx, depClassId, depName, depFlag in l:
                 this = (idx, depClassId, depName)
 
                 if this != last:
                     if last:
-                        depClass = deps.dependencyClasses[depClassId]
-                        depSet = dsList[last[0]]
-                        depSet.addDep(deps.dependencyClasses[last[1]],
-                                      deps.Dependency(last[2], flags))
+                        dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
 
                     last = this
                     flags = []
@@ -3327,13 +3338,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     flags.append((depFlag, deps.FLAG_SENSE_REQUIRED))
 
             if last:
-                depClass = deps.dependencyClasses[depClassId]
-                depSet = dsList[last[0]]
-                depSet.addDep(deps.dependencyClasses[last[1]],
-                              deps.Dependency(last[2], flags))
+                dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+            flagMap = [ None, '', '~', '~!', '!' ]
+            for i, itemList in enumerate(dsList):
+                depList = itemList.items()
+                depList.sort()
 
-        return zip([ self.fromDepSet(x) for x in prov ],
-                   [ self.fromDepSet(x) for x in req ])
+                if not depList:
+                    frz = ''
+                else:
+                    l = []
+                    for (depClassId, depName), depFlags in depList:
+                        l += [ '|', str(depClassId), '#', depName.replace(':', '::') ]
+                        lastFlag = None
+                        for flag in sorted(depFlags):
+                            if flag == lastFlag:
+                                continue
+
+                            l.append(':')
+                            l.append(flagMap[flag[1]])
+                            l.append(flag[0].replace(':', '::'))
+
+                    frz = ''.join(l[1:])
+
+                dsList[i] = frz
+
+        result = zip(prov, req)
+        return result
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
