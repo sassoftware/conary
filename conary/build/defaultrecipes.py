@@ -260,6 +260,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{dump}
         - L{find}
         - L{findByName}
+        - L{findBySourceName}
         - L{flatten}
         - L{getInstall}
         - L{getOptional}

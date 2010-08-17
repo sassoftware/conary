@@ -138,6 +138,17 @@ class GroupTupleSetMethods(object):
         return self._action(namePattern, emptyOkay = emptyOkay,
                             ActionClass = FindByNameAction)
 
+    def findBySourceName(self, sourceName):
+        """
+        troveset.findByName(sourceName)
+
+        The troveset is searched for troves which were built from source
+        trove called sourceName.  The install/optional value is preserved
+        from the troveset being searched.
+        """
+        return self._action(sourceName,
+                            ActionClass = FindBySourceNameAction)
+
     __getitem__ = find
 
     def components(self, *componentList):
@@ -602,6 +613,41 @@ class FindByNameAction(GroupDelayedTupleSetAction):
 
         if (not self.emptyOkay and not install and not optional):
             raise CookError("findByName() matched no trove names")
+
+class FindBySourceNameAction(GroupDelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, sourceName):
+        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        self.sourceName = sourceName
+
+    def __call__(self, data):
+        troveTuples = (
+            list(itertools.izip(itertools.repeat(True),
+                           self.primaryTroveSet._getInstallSet())) +
+            list(itertools.izip(itertools.repeat(False),
+                           self.primaryTroveSet._getOptionalSet())) )
+
+        sourceNames = data.troveCache.getTroveInfo(
+                                trove._TROVEINFO_TAG_SOURCENAME,
+                                [ x[1] for x in troveTuples ])
+
+        installs = []
+        optional = []
+        for (isInstallSet, troveTup), sourceName in \
+                itertools.izip(troveTuples, sourceNames):
+            if sourceName() != self.sourceName:
+                continue
+
+            if isInstallSet:
+                installs.append(troveTup)
+            else:
+                optional.append(troveTup)
+
+        self.outSet._setInstall(installs)
+        self.outSet._setOptional(optional)
+
+        if (not installs and not optional):
+            raise CookError("findBySourceName() matched no trove names")
 
 class IsEmptyAction(GroupDelayedTupleSetAction):
 
