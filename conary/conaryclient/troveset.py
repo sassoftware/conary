@@ -568,7 +568,7 @@ class UpdateAction(ReplaceAction):
             # something in the update doesn't map to something we
             # had previously, include it if it is explicit in the
             # new trove, and use the new trove's install/optional value
-            isInInstallSet, isExplicit = beforeInfo[oldTuple]
+            isInInstallSet, isExplicit = afterInfo[newTuple]
             if isExplicit:
                 if isInInstallSet:
                     installSet.add(newTuple)
