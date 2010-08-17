@@ -140,7 +140,7 @@ class GroupTupleSetMethods(object):
 
     def findBySourceName(self, sourceName):
         """
-        troveset.findByName(sourceName)
+        troveset.findBySourceName(sourceName)
 
         The troveset is searched for troves which were built from source
         trove called sourceName.  The install/optional value is preserved
