@@ -704,8 +704,8 @@ class GroupPolicy(BasePolicy):
             # we walk each group we built separately, so don't traverse them
             for nvf in trv.iterTroveList(strongRefs = True):
                 if nvf not in self.recipe.troveMap:
-                    newTrv = cache.get(nvf)
-                    if newTrv:
+                    if cache.troveIsCached(nvf):
+                        newTrv = cache.getTrove(*nvf, withFiles = False)
                         for childPath in self.walkTrove(path, cache, newTrv):
                             yield childPath
 

@@ -1593,6 +1593,21 @@ class SourceStack(object):
                                            troveList[0][1][1])
         return results
 
+    def getDepsForTroveList(self, troveInfoList):
+        results = [ None ] * len(troveInfoList)
+        for source in self.sources:
+            need = [ (i, troveInfo) for i, (troveInfo, depTuple) in
+                        enumerate(itertools.izip(troveInfoList, results))
+                        if depTuple is None ]
+            if not need:
+                break
+
+            depList = source.getDepsForTroveList([ x[1] for x in need] )
+            for (i, troveInfo), depTuple in itertools.izip(need, depList):
+                if depTuple is not None:
+                    results[i] = depTuple
+
+        return results
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, callback = None):

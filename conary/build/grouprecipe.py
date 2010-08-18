@@ -1614,8 +1614,8 @@ class _SingleGroup(object):
                 return "Added to satisfy dep of %s=%s[%s]" % reason[1][0]
             troveTup = reason[1][0]
             provTroveTup = reason[1][1]
-            trv = self.cache.getTrove(troveTup)
-            provTrv = self.cache.getTrove(provTroveTup)
+            trv = self.cache.getTrove(*troveTup, withFiles = False)
+            provTrv = self.cache.getTrove(*provTroveTup, withFiles = False)
             deps = trv.requires().intersection(provTrv.provides())
             deps = str(deps).splitlines()
             if log.getVerbosity() == log.DEBUG:
@@ -1912,133 +1912,34 @@ class GroupReference:
         """
         return self.getTroves(self.sourceTups, withFiles=False)
 
-class TroveCache(dict):
+from conary.repository import trovecache
+class TroveCache(trovecache.TroveCache):
     def __init__(self, repos, callback = None):
-        self.repos = repos
+        trovecache.TroveCache.__init__(self, repos)
         if not callback:
             callback = callbacks.CookCallback()
         self.callback = callback
-        self.depCache = {}
-        self.troveInfoCache = {}
 
     def __getattr__(self, key):
-        return getattr(self.repos, key)
+        return getattr(self.troveSource, key)
 
-    def getDepsForTroveList(self, troveTupList):
-        # look in the dep cache and trove cache
-        result = [ None ] * len(troveTupList)
-        for i, tup in enumerate(troveTupList):
-            result[i] = self.depCache.get(tup)
-            if result[i] is None and self.troveIsCached(tup):
-                trv = self.getTrove(tup)
-                result[i] = (trv.getProvides(), trv.getRequires())
-            elif result[i] is None and trove.troveIsPackage(tup[0]):
-                # packages provide only themselves; querying the repository
-                # to figure that out seems unnecessarily complicated
-                result[i] = deps.parseDep('trove: %s' % tup[0])
-
-        needed = [ (i, troveTup) for i, (troveTup, depSet) in
-                            enumerate(izip(troveTupList, result))
-                            if depSet is None ]
-        if not needed:
-            return result
-
-        # use the getDepsForTroveList call; it raises an error if it needs
-        # to access some repositories which don't support it
-        log.info("Getting deps for %d troves" % len(needed))
-        try:
-            depList = self.repos.getDepsForTroveList([ x[1] for x in needed ])
-        except netclient.PartialResultsError, e:
-            # we can't use this call everywhere; handle what we can and we'll
-            # deal with the None's later
-            depList = e.partialResults
-
-        for (i, troveTup), depInfo in izip(needed, depList):
-            self.depCache[troveTup] = depInfo
-            result[i] = depInfo
-
-        # see if anything else is None; if so, we need to cache the complete
-        needed = [ (i, troveTup) for i, troveTup in
-                            enumerate(troveTupList) if result[i] is None ]
-
-        trvs = self.getTroves([ x[1] for x in needed])
-        for (i, troveTup), trv in izip(needed, trvs):
-            result[i] = (trv.getProvides(), trv.getRequires())
-
-        return result
-
-    def getSizes(self, troveTupList):
-        tiList = self.getTroveInfo(trove._TROVEINFO_TAG_SIZE, troveTupList)
-        rc = [ None ] * len(tiList)
-        for i, x in enumerate(tiList):
-            if x:
-                tiList[i] = x()
-
-        return tiList
-
-    def getTroveInfo(self, infoType, troveTupList):
-        troveTupList = list(troveTupList)
-        infoCache = self.troveInfoCache.setdefault(infoType, {})
-
-        result = [ None ] * len(troveTupList)
-        for i, tup in enumerate(troveTupList):
-            result[i] = infoCache.get(tup)
-            if result[i] is None and self.troveIsCached(tup):
-                trv = self.getTrove(tup)
-                result[i] = getattr(trv.troveInfo,
-                                    trv.troveInfo.streamDict[infoType][2])
-
-        needed = [ (i, troveTup) for i, (troveTup, depSet) in
-                            enumerate(izip(troveTupList, result))
-                            if depSet is None ]
-        if not needed:
-            return result
-
-        troveInfoList = self.repos.getTroveInfo(infoType,
-                                                [ x[1] for x in needed ])
-        for (i, troveTup), troveInfo in izip(needed, troveInfoList):
-            infoCache[troveTup] = troveInfo
-            result[i] = troveInfo
-
-        return result
-
-    def getPathHashesForTroveList(self, troveList):
-        return self.getTroveInfo(trove._TROVEINFO_TAG_PATH_HASHES, troveList)
-
-    def getTroves(self, troveList, *args, **kw):
-        self.cacheTroves(troveList)
-        return [self[x] for x in troveList]
-
-    def getTrove(self, troveTup, *args, **kw):
-        self.cacheTroves([troveTup])
-        return self[troveTup]
-
-    def troveIsCached(self, troveTup):
-        return troveTup in self
-
-    def cacheTroves(self, troveTupList):
-        troveTupList = [x for x in troveTupList if x not in self]
-        if not troveTupList:
-            return
+    def _caching(self, troveTupList):
         self.callback.gettingTroveDefinitions(len(troveTupList))
-        troves = self.repos.getTroves(troveTupList, withFiles=False,
-                                      callback = self.callback)
-        # cache first, descend later
-        for troveTup, trv in izip(troveTupList, troves):
-            self[troveTup] = trv
-        for trv in troves:
+
+    def _cached(self, troveList):
+        for trv in troveList:
             self.getChildren(trv)
 
     def hasTroves(self, troveList):
         d = {}
         needed = []
         for troveTup in troveList:
-            if troveTup in self:
+            if troveTup in self.cache:
                 d[troveTup] = True
             else:
                 needed.append(troveTup)
         if needed:
-            d.update(self.repos.hasTroves(needed))
+            d.update(self.troveSource.hasTroves(needed))
         return d
 
     def createChangeSet(self, jobList, withFiles = True, withFileContents=True,
@@ -2060,8 +1961,8 @@ class TroveCache(dict):
                 raise RuntimeError("Cannot use TroveWrapper cache for recursive"
                                    " jobs")
             troveTup = job[0], job[2][0], job[2][1]
-            if troveTup in self:
-                troves.append(self[troveTup])
+            if troveTup in self.cache:
+                troves.append(self.cache[troveTup])
             else:
                 needed.append(troveTup)
         if needed:
@@ -2101,7 +2002,7 @@ class TroveCache(dict):
         newColls = []
         for childTup, byDefault, isStrong in childColls:
 
-            childTrv = self[childTup]
+            childTrv = self.cache[childTup]
             for childChildTup, childByDefault, _ in childTrv.iterTroveListInfo():
                 # by this point, we can be sure that any collections
                 # are recursively complete.
@@ -2114,21 +2015,19 @@ class TroveCache(dict):
 
 
     def isRedirect(self, troveTup):
-        return self[troveTup].isRedirect()
+        return self.cache[troveTup].isRedirect()
 
     def iterTroveList(self, troveTup, strongRefs=False, weakRefs=False):
-        for troveTup, byDefault, isStrong in self[troveTup].iterTroveListInfo():
+        for troveTup, byDefault, isStrong in \
+                        self.cache[troveTup].iterTroveListInfo():
             if isStrong:
                 if strongRefs:
                     yield troveTup
             elif weakRefs:
                 yield troveTup
 
-    def iterTroveListInfo(self, troveTup):
-        return(self[troveTup].iterTroveListInfo())
-
     def includeByDefault(self, troveTup, childTrove):
-        return self[troveTup].includeTroveByDefault(*childTrove)
+        return self.cache[troveTup].includeTroveByDefault(*childTrove)
 
 
 def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
@@ -2547,7 +2446,9 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap,
         cache.getTroves(troveTupList, withFiles=False)
         for troveTup in troveTupList:
             if cache.isRedirect(troveTup):
-                troveTups = followRedirect(recipeObj, cache.getTrove(troveTup),
+                troveTups = followRedirect(recipeObj,
+                                           cache.getTrove(*troveTup,
+                                                          withFiles = False),
                                            refSource, 'add')
                 cache.cacheTroves(troveTups)
             else:
@@ -3006,7 +2907,7 @@ def resolveGroupDependencies(group, cache, cfg, repos, labelPath, flavor,
 
         # build a list of the troves that we're checking so far
         troves = [ (n, (None, None), (v, f), True) for (n,v,f) in troveList
-                    if not ((n,v,f) in cache and cache.isRedirect((n,v,f)))]
+                    if not (cache.troveIsCached((n,v,f)) and cache.isRedirect((n,v,f)))]
 
         # there's nothing worse than seeing a bunch of nice group debugging
         # information and then having your screen filled up with all
@@ -3101,7 +3002,8 @@ def checkGroupDependencies(group, cfg, cache, callback):
     cache.cacheTroves(troveList)
 
     jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList
-                if not ((n,v,f) in cache and cache.isRedirect((n,v,f))) ]
+                if not (cache.troveIsCached((n,v,f))
+                   and cache.isRedirect((n,v,f))) ]
 
     cfg = copy.deepcopy(cfg)
     cfg.dbPath = ':memory:'
@@ -3155,7 +3057,7 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
         for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
             # Find troves to cache
             needed = [ x for x in conflictSet if x not in trovesWithFiles ]
-            troves = troveCache.repos.getTroves(needed, withFiles=True)
+            troves = troveCache.troveSource.getTroves(needed, withFiles=True)
             trovesWithFiles.update(dict(izip(needed, troves)))
 
             # Build set of paths which conflicts across these troves
@@ -3192,7 +3094,7 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
             for paths, fileInfo in pathList:
                     streamsNeeded.extend( (x[0], x[2], x[3]) for x in fileInfo )
 
-        fileObjs = troveCache.repos.getFileVersions(streamsNeeded)
+        fileObjs = troveCache.troveSource.getFileVersions(streamsNeeded)
         filesByFileId = dict( (x[1], y) for (x, y) in
                                 izip(streamsNeeded, fileObjs) )
 
