@@ -2447,8 +2447,8 @@ def addTrovesToGroup(group, troveMap, cache, childGroups, repos, groupMap,
         for troveTup in troveTupList:
             if cache.isRedirect(troveTup):
                 troveTups = followRedirect(recipeObj,
-                                           cache.getTrove(*troveTup,
-                                                          withFiles = False),
+                                           cache.getTrove(withFiles = False,
+                                                          *troveTup),
                                            refSource, 'add')
                 cache.cacheTroves(troveTups)
             else:
