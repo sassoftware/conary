@@ -1614,8 +1614,8 @@ class _SingleGroup(object):
                 return "Added to satisfy dep of %s=%s[%s]" % reason[1][0]
             troveTup = reason[1][0]
             provTroveTup = reason[1][1]
-            trv = self.cache.getTrove(*troveTup, withFiles = False)
-            provTrv = self.cache.getTrove(*provTroveTup, withFiles = False)
+            trv = self.cache.getTrove(withFiles = False, *troveTup)
+            provTrv = self.cache.getTrove(withFiles = False, *provTroveTup)
             deps = trv.requires().intersection(provTrv.provides())
             deps = str(deps).splitlines()
             if log.getVerbosity() == log.DEBUG:
