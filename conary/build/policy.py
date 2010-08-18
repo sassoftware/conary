@@ -705,7 +705,7 @@ class GroupPolicy(BasePolicy):
             for nvf in trv.iterTroveList(strongRefs = True):
                 if nvf not in self.recipe.troveMap:
                     if cache.troveIsCached(nvf):
-                        newTrv = cache.getTrove(*nvf, withFiles = False)
+                        newTrv = cache.getTrove(withFiles = False, *nvf)
                         for childPath in self.walkTrove(path, cache, newTrv):
                             yield childPath
 
