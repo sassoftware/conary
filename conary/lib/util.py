@@ -1719,7 +1719,7 @@ def urlUnsplit(urlTuple):
             userpass = "%s:${passwd}" % (urllib.quote(user))
         else:
             userpass = urllib.quote(user)
-    if ':' in host:
+    if host and ':' in host:
         # Support IPv6 addresses as e.g. [dead::beef]:80
         host = '[%s]' % (host,)
     if port is not None:
