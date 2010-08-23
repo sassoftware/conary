@@ -1688,7 +1688,18 @@ def urlSplit(url, defaultPort = None):
     """
     scheme, netloc, path, query, fragment = urlparse.urlsplit(url)
     userpass, hostport = urllib.splituser(netloc)
-    host, port = urllib.splitnport(hostport, None)
+
+    # Parse bracketed IPv6 addresses: [dead::beef]:8080
+    i = hostport.rfind(':')
+    j = hostport.rfind(']')
+    if i > j:
+        host, port = hostport[:i], int(hostport[i+1:])
+    else:
+        host = hostport
+        port = None
+    if host and host[0] == '[' and host[-1] == ']':
+        host = host[1:-1]
+
     if userpass:
         user, passwd = urllib.splitpasswd(userpass)
         if passwd:
@@ -1708,9 +1719,13 @@ def urlUnsplit(urlTuple):
             userpass = "%s:${passwd}" % (urllib.quote(user))
         else:
             userpass = urllib.quote(user)
-    hostport = host
+    if ':' in host:
+        # Support IPv6 addresses as e.g. [dead::beef]:80
+        host = '[%s]' % (host,)
     if port is not None:
-        hostport = urllib.quote("%s:%s" % (host, port), safe = ':')
+        hostport = urllib.quote("%s:%s" % (host, port), safe = ':[]')
+    else:
+        hostport = host
     netloc = hostport
     if userpass:
         netloc = "%s@%s" % (userpass, hostport)
