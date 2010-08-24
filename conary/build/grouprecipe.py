@@ -2416,7 +2416,7 @@ def removeDifferences(group, differenceGroupList, differenceSpecs, troveMap,
         troveTups = chain(*[x[1][troveSpec] for x in \
                 troveMap.iteritems() if x[0][0] == ref])
         for troveTup in troveTups:
-            trv = cache.getTrove(*troveTup, withFiles = False)
+            trv = cache.getTrove(withFiles = False, *troveTup)
             for childTrove in trv.iterTroveList(strongRefs=True,
                                               weakRefs=True):
                 if group.hasTrove(*childTrove):
@@ -2875,7 +2875,7 @@ def getResolveSource(searchSource, troveSpecList, troveMap, cache, flavor):
         # requireLatest setting
         resolveTups.extend(chain(*[x[1][troveSpec] for x in \
                 troveMap.iteritems() if x[0][0] == ref]))
-    resolveTroves = [ cache.getTrove(*x, withFiles = False)
+    resolveTroves = [ cache.getTrove(withFiles = False, *x)
                             for x in resolveTups ]
     return searchsource.createSearchSourceStack(searchSource, [resolveTroves],
                                                 flavor)
