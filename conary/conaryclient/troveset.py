@@ -58,7 +58,6 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
 
         self.troveTupList = [ x[0] for x in troveSet._walk(troveCache,
                                                 newGroups = False,
-                                                descendNewGroups = True,
                                                 recurse = True) ]
         self.inDepDb = [ False ] * len(self.troveTupList)
 
@@ -206,8 +205,7 @@ class TroveTupleSet(TroveSet):
         self.installSet = set()
         self.optionalSet = set()
 
-    def _walk(self, troveCache, newGroups = True, descendNewGroups = False,
-              recurse = False):
+    def _walk(self, troveCache, newGroups = True, recurse = False):
         """
         Return ((name, version, flavor), inInstallSet, explicit) tuples
         for the troves referenced by this TroveSet. inInstallSet is True
@@ -220,9 +218,6 @@ class TroveTupleSet(TroveSet):
         @param newGroups: Return newly created groups. Version will
         be NewVersion().
         @type newGroups: bool
-        @param descendNewGroups: Descend into newly created groups. Orthogonal
-        too newGroups, implied by recurse.
-        @type descendNewGroups: bool
         @param recurse: Return full recursive closure. When possible, implicit
         includes are used to generate this information.
         @type recurse: bool
@@ -255,7 +250,7 @@ class TroveTupleSet(TroveSet):
                 if newGroups:
                     results[troveTuple] = (0, inInstallSet)
 
-                if recurse or descendNewGroups:
+                if recurse:
                     recurseList.append((0, troveTuple,
                                         { troveTuple : inInstallSet } ))
             else:
@@ -435,8 +430,7 @@ class FetchAction(ParallelAction):
             # if it were True, it would cause fetchs (inefficiently)
             troveTuples.update(x[0] for x in
                                  action.primaryTroveSet._walk(data.troveCache,
-                                                 newGroups = False,
-                                                 descendNewGroups = True))
+                                                 newGroups = False))
 
         troveTuples = [ x for x in troveTuples
                             if not isinstance(x[1], versions.NewVersion) ]
