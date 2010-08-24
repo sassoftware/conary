@@ -16,7 +16,7 @@ import itertools
 
 from conary import trove, versions
 from conary.deps import deps
-from conary.lib import graph, util
+from conary.lib import graph
 from conary.local import deptable
 from conary.repository import searchsource, trovesource
 
