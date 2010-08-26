@@ -23,9 +23,9 @@ import shutil
 
 from conary import branch
 from conary import checkin
-from conary import conaryclient
 from conary import state
 from conary import updatecmd
+from conary.conaryclient import cmdline
 from conary.lib import log, util
 from conary.versions import Label
 
@@ -65,18 +65,14 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir=None,
     if isinstance(troveSpec, tuple):
         troveName, versionSpec, flavor = troveSpec
         versionSpec = str(versionSpec)
-        troveSpec = conaryclient.cmdline.toTroveSpec(troveName,
-                                                     versionSpec,
-                                                     flavor)
+        troveSpec = cmdline.toTroveSpec(troveName, versionSpec, flavor)
     else:
-        troveName, versionSpec, flavor = conaryclient.cmdline.parseTroveSpec(
-            troveSpec)
+        troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
 
     if isinstance(targetLabel, str):
         targetLabel = Label(targetLabel)
 
-    troveName, versionSpec, flavor = conaryclient.cmdline.parseTroveSpec(
-                                                                    troveSpec)
+    troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
     result = repos.findTrove(cfg.buildLabel, (troveName, versionSpec, flavor),
                              cfg.flavor)
     # findTrove shouldn't return multiple items for one package anymore
