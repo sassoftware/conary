@@ -214,8 +214,8 @@ class DirectedGraph:
         return [ self.data.get(x[0])
                     for x in self.edges.iteritems() if not x[1] ]
 
-    def getRoots(Self):
-        return self.transpose.getLeaves()
+    def getRoots(self):
+        return self.transpose().getLeaves()
 
     def getDisconnected(self):
         # gets nodes with neither edges pointing in or out

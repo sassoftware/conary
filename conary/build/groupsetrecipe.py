@@ -68,6 +68,13 @@ class GroupSetTroveCache(object):
             for x in self.cache.iterTroveListInfo(troveTup):
                 yield x
 
+    def troveReferencesTrove(self, troveTup, troveRef):
+        if isinstance(troveTup[1], versions.NewVersion):
+            sg = self.groupRecipe._getGroup(troveTup[0])
+            return sg.hasTrove(*troveRef)
+
+        return self.cache.troveReferencesTrove(troveTup, troveRef)
+
 class GroupActionData(troveset.ActionData):
 
     def __init__(self, troveCache, groupRecipe):

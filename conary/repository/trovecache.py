@@ -148,8 +148,12 @@ class TroveCache(trovesource.AbstractTroveSource):
         return [ self.cache[x] for x in tupList ]
 
     def iterTroveListInfo(self, troveTup):
+        if trove.troveIsComponent(troveTup[0]): return []
         return(self.cache[troveTup].iterTroveListInfo())
 
     def troveIsCached(self, troveTup):
         return troveTup in self.cache
+
+    def troveReferencesTrove(self, troveTup, troveRef):
+        return self.cache[troveTup].hasTrove(*troveRef)
 

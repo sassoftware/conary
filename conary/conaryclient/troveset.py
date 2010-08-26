@@ -224,76 +224,101 @@ class TroveTupleSet(TroveSet):
         @rtype: ((str, versions.Version, deps.Flavor), isInstall, isExplicit)
         """
 
-        # we use weakrefs instead of explicit recursion wherever we can.
-        # everything except this troveset ought to have proper weakrefs
-        # since troves from the repository have them already, and newly
-        # created groups get them thanks to populate()
-        # 
-        # results is indexed by troveTuple, and contains our best idea
-        # on explict and byDefault status for troves we've seen. they're
-        # stored in a (depth, isInstall) tuple, where depth is the
-        # depth in the graph we discovered the values, allowing more
-        # specific ideas replace less specific ones. depth == 0 means it
-        # was an explicit reference from the trovetuple
-        #
-        # recurse list is a list of troves we need to recurse through.
-        # it's a set of (depth, troveTuple, installMap) tuples
-        # where depth is as above and installMap gives a dict of bools
-        # describing the weakRef isInstall values from the trove which
-        # caused the recursion
-        results = dict()
-        recurseList = []
-        for (troveTuple, inInstallSet) in \
-                       ( [ (x, True) for x in self.installSet ] +
-                         [ (x, False) for x in  self.optionalSet ] ):
-            if isinstance(troveTuple[1], versions.NewVersion):
-                if newGroups:
-                    results[troveTuple] = (0, inInstallSet)
+        if not recurse:
+            for (troveTup) in self._getInstallSet():
+                if (newGroups
+                        or not isinstance(troveTup[1], versions.NewVersion)):
+                    yield (troveTup, True, True)
 
-                if recurse:
-                    recurseList.append((0, troveTuple,
-                                        { troveTuple : inInstallSet } ))
-            else:
-                results[troveTuple] = (0, inInstallSet)
-                if recurse and trove.troveIsCollection(troveTuple[0]):
-                    recurseList.append((0, troveTuple,
-                                        { troveTuple : inInstallSet } ))
+            for (troveTup) in self._getOptionalSet():
+                if (newGroups
+                        or not isinstance(troveTup[1], versions.NewVersion)):
+                    yield (troveTup, False, True)
 
-        while recurseList:
-            depth, troveTuple, installMap = recurseList.pop(0)
-            depth += 1
+            return
 
-            installThis = installMap[troveTuple]
+        usedPackages = set()
+        for troveTuple in itertools.chain(self.installSet, self.optionalSet):
+            if trove.troveIsComponent(troveTuple[0]):
+                usedPackages.add(troveTuple[0].split(":")[0])
 
-            # gather byDefault mappings
-            newInstallMap = {}
-            for subTuple, subDoInstall, subExplicit in \
-                        troveCache.iterTroveListInfo(troveTuple):
-                newInstallMap[subTuple] = installMap.get(
-                                subTuple, subDoInstall and installThis)
+        collections = list()
+        newCollections = list()
+        for troveTuple in itertools.chain(self.installSet, self.optionalSet):
+            if (isinstance(troveTuple[1], versions.NewVersion)):
+                newCollections.append(troveTuple)
+            elif (trove.troveIsGroup(troveTuple[0]) or
+                        troveTuple[0] in usedPackages):
+                collections.append(troveTuple)
 
-            # handle strongrefs
-            for subTuple, subDoInstall, subExplicit in \
-                        troveCache.iterTroveListInfo(troveTuple):
-                if not subExplicit:
-                    continue
+        troveCache.cacheTroves(collections)
 
-                if trove.troveIsCollection(subTuple[0]):
-                    recurseList.append((depth, subTuple, newInstallMap))
+        containedBy = dict ( (x, []) for x in
+                           itertools.chain(self.installSet, self.optionalSet))
+        containsItems = dict ( (x, False) for x in
+                           itertools.chain(self.installSet, self.optionalSet))
 
-                installSub = newInstallMap[subTuple]
+        for troveTuple in itertools.chain(self.installSet, self.optionalSet):
+            for collection in itertools.chain(collections, newCollections):
+                if troveCache.troveReferencesTrove(collection, troveTuple):
+                    containsItems[collection] = True
+                    containedBy[troveTuple].append(collection)
 
-                if subTuple not in results:
-                    results[subTuple] = (depth, installSub)
-                else:
-                    if results[subTuple][0] > depth:
-                        results[subTuple] = (depth, installSub)
-                    if results[subTuple][0] == depth:
-                        results[subTuple] = (depth,
-                                             installSub or results[subTuple][1])
+        # for each pair of troves determine the longest path between them; we
+        # do this through a simple tree walk
+        maxPathLength = {}
+        searchList = [ (x, x, 0) for x, y in containsItems.iteritems()
+                            if not y ]
+        while searchList:
+            start, next, depth = searchList.pop(0)
+
+            knownDepth = maxPathLength.get( (start, next), -1 )
+            if depth > knownDepth:
+                maxPathLength[(start, next)] = depth
+
+            for container in containedBy[next]:
+                searchList.append( (start, container, depth + 2) )
+
+        searchList = sorted([ (x, x, 0) for x, y in containsItems.iteritems()
+                              if not y ])
+
+        results = {}
+        while searchList:
+            start, troveTup, depth = searchList.pop(0)
+            if depth < maxPathLength[(start, troveTup)]:
+                continue
+            assert(maxPathLength[(start, troveTup)] == depth)
+
+            inInstallSet = (troveTup in self.installSet)
+
+            def handle(tt, dp, ii):
+                if tt not in results:
+                    results[tt] = (dp, ii)
+                elif results[tt][0] == dp:
+                    results[tt] = (dp, ii or results[tt][1])
+                elif results[tt][0] > dp:
+                    results[tt] = (dp, ii)
+
+            handle(troveTup, depth, inInstallSet)
+
+            for child in containedBy[troveTup]:
+                searchList.append( (start, child, depth + 2) )
+
+            if not recurse:
+                continue
+
+            for subTroveTup, subIsInstall, subIsExplicit in \
+                            troveCache.iterTroveListInfo(troveTup):
+                handle(subTroveTup, depth + 1, inInstallSet and subIsInstall)
 
         for (troveTup), (depth, isInstall) in results.iteritems():
-            yield (troveTup, isInstall, depth == 0)
+            if (newGroups
+                    or not isinstance(troveTup[1], versions.NewVersion)):
+                yield (troveTup, isInstall,
+                       (troveTup in self.installSet or
+                        troveTup in self.optionalSet) )
+
+        return
 
 class DelayedTupleSet(TroveTupleSet):
 
@@ -433,7 +458,8 @@ class FetchAction(ParallelAction):
                                                  newGroups = False))
 
         troveTuples = [ x for x in troveTuples
-                            if not isinstance(x[1], versions.NewVersion) ]
+                            if not isinstance(x[1], versions.NewVersion) and
+                               not trove.troveIsComponent(x[0]) ]
         data.troveCache.getTroves(troveTuples, withFiles = False)
 
 class FindAction(ParallelAction):
@@ -492,7 +518,7 @@ class ReplaceAction(DelayedTupleSetAction):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
         self.updateTroveSet = updateTroveSet
 
-    def __call__(self, data):
+    def replaceAction(self, data):
         before = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
         beforeInfo = {}
@@ -521,6 +547,8 @@ class ReplaceAction(DelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
+
+    __call__ = replaceAction
 
     def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
