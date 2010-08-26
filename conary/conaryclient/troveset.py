@@ -606,16 +606,14 @@ class UpdateAction(ReplaceAction):
                 else:
                     optionalSet.add(oldTuple)
         else:
-            # we've mapped an update; turn off the old version (by
-            # marking it as optional). include the new one if it's explictly
-            # and let the weakrefs come in automatically later
+            # it existed before and after; keep the install setting
+            # we used before
             optionalSet.add(oldTuple)
-            inInstallSet, isExplicit = afterInfo[newTuple]
-            if isExplicit:
-                if inInstallSet:
-                    installSet.add(newTuple)
-                else:
-                    optionalSet.add(newTuple)
+            wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
+            if wasInInstallSet:
+                installSet.add(newTuple)
+            else:
+                optionalSet.add(newTuple)
 
 
 class OperationGraph(graph.DirectedGraph):
