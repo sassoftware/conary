@@ -51,6 +51,13 @@ class ParseError(ConaryError):
     """Base class for errors parsing input"""
     pass
 
+class TroveSpecError(ParseError):
+    """Error parsing a trove spec (parseTroveSpec or TroveSpec)"""
+    # Part of the conaryclient.cmdline.parseTroveSpec API
+    def __init__(self, spec, error):
+        self.spec = spec
+        ParseError.__init__(self, 'Error with spec "%s": %s' % (spec, error))
+
 class VersionStringError(ConaryError):
     """Base class for other version string specific error"""
     pass
