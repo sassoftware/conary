@@ -380,6 +380,9 @@ class SystemModelText(SystemModel):
     def format(self):
         return ''.join(self.iterFormat())
 
+    def write(self, f):
+        f.write(self.format())
+
 #class SystemModelXML(SystemModel):
 #    '''
 #    Implements the abstract system model persisting in an XML format,
@@ -425,5 +428,5 @@ class SystemModelFile(object):
         dirName = os.path.dirname(fileFullName)
         fd, tmpName = tempfile.mkstemp(prefix='system-model', dir=dirName)
         f = os.fdopen(fd, 'w')
-        f.write(self.model.format())
+        self.model.write(f)
         os.rename(tmpName, fileFullName)
