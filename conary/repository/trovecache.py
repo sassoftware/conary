@@ -33,7 +33,7 @@ class TroveCache(trovesource.AbstractTroveSource):
     def _cached(self, troveList):
         pass
 
-    def cacheTroves(self, troveTupList):
+    def cacheTroves(self, troveTupList, _cached = None):
         troveTupList = [x for x in troveTupList if x not in self.cache]
         if not troveTupList:
             return
@@ -46,7 +46,10 @@ class TroveCache(trovesource.AbstractTroveSource):
         for troveTup, trv in izip(troveTupList, troves):
             self.cache[troveTup] = trv
 
-        self._cached(troves)
+        if _cached:
+            _cached(troves)
+        else:
+            self._cached(troves)
 
     def getDepsForTroveList(self, troveTupList):
         # look in the dep cache and trove cache
@@ -136,11 +139,12 @@ class TroveCache(trovesource.AbstractTroveSource):
 
     def getTrove(self, name, version, flavor, withFiles = True):
         assert(not withFiles)
-        return self.cache[(name, version, flavor)]
+        return self.getTroves(
+                        [ (name, version, flavor) ], withFiles = False)[0]
 
-    def getTroves(self, tupList, withFiles = False):
+    def getTroves(self, tupList, withFiles = False, _cached = None):
         assert(not withFiles)
-        self.cacheTroves(tupList)
+        self.cacheTroves(tupList, _cached = _cached)
         return [ self.cache[x] for x in tupList ]
 
     def iterTroveListInfo(self, troveTup):

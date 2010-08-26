@@ -36,10 +36,20 @@ class GroupSetTroveCache(object):
     def __getattr__(self, name):
         return getattr(self.cache, name)
 
-    def getChildren(self, trv):
-        # we don't need to manually close deps or fill in the trove cache
-        # with the closure; we're smart enough to use weakrefs properly
+    def _cached(self, troveList):
+        # this avoids the call to recursively get children
+        # GroupSet.TroveCache needs
         pass
+
+    def cacheTroves(self, troveList):
+        return self.cache.cacheTroves(troveList, _cached = self._cached)
+
+    def getTrove(self, n, v, f, withFiles = False):
+        raise NotImplementedError
+
+    def getTroves(self, troveList, withFiles = False):
+        return self.cache.getTroves(troveList, _cached = self._cached,
+                                    withFiles = withFiles)
 
     def iterTroveList(self, troveTup, strongRefs=False, weakRefs=False):
         raise NotImplementedError
