@@ -67,6 +67,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.setFlavorPreferencesByFlavor(flavor)
         self.searchWithFlavor()
         self.searchLeavesOnly()
+        self.depDb = deptable.DependencyDatabase()
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
         def _depClassAndName(oneDep):
@@ -82,7 +83,6 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             reqNames.update(_depClassAndName(dep))
 
         emptyDep = deps.DependencySet()
-        self.depDb = deptable.DependencyDatabase()
 
         for i, (troveTup, (p, r)) in enumerate(itertools.izip(
                 self.troveTupList,
@@ -103,6 +103,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 newSolListList.append([ self.troveTupList[x] for x in solList ])
 
             suggMap[depSet] = newSolListList
+
+        self.depDb.db.rollback()
 
         return suggMap
 
