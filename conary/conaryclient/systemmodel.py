@@ -208,6 +208,7 @@ class SystemModel:
     def appendTroveOpByName(self, key, *args, **kwargs):
         op = troveOpMap[key](*args, **kwargs)
         self.appendTroveOp(op)
+        return op
 
     def refreshSearchPath(self):
         cfg = self.cfg
@@ -310,10 +311,10 @@ class SystemModelText(SystemModel):
                     # going to happen.  (When adding "include", then
                     # this warning should apply only to the outmost
                     # file, not to included files.)
-                    log.syslog('warning: %s line %d:'
-                        ' "search" entry follows operations:'
-                        ' but will still be honored for prior'
-                        ' operations' %fileName, index)
+                    log.warning('%s line %d:'
+                        ' "search %s" entry follows operations,'
+                        ' though it applies to earlier operations'
+                        %(fileName, index, nouns))
                 # Handle it if quoted, but it doesn't need to be
                 nouns = ' '.join(shlex.split(nouns, comments=True))
                 try:
@@ -372,10 +373,6 @@ class SystemModelText(SystemModel):
                 for item in (x for x in self.systemItems
                              if x.index is None):
                     yield str(item) + '\n'
-
-        # Finally, emit any trailing comments
-        while commentLines:
-            yield self.filedata[commentLines.pop(0)]
 
     def format(self):
         return ''.join(self.iterFormat())
