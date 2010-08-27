@@ -475,8 +475,15 @@ class FindAction(ParallelAction):
         for action in actionList:
             l = troveSpecsByInSet.setdefault(action.primaryTroveSet, [])
             from conary.conaryclient.cmdline import parseTroveSpec
-            l.extend([ (action.outSet, parseTroveSpec(troveSpec))
-                            for troveSpec in action.troveSpecs ] )
+            for troveSpec in action.troveSpecs:
+                # handle str's that need parsing as well as tuples which
+                # have already been parsed
+                if isinstance(troveSpec, str):
+                    l.extend([ (action.outSet, parseTroveSpec(troveSpec))
+                                    for troveSpec in action.troveSpecs ] )
+                else:
+                    l.extend([ (action.outSet, troveSpec)
+                                    for troveSpec in action.troveSpecs ] )
 
         for inSet, searchList in troveSpecsByInSet.iteritems():
             d = inSet._findTroves([ x[1] for x in searchList ])
@@ -484,8 +491,15 @@ class FindAction(ParallelAction):
                 outSet._setInstall(d[troveSpec])
 
     def __str__(self):
-        n1 = self.troveSpecs[0].split('=')[0]
-        n2 = self.troveSpecs[-1].split('=')[0]
+        if isinstance(self.troveSpecs[0], str):
+            n1 = self.troveSpecs[0].split('=')[0]
+        else:
+            n1 = self.troveSpecs[0][0]
+
+        if isinstance(self.troveSpecs[-1], str):
+            n2 = self.troveSpecs[-1].split('=')[0]
+        else:
+            n2 = self.troveSpecs[-1][0]
 
         if len(self.troveSpecs) == 1:
             s =  n1

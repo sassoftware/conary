@@ -1215,16 +1215,27 @@ class DepCheckState:
     def setJobs(self, newJobSet):
         newJobSet = set(newJobSet)
         removedJobs = self.jobSet - newJobSet
+
         if removedJobs:
-            self.done()
-            addedJobs = newJobSet
+            # if every removed job was a simple removal, we can incrementally
+            # fix that up. if they are anything else, we need to start over
+            if [ x for x in removedJobs if x[2][0] is not None ]:
+                self.done()
+                addedJobs = newJobSet
+            else:
+                # just add back in the things which have been removed
+                restoreJobs = [ (x[0], (None, None), x[1], True) for
+                                    x in removedJobs ]
+                self.checker.addJobs(restoreJobs)
+                self.jobSet.difference_update(removedJobs)
+                addedJobs = newJobSet - self.jobSet
         else:
             addedJobs = newJobSet - self.jobSet
 
         self.setup()
 
         self.checker.addJobs(addedJobs)
-        self.jobSet = newJobSet
+        self.jobSet.update(addedJobs)
 
     def depCheck(self, jobSet,
                  linkedJobs = None, criticalJobs = None,

@@ -419,7 +419,7 @@ class DependencyChecker:
                     if targetTrove >= 0:
                         addEdge((i, targetTrove, None))
 
-            if job[2][0]:
+            if job[2][0] and trove.troveIsCollection(job[0]):
                 trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
                                                 withFiles = False)
 

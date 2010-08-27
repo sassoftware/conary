@@ -31,6 +31,7 @@ from conary.conaryclient.branch import ClientBranch
 from conary.conaryclient.clone import ClientClone
 from conary.conaryclient.update import ClientUpdate
 from conary.conaryclient.newtrove import ClientNewTrove
+from conary.conaryclient.modelupdate import SystemModelClient
 
 CloneError = clone.CloneError
 CloneIncomplete = clone.CloneIncomplete
@@ -58,7 +59,8 @@ class VersionSuppliedError(UpdateError):
         return "version should not be specified when a Conary change set " \
                "is being installed"
 
-class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
+class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
+                   SystemModelClient):
     """
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.
