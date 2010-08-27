@@ -703,7 +703,7 @@ class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
             d[None][label] = [ flavor ]
 
         matches = troveSource.getTroveLatestByLabel(
-                                d, troveTypes = netclient.TROVE_QUERY_NORMAL,
+                                d, troveTypes = netclient.TROVE_QUERY_ALL,
                                 bestFlavor = True)
 
         fullTupList = []
