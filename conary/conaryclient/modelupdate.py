@@ -90,7 +90,7 @@ class SysModelFindAction(troveset.FindAction):
 
     resultClass = SysModelDelayedTroveTupleSet
 
-class FlattenAction(SysModelDelayedTupleSetAction):
+class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
 
@@ -142,7 +142,35 @@ class SystemModelClient(object):
                 elif trove.troveIsGroup(name):
                     collections.add(name)
 
-        searchTroveSet = self._createRepositoryTroveSet()
+        # create the initial search path from the installLabelPath
+        reposTroveSet = self._createRepositoryTroveSet()
+
+        # now build new search path elements
+        searchPathItems = []
+        for searchItem in sysModel.searchPath:
+            partialTup = searchItem.item
+            if isinstance(partialTup, versions.Label):
+                repos = troveset.SearchSourceTroveSet(
+                        searchsource.NetworkSearchSource(self.getRepos(),
+                                                         [ partialTup ],
+                                                         self.cfg.flavor))
+                searchPathItems.append(repos)
+            elif partialTup[0] is not None:
+                result = self.repos.findTrove(self.cfg.installLabelPath,
+                                              partialTup, self.cfg.flavor)
+                assert(len(result) == 1)
+                ts = SysModelInitialTroveTupleSet(troveTuple = result,
+                                                  graph = reposTroveSet.g)
+                # get the trove itself
+                fetched = ts._action(ActionClass = troveset.FetchAction)
+                flattened = fetched._action(ActionClass = SysModelFlattenAction)
+                searchPathItems.append(flattened)
+            else:
+                assert(0)
+
+        searchPathItems.append(reposTroveSet)
+        searchTroveSet = SysModelSearchPathTroveSet(searchPathItems,
+                                                    graph = reposTroveSet.g)
 
         import systemmodel
         finalTroveSet = SysModelInitialTroveTupleSet(graph = searchTroveSet.g)
@@ -157,7 +185,8 @@ class SystemModelClient(object):
                         growSearchPath = True
 
                 if growSearchPath:
-                    flatten = matches._action(ActionClass = FlattenAction)
+                    flatten = matches._action(ActionClass =
+                                                SysModelFlattenAction)
                     searchTroveSet = SysModelSearchPathTroveSet(
                             [ flatten, searchTroveSet ],
                             graph = searchTroveSet.g)
@@ -181,7 +210,7 @@ class SystemModelClient(object):
         g = troveset.OperationGraph()
         repos = troveset.SearchSourceTroveSet(
                 searchsource.NetworkSearchSource(self.getRepos(),
-                                                 self.cfg.installLabelPath,
+                                                 [],
                                                  self.cfg.flavor))
         return SysModelSearchPathTroveSet([ repos ], graph = g)
 
