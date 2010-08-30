@@ -46,7 +46,7 @@ class SysModelTupleSetMethods(object):
                             ActionClass = SysModelReplaceAction)
 
     def union(self, *troveSetList):
-        return self._action(*troveSetList, ActionClass = SysModelUnionAction)
+        return self._action(ActionClass = SysModelUnionAction, *troveSetList)
 
     def update(self, replaceTroveSet = None):
         return self._action(replaceTroveSet,
@@ -128,7 +128,7 @@ class SysModelUpdateAction(troveset.UpdateAction):
 class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
     def find(self, *troveSpecs):
-        return self._action(*troveSpecs, ActionClass = SysModelFindAction)
+        return self._action(ActionClass = SysModelFindAction, *troveSpecs)
 
 class SystemModelClient(object):
 
