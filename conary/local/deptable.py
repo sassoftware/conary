@@ -218,6 +218,28 @@ class DependencyWorkTables:
                                 ("Dependencies", "TmpDependencies"),
                                 multiplier = -1)
 
+    def restoreTrove(self, n, v, f):
+        args = [ n, v.asString() ]
+        if f.isEmpty():
+            flavorCheck = "flavors.flavor is null"
+        else:
+            flavorCheck = "flavors.flavor = ?"
+            args.append(f.freeze())
+
+        self.cu.execute("""
+            select instanceId from Instances
+                join versions using (versionid)
+                join flavors on instances.flavorid = flavors.flavorid
+                where
+                    instances.trovename = ? and
+                    versions.version = ? and
+                    %s
+        """ % (flavorCheck), args)
+
+        instanceId = self.cu.next()[0]
+        self.cu.execute("delete from removedtroveids where troveId=?",
+                        instanceId)
+
     def mergeRemoves(self):
         # The COALESCE here handles RemovedTroveIds being empty. The max
         # tells us how many rows from RemovedTroveIds have already been
@@ -398,7 +420,7 @@ class DependencyChecker:
 
         # skip node 0, which is None
         oldTroveIndexes = [ (i, job) for i, (job, _, _) in
-                              itertools.islice(enumerate(self.nodes), 1, None)
+                                    self.iterNodes(enum = True)
                               if trove.troveIsCollection(job[0]) and
                                  job[1][0] is not None ]
         referencesList = self.troveSource.db.getTroveReferences(
@@ -407,7 +429,7 @@ class DependencyChecker:
                           weakRefs = True)
 
         # skip node 0, which is None
-        for i, (job, _, _) in itertools.islice(enumerate(self.nodes), 1, None):
+        for i, (job, _, _) in self.iterNodes(enum = True):
             if not trove.troveIsCollection(job[0]): continue
 
             if job[1][0]:
@@ -504,13 +526,15 @@ class DependencyChecker:
         versionCache = sqldb.VersionCache()
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
-            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None)
-                    for x in self.iterNodes() ]
+            failedSets = [ None ] * len(self.nodes)
+            for i, x in self.iterNodes(enum = True):
+                x = x[0]
+                failedSets[i] = ((x[0], x[2][0], x[2][1]), None, None, None)
 
             for idx in idxList:
                 (troveIndex, classId, dep) = depInfoList[-idx]
 
-                troveIndex = -(troveIndex + 1)
+                troveIndex = -troveIndex
 
                 if failedSets[troveIndex][2] is None:
                     failedSets[troveIndex] = (failedSets[troveIndex][0],
@@ -525,7 +549,9 @@ class DependencyChecker:
                     failedSets[troveIndex][3].extend(wasIn[idx])
 
             failedList = []
-            for (name, classId, depSet, neededByList) in failedSets:
+            for item in failedSets:
+                if item is None: continue
+                (name, classId, depSet, neededByList) = item
                 if depSet is not None:
                     if not wasIn:
                         failedList.append((name, depSet))
@@ -993,9 +1019,20 @@ class DependencyChecker:
             nodeList.append(nodeId)
         return nodeList
 
-    def iterNodes(self):
-        # skips the None node on the front
-        return [ x[0] for x in itertools.islice(self.nodes, 1, None) ]
+    def iterNodes(self, enum = False):
+        # skips None entries
+        if enum:
+            return ( tup for tup in enumerate(self.nodes)
+                     if tup[1] is not None )
+        else:
+            return ( x[0] for x in self.nodes if x is not None )
+
+    def restoreTrove(self, troveTup):
+        nodeId = self.oldInfoToNodeId[troveTup]
+        del self.oldInfoToNodeId[troveTup]
+        self.nodes[nodeId] = None
+        self.g.delete(nodeId)
+        self.workTables.restoreTrove(*troveTup)
 
     def addJobs(self, jobSet):
         # This sets up negative depNum entries for the requirements we're

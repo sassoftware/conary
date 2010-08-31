@@ -1223,10 +1223,8 @@ class DepCheckState:
                 self.done()
                 addedJobs = newJobSet
             else:
-                # just add back in the things which have been removed
-                restoreJobs = [ (x[0], (None, None), x[1], True) for
-                                    x in removedJobs ]
-                self.checker.addJobs(restoreJobs)
+                for (name, (oldV, oldF), (newV, newF), isAbs) in removedJobs:
+                    self.checker.restoreTrove((name, oldV, oldF))
                 self.jobSet.difference_update(removedJobs)
                 addedJobs = newJobSet - self.jobSet
         else:
