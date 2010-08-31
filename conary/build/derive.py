@@ -19,15 +19,14 @@ resulting packages to the repository.
 
 import os
 import stat
-import shutil
 
 from conary import branch
 from conary import checkin
-from conary import conaryclient
 from conary import state
-from conary import updatecmd
+from conary.conaryclient import cmdline
 from conary.lib import log, util
 from conary.versions import Label
+from conary.repository.changeset import ChangesetExploder
 
 class DeriveCallback(checkin.CheckinCallback):
     def setUpdateJob(self, *args, **kw):
@@ -65,18 +64,14 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir=None,
     if isinstance(troveSpec, tuple):
         troveName, versionSpec, flavor = troveSpec
         versionSpec = str(versionSpec)
-        troveSpec = conaryclient.cmdline.toTroveSpec(troveName,
-                                                     versionSpec,
-                                                     flavor)
+        troveSpec = cmdline.toTroveSpec(troveName, versionSpec, flavor)
     else:
-        troveName, versionSpec, flavor = conaryclient.cmdline.parseTroveSpec(
-            troveSpec)
+        troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
 
     if isinstance(targetLabel, str):
         targetLabel = Label(targetLabel)
 
-    troveName, versionSpec, flavor = conaryclient.cmdline.parseTroveSpec(
-                                                                    troveSpec)
+    troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
     result = repos.findTrove(cfg.buildLabel, (troveName, versionSpec, flavor),
                              cfg.flavor)
     # findTrove shouldn't return multiple items for one package anymore
@@ -172,8 +167,10 @@ class %(className)sRecipe(%(recipeBaseClass)s):
     # created
     sourceState.setFactory('')
 
+    addRecipe=True
     for (pathId, path, fileId, version) in list(sourceState.iterFileList()):
         if path == recipeName:
+            addRecipe = False
             continue
         sourceState.removeFile(pathId)
         if util.exists(path):
@@ -185,15 +182,22 @@ class %(className)sRecipe(%(recipeBaseClass)s):
                     os.unlink(path)
             except OSError, e:
                 log.warning("cannot remove %s: %s" % (path, e.strerror))
+
     conaryState.write('CONARY')
 
+    if addRecipe:
+        checkin.addFiles([recipeName])
+
     if extract:
-        extractDir = os.path.join(os.getcwd(), '_ROOT_')
         log.info('extracting files from %s=%s[%s]' % (troveToDerive))
-        cfg.root = os.path.abspath(extractDir)
-        cfg.interactive = False
-        updatecmd.doUpdate(cfg, troveSpec,
-                           callback=callback, depCheck=False)
+        # extract to _ROOT_
+        extractDir = os.path.join(os.getcwd(), '_ROOT_')
+        ts = [ (troveToDerive[0], (None, None),
+                (troveToDerive[1], troveToDerive[2]), True) ]
+        cs = repos.createChangeSet(ts, recurse = True)
+        ChangesetExploder(cs, extractDir)
+        # extract to _OLD_ROOT_
         secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
-        shutil.copytree(extractDir, secondDir)
+        cs = repos.createChangeSet(ts, recurse = True)
+        ChangesetExploder(cs, secondDir)
 

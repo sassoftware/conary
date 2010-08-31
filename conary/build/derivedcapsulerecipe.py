@@ -193,9 +193,16 @@ class AbstractDerivedCapsuleRecipe(AbstractCapsuleRecipe):
                         capsules = False, members = True):
                         fc = cs.getFileChange(None,fileId)
                         fileObj = files.ThawFile(fc, pathId)
-                        self.exploder.handleFileAttributes(trv, fileObj, path)
-                        self.exploder.handleFileMode(trv, fileObj, path,
-                                                     self.macros.destdir)
+                        try:
+                            self.exploder.handleFileAttributes(trv, fileObj,
+                                                               path)
+                            self.exploder.handleFileMode(trv, fileObj, path,
+                                                         self.macros.destdir)
+                        except OSError, e:
+                            if fileObj.flags.isInitialContents():
+                                pass
+                            else:
+                                raise e
                 elif trv.troveInfo.capsule.type():
                     raise builderrors.CookError("Derived Packages with %s type "
                         "capsule is unsupported." %trv.troveInfo.capsule.type())
