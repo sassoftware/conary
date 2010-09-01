@@ -183,6 +183,14 @@ class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
     def find(self, *troveSpecs):
         return self._action(ActionClass = SysModelFindAction, *troveSpecs)
 
+    def hasOptionalTrove(self, troveTup):
+        for ts in self.troveSetList:
+            if isinstance(ts, troveset.TroveTupleSet):
+                if troveTup in ts._getOptionalSet():
+                    return True
+
+        return False
+
 class SystemModelClient(object):
 
     def systemModelGraph(self, sysModel):
@@ -470,21 +478,35 @@ class SystemModelClient(object):
 
             suggMap = {}
             while True:
-                unsatisfied = result.unsatisfiedList
-                unsatisfied += [ x[0:2] for x in result.unresolveableList ]
+                foundTroves = False
+                added = set()
+                for (needingTup, neededDeps, neededTupList) in \
+                                                result.unresolveableList:
+                    for neededTup in neededTupList:
+                        if (neededTup not in added and
+                                searchPath.hasOptionalTrove(neededTup)):
+                            log.info("keeping installed trove for deps %s",
+                                     neededTup)
+                            targetTrv.addTrove(*neededTup)
+                            added.add(neededTup)
+                            foundTroves = True
 
-                if not resolveMethod.prepareForResolution(unsatisfied):
-                    break
+                if not foundTroves:
+                    unsatisfied = result.unsatisfiedList
+                    unsatisfied += [ x[0:2] for x in result.unresolveableList ]
 
-                sugg = resolveMethod.resolveDependencies()
-                newJob = resolveMethod.filterSuggestions(
-                                    result.unsatisfiedList, sugg, suggMap)
-                newTroves = []
+                    if not resolveMethod.prepareForResolution(unsatisfied):
+                        break
 
-                for (name, oldInfo, newInfo, isAbsolute) in newJob:
-                    assert(isAbsolute)
-                    log.info("adding new trove %s", name)
-                    targetTrv.addTrove(name, newInfo[0], newInfo[1])
+                    sugg = resolveMethod.resolveDependencies()
+                    newJob = resolveMethod.filterSuggestions(
+                                        result.unsatisfiedList, sugg, suggMap)
+                    newTroves = []
+
+                    for (name, oldInfo, newInfo, isAbsolute) in newJob:
+                        assert(isAbsolute)
+                        log.info("adding for dependency %s", name)
+                        targetTrv.addTrove(name, newInfo[0], newInfo[1])
 
                 job = targetTrv.diff(existsTrv)[2]
 
