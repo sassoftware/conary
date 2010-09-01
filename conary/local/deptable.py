@@ -442,10 +442,18 @@ class DependencyChecker:
                         addEdge((i, targetTrove, None))
 
             if job[2][0] and trove.troveIsCollection(job[0]):
-                trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                                withFiles = False)
+                if (not hasattr(self.troveSource, 'getPackageComponents') or
+                    trove.troveIsGroup(job[0])):
+                    trv = self.troveSource.getTrove(
+                                    job[0], job[2][0], job[2][1],
+                                    withFiles = False)
+                    troveListIter = trv.iterTroveList(strongRefs=True,
+                                                      weakRefs=True)
+                else:
+                    troveListIter = self.troveSource.getPackageComponents(
+                                            ( job[0], job[2][0], job[2][1] ))
 
-                for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                for info in troveListIter:
                     targetTrove = getNew(info, -1)
                     if targetTrove >= 0:
                         addEdge((i, targetTrove, None))

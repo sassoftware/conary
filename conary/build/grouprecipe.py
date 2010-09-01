@@ -1926,7 +1926,7 @@ class TroveCache(trovecache.TroveCache):
     def _caching(self, troveTupList):
         self.callback.gettingTroveDefinitions(len(troveTupList))
 
-    def _cached(self, troveList):
+    def _cached(self, troveTupList, troveList):
         for trv in troveList:
             self.getChildren(trv)
 

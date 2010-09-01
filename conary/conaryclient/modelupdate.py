@@ -1,4 +1,4 @@
-# Copyright (c) 2010 rPath, Inc.
+
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -22,6 +22,7 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.db = db
         self.repos = repos
         self.callback = callback
+        self.componentMap = {}
         if changeSetList:
             csSource = trovesource.ChangesetFilesTroveSource(db)
             csSource.addChangeSets(changeSetList)
@@ -34,6 +35,21 @@ class SystemModelTroveCache(trovecache.TroveCache):
     def _caching(self, troveTupList):
         log.info("loading %d trove(s) from the repository, one of which is %s",
                   len(troveTupList), troveTupList[0])
+
+    def _cached(self, troveTupList, troveList):
+        for tup, trv in itertools.izip(troveTupList, troveList):
+            for name, version, flavor in trv.iterTroveList(strongRefs = True,
+                                                           weakRefs = True):
+                if not trove.troveIsComponent(name):
+                    continue
+
+                pkgName = name.split(':')[0]
+                tup = (pkgName, version, flavor)
+                l = self.componentMap.get(tup)
+                if l is None:
+                    l = []
+                    self.componentMap[tup] = l
+                l.append(name)
 
 class SysModelTupleSetMethods(object):
 
@@ -55,7 +71,24 @@ class SysModelTupleSetMethods(object):
 class SysModelDelayedTroveTupleSet(SysModelTupleSetMethods,
                                    troveset.DelayedTupleSet):
 
-    pass
+    def __init__(self, *args, **kwargs):
+        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
+        self._flat = False
+
+    def _walk(self, *args, **kwargs):
+        if self._flat:
+            # this is easy
+            result = []
+
+            for (troveTup) in self._getInstallSet():
+                result.append( (troveTup, True, True) )
+
+            for (troveTup) in self._getOptionalSet():
+                result.append( (troveTup, False, True) )
+
+            return result
+
+        return troveset.DelayedTupleSet._walk(self, *args, **kwargs)
 
 class SysModelDelayedTupleSetAction(troveset.DelayedTupleSetAction):
 
@@ -107,6 +140,7 @@ class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
         self.outSet._setInstall(installs)
         self.outSet._setOptional(available)
+        self.outSet._flat = True
 
 class SysModelGetOptionalAction(SysModelDelayedTupleSetAction):
 

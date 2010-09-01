@@ -30,7 +30,7 @@ class TroveCache(trovesource.AbstractTroveSource):
     def _caching(self, troveTupList):
         pass
 
-    def _cached(self, troveList):
+    def _cached(self, troveTupList, troveList):
         pass
 
     def cacheTroves(self, troveTupList, _cached = None):
@@ -47,9 +47,9 @@ class TroveCache(trovesource.AbstractTroveSource):
             self.cache[troveTup] = trv
 
         if _cached:
-            _cached(troves)
+            _cached(troveTupList, troves)
         else:
-            self._cached(troves)
+            self._cached(troveTupList, troves)
 
     def getDepsForTroveList(self, troveTupList):
         # look in the dep cache and trove cache

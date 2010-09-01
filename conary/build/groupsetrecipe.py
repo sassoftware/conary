@@ -36,7 +36,7 @@ class GroupSetTroveCache(object):
     def __getattr__(self, name):
         return getattr(self.cache, name)
 
-    def _cached(self, troveList):
+    def _cached(self, troveTupList, troveList):
         # this avoids the call to recursively get children
         # GroupSet.TroveCache needs
         pass
