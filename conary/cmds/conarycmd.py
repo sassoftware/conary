@@ -56,6 +56,7 @@ from conary.cmds import verify
 from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
+from conary.conaryclient import systemmodel
 from conary.repository import trovesource
 
 if __name__ == '__main__':
@@ -897,6 +898,7 @@ class _UpdateCommand(ConaryCommand):
                           'which will remain installed',
         'exact-flavors' : 'Only match troves whose flavors match exactly',
         'info'          : 'Display what update would have done',
+        'model'         : 'Display the new model that would have been applied',
         'no-deps'       : 'Do not raise errors due to dependency failures',
         'no-recurse'    : (VERBOSE_HELP, 
                            'Do not install/erase children of specified trove'),
@@ -945,6 +947,7 @@ class _UpdateCommand(ConaryCommand):
         d["keep-journal"] = NO_PARAM            # don't document this
         d["keep-required"] = NO_PARAM
         d["info"] = '-i', NO_PARAM
+        d["model"] = NO_PARAM
         d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
@@ -968,7 +971,9 @@ class _UpdateCommand(ConaryCommand):
         argDef['Update Options'] = d
 
     def runCommand(self, cfg, argSet, otherArgs):
-        kwargs = {}
+        kwargs = { 'systemModel': False }
+        model = systemmodel.SystemModelText(cfg)
+        modelFile = systemmodel.SystemModelFile(model)
 
         callback = updatecmd.UpdateCallback(cfg)
         if cfg.quiet:
@@ -1016,7 +1021,9 @@ class _UpdateCommand(ConaryCommand):
                                 not argSet.pop('no-conflict-check', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
-        kwargs['keepExisting'] = argSet.pop('keep-existing', False)
+        kwargs['model'] = argSet.pop('model', False)
+        kwargs['keepExisting'] = argSet.pop('keep-existing',
+            otherArgs[1] == 'install') # install implies --keep-existing
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['noScripts'] = argSet.pop('no-scripts', False)
@@ -1032,16 +1039,19 @@ class _UpdateCommand(ConaryCommand):
         #
         kwargs['syncChildren'] = False
         kwargs['syncUpdate'] = False
-        if otherArgs[1] == 'sync':
-            if argSet.pop('current', False):
+        if not modelFile.exists():
+            # this argument handling does not make sense for a modeled system
+            kwargs.pop('model')
+            if otherArgs[1] == 'sync':
+                    if argSet.pop('current', False):
+                        kwargs['syncChildren'] = True
+                    else:
+                        kwargs['syncUpdate'] = True
+                    kwargs['removeNotByDefault'] = argSet.pop('full', False)
+            elif otherArgs[1] == 'syncchildren':
+                # backwards compatibility.  Don't remove this 
                 kwargs['syncChildren'] = True
-            else:
-                kwargs['syncUpdate'] = True
-            kwargs['removeNotByDefault'] = argSet.pop('full', False)
-        elif otherArgs[1] == 'syncchildren':
-            # backwards compatibility.  Don't remove this 
-            kwargs['syncChildren'] = True
-            kwargs['removeNotByDefault'] = argSet.pop('full', False)
+                kwargs['removeNotByDefault'] = argSet.pop('full', False)
 
         if kwargs['sync'] and kwargs['fromFiles']:
             log.error("Only one of --sync and --from-file may be used")
@@ -1049,15 +1059,42 @@ class _UpdateCommand(ConaryCommand):
 
         if argSet: return self.usage()
 
-        if len(otherArgs) >=3:
-            updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
+        if modelFile.exists():
+            if otherArgs[1] == 'sync' and len(otherArgs) > 2:
+                log.error('The "sync" command cannot take trove arguments with a system model')
+                return 1
+            if otherArgs[1] == 'migrate':
+                # Not entirely obvious what to do with the pre-existing
+                # system model.  Keep search lines and remove all the
+                # rest, replacing with the migrate arguments?  Remove
+                # all search lines?  Add label-based search lines?
+                # Add each of the items both as search (with version)
+                # and install (without)?  If adding search lines, how
+                # should they be ordered?
+                log.error('The "migrate" command does not function with a system model')
+                return 1
+            if 'sync' in kwargs and kwargs['sync']:
+                log.error('The --sync-to-parents argument cannot be used with a system model')
+                return 1
+            retval = updatecmd.doModelUpdate(cfg,
+                model, modelFile, otherArgs[2:], **kwargs)
+        elif len(otherArgs) >= 3:
+            retval = updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
         else:
             return self.usage()
+
+        return retval
 
 class UpdateCommand(_UpdateCommand):
     commands = [ "update" ]
     help = 'Update or install software on the system'
 _register(UpdateCommand)
+
+
+class InstallCommand(_UpdateCommand):
+    commands = [ "install" ]
+    help = 'Install software on the system'
+_register(InstallCommand)
 
 
 class EraseCommand(_UpdateCommand):
@@ -1124,6 +1161,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["info"] = '-i', NO_PARAM
         argDef["just-db"] = NO_PARAM
         argDef["keep-required"] = NO_PARAM
+        argDef["model"] = NO_PARAM
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
@@ -1139,7 +1177,14 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["apply-critical"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
-        kwargs = {}
+        kwargs = { 'systemModel': False }
+        model = systemmodel.SystemModelText(cfg)
+        modelFile = systemmodel.SystemModelFile(model)
+        if modelFile.exists():
+            kwargs['systemModel'] = model
+            kwargs['systemModelFile'] = modelFile
+
+        kwargs['model'] = argSet.pop('model', False)
 
         noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
         if noRestart and cfg.root == '/':
