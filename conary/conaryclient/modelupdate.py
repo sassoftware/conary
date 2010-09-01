@@ -68,6 +68,7 @@ class SysModelTupleSetMethods(object):
         return self._action(replaceTroveSet,
                             ActionClass = SysModelUpdateAction)
 
+
 class SysModelDelayedTroveTupleSet(SysModelTupleSetMethods,
                                    troveset.DelayedTupleSet):
 
@@ -123,9 +124,13 @@ class SysModelFindAction(troveset.FindAction):
 
     resultClass = SysModelDelayedTroveTupleSet
 
+class SysModelFetchAction(troveset.FetchAction):
+
+    resultClass = SysModelDelayedTroveTupleSet
+
 class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
-    prefilter = troveset.FetchAction
+    prefilter = SysModelFetchAction
 
     def __call__(self, data):
         installs = []
@@ -196,7 +201,7 @@ class SystemModelClient(object):
                 ts = SysModelInitialTroveTupleSet(troveTuple = result,
                                                   graph = reposTroveSet.g)
                 # get the trove itself
-                fetched = ts._action(ActionClass = troveset.FetchAction)
+                fetched = ts._action(ActionClass = SysModelFetchAction)
                 flattened = fetched._action(ActionClass = SysModelFlattenAction)
                 searchPathItems.append(flattened)
             else:
@@ -247,6 +252,102 @@ class SystemModelClient(object):
                                                  [],
                                                  self.cfg.flavor))
         return SysModelSearchPathTroveSet([ repos ], graph = g)
+
+    def _processSysmodelJobList(self, origJobList, updJob, troveCache):
+        # this is just like _processJobList, but it's forked to use the
+        # sysmodel trove cache instead of a changeset with all of the troves
+        # in it
+        missingTroves = list()
+        removedTroves = list()
+        rollbackFence = False
+
+        # this only accesses old troves in the database
+        self._addJobPreEraseScripts(origJobList, updJob)
+
+        # removals are uninteresting from now on here
+        jobList = [ x for x in origJobList if x[2][0] is not None ]
+
+        # we get the sizes here only because the size of redirects and
+        # removed troves isn't set (so it shows up as None); it would
+        # be nice if we could explicitly get the trove types from the
+        # repository, but we can't right now
+        newTroves = [ (x[0], x[2][0], x[2][1]) for x in jobList ]
+        newTroveSizes = troveCache.getTroveInfo(
+                                trove._TROVEINFO_TAG_SIZE, newTroves)
+        missingSize = [ troveTup for (troveTup, size) in
+                            itertools.izip(newTroves, newTroveSizes)
+                            if size() is None ]
+
+        scripts = troveCache.getTroveInfo(trove._TROVEINFO_TAG_SCRIPTS,
+                                          newTroves)
+        compatibilityClasses = troveCache.getTroveInfo(
+                                          trove._TROVEINFO_TAG_COMPAT_CLASS,
+                                          newTroves)
+        neededTroves = [ troveTup for (troveTup, script, compatClass)
+                         in itertools.izip(newTroves, scripts,
+                                           compatibilityClasses)
+                         if script is not None or compatClass is not None ]
+
+        if hasattr(troveCache, 'cacheTroves'):
+            troveCache.cacheTroves(set(missingSize + neededTroves))
+
+        for job, newTroveTup, scripts, compatClass in itertools.izip(
+                        jobList, newTroves, scripts, compatibilityClasses):
+            if newTroveTup in missingSize:
+                trv = troveCache.getTroves([newTroveTup])[0]
+                if trv.type() == trove.TROVE_TYPE_REMOVED:
+                    if trv.troveInfo.flags.isMissing():
+                        missingTroves.append(job)
+                    else:
+                        removedTroves.append(job)
+
+            oldCompatClass = None
+
+            if scripts:
+                preScript = None
+                if job[1][0] is not None:
+                    action = "preupdate"
+                    # check for preupdate scripts
+                    oldCompatClass = self.db.getTroveCompatibilityClass(
+                                                job[0], job[1][0], job[1][1])
+                    preScript = scripts.preUpdate.script()
+                    if preScript:
+                        troveObj = troveCache.getTroves([ newTroveTup ],
+                                                        withFiles = False)[0]
+                else:
+                    action = "preinstall"
+                    oldCompatClass = None
+                    preSript = scripts.preInstall.script()
+                    if preScript:
+                        troveObj = troveCache.getTroves([ newTroveTup ],
+                                                        withFiles = False)[0]
+
+                if compatClass:
+                    compatClass = compatClass()
+
+                if preScript:
+                    updJob.addJobPreScript(job, preScript, oldCompatClass,
+                                           compatClass,
+                                           action = action, troveObj = troveObj)
+
+                postRollbackScript = scripts.postRollback.script()
+                if postRollbackScript and job[1][0] is not None:
+                    # Add the post-rollback script that will be saved on the
+                    # rollback stack
+                    # CNY-2844: do not run rollbacks for installs
+                    updJob.addJobPostRollbackScript(job, postRollbackScript,
+                                                    compatClass, oldCompatClass)
+
+            if compatClass:
+                trv = troveCache.getTroves([ newTroveTup ])[0]
+                # this is awful
+                troveCs = trv.diff(None, absolute = True)[0]
+                rollbackFence = rollbackFence or \
+                    troveCs.isRollbackFence(update = (job[1][0] is not None),
+                                    oldCompatibilityClass = oldCompatClass)
+
+        updJob.setInvalidateRollbacksFlag(rollbackFence)
+        return missingTroves, removedTroves
 
     def _updateFromTroveSetGraph(self, uJob, troveSet, split = True,
                             fromChangesets = [], criticalUpdateInfo=None,
@@ -307,7 +408,7 @@ class SystemModelClient(object):
                                            callback = callback)
 
         # we need to explicitly fetch this before we can walk it
-        preFetch = troveSet._action(ActionClass = troveset.FetchAction)
+        preFetch = troveSet._action(ActionClass = SysModelFetchAction)
         availForDeps = preFetch._action(ActionClass = SysModelGetOptionalAction)
         preFetch.g.realize(troveset.ActionData(troveCache, self.cfg.flavor[0]))
 
@@ -404,17 +505,12 @@ class SystemModelClient(object):
             (depList, suggMap, cannotResolve, splitJob, keepList,
              criticalUpdates) = ( [], {}, [], [ job ], [], [] )
 
-        infoCs = troveCache.troveSource.createChangeSet(job, withFiles = False,
-                                                        callback = callback)
-        uJob.getTroveSource().addChangeSet(infoCs)
-
-        ts = uJob.getTroveSource()
-        troveSourceCallback = lambda job: ts.createChangeSet([ job ],
-                                                         withFiles = False)[0]
-
         # this prevents us from using the changesetList as a searchSource
-        self._processJobList(job, uJob, troveSourceCallback)
+        log.info("processing job list")
+        self._processSysmodelJobList(job, uJob, troveCache)
+        log.info("combining jobs")
         self._combineJobs(uJob, splitJob, criticalUpdates)
+        log.info("combining jobs")
         uJob.setTransactionCounter(self.db.getTransactionCounter())
 
 

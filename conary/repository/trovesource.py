@@ -70,6 +70,9 @@ class AbstractTroveSource:
     def searchableByType(self):
         return self._searchableByType
 
+    def getTroveInfo(self, infoType, troveTupleList):
+        raise NotImplementedError
+
     def getTroveLeavesByLabel(self, query, bestFlavor=True,
                               troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
@@ -1195,6 +1198,20 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
     def getFileVersion(self, pathId, fildId, version):
         # TODO: implement getFileVersion for changeset source
         raise KeyError
+
+    def getTroveInfo(self, infoType, troveList):
+        retList = []
+
+        attrName = trove.TroveInfo.streamDict[infoType][2]
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            assert(cs)
+            trvCs = cs.getNewTroveVersion(*info)
+            ti = trvCs.getTroveInfo()
+            retList.append(getattr(ti, attrName))
+
+        return retList
 
     def getDepsForTroveList(self, troveList):
         # returns a list of (prov, req) pairs
