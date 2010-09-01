@@ -13,11 +13,8 @@
 
 import sys
 import re
-import inspect
 import pydoc, types
-from conary.build import build
 from conary import versions
-from conary.build import source
 from conary.build import packagerecipe, redirectrecipe
 from conary.build import filesetrecipe, grouprecipe, inforecipe
 
@@ -46,7 +43,6 @@ class DummyGroupRecipe(grouprecipe.GroupRecipe):
     def __init__(self, cfg):
         self.name = 'group-dummy'
         self.version = '1.0'
-        troveCache = grouprecipe.TroveCache(None, None)
         repos = DummyRepos()
         grouprecipe.GroupRecipe.__init__(self, repos, cfg,
                                          versions.Label('a@b:c'), None,
@@ -123,11 +119,6 @@ def _formatDoc(className, obj):
 
 def _parentName(klass):
     return klass.__base__.__name__
-
-def formatDoc(obj):
-    name = obj.__name__
-    docString = obj.__doc__
-    pageDoc(name, docString)
 
 def docObject(cfg, what):
     classList = sys.modules[__name__].classList

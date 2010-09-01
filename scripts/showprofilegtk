@@ -17,7 +17,6 @@
 import cPickle
 import gobject
 import gtk
-import hotshot.stats
 import sys
 import pango
 import os
@@ -369,8 +368,6 @@ class StatWindow(gtk.Window):
         if '.pickle' in filename:
             f = open(filename)
             stats = cPickle.load(f).stats
-        elif filename.endswith('.prof'):
-            stats = hotshot.stats.load(filename).stats
         else:
             import marshal
             f = open(filename)

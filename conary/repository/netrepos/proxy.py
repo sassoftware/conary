@@ -12,7 +12,14 @@
 # full details.
 #
 
-import base64, cPickle, itertools, os, tempfile, urllib, urllib2, urlparse
+import cPickle
+import itertools
+import os
+import tempfile
+import time
+import urllib
+import urllib2
+import urlparse
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, util
@@ -418,21 +425,6 @@ class ChangesetFilter(BaseProxy):
     def __init__(self, cfg, basicUrl, cache):
         BaseProxy.__init__(self, cfg, basicUrl)
         self.csCache = cache
-
-    def _cvtJobEntry(self, authToken, jobEntry):
-        (name, (old, oldFlavor), (new, newFlavor), mbsolute) = jobEntry
-
-        newVer = self.toVersion(new)
-
-        if old == 0:
-            l = (name, (None, None),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        else:
-            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        return l
 
     @staticmethod
     def _getChangeSetVersion(clientVersion):
@@ -1290,7 +1282,9 @@ class SimpleRepositoryFilter(ChangesetFilter):
     def __init__(self, cfg, basicUrl, repos):
         if cfg.changesetCacheDir:
             util.mkdirChain(cfg.changesetCacheDir)
-            csCache = ChangesetCache(datastore.DataStore(cfg.changesetCacheDir))
+            csCache = ChangesetCache(
+                    datastore.DataStore(cfg.changesetCacheDir),
+                    cfg.changesetCacheLogFile)
         else:
             csCache = None
 
@@ -1322,7 +1316,8 @@ class ProxyRepositoryServer(ChangesetFilter):
 
     def __init__(self, cfg, basicUrl):
         util.mkdirChain(cfg.changesetCacheDir)
-        csCache = ChangesetCache(datastore.DataStore(cfg.changesetCacheDir))
+        csCache = ChangesetCache(datastore.DataStore(cfg.changesetCacheDir),
+                cfg.changesetCacheLogFile)
 
         util.mkdirChain(cfg.proxyContentsDir)
         self.contents = datastore.DataStore(cfg.proxyContentsDir)
@@ -1571,10 +1566,10 @@ class ProxyRepositoryServer(ChangesetFilter):
                                       integrityCheck = False)
 
 class ChangesetCache(object):
-    __slots__ = ['dataStore', 'locksMap']
 
-    def __init__(self, dataStore):
+    def __init__(self, dataStore, logPath=None):
         self.dataStore = dataStore
+        self.logPath = logPath
         self.locksMap = {}
 
     def hashKey(self, key):
@@ -1607,6 +1602,9 @@ class ChangesetCache(object):
         csObj.commit()
         # If we locked the cache file, we need to no longer track it
         self.locksMap.pop(csPath, None)
+
+        self._log('WRITE', key, size=sizeLimit)
+
         return csPath
 
     def get(self, key, shouldLock = True):
@@ -1638,6 +1636,7 @@ class ChangesetCache(object):
             if shouldLock:
                 # We got the lock on csPath
                 self.locksMap[csPath] = lockfile
+            self._log('MISS', key)
             return None
 
         # touch to refresh atime
@@ -1651,17 +1650,33 @@ class ChangesetCache(object):
         try:
             csInfo = ChangeSetInfo(pickled = dataFile.read())
             dataFile.close()
-        except IOError:
+        except IOError, err:
+            self._log('MISS', key, errno=err.errno)
             return None
 
         csInfo.path = csPath
         csInfo.cached = True
         csInfo.version = csVersion
 
+        self._log('HIT', key)
+
         return csInfo
 
     def resetLocks(self):
         self.locksMap.clear()
+
+    def _log(self, status, key, **kwargs):
+        """Log a HIT/MISS/WRITE to file."""
+        if self.logPath is None:
+            return
+        now = time.time()
+        msecs = (now - long(now)) * 1000
+        extra = ''.join(' %s=%r' % (x, y) for (x, y) in kwargs.items())
+        rec = '%s,%03d %s-%d %s%s\n' % (
+                time.strftime('%F %T', time.localtime(now)), msecs,
+                key[0], key[1], status, extra)
+        open(self.logPath, 'a').write(rec)
+
 
 def redirectUrl(authToken, url):
     # return the url to use for the final server
