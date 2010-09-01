@@ -174,11 +174,11 @@ class GroupTupleSetMethods(object):
 
     def components(self, *componentList):
         """
-        B{C{troveset.components()}} - Returns the components recursively
-        included in all members of the troveset. Components of packages
-        to be installed, which the package specifies should be installed,
-        are in the return set as installable. All other components are
-        marked as optional.
+        NAME
+        ====
+
+        B{C{troveset.components()}} - Returns components included in
+        all members of the troveset, recursively.
 
         SYNOPSIS
         ========
@@ -188,6 +188,11 @@ class GroupTupleSetMethods(object):
         DESCRIPTION
         ===========
 
+        Returns the components included in all members of the
+        troveset, found recursively.  Whether a component is
+        install or optional in the returned troveset is determined
+        only by whether the component is installed or optional in
+        the package that contains it.
 
         PARAMETERS
         ==========
@@ -199,103 +204,264 @@ class GroupTupleSetMethods(object):
 
         C{repos['glibc'].components()}
 
-        Returns the components of the default glibc found in the repos
-        object.
+        Returns the components of the default glibc package found in the
+        C{repos} object.
         """
         return self._action(ActionClass = ComponentsAction, *componentList)
 
     def flatten(self):
         """
-        troveset.flatten()
+        NAME
+        ====
 
-        The troveset returned consists of any trove referenced by the original
-        troveset, directly or indirectly. The install/optioanl value is
-        inherited from the troveset called.
+        B{C{troveset.flatten()}} - Returns all non-group troves
+
+        SYNOPSIS
+        ========
+
+        C{troveset.flatten()}
+
+        DESCRIPTION
+        ===========
+
+        The troveset returned consists of any non-group trove referenced
+        by the original troveset, directly or indirectly via groups.
+        The install/optional setting for each troves is inherited from
+        the original troveset, not from the troves referenced.
+
+        This is useful both for creating flattened groups (removing
+        group structure present in upstream groups but not desired
+        in the groups being built) and for creating trovesets to use
+        in SearchPaths, particularly for resolving dependencies.
+
+        PARAMETERS
+        ==========
+
+        None
+
+        EXAMPLES
+        ========
+
+        C{platGrp = repos['group-appliance-platform'].flatten()}
+
+        Returns all the non-group troves included directly in
+        group-appliance-platform, as well as those included only within
+        group-core (included in group-appliance-platform), and those
+        included only within group-bootable, included only because it
+        is included within group-core.  Does not include any of those
+        groups; only the members of the groups.
         """
         return self._action(ActionClass = FlattenAction)
 
     def getInstall(self):
         """
-        troveset.getInstall()
+        NAME
+        ====
 
-        A new troveset is returned which includes only the members of
+        B{C{troveset.getInstall()}} - Returns only install members
+
+        SYNOPSIS
+        ========
+
+        C{troveset.getInstall()}
+
+        DESCRIPTION
+        ===========
+
+        Returns a new troveset which includes only the members of
         this troveset which are marked as install; optional members are
         omitted. All members of the returned set are marked as install.
+
+        PARAMETERS
+        ==========
+
+        None
         """
         return self._action(ActionClass = GetInstalledAction)
 
     def getOptional(self):
         """
-        troveset.getOptional()
+        NAME
+        ====
 
-        A new troveset is returned which includes only the members of
+        B{C{troveset.getOptional()}} - Returns only optional members
+
+        SYNOPSIS
+        ========
+
+        C{troveset.getOptional()}
+
+        DESCRIPTION
+        ===========
+
+        Returns a new troveset which includes only the members of
         this troveset which are marked as optional; install members are
         omitted. All members of the returned set are marked as optional.
+
+        PARAMETERS
+        ==========
+
+        None
         """
         return self._action(ActionClass = GetOptionalAction)
 
     def isEmpty(self):
         """
-        troveset.isEmpty()
+        NAME
+        ====
 
-        An exception is raised if the troveset contains any members; otherwise
-        an identical troveset is created and returned (and may be ignored).
+        B{C{troveset.isEmpty()}} - Assert that troveset is empty
+
+        SYNOPSIS
+        ========
+
+        C{troveset.isEmpty()}
+
+        DESCRIPTION
+        ===========
+
+        Raises an exception is raised if the troveset contains any members.
+        Otherwise, returns an identical (empty) troveset that may be ignored.
+
+        PARAMETERS
+        ==========
+
+        None
         """
         return self._action(ActionClass = IsEmptyAction)
 
     def isNotEmpty(self):
         """
-        troveset.isEmpty()
+        NAME
+        ====
 
-        An exception is raised if the troveset contains no members; otherwise
-        an empty troveset is returned (and may be ignored).
+        B{C{troveset.isNotEmpty()}} - Assert that troveset is not empty
+
+        SYNOPSIS
+        ========
+
+        C{troveset.isNotEmpty()}
+
+        DESCRIPTION
+        ===========
+
+        Raises an exception is raised if the troveset contains no members.
+        Otherwise, returns an identical troveset that may be ignored.
+
+        PARAMETERS
+        ==========
+
+        None
         """
         return self._action(ActionClass = IsNotEmptyAction)
 
     def makeInstall(self, installTroveSet = None):
         """
-        troveset.makeInstall(installTroveSet = None)
+        NAME
+        ====
 
-        If a troveset is given as an argument, all members of the argument
-        are included in the result as install members. Any members of this
-        troveset which are optional, and are not in the installTroveSet,
-        are also optional in the result.
+        B{C{troveset.makeInstall()}} - Make all troves install, or add all
+        provided troves as install troves
 
-        If installTroveSet is not passed, the return value includes all
-        members of this troveset as install members.
+        SYNOPSIS
+        ========
+
+        C{troveset.makeInstall(installTroveSet = None)}
+
+        DESCRIPTION
+        ===========
+
+        If C{installTroveSet} troveset is provided as an argument, all
+        members of that other troveset are included in the result as
+        install members.  Any members of the original troveset which
+        are optional, and are not in C{installTroveSet}, are also
+        optional in the result.
+
+        If C{installTroveSet} is not provided, the troveset returned
+        includes all members of the original troveset as install members.
+
+        PARAMETERS
+        ==========
+
+        - L{instalTroveSet} : TroveSet providing all its members as install
         """
         return self._action(ActionClass = MakeInstallAction,
                             installTroveSet = installTroveSet)
 
     def makeOptional(self, optionalTroveSet = None):
         """
-        troveset.makeOptional(optionalTroveSet = None)
+        NAME
+        ====
 
-        If a troveset is given as an argument, all members of the argument
-        are included in the result as optional members. Any members of this
-        troveset which are install, and are not in the optionalTroveSet,
-        are also included to install in the result.
+        B{C{troveset.makeOptional()}} - Make all troves optional, or add all
+        provided troves as optional troves
 
-        If optionalTroveSet is not passed, the return value includes all
-        members of this troveset as optional members.
+        SYNOPSIS
+        ========
+
+        C{troveset.makeOptional(optionalTroveSet = None)}
+
+        DESCRIPTION
+        ===========
+
+        If C{optionalTroveSet} troveset is provided as an argument, all
+        members of that other troveset are included in the result as
+        optional members.  Any members of the original troveset which
+        are install, and are not in C{optionalTroveSet}, are also
+        install in the result.
+
+        If C{optionalTroveSet} is not provided, the troveset returned
+        includes all members of the original troveset as optional members.
+
+        PARAMETERS
+        ==========
+
+        - L{optionalTroveSet} : TroveSet providing all its members as optional
         """
         return self._action(ActionClass = MakeOptionalAction,
                             optionalTroveSet = optionalTroveSet)
 
     def members(self):
         """
-        troveset.members()
+        NAME
+        ====
+
+        B{C{troveset.members()}} - Returns all members of the troveset
+
+        SYNOPSIS
+        ========
+
+        C{troveset.members()}
+
+        DESCRIPTION
+        ===========
 
         All troves directly included by the troves in this troveset
         are returned as a new troveset. They are optional in the result
         only if they are optional in every member of this troveset which
         includes them.
+
+        PARAMETERS
+        ==========
+
+        None
         """
         return self._action(ActionClass = MembersAction)
 
     def packages(self, *packageList):
         """
-        troveset.packages()
+        NAME
+        ====
+
+        B{C{troveset.packages()}} - Return recursively-search package references
+
+        SYNOPSIS
+        ========
+
+        C{troveset.packages()}
+
+        DESCRIPTION
+        ===========
 
         Return all packages and filesets referenced directly or indirectly
         by this troveset. They are optional in the result only if they
@@ -305,9 +471,20 @@ class GroupTupleSetMethods(object):
 
     def union(self, *troveSetList):
         """
-        troveset.union(other1, other2, ..., otherN)
-        troveset + other1 + other2
-        troveset | other1 | other2
+        NAME
+        ====
+
+        B{C{troveset.union()}} - Get the union of all provided TroveSets (|, +)
+
+        SYNOPSIS
+        ========
+
+        C{troveset.union(other1, other2, ..., otherN)}
+        C{troveset + other1 + other2}
+        C{troveset | other1 | other2}
+
+        DESCRIPTION
+        ===========
 
         Return a troveset which includes all of the members of this trove
         as well as all of the members of the arguments. Troves are optional
@@ -317,15 +494,51 @@ class GroupTupleSetMethods(object):
 
     def replace(self, replaceSet):
         """
-        troveset.replace(replaceSet)
+        NAME
+        ====
 
-        Look for items in this troveset (recursively) which can reasonably
-        be replaced by members in replaceSet. The install/optional values
-        are inherited from replaceSet. Any items in replaceSet which do not
-        appear to replace members of this troveset are included as optioanl
-        in the result. Members of this troveset which are outdated are
-        included as optional in this group as well to prevent their
-        installation.
+        B{C{troveset.replace()}} - Replace troves with matching-name troves
+
+        SYNOPSIS
+        ========
+
+        C{troveset.replace(replaceSet)}
+
+        DESCRIPTION
+        ===========
+
+        Look (recursively) for items in this troveset which can
+        reasonably be replaced by members found in the replaceSet.
+        The install/optional values are inherited from replaceSet.
+        Any items in replaceSet which do not appear to replace
+        members of this troveset are included as optional in the
+        result.  Members of the original troveset which are outdated
+        by members of the replaceSet are also included as optional
+        in the returned troveset, to prevent them from inadvertently
+        showing up as install troves due to other operations.
+
+        PARAMETERS
+        ==========
+
+        - L{replaceSet} : TroveSet containing potential replacements
+
+        EXAMPLES
+        ========
+
+        This operation is intended to implement the appropriate
+        behavior for applying a group specifying a set of updated
+        packages.  For example, if only the postgresql client is
+        in the current install set, and group-CVE-2015-1234 contains
+        both the postgresql client and server in different packages,
+        then the replace operation will mark the existing postgresql
+        client as optional, add the new postgresql client as install,
+        and add the new postgresql server as optional in the returned
+        troveSet.
+
+        base = repos['group-standard']
+        update = base.replace('group-CVE-2015-1234')
+        groupStandard = update.createGroup('group-standard')
+
         """
         return self._action(replaceSet, ActionClass = GroupReplaceAction)
 

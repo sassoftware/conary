@@ -254,7 +254,8 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     on sets of references to troves, called B{TroveSets}.  Each trove
     reference in a TroveSet is a four-tuple of B{name}, B{version},
     B{flavor}, and whether the trove is considered B{installed} or
-    B{optional}.  Each TroveSet is immutable.
+    B{optional}.  Each TroveSet is immutable.  TroveSet operations
+    return new TroveSets; they do not modify existing TroveSets.
 
     A TroveSet is created either by reference to other TroveSets or
     by reference to a repository.  A C{GroupSetRecipe} must have at
@@ -265,6 +266,9 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     Repositories and TroveSets can be combined in order in a C{SearchPath}
     object.  A C{SearchPath} object can be used both for looking up
     troves and as a source of troves for dependency resolution.
+    TroveSets in a SearchPath are not searched recursively; only the
+    troves mentioned explicitly are searched.  (Use C{TroveSet.flatten()}
+    if you want to search a TroveSet recursively.)
 
     Finally, the ultimate purpose of a group recipe is to create a
     new binary group or set of groups.  TroveSets have a C{createGroup}
@@ -309,13 +313,13 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{TroveSet.components} : Recursively search for components
         - L{TroveSet.createGroup} : Create a binary group
         - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
-        - L{TroveSet.difference} : Subtract one TroveSet from another
+        - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
         - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
         - L{TroveSet.find} : Search the TroveSet for specified troves
         - L{TroveSet.findByName} : Find troves by regular expression matchin name
         - L{TroveSet.findBySourceName} : Find troves by the name of the source
         package from which they were built
-        - L{TroveSet.flatten} : Resolve trove references recursively
+        - L{TroveSet.flatten} : Resolve non-group trove references recursively
         - L{TroveSet.getInstall} : Get only install troves from set
         - L{TroveSet.getOptional} : Get only optional troves from set
         - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
@@ -330,13 +334,67 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         return packages
         - L{TroveSet.replace} : Replace troves in the TroveSet with
         matching-named troves from the replacement set
-        - L{TroveSet.union} : Get the union of all provided TroveSets
+        - L{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
         - L{TroveSet.update} : Replace troves in the TroveSet with
         all troves from the replacement set
 
     Except for C{TroveSet.dump}, which prints debugging information,
     each of these C{Repository}, C{SearchPath}, and C{TroveSet} methods
     returns a C{TroveSet}.
+
+    EXAMPLE
+    =======
+
+    This is an example recipe that uses the search path included in
+    a product definition, if available, to provide a stable search.
+    It adds to the base C{group-appliance-platform} the httpd, mod_ssl,
+    and php packages, as well as all the required dependencies.
+
+    class GroupMyAppliance(GroupSetRecipe):
+        name = 'group-my-appliance'
+        version = '1.0'
+
+        def setup(r):
+            r.dumpAll()
+            repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+            if 'productDefinitionSearchPath' in r.macros:
+                # proper build with product definition
+                searchPath = r.SearchPath(repo[x].flatten() for x in
+                    r.macros.productDefinitionSearchPath.split('\\\\n'))
+            else:
+                # local test build
+                searchPath = r.SearchPath(
+                    repo['group-os=conary.rpath.com@rpl:2'].flatten())
+                searchPath = r.SearchPath(repo)
+            base = searchPath['group-appliance-platform']
+            additions = searchPath.find(
+                'httpd',
+                'mod_ssl',
+                'php')
+            # We know that base is dependency-closed and consistent
+            # with the searchPath, so just get the extra deps we need
+            deps = (additions + base).depsNeeded(searchPath)
+
+            r.Group(base + additions + deps)
+
+    Next, an example of building a platform derived from another platform,
+    adding all packages defined locally to the group:
+
+    class GroupMyPlatform(GroupSetRecipe):
+        name = 'group-my-platform'
+        version = '1.0'
+
+        def setup(r):
+            centOS = r.Repository('centos.rpath.com@rpath:centos-5', r.flavor)
+            local = r.Repository('repo.example.com@example:centos-5', r.flavor)
+            pkgs = centOS['group-packages']
+            std = centOS['group-standard']
+            localPackages = localRepo.latestPackages()
+            std += localPackages
+            pkgs += localPackages
+            stdGrp = std.createGroup('group-standard')
+            pkgGrp = pkgs.createGroup('group-packages')
+            r.Group(stdGrp + pkgGrp)
     """
     name = 'groupset'
     internalAbstractBaseClass = 1
