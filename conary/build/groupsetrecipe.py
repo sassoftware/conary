@@ -83,7 +83,8 @@ class GroupActionData(troveset.ActionData):
 
 class GroupTupleSetMethods(object):
 
-    _explainObjectName = 'TupleSet'
+    # used mainly in a TroveSet context, so document it there from user POV
+    _explainObjectName = 'TroveSet'
 
     def depsNeeded(self, resolveSource, failOnUnresolved = True):
         """
@@ -92,7 +93,7 @@ class GroupTupleSetMethods(object):
         Looks for unresolved dependencies in the trove set. Missing
         dependencies (and their dependencies) are looked for in
         the resolveSource. If there are unresolvable dependencies,
-        an error is raised unless failOnUnresolved is specified.
+        an error is raised unless failOnUnresolved=False.
         """
         if isinstance(resolveSource, troveset.SearchPathTroveSet):
             newList = []
@@ -116,9 +117,9 @@ class GroupTupleSetMethods(object):
     def difference(self, other):
         """
         troveset.difference(other)
-        trovset - other
+        troveset - other
 
-        A new trove set is return which includes the members of the original
+        Returns a new trove set which includes the members of the original
         set which are not in other. The install and optional split of
         other is irrelevent for deciding if a trove should be included
         in the result.
@@ -138,7 +139,8 @@ class GroupTupleSetMethods(object):
         troveset.find(troveSpec1, troveSpec2, ..., troveSpecN)
         troveset[findSpec]
 
-        The troveset is searched for troves which match the given troveSpecs.
+        The troveset is searched for troves which match the given troveSpecs,
+        and matching troves are returned in a new troveset.
         The install/optional value is preserved from the troveset being
         searched.
         """
@@ -148,8 +150,9 @@ class GroupTupleSetMethods(object):
         """
         troveset.findByName(nameRegularExpression, emptyOkay = False)
 
-        The troveset is searched for troves whose name matches
-        nameRegularExpression. The install/optional value is preserved from the
+        The troveset is searched for troves whose names match
+        nameRegularExpression, and matching troves are returned in
+        a new troveset.  The install/optional value is preserved from the
         troveset being searched.
         """
         return self._action(namePattern, emptyOkay = emptyOkay,
@@ -160,7 +163,8 @@ class GroupTupleSetMethods(object):
         troveset.findBySourceName(sourceName)
 
         The troveset is searched for troves which were built from source
-        trove called sourceName.  The install/optional value is preserved
+        trove called sourceName, and matching troves are returned in
+        a new troveset.  The install/optional value is preserved
         from the troveset being searched.
         """
         return self._action(sourceName,
@@ -1008,6 +1012,13 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
     def track(self, troveSpec):
+        '''
+        Print out actions that match the provided C{troveSpec}.  Usually
+        used when a trove is unexpectedly present or missing in one or
+        more TroveSets (or their resulting groups), in order to learn why.
+
+        C{track} is a debugging tool and does not return a TroveSet.
+        '''
         self._trackDict[parseTroveSpec(troveSpec)] = troveSpec
 
 from conary.build.packagerecipe import BaseRequiresRecipe
