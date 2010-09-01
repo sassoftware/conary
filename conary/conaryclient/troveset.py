@@ -53,12 +53,17 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
     for dependency solving.
     """
 
-    def __init__(self, troveCache, troveSet, flavor):
+    def __init__(self, troveCache, troveSet, flavor,
+                 filterFn = lambda *args: False):
         self.depDb = None
 
-        self.troveTupList = [ x[0] for x in troveSet._walk(troveCache,
-                                                newGroups = False,
-                                                recurse = True) ]
+        self.troveTupList = []
+        for troveTup, inInstall, isExplicit in troveSet._walk(troveCache,
+                                                    newGroups = False,
+                                                    recurse = True):
+            if not filterFn(*troveTup):
+                self.troveTupList.append(troveTup)
+
         self.inDepDb = [ False ] * len(self.troveTupList)
 
         SimpleFilteredTroveSource.__init__(self, troveCache,
@@ -164,11 +169,12 @@ class TroveTupleSet(TroveSet):
 
         return self._troveSource
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, filterFn = lambda *args: False):
         if self._resolveSource is None:
             resolveTroveSource = ResolveTroveTupleSetTroveSource(
                                         self.g.actionData.troveCache, self,
-                                        self.g.actionData.flavor)
+                                        self.g.actionData.flavor,
+                                        filterFn = filterFn)
             self._resolveSource = TroveTupleSetSearchSource(
                                     resolveTroveSource, self,
                                     self.g.actionData.flavor)

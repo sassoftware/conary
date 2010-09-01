@@ -166,6 +166,20 @@ class SysModelUpdateAction(troveset.UpdateAction):
 
 class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
+    def _getResolveSource(self, filterFn):
+        # don't bother with items in the install set; those are being installed
+        # already so aren't a good choice for suggestions
+        sourceList = []
+        for ts in self.troveSetList:
+            if isinstance(ts, troveset.TroveTupleSet):
+                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+            elif isinstance(ts, SysModelSearchPathTroveSet):
+                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+            else:
+                sourceList.append(ts._getResolveSource())
+
+        return searchsource.SearchSourceStack(*sourceList)
+
     def find(self, *troveSpecs):
         return self._action(ActionClass = SysModelFindAction, *troveSpecs)
 
@@ -426,7 +440,8 @@ class SystemModelClient(object):
 
         job = targetTrv.diff(existsTrv)[2]
 
-        depResolveSource = searchPath._getResolveSource()
+        depResolveSource = searchPath._getResolveSource(
+                        filterFn = targetTrv.isStrongReference)
         resolveMethod = depResolveSource.getResolveMethod()
 
         uJob.setSearchSource(self.getSearchSource())
