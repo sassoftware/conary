@@ -655,4 +655,15 @@ class SystemModelClient(object):
         log.info("combining jobs")
         uJob.setTransactionCounter(self.db.getTransactionCounter())
 
+        # remove things from the suggMap which are in the already installed
+        # set
+        for neededSet in suggMap.itervalues():
+            for troveTup in set(neededSet):
+                if existsTrv.hasTrove(*troveTup):
+                    neededSet.remove(troveTup)
 
+        for needingTroveTup, neededSet in suggMap.items():
+            if not neededSet:
+                del suggMap[needingTroveTup]
+
+        return suggMap
