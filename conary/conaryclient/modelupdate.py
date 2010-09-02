@@ -15,8 +15,15 @@ import itertools
 from conary import trove, versions
 from conary.conaryclient import troveset, update
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, util
 from conary.repository import searchsource, trovecache, trovesource
+
+class SysModelActionData(troveset.ActionData):
+
+    def __init__(self, troveCache, flavor, repos, cfg):
+        troveset.ActionData.__init__(self, troveCache, flavor)
+        self.repos = repos
+        self.cfg = cfg
 
 class SystemModelTroveCache(trovecache.TroveCache):
 
@@ -133,6 +140,76 @@ class SysModelFindAction(troveset.FindAction):
 class SysModelFetchAction(troveset.FetchAction):
 
     resultClass = SysModelDelayedTroveTupleSet
+
+    # this not only fetches, but it follows redirects as well. it's the
+    # perfect place, if awkwardly named
+
+    def __call__(self, actionList, data):
+        self._fetch(actionList, data)
+
+        redirects = []
+
+        for action in actionList:
+            installSet = set()
+            optionalSet = set()
+            for troveTup, inInstall, isExplicit in \
+                                action.primaryTroveSet._walk(data.troveCache):
+                trv = data.troveCache.getTrove(withFiles = False, *troveTup);
+                if trv.isRedirect():
+                    log.info("following redirect %s=%s[%s]", *troveTup)
+                    redirects.append( (troveTup, inInstall) )
+                elif inInstall:
+                    installSet.add(troveTup)
+                else:
+                    optionalSet.add(troveTup)
+
+            self._redirects(data, redirects, optionalSet, installSet)
+
+            action.outSet._setOptional(optionalSet)
+            action.outSet._setInstall(installSet)
+
+    def _redirects(self, data, redirectList, optionalSet, installSet):
+        q = util.IterableQueue()
+        # this tells the code to fetch troves
+        q.add((None, None))
+        seen = set()
+        atEnd = False
+        for (troveTup, inInstall) in itertools.chain(redirectList, q):
+            if troveTup is None:
+                data.troveCache.getTroves(seen, withFiles = False)
+                if not atEnd:
+                    q.add((None, None))
+                atEnd = True
+                continue
+
+            atEnd = False
+            trv = data.troveCache.getTrove(withFiles = False, *troveTup)
+
+            if not trv.isRedirect():
+                if inInstall:
+                    installSet.add(troveTup)
+                else:
+                    optionalSet.add(troveTup)
+
+                continue
+
+            targets = [ (x[0], str(x[1].label()), x[2])
+                                    for x in trv.iterRedirects() ]
+
+            if not targets:
+                # this is a remove redirect. that's easy, just keep going
+                continue
+
+            matches = data.repos.findTroves([], targets, data.cfg.flavor)
+            for matchList in matches.itervalues():
+                for match in matchList:
+                    if match in seen:
+                        raise update.UpdateError, \
+                            "Redirect loop found which includes " \
+                            "troves %s, %s" % (troveTup[0], match[0])
+
+                    seen.add(match)
+                    q.add((match, inInstall))
 
 class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
@@ -304,7 +381,7 @@ class SystemModelClient(object):
                                 trove._TROVEINFO_TAG_SIZE, newTroves)
         missingSize = [ troveTup for (troveTup, size) in
                             itertools.izip(newTroves, newTroveSizes)
-                            if size() is None ]
+                            if size is None ]
 
         scripts = troveCache.getTroveInfo(trove._TROVEINFO_TAG_SCRIPTS,
                                           newTroves)
@@ -328,6 +405,8 @@ class SystemModelClient(object):
                         missingTroves.append(job)
                     else:
                         removedTroves.append(job)
+                else:
+                    assert 0, "Trove has no size"
 
             oldCompatClass = None
 
@@ -450,7 +529,8 @@ class SystemModelClient(object):
         # we need to explicitly fetch this before we can walk it
         preFetch = troveSet._action(ActionClass = SysModelFetchAction)
         availForDeps = preFetch._action(ActionClass = SysModelGetOptionalAction)
-        preFetch.g.realize(troveset.ActionData(troveCache, self.cfg.flavor[0]))
+        preFetch.g.realize(SysModelActionData(troveCache, self.cfg.flavor[0],
+                                              self.repos, self.cfg))
 
         existsTrv = trove.Trove("@update", versions.NewVersion(),
                                 deps.Flavor(), None)

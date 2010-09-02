@@ -450,13 +450,14 @@ class FetchAction(ParallelAction):
     # they're already there
 
     def __call__(self, actionList, data):
-        troveTuples = set()
-        allInputSets = []
-
         for action in actionList:
             action.outSet._setOptional(action.primaryTroveSet._getOptionalSet())
             action.outSet._setInstall(action.primaryTroveSet._getInstallSet())
-            allInputSets.append(self.primaryTroveSet)
+
+        self._fetch(actionList, data);
+
+    def _fetch(self, actionList, data):
+        troveTuples = set()
 
         for action in actionList:
             # repository calls) because the recurse arg to _walk is False;
