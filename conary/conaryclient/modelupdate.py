@@ -377,6 +377,18 @@ class SystemModelClient(object):
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves
 
+    def _closePackages(self, trv, newTroves = None):
+        packagesNeeded = set()
+        if newTroves is None:
+            newTroves = list(trv.iterTroveList(strongRefs = True))
+        for n, v, f in newTroves:
+            if trove.troveIsComponent(n):
+                packageN = n.split(':')[0]
+                if not trv.hasTrove(packageN, v, f):
+                    log.info("adding package %s for component %s",
+                             packageN, (n, v, f))
+                    trv.addTrove(packageN, v, f)
+
     def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
                             split = True, fromChangesets = [],
                             criticalUpdateInfo=None, applyCriticalOnly = False,
@@ -456,6 +468,7 @@ class SystemModelClient(object):
             if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
+        self._closePackages(targetTrv)
         job = targetTrv.diff(existsTrv)[2]
 
         depResolveSource = searchPath._getResolveSource(
@@ -517,7 +530,9 @@ class SystemModelClient(object):
                         assert(isAbsolute)
                         log.info("adding for dependency %s", name)
                         targetTrv.addTrove(name, newInfo[0], newInfo[1])
+                        added.add((name, newInfo[0], newInfo[1]))
 
+                self._closePackages(targetTrv, newTroves = added)
                 job = targetTrv.diff(existsTrv)[2]
 
                 log.info("resolving dependencies")
