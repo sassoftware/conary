@@ -12,8 +12,6 @@
 
 import itertools
 
-import itertools
-
 from conary import trove, versions
 from conary.conaryclient import troveset, update
 from conary.deps import deps
