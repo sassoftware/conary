@@ -13,13 +13,21 @@
 #
 
 from itertools import izip
+import cPickle, os, tempfile
 
-from conary import trove
+from conary import errors, trove, versions
 from conary.deps import deps
-from conary.lib import log
+from conary.lib import log, util
+from conary.repository import changeset, filecontainer, filecontents
 from conary.repository import netclient, trovesource
 
 class TroveCache(trovesource.AbstractTroveSource):
+
+    depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
+    depCacheFileId = '\0' * 40
+
+    troveInfoPathId = 'SYSTEM-MODEL-TROVEINFO-CACHE----'
+    troveInfoFileId = '\0' * 40
 
     def __init__(self, troveSource):
         self.troveInfoCache = {}
@@ -150,6 +158,80 @@ class TroveCache(trovesource.AbstractTroveSource):
     def iterTroveListInfo(self, troveTup):
         if trove.troveIsComponent(troveTup[0]): return []
         return(self.cache[troveTup].iterTroveListInfo())
+
+    def load(self, path):
+        assert(not self.cache and not self.depCache)
+        try:
+            cs = changeset.ChangeSetFromFile(path)
+        except filecontainer.BadContainer:
+            log.warning('trove cache %s was corrupt, ignoring' %path)
+            return
+        except (IOError, errors.ConaryError):
+            return
+
+        for trvCs in cs.iterNewTroveList():
+            trv = trove.Trove(trvCs, skipIntegrityChecks = True)
+            self.cache[trv.getNameVersionFlavor()] = trv
+
+        self._cached(self.cache.keys(), self.cache.values())
+
+        contType, depContents = cs.getFileContents(
+                           self.depCachePathId, self.depCacheFileId)
+        pickled = depContents.get().read()
+        depDict = cPickle.loads(pickled)
+        for (frzTup, frzDeps) in depDict.iteritems():
+            self.depCache[ (frzTup[0], versions.VersionFromString(frzTup[1]),
+                            deps.ThawFlavor(frzTup[2])) ] = \
+                        (deps.ThawDependencySet(frzDeps[0]),
+                         deps.ThawDependencySet(frzDeps[1]))
+
+        self._startingSizes = ( len(self.cache), len(self.depCache) )
+
+    def save(self, path):
+        cs = changeset.ChangeSet()
+        for trv in self.cache.values():
+            cs.newTrove(trv.diff(None, absolute = True)[0])
+
+        depDict = dict ( ((str(x[0]), x[1].asString(), x[2].freeze()), (y[0].freeze(), y[1].freeze()))
+                         for x, y in self.depCache.iteritems() )
+        depStr = cPickle.dumps(depDict)
+
+        cs.addFileContents(self.depCachePathId, self.depCacheFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString(depStr), False)
+
+        troveInfoDict = {}
+        for infoType, infoCache in self.troveInfoCache.iteritems():
+            for troveTup, troveInfo in infoCache.iteritems():
+                if troveInfo is None:
+                    frz = None
+                else:
+                    frz = troveInfo.freeze()
+                    troveInfoDict.setdefault(troveTup, []).append(
+                                                (infoType, frz))
+
+        finalTroveInfoDict = dict(
+                ((x[0], x[1].asString(), x[2].freeze()), infoDict) for
+                x, infoDict in troveInfoDict.iteritems() )
+        troveInfoStr = cPickle.dumps(finalTroveInfoDict)
+
+        cs.addFileContents(self.troveInfoPathId, self.troveInfoFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString(troveInfoStr), False)
+
+        (_, cacheName) = tempfile.mkstemp(prefix=os.path.basename(path)+'.',
+                                          dir=os.path.dirname(path))
+
+        try:
+            cs.writeToFile(cacheName)
+            if util.exists(path):
+                os.chmod(cacheName, os.stat(path).st_mode)
+            else:
+                os.chmod(cacheName, 0644)
+            os.rename(cacheName, path)
+        finally:
+            if os.path.exists(cacheName):
+                os.remove(cacheName)
 
     def troveIsCached(self, troveTup):
         return troveTup in self.cache

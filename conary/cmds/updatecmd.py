@@ -23,6 +23,7 @@ from conary import display
 from conary import errors
 from conary.deps import deps
 from conary.lib import api
+from conary.lib import log
 from conary.lib import util
 from conary.local import database
 from conary.repository import changeset, filecontainer
@@ -476,6 +477,7 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     # write temporary file?  something else?
     kwargs['systemModel'] = sysmodel
     kwargs['systemModelFile'] = modelFile
+    kwargs['loadTroveCache'] = True
     kwargs.setdefault('updateByDefault', True) # erase is not default case
     kwargs.setdefault('model', False)
     kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
@@ -614,8 +616,26 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     try:
         if model:
+            from conary.conaryclient import modelupdate
+            tc = modelupdate.SystemModelTroveCache(client.getDatabase(),
+                                                   client.getRepos(),
+                                                   callback = callback)
+            tcPath = cfg.root + '/var/lib/conarydb/modelcache'
+            import time
+            start = time.time()
+            if 'loadTroveCache' in kwargs and kwargs['loadTroveCache']:
+                log.info("loading modelcache")
+                if os.path.exists(tcPath):
+                    tc.load(tcPath)
+                log.info("done %.2f", time.time() - start)
+            kwargs.pop('loadTroveCache')
             ts = client.systemModelGraph(model)
-            suggMap = client._updateFromTroveSetGraph(updJob, ts)
+            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
+            if tc.cacheModified():
+                log.info("saving modelcache")
+                start = time.time()
+                tc.save(tcPath)
+                log.info("done %.2f", time.time() - start)
             # FIXME -- until suggMap really returned
             suggMap = {}
         else:
@@ -823,6 +843,7 @@ def updateAll(cfg, **kwargs):
 
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
     kwargs['callback'] = UpdateCallback(cfg)
+    kwargs['loadTroveCache'] = False
 
     client = conaryclient.ConaryClient(cfg)
     # We want to be careful not to break the old style display, for whoever

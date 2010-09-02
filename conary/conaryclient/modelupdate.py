@@ -12,6 +12,8 @@
 
 import itertools
 
+import itertools
+
 from conary import trove, versions
 from conary.conaryclient import troveset, update
 from conary.deps import deps
@@ -25,6 +27,7 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.repos = repos
         self.callback = callback
         self.componentMap = {}
+        self._startingSizes = (0, 0)
         if changeSetList:
             csSource = trovesource.ChangesetFilesTroveSource(db)
             csSource.addChangeSets(changeSetList)
@@ -52,6 +55,9 @@ class SystemModelTroveCache(trovecache.TroveCache):
                     l = []
                     self.componentMap[tup] = l
                 l.append(name)
+
+    def cacheModified(self):
+        return (len(self.cache), len(self.depCache)) != self._startingSizes
 
 class SysModelTupleSetMethods(object):
 
@@ -373,10 +379,10 @@ class SystemModelClient(object):
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves
 
-    def _updateFromTroveSetGraph(self, uJob, troveSet, split = True,
-                            fromChangesets = [], criticalUpdateInfo=None,
-                            applyCriticalOnly = False, restartInfo = None,
-                            callback = None):
+    def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
+                            split = True, fromChangesets = [],
+                            criticalUpdateInfo=None, applyCriticalOnly = False,
+                            restartInfo = None):
         """
         Populates an update job based on a set of trove update and erase
         operations.If self.cfg.autoResolve is set, dependencies
@@ -426,10 +432,10 @@ class SystemModelClient(object):
             criticalUpdateInfo = update.CriticalUpdateInfo()
 
         searchPath = troveSet.searchPath
-        troveCache = SystemModelTroveCache(self.getDatabase(),
-                                           self.getRepos(),
-                                           changeSetList = fromChangesets,
-                                           callback = callback)
+        #troveCache = SystemModelTroveCache(self.getDatabase(),
+                                           #self.getRepos(),
+                                           #changeSetList = fromChangesets,
+                                           #callback = callback)
 
         # we need to explicitly fetch this before we can walk it
         preFetch = troveSet._action(ActionClass = SysModelFetchAction)
