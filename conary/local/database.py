@@ -1306,8 +1306,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def iterAllTroveNames(self):
         return self.db.iterAllTroveNames()
 
-    def iterAllTroves(self):
-        return self.db.iterAllTroves()
+    def iterAllTroves(self, withPins = False):
+        return self.db.iterAllTroves(withPins = withPins)
 
     def findRemovedByName(self, name):
         return self.db.findRemovedByName(name)

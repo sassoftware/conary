@@ -445,11 +445,15 @@ class SystemModelClient(object):
         targetTrv = trove.Trove("@update", versions.NewVersion(),
                                 deps.Flavor(), None)
 
-        for tup in self.db.iterAllTroves():
+        pins = set()
+        for tup, pinned in self.db.iterAllTroves(withPins = True):
             existsTrv.addTrove(*tup)
+            if pinned:
+                pins.add(tup)
+                targetTrv.addTrove(*tup)
 
         for tup, inInstall, explicit in preFetch._walk(troveCache, recurse = True):
-            if inInstall:
+            if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
         job = targetTrv.diff(existsTrv)[2]
