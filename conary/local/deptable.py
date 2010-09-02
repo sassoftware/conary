@@ -1062,10 +1062,6 @@ class DependencyChecker:
 
                 newNodeId = self._addJob(job)
 
-                # this reduces the size of our tables by removing things
-                # which this trove both provides and requires conary 1.0.11
-                # and later remove these from troves at build time
-                requires = requires - provides
                 for depClass in self.ignoreDepClasses:
                     requires.removeDepsByClass(depClass)
 
