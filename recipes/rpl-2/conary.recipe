@@ -24,7 +24,7 @@ class Conary(CPackageRecipe):
 
     def setup(r):
         r.macros.sitepkgs = '%s/%%(name)s' % Python.sitepkgs
-        r.macros.sqlitever = '3.6.18'
+        r.macros.sqlitever = '3.7.2'
         r.macros.sqlite = 'sqlite-%(sqlitever)s'
         r.addMercurialSnapshot('http://hg.rpath.com/conary/')
         # r.addArchive('ftp://download.rpath.com/conary/')
