@@ -576,6 +576,7 @@ def _updateTroves(cfg, applyList, **kwargs):
             applyKwargs[k] = kwargs.pop(k)
 
     callback = kwargs.pop('callback')
+    loadTroveCache = kwargs.pop('loadTroveCache', False)
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
     applyKwargs['autoPinList'] = cfg.pinTroves
@@ -623,12 +624,11 @@ def _updateTroves(cfg, applyList, **kwargs):
             tcPath = cfg.root + '/var/lib/conarydb/modelcache'
             import time
             start = time.time()
-            if 'loadTroveCache' in kwargs and kwargs['loadTroveCache']:
+            if loadTroveCache:
                 log.info("loading modelcache")
                 if os.path.exists(tcPath):
                     tc.load(tcPath)
                 log.info("done %.2f", time.time() - start)
-            kwargs.pop('loadTroveCache')
             ts = client.systemModelGraph(model)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
             if tc.cacheModified():
@@ -636,8 +636,6 @@ def _updateTroves(cfg, applyList, **kwargs):
                 start = time.time()
                 tc.save(tcPath)
                 log.info("done %.2f", time.time() - start)
-            # FIXME -- until suggMap really returned
-            suggMap = {}
         else:
             suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
