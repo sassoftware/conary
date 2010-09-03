@@ -325,10 +325,12 @@ class DependencyChecker:
 
         return nodeId
 
-    @staticmethod
-    def _findNewDependencies(nodeId, depSet, idx):
+    def _findNewDependencies(self, nodeId, depSet, idx):
         new = deps.DependencySet()
         for depClass, oneDep in depSet.iterDeps():
+            if depClass in self.ignoreDepClasses:
+                continue
+
             # we index my depTuple, which seems awfully slow
             depTuple = (depClass.tag, oneDep)
             l = idx.get(depTuple, None)
@@ -1061,9 +1063,8 @@ class DependencyChecker:
                 (provides, requires) = allDeps.pop(0)
 
                 newNodeId = self._addJob(job)
-
-                for depClass in self.ignoreDepClasses:
-                    requires.removeDepsByClass(depClass)
+                #requires = requires - provides
+                r1 = requires.copy()
 
                 newRequires = self._findNewDependencies(newNodeId, requires,
                                                         self.requiresToNodeId)
