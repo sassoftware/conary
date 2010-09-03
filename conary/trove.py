@@ -1000,8 +1000,11 @@ _TROVEINFO_TAG_LAST           = 29
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
+_TROVECAPSULE_MSI             = 2
+
 _TROVECAPSULE_TYPE_CONARY     = ''
 _TROVECAPSULE_TYPE_RPM        = 'rpm'
+_TROVECAPSULE_TYPE_MSI        = 'msi'
 
 _TROVECAPSULE_RPM_NAME        = 0
 _TROVECAPSULE_RPM_VERSION     = 1
@@ -1010,6 +1013,9 @@ _TROVECAPSULE_RPM_ARCH        = 3
 _TROVECAPSULE_RPM_EPOCH       = 4
 _TROVECAPSULE_RPM_OBSOLETES   = 5
 _TROVECAPSULE_RPM_SHA1HEADER  = 6
+
+_TROVECAPSULE_MSI_NAME        = 0
+_TROVECAPSULE_MSI_VERSION     = 1
 
 _RPM_OBSOLETE_NAME    = 0
 _RPM_OBSOLETE_FLAGS   = 1
@@ -1070,16 +1076,29 @@ class TroveRpmCapsule(streams.StreamSet):
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
 
+class TroveMsiCapsule(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_MSI_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_MSI_VERSION : (DYNAMIC, streams.StringStream, 'version' ),
+    }
+
+    def reset(self):
+        self.name.set(None)
+        self.version.set(None)
+
 class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
-        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,      'rpm'  ),
+        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,         'rpm'  ),
+        _TROVECAPSULE_MSI      : (SMALL, TroveMsiCapsule,         'msi'  ),
     }
 
     def reset(self):
         self.type.set(None)
         self.rpm.reset()
+        self.msi.reset()
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -1737,6 +1756,15 @@ class Trove(streams.StreamSet):
                 sha1helper.sha1FromString(sha1header))
 
         self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
+
+    def addMsiCapsule(self, path, version, fileId):
+        assert(len(fileId) == 20)
+        dir, base = os.path.split(path)
+        self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
+        self.troveInfo.capsule.type.set('msi')
+        ### FIXME ###
+        self.troveInfo.capsule.msi.name.set("MSIName")
+        self.troveInfo.capsule.msi.version.set("1.2.3.4.5")
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()

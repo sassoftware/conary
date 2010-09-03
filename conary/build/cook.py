@@ -67,8 +67,15 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         m = magic.magic(capsulePath)
         fileObj = files.FileFromFilesystem(capsulePath,
                                            trove.CAPSULE_PATHID)
-        p.addRpmCapsule(os.path.basename(capsulePath),
-                          newVersion, fileObj.fileId(), m.hdr)
+        if capsuleInfo[0] == 'rpm':
+            p.addRpmCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), m.hdr)
+        elif capsuleInfo[0] == 'msi':
+            p.addMsiCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId())
+        else:
+            # This shouldn't be able to happen
+            raise
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
 
@@ -426,7 +433,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     """
 
     if not groupOptions:
-        groupCookOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
+        groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
     assert(len(set((x.getRecipe().name, x.getRecipe().version)
                 for x in loaderList)) == 1)
@@ -489,7 +496,6 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     macros['buildlabel'] = buildBranch.label().asString()
 
     if targetLabel:
-        signatureLabel = targetLabel
         signatureKey = selectSignatureKey(cfg, targetLabel)
     else:
         signatureKey = selectSignatureKey(cfg, sourceVersion.trailingLabel())
@@ -743,7 +749,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
         use.track(True)
-        policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
+        _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
         _callSetup(cfg, recipeObj)
 
@@ -1102,7 +1108,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
        described there.
     """
     recipeClass = loader.getRecipe()
-    fullName = recipeClass.name
 
     lcache = lookaside.RepositoryCache(repos, cfg=cfg)
 
@@ -1275,8 +1280,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
             logBuild and logFile.popDescriptor('policy')
         finally:
             os.chdir(cwd)
-
-        grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
         if (recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE and
@@ -1465,7 +1468,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     built = []
     packageList = []
-    perviousQuery = {}
 
     for buildPkg in bldList:
         # bldList only contains components
@@ -1501,7 +1503,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     if not targetVersion.isOnLocalHost():
         # this keeps cook and emerge branchs from showing up
-        searchBranch = targetVersion.branch()
         previousVersions = repos.getTroveLeavesByBranch(
                 dict(
                     ( x[1].getName(), { targetVersion.branch() : [ flavor ] } )
@@ -1821,7 +1822,6 @@ def guessSourceVersion(repos, name, versionStr, buildLabel, conaryState = None,
         trove if it was previously built on the same branch.
     """
     srcName = name + ':source'
-    sourceVerison = None
 
     if not conaryState and os.path.exists('CONARY'):
         conaryState = ConaryStateFromFile('CONARY', repos)
@@ -1922,7 +1922,6 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
             loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
                                              branch=branch,
                                              buildFlavor=buildFlavor)
-        version = None
     except builderrors.RecipeFileError, msg:
         raise CookError(str(msg))
 
@@ -2219,7 +2218,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 import cProfile
                 prof = cProfile.Profile()
                 prof.enable()
-                lsprof = True
             # child, set ourself to be the foreground process
             os.setpgrp()
 
@@ -2336,7 +2334,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     callback.done()
 
                 try:
-                    restartDir = client.applyUpdateJob(updJob)
+                    client.applyUpdateJob(updJob)
                 finally:
                     updJob.close()
                     client.close()
@@ -2365,7 +2363,7 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
             setupMethod = recipeObj.setupAbstractBaseClass
         else:
             setupMethod = recipeObj.setup
-        rv = recipeObj.recordCalls(setupMethod)
+        recipeObj.recordCalls(setupMethod)
         functionNames = []
         if recordCalls:
             for (depth, className, fnName) in recipeObj.methodsCalled:
@@ -2622,7 +2620,6 @@ def _setCookTroveMetadata(trv, itemDictList):
     # Copy the metadata back in the trove
     # We don't bother with flattening it at this point, we'll take care of
     # that later
-    langMap = []
     metadata = trv.troveInfo.metadata
     for itemDict in itemDictList:
         item = trove.MetadataItem()
