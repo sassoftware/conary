@@ -631,7 +631,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                 log.info("done %.2f", time.time() - start)
             ts = client.systemModelGraph(model)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
-            if tc.cacheModified() and not info:
+            if tc.cacheModified():
                 log.info("saving modelcache")
                 start = time.time()
                 tc.save(tcPath)
@@ -841,7 +841,8 @@ def updateAll(cfg, **kwargs):
 
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
     kwargs['callback'] = UpdateCallback(cfg)
-    kwargs['loadTroveCache'] = False
+    # load trove cache only if --info provided
+    kwargs['loadTroveCache'] = kwargs.get('info', False)
 
     client = conaryclient.ConaryClient(cfg)
     # We want to be careful not to break the old style display, for whoever
