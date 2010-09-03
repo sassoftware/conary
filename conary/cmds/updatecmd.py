@@ -631,7 +631,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                 log.info("done %.2f", time.time() - start)
             ts = client.systemModelGraph(model)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
-            if tc.cacheModified():
+            if tc.cacheModified() and not info:
                 log.info("saving modelcache")
                 start = time.time()
                 tc.save(tcPath)
