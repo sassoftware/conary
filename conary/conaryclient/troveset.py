@@ -290,22 +290,33 @@ class TroveTupleSet(TroveSet):
         searchList = sorted([ (x, x, 0) for x, y in containsItems.iteritems()
                               if not y ])
 
+        def handle(tt, dp, ii):
+            val = results.get(tt)
+
+            if val is None:
+                results[tt] = (dp, ii)
+            elif val[0] == dp:
+                results[tt] = (dp, ii or val[1])
+            elif val[0] > dp:
+                results[tt] = (dp, ii)
+
         results = {}
+        seenDepths = {}
         while searchList:
             start, troveTup, depth = searchList.pop(0)
+
             if depth < maxPathLength[(start, troveTup)]:
                 continue
             assert(maxPathLength[(start, troveTup)] == depth)
 
-            inInstallSet = (troveTup in self.installSet)
+            seenAtDepth = seenDepths.get(troveTup)
+            if seenAtDepth is not None and seenAtDepth <= depth:
+                # we've walked this at a lower depth; there is no reason
+                # to do so again
+                continue
+            seenDepths[troveTup] = depth
 
-            def handle(tt, dp, ii):
-                if tt not in results:
-                    results[tt] = (dp, ii)
-                elif results[tt][0] == dp:
-                    results[tt] = (dp, ii or results[tt][1])
-                elif results[tt][0] > dp:
-                    results[tt] = (dp, ii)
+            inInstallSet = (troveTup in self.installSet)
 
             handle(troveTup, depth, inInstallSet)
 
