@@ -78,8 +78,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         def _depClassAndName(oneDep):
             s = set()
 
-            for depClass, dep in oneDep.iterDeps():
-                s.add( ( (depClass, dep.getName()[0]) ) )
+            for depClass, depName, flags in oneDep.iterRawDeps():
+                s.add( (depClass, depName) )
 
             return s
 
