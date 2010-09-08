@@ -156,6 +156,9 @@ class SystemModel:
         self.systemItems = []
         self.indexes = {}
         self.cfg = cfg
+        # Keep track of modifications that do not involve setting
+        # an operation as modified
+        self.modelModified = False
 
     def _addIndex(self, item):
         # normally, this list is one item long except for index None
@@ -167,12 +170,14 @@ class SystemModel:
         l = self.indexes.get(item.index, [])
         while item in l:
             l.remove(item)
+            self.modelModified = True
         if not l:
             self.indexes.pop(item.index)
 
     def modified(self):
-        return bool([x for x in self.searchPath + self.systemItems
-                     if x.modified])
+        return (self.modelModified or
+                bool([x for x in self.searchPath + self.systemItems
+                      if x.modified]))
 
     def appendToSearchPath(self, item):
         self.searchPath.append(item)

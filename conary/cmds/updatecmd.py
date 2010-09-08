@@ -743,7 +743,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                 'Critical update completed, rerunning command...', params,
                 restartDir)
     else:
-        if kwargs.get('test', False) and model and model.modified():
+        if (not kwargs.get('test', False)) and model and model.modified():
             modelFile.write()
             # save trove cache here
 
