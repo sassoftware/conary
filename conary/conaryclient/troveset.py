@@ -555,23 +555,31 @@ class ReplaceAction(DelayedTupleSetAction):
     def replaceAction(self, data):
         before = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
-        beforeInfo = {}
-        for troveTup, inInstallSet, explicit in \
-                  self.primaryTroveSet._walk(data.troveCache, recurse = True):
-            before.addTrove(troveTup[0], troveTup[1], troveTup[2])
-            beforeInfo[troveTup] = (inInstallSet, explicit)
-
         after = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
         afterInfo = {}
+        updateNames = set()
         for troveTup, inInstallSet, explicit in \
                   self.updateTroveSet._walk(data.troveCache, recurse = True):
             after.addTrove(troveTup[0], troveTup[1], troveTup[2])
             afterInfo[troveTup] = (inInstallSet, explicit)
+            updateNames.add(troveTup[0])
 
-        troveMapping = after.diff(before)[2]
+        beforeInfo = {}
         installSet = set()
         optionalSet = set()
+        for troveTup, inInstallSet, explicit in \
+                  self.primaryTroveSet._walk(data.troveCache, recurse = True):
+            if troveTup[0] in updateNames:
+                before.addTrove(troveTup[0], troveTup[1], troveTup[2])
+                beforeInfo[troveTup] = (inInstallSet, explicit)
+            elif explicit:
+                if inInstallSet:
+                    installSet.add(troveTup)
+                else:
+                    optionalSet.add(troveTup)
+
+        troveMapping = after.diff(before)[2]
         for (trvName, (oldVersion, oldFlavor),
                       (newVersion, newFlavor), isAbsolute) in troveMapping:
             oldTuple = (trvName, oldVersion, oldFlavor)
