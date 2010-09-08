@@ -75,6 +75,8 @@ class Importer(object):
                            )),
         ('conary.build.grouprecipe', ('_BaseGroupRecipe', '_GroupRecipe',
                                       'GroupRecipe')),
+        ('conary.build.groupsetrecipe', ('_GroupSetRecipe',
+                                         'GroupSetRecipe')),
         ('conary.build.filesetrecipe', ('_FilesetRecipe', 'FilesetRecipe')),
         ('conary.build.redirectrecipe', ('_RedirectRecipe', 'RedirectRecipe')),
         ('conary.build.derivedrecipe', ('DerivedChangesetExploder',
