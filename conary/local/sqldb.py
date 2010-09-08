@@ -502,20 +502,23 @@ class Database:
                     outD[name][version].append(flavorCache.get(flavor))
         return outD
 
-    def iterAllTroves(self):
+    def iterAllTroves(self, withPins = False):
         cu = self.db.cursor()
         cu.execute("""
-            SELECT troveName, version, timeStamps, flavor FROM Instances
-                NATURAL JOIN Versions
+            SELECT troveName, version, timeStamps, flavor, pinned
+                FROM Instances NATURAL JOIN Versions
                 INNER JOIN Flavors
                     ON Instances.flavorid = Flavors.flavorid
             WHERE isPresent=1""")
         versionCache = VersionCache()
         flavorCache = FlavorCache()
-        for (troveName, version, timeStamps, flavor) in cu:
+        for (troveName, version, timeStamps, flavor, pinned) in cu:
             version = versionCache.get(version, timeStamps)
             flavor = flavorCache.get(flavor)
-            yield troveName, version, flavor
+            if withPins:
+                yield (troveName, version, flavor), (pinned != 0)
+            else:
+                yield troveName, version, flavor
 
     def pinTroves(self, name, version, flavor, pin = True):
         if flavor is None or flavor.isEmpty():

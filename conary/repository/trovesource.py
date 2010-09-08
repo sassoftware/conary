@@ -70,6 +70,9 @@ class AbstractTroveSource:
     def searchableByType(self):
         return self._searchableByType
 
+    def getTroveInfo(self, infoType, troveTupleList):
+        raise NotImplementedError
+
     def getTroveLeavesByLabel(self, query, bestFlavor=True,
                               troveTypes=TROVE_QUERY_PRESENT):
         raise NotImplementedError
@@ -945,7 +948,7 @@ class SimpleTroveSource(SearchableTroveSource):
 
 
 class TroveListTroveSource(SimpleTroveSource):
-    def __init__(self, source, troveTups):
+    def __init__(self, source, troveTups, recurse=True):
         SimpleTroveSource.__init__(self, troveTups)
         self.source = source
         self.sourceTups = troveTups[:]
@@ -956,11 +959,12 @@ class TroveListTroveSource(SimpleTroveSource):
         for (n,v,f) in troveTups:
             self._trovesByName.setdefault(n, set()).add((n,v,f))
 
-        newTroves = source.getTroves(troveTups, withFiles=False)
-        for newTrove in newTroves:
-            for tup in newTrove.iterTroveList(strongRefs=True,
-                                              weakRefs=True):
-                self._trovesByName.setdefault(tup[0], set()).add(tup)
+        if recurse:
+            newTroves = source.getTroves(troveTups, withFiles=False)
+            for newTrove in newTroves:
+                for tup in newTrove.iterTroveList(strongRefs=True,
+                                                  weakRefs=True):
+                    self._trovesByName.setdefault(tup[0], set()).add(tup)
 
     def getSourceTroves(self):
         return self.getTroves(self.sourceTups)
@@ -1194,6 +1198,20 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
     def getFileVersion(self, pathId, fildId, version):
         # TODO: implement getFileVersion for changeset source
         raise KeyError
+
+    def getTroveInfo(self, infoType, troveList):
+        retList = []
+
+        attrName = trove.TroveInfo.streamDict[infoType][2]
+
+        for info in troveList:
+            cs = self.troveCsMap.get(info, None)
+            assert(cs)
+            trvCs = cs.getNewTroveVersion(*info)
+            ti = trvCs.getTroveInfo()
+            retList.append(getattr(ti, attrName))
+
+        return retList
 
     def getDepsForTroveList(self, troveList):
         # returns a list of (prov, req) pairs
@@ -1592,6 +1610,21 @@ class SourceStack(object):
                                            troveList[0][1][1])
         return results
 
+    def getDepsForTroveList(self, troveInfoList):
+        results = [ None ] * len(troveInfoList)
+        for source in self.sources:
+            need = [ (i, troveInfo) for i, (troveInfo, depTuple) in
+                        enumerate(itertools.izip(troveInfoList, results))
+                        if depTuple is None ]
+            if not need:
+                break
+
+            depList = source.getDepsForTroveList([ x[1] for x in need] )
+            for (i, troveInfo), depTuple in itertools.izip(need, depList):
+                if depTuple is not None:
+                    results[i] = depTuple
+
+        return results
 
     def createChangeSet(self, jobList, withFiles = True, recurse = False,
                         withFileContents = False, callback = None):
