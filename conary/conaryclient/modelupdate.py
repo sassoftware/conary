@@ -458,6 +458,7 @@ class SystemModelClient(object):
 
     def _closePackages(self, trv, newTroves = None):
         packagesNeeded = set()
+        packagesAdded = set()
         if newTroves is None:
             newTroves = list(trv.iterTroveList(strongRefs = True))
         for n, v, f in newTroves:
@@ -467,6 +468,9 @@ class SystemModelClient(object):
                     log.info("adding package %s for component %s",
                              packageN, (n, v, f))
                     trv.addTrove(packageN, v, f)
+                    packagesAdded.add( (packageN, v, f) )
+
+        return packagesAdded
 
     def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
                             split = True, fromChangesets = [],
@@ -517,14 +521,34 @@ class SystemModelClient(object):
             L{applyUpdateJob} for an explanation of the behavior of exceptions
             within callbacks.
         """
+
+        def _updateJob(origJob, addedTroves):
+            newJob = []
+            for oneJob in origJob:
+                if oneJob[1][0] is None:
+                    newJob.append(oneJob)
+                    continue
+
+                oldTroveTup = (oneJob[0], oneJob[1][0], oneJob[1][1])
+                if oldTroveTup not in added:
+                    newJob.append(oneJob)
+                    continue
+
+                if oneJob[2][0] is not None:
+                    return None
+
+                added.remove(oldTroveTup)
+
+            for troveTup in added:
+                newJob.append( (troveTup[0], (None, None),
+                                troveTup[1:], True) )
+
+            return newJob
+
         if criticalUpdateInfo is None:
             criticalUpdateInfo = update.CriticalUpdateInfo()
 
         searchPath = troveSet.searchPath
-        #troveCache = SystemModelTroveCache(self.getDatabase(),
-                                           #self.getRepos(),
-                                           #changeSetList = fromChangesets,
-                                           #callback = callback)
 
         # we need to explicitly fetch this before we can walk it
         preFetch = troveSet._action(ActionClass = SysModelFetchAction)
@@ -589,7 +613,6 @@ class SystemModelClient(object):
                                 searchPath.hasOptionalTrove(neededTup)):
                             log.info("keeping installed trove for deps %s",
                                      neededTup)
-                            targetTrv.addTrove(*neededTup)
                             added.add(neededTup)
 
                 if not added:
@@ -606,14 +629,20 @@ class SystemModelClient(object):
                         for (name, oldInfo, newInfo, isAbsolute) in newJob:
                             assert(isAbsolute)
                             log.info("adding for dependency %s", name)
-                            targetTrv.addTrove(name, newInfo[0], newInfo[1])
                             added.add((name, newInfo[0], newInfo[1]))
 
                 if not added:
                     break
 
-                self._closePackages(targetTrv, newTroves = added)
-                job = targetTrv.diff(existsTrv)[2]
+                for troveTup in added:
+                    targetTrv.addTrove(*troveTup)
+
+                added.update(self._closePackages(targetTrv, newTroves = added))
+
+                # try to avoid a diff here
+                job = _updateJob(job, added)
+                if job is None:
+                    job = targetTrv.diff(existsTrv)[2]
 
                 log.info("resolving dependencies")
                 result = check.depCheck(job,
