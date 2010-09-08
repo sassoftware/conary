@@ -581,7 +581,6 @@ class SystemModelClient(object):
 
             suggMap = {}
             while True:
-                foundTroves = False
                 added = set()
                 for (needingTup, neededDeps, neededTupList) in \
                                                 result.unresolveableList:
@@ -592,25 +591,26 @@ class SystemModelClient(object):
                                      neededTup)
                             targetTrv.addTrove(*neededTup)
                             added.add(neededTup)
-                            foundTroves = True
 
-                if not foundTroves:
+                if not added:
                     unsatisfied = result.unsatisfiedList
                     unsatisfied += [ x[0:2] for x in result.unresolveableList ]
 
-                    if not resolveMethod.prepareForResolution(unsatisfied):
-                        break
+                    while (resolveMethod.prepareForResolution(unsatisfied) and
+                           not added):
+                        sugg = resolveMethod.resolveDependencies()
+                        newJob = resolveMethod.filterSuggestions(
+                                            result.unsatisfiedList, sugg, suggMap)
+                        newTroves = []
 
-                    sugg = resolveMethod.resolveDependencies()
-                    newJob = resolveMethod.filterSuggestions(
-                                        result.unsatisfiedList, sugg, suggMap)
-                    newTroves = []
+                        for (name, oldInfo, newInfo, isAbsolute) in newJob:
+                            assert(isAbsolute)
+                            log.info("adding for dependency %s", name)
+                            targetTrv.addTrove(name, newInfo[0], newInfo[1])
+                            added.add((name, newInfo[0], newInfo[1]))
 
-                    for (name, oldInfo, newInfo, isAbsolute) in newJob:
-                        assert(isAbsolute)
-                        log.info("adding for dependency %s", name)
-                        targetTrv.addTrove(name, newInfo[0], newInfo[1])
-                        added.add((name, newInfo[0], newInfo[1]))
+                if not added:
+                    break
 
                 self._closePackages(targetTrv, newTroves = added)
                 job = targetTrv.diff(existsTrv)[2]
