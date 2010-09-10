@@ -32,6 +32,8 @@ class ConaryURLOpener(URLOpener):
 
     class ConnectionManager(URLOpener.ConnectionManager):
         ConaryProxyProtocols = set([ 'conary' ])
+        # Conary connections to http:// try to use conary proxies first, then
+        # fall back to regular HTTP proxies.
         ProtocolMaps = dict(http = [ 'conary:http', 'http:http' ],
             https = [ 'conary:https', 'http:https' ])
 

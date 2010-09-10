@@ -537,6 +537,13 @@ class CfgProxyMap(CfgDict):
             return val
 
         proto = key
+        protoparts = proto.split(':', 1)
+        if (protoparts[0] not in ('http', 'conary')
+                or (len(protoparts) > 1
+                    and protoparts[1] not in ('http', 'https'))):
+            raise ParseError("Protocol field must be http or conary, "
+                    "optionally followed by :http or :https, or []")
+
         pattern, urlObjs = self.valueType.parseString(valueStr)
         if pattern:
             if urlObjs:

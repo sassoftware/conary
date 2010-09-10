@@ -121,6 +121,7 @@ class ConnectionManager(object):
     URL = util.URL
     ProxyURL = util.ProxyURL
 
+    # Map schemes in the target URL to a proxyMap protocol.
     ProtocolMaps = dict(http = [ 'http:http' ], https = [ 'http:https' ])
 
     class _ConnectionIterator(object):
@@ -230,7 +231,7 @@ class ConnectionManager(object):
 
     def getConnectionIterator(self, url, ssl = None):
         connSpec = self.newUrl(url, ssl=ssl)
-        protocols = self.ProtocolMaps[connSpec.protocol]
+        protocols = tuple(self.ProtocolMaps[connSpec.protocol])
         connIter = self._ConnectionIterator(connSpec, self.proxyMap,
             protocols, self.retries, self.proxyRetries)
         return connIter
@@ -364,7 +365,17 @@ class ConnectionManager(object):
                 auth = util.ProtectedString(base64.b64encode(str(userpass))))))
 
     def getIPAddress(self, connSpec):
-        host = IPCache.get(connSpec.host)
+        try:
+            host = IPCache.get(connSpec.host)
+        except socket.gaierror, err:
+            if len(err.args) != 2:
+                raise
+            # Reformat to indicate which thing actually failed, otherwise
+            # there's no indication that a proxy was involved.
+            if len(err.args) != 2:
+                raise
+            util.rethrow(socket.gaierror(err.args[0],
+                "Error resolving name %s: %s" % (connSpec.host, err[1])))
         if connSpec.port is not None:
             return "%s:%s" % (host, connSpec.port)
         return host
@@ -769,20 +780,25 @@ class IPCache(object):
     """
     A global IP cache
     """
+
+    # Maps hostname to a list of IP addresses, as returned by getaddrinfo.
     _cache = util.TimestampedMap(delta = 600)
 
+    @staticmethod
+    def _resolve(host):
+        # This is split out to make mocking easier
+        return socket.getaddrinfo(host, None, 0, socket.SOCK_STREAM)
+
     @classmethod
-    def get(cls, host, resetResolver = False, stale = False):
+    def getMany(cls, host, resetResolver=False, stale=False):
         if host in LocalHosts:
-            return host
+            return [host]
         # Fetch fresh results only first
         ret = cls._cache.get(host, None, stale = False)
         if ret is not None:
             return ret
         try:
-            ret = socket.gethostbyname(host)
-            cls._cache.set(host, ret)
-            return ret
+            results = cls._resolve(host)
         except (IOError, socket.error):
             if not resetResolver and not stale:
                 raise
@@ -793,6 +809,15 @@ class IPCache(object):
             # Recursively call ourselves
             util.res_init()
             return cls.get(host, resetResolver = False, stale = False)
+        else:
+            # [(family, type, proto, canonname, (host, port, ...))]
+            results = [x[4][0] for x in results]
+            cls._cache.set(host, results)
+            return results
+
+    @classmethod
+    def get(cls, host, resetResolver=False, stale=False):
+        return cls.getMany(host, resetResolver, stale)[0]
 
     @classmethod
     def clear(cls):
