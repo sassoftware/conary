@@ -2363,7 +2363,7 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
             setupMethod = recipeObj.setupAbstractBaseClass
         else:
             setupMethod = recipeObj.setup
-        recipeObj.recordCalls(setupMethod)
+        rv = recipeObj.recordCalls(setupMethod)
         functionNames = []
         if recordCalls:
             for (depth, className, fnName) in recipeObj.methodsCalled:
