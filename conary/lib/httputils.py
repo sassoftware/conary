@@ -603,7 +603,9 @@ class URLOpener(urllib.FancyURLopener):
             data.contentType = self.contentType
 
         connIterator = self.connmgr.getConnectionIterator(url, ssl=ssl)
-        lastProxyError = None
+        # Exception tuple (e_type, e_value, e_tb) from the last maybe-fatal
+        # error. To be rethrown if all retries are exhausted.
+        lastProxyError = lastError = None
         for connSpec in connIterator:
             try:
                 conn = self.connmgr.openConnection(connSpec)
@@ -619,7 +621,7 @@ class URLOpener(urllib.FancyURLopener):
                     h.endheaders()
                 except socket.error, e:
                     if e.args[0] == errno.ECONNREFUSED and connSpec[1]:
-                        raise ProxyError(e, host=connSpec[1])
+                        util.rethrow(ProxyError(e, host=connSpec[1]))
                     raise
                 data.writeTo(h)
                 # wait for a response
@@ -630,13 +632,15 @@ class URLOpener(urllib.FancyURLopener):
                 fp = response.fp
                 break
             except ProxyError, e:
-                lastProxyError = e
+                lastProxyError = lastError = sys.exc_info()
                 connIterator.markFailedProxy(connSpec[1], e)
                 continue
             except (socket.sslerror, socket.gaierror), e:
+                lastError = sys.exc_info()
                 if e.args[0] == 'socket error':
                     e = e.args[1]
                 self._processSocketError(e)
+                lastError = e.__class__, e, lastError[2]
                 if isinstance(e, socket.gaierror):
                     if e.args[0] == socket.EAI_AGAIN:
                         pass
@@ -648,12 +652,12 @@ class URLOpener(urllib.FancyURLopener):
                 else:
                     connectFailed = True
                     break
-            except httplib.BadStatusLine, e:
+            except httplib.BadStatusLine:
                 # closed connection without sending a response.
-                pass
+                lastError = sys.exc_info()
             except socket.error, e:
                 self._processSocketError(e)
-                raise e
+                util.rethrow(e)
             # try resetting the resolver - /etc/resolv.conf
             # might have changed since this process started.
             if not resetResolv:
@@ -664,11 +668,12 @@ class URLOpener(urllib.FancyURLopener):
             connectFailed = True
         if connectFailed:
             if lastProxyError:
-                return self.handleProxyErrors(lastProxyError)
+                return self.handleProxyErrors(lastProxyError[1],
+                        lastProxyError[2])
             log.info("Failed to connect to %s. Aborting after "
                       "%i of %i tries." % (connection,
                       connIterator.retryCount, connIterator.retries))
-            raise e
+            raise lastError[0], lastError[1], lastError[2]
         elif connIterator.retryCount > 1:
             log.info("Successfully connected to %s after "
                       "%i of %i tries." % (connection,
@@ -690,7 +695,7 @@ class URLOpener(urllib.FancyURLopener):
             urlString = conn.url.asString(withAuth=True)
             return self.http_error(urlString, fp, errcode, errmsg, headers, data)
 
-    def handleProxyErrors(self, errcode):
+    def handleProxyErrors(self, errcode, tb=None):
         e = None
         if isinstance(errcode, ProxyError):
             self.proxyHost = errcode.host
@@ -703,7 +708,7 @@ class URLOpener(urllib.FancyURLopener):
             e = socket.error(111, "Bad Gateway (error reported by proxy)")
         if e:
             self._processSocketError(e)
-            raise e
+            raise e.__class__, e, tb
 
     def _processSocketError(self, error):
         if not self.proxyHost:
