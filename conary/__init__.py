@@ -28,6 +28,10 @@ The Conary Repository System
 """
 
 # For backward compatibility, provide interfaces in old locations
+from conary.cmds import commit, cscmd, fmtroves, metadata # pyflakes=ignore
+from conary.cmds import query, queryrep, rollbacks # pyflakes=ignore
+from conary.cmds import showchangeset, updatecmd, verify # pyflakes=ignore
+
 try:
     import conary.cmds.cvccmd as cvc # pyflakes=ignore
     from conary.cmds import branch, clone # pyflakes=ignore
@@ -35,6 +39,3 @@ except ImportError:
     # conary-build not installed
     pass
 
-from conary.cmds import commit, cscmd, fmtroves, metadata # pyflakes=ignore
-from conary.cmds import query, queryrep, rollbacks # pyflakes=ignore
-from conary.cmds import showchangeset, updatecmd, verify # pyflakes=ignore
