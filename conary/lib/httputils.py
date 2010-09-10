@@ -262,7 +262,11 @@ class ConnectionManager(object):
         endpointHost, endpointPort = self._splitport(
             (endpoint.host, endpoint.port),
             defaultPort = httplib.HTTPS_PORT, getIP=False)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if ':' in proxyHost:
+            family = socket.AF_INET6
+        else:
+            family = socket.AF_INET
+        sock = socket.socket(family, socket.SOCK_STREAM)
         try:
             sock.connect((proxyHost, proxyPort))
         except socket.error, e:
