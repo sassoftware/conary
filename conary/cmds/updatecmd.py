@@ -481,6 +481,8 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     kwargs.setdefault('updateByDefault', True) # erase is not default case
     kwargs.setdefault('model', False)
     kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
+    infoArg = kwargs.get('info', False)
+    testArg = kwargs.get('test', False)
 
     fromChangesets = []
 
@@ -541,6 +543,8 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
         # We don't care about applyList, we will set it later
         applyList = None
     else:
+        if not infoArg and not testArg:
+            modelFile.writeSnapshot()
         keepExisting = kwargs.get('keepExisting')
         updateByDefault = kwargs.get('updateByDefault', True)
         applyList = cmdline.parseChangeList([], keepExisting,
@@ -743,9 +747,8 @@ def _updateTroves(cfg, applyList, **kwargs):
                 'Critical update completed, rerunning command...', params,
                 restartDir)
     else:
-        if (not kwargs.get('test', False)) and model and model.modified():
-            modelFile.write()
-            # save trove cache here
+        if (not kwargs.get('test', False)) and model:
+            modelFile.closeSnapshot()
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
@@ -829,20 +832,21 @@ def updateAll(cfg, **kwargs):
     modelArg = kwargs.pop('model', False)
     modelFile = kwargs.get('systemModelFile', None)
     model = kwargs.get('systemModel', None)
+    infoArg = kwargs.get('info', False)
 
     if model and modelFile and modelFile.exists():
         model.refreshSearchPath()
-        # FIXME: handle restarting after partial failure
-        #modelFile.writeTemporary() ?
         if modelArg:
             model.write(sys.stdout)
             sys.stdout.flush()
             return None
+        if not infoArg:
+            modelFile.writeSnapshot()
 
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
     kwargs['callback'] = UpdateCallback(cfg)
     # load trove cache only if --info provided
-    kwargs['loadTroveCache'] = kwargs.get('info', False)
+    kwargs['loadTroveCache'] = infoArg
 
     client = conaryclient.ConaryClient(cfg)
     # We want to be careful not to break the old style display, for whoever

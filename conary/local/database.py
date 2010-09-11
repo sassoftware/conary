@@ -87,13 +87,6 @@ class Rollback:
         os.write(fd, "%d\n" % self.count)
         os.close(fd)
 
-        if util.exists(self.systemModelPath):
-            saveSysModel = self.dir + '/system-model'
-            fd, tmpname = tempfile.mkstemp('system-model', '.tmp', self.dir)
-            os.rename(tmpname, saveSysModel)
-            os.write(fd, file(self.systemModelPath).read())
-            os.close(fd)
-
     def _getChangeSets(self, item, repos = True, local = True):
         if repos:
             reposCs = changeset.ChangeSetFromFile(
@@ -148,15 +141,6 @@ class Rollback:
 
         return True
 
-    def restoreSystemModel(self):
-        saveSysModel = self.dir + '/system-model'
-        if util.exists(saveSysModel):
-            fd, tmpname = tempfile.mkstemp('system-model', '.restore',
-                os.path.dirname(self.systemModelPath))
-            os.write(fd, file(saveSysModel).read())
-            os.close(fd)
-            os.rename(tmpname, self.systemModelPath)
-
     def removeLast(self):
         if self.count == 0:
             return
@@ -185,9 +169,8 @@ class Rollback:
     def getCount(self):
         return self.count
 
-    def __init__(self, dir, systemModelPath, load = False):
+    def __init__(self, dir, load = False):
         self.dir = dir
-        self.systemModelPath = systemModelPath
 
         if load:
             self.stored = True
@@ -245,7 +228,33 @@ class RollbackStack:
         os.mkdir(rbDir, 0700)
         self.last += 1
         self.writeStatus(opJournal = opJournal)
-        return Rollback(rbDir, self.root)
+
+        if util.exists(self.systemModelPath):
+            saveSysModel = rbDir + '/system-model'
+            opJournal.create(saveSysModel)
+            ofd = os.open(saveSysModel, os.O_RDWR|os.O_CREAT)
+            ifile = file(self.systemModelPath, 'r')
+            os.write(ofd, ifile.read())
+            os.close(ofd)
+            ifile.close()
+
+        return Rollback(rbDir)
+
+    def restoreSystemModel(self):
+        saveSysModel = self.dir + "/%d/system-model" % self.last
+        if util.exists(saveSysModel):
+            fd, tmpname = tempfile.mkstemp('system-model', '.restore',
+                os.path.dirname(self.systemModelPath))
+            os.write(fd, file(saveSysModel).read())
+            os.close(fd)
+            os.rename(tmpname, self.systemModelPath)
+            os.unlink(saveSysModel)
+        # if this is a rollback from a failed update/sync operation,
+        # remove the target snapshot
+        saveSysModelNext = self.systemModelPath + '.next'
+        if util.exists(saveSysModelNext):
+            os.unlink(saveSysModelNext)
+
 
     def hasRollback(self, name):
         try:
@@ -265,7 +274,7 @@ class RollbackStack:
 
         num = int(name[2:])
         dir = self.dir + "/" + "%d" % num
-        return Rollback(dir, self.root, load = True)
+        return Rollback(dir, load = True)
 
     def removeFirst(self):
         name = 'r.%d' % self.first
@@ -320,9 +329,10 @@ class RollbackStack:
             rb = self.getRollback(rollbackName)
             yield (rollbackName, rb)
 
-    def __init__(self, rbDir, root):
+    def __init__(self, rbDir, root, systemModelPath):
         self.dir = rbDir
         self.root = root
+        self.systemModelPath = systemModelPath
         self.statusPath = self.dir + '/status'
 
         if not os.path.exists(self.dir):
@@ -2620,7 +2630,6 @@ class Database(SqlDbRepository):
                             fsJob.runPostScripts(tagScript)
                     fsUpdateJob.close()
 
-                    rb.restoreSystemModel()
                     rb.removeLast()
                 except CommitError, err:
                     updJob.close()
@@ -2640,6 +2649,7 @@ class Database(SqlDbRepository):
                         lastFsJob.addPostRollbackScript(*scriptData)
                     lastFsJob.runPostScripts(tagScript)
 
+            self.rollbackStack.restoreSystemModel()
             self.rollbackStack.removeLast()
 
     def _getChangesetPreScripts(self, cs, updJob):
@@ -2856,7 +2866,7 @@ class Database(SqlDbRepository):
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
             try:
-                self.rollbackStack = RollbackStack(self.rollbackCache,
+                self.rollbackStack = RollbackStack(self.rollbackCache, root,
                                                    self.systemModelPath)
             except OpenError, e:
                 raise OpenError(top, e.msg)
