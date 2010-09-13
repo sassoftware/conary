@@ -385,37 +385,49 @@ class SystemModelText(SystemModel):
     def write(self, f):
         f.write(self.format())
 
-#class SystemModelXML(SystemModel):
-#    '''
-#    Implements the abstract system model persisting in an XML format,
-#    which is intended to be machine-readable and machine-editable.
-#    ...
-#    '''
 
 class SystemModelFile(object):
-    def __init__(self, model, fileName='/etc/conary/system-model'):
+    '''
+    Implements file manipulation of a system model file.  This includes
+    snapshot files, which are used to store the target state while the
+    system is in transition.
+    '''
+
+    def __init__(self, model, fileName='/etc/conary/system-model',
+            snapshotExt='.next'):
         self.fileName = fileName
+        self.snapName = fileName + snapshotExt
         self.root = model.cfg.root
         self.model = model
 
         self.fileFullName = self.root+fileName
+        self.snapFullName = self.fileFullName + snapshotExt
+
         if self.exists():
             self.parse()
+
+    def snapshotExists(self):
+        return util.exists(self.snapFullName)
 
     def exists(self):
         return util.exists(self.fileFullName)
 
     def read(self):
-        self.model.filedata = open(self.fileFullName, 'r').readlines()
-        return self.model.filedata
+        if self.snapshotExists():
+            readFileName = self.snapFullName
+        else:
+            readFileName = self.fileFullName
+        self.model.filedata = open(readFileName, 'r').readlines()
+        return readFileName, self.model.filedata
 
     def parse(self, fileData=None):
         if fileData is None:
-            self.read()
+            readFileName, _ = self.read()
         else:
+            readFileName = None
             self.model.filedata = fileData
         self.model.parse(fileData=self.model.filedata,
-                         fileName=self.fileFullName)
+                         fileName=readFileName)
 
     def write(self, fileName=None):
         '''
@@ -432,3 +444,16 @@ class SystemModelFile(object):
         f = os.fdopen(fd, 'w')
         self.model.write(f)
         os.rename(tmpName, fileFullName)
+
+    def writeSnapshot(self):
+        '''
+        Write the current state of the model to the snapshot file
+        '''
+        self.write(fileName=self.snapName)
+
+    def closeSnapshot(self):
+        '''
+        Indicate that a model has been fully applied to the system by
+        renaming the snapshot over the previous model file.
+        '''
+        os.rename(self.snapFullName, self.fileFullName)

@@ -995,6 +995,10 @@ downloaded at one time from the repository.  Setting updateThreshold to a
 low value tends to result in many small downloads, while setting it to a high 
 value tends to result in fewer, larger downloads.  Defaults to 10.
 .TP
+.B user <repositoryHostGlob> <username> [<password>]
+Specifies the user name, and optionally the password, to use for
+repositories with a hostname matching <repositoryHostGlob>.
+.TP
 .B Macros <macro> <definition>
 Assigns the given string to <macro>, for use in cooking.  Useful especially for setting march, os, target, and parallelmflags.
 Can be overridden by the \fB\-\-macro \fI"<macro> <value>"\fR command-line option.  Note that all values are assumed to be strings -- no quotes are necessary around <value> on the command line or in the config file.

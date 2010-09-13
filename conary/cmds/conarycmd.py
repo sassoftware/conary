@@ -1063,6 +1063,9 @@ class _UpdateCommand(ConaryCommand):
             if otherArgs[1] == 'sync' and len(otherArgs) > 2:
                 log.error('The "sync" command cannot take trove arguments with a system model')
                 return 1
+            if otherArgs[1] != 'sync' and modelFile.snapshotExists():
+                log.error('The previous update was aborted; resume with "conary sync" or revert with "conary rollback 1"')
+                return 1
             if otherArgs[1] == 'migrate':
                 # Not entirely obvious what to do with the pre-existing
                 # system model.  Keep search lines and remove all the
@@ -1183,6 +1186,9 @@ class UpdateAllCommand(_UpdateCommand):
         if modelFile.exists():
             kwargs['systemModel'] = model
             kwargs['systemModelFile'] = modelFile
+            if modelFile.snapshotExists():
+                log.error('The previous update was aborted; resume with "conary sync" or revert with "conary rollback 1"')
+                return 1
 
         kwargs['model'] = argSet.pop('model', False)
 
