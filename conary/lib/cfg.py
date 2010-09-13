@@ -447,8 +447,8 @@ class ConfigFile(_Config):
                                                             % (fileName,
                                                                lineno, msg, key)
 
-    def _getProxies(self):
-        return {}
+    def getProxyMap(self):
+        return util.ProxyMap()
 
     def _openUrl(self, url):
         oldTimeout = socket.getdefaulttimeout()
@@ -459,15 +459,13 @@ class ConfigFile(_Config):
             'X-Conary-Version' : constants.version or "UNRELEASED",
             'X-Conary-Config-Version' : int(configVersion),
         }
-        opener = transport.URLOpener(proxies=self._getProxies())
+        opener = transport.URLOpener(proxyMap=self.getProxyMap())
         for key, value in headers.items():
             opener.addheader(key, value)
         try:
             for i in range(4):
                 try:
                     return opener.open(url)
-                except urllib2.HTTPError, err:
-                    raise CfgEnvironmentError(err.filename, err.msg)
                 except IOError, err:
                     if (err.strerror and isinstance(err.strerror,
                                                     socket.timeout)):

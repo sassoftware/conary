@@ -179,6 +179,14 @@ class DataStore(AbstractDataStore):
         if (not os.path.isdir(self.top)):
             raise IOError, ("path is not a directory: %s" % topPath)
 
+class ShallowDataStore(DataStore):
+
+    def hashToPath(self, hash):
+        if (len(hash) < 5):
+            raise KeyError, ("invalid hash %s" % hash)
+
+        return os.sep.join((self.top, hash[0:2], hash[2:]))
+
 class OverlayDataStoreSet:
 
     """
