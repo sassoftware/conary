@@ -32,7 +32,6 @@ import xmlrpclib
 import urllib
 import warnings
 import zlib
-import errors
 
 try:
     from cStringIO import StringIO
@@ -52,7 +51,6 @@ LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
                   socket.gethostname()])
 
 from conary.lib import util
-from conary.lib import log as clog
 
 
 class InfoURL(urllib.addinfourl):

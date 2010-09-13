@@ -27,7 +27,7 @@ import xmlrpclib
 from conary import callbacks
 from conary import conarycfg
 from conary import files
-from conary import metadata
+from conary.cmds import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util, api
@@ -52,13 +52,19 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 69 + 1)
+CLIENT_VERSIONS = range(36, 70 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
 # this is a quote function that quotes all RFC 2396 reserved characters,
 # including / (which is normally considered "safe" by urllib.quote)
 quote = lambda s: urllib.quote(s, safe='')
+
+class PartialResultsError(Exception):
+
+    # this is expected to be handled by the caller!
+    def __init__(self, partialResults):
+        self.partialResults = partialResults
 
 # mask out the username and password for error messages
 def _cleanseUrl(protocol, url):
@@ -2754,6 +2760,36 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getNewPGPKeys(self, host, mark):
         return [ base64.decodestring(x) for x in
                     self.c[host].getNewPGPKeys(mark) ]
+
+    def getDepsForTroveList(self, troveList):
+        # for old servers, UnsupportedCallError is raised, and the caller
+        # is expected to handle it. we do it this way because the outer
+        # layers often want to cache a complete trove in this case instead
+        # of getting a trove and throwing it away immediately
+        byServer = {}
+        for i, info in enumerate(troveList):
+            l = byServer.setdefault(info[1].getHost(), [])
+            l.append((i, info))
+
+        results = [ None ] * len(troveList)
+        partialOnly = False
+        for host, l in byServer.iteritems():
+            if self.c[host].getProtocolVersion() < 70:
+                partialOnly = True
+                continue
+
+            tl = [ (x[1][0], self.fromVersion(x[1][1]),
+                             self.fromFlavor(x[1][2]))
+                   for x in l ]
+            result = self.c[host].getDepsForTroveList(tl)
+
+            for ((idx, troveTup), (prov, req)) in itertools.izip(l, result):
+                results[idx] = (self.toDepSet(prov), self.toDepSet(req))
+
+        if partialOnly:
+            raise PartialResultsError(results)
+
+        return results
 
     def getTroveInfo(self, infoType, troveList):
         # first, we need to know about this infoType

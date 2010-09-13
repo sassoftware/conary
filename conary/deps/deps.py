@@ -870,6 +870,19 @@ class DependencySet(object):
             for dep in c.members.itervalues():
                 yield dep
 
+    def iterRawDeps(self):
+        # returns deps as (classId, name, flags) tuples
+        if type(self._members) == str:
+            next = 0
+            end = len(self._members)
+            while next < end:
+                (next, classId, depStr) = misc.depSetSplit(next, self._members)
+                (name, flags) = misc.depSplit(depStr)
+                yield (classId, name, flags)
+        else:
+            for depClass, oneDep in self.iterDeps():
+                yield (depClass.tag, oneDep.getName()[0], oneDep.getFlags()[0])
+
     def hasDepClass(self, depClass):
         return depClass.tag in self.members
 

@@ -14,6 +14,7 @@
 import itertools
 
 from conary import errors
+from conary.deps import deps
 from conary.lib import log
 from conary.repository import searchsource
 from conary.repository.resolvemethod import DepResolutionByTroveList, \
@@ -461,5 +462,69 @@ class DependencySolver(object):
             hasTroves = dict(itertools.izip(toCheck, hasTroves))
         packageJobs = [x[1] for x in packages.iteritems() if hasTroves[x[0]]]
         return packageJobs
+
+class PythonDependencyChecker(object):
+
+    """
+    Dependency checker/solver which uses in-memory python operations
+    rather than graph and sql operations. It is much faster for large
+    operations, but cannot preserve state or give installation orderings.
+    """
+
+    def __init__(self, troveSource, ignoreDepClasses = set()):
+        self.ignoreDepClasses = ignoreDepClasses
+        self.masterProvides = deps.DependencySet()
+        self.troveSource = troveSource
+        self.jobs = []
+
+    def addJobs(self, jobSet):
+        assert(not [ x[0] for x in jobSet if x[1][0] is not None ])
+        depList = self.troveSource.getDepsForTroveList(
+                    [ (x[0], x[2][0], x[2][1]) for x in jobSet ] )
+        for job, (provides, requires) in itertools.izip(jobSet, depList):
+            self.masterProvides.union(provides)
+            self.jobs.append( (job, requires) )
+
+    def check(self):
+        failed = []
+
+        for job, requires in self.jobs:
+            r = requires.copy()
+            for depClass in self.ignoreDepClasses:
+                r.removeDepsByClass(depClass)
+
+            if not self.masterProvides.satisfies(r):
+                failedDep = deps.DependencySet()
+                for depClass, dep in r.iterDeps():
+                    subSet = deps.DependencySet()
+                    subSet.addDeps(depClass, [ dep ])
+                    if not self.masterProvides.satisfies(subSet):
+                        failedDep.union(subSet)
+
+                failed.append( ((job[0], job[2][0], job[2][1]), failedDep) )
+
+        return failed
+
+    def resolve(self, resolveMethod):
+        oldProvides = self.masterProvides.copy()
+        oldJobLen = len(self.jobs)
+
+        suggMap = {}
+        failedDeps = self.check()
+        while resolveMethod.prepareForResolution(failedDeps):
+            sugg = resolveMethod.resolveDependencies()
+            newJob = resolveMethod.filterSuggestions(failedDeps, sugg,
+                                                     suggMap)
+
+            if not newJob:
+                continue
+
+            self.addJobs(newJob)
+            failedDeps = self.check()
+
+        self.masterProvides = oldProvides
+        self.jobs = self.jobs[:oldJobLen]
+
+        return failedDeps, suggMap
 
 
