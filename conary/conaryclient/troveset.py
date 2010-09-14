@@ -73,6 +73,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.searchWithFlavor()
         self.searchLeavesOnly()
         self.depDb = deptable.DependencyDatabase()
+        self.providesIndex = None
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
         def _depClassAndName(oneDep):
@@ -88,15 +89,32 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             reqNames.update(_depClassAndName(dep))
 
         emptyDep = deps.DependencySet()
+        troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList)
 
-        for i, (troveTup, (p, r)) in enumerate(itertools.izip(
-                self.troveTupList,
-                self.troveCache.getDepsForTroveList(self.troveTupList))):
-            if self.inDepDb[i]:
+        if self.providesIndex is None:
+            index = {}
+            self.providesIndex = index
+            for i, (troveTup, (p, r)) in enumerate(itertools.izip(
+                    self.troveTupList, troveDeps)):
+                classAndNameSet = _depClassAndName(p)
+                for classAndName in classAndNameSet:
+                    val = index.get(classAndName)
+                    if val is None:
+                        index[classAndName] = [ i ]
+                    else:
+                        val.append(i)
+
+
+        for classAndName in reqNames:
+            val = self.providesIndex.get(classAndName)
+            if val is None:
                 continue
 
-            if _depClassAndName(p) & reqNames:
-                self.depDb.add(i, p, emptyDep)
+            for i in val:
+                if self.inDepDb[i]:
+                    continue
+
+                self.depDb.add(i, troveDeps[i][0], emptyDep)
                 self.inDepDb[i] = True
 
         self.depDb.commit()
