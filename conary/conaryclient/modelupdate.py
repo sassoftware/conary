@@ -235,6 +235,20 @@ class SysModelFetchAction(troveset.FetchAction):
 
     resultClass = SysModelDelayedTroveTupleSet
 
+class SysModelFinalFetchAction(SysModelFetchAction):
+
+    def _fetch(self, actionList, data):
+        troveTuples = set()
+
+        for action in actionList:
+            troveTuples.update(troveTup for troveTup, inInstall, isExplicit in
+                                 action.primaryTroveSet._walk(data.troveCache,
+                                                 newGroups = False,
+                                                 recurse = True)
+                            if trove.troveIsGroup(troveTup[0]) or isExplicit)
+
+        data.troveCache.getTroves(troveTuples, withFiles = False)
+
 class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
     prefilter = SysModelFetchAction
@@ -575,7 +589,7 @@ class SystemModelClient(object):
         searchPath = troveSet.searchPath
 
         # we need to explicitly fetch this before we can walk it
-        preFetch = troveSet._action(ActionClass = SysModelFetchAction)
+        preFetch = troveSet._action(ActionClass = SysModelFinalFetchAction)
         availForDeps = preFetch._action(ActionClass = SysModelGetOptionalAction)
         preFetch.g.realize(SysModelActionData(troveCache, self.cfg.flavor[0],
                                               self.repos, self.cfg))

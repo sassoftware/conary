@@ -489,15 +489,12 @@ class FetchAction(ParallelAction):
         troveTuples = set()
 
         for action in actionList:
-            # repository calls) because the recurse arg to _walk is False;
-            # if it were True, it would cause fetchs (inefficiently)
             troveTuples.update(x[0] for x in
                                  action.primaryTroveSet._walk(data.troveCache,
-                                                 newGroups = False))
+                                                 newGroups = False,
+                                                 recurse = False)
+                                if not trove.troveIsComponent(x[0]))
 
-        troveTuples = [ x for x in troveTuples
-                            if not isinstance(x[1], versions.NewVersion) and
-                               not trove.troveIsComponent(x[0]) ]
         data.troveCache.getTroves(troveTuples, withFiles = False)
 
 class FindAction(ParallelAction):
