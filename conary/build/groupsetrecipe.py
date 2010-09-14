@@ -81,19 +81,127 @@ class GroupActionData(troveset.ActionData):
         troveset.ActionData.__init__(self, troveCache, groupRecipe.flavor)
         self.groupRecipe = groupRecipe
 
-class GroupTupleSetMethods(object):
 
+class GroupTupleSetMethods(object):
     # used mainly in a TroveSet context, so document it there from user POV
+    '''
+    NAME
+    ====
+
+    B{C{TroveSet}} - collection of trove references
+
+    DESCRIPTION
+    ===========
+
+    A B{TroveSet} is an immutable collection of references to
+    specific troves from a Conary repository, and set operations
+    on those collections.  Each trove reference in the set is a
+    four-tuple of B{name}, B{version}, B{flavor}, and whether the
+    trove is considered B{installed} or B{optional}.  Each operation
+    returns a new immutable TroveSet; none of them modifies an
+    existing TroveSet.
+
+    METHODS
+    =======
+
+    The following methods are available in C{TroveSet} objects:
+
+        - L{TroveSet.components} : Recursively search for components
+        - L{TroveSet.createGroup} : Create a binary group
+        - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
+        - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
+        - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
+        - L{TroveSet.find} : Search the TroveSet for specified troves
+        - L{TroveSet.findByName} : Find troves by regular expression
+        - L{TroveSet.findBySourceName} : Find troves by the name of the source
+        package from which they were built
+        - L{TroveSet.flatten} : Resolve non-group trove references recursively
+        - L{TroveSet.getInstall} : Get only install troves from set
+        - L{TroveSet.getOptional} : Get only optional troves from set
+        - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
+        - L{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
+        - L{TroveSet.makeInstall} : Make all troves install, or add all
+        provided troves as install troves
+        - L{TroveSet.makeOptional} : Make all troves optional, or add all
+        provided troves as optional troves
+        - L{TroveSet.members} : Resolve exactly one level of trove
+        references, return only those resolved references
+        - L{TroveSet.packages} : Resolve trove references recursively,
+        return packages
+        - L{TroveSet.replace} : Replace troves in the TroveSet with
+        matching-named troves from the replacement set
+        - L{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
+        - L{TroveSet.update} : Replace troves in the TroveSet with
+        all troves from the replacement set
+
+    Except for C{TroveSet.dump}, which prints debugging information,
+    each of these methods returns a new TroveSet.
+    '''
     _explainObjectName = 'TroveSet'
 
     def depsNeeded(self, resolveSource, failOnUnresolved = True):
         """
-        troveset.depsNeeded(resolveSource, failOnUnresolved = True)
+        NAME
+        ====
 
-        Looks for unresolved dependencies in the trove set. Missing
-        dependencies (and their dependencies) are looked for in
-        the resolveSource. If there are unresolvable dependencies,
-        an error is raised unless failOnUnresolved=False.
+        B{C{TroveSet.depsNeeded}} - Get troves satisfying dependencies
+
+        SYNOPSIS
+        ========
+
+        C{troveset.depsNeeded(resolveSource, failOnUnresolved=True)}
+
+        DESCRIPTION
+        ===========
+
+        Looks for unresolved dependencies in the trove set.  Those unmet
+        dependencies (and their dependencies, recursively) are sought in
+        the C{resolveSource}. If there are unresolvable dependencies,
+        an error is raised unless C{failOnUnresolved=False}.  Returns a
+        troveset containing the troves that were used to resolve the
+        dependencies.  This is not a union operation; the contents of
+        the returned troveset do not include the contents of the original
+        troveset.
+
+        PARAMETERS
+        ==========
+
+        - L{resolveSource} : Source against which to resolve dependencies
+        - L{failOnUnresolved} (C{True}) : Whether to fail if not all
+        dependencies can be resolved.
+
+        EXAMPLES
+        ========
+
+        There are several significant use cases for C{depsNeeded}.
+
+        The first use case is perhaps the most obvious; creating a group
+        that is dependency-complete:
+
+        mygrp = repos['group-standard'] + repos['other-package']
+        mygrp += mygrp.depsNeeded(repos)
+        groupStandard = mygrp.createGroup('group-standard')
+
+        A second use case is to enforce that dependencies can be
+        resolved.  If C{failOnUnresolved} is left to the default C{True}
+        and the resulting troveset is not used, this becomes an assertion
+        that all the dependencies for the original troveset not provided
+        within the original troveset can be found within the specified
+        search path.
+
+        std = repos['group-standard']
+        mygrp = std + myrepos['mypackage']
+        # mypackage has added only dependencies resolved in group-packages
+        mygrp.depsNeeded(repos['group-packages'])
+        groupStandard = mygrp.createGroup('group-standard')
+
+        A third use case is partial dependency closure.  The
+        C{failOnUnresolved} option can be set if you want to resolve
+        all the dependencies possible, with the understanding that
+        other dependencies will be resolved in another context.
+        This is normally useful only when that other context is
+        outside of the current group cook.
+
         """
         if isinstance(resolveSource, troveset.SearchPathTroveSet):
             newList = []
@@ -116,13 +224,24 @@ class GroupTupleSetMethods(object):
 
     def difference(self, other):
         """
-        troveset.difference(other)
-        troveset - other
+        NAME
+        ====
+        B{C{TroveSet.difference}} - Subtract one TroveSet from another (C{-})
 
-        Returns a new trove set which includes the members of the original
-        set which are not in other. The install and optional split of
-        other is irrelevent for deciding if a trove should be included
-        in the result.
+        SYNOPSIS
+        ========
+
+        C{troveset.difference(other)}
+        C{troveset - other}
+
+        DESCRIPTION
+        ===========
+
+        Returns a new troveset which includes the members of the
+        original set which are not in the troveset C{other}. The
+        install and optional values of the troveset C{other} is
+        ignored when deciding if a trove should be included in
+        the result.
         """
         if type(other) == str:
             findSet = self.find(other)
@@ -136,36 +255,73 @@ class GroupTupleSetMethods(object):
 
     def find(self, *troveSpecs):
         """
-        troveset.find(troveSpec1, troveSpec2, ..., troveSpecN)
-        troveset[findSpec]
+        NAME
+        ====
+        B{C{TroveSet.find}} - Search the TroveSet for specified troves
 
-        The troveset is searched for troves which match the given troveSpecs,
-        and matching troves are returned in a new troveset.
-        The install/optional value is preserved from the troveset being
-        searched.
+        SYNOPSIS
+        ========
+
+        C{troveset.find('troveSpec1', 'troveSpec2', ..., 'troveSpecN')}
+        C{troveset['troveSpec']}
+
+        DESCRIPTION
+        ===========
+
+        Returns a new C{troveset} containing all troves from the original
+        troveset which match the given C{troveSpec}(s).  The original
+        troveset's install/optional settings are preserved for each
+        returned trove.
         """
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     def findByName(self, namePattern, emptyOkay = False):
         """
-        troveset.findByName(nameRegularExpression, emptyOkay = False)
+        NAME
+        ====
+        B{C{TroveSet.findByName}} - Find troves by regular expression
 
-        The troveset is searched for troves whose names match
-        nameRegularExpression, and matching troves are returned in
+        SYNOPSIS
+        ========
+
+        C{troveset.findByName(nameRegularExpression, emptyOkay = False)}
+
+        DESCRIPTION
+        ===========
+
+        The original troveset is searched for troves whose names match
+        C{nameRegularExpression, and matching troves are returned in
         a new troveset.  The install/optional value is preserved from the
-        troveset being searched.
+        original troveset being searched.
+
+        PARAMETERS
+        ==========
+
+        - L{emptyOkay} : Unless set to C{True}, raise an exception if
+        no troves are found.
         """
         return self._action(namePattern, emptyOkay = emptyOkay,
                             ActionClass = FindByNameAction)
 
     def findBySourceName(self, sourceName):
         """
-        troveset.findBySourceName(sourceName)
+        NAME
+        ====
+        B{C{TroveSet.findBySourceName}} - Find troves by the name of the source
+        package from which they were built
 
-        The troveset is searched for troves which were built from source
-        trove called sourceName, and matching troves are returned in
-        a new troveset.  The install/optional value is preserved
-        from the troveset being searched.
+        SYNOPSIS
+        ========
+
+        C{troveset.findBySourceName(sourceName)}
+
+        DESCRIPTION
+        ===========
+
+        The original troveset is searched for troves which were built
+        from source trove called C{sourceName}, and all matching
+        troves are returned in a new troveset.  The install/optional
+        value is preserved from the original troveset being searched.
         """
         return self._action(sourceName,
                             ActionClass = FindBySourceNameAction)
@@ -177,7 +333,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.components()}} - Returns components included in
+        B{C{TroveSet.components}} - Returns components included in
         all members of the troveset, recursively.
 
         SYNOPSIS
@@ -194,11 +350,6 @@ class GroupTupleSetMethods(object):
         only by whether the component is installed or optional in
         the package that contains it.
 
-        PARAMETERS
-        ==========
-
-        None
-
         EXAMPLES
         ========
 
@@ -214,7 +365,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.flatten()}} - Returns all non-group troves
+        B{C{TroveSet.flatten}} - Returns all non-group troves, recursively
 
         SYNOPSIS
         ========
@@ -233,11 +384,6 @@ class GroupTupleSetMethods(object):
         group structure present in upstream groups but not desired
         in the groups being built) and for creating trovesets to use
         in SearchPaths, particularly for resolving dependencies.
-
-        PARAMETERS
-        ==========
-
-        None
 
         EXAMPLES
         ========
@@ -258,7 +404,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.getInstall()}} - Returns only install members
+        B{C{TroveSet.getInstall}} - Returns only install members
 
         SYNOPSIS
         ========
@@ -271,11 +417,6 @@ class GroupTupleSetMethods(object):
         Returns a new troveset which includes only the members of
         this troveset which are marked as install; optional members are
         omitted. All members of the returned set are marked as install.
-
-        PARAMETERS
-        ==========
-
-        None
         """
         return self._action(ActionClass = GetInstalledAction)
 
@@ -284,7 +425,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.getOptional()}} - Returns only optional members
+        B{C{TroveSet.getOptional}} - Returns only optional members
 
         SYNOPSIS
         ========
@@ -297,11 +438,6 @@ class GroupTupleSetMethods(object):
         Returns a new troveset which includes only the members of
         this troveset which are marked as optional; install members are
         omitted. All members of the returned set are marked as optional.
-
-        PARAMETERS
-        ==========
-
-        None
         """
         return self._action(ActionClass = GetOptionalAction)
 
@@ -310,7 +446,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.isEmpty()}} - Assert that troveset is empty
+        B{C{TroveSet.isEmpty}} - Assert that troveset is empty
 
         SYNOPSIS
         ========
@@ -322,11 +458,6 @@ class GroupTupleSetMethods(object):
 
         Raises an exception is raised if the troveset contains any members.
         Otherwise, returns an identical (empty) troveset that may be ignored.
-
-        PARAMETERS
-        ==========
-
-        None
         """
         return self._action(ActionClass = IsEmptyAction)
 
@@ -335,7 +466,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.isNotEmpty()}} - Assert that troveset is not empty
+        B{C{TroveSet.isNotEmpty}} - Assert that troveset is not empty
 
         SYNOPSIS
         ========
@@ -347,11 +478,6 @@ class GroupTupleSetMethods(object):
 
         Raises an exception is raised if the troveset contains no members.
         Otherwise, returns an identical troveset that may be ignored.
-
-        PARAMETERS
-        ==========
-
-        None
         """
         return self._action(ActionClass = IsNotEmptyAction)
 
@@ -360,7 +486,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.makeInstall()}} - Make all troves install, or add all
+        B{C{TroveSet.makeInstall}} - Make all troves install, or add all
         provided troves as install troves
 
         SYNOPSIS
@@ -383,7 +509,7 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{instalTroveSet} : TroveSet providing all its members as install
+        - L{installTroveSet} : TroveSet providing all its members as install
         """
         return self._action(ActionClass = MakeInstallAction,
                             installTroveSet = installTroveSet)
@@ -393,7 +519,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.makeOptional()}} - Make all troves optional, or add all
+        B{C{TroveSet.makeOptional}} - Make all troves optional, or add all
         provided troves as optional troves
 
         SYNOPSIS
@@ -426,7 +552,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.members()}} - Returns all members of the troveset
+        B{C{TroveSet.members}} - Returns all members of the troveset
 
         SYNOPSIS
         ========
@@ -440,11 +566,6 @@ class GroupTupleSetMethods(object):
         are returned as a new troveset. They are optional in the result
         only if they are optional in every member of this troveset which
         includes them.
-
-        PARAMETERS
-        ==========
-
-        None
         """
         return self._action(ActionClass = MembersAction)
 
@@ -453,7 +574,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.packages()}} - Return recursively-search package references
+        B{C{TroveSet.packages}} - Return recursively-search package references
 
         SYNOPSIS
         ========
@@ -474,7 +595,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.union()}} - Get the union of all provided TroveSets (|, +)
+        B{C{TroveSet.union}} - Get the union of all provided TroveSets (C{|}, C{+})
 
         SYNOPSIS
         ========
@@ -497,7 +618,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{troveset.replace()}} - Replace troves with matching-name troves
+        B{C{TroveSet.replace}} - Replace troves with matching-name troves
 
         SYNOPSIS
         ========
@@ -516,6 +637,17 @@ class GroupTupleSetMethods(object):
         by members of the replaceSet are also included as optional
         in the returned troveset, to prevent them from inadvertently
         showing up as install troves due to other operations.
+
+        This is a recursive union operation in which only troves
+        which are installed in the original set are installed in
+        the resulting set, and all other troves are available.
+
+        The difference between C{TroveSet.update} and C{TroveSet.replace} is
+        how new troves introduced in C{replaceSet} but not present in the
+        original set are handled.  With C{TroveSet.replace}, the new
+        troves from C{replaceSet} are not installed in the result; with
+        C{TroveSet.update}, the new troves are installed in the result if
+        they are installed in the C{updateSet}.
 
         PARAMETERS
         ==========
@@ -536,7 +668,7 @@ class GroupTupleSetMethods(object):
         troveSet.
 
         base = repos['group-standard']
-        update = base.replace('group-CVE-2015-1234')
+        update = base.replace(repos['group-CVE-2015-1234'])
         groupStandard = update.createGroup('group-standard')
 
         """
@@ -544,22 +676,84 @@ class GroupTupleSetMethods(object):
 
     def update(self, updateSet):
         """
-        troveset.replace(updateSet)
+        NAME
+        ====
 
-        Look for items in this troveset (recursively) which are updated
-        by members in updateSet.
+        B{C{TroveSet.update}} - Replace troves in the TroveSet with
+        all troves from the replacement set
+
+        SYNOPSIS
+        ========
+
+        C{troveset.update(updateSet)}
+
+        DESCRIPTION
+        ===========
+
+        Returns a troveset that is a recusive union of the original
+        troveset and C{updateSet}, except that only where the names of
+        troves overlap, the versions from C{updateSet} are used, though
+        the choice of update or install is honored from the original set.
+
+        The difference between C{TroveSet.update} and C{TroveSet.replace} is
+        how new troves introduced in C{updateSet} but not present in the
+        original set are handled.  With C{TroveSet.replace}, the new
+        troves from C{replaceSet} are not installed in the result; with
+        C{TroveSet.update}, the new troves are installed in the result if
+        they are installed in the C{updateSet}.
+
+        PARAMETERS
+        ==========
+
+        - L{updateSet} : TroveSet providing all its contents
+
+        EXAMPLES
+        ========
+
+        This is commonly used to update to new package versions while
+        preserving the semantics of a source group.  This might be used
+        to apply a "hotfix".  So if you are building a group based on
+        a specific version of a platform, and do not wish to move to
+        a new version of the platform, except that you want to inclue
+        a specific new package that implements a necessary fix, this
+        is most likely the correct operation.
+
+        base = repos['group-standard']
+        # Use latest conary to resolve CNY-98765 until resolved
+        update = base.update(repos['conary=centos.rpath.com@rpath:centos-5'])
+        groupStandard = update.createGroup('group-standard')
+
         """
         return self._action(updateSet, ActionClass = GroupUpdateAction)
 
 
     def createGroup(self, name, checkPathConflicts = True):
         """
-        troveset.createGroup(name, checkPathConflicts = True)
+        NAME
+        ====
+        
+        B{C{TroveSet.createGroup}} - Create a binary group
 
-        Create a new group in the repository whose members are defined
-        by this troveset, and call it name (which must begin with group-).
-        Returns a troveset which references the newly created group,
-        allowing it to be included in other trovesets (and hence, groups).
+        SYNOPSIS
+        ========
+
+        C{troveset.createGroup(name, checkPathConflicts = True)}
+
+        DESCRIPTION
+        ===========
+
+        Create a new group whose members are defined by this
+        troveset, and call it C{name} (which must begin with
+        "C{group-}").
+
+        Returns a troveset which references this newly created group,
+        which allows it to be included in other trovesets, and hence,
+        other groups.
+
+        PARAMETERS
+        ==========
+
+        - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
                             ActionClass = CreateNewGroupAction)
@@ -646,36 +840,147 @@ class GroupLoggingDelayedTroveTupleSet(GroupDelayedTroveTupleSet):
             log.info("\ttook %.1fs" % runtime)
 
 class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
+    '''
+    NAME
+    ====
+
+    B{C{SearchPath}} - Collection of troves in which to search
+
+    DESCRIPTION
+    ===========
+
+    An object which searches multiple other objects in the order
+    specified.  Troves can be looked up in the result, and the
+    result can also be used for resolving dependencies.
+
+    METHODS
+    =======
+
+    - L{find} : Search the SearchPath for specified troves
+    '''
+    _explainObjectName = 'SearchPath'
 
     def find(self, *troveSpecs):
+        '''
+        NAME
+        ====
+
+        B{C{SearchPath.find}} - Search the SearchPath for specified troves
+
+        SYNOPSIS
+        ========
+
+        C{searchpath.find('troveSpec1', 'troveSpec2', ..., 'troveSpecN')}
+        C{searchpath['troveSpec']}
+
+        DESCRIPTION
+        ===========
+
+        The B{SearchPath} is searched for troves which match the given
+        troveSpecs.  All matches are included as installed in the
+        returned C{TroveSet}.
+
+        Each C{troveSpec} has the same format as a trove referenced on
+        the command line: C{name=version[flavor]}
+
+        - L{name} : Required: the full name of the trove
+        - L{version} : Optional: Any legal full or partial version,
+        with or without a full or partial label.
+        - L{flavor} : Optional: The flavor to match, composed with
+        the Repository flavor and the build configuration flavor.
+        '''
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     __getitem__ = find
 
 class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
+    # This is really GroupSetRecipe.Repository, documented here
+    # for the benefit of Repository.find and Repository.latestPackages
+    # Specifically, the synopsis describes GroupSetRecipe.Repository,
+    # not this underlying object.
+    '''
+    NAME
+    ====
 
+    B{C{Repository}} - Source of trove references
+
+    SYNOPSIS
+    ========
+
+    C{r.Repository(defaultLabelList, baseFlavor)}
+
+    DESCRIPTION
+    ===========
+
+    A B{Repository} object is used to look troves up in a repository,
+    and provide references to those troves as B{TroveSet} objects.
+    It has a list of default labels (or a single default label) and
+    a default flavor; these are used when no label or flavor is provided
+    to the B{find} method.
+
+    METHODS
+    =======
+
+    - L{find} : Search the repository for specified troves
+    - L{latestPackages} : All the latest normal packages on the default label(s)
+    '''
     _explainObjectName = 'Repository'
 
     def find(self, *troveSpecs):
-        """
-        repos.find(troveSpec1, troveSpec2, ..., troveSpecN)
-        repos[findSpec]
+        '''
+        NAME
+        ====
 
-        The repository is searched for troves which match the given
-        troveSpecs. All matches are returned in the install portion
-        of the return value.
-        """
+        B{C{Repository.find}} - Search the Repository for specified troves
+
+        SYNOPSIS
+        ========
+
+        C{repos.find('troveSpec1', 'troveSpec2', ..., 'troveSpecN')}
+        C{repos['troveSpec']}
+
+        DESCRIPTION
+        ===========
+
+        The B{Repository} is searched for troves which match the given
+        troveSpecs.  All matches are included as installed in the
+        returned C{TroveSet}.
+
+        Each C{troveSpec} has the same format as a trove referenced on
+        the command line: C{name=version[flavor]}
+
+        - L{name} : Required: the full name of the trove
+        - L{version} : Optional: Any legal full or partial version,
+        with or without a full or partial label.
+        - L{flavor} : Optional: The flavor to match, composed with
+        the Repository flavor and the build configuration flavor.
+        '''
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
     __getitem__ = find
 
     def latestPackages(self):
-        """
-        Returns a troveset consisting of the latest packages and filesets on
-        the default search label. The troves returned are those which best
-        match the default flavor. Any troves which have a redirect as their
-        latest version will be ignored.
-        """
+        '''
+        NAME
+        ====
+
+        B{C{Repository.latestPackages}} - Get latest normal packages of the
+        default flavor on the default label
+
+        SYNOPSIS
+        ========
+
+        C{repos.latestPackages()}
+
+        DESCRIPTION
+        ===========
+
+        Returns a B{TroveSet} consisting of the latest packages and
+        filesets on the default search label.  The troves returned are
+        those which best match the default flavor.  Any troves which
+        have a redirect as their latest version are not included in
+        the returned TroveSet, nor are groups or components.
+        '''
         return self._action(ActionClass = LatestPackagesFromSearchSourceAction)
 
 class GroupFindAction(troveset.FindAction):
@@ -1151,11 +1456,25 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.g.realize(data)
 
     def dumpAll(self):
-        """
-        r.dumpAll()
+        '''
+        NAME
+        ====
 
-        Dump the contents of trove sets as they're populated.
-        """
+        B{C{dumpAll}} - Display copious output describing each action.
+
+        SYNOPSYS
+        ========
+
+        C{r.dumpAll()}
+
+        DESCRIPTION
+        ===========
+
+        Causes a GroupSetRecipe to print a textual listing of the
+        entire contents of each TroveSet as it is populated.
+
+        C{dumpAll} is a debugging tool and does not return a TroveSet.
+        '''
         self._dumpAll = True
 
     def getLabelPath(self):
@@ -1183,21 +1502,69 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         return [ ]
 
     def writeDotGraph(self, path):
+        '''
+        NAME
+        ====
+
+        B{C{GroupSetRecipe.writeDotGraph}}
+
+        SYNOPSIS
+        ========
+
+        C{r.writeDotGraph('path')}
+
+        DESCRIPTION
+        ===========
+
+        Writes a description of the internal graph represenstation of
+        the elements of the GroupSetRecipe in C{dot} format.  This
+        graph can be converted to SVG format using the dot command:
+
+        C{dot -Tsvg outputfile > outputfile.svg}
+
+        The resulting SVG file may be viewed in any tool capable of
+        displaying SVG files, including many Web browsers.
+
+        C{writeDotGraph} is a debugging tool and does not return a TroveSet.
+        '''
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
 
     def Group(self, ts, checkPathConflicts = True):
-        """
-        r.Group(troveSet, checkPathConflicts = True)
+        '''
+        NAME
+        ====
+        B{C{GroupSetRecipe.Group}} - Create primary group object
 
-        Set the passed trove set as the contents of the primary group
-        being built. The return value is a trove set which references
-        the primary group (which can be used to create other groups
-        which reference the primary group).
-        """
+        SYNOPSIS
+        ========
+
+        C{r.Group(troveSet, checkPathConflicts = True)}
+
+        DESCRIPTION
+        ===========
+
+        Set the passed B{TroveSet} as the contents of the primary
+        group being built; the group that has the same name as
+        the source component. The return value is a troveset which
+        references the newly-created primary group.  This returned
+        TroveSet can be used to create other groups which reference
+        the primary group.
+
+        PARAMETERS
+        ==========
+
+        - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+        '''
         return ts._createGroup(self.name,
                                checkPathConflicts = checkPathConflicts)
 
     def Repository(self, labelList, flavor):
+        # Documented in GroupSearchSourceTroveSet as "Repository" so that
+        # Repository.find and Repository.latestPackages documentation
+        # shows up in cvc explain
+        '''
+        See Repository.
+        '''
         if type(labelList) == tuple:
             labelList = list(tuple)
         elif type(labelList) != list:
@@ -1217,18 +1584,32 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         return GroupSearchSourceTroveSet(searchSource, graph = self.g)
 
     def SearchPath(self, *troveSets):
-        """
-        Build an object which searches multiple other objects in the
-        order specified. Troves can be looked up in the result, and the
-        result can also be used for resolving dependencies.
-        """
+        # Documented in GroupSearchPathTroveSet as "SearchPath" so that
+        # SearchPath.find documentation shows up in cvc explain
+        '''
+        See SearchPath.
+        '''
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
     def track(self, troveSpec):
         '''
-        Print out actions that match the provided C{troveSpec}.  Usually
+        NAME
+        ====
+
+        B{C{GroupSetRecipe.track}}
+
+        SYNOPSIS
+        ========
+
+        C{r.track('troveSpec')}
+
+        DESCRIPTION
+        ===========
+
+        Prints out actions that match the provided C{troveSpec}.  Usually
         used when a trove is unexpectedly present or missing in one or
-        more TroveSets (or their resulting groups), in order to learn why.
+        more TroveSets (or their resulting groups), in order to learn why
+        the trove is present or missing.
 
         C{track} is a debugging tool and does not return a TroveSet.
         '''

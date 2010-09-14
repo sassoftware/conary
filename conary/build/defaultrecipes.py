@@ -258,10 +258,10 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     return new TroveSets; they do not modify existing TroveSets.
 
     A TroveSet is created either by reference to other TroveSets or
-    by reference to a repository.  A C{GroupSetRecipe} must have at
+    by reference to a Repository.  A C{GroupSetRecipe} must have at
     least one C{Repository} object.  A C{Repository} object has a
-    default search label and default flavor, but can be used to find
-    any trove in any accessible Conary repository.
+    default search label list and default flavor, but can be used to
+    find any trove in any accessible Conary repository.
 
     Repositories and TroveSets can be combined in order in a C{SearchPath}
     object.  A C{SearchPath} object can be used both for looking up
@@ -289,11 +289,10 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     The following recipe methods are available in Conary group set recipes:
 
         - L{Repository} : Creates an object representing a respository
-        with a default search label and flavor.
+        with a default search label list and flavor.
         - L{SearchPath} : Creates an object in which to search for
         troves or dependencies.
-        - L{Group} : Creates the primary group object from a TroveSet,
-        returning a TroveSet representing that group.
+        - L{Group} : Creates the primary group object.
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
         troves.
@@ -316,7 +315,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
         - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
         - L{TroveSet.find} : Search the TroveSet for specified troves
-        - L{TroveSet.findByName} : Find troves by regular expression matchin name
+        - L{TroveSet.findByName} : Find troves by regular expression
         - L{TroveSet.findBySourceName} : Find troves by the name of the source
         package from which they were built
         - L{TroveSet.flatten} : Resolve non-group trove references recursively
