@@ -64,6 +64,9 @@ class SystemModelTroveCache(trovecache.TroveCache):
     def cacheModified(self):
         return (len(self.cache), len(self.depCache)) != self._startingSizes
 
+    def getPackageComponents(self, troveTup):
+        return self.componentMap[troveTup]
+
 class SysModelTupleSetMethods(object):
 
     def remove(self, removeTroveSet = None):
