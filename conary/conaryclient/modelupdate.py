@@ -137,23 +137,34 @@ class SysModelFindAction(troveset.FindAction):
 
     resultClass = SysModelDelayedTroveTupleSet
 
-class SysModelFetchAction(troveset.FetchAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
-    # this not only fetches, but it follows redirects as well. it's the
-    # perfect place, if awkwardly named
+    # this not only finds, but it fetches and finds as well. it's a pretty
+    # convienent way of handling redirects
 
     def __call__(self, actionList, data):
-        self._fetch(actionList, data)
+        troveset.FindAction.__call__(self, actionList, data)
+
+        fetchActions = []
+        for action in actionList:
+            action.outSet.realized = True
+            newAction = SysModelFetchAction(action.outSet)
+            newAction.getResultTupleSet(action.primaryTroveSet.g)
+            fetchActions.append(newAction)
+
+        SysModelFetchAction.__call__(fetchActions[0], fetchActions, data)
 
         redirects = []
-
         for action in actionList:
             installSet = set()
             optionalSet = set()
-            for troveTup, inInstall, isExplicit in \
-                                action.primaryTroveSet._walk(data.troveCache):
+
+            for troveTup, inInstall in ( itertools.chain(
+                    itertools.izip( action.outSet.installSet,
+                                    itertools.repeat(True)),
+                    itertools.izip( action.outSet.optionalSet,
+                                    itertools.repeat(True)) ) ):
+
+                assert(data.troveCache.troveIsCached(troveTup))
+
                 trv = data.troveCache.getTrove(withFiles = False, *troveTup);
                 if trv.isRedirect():
                     log.info("following redirect %s=%s[%s]", *troveTup)
@@ -162,6 +173,11 @@ class SysModelFetchAction(troveset.FetchAction):
                     installSet.add(troveTup)
                 else:
                     optionalSet.add(troveTup)
+
+            action.outSet.installSet.clear()
+            action.outSet.optionalSet.clear()
+            # caller gets to set this for us
+            action.realized = False
 
             self._redirects(data, redirects, optionalSet, installSet)
 
@@ -210,6 +226,11 @@ class SysModelFetchAction(troveset.FetchAction):
 
                     seen.add(match)
                     q.add((match, inInstall))
+
+
+class SysModelFetchAction(troveset.FetchAction):
+
+    resultClass = SysModelDelayedTroveTupleSet
 
 class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
