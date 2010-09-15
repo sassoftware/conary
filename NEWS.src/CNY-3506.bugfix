@@ -1,0 +1,1 @@
+RPM netshared path support is now only enabled if the RPM python bindings export expandMacro()

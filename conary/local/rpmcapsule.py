@@ -129,11 +129,12 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
     def __init__(self, *args, **kwargs):
         SingleCapsuleOperation.__init__(self, *args, **kwargs)
-        nsp = rpm.expandMacro('%_netsharedpath')
-        if nsp != '%_netsharedpath':
-            self.netSharedPath = set(nsp.split(':'))
-        else:
-            self.netSharedPath = set()
+
+        self.netSharedPath = set()
+        if (hasattr(rpm, 'expandMacro')):
+            nsp = rpm.expandMacro('%_netsharedpath')
+            if nsp != '%_netsharedpath':
+                self.netSharedPath = set(nsp.split(':'))
 
     @staticmethod
     def _canonicalNvra(n, v, r, a):
