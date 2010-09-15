@@ -159,7 +159,7 @@ class SysModelFindAction(troveset.FindAction):
         fetchActions = []
         for action in actionList:
             action.outSet.realized = True
-            newAction = SysModelFetchAction(action.outSet)
+            newAction = SysModelFetchAction(action.outSet, all = True)
             newAction.getResultTupleSet(action.primaryTroveSet.g)
             fetchActions.append(newAction)
 

@@ -478,6 +478,10 @@ class FetchAction(ParallelAction):
     # the whole point is to cache troves so iterTroveListInfo() can assume
     # they're already there
 
+    def __init__(self, primaryTroveSet, all = False):
+        ParallelAction.__init__(self, primaryTroveSet)
+        self.fetchAll = all
+
     def __call__(self, actionList, data):
         for action in actionList:
             action.outSet._setOptional(action.primaryTroveSet._getOptionalSet())
@@ -489,11 +493,15 @@ class FetchAction(ParallelAction):
         troveTuples = set()
 
         for action in actionList:
-            troveTuples.update(x[0] for x in
+            newTuples = [ x[0] for x in
                                  action.primaryTroveSet._walk(data.troveCache,
-                                                 newGroups = False,
-                                                 recurse = False)
-                                if not trove.troveIsComponent(x[0]))
+                                                 newGroups = False) ]
+
+            if not action.fetchAll:
+                newTuples = [ x for x in newTuples
+                                if not trove.troveIsComponent(x[0]) ]
+
+            troveTuples.update(newTuples)
 
         data.troveCache.getTroves(troveTuples, withFiles = False)
 
