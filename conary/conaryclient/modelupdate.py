@@ -505,7 +505,6 @@ class SystemModelClient(object):
         return missingTroves, removedTroves
 
     def _closePackages(self, cache, trv, newTroves = None):
-        packagesNeeded = set()
         packagesAdded = set()
         if newTroves is None:
             newTroves = list(trv.iterTroveList(strongRefs = True))
