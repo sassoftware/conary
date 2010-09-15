@@ -61,10 +61,20 @@ class SystemModelTroveCache(trovecache.TroveCache):
                     self.componentMap[tup] = l
                 l.append(name)
 
+    def cacheComponentMap(self, pkgList):
+        need = [ x for x in pkgList if
+                  (not self.troveIsCached(x) and x not in self.componentMap) ]
+        self.cacheTroves(need)
+
     def cacheModified(self):
         return (len(self.cache), len(self.depCache)) != self._startingSizes
 
     def getPackageComponents(self, troveTup):
+        if self.troveIsCached(troveTup):
+            trv = self.getTrove(*troveTup, withFiles = False);
+            return  [ x[0] for x in trv.iterTroveList(strongRefs = True,
+                                                      weakRefs = True) ]
+
         return self.componentMap[troveTup]
 
 class SysModelTupleSetMethods(object):
@@ -494,7 +504,7 @@ class SystemModelClient(object):
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves
 
-    def _closePackages(self, trv, newTroves = None):
+    def _closePackages(self, cache, trv, newTroves = None):
         packagesNeeded = set()
         packagesAdded = set()
         if newTroves is None:
@@ -507,6 +517,8 @@ class SystemModelClient(object):
                              packageN, (n, v, f))
                     trv.addTrove(packageN, v, f)
                     packagesAdded.add( (packageN, v, f) )
+
+        cache.cacheComponentMap(packagesAdded)
 
         return packagesAdded
 
@@ -610,7 +622,7 @@ class SystemModelClient(object):
             if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
-        self._closePackages(targetTrv)
+        self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv)[2]
 
         depResolveSource = searchPath._getResolveSource(
@@ -675,7 +687,8 @@ class SystemModelClient(object):
                 for troveTup in added:
                     targetTrv.addTrove(*troveTup)
 
-                added.update(self._closePackages(targetTrv, newTroves = added))
+                added.update(self._closePackages(troveCache, targetTrv,
+                                                 newTroves = added))
 
                 # try to avoid a diff here
                 job = _updateJob(job, added)
