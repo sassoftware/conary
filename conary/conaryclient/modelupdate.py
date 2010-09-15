@@ -71,7 +71,7 @@ class SystemModelTroveCache(trovecache.TroveCache):
 
     def getPackageComponents(self, troveTup):
         if self.troveIsCached(troveTup):
-            trv = self.getTrove(*troveTup, withFiles = False);
+            trv = self.getTrove(withFiles = False, *troveTup)
             return  [ x[0] for x in trv.iterTroveList(strongRefs = True,
                                                       weakRefs = True) ]
 
