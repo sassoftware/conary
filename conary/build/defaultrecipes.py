@@ -252,10 +252,11 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     In a C{GroupSetRecipe}, almost all the operations are operations
     on sets of references to troves, called B{TroveSets}.  Each trove
-    reference in a TroveSet is a four-tuple of B{name}, B{version},
-    B{flavor}, and whether the trove is considered B{installed} or
-    B{optional}.  Each TroveSet is immutable.  TroveSet operations
-    return new TroveSets; they do not modify existing TroveSets.
+    reference in a TroveSet is a three-tuple of B{name}, B{version},
+    B{flavor}, along with an attribute, C{isInstalled}, that describes
+    whether the trove is considered B{installed} or B{optional}.  Each
+    TroveSet is immutable.  TroveSet operations return new TroveSets;
+    they do not modify existing TroveSets.
 
     A TroveSet is created either by reference to other TroveSets or
     by reference to a Repository.  A C{GroupSetRecipe} must have at
@@ -274,7 +275,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     new binary group or set of groups.  TroveSets have a C{createGroup}
     method that creates binary groups from the TroveSets.  (The binary
     group with the same name as the source group can be created using
-    the C{Group} method, which itself calls C{createGroup}.)  The binary
+    the C{Group} method, which itself calls C{createGroup}.)  In the binary
     groups created by C{Group} or C{createGroup}, the C{byDefault} flag
     is used to indicate B{installed} (C{byDefault=True}) or B{optional}
     (C{byDefault=False}).
@@ -309,7 +310,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     The following methods are available in C{TroveSet} objects:
 
-        - L{TroveSet.components} : Recursively search for components
+        - L{TroveSet.components} : Recursively search for named components
         - L{TroveSet.createGroup} : Create a binary group
         - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
         - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
@@ -318,7 +319,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{TroveSet.findByName} : Find troves by regular expression
         - L{TroveSet.findBySourceName} : Find troves by the name of the source
         package from which they were built
-        - L{TroveSet.flatten} : Resolve non-group trove references recursively
+        - L{TroveSet.flatten} : Resolve trove references recursively
         - L{TroveSet.getInstall} : Get only install troves from set
         - L{TroveSet.getOptional} : Get only optional troves from set
         - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty

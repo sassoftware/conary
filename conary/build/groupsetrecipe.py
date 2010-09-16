@@ -95,11 +95,12 @@ class GroupTupleSetMethods(object):
 
     A B{TroveSet} is an immutable collection of references to
     specific troves from a Conary repository, and set operations
-    on those collections.  Each trove reference in the set is a
-    four-tuple of B{name}, B{version}, B{flavor}, and whether the
-    trove is considered B{installed} or B{optional}.  Each operation
-    returns a new immutable TroveSet; none of them modifies an
-    existing TroveSet.
+    on those collections.  Each trove reference in a TroveSet is a
+    three-tuple of B{name}, B{version}, B{flavor}, along with an
+    attribute, C{isInstalled}, that describes whether the trove
+    is considered B{installed} or B{optional}.  Each TroveSet is
+    immutable.  TroveSet operations return new TroveSets; they do
+    not modify existing TroveSets.
 
     METHODS
     =======
@@ -115,7 +116,7 @@ class GroupTupleSetMethods(object):
         - L{TroveSet.findByName} : Find troves by regular expression
         - L{TroveSet.findBySourceName} : Find troves by the name of the source
         package from which they were built
-        - L{TroveSet.flatten} : Resolve non-group trove references recursively
+        - L{TroveSet.flatten} : Resolve trove references recursively
         - L{TroveSet.getInstall} : Get only install troves from set
         - L{TroveSet.getOptional} : Get only optional troves from set
         - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
@@ -156,12 +157,12 @@ class GroupTupleSetMethods(object):
 
         Looks for unresolved dependencies in the trove set.  Those unmet
         dependencies (and their dependencies, recursively) are sought in
-        the C{resolveSource}. If there are unresolvable dependencies,
-        an error is raised unless C{failOnUnresolved=False}.  Returns a
-        troveset containing the troves that were used to resolve the
-        dependencies.  This is not a union operation; the contents of
-        the returned troveset do not include the contents of the original
-        troveset.
+        the C{resolveSource}, which must be a C{TroveSet}, C{Repository}, or
+        C{SearchPath}.  If there are unresolvable dependencies, it raises
+        an error unless C{failOnUnresolved=False}.  Returns a troveset
+        containing the troves that were used to resolve the dependencies.
+        This is not a union operation; the contents of the returned
+        troveset do not include the contents of the original troveset.
 
         PARAMETERS
         ==========
@@ -239,8 +240,8 @@ class GroupTupleSetMethods(object):
 
         Returns a new troveset which includes the members of the
         original set which are not in the troveset C{other}. The
-        install and optional values of the troveset C{other} is
-        ignored when deciding if a trove should be included in
+        isInstall values of the troves in troveset C{other} are
+        ignored when deciding if those troves should be included in
         the result.
         """
         if type(other) == str:
@@ -270,8 +271,23 @@ class GroupTupleSetMethods(object):
 
         Returns a new C{troveset} containing all troves from the original
         troveset which match the given C{troveSpec}(s).  The original
-        troveset's install/optional settings are preserved for each
-        returned trove.
+        troveset's isInstall settings are preserved for each returned
+        trove.  The contents of the TroveSet are not sought recursively.
+
+        EXAMPLES
+        ========
+
+        C{groupOS = repos['group-os'].flatten()}
+        C{allGlibcVersions = groupOS.find('glibc')}
+        C{compatGlibc = groupOS['glibc=@rpl:1-compat']}
+
+        This sets C{groupOS} to be a TroveSet containing the recursive
+        contents of C{group-os} -- all the troves included in group-os.
+        It then finds all versions/flavors of glibc referenced (there
+        could be more than one) and creates an C{allGlibcVersions}
+        TroveSet that contains references to all of them, and another
+        C{compatGlibc} that contains refernces to all flavors of glibc
+        that are on a label matching C{@rpl:1-compat}.
         """
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
@@ -291,7 +307,7 @@ class GroupTupleSetMethods(object):
 
         The original troveset is searched for troves whose names match
         C{nameRegularExpression, and matching troves are returned in
-        a new troveset.  The install/optional value is preserved from the
+        a new troveset.  The isInstall value is preserved from the
         original troveset being searched.
 
         PARAMETERS
@@ -299,6 +315,18 @@ class GroupTupleSetMethods(object):
 
         - L{emptyOkay} : Unless set to C{True}, raise an exception if
         no troves are found.
+        
+        EXAMPLES
+        ========
+
+        C{allGnomePackages = allPackages.findByName('^gnome-')}
+
+        Returns a troveset containing all troves in the troveset
+        C{allPackages} with a name starting with C{^gnome-}
+
+        C{allTroves = repos['group-os'].flatten()}
+        C{allGroups = allTroves.findByName('^group-')}
+        C{allOtherTroves = allTroves - allGroups}
         """
         return self._action(namePattern, emptyOkay = emptyOkay,
                             ActionClass = FindByNameAction)
@@ -320,8 +348,8 @@ class GroupTupleSetMethods(object):
 
         The original troveset is searched for troves which were built
         from source trove called C{sourceName}, and all matching
-        troves are returned in a new troveset.  The install/optional
-        value is preserved from the original troveset being searched.
+        troves are returned in a new troveset.  The isInstall value is
+        preserved from the original troveset being searched.
         """
         return self._action(sourceName,
                             ActionClass = FindBySourceNameAction)
@@ -333,30 +361,40 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{TroveSet.components}} - Returns components included in
+        B{C{TroveSet.components}} - Returns named components included in
         all members of the troveset, recursively.
 
         SYNOPSIS
         ========
 
-        C{troveset.components()}
+        C{troveset.components(I{componentName1}, I{componentName2}, ...)}
 
         DESCRIPTION
         ===========
 
-        Returns the components included in all members of the
-        troveset, found recursively.  Whether a component is
-        install or optional in the returned troveset is determined
-        only by whether the component is installed or optional in
-        the package that contains it.
+        Returns components included in all members of the troveset, found
+        recursively, where the component name (C{runtime}, C{lib}, C{data},
+        etc.) matches one of the component names provided.  The C{isInstalled}
+        setting for each component in the returned troveset is determined
+        only by whether the component is installed or optional in the
+        package that contains it.
 
         EXAMPLES
         ========
 
-        C{repos['glibc'].components()}
+        C{groupOs = repos['group-os'].flatten()}
+        C{allDebugInfo = groupOs.components('debuginfo')}
 
-        Returns the components of the default glibc package found in the
-        C{repos} object.
+        Returns a TroveSet referencing all the C{debuginfo} components of
+        all packages referenced in C{group-os} as found in the C{repos}
+        object.
+
+        C{groupDist = repos['group-dist'].flatten()}
+        C{docTroves = groupDist.components('doc', 'supdoc')}
+
+        Returns a TroveSet referencing all the C{doc} and C{supdoc}
+        components of all packages referenced in C{group-dist} as found
+        in the C{repos} object.
         """
         return self._action(ActionClass = ComponentsAction, *componentList)
 
@@ -365,7 +403,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
 
-        B{C{TroveSet.flatten}} - Returns all non-group troves, recursively
+        B{C{TroveSet.flatten}} - Returns all troves, recursively
 
         SYNOPSIS
         ========
@@ -375,15 +413,20 @@ class GroupTupleSetMethods(object):
         DESCRIPTION
         ===========
 
-        The troveset returned consists of any non-group trove referenced
+        The troveset returned consists of any existing trove referenced
         by the original troveset, directly or indirectly via groups.
-        The install/optional setting for each troves is inherited from
-        the original troveset, not from the troves referenced.
+        The C{isInstall} setting for each troves is inherited from
+        the original troveset, not from the troves referenced.  (The
+        only troves that will not be returned are references to binary
+        groups being built out of the recipe, as returned by the
+        C{TroveSet.createGroup()} method.)
 
-        This is useful both for creating flattened groups (removing
-        group structure present in upstream groups but not desired
-        in the groups being built) and for creating trovesets to use
-        in SearchPaths, particularly for resolving dependencies.
+        This is useful for creating flattened groups (removing group
+        structure present in upstream groups but not desired in the
+        groups being built), for creating trovesets to use to look
+        up specific troves (for example, C{find} and C{findByName}),
+        and to include in SearchPaths, particularly for resolving
+        dependencies.
 
         EXAMPLES
         ========
@@ -533,8 +576,8 @@ class GroupTupleSetMethods(object):
         If C{optionalTroveSet} troveset is provided as an argument, all
         members of that other troveset are included in the result as
         optional members.  Any members of the original troveset which
-        are install, and are not in C{optionalTroveSet}, are also
-        install in the result.
+        are install troves, and are not in C{optionalTroveSet}, are also
+        install troves in the returned troveset.
 
         If C{optionalTroveSet} is not provided, the troveset returned
         includes all members of the original troveset as optional members.
@@ -630,7 +673,7 @@ class GroupTupleSetMethods(object):
 
         Look (recursively) for items in this troveset which can
         reasonably be replaced by members found in the replaceSet.
-        The install/optional values are inherited from replaceSet.
+        The isInstall values are inherited from the original troveset.
         Any items in replaceSet which do not appear to replace
         members of this troveset are included as optional in the
         result.  Members of the original troveset which are outdated
@@ -693,7 +736,7 @@ class GroupTupleSetMethods(object):
         Returns a troveset that is a recusive union of the original
         troveset and C{updateSet}, except that only where the names of
         troves overlap, the versions from C{updateSet} are used, though
-        the choice of update or install is honored from the original set.
+        the choice of isInstall is honored from the original set.
 
         The difference between C{TroveSet.update} and C{TroveSet.replace} is
         how new troves introduced in C{updateSet} but not present in the
@@ -980,6 +1023,15 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
         those which best match the default flavor.  Any troves which
         have a redirect as their latest version are not included in
         the returned TroveSet, nor are groups or components.
+
+        A package is considered latest only if it is built from the
+        latest source from which some binaries have been built.  So
+        if the C{foo:source} package previously built both the C{foo}
+        and C{bar} packages, but the most recent binary version of
+        the C{bar} package is built from a C{foo:source} that did not
+        build a C{bar} package, the C{bar} package previously built
+        from C{foo:source} will not be considered latest.  (Thus, a
+        redirect from C{bar} to nothing is not required here.)
         '''
         return self._action(ActionClass = LatestPackagesFromSearchSourceAction)
 
