@@ -127,6 +127,15 @@ class Callback:
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
+    def __init__(self, *args, **kwargs):
+        SingleCapsuleOperation.__init__(self, *args, **kwargs)
+
+        self.netSharedPath = set()
+        if (hasattr(rpm, 'expandMacro')):
+            nsp = rpm.expandMacro('%_netsharedpath')
+            if nsp != '%_netsharedpath':
+                self.netSharedPath = set(nsp.split(':'))
+
     @staticmethod
     def _canonicalNvra(n, v, r, a):
         return "%s-%s-%s.%s" % (n, v, r, a)
@@ -323,6 +332,13 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         for fileInfo in trv.iterFileList():
             pathId, path, fileId, version = fileInfo
+
+            if os.path.dirname(path) in self.netSharedPath:
+                # we do nothing. really. nothing.
+                #
+                # we don't back it up. we don't mark it as removed in
+                # our database. we don't look for conflicts. nothing.
+                continue
 
             if pathId in changedByPathId:
                 fileObj = fileObjsByPathId[pathId]
