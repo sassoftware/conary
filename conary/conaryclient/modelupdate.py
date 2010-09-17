@@ -61,8 +61,21 @@ class SystemModelTroveCache(trovecache.TroveCache):
                     self.componentMap[tup] = l
                 l.append(name)
 
+    def cacheComponentMap(self, pkgList):
+        need = [ x for x in pkgList if
+                  (not self.troveIsCached(x) and x not in self.componentMap) ]
+        self.cacheTroves(need)
+
     def cacheModified(self):
         return (len(self.cache), len(self.depCache)) != self._startingSizes
+
+    def getPackageComponents(self, troveTup):
+        if self.troveIsCached(troveTup):
+            trv = self.getTrove(withFiles = False, *troveTup)
+            return  [ x[0] for x in trv.iterTroveList(strongRefs = True,
+                                                      weakRefs = True) ]
+
+        return self.componentMap[troveTup]
 
 class SysModelTupleSetMethods(object):
 
@@ -137,23 +150,34 @@ class SysModelFindAction(troveset.FindAction):
 
     resultClass = SysModelDelayedTroveTupleSet
 
-class SysModelFetchAction(troveset.FetchAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
-    # this not only fetches, but it follows redirects as well. it's the
-    # perfect place, if awkwardly named
+    # this not only finds, but it fetches and finds as well. it's a pretty
+    # convienent way of handling redirects
 
     def __call__(self, actionList, data):
-        self._fetch(actionList, data)
+        troveset.FindAction.__call__(self, actionList, data)
+
+        fetchActions = []
+        for action in actionList:
+            action.outSet.realized = True
+            newAction = SysModelFetchAction(action.outSet, all = True)
+            newAction.getResultTupleSet(action.primaryTroveSet.g)
+            fetchActions.append(newAction)
+
+        SysModelFetchAction.__call__(fetchActions[0], fetchActions, data)
 
         redirects = []
-
         for action in actionList:
             installSet = set()
             optionalSet = set()
-            for troveTup, inInstall, isExplicit in \
-                                action.primaryTroveSet._walk(data.troveCache):
+
+            for troveTup, inInstall in ( itertools.chain(
+                    itertools.izip( action.outSet.installSet,
+                                    itertools.repeat(True)),
+                    itertools.izip( action.outSet.optionalSet,
+                                    itertools.repeat(True)) ) ):
+
+                assert(data.troveCache.troveIsCached(troveTup))
+
                 trv = data.troveCache.getTrove(withFiles = False, *troveTup);
                 if trv.isRedirect():
                     log.info("following redirect %s=%s[%s]", *troveTup)
@@ -162,6 +186,11 @@ class SysModelFetchAction(troveset.FetchAction):
                     installSet.add(troveTup)
                 else:
                     optionalSet.add(troveTup)
+
+            action.outSet.installSet.clear()
+            action.outSet.optionalSet.clear()
+            # caller gets to set this for us
+            action.realized = False
 
             self._redirects(data, redirects, optionalSet, installSet)
 
@@ -210,6 +239,25 @@ class SysModelFetchAction(troveset.FetchAction):
 
                     seen.add(match)
                     q.add((match, inInstall))
+
+
+class SysModelFetchAction(troveset.FetchAction):
+
+    resultClass = SysModelDelayedTroveTupleSet
+
+class SysModelFinalFetchAction(SysModelFetchAction):
+
+    def _fetch(self, actionList, data):
+        troveTuples = set()
+
+        for action in actionList:
+            troveTuples.update(troveTup for troveTup, inInstall, isExplicit in
+                                 action.primaryTroveSet._walk(data.troveCache,
+                                                 newGroups = False,
+                                                 recurse = True)
+                            if trove.troveIsGroup(troveTup[0]) or isExplicit)
+
+        data.troveCache.getTroves(troveTuples, withFiles = False)
 
 class SysModelFlattenAction(SysModelDelayedTupleSetAction):
 
@@ -456,8 +504,7 @@ class SystemModelClient(object):
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves
 
-    def _closePackages(self, trv, newTroves = None):
-        packagesNeeded = set()
+    def _closePackages(self, cache, trv, newTroves = None):
         packagesAdded = set()
         if newTroves is None:
             newTroves = list(trv.iterTroveList(strongRefs = True))
@@ -469,6 +516,8 @@ class SystemModelClient(object):
                              packageN, (n, v, f))
                     trv.addTrove(packageN, v, f)
                     packagesAdded.add( (packageN, v, f) )
+
+        cache.cacheComponentMap(packagesAdded)
 
         return packagesAdded
 
@@ -551,7 +600,7 @@ class SystemModelClient(object):
         searchPath = troveSet.searchPath
 
         # we need to explicitly fetch this before we can walk it
-        preFetch = troveSet._action(ActionClass = SysModelFetchAction)
+        preFetch = troveSet._action(ActionClass = SysModelFinalFetchAction)
         availForDeps = preFetch._action(ActionClass = SysModelGetOptionalAction)
         preFetch.g.realize(SysModelActionData(troveCache, self.cfg.flavor[0],
                                               self.repos, self.cfg))
@@ -572,7 +621,7 @@ class SystemModelClient(object):
             if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
-        self._closePackages(targetTrv)
+        self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv)[2]
 
         depResolveSource = searchPath._getResolveSource(
@@ -637,7 +686,8 @@ class SystemModelClient(object):
                 for troveTup in added:
                     targetTrv.addTrove(*troveTup)
 
-                added.update(self._closePackages(targetTrv, newTroves = added))
+                added.update(self._closePackages(troveCache, targetTrv,
+                                                 newTroves = added))
 
                 # try to avoid a diff here
                 job = _updateJob(job, added)

@@ -73,6 +73,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.searchWithFlavor()
         self.searchLeavesOnly()
         self.depDb = deptable.DependencyDatabase()
+        self.providesIndex = None
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
         def _depClassAndName(oneDep):
@@ -88,15 +89,32 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             reqNames.update(_depClassAndName(dep))
 
         emptyDep = deps.DependencySet()
+        troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList)
 
-        for i, (troveTup, (p, r)) in enumerate(itertools.izip(
-                self.troveTupList,
-                self.troveCache.getDepsForTroveList(self.troveTupList))):
-            if self.inDepDb[i]:
+        if self.providesIndex is None:
+            index = {}
+            self.providesIndex = index
+            for i, (troveTup, (p, r)) in enumerate(itertools.izip(
+                    self.troveTupList, troveDeps)):
+                classAndNameSet = _depClassAndName(p)
+                for classAndName in classAndNameSet:
+                    val = index.get(classAndName)
+                    if val is None:
+                        index[classAndName] = [ i ]
+                    else:
+                        val.append(i)
+
+
+        for classAndName in reqNames:
+            val = self.providesIndex.get(classAndName)
+            if val is None:
                 continue
 
-            if _depClassAndName(p) & reqNames:
-                self.depDb.add(i, p, emptyDep)
+            for i in val:
+                if self.inDepDb[i]:
+                    continue
+
+                self.depDb.add(i, troveDeps[i][0], emptyDep)
                 self.inDepDb[i] = True
 
         self.depDb.commit()
@@ -460,6 +478,10 @@ class FetchAction(ParallelAction):
     # the whole point is to cache troves so iterTroveListInfo() can assume
     # they're already there
 
+    def __init__(self, primaryTroveSet, all = False):
+        ParallelAction.__init__(self, primaryTroveSet)
+        self.fetchAll = all
+
     def __call__(self, actionList, data):
         for action in actionList:
             action.outSet._setOptional(action.primaryTroveSet._getOptionalSet())
@@ -471,15 +493,16 @@ class FetchAction(ParallelAction):
         troveTuples = set()
 
         for action in actionList:
-            # repository calls) because the recurse arg to _walk is False;
-            # if it were True, it would cause fetchs (inefficiently)
-            troveTuples.update(x[0] for x in
+            newTuples = [ x[0] for x in
                                  action.primaryTroveSet._walk(data.troveCache,
-                                                 newGroups = False))
+                                                 newGroups = False) ]
 
-        troveTuples = [ x for x in troveTuples
-                            if not isinstance(x[1], versions.NewVersion) and
-                               not trove.troveIsComponent(x[0]) ]
+            if not action.fetchAll:
+                newTuples = [ x for x in newTuples
+                                if not trove.troveIsComponent(x[0]) ]
+
+            troveTuples.update(newTuples)
+
         data.troveCache.getTroves(troveTuples, withFiles = False)
 
 class FindAction(ParallelAction):

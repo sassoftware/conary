@@ -13,13 +13,12 @@
 
 import sys
 import re
+import os
 import pydoc, types
 from conary import versions
 from conary.build import recipe
 from conary.build import packagerecipe, redirectrecipe
 from conary.build import filesetrecipe, grouprecipe, groupsetrecipe, inforecipe
-
-DELETE_CHAR = chr(8)
 
 blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'reportExcessBuildRequires', 'setModes'),
         'GroupInfoRecipe': ('User',),
@@ -88,28 +87,54 @@ class DummyGroupInfoRecipe(inforecipe.GroupInfoRecipe):
         self.version = '1.0'
         inforecipe.GroupInfoRecipe.__init__(self, cfg, None, None)
 
+class DummyTroveSet(groupsetrecipe.GroupTupleSetMethods):
+    def __init__(self, *args, **kwargs):
+        pass
+
+class DummyRepository(groupsetrecipe.GroupSearchSourceTroveSet):
+    def __init__(self, *args, **kwargs):
+        pass
+
+class DummySearchPath(groupsetrecipe.GroupSearchPathTroveSet):
+    def __init__(self, *args, **kwargs):
+        pass
+
 classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
           DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe,
-          DummyGroupSetRecipe, groupsetrecipe.GroupTupleSetMethods,
-          groupsetrecipe.GroupSearchSourceTroveSet ]
+          DummyGroupSetRecipe,
+          DummyTroveSet, DummyRepository, DummySearchPath ]
+
+def _useLess():
+    if 'PAGER' in os.environ:
+        if 'less' in os.environ['PAGER']:
+            return True
+        return False
+    return True
+
+def _wrapString(msg, on, off):
+    # on and off are ANSI color codes
+    onCode = '\033[%dm' % on
+    offCode = '\033[%dm' % off
+    # nesting does not work
+    msg = msg.replace(onCode, '').replace(offCode, '')
+    return onCode + msg + offCode
 
 def _formatString(msg):
-    if msg[0] == 'B':
-        res = ''
-        skipIndex = 0
-        for index, char in enumerate(msg[2:-1]):
-            if msg[index + 3] == DELETE_CHAR:
-                skipIndex = 2
-            else:
-                if skipIndex:
-                    skipIndex = max(skipIndex - 1, 0)
-                    continue
-            res += char + DELETE_CHAR + char
-        return res
-    else:
-        return msg[2:-1]
+    if _useLess():
+        if msg[0] == 'B':
+            return _wrapString(msg[2:-1], 1, 21)
+        elif msg[0] == 'C':
+            # use underline for constant width because reverse video
+            # is too distracting in practice, due to appropriate
+            # widespread use of constant width
+            return _wrapString(msg[2:-1], 4, 24)
+        elif msg[0] == 'I':
+            # use reverse video instead of underline for italic to
+            # disambiguate from constant width
+            return _wrapString(msg[2:-1], 7, 27)
+    return msg[2:-1]
 
-def _pageDoc(title, docString):
+def _formatDocString(docString):
     docStringRe = re.compile('[A-Z]\{[^{}]*\}')
     srch = re.search(docStringRe, docString)
     while srch:
@@ -117,18 +142,46 @@ def _pageDoc(title, docString):
         newString = _formatString(oldString)
         docString = docString.replace(oldString, newString)
         srch = re.search(docStringRe, docString)
+    return docString
+
+def _pageDoc(title, docString):
+    docString = _formatDocString(docString)
     # pydoc is fooled by conary's wrapping of stdout. override it if needed.
     if sys.stdout.isatty():
-        pydoc.pager = lambda x: pydoc.pipepager(x, 'less')
-    pydoc.pager("Conary API Documentation: %s\n\n" %
+        if _useLess():
+            # -R parses CSR escape codes properly
+            pydoc.pager = lambda x: pydoc.pipepager(x, 'less -R')
+        else:
+            # PAGER is set if _useLess returns False
+            pydoc.pager = lambda x: pydoc.pipepager(x, os.environ['PAGER'])
+    pydoc.pager("Conary API Documentation: %s\n" %
             _formatString('B{' + title + '}') + docString)
+
+def _reindentGen(lines, indentLength):
+    four = '    '
+    for line in lines:
+        if line:
+            yield four + line[indentLength:]
+        else:
+            yield line
+
+def _reindent(text):
+    # consistently provide no more than 4 leading spaces 
+    # space sorts before any letters; use that to find shortest
+    # non-blank line
+    lines = text.split('\n')
+    outmostLine = [x for x in sorted(lines) if x][-1]
+    indentLength = len(outmostLine) - len(outmostLine.lstrip())
+    if indentLength <= 4:
+        return text
+    return '\n'.join(_reindentGen(lines, indentLength))
 
 def _formatDoc(className, obj):
     name = obj.__name__
     docString = obj.__doc__
     if not docString:
         docString = 'No documentation available.'
-    _pageDoc('%s.%s' % (className, name), docString)
+    _pageDoc('%s.%s' % (className, name), _reindent(docString))
 
 def _parentName(klass):
     if hasattr(klass, '_explainObjectName'):
@@ -204,11 +257,14 @@ def docClass(cfg, recipeType):
     display = {}
     if recipeType in ('PackageRecipe', 'GroupRecipe', 'GroupSetRecipe'):
         display['Build'] = sorted(x for x in r.externalMethods if x[0] != '_' and x not in blacklist.get(recipeType, []))
+    elif recipeType == 'TroveSet':
+        pass
     elif 'GroupInfoRecipe' in recipeType:
         display['Build'] = ['Group', 'SupplementalGroup']
     elif 'UserInfoRecipe' in recipeType:
         display['Build'] = ['User']
-    display['Policy'] = sorted(x for x in r._policyMap if x[0] != '_' and x not in blacklist.get(recipeType, []))
+    if '_policyMap' in r.__dict__:
+        display['Policy'] = sorted(x for x in r._policyMap if x[0] != '_' and x not in blacklist.get(recipeType, []))
     if recipeType == 'PackageRecipe':
         Actions = display['Build'][:]
         display['Source'] = [x for x in Actions if x.startswith('add')]
@@ -219,6 +275,7 @@ def docClass(cfg, recipeType):
         else:
             del display[key]
     text = r.__class__.__base__.__doc__
+    text = _reindent(text)
     if not text:
         text = 'No documentation available.'
     text += "\n\n" + '\n\n'.join(["B{%s Actions}:\n    %s" % x for x in sorted(display.iteritems())])

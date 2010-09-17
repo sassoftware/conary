@@ -252,16 +252,17 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     In a C{GroupSetRecipe}, almost all the operations are operations
     on sets of references to troves, called B{TroveSets}.  Each trove
-    reference in a TroveSet is a four-tuple of B{name}, B{version},
-    B{flavor}, and whether the trove is considered B{installed} or
-    B{optional}.  Each TroveSet is immutable.  TroveSet operations
-    return new TroveSets; they do not modify existing TroveSets.
+    reference in a TroveSet is a three-tuple of B{name}, B{version},
+    B{flavor}, along with an attribute, C{isInstalled}, that describes
+    whether the trove is considered B{installed} or B{optional}.  Each
+    TroveSet is immutable.  TroveSet operations return new TroveSets;
+    they do not modify existing TroveSets.
 
     A TroveSet is created either by reference to other TroveSets or
-    by reference to a repository.  A C{GroupSetRecipe} must have at
+    by reference to a Repository.  A C{GroupSetRecipe} must have at
     least one C{Repository} object.  A C{Repository} object has a
-    default search label and default flavor, but can be used to find
-    any trove in any accessible Conary repository.
+    default search label list and default flavor, but can be used to
+    find any trove in any accessible Conary repository.
 
     Repositories and TroveSets can be combined in order in a C{SearchPath}
     object.  A C{SearchPath} object can be used both for looking up
@@ -274,7 +275,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     new binary group or set of groups.  TroveSets have a C{createGroup}
     method that creates binary groups from the TroveSets.  (The binary
     group with the same name as the source group can be created using
-    the C{Group} method, which itself calls C{createGroup}.)  The binary
+    the C{Group} method, which itself calls C{createGroup}.)  In the binary
     groups created by C{Group} or C{createGroup}, the C{byDefault} flag
     is used to indicate B{installed} (C{byDefault=True}) or B{optional}
     (C{byDefault=False}).
@@ -289,11 +290,10 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     The following recipe methods are available in Conary group set recipes:
 
         - L{Repository} : Creates an object representing a respository
-        with a default search label and flavor.
+        with a default search label list and flavor.
         - L{SearchPath} : Creates an object in which to search for
         troves or dependencies.
-        - L{Group} : Creates the primary group object from a TroveSet,
-        returning a TroveSet representing that group.
+        - L{Group} : Creates the primary group object.
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
         troves.
@@ -310,16 +310,16 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     The following methods are available in C{TroveSet} objects:
 
-        - L{TroveSet.components} : Recursively search for components
+        - L{TroveSet.components} : Recursively search for named components
         - L{TroveSet.createGroup} : Create a binary group
         - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
         - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
         - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
         - L{TroveSet.find} : Search the TroveSet for specified troves
-        - L{TroveSet.findByName} : Find troves by regular expression matchin name
+        - L{TroveSet.findByName} : Find troves by regular expression
         - L{TroveSet.findBySourceName} : Find troves by the name of the source
         package from which they were built
-        - L{TroveSet.flatten} : Resolve non-group trove references recursively
+        - L{TroveSet.flatten} : Resolve trove references recursively
         - L{TroveSet.getInstall} : Get only install troves from set
         - L{TroveSet.getOptional} : Get only optional troves from set
         - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
