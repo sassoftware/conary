@@ -1428,8 +1428,10 @@ class addCapsule(_Source):
         @keyword ignoreAllConflictingTimes: When checking for conflicts between
         files contained in multiple capsules, ignore the mtime on the files.
         """
+        self.capsuleMagic = None
+        self.capsuleType = None
+
         _Source.__init__(self, recipe, *args, **keywords)
-        self.magicObj = None
 
     def _initManifest(self):
         assert self.package
@@ -1439,27 +1441,62 @@ class addCapsule(_Source):
         self.manifest = ExplicitManifest(package=self.package,
                                          recipe=self.recipe)
 
-    def _getMagic(self,path):
-        if not self.magicObj:
-            self.magicObj = magic.magic(path)
-            if self.magicObj is None:
+    def _getCapsuleMagic(self, path):
+        if not self.capsuleMagic:
+            self.capsuleMagic = magic.magic(path)
+            if self.capsuleMagic is None:
                 raise SourceError('unknown capsule type for file %s', path)
-            self.capsuleType = self.magicObj.name.lower()
-        assert(path==self.magicObj.path)
-        return self.magicObj
+            self.capsuleType = self.capsuleMagic.name.lower()
+        assert(path==self.capsuleMagic.path)
+        return self.capsuleMagic
+
+    def _getWinHelper(self, path):
+        if not self.recipe.cfg.windowsBuildService:
+            raise SourceError('MSI capsules cannot be added without a '
+                              'windowsBuildService defined in the conary '
+                              'configuration')
+        import robj
+        from xobj import xobj
+        xmlTemplate = '''\
+<msi id="">
+    <path href="">%s</path>
+    <size>%i</size>
+</msi>'''
+
+        baseUrl = 'http://' + self.recipe.cfg.windowsBuildService + '/api'
+        api = robj.connect(baseUrl)
+        msis = api.msis
+        # post the xml with filename and size to create the resource
+        x = xmlTemplate % (os.path.split(path)[1], os.stat(path).st_size)
+        msis.append(xobj.parse(x))
+        wh = msis[-1]
+
+        # put the actual file contents
+        wh.path = open(path)
+        wh.refresh()
+
+        return wh
 
     def doDownload(self):
         f = self._findSource()
 
         # identify the capsule type
-        m = self._getMagic(f)
+        m = self._getCapsuleMagic(f)
 
         # here we guarantee that package contains a package:component
         # designation.  This is required for _addComponent().
         if self.capsuleType == 'rpm':
             pname = m.contents['name']
+        elif self.capsuleType == 'msi':
+            self.recipe.winHelper = self._getWinHelper(f)
+            pname = str(self.recipe.winHelper.name).split()
+            if len(pname) > 1 and '.' in pname[-1]:
+                pname = '-'.join(pname[:-1])
+            else:
+                pname = '-'.join(pname)
         else:
-            pname = self.recipe.name
+            raise SourceError('unknown capsule type %s', self.capsuleType)
+
         if self.package is None:
             self.package = pname + ':' + self.capsuleType
         else:
@@ -1628,7 +1665,7 @@ class addCapsule(_Source):
 
     def checkSignature(self, filepath):
         # generate the magic object in order to populate the capsuleType
-        self._getMagic(filepath)
+        self._getCapsuleMagic(filepath)
 
         if self.keyid:
             key = self._getPublicKey()

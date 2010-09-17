@@ -278,20 +278,8 @@ class RPM(Magic):
         self.contents['isSource'] = self.hdr.isSource
 
 class MSI(Magic):
-    _tagMap = [
-        ("name",    rpmhelper.NAME, str),
-        ("version", rpmhelper.VERSION, str),
-    ]
     def __init__(self, path, basedir=''):
 	Magic.__init__(self, path, basedir)
-        self.version = 'FakeMSIVersion'
-        try:
-            f = file(path)
-        except:
-            return None
-        # Convert list of objects to simple types
-        for key, tagName, valType in self._tagMap:
-            self.contents[key] = getattr(self,key)
 
 def _javaMagic(b):
     if len(b) > 4 and b[0:4] == "\xCA\xFE\xBA\xBE":

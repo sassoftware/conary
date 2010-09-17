@@ -1016,6 +1016,9 @@ _TROVECAPSULE_RPM_SHA1HEADER  = 6
 
 _TROVECAPSULE_MSI_NAME        = 0
 _TROVECAPSULE_MSI_VERSION     = 1
+_TROVECAPSULE_MSI_PLATFORM    = 2
+_TROVECAPSULE_MSI_PCODE       = 3
+_TROVECAPSULE_MSI_UCODE       = 4
 
 _RPM_OBSOLETE_NAME    = 0
 _RPM_OBSOLETE_FLAGS   = 1
@@ -1081,11 +1084,20 @@ class TroveMsiCapsule(streams.StreamSet):
     streamDict = {
         _TROVECAPSULE_MSI_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
         _TROVECAPSULE_MSI_VERSION : (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_MSI_PLATFORM: (DYNAMIC, streams.StringStream,
+                                     'platform' ),
+        _TROVECAPSULE_MSI_PCODE: (DYNAMIC, streams.StringStream,
+                                  'productCode' ),
+        _TROVECAPSULE_MSI_UCODE: (DYNAMIC, streams.StringStream,
+                                     'upgradeCode' ),
     }
 
     def reset(self):
         self.name.set(None)
         self.version.set(None)
+        self.platform.set(None)
+        self.productCode.set(None)
+        self.upgradeCode.set(None)
 
 class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -1757,14 +1769,16 @@ class Trove(streams.StreamSet):
 
         self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
 
-    def addMsiCapsule(self, path, version, fileId):
+    def addMsiCapsule(self, path, version, fileId, winHelper):
         assert(len(fileId) == 20)
         dir, base = os.path.split(path)
         self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
         self.troveInfo.capsule.type.set('msi')
-        ### FIXME ###
-        self.troveInfo.capsule.msi.name.set("MSIName")
-        self.troveInfo.capsule.msi.version.set("1.2.3.4.5")
+        self.troveInfo.capsule.msi.name.set(winHelper.name.encode('utf-8'))
+        self.troveInfo.capsule.msi.version.set(winHelper.version.encode('utf-8'))
+        self.troveInfo.capsule.msi.platform.set(winHelper.platform.encode('utf-8'))
+        self.troveInfo.capsule.msi.productCode.set(winHelper.productCode.encode('utf-8'))
+        self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode.encode('utf-8'))
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()

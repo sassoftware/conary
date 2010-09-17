@@ -48,7 +48,8 @@ CookError = builderrors.CookError
 RecipeFileError = builderrors.RecipeFileError
 
 # -------------------- private below this line -------------------------
-def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
+def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo,
+                     winHelper=None):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
@@ -72,7 +73,7 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
                             newVersion, fileObj.fileId(), m.hdr)
         elif capsuleInfo[0] == 'msi':
             p.addMsiCapsule(os.path.basename(capsulePath),
-                            newVersion, fileObj.fileId())
+                            newVersion, fileObj.fileId(), winHelper)
         else:
             # This shouldn't be able to happen
             raise
@@ -1476,8 +1477,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         assert(comp)
         grp = grpMap[main]
 
-        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen,
-                                recipeObj._getCapsule(buildPkg.getName()))
+        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion,
+                idgen, recipeObj._getCapsule(buildPkg.getName()),
+                getattr(recipeObj, 'winHelper', None))
 
         built.append((compName, p.getVersion().asString(), p.getFlavor()))
 
