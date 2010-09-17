@@ -67,8 +67,15 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         m = magic.magic(capsulePath)
         fileObj = files.FileFromFilesystem(capsulePath,
                                            trove.CAPSULE_PATHID)
-        p.addRpmCapsule(os.path.basename(capsulePath),
-                          newVersion, fileObj.fileId(), m.hdr)
+        if capsuleInfo[0] == 'rpm':
+            p.addRpmCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), m.hdr)
+        elif capsuleInfo[0] == 'msi':
+            p.addMsiCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId())
+        else:
+            # This shouldn't be able to happen
+            raise
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
 

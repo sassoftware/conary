@@ -26,3 +26,4 @@ For example:
 echo Clone operations no longer print an error in the callback. \
     > news/CNY-3413.bugfix
 hg add news/CNY-3413.bugfix
+
