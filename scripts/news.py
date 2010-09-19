@@ -24,6 +24,7 @@ from mercurial import hg, ui
 PRODUCT_NAME = "Conary"
 HEADINGS = [
         ('feature', 'New Features'),
+        ('api', 'API Changes'),
         ('bugfix', 'Bug Fixes'),
         ('internal', 'Internal Changes'),
         ]

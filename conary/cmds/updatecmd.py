@@ -23,11 +23,12 @@ from conary import display
 from conary import errors
 from conary.deps import deps
 from conary.lib import api
+from conary.lib import log
 from conary.lib import util
 from conary.local import database
-from conary.repository import changeset
-from conaryclient import cmdline
-from conaryclient.cmdline import parseTroveSpec
+from conary.repository import changeset, filecontainer
+from conary.conaryclient import cmdline
+from conary.conaryclient.cmdline import parseTroveSpec
 
 # FIXME client should instantiated once per execution of the command line
 # conary client
@@ -471,6 +472,91 @@ def doUpdate(cfg, changeSpecs, **kwargs):
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
 
+def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
+    # FIXME: handle restarting after partial failure
+    # write temporary file?  something else?
+    kwargs['systemModel'] = sysmodel
+    kwargs['systemModelFile'] = modelFile
+    kwargs['loadTroveCache'] = True
+    kwargs.setdefault('updateByDefault', True) # erase is not default case
+    kwargs.setdefault('model', False)
+    kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
+    infoArg = kwargs.get('info', False)
+    testArg = kwargs.get('test', False)
+
+    fromChangesets = []
+
+    addArgs = [x[1:] for x in otherArgs if x.startswith('+')]
+    rmArgs = [x[1:] for x in otherArgs if x.startswith('-')]
+    defArgs = [x for x in otherArgs
+                if not (x.startswith('+') or x.startswith('-'))]
+
+    # find any default arguments that represent changesets
+    for i, defArg in enumerate(defArgs):
+        if util.exists(defArg):
+            try:
+                cs = changeset.ChangeSetFromFile(defArgs[i])
+                fromChangesets.append(cs)
+                defArgs.pop(i)
+            except filecontainer.BadContainer:
+                # not a changeset, must be a trove name
+                pass
+
+    if kwargs['updateByDefault']:
+        addArgs += defArgs
+    else:
+        rmArgs += defArgs
+
+    if rmArgs:
+        sysmodel.appendTroveOpByName('erase', text=rmArgs)
+
+    if addArgs:
+        updateName = { False: 'update',
+                       True: 'install' }[kwargs['keepExisting']]
+        sysmodel.appendTroveOpByName(updateName, text=addArgs)
+
+    for cs in fromChangesets:
+        for trvInfo in cs.getPrimaryTroveList():
+            sysmodel.appendTroveOpByName('install', text='%s=%s[%s]' % (
+                trvInfo[0],
+                trvInfo[1].asString(),
+                deps.formatFlavor(trvInfo[2])))
+
+    if kwargs.pop('model'):
+        sysmodel.write(sys.stdout)
+        sys.stdout.flush()
+        return None
+
+    callback = kwargs.get('callback', None)
+    if not callback:
+        callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
+        kwargs['callback'] = callback
+    else:
+        callback.setTrustThreshold(cfg.trustThreshold)
+
+    restartInfo = kwargs.get('restartInfo', None)
+
+    kwargs['fromChangesets'] = fromChangesets
+
+    # FIXME: restarting not yet implemented properly
+    if kwargs.get('restartInfo', None):
+        # We don't care about applyList, we will set it later
+        applyList = None
+    else:
+        if not infoArg and not testArg:
+            modelFile.writeSnapshot()
+        keepExisting = kwargs.get('keepExisting')
+        updateByDefault = kwargs.get('updateByDefault', True)
+        applyList = cmdline.parseChangeList([], keepExisting,
+                                            updateByDefault,
+                                            allowChangeSets=True)
+
+    _updateTroves(cfg, applyList, **kwargs)
+    # XXX fixme
+    # Clean up after ourselves
+    if restartInfo:
+        util.rmtree(restartInfo, ignore_errors=True)
+
 
 def _updateTroves(cfg, applyList, **kwargs):
     # Take out the apply-related keyword arguments
@@ -494,9 +580,14 @@ def _updateTroves(cfg, applyList, **kwargs):
             applyKwargs[k] = kwargs.pop(k)
 
     callback = kwargs.pop('callback')
+    loadTroveCache = kwargs.pop('loadTroveCache', False)
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
     applyKwargs['autoPinList'] = cfg.pinTroves
+
+    model = kwargs.pop('systemModel', None)
+    if model:
+        modelFile = kwargs.pop('systemModelFile', None)
 
     noRestart = applyKwargs.get('noRestart', False)
 
@@ -529,7 +620,28 @@ def _updateTroves(cfg, applyList, **kwargs):
     updJob = client.newUpdateJob()
 
     try:
-        suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
+        if model:
+            from conary.conaryclient import modelupdate
+            tc = modelupdate.SystemModelTroveCache(client.getDatabase(),
+                                                   client.getRepos(),
+                                                   callback = callback)
+            tcPath = cfg.root + '/var/lib/conarydb/modelcache'
+            import time
+            start = time.time()
+            if loadTroveCache:
+                log.info("loading modelcache")
+                if os.path.exists(tcPath):
+                    tc.load(tcPath)
+                log.info("done %.2f", time.time() - start)
+            ts = client.systemModelGraph(model)
+            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
+            if tc.cacheModified():
+                log.info("saving modelcache")
+                start = time.time()
+                tc.save(tcPath)
+                log.info("done %.2f", time.time() - start)
+        else:
+            suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
         callback.done()
         client.close()
@@ -581,9 +693,16 @@ def _updateTroves(cfg, applyList, **kwargs):
             displayChangedJobs(addedJobs, removedJobs, cfg)
         else:
             askInteractive = False
+
+    if not updJob.jobs:
+        # Nothing to do
+        updJob.close()
+        client.close()
+        return
     elif askInteractive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
+
     if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'
                ' specified.')
@@ -627,6 +746,9 @@ def _updateTroves(cfg, applyList, **kwargs):
         raise errors.ReexecRequired(
                 'Critical update completed, rerunning command...', params,
                 restartDir)
+    else:
+        if (not kwargs.get('test', False)) and model:
+            modelFile.closeSnapshot()
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
@@ -707,8 +829,24 @@ def updateAll(cfg, **kwargs):
     showItems = kwargs.pop('showItems', False)
     restartInfo = kwargs.get('restartInfo', None)
     migrate = kwargs.pop('migrate', False)
+    modelArg = kwargs.pop('model', False)
+    modelFile = kwargs.get('systemModelFile', None)
+    model = kwargs.get('systemModel', None)
+    infoArg = kwargs.get('info', False)
+
+    if model and modelFile and modelFile.exists():
+        model.refreshSearchPath()
+        if modelArg:
+            model.write(sys.stdout)
+            sys.stdout.flush()
+            return None
+        if not infoArg:
+            modelFile.writeSnapshot()
+
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
     kwargs['callback'] = UpdateCallback(cfg)
+    # load trove cache only if --info provided
+    kwargs['loadTroveCache'] = infoArg
 
     client = conaryclient.ConaryClient(cfg)
     # We want to be careful not to break the old style display, for whoever

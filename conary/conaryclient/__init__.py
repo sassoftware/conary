@@ -14,9 +14,12 @@
 import os
 import pickle
 
-#conary imports
-from conary import conarycfg, errors, metadata, rollbacks, trove
+#conary imports. the unused imports of filetypes, mirror, and callbacks
+#are part of the conaryclient api
+from conary import conarycfg, errors, trove
+from conary.cmds import metadata, rollbacks
 from conary.conaryclient import clone, cmdline, password, resolve, update
+from conary.conaryclient import filetypes, mirror, callbacks  # pyflakes=ignore
 from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
@@ -28,6 +31,7 @@ from conary.conaryclient.branch import ClientBranch
 from conary.conaryclient.clone import ClientClone
 from conary.conaryclient.update import ClientUpdate
 from conary.conaryclient.newtrove import ClientNewTrove
+from conary.conaryclient.modelupdate import SystemModelClient
 
 CloneError = clone.CloneError
 CloneIncomplete = clone.CloneIncomplete
@@ -55,7 +59,8 @@ class VersionSuppliedError(UpdateError):
         return "version should not be specified when a Conary change set " \
                "is being installed"
 
-class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
+class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
+                   SystemModelClient):
     """
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.

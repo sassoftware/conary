@@ -1000,8 +1000,11 @@ _TROVEINFO_TAG_LAST           = 29
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
+_TROVECAPSULE_MSI             = 2
+
 _TROVECAPSULE_TYPE_CONARY     = ''
 _TROVECAPSULE_TYPE_RPM        = 'rpm'
+_TROVECAPSULE_TYPE_MSI        = 'msi'
 
 _TROVECAPSULE_RPM_NAME        = 0
 _TROVECAPSULE_RPM_VERSION     = 1
@@ -1010,6 +1013,12 @@ _TROVECAPSULE_RPM_ARCH        = 3
 _TROVECAPSULE_RPM_EPOCH       = 4
 _TROVECAPSULE_RPM_OBSOLETES   = 5
 _TROVECAPSULE_RPM_SHA1HEADER  = 6
+
+_TROVECAPSULE_MSI_NAME        = 0
+_TROVECAPSULE_MSI_VERSION     = 1
+_TROVECAPSULE_MSI_PLATFORM    = 2
+_TROVECAPSULE_MSI_PCODE       = 3
+_TROVECAPSULE_MSI_UCODE       = 4
 
 _RPM_OBSOLETE_NAME    = 0
 _RPM_OBSOLETE_FLAGS   = 1
@@ -1070,16 +1079,38 @@ class TroveRpmCapsule(streams.StreamSet):
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
 
+class TroveMsiCapsule(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_MSI_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_MSI_VERSION : (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_MSI_PLATFORM: (DYNAMIC, streams.StringStream,
+                                     'platform' ),
+        _TROVECAPSULE_MSI_PCODE: (DYNAMIC, streams.StringStream,
+                                  'productCode' ),
+        _TROVECAPSULE_MSI_UCODE: (DYNAMIC, streams.StringStream,
+                                     'upgradeCode' ),
+    }
+
+    def reset(self):
+        self.name.set(None)
+        self.version.set(None)
+        self.platform.set(None)
+        self.productCode.set(None)
+        self.upgradeCode.set(None)
+
 class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
-        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,      'rpm'  ),
+        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,         'rpm'  ),
+        _TROVECAPSULE_MSI      : (SMALL, TroveMsiCapsule,         'msi'  ),
     }
 
     def reset(self):
         self.type.set(None)
         self.rpm.reset()
+        self.msi.reset()
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -1738,6 +1769,17 @@ class Trove(streams.StreamSet):
 
         self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
 
+    def addMsiCapsule(self, path, version, fileId, winHelper):
+        assert(len(fileId) == 20)
+        dir, base = os.path.split(path)
+        self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
+        self.troveInfo.capsule.type.set('msi')
+        self.troveInfo.capsule.msi.name.set(winHelper.name.encode('utf-8'))
+        self.troveInfo.capsule.msi.version.set(winHelper.version.encode('utf-8'))
+        self.troveInfo.capsule.msi.platform.set(winHelper.platform.encode('utf-8'))
+        self.troveInfo.capsule.msi.productCode.set(winHelper.productCode.encode('utf-8'))
+        self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode.encode('utf-8'))
+
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()
         self.troveInfo.dirHashes.clear()
@@ -1892,11 +1934,7 @@ class Trove(streams.StreamSet):
             yield item, byDefault, False
 
     def isStrongReference(self, name, version, flavor):
-        key = (name, version, flavor)
-        rc = self.strongTroves.get(key, None)
-        if rc is None:
-            return False
-        return True
+        return (name, version, flavor) in self.strongTroves
 
     def includeTroveByDefault(self, name, version, flavor):
         key = (name, version, flavor)

@@ -223,7 +223,9 @@ class TroveSearchSource(SearchSource):
         a list of trove tuples or a list of trove objects.
     """
     def __init__(self, troveSource, troveList, flavor=None, db=None):
-        if not isinstance(troveList, (list, tuple)):
+        if isinstance(troveList, set):
+            troveList = tuple(troveList)
+        elif not isinstance(troveList, (list, tuple)):
             troveList = [troveList]
 
         if troveList and not isinstance(troveList[0], trove.Trove):

@@ -18,7 +18,6 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import itertools
-import gzip
 import os
 import re
 import shutil, subprocess
@@ -28,7 +27,6 @@ import tempfile
 import stat
 
 from conary.lib import debugger, digestlib, log, magic, sha1helper
-from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
 from conary.build import action, errors, filter
@@ -959,7 +957,7 @@ class addPatch(_Source):
         logFiles = []
         log.info('attempting to apply %s to %s with patch level(s) %s'
                  %(patchPath, destDir, ', '.join(str(x) for x in patchlevels)))
-        partiallyApplied = []
+
         for patchlevel in patchlevels:
             failed, logFile = self._applyPatch(patchlevel, patch, destDir,
                                               dryRun=True)
@@ -1321,6 +1319,8 @@ class addCapsule(_Source):
     NAME
     ====
 
+    **************** UPDATE ME FOR MSI SUPPORT AT SOME POINT ************
+
     B{C{r.addCapsule()}} - Add an encapsulated file
 
     SYNOPSIS
@@ -1428,29 +1428,75 @@ class addCapsule(_Source):
         @keyword ignoreAllConflictingTimes: When checking for conflicts between
         files contained in multiple capsules, ignore the mtime on the files.
         """
-        _Source.__init__(self, recipe, *args, **keywords)
+        self.capsuleMagic = None
         self.capsuleType = None
+
+        _Source.__init__(self, recipe, *args, **keywords)
 
     def _initManifest(self):
         assert self.package
         assert not self.manifest
 
         self.package = self.package % self.recipe.macros
-        self.manifest = ExplicitManifest(package=self.package, recipe=self.recipe)
+        self.manifest = ExplicitManifest(package=self.package,
+                                         recipe=self.recipe)
+
+    def _getCapsuleMagic(self, path):
+        if not self.capsuleMagic:
+            self.capsuleMagic = magic.magic(path)
+            if self.capsuleMagic is None:
+                raise SourceError('unknown capsule type for file %s', path)
+            self.capsuleType = self.capsuleMagic.name.lower()
+        assert(path==self.capsuleMagic.path)
+        return self.capsuleMagic
+
+    def _getWinHelper(self, path):
+        if not self.recipe.cfg.windowsBuildService:
+            raise SourceError('MSI capsules cannot be added without a '
+                              'windowsBuildService defined in the conary '
+                              'configuration')
+        import robj
+        from xobj import xobj
+        xmlTemplate = '''\
+<msi id="">
+    <path href="">%s</path>
+    <size>%i</size>
+</msi>'''
+
+        baseUrl = 'http://' + self.recipe.cfg.windowsBuildService + '/api'
+        api = robj.connect(baseUrl)
+        msis = api.msis
+        # post the xml with filename and size to create the resource
+        x = xmlTemplate % (os.path.split(path)[1], os.stat(path).st_size)
+        msis.append(xobj.parse(x))
+        wh = msis[-1]
+
+        # put the actual file contents
+        wh.path = open(path)
+        wh.refresh()
+
+        return wh
 
     def doDownload(self):
         f = self._findSource()
 
         # identify the capsule type
-        m = magic.magic(f)
-        if m is None:
-            raise SourceError('unknown capsule type for file %s', f)
-        if self.capsuleType is None:
-            self.capsuleType = m.name.lower()
+        m = self._getCapsuleMagic(f)
 
         # here we guarantee that package contains a package:component
         # designation.  This is required for _addComponent().
-        pname = m.contents['name']
+        if self.capsuleType == 'rpm':
+            pname = m.contents['name']
+        elif self.capsuleType == 'msi':
+            self.recipe.winHelper = self._getWinHelper(f)
+            pname = str(self.recipe.winHelper.name).split()
+            if len(pname) > 1 and '.' in pname[-1]:
+                pname = '-'.join(pname[:-1])
+            else:
+                pname = '-'.join(pname)
+        else:
+            raise SourceError('unknown capsule type %s', self.capsuleType)
+
         if self.package is None:
             self.package = pname + ':' + self.capsuleType
         else:
@@ -1483,6 +1529,12 @@ class addCapsule(_Source):
         # initialize the manifest
         self._initManifest()
 
+        if self.capsuleType == 'rpm':
+            self.doRPM(f, destDir)
+        elif self.capsuleType == 'msi':
+            self.doMSI(f, destDir)
+
+    def doRPM(self,f,destDir):
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
 
@@ -1496,6 +1548,7 @@ class addCapsule(_Source):
 
         for (path, user, group, mode, size,
              rdev, flags, vflags, digest, filelinktos, mtime) in ownerList:
+
             fullpath = util.joinPaths(destDir,path)
 
             totalPathList.append(path)
@@ -1535,20 +1588,22 @@ class addCapsule(_Source):
                         file(fullpath, 'w')
                     elif stat.S_ISLNK(mode):
                         if not filelinktos:
-                            raise SourceError, 'Ghost Symlink in RPM has no target'
+                            raise SourceError, \
+                                'Ghost Symlink in RPM has no target'
                         if util.exists(fullpath):
                             contents = os.readlink(fullpath)
                             if contents != filelinktos:
                                 raise SourceError(
                                     "Inconsistent symlink contents for %s:"
                                     "'%s' != '%s'" % (
-                                    path, contents, filelinktos))
+                                        path, contents, filelinktos))
                         else:
                             os.symlink(filelinktos, fullpath)
                     elif stat.S_ISFIFO(mode):
                         os.mkfifo(fullpath)
                     else:
-                        raise SourceError, 'Unknown Ghost Filetype defined in RPM'
+                        raise SourceError, \
+                            'Unknown Ghost Filetype defined in RPM'
                 elif flags & (rpmhelper.RPMFILE_CONFIG |
                               rpmhelper.RPMFILE_MISSINGOK |
                               rpmhelper.RPMFILE_NOREPLACE):
@@ -1559,9 +1614,10 @@ class addCapsule(_Source):
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
                     if (stat.S_ISREG(mode) and \
-                            not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) or \
-                            (stat.S_ISLNK(mode) and \
-                             not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
+                        not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) \
+                        or (stat.S_ISLNK(mode) and \
+                        not (vflags & rpmhelper.RPMVERIFY_LINKTO)): \
+
                         InitialContents.append( path )
 
             if flags & rpmhelper.RPMFILE_MISSINGOK:
@@ -1601,20 +1657,31 @@ class addCapsule(_Source):
             '_CAPSULE_SCRIPTS_'))
         _extractScriptsFromRPM(f, scriptDir)
 
+    def doMSI(self, f, destDir):
+        totalPathList = []
+        self.manifest.recordRelativePaths(totalPathList)
+        self.manifest.create()
+        self.recipe._addCapsule(f, self.capsuleType, self.package)
+
     def checkSignature(self, filepath):
+        # generate the magic object in order to populate the capsuleType
+        self._getCapsuleMagic(filepath)
+
         if self.keyid:
             key = self._getPublicKey()
             validKeys = [ key ]
         else:
             validKeys = None
 
-        rpmFileObj = util.ExtendedFile(filepath, buffering = False)
-
-        try:
-            rpmhelper.verifySignatures(rpmFileObj, validKeys)
-        except rpmhelper.SignatureVerificationError, e:
-            raise SourceError, str(e)
-
+        capsuleFileObj = util.ExtendedFile(filepath, buffering = False)
+        if self.capsuleType == 'rpm':
+            try:
+                rpmhelper.verifySignatures(capsuleFileObj, validKeys)
+            except rpmhelper.SignatureVerificationError, e:
+                raise SourceError, str(e)
+        elif self.capsuleType == 'msi':
+            ### WRITE ME ###
+            pass
         log.info('GPG signature for %s is OK', os.path.basename(filepath))
 
 
@@ -2579,7 +2646,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
             break
         try:
             os.write(wpipe, buf)
-        except OSError, msg:
+        except OSError:
             break
     os.close(wpipe)
     (pid, status) = os.waitpid(pid, 0)
@@ -2607,7 +2674,6 @@ def _extractFilesFromISO(iso, directory):
         raise IOError('ISO %s contains neither Joliet nor Rock Ridge info'
                       %iso)
 
-    errorMessage = 'extracting ISO %s' %os.path.basename(iso)
     filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 
