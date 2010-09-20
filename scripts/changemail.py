@@ -26,7 +26,6 @@ import tempfile
 import textwrap
 
 from conary import checkin
-from conary import versions
 from conary.lib import options
 
 def usage(exitcode=1):
