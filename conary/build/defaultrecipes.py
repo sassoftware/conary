@@ -106,28 +106,29 @@ PackageRecipe = '''class PackageRecipe(SourcePackageRecipe, BaseRequiresRecipe):
         'patch:runtime',
     ]'''
 
+groupDescription = '''A group refers to a collection of references to specific troves
+    (specific name, specific version, and specific flavor); the troves
+    may define all the software required to install a system, or sets of
+    troves that are available for a system, or other groups.  Each group
+    may contain any kind of trove, including other groups, and groups
+    may reference other groups built at the same time as well as other
+    groups that exist in a repository.'''
+
 GroupRecipe = '''
 class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
     """
     NAME
     ====
 
-    B{C{r.GroupRecipe()}} - Provides the recipe interface for creating a group.
-
-    SYNOPSIS
-    ========
-
-    See USER COMMANDS Section
+    B{C{r.GroupRecipe()}} - Provides the original type of recipe interface
+    for creating groups.
 
     DESCRIPTION
     ===========
-    The C{r.GroupRecipe} class provides the interface for creation of groups
-    in a Conary recipe.  A group refers to a collection of troves; the troves
-    may be related in purpose to provide a useful functionality, such as a
-    group of media-related troves to provide encoding, decoding, and playback
-    facilities for various media, for example.  Groups are not required to
-    consist of troves with related functionality however, and may contain a
-    collection of any arbitrary troves.
+    The C{r.GroupRecipe} class provides the original interface for creating
+    groups that are stored in a Conary repository.
+
+    ''' + groupDescription + '''
 
     Most C{r.GroupRecipe} user commands accept a B{groupName}
     parameter. This parameter  specifies the group a particular command
@@ -173,7 +174,7 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
     group by default to ensure that the group can be installed without path
     conflicts.  Setting this parameter to C{False} will disable the check.
 
-    B{imageGroup} | (True) Indicates that this group defines a complete,
+    B{imageGroup} : (True) Indicates that this group defines a complete,
     functioning system, as opposed to a group representing a system
     component or a collection of multiple groups that might or might not
     collectively define a complete, functioning system.
@@ -181,9 +182,9 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
     This setting is recorded in the troveInfo for the group. This setting
     does not propogate to subgroups.
 
-    USER COMMANDS
-    =============
-    The following user commands are applicable in Conary group recipes:
+    METHODS
+    =======
+    The following methods are applicable in Conary group recipes:
 
         - L{add} : Adds a trove to a group
 
@@ -230,6 +231,172 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
 
     """
     name = 'group'
+    internalAbstractBaseClass = 1
+'''
+
+GroupSetRecipe = '''
+class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
+    """
+    NAME
+    ====
+
+    B{C{r.GroupSetRecipe()}} - Provides a set-oriented recipe interface
+    for creating groups.
+
+    DESCRIPTION
+    ===========
+    The C{r.GroupSetRecipe} class provides a set-oriented interface for
+    creating groups that are stored in a Conary repository.
+
+    ''' + groupDescription + '''
+
+    In a C{GroupSetRecipe}, almost all the operations are operations
+    on sets of references to troves, called B{TroveSets}.  Each trove
+    reference in a TroveSet is a three-tuple of B{name}, B{version},
+    B{flavor}, along with an attribute, C{isInstalled}, that describes
+    whether the trove is considered B{installed} or B{optional}.  Each
+    TroveSet is immutable.  TroveSet operations return new TroveSets;
+    they do not modify existing TroveSets.
+
+    A TroveSet is created either by reference to other TroveSets or
+    by reference to a Repository.  A C{GroupSetRecipe} must have at
+    least one C{Repository} object.  A C{Repository} object has a
+    default search label list and default flavor, but can be used to
+    find any trove in any accessible Conary repository.
+
+    Repositories and TroveSets can be combined in order in a C{SearchPath}
+    object.  A C{SearchPath} object can be used both for looking up
+    troves and as a source of troves for dependency resolution.
+    TroveSets in a SearchPath are not searched recursively; only the
+    troves mentioned explicitly are searched.  (Use C{TroveSet.flatten()}
+    if you want to search a TroveSet recursively.)
+
+    Finally, the ultimate purpose of a group recipe is to create a
+    new binary group or set of groups.  TroveSets have a C{createGroup}
+    method that creates binary groups from the TroveSets.  (The binary
+    group with the same name as the source group can be created using
+    the C{Group} method, which itself calls C{createGroup}.)  In the binary
+    groups created by C{Group} or C{createGroup}, the C{byDefault} flag
+    is used to indicate B{installed} (C{byDefault=True}) or B{optional}
+    (C{byDefault=False}).
+
+    In summary, C{Repository} objects are the source of all references
+    to troves in TroveSets, directly or indirectly.  The TroveSets are
+    manipulated in various ways until they represent the desired groups,
+    and then those groups are built with C{createGroup} (or C{Group}).
+
+    METHODS
+    =======
+    The following recipe methods are available in Conary group set recipes:
+
+        - L{Repository} : Creates an object representing a respository
+        with a default search label list and flavor.
+        - L{SearchPath} : Creates an object in which to search for
+        troves or dependencies.
+        - L{Group} : Creates the primary group object.
+        - L{dumpAll} : Displays copious output describing each action.
+        - L{track} : Displays less copious output describing specific
+        troves.
+
+    The following methods are available in C{Repository} objects:
+
+        - L{Repository.find} : Search the Repository for specified troves
+        - L{Repository.latestPackages} : Get latest normal packages of the
+        default flavor on the default label
+
+    The following methods are available in C{SearchPath} objects:
+
+        - L{SearchPath.find} : Search the SearchPath for specified troves 
+
+    The following methods are available in C{TroveSet} objects:
+
+        - L{TroveSet.components} : Recursively search for named components
+        - L{TroveSet.createGroup} : Create a binary group
+        - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
+        - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
+        - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
+        - L{TroveSet.find} : Search the TroveSet for specified troves
+        - L{TroveSet.findByName} : Find troves by regular expression
+        - L{TroveSet.findBySourceName} : Find troves by the name of the source
+        package from which they were built
+        - L{TroveSet.flatten} : Resolve trove references recursively
+        - L{TroveSet.getInstall} : Get only install troves from set
+        - L{TroveSet.getOptional} : Get only optional troves from set
+        - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
+        - L{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
+        - L{TroveSet.makeInstall} : Make all troves install, or add all
+        provided troves as install troves
+        - L{TroveSet.makeOptional} : Make all troves optional, or add all
+        provided troves as optional troves
+        - L{TroveSet.members} : Resolve exactly one level of trove
+        references, return only those resolved references
+        - L{TroveSet.packages} : Resolve trove references recursively,
+        return packages
+        - L{TroveSet.replace} : Replace troves in the TroveSet with
+        matching-named troves from the replacement set
+        - L{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
+        - L{TroveSet.update} : Replace troves in the TroveSet with
+        all troves from the replacement set
+
+    Except for C{TroveSet.dump}, which prints debugging information,
+    each of these C{Repository}, C{SearchPath}, and C{TroveSet} methods
+    returns a C{TroveSet}.
+
+    EXAMPLE
+    =======
+
+    This is an example recipe that uses the search path included in
+    a product definition, if available, to provide a stable search.
+    It adds to the base C{group-appliance-platform} the httpd, mod_ssl,
+    and php packages, as well as all the required dependencies.
+
+    class GroupMyAppliance(GroupSetRecipe):
+        name = 'group-my-appliance'
+        version = '1.0'
+
+        def setup(r):
+            r.dumpAll()
+            repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+            if 'productDefinitionSearchPath' in r.macros:
+                # proper build with product definition
+                searchPath = r.SearchPath(repo[x].flatten() for x in
+                    r.macros.productDefinitionSearchPath.split('\\\\n'))
+            else:
+                # local test build
+                searchPath = r.SearchPath(
+                    repo['group-os=conary.rpath.com@rpl:2'].flatten())
+                searchPath = r.SearchPath(repo)
+            base = searchPath['group-appliance-platform']
+            additions = searchPath.find(
+                'httpd',
+                'mod_ssl',
+                'php')
+            # We know that base is dependency-closed and consistent
+            # with the searchPath, so just get the extra deps we need
+            deps = (additions + base).depsNeeded(searchPath)
+
+            r.Group(base + additions + deps)
+
+    Next, an example of building a platform derived from another platform,
+    adding all packages defined locally to the group:
+
+    class GroupMyPlatform(GroupSetRecipe):
+        name = 'group-my-platform'
+        version = '1.0'
+
+        def setup(r):
+            centOS = r.Repository('centos.rpath.com@rpath:centos-5', r.flavor)
+            local = r.Repository('repo.example.com@example:centos-5', r.flavor)
+            pkgs = centOS['group-packages']
+            std = centOS['group-standard']
+            localPackages = localRepo.latestPackages()
+            std += localPackages
+            pkgs += localPackages
+            stdGrp = std.createGroup('group-standard')
+            pkgGrp = pkgs.createGroup('group-packages')
+            r.Group(stdGrp + pkgGrp)
+    """
+    name = 'groupset'
     internalAbstractBaseClass = 1
 '''
 
@@ -620,6 +787,7 @@ recipeNames = {'baserequires': 'BaseRequiresRecipe',
                'groupinfo': 'GroupInfoRecipe',
                'derivedpackage': 'DerivedPackageRecipe',
                'group': 'GroupRecipe',
+               'groupset': 'GroupSetRecipe',
                'redirect': 'RedirectRecipe',
                'fileset': 'FilesetRecipe',
                'capsule': 'CapsuleRecipe',
