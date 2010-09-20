@@ -365,7 +365,6 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
                 # local test build
                 searchPath = r.SearchPath(
                     repo['group-os=conary.rpath.com@rpl:2'].flatten())
-                searchPath = r.SearchPath(repo)
             base = searchPath['group-appliance-platform']
             additions = searchPath.find(
                 'httpd',
