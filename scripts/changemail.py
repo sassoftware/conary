@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2005-2009 rPath, Inc.
+# Copyright (C) 2005-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,7 +16,8 @@
 import os
 import sys
 import smtplib
-from email.mime.text import MIMEText
+# python 2.4 does not have email.mime; email.MIMEText is available in 2.6
+from email import MIMEText
 
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
