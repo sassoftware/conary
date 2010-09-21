@@ -1206,7 +1206,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         for info in troveList:
             cs = self.troveCsMap.get(info, None)
-            assert(cs)
+            if cs is None:
+                retList.append(None)
+                continue
+
             trvCs = cs.getNewTroveVersion(*info)
             ti = trvCs.getTroveInfo()
             retList.append(getattr(ti, attrName))
@@ -1608,6 +1611,25 @@ class SourceStack(object):
         if troveList and not allowMissing:
             raise errors.TroveMissingError(troveList[0][1][0],
                                            troveList[0][1][1])
+        return results
+
+    def getTroveInfo(self, infoType, troveTupList):
+        # -1 means "unknown trove" None means "troveinfo not in the trove"
+        results = [ -1 ] * len(troveTupList)
+        for source in self.sources:
+            need = [ (i, troveTup) for i, (troveTup, ti) in
+                        enumerate(itertools.izip(troveTupList, results))
+                        if ti == -1]
+            if not need:
+                break
+
+            tiList = source.getTroveInfo(infoType, [ x[1] for x in need] )
+            for (i, troveTup), troveInfo in itertools.izip(need, tiList):
+                if troveInfo == 0:
+                    results[0] = None
+                else:
+                    results[i] = troveInfo
+
         return results
 
     def getDepsForTroveList(self, troveInfoList):

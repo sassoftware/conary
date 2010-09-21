@@ -510,14 +510,15 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     if rmArgs:
         sysmodel.appendTroveOpByName('erase', text=rmArgs)
 
+    updateName = { False: 'update',
+                   True: 'install' }[kwargs['keepExisting']]
+
     if addArgs:
-        updateName = { False: 'update',
-                       True: 'install' }[kwargs['keepExisting']]
         sysmodel.appendTroveOpByName(updateName, text=addArgs)
 
     for cs in fromChangesets:
         for trvInfo in cs.getPrimaryTroveList():
-            sysmodel.appendTroveOpByName('install', text='%s=%s[%s]' % (
+            sysmodel.appendTroveOpByName(updateName, text='%s=%s[%s]' % (
                 trvInfo[0],
                 trvInfo[1].asString(),
                 deps.formatFlavor(trvInfo[2])))
@@ -624,7 +625,9 @@ def _updateTroves(cfg, applyList, **kwargs):
             from conary.conaryclient import modelupdate
             tc = modelupdate.SystemModelTroveCache(client.getDatabase(),
                                                    client.getRepos(),
-                                                   callback = callback)
+                                                   callback = callback,
+                                                   changeSetList =
+                                                      kwargs['fromChangesets'])
             tcPath = cfg.root + '/var/lib/conarydb/modelcache'
             import time
             start = time.time()
@@ -633,8 +636,10 @@ def _updateTroves(cfg, applyList, **kwargs):
                 if os.path.exists(tcPath):
                     tc.load(tcPath)
                 log.info("done %.2f", time.time() - start)
-            ts = client.systemModelGraph(model)
-            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
+            ts = client.systemModelGraph(
+                            model, changeSetList = kwargs['fromChangesets'])
+            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
+                                  fromChangesets = kwargs['fromChangesets'])
             if tc.cacheModified():
                 log.info("saving modelcache")
                 start = time.time()

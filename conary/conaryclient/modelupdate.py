@@ -12,7 +12,7 @@
 
 import itertools
 
-from conary import trove, versions
+from conary import errors, trove, versions
 from conary.conaryclient import troveset, update
 from conary.deps import deps
 from conary.lib import log, util
@@ -43,8 +43,26 @@ class SystemModelTroveCache(trovecache.TroveCache):
         trovecache.TroveCache.__init__(self, troveSource)
 
     def _caching(self, troveTupList):
-        log.info("loading %d trove(s) from the repository, one of which is %s",
-                  len(troveTupList), troveTupList[0])
+        local = [ x for x in troveTupList if x[1].isOnLocalHost() ]
+
+        if local:
+            troves = self.db.getTroves(local)
+
+            gotTups = []
+            gotTrvs = []
+            for troveTup, trv in itertools.izip(local, troves):
+                if trv is None:
+                    continue
+
+                gotTups.append(troveTup)
+                gotTrvs.append(trv)
+                troveTupList.remove(troveTup)
+
+            self._addToCache(gotTups, gotTrvs)
+
+        if troveTupList:
+            log.info("loading %d trove(s) from the repository, "
+                     "one of which is %s", len(troveTupList), troveTupList[0])
 
     def _cached(self, troveTupList, troveList):
         for tup, trv in itertools.izip(troveTupList, troveList):
@@ -255,7 +273,9 @@ class SysModelFinalFetchAction(SysModelFetchAction):
                                  action.primaryTroveSet._walk(data.troveCache,
                                                  newGroups = False,
                                                  recurse = True)
-                            if trove.troveIsGroup(troveTup[0]) or isExplicit)
+                            if (inInstall and
+                                (trove.troveIsGroup(troveTup[0]) or isExplicit)
+                               ) )
 
         data.troveCache.getTroves(troveTuples, withFiles = False)
 
@@ -324,7 +344,7 @@ class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
 class SystemModelClient(object):
 
-    def systemModelGraph(self, sysModel):
+    def systemModelGraph(self, sysModel, changeSetList = []):
         collections = set()
         for op in sysModel.systemItems:
             for troveTup in op:
@@ -334,8 +354,20 @@ class SystemModelClient(object):
                 elif trove.troveIsGroup(name):
                     collections.add(name)
 
+        if changeSetList:
+            csTroveSource = trovesource.ChangesetFilesTroveSource(
+                                                        self.getDatabase())
+            csTroveSource.addChangeSets(changeSetList)
+            csSearchSource = searchsource.SearchSource(csTroveSource,
+                                                       self.cfg.flavor)
+            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource)
+        else:
+            csTroveSet = None
+
         # create the initial search path from the installLabelPath
-        reposTroveSet = self._createRepositoryTroveSet()
+        reposTroveSet = self._createRepositoryTroveSet(csTroveSet = csTroveSet)
+        dbTroveSet = self._createDatabaseTroveSet(graph = reposTroveSet.g,
+                                                  csTroveSet = csTroveSet)
 
         # now build new search path elements
         searchPathItems = []
@@ -366,13 +398,45 @@ class SystemModelClient(object):
 
         finalTroveSet = SysModelInitialTroveTupleSet(graph = searchTroveSet.g)
         for op in sysModel.systemItems:
-            matches = searchTroveSet.find(*[ x for x in op ])
+            searchSpecs = []
+            localSpecs = []
+            for troveSpec in op:
+                if (troveSpec.version is not None and
+                                    troveSpec.version[0] == '/'):
+                    try:
+                        verObj = versions.VersionFromString(troveSpec.version)
+                        if verObj.isInLocalNamespace():
+                            localSpecs.append(troveSpec)
+                            break
+
+                    except (errors.VersionStringError, errors.ParseError):
+                        pass
+
+                searchSpecs.append(troveSpec)
+
+            if searchSpecs:
+                searchMatches = searchTroveSet.find(*searchSpecs)
+            else:
+                searchMatches = None
+
+            if localSpecs:
+                localMatches = dbTroveSet.find(*localSpecs)
+            else:
+                localMatches = None
+
+            if searchMatches and localMatches:
+                matches = searchMatches.union(localMatches)
+            elif searchMatches:
+                matches = searchMatches
+            else:
+                matches = localMatches
+
             if isinstance(op, sysModel.InstallTroveOperation):
                 finalTroveSet = finalTroveSet.union(matches)
 
                 growSearchPath = False
                 for troveSpec in op:
-                    if troveSpec[0] in collections:
+                    if troveSpec.name in collections:
                         growSearchPath = True
 
                 if growSearchPath:
@@ -382,14 +446,11 @@ class SystemModelClient(object):
                             [ flatten, searchTroveSet ],
                             graph = searchTroveSet.g)
             elif isinstance(op, sysModel.EraseTroveOperation):
-                removeSet = searchTroveSet.find(*[ x for x in op ])
-                finalTroveSet = finalTroveSet.remove(removeSet)
+                finalTroveSet = finalTroveSet.remove(matches)
             elif isinstance(op, sysModel.ReplaceTroveOperation):
-                replaceSet = searchTroveSet.find(*[ x for x in op])
-                finalTroveSet = finalTroveSet.replace(replaceSet)
+                finalTroveSet = finalTroveSet.replace(matches)
             elif isinstance(op, sysModel.UpdateTroveOperation):
-                updateSet = searchTroveSet.find(*[ x for x in op])
-                finalTroveSet = finalTroveSet.update(updateSet)
+                finalTroveSet = finalTroveSet.update(matches)
             else:
                 assert(0)
 
@@ -397,13 +458,33 @@ class SystemModelClient(object):
 
         return finalTroveSet
 
-    def _createRepositoryTroveSet(self):
+    def _createRepositoryTroveSet(self, csTroveSet = None):
+        if csTroveSet is None:
+            path = []
+        else:
+            path = [ csTroveSet ]
+
         g = troveset.OperationGraph()
         repos = troveset.SearchSourceTroveSet(
                 searchsource.NetworkSearchSource(self.getRepos(),
                                                  [],
                                                  self.cfg.flavor))
-        return SysModelSearchPathTroveSet([ repos ], graph = g)
+        path.append(repos)
+
+        return SysModelSearchPathTroveSet(path, graph = g)
+
+    def _createDatabaseTroveSet(self, graph = None, csTroveSet = None):
+        if csTroveSet is None:
+            path = []
+        else:
+            path = [ csTroveSet ]
+
+        db = self.getDatabase()
+        dbSearchSource = searchsource.SearchSource(db, self.cfg.flavor)
+        dbTroveSet = troveset.SearchSourceTroveSet(dbSearchSource)
+        path.append(dbTroveSet)
+
+        return SysModelSearchPathTroveSet(path, graph = graph)
 
     def _processSysmodelJobList(self, origJobList, updJob, troveCache):
         # this is just like _processJobList, but it's forked to use the
@@ -621,13 +702,17 @@ class SystemModelClient(object):
                 targetTrv.addTrove(*tup[0:3])
 
         self._closePackages(troveCache, targetTrv)
-        job = targetTrv.diff(existsTrv)[2]
+        job = targetTrv.diff(existsTrv, absolute = False)[2]
 
         depResolveSource = searchPath._getResolveSource(
                         filterFn = targetTrv.isStrongReference)
         resolveMethod = depResolveSource.getResolveMethod()
 
         uJob.setSearchSource(self.getSearchSource())
+        # this is awful
+        jobTroveSource = uJob.getTroveSource()
+        jobTroveSource.addChangeSets(fromChangesets,
+                                     includesFileContents = True)
 
         pathHashCache = {}
 
@@ -691,7 +776,7 @@ class SystemModelClient(object):
                 # try to avoid a diff here
                 job = _updateJob(job, added)
                 if job is None:
-                    job = targetTrv.diff(existsTrv)[2]
+                    job = targetTrv.diff(existsTrv, absolute = False)[2]
 
                 log.info("resolving dependencies")
                 result = check.depCheck(job,

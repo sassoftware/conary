@@ -35,6 +35,15 @@ class TroveCache(trovesource.AbstractTroveSource):
         self.cache = {}
         self.troveSource = troveSource
 
+    def _addToCache(self, troveTupList, troves, _cached = None):
+        for troveTup, trv in izip(troveTupList, troves):
+            self.cache[troveTup] = trv
+
+        if _cached:
+            _cached(troveTupList, troves)
+        else:
+            self._cached(troveTupList, troves)
+
     def _caching(self, troveTupList):
         pass
 
@@ -51,13 +60,7 @@ class TroveCache(trovesource.AbstractTroveSource):
         troves = self.troveSource.getTroves(troveTupList, withFiles=False,
                                             callback = self.callback)
 
-        for troveTup, trv in izip(troveTupList, troves):
-            self.cache[troveTup] = trv
-
-        if _cached:
-            _cached(troveTupList, troves)
-        else:
-            self._cached(troveTupList, troves)
+        self._addToCache(troveTupList, troves, _cached = _cached)
 
     def getDepsForTroveList(self, troveTupList):
         # look in the dep cache and trove cache
