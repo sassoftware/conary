@@ -431,9 +431,20 @@ class SystemModelClient(object):
             else:
                 matches = localMatches
 
+            growSearchPath = True
             if isinstance(op, sysModel.InstallTroveOperation):
                 finalTroveSet = finalTroveSet.union(matches)
+            elif isinstance(op, sysModel.EraseTroveOperation):
+                growSearchPath = False
+                finalTroveSet = finalTroveSet.remove(matches)
+            elif isinstance(op, sysModel.ReplaceTroveOperation):
+                finalTroveSet = finalTroveSet.replace(matches)
+            elif isinstance(op, sysModel.UpdateTroveOperation):
+                finalTroveSet = finalTroveSet.update(matches)
+            else:
+                assert(0)
 
+            if growSearchPath:
                 growSearchPath = False
                 for troveSpec in op:
                     if troveSpec.name in collections:
@@ -445,14 +456,6 @@ class SystemModelClient(object):
                     searchTroveSet = SysModelSearchPathTroveSet(
                             [ flatten, searchTroveSet ],
                             graph = searchTroveSet.g)
-            elif isinstance(op, sysModel.EraseTroveOperation):
-                finalTroveSet = finalTroveSet.remove(matches)
-            elif isinstance(op, sysModel.ReplaceTroveOperation):
-                finalTroveSet = finalTroveSet.replace(matches)
-            elif isinstance(op, sysModel.UpdateTroveOperation):
-                finalTroveSet = finalTroveSet.update(matches)
-            else:
-                assert(0)
 
         finalTroveSet.searchPath = searchTroveSet
 
