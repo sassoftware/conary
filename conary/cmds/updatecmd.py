@@ -619,6 +619,7 @@ def _updateTroves(cfg, applyList, **kwargs):
         client.checkWriteableRoot()
 
     updJob = client.newUpdateJob()
+    changeSetList = kwargs.pop('fromChangesets', [])
 
     try:
         if model:
@@ -627,7 +628,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                                                    client.getRepos(),
                                                    callback = callback,
                                                    changeSetList =
-                                                      kwargs['fromChangesets'])
+                                                        changeSetList)
             tcPath = cfg.root + '/var/lib/conarydb/modelcache'
             import time
             start = time.time()
@@ -636,10 +637,9 @@ def _updateTroves(cfg, applyList, **kwargs):
                 if os.path.exists(tcPath):
                     tc.load(tcPath)
                 log.info("done %.2f", time.time() - start)
-            ts = client.systemModelGraph(
-                            model, changeSetList = kwargs['fromChangesets'])
+            ts = client.systemModelGraph( model, changeSetList = changeSetList)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
-                                  fromChangesets = kwargs['fromChangesets'])
+                                            fromChangesets = changeSetList)
             if tc.cacheModified():
                 log.info("saving modelcache")
                 start = time.time()
