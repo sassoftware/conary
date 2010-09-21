@@ -603,6 +603,14 @@ class ReplaceAction(DelayedTupleSetAction):
                     optionalSet.add(troveTup)
 
         troveMapping = after.diff(before)[2]
+        # this completely misses anything where the only change is
+        # byDefault status
+        for troveTup in (set(after.iterTroveList(strongRefs = True)) &
+                         set(before.iterTroveList(strongRefs = True))):
+            if beforeInfo[troveTup] != afterInfo[troveTup]:
+                troveMapping.append( (troveTup[0], troveTup[1:3],
+                                      troveTup[1:3], False) )
+
         for (trvName, (oldVersion, oldFlavor),
                       (newVersion, newFlavor), isAbsolute) in troveMapping:
             oldTuple = (trvName, oldVersion, oldFlavor)
@@ -636,13 +644,17 @@ class ReplaceAction(DelayedTupleSetAction):
         else:
             # we've mapped an update; turn off the old version (by
             # marking it as optional) and include the new one with the
-            # same defaultness as the old one had
-            optionalSet.add(oldTuple)
+            # same defaultness as the old one had. if it is explicit
+            # in the new one, we always include it
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
-            if wasInInstallSet:
+            inInstallSet, isExplicit = afterInfo[newTuple]
+            if (isExplicit and inInstallSet) or wasInInstallSet:
                 installSet.add(newTuple)
             else:
                 optionalSet.add(newTuple)
+
+            if newTuple != oldTuple:
+                optionalSet.add(oldTuple)
 
 class UpdateAction(ReplaceAction):
 
@@ -673,12 +685,15 @@ class UpdateAction(ReplaceAction):
         else:
             # it existed before and after; keep the install setting
             # we used before
-            optionalSet.add(oldTuple)
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
-            if wasInInstallSet:
+            isInInstallSet, isExplicit = afterInfo[newTuple]
+            if wasInInstallSet or (isExplicit and isInInstallSet):
                 installSet.add(newTuple)
             else:
                 optionalSet.add(newTuple)
+
+            if oldTuple != newTuple:
+                optionalSet.add(oldTuple)
 
 
 class OperationGraph(graph.DirectedGraph):
