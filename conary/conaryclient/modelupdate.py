@@ -364,11 +364,10 @@ class SystemModelClient(object):
         searchTroveSet = SysModelSearchPathTroveSet(searchPathItems,
                                                     graph = reposTroveSet.g)
 
-        import systemmodel
         finalTroveSet = SysModelInitialTroveTupleSet(graph = searchTroveSet.g)
         for op in sysModel.systemItems:
             matches = searchTroveSet.find(*[ x for x in op ])
-            if isinstance(op, systemmodel.InstallTroveOperation):
+            if isinstance(op, sysModel.InstallTroveOperation):
                 finalTroveSet = finalTroveSet.union(matches)
 
                 growSearchPath = False
@@ -382,13 +381,13 @@ class SystemModelClient(object):
                     searchTroveSet = SysModelSearchPathTroveSet(
                             [ flatten, searchTroveSet ],
                             graph = searchTroveSet.g)
-            elif isinstance(op, systemmodel.EraseTroveOperation):
+            elif isinstance(op, sysModel.EraseTroveOperation):
                 removeSet = searchTroveSet.find(*[ x for x in op ])
                 finalTroveSet = finalTroveSet.remove(removeSet)
-            elif isinstance(op, systemmodel.ReplaceTroveOperation):
+            elif isinstance(op, sysModel.ReplaceTroveOperation):
                 replaceSet = searchTroveSet.find(*[ x for x in op])
                 finalTroveSet = finalTroveSet.replace(replaceSet)
-            elif isinstance(op, systemmodel.UpdateTroveOperation):
+            elif isinstance(op, sysModel.UpdateTroveOperation):
                 updateSet = searchTroveSet.find(*[ x for x in op])
                 finalTroveSet = finalTroveSet.update(updateSet)
             else:
