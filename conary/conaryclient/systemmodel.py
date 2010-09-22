@@ -183,10 +183,10 @@ class SystemModel:
         self.searchPath.append(item)
         self._addIndex(item)
 
-    def appendTroveOp(self, op):
+    def appendTroveOp(self, op, deDup=True):
         # First, remove trivially obvious duplication -- more
         # complex duplicates may be removed after building the graph
-        if isinstance(op, EraseTroveOperation) and self.systemItems:
+        if isinstance(op, EraseTroveOperation) and self.systemItems and deDup:
             otherOp = self.systemItems[-1]
             if op == otherOp:
                 if isinstance(otherOp, (UpdateTroveOperation,
@@ -211,8 +211,9 @@ class SystemModel:
             self.systemItems.remove(op)
 
     def appendTroveOpByName(self, key, *args, **kwargs):
+        deDup = kwargs.pop('deDup', True)
         op = troveOpMap[key](*args, **kwargs)
-        self.appendTroveOp(op)
+        self.appendTroveOp(op, deDup=deDup)
         return op
 
     def refreshSearchPath(self):
@@ -333,7 +334,8 @@ class SystemModelText(SystemModel):
             elif verb in troveOpMap:
                 self.appendTroveOpByName(verb,
                     text=shlex.split(nouns, comments=True),
-                    modified=False, index=index)
+                    modified=False, index=index,
+                    deDup=False)
 
             else:
                 raise SystemModelError(
