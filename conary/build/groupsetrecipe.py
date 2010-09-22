@@ -107,33 +107,33 @@ class GroupTupleSetMethods(object):
 
     The following methods are available in C{TroveSet} objects:
 
-        - L{TroveSet.components} : Recursively search for components
-        - L{TroveSet.createGroup} : Create a binary group
-        - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
-        - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
-        - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
-        - L{TroveSet.find} : Search the TroveSet for specified troves
-        - L{TroveSet.findByName} : Find troves by regular expression
-        - L{TroveSet.findBySourceName} : Find troves by the name of the source
-        package from which they were built
-        - L{TroveSet.flatten} : Resolve trove references recursively
-        - L{TroveSet.getInstall} : Get only install troves from set
-        - L{TroveSet.getOptional} : Get only optional troves from set
-        - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
-        - L{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
-        - L{TroveSet.makeInstall} : Make all troves install, or add all
-        provided troves as install troves
-        - L{TroveSet.makeOptional} : Make all troves optional, or add all
-        provided troves as optional troves
-        - L{TroveSet.members} : Resolve exactly one level of trove
-        references, return only those resolved references
-        - L{TroveSet.packages} : Resolve trove references recursively,
-        return packages
-        - L{TroveSet.replace} : Replace troves in the TroveSet with
-        matching-named troves from the replacement set
-        - L{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
-        - L{TroveSet.update} : Replace troves in the TroveSet with
-        all troves from the replacement set
+        - C{TroveSet.components} : Recursively search for components
+        - C{TroveSet.createGroup} : Create a binary group
+        - C{TroveSet.depsNeeded} : Get troves satisfying dependencies
+        - C{TroveSet.difference} : Subtract one TroveSet from another (C{-})
+        - C{TroveSet.dump} : Debugging: print the contents of the TroveSet
+        - C{TroveSet.find} : Search the TroveSet for specified troves
+        - C{TroveSet.findByName} : Find troves by regular expression
+        - C{TroveSet.findBySourceName} : Find troves by the name of the source
+          package from which they were built
+        - C{TroveSet.flatten} : Resolve trove references recursively
+        - C{TroveSet.getInstall} : Get only install troves from set
+        - C{TroveSet.getOptional} : Get only optional troves from set
+        - C{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
+        - C{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
+        - C{TroveSet.makeInstall} : Make all troves install, or add all
+          provided troves as install troves
+        - C{TroveSet.makeOptional} : Make all troves optional, or add all
+          provided troves as optional troves
+        - C{TroveSet.members} : Resolve exactly one level of trove
+          references, return only those resolved references
+        - C{TroveSet.packages} : Resolve trove references recursively,
+          return packages
+        - C{TroveSet.replace} : Replace troves in the TroveSet with
+          matching-named troves from the replacement set
+        - C{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
+        - C{TroveSet.update} : Replace troves in the TroveSet with
+          all troves from the replacement set
 
     Except for C{TroveSet.dump}, which prints debugging information,
     each of these methods returns a new TroveSet.
@@ -167,9 +167,9 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{resolveSource} : Source against which to resolve dependencies
-        - L{failOnUnresolved} (C{True}) : Whether to fail if not all
-        dependencies can be resolved.
+            - L{resolveSource} : Source against which to resolve dependencies
+            - L{failOnUnresolved} (C{True}) : Whether to fail if not all
+              dependencies can be resolved.
 
         EXAMPLES
         ========
@@ -227,6 +227,7 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
+
         B{C{TroveSet.difference}} - Subtract one TroveSet from another (C{-})
 
         SYNOPSIS
@@ -258,6 +259,7 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
+
         B{C{TroveSet.find}} - Search the TroveSet for specified troves
 
         SYNOPSIS
@@ -295,6 +297,7 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
+
         B{C{TroveSet.findByName}} - Find troves by regular expression
 
         SYNOPSIS
@@ -306,15 +309,15 @@ class GroupTupleSetMethods(object):
         ===========
 
         The original troveset is searched for troves whose names match
-        C{nameRegularExpression, and matching troves are returned in
+        C{nameRegularExpression}, and matching troves are returned in
         a new troveset.  The isInstall value is preserved from the
         original troveset being searched.
 
         PARAMETERS
         ==========
 
-        - L{emptyOkay} : Unless set to C{True}, raise an exception if
-        no troves are found.
+            - L{emptyOkay} : Unless set to C{True}, raise an exception if
+              no troves are found.
         
         EXAMPLES
         ========
@@ -335,6 +338,7 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
+
         B{C{TroveSet.findBySourceName}} - Find troves by the name of the source
         package from which they were built
 
@@ -552,7 +556,7 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{installTroveSet} : TroveSet providing all its members as install
+            - L{installTroveSet} : TroveSet providing all its members as install
         """
         return self._action(ActionClass = MakeInstallAction,
                             installTroveSet = installTroveSet)
@@ -585,7 +589,7 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{optionalTroveSet} : TroveSet providing all its members as optional
+            - L{optionalTroveSet} : TroveSet providing all its members as optional
         """
         return self._action(ActionClass = MakeOptionalAction,
                             optionalTroveSet = optionalTroveSet)
@@ -695,7 +699,7 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{replaceSet} : TroveSet containing potential replacements
+            - L{replaceSet} : TroveSet containing potential replacements
 
         EXAMPLES
         ========
@@ -748,7 +752,7 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{updateSet} : TroveSet providing all its contents
+            - L{updateSet} : TroveSet providing all its contents
 
         EXAMPLES
         ========
@@ -796,7 +800,7 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
 
-        - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+            - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
                             ActionClass = CreateNewGroupAction)
@@ -899,7 +903,7 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     METHODS
     =======
 
-    - L{find} : Search the SearchPath for specified troves
+        - L{find} : Search the SearchPath for specified troves
     '''
     _explainObjectName = 'SearchPath'
 
@@ -926,11 +930,11 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
         Each C{troveSpec} has the same format as a trove referenced on
         the command line: C{name=version[flavor]}
 
-        - L{name} : Required: the full name of the trove
-        - L{version} : Optional: Any legal full or partial version,
-        with or without a full or partial label.
-        - L{flavor} : Optional: The flavor to match, composed with
-        the Repository flavor and the build configuration flavor.
+            - L{name} : Required: the full name of the trove
+            - L{version} : Optional: Any legal full or partial version,
+              with or without a full or partial label.
+            - L{flavor} : Optional: The flavor to match, composed with
+              the Repository flavor and the build configuration flavor.
         '''
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 
@@ -964,8 +968,9 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
     METHODS
     =======
 
-    - L{find} : Search the repository for specified troves
-    - L{latestPackages} : All the latest normal packages on the default label(s)
+        - L{find} : Search the repository for specified troves
+        - L{latestPackages} : All the latest normal packages on the
+          default label(s)
     '''
     _explainObjectName = 'Repository'
 
@@ -992,11 +997,11 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
         Each C{troveSpec} has the same format as a trove referenced on
         the command line: C{name=version[flavor]}
 
-        - L{name} : Required: the full name of the trove
-        - L{version} : Optional: Any legal full or partial version,
-        with or without a full or partial label.
-        - L{flavor} : Optional: The flavor to match, composed with
-        the Repository flavor and the build configuration flavor.
+            - L{name} : Required: the full name of the trove
+            - L{version} : Optional: Any legal full or partial version,
+              with or without a full or partial label.
+            - L{flavor} : Optional: The flavor to match, composed with
+              the Repository flavor and the build configuration flavor.
         '''
         return self._action(ActionClass = GroupFindAction, *troveSpecs)
 

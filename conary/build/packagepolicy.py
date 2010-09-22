@@ -2382,8 +2382,8 @@ class _dependency(policy.Policy):
         """
         Takes a path
         Returns, for that path, a tuple of
-            the preferred instance of python to use
-            whether that instance is in the destdir
+            - the preferred instance of python to use
+            - whether that instance is in the destdir
         """
         m = self.recipe.magic[path]
         if m and m.name == 'script' and 'python' in m.contents['interpreter']:
@@ -4432,8 +4432,8 @@ class reportExcessBuildRequires(policy.Policy):
     SYNOPSIS
     ========
 
-    - C{r.reportExcessBuildRequires('required:component')}
-    - C{r.reportExcessBuildRequires(['list:of', 'required:components'])}
+    C{r.reportExcessBuildRequires('required:component')}
+    C{r.reportExcessBuildRequires(['list:of', 'required:components'])}
 
     DESCRIPTION
     ===========

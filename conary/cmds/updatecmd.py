@@ -52,6 +52,8 @@ def locked(method):
         finally:
             self.lock.release()
 
+    wrapper.__doc__ = method.__doc__
+    wrapper.func_name = method.func_name
     return wrapper
 
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):

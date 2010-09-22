@@ -263,7 +263,7 @@ class SystemModelText(SystemModel):
 
     C{search} lines take a single troveSpec or label, which B{may} be
     enclosed in single or double quote characters.  Each C{search}
-    item B{appends} to the search path.  The C{installLabelPath}}
+    item B{appends} to the search path.  The C{installLabelPath}
     configuration item is implicitly appended to the specified
     C{searchPath}.
 

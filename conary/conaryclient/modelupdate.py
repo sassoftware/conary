@@ -650,8 +650,8 @@ class SystemModelClient(object):
             be found.
 
         @raise other: Callbacks may generate exceptions on their own. See
-            L{applyUpdateJob} for an explanation of the behavior of exceptions
-            within callbacks.
+            L{update.ClientUpdate.applyUpdateJob} for an explanation of
+            the behavior of exceptions within callbacks.
         """
 
         def _updateJob(origJob, addedTroves):
