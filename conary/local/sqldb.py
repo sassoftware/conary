@@ -550,7 +550,7 @@ class Database:
 
         @note:
             This function makes database calls and may raise any exceptions
-        defined in L{conary.dbstore.sqlerrors}
+            defined in L{conary.dbstore.sqlerrors}
 
         @raises AssertionError:
         """
@@ -1288,8 +1288,8 @@ order by
 
         @param pristine: Return the trove unmodified based on the local system.
         @type pristine: boolean
-        @param instanceId: Instance ids to iterate over.
-        @type instanceId: list of int
+        @param instanceIds: Instance ids to iterate over.
+        @type instanceIds: list of int
         @param withFiles: Include (pathId, path, fileId, version) information
         for the files referenced by troves.
         @type withFiles: boolean

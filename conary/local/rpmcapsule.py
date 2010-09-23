@@ -12,10 +12,10 @@
 # full details.
 #
 
-import itertools, rpm, os, pwd, stat, tempfile
+import itertools, re, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
-from conary.lib import util, log
+from conary.lib import elf, misc, util, log
 from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors
 from conary.repository import filecontents
@@ -129,11 +129,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
     def __init__(self, *args, **kwargs):
         SingleCapsuleOperation.__init__(self, *args, **kwargs)
-        nsp = rpm.expandMacro('%_netsharedpath')
+
+        self.netSharedPath = set()
+        nsp = rpmExpandMacro('%_netsharedpath')
         if nsp != '%_netsharedpath':
             self.netSharedPath = set(nsp.split(':'))
-        else:
-            self.netSharedPath = set()
 
     @staticmethod
     def _canonicalNvra(n, v, r, a):
@@ -516,3 +516,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 self.fsJob._remove(fsFileObj, path, fullPath,
                                    'removing rpm owned file %s',
                                    ignoreMissing = True)
+
+def rpmExpandMacro(str):
+    rawRpmModulePath = rpm._rpm.__file__
+    sonames = [ x[1] for x in elf.inspect(rawRpmModulePath)[0]
+                    if x[0] == 'soname']
+    rpmLibs = [ x for x in sonames if re.match('librpm[-\.].*so', x) ]
+    assert(len(rpmLibs) == 1)
+    return misc.rpmExpandMacro(rpmLibs[0], str)

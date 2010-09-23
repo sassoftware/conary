@@ -2040,7 +2040,7 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         @param repos: Repository object (why do we need this and a troveCache)
         @type repos: netclient.NetworkRepositoryClient
         @param troveCache: Caching repository object
-        @type repos: troveSource
+        @type troveCache: troveSource
         @param callback: Callback for progress information
         @type callback: callbacks.CookCallback
     """
