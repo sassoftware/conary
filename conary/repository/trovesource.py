@@ -562,9 +562,12 @@ class SearchableTroveSource(AbstractTroveSource):
 
             @param versionFlavorDict: dict of available version flavor pairs
             @type versionFlavorDict: {version -> [flavor]}
-            @param flavorQueryList: requested flavors that this query must
+            @param flavorQuery: requested flavors that this query must
             match.
             @type flavorQuery: list of flavors
+            @param filterOptions: how to limit matching results for return
+            against the available troves.
+            @type filterOptions: L{FilterOptions}
             @param scoreCache: dict that will hold cached flavor scoring
         """
         if not filterOptions.splitByBranch:
@@ -631,22 +634,13 @@ class SearchableTroveSource(AbstractTroveSource):
         """
             @param versionFlavorDict: dict of available version flavor pairs
             @type versionFlavorDict: {version -> [flavor]}
-            @param flavorQueryList: requested flavors that this query must
+            @param flavorQuery: requested flavors that this query must
             match.
-            @type flavorQueryList: list of flavors
-            @param flavorCheck: How to match the flavorQuery against
-            the available flavors.
-            @type flavorCheck: One of _CHECK_TROVE_STRONG_FLAVOR
-            or _CHECK_TROVE_REG_FLAVOR
-            @param flavorFilter: how to limit matching results for return
+            @type flavorQuery: list of flavors
+            @param filterOptions: how to limit matching results for return
             against the available troves.
-            @type flavorFilter: one of _GET_TROVE_ALL_FLAVORS,
-            _GET_TROVE_AVAILABLE_FLAVORS, or _GET_TROVE_BEST_FLAVOR
-            @type latestFilter: one of _GET_TROVE_ALL_VERSIONS,
-            _GET_TROVE_VERY_LATEST
-            @param latestFilter: once packages are filtered by flavor
-            so that only matching flavors are available, this filter
-            chooses how to filter by version timestamp.
+            @type filterOptions: L{FilterOptions}
+            @param scoreCache: dict that will hold cached flavor scoring
         """
         flavorFilter = filterOptions.flavorFilter
         latestFilter = filterOptions.latestFilter
@@ -1206,7 +1200,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         for info in troveList:
             cs = self.troveCsMap.get(info, None)
-            assert(cs)
+            if cs is None:
+                retList.append(None)
+                continue
+
             trvCs = cs.getNewTroveVersion(*info)
             ti = trvCs.getTroveInfo()
             retList.append(getattr(ti, attrName))
@@ -1608,6 +1605,25 @@ class SourceStack(object):
         if troveList and not allowMissing:
             raise errors.TroveMissingError(troveList[0][1][0],
                                            troveList[0][1][1])
+        return results
+
+    def getTroveInfo(self, infoType, troveTupList):
+        # -1 means "unknown trove" None means "troveinfo not in the trove"
+        results = [ -1 ] * len(troveTupList)
+        for source in self.sources:
+            need = [ (i, troveTup) for i, (troveTup, ti) in
+                        enumerate(itertools.izip(troveTupList, results))
+                        if ti == -1]
+            if not need:
+                break
+
+            tiList = source.getTroveInfo(infoType, [ x[1] for x in need] )
+            for (i, troveTup), troveInfo in itertools.izip(need, tiList):
+                if troveInfo == 0:
+                    results[0] = None
+                else:
+                    results[i] = troveInfo
+
         return results
 
     def getDepsForTroveList(self, troveInfoList):

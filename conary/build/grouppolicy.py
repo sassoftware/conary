@@ -34,8 +34,9 @@ class PathConflicts(policy.GroupEnforcementPolicy):
     C{r.PathConflicts(exceptions='/path/regexp/.*')}
     C{r.PathConflicts(exceptions=['/regexp/.*', '/other/foo.*'])}
     C{r.PathConflicts(exceptions=r.troveFilter('foo:runtime'))}
-    C{r.PathConflicts(exceptions=[r.troveFilter('foo:runtime'),}
-                                C{r.troveFilter('bar:runtime')])}
+    C{foo = r.troveFilter('foo:runtime')}
+    C{bar = r.troveFilter('bar:runtime')}
+    C{r.PathConflicts(exceptions=[foo, bar])}
 
     DESCRIPTION
     ===========

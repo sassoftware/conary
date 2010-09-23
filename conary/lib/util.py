@@ -2099,7 +2099,7 @@ def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
 
     @param newClassOrInstance: Class of the new exception to be thrown,
         or the exact exception instance to be thrown.
-    @type  newClass: subclass or instance of Exception
+    @type  newClassOrInstance: subclass or instance of Exception
     @param prependClassName: If C{True}, prepend the original class
         name to the new exception
     @type  prependClassName: bool
@@ -2294,18 +2294,18 @@ def fnmatchTranslate(pattern):
 class LockedFile(object):
     """
     A file protected by a lock.
-    To use it:
+    To use it::
 
-    l = LockedFile("filename")
-    fileobj = l.open()
-    if fileobj is None:
-        # The target file does not exist. Create it.
-        l.write("Some content")
-        fileobj = l.commit()
-    else:
-        # The target file exists
-        pass
-    print fileobj.read()
+        l = LockedFile("filename")
+        fileobj = l.open()
+        if fileobj is None:
+            # The target file does not exist. Create it.
+            l.write("Some content")
+            fileobj = l.commit()
+        else:
+            # The target file exists
+            pass
+        print fileobj.read()
     """
     __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj')
 
@@ -2322,10 +2322,12 @@ class LockedFile(object):
     def open(self, shouldLock = True):
         """
         Attempt to open the file.
+
         Returns a file object if the file exists.
-        Returns None if the file does not exist, and needs to be created. At
-            this point the lock is acquired. Use write() and commit() to have
-            the file created and the lock released.
+
+        Returns None if the file does not exist, and needs to be created.
+        At this point the lock is acquired.  Use write() and commit() to
+        have the file created and the lock released.
         """
 
         if self._lockfobj is not None:

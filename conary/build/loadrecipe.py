@@ -172,10 +172,8 @@ class Importer(object):
 
     def _localImport(self, package, modules=()):
         """
-        import a package into a non-global context.
+        Import a package into a non-global context.
 
-        @param d: the context to import the module
-        @type d: dict
         @param package: the name of the module to import
         @type package: str
         @param modules: a sequence of modules to import from the package.

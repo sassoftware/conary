@@ -1389,8 +1389,7 @@ def _filterFlavorFlags(depClass, dep, filterDeps):
     @type dep: Dependency
     @param filterDeps: Objects whose flags will be used to filter the dep parameter
     @type filterDeps: [ Dependency ]
-    @rtype dep: Dependency
-
+    @rtype: Dependency
     """
     filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
     finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]

@@ -27,7 +27,7 @@ from conary.lib import log
 from conary.lib import util
 from conary.local import database
 from conary.repository import changeset, filecontainer
-from conary.conaryclient import cmdline
+from conary.conaryclient import cmdline, modelupdate
 from conary.conaryclient.cmdline import parseTroveSpec
 
 # FIXME client should instantiated once per execution of the command line
@@ -52,6 +52,8 @@ def locked(method):
         finally:
             self.lock.release()
 
+    wrapper.__doc__ = method.__doc__
+    wrapper.func_name = method.func_name
     return wrapper
 
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
@@ -510,14 +512,15 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     if rmArgs:
         sysmodel.appendTroveOpByName('erase', text=rmArgs)
 
+    updateName = { False: 'update',
+                   True: 'install' }[kwargs['keepExisting']]
+
     if addArgs:
-        updateName = { False: 'update',
-                       True: 'install' }[kwargs['keepExisting']]
         sysmodel.appendTroveOpByName(updateName, text=addArgs)
 
     for cs in fromChangesets:
         for trvInfo in cs.getPrimaryTroveList():
-            sysmodel.appendTroveOpByName('install', text='%s=%s[%s]' % (
+            sysmodel.appendTroveOpByName(updateName, text='%s=%s[%s]' % (
                 trvInfo[0],
                 trvInfo[1].asString(),
                 deps.formatFlavor(trvInfo[2])))
@@ -621,25 +624,23 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     try:
         if model:
-            from conary.conaryclient import modelupdate
+            changeSetList = kwargs.get('fromChangesets', [])
             tc = modelupdate.SystemModelTroveCache(client.getDatabase(),
                                                    client.getRepos(),
-                                                   callback = callback)
+                                                   callback = callback,
+                                                   changeSetList =
+                                                        changeSetList)
             tcPath = cfg.root + '/var/lib/conarydb/modelcache'
-            import time
-            start = time.time()
             if loadTroveCache:
-                log.info("loading modelcache")
                 if os.path.exists(tcPath):
+                    log.info("loading %s", tcPath)
                     tc.load(tcPath)
-                log.info("done %.2f", time.time() - start)
-            ts = client.systemModelGraph(model)
-            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc)
+            ts = client.systemModelGraph( model, changeSetList = changeSetList)
+            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
+                                            fromChangesets = changeSetList)
             if tc.cacheModified():
-                log.info("saving modelcache")
-                start = time.time()
+                log.info("saving %s", tcPath)
                 tc.save(tcPath)
-                log.info("done %.2f", time.time() - start)
         else:
             suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:

@@ -1020,8 +1020,6 @@ def cookPackageObject(repos, db, cfg, loader, sourceVersion, prep=True,
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean

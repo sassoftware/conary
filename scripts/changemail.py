@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2005-2009 rPath, Inc.
+# Copyright (C) 2005-2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,6 +15,9 @@
 
 import os
 import sys
+import smtplib
+# python 2.4 does not have email.mime; email.MIMEText is available in 2.6
+from email.MIMEText import MIMEText
 
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
@@ -24,8 +27,7 @@ import tempfile
 import textwrap
 
 from conary import checkin
-from conary import versions
-from conary.lib import options, util
+from conary.lib import options
 
 def usage(exitcode=1):
     sys.stderr.write("\n".join((
@@ -198,10 +200,6 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
 def sendMail(tmpfile, subject, fromaddr, maxsize, addresses):
     # stdout is the tmpfile, so make sure it has been flushed!
     sys.stdout.flush()
-    if fromaddr:
-        fromarg = "-r '%s'" %fromaddr
-    else:
-        fromarg = ''
 
     if maxsize:
         tmpfile.seek(0, 2)
@@ -211,11 +209,23 @@ def sendMail(tmpfile, subject, fromaddr, maxsize, addresses):
             tmpfile.seek(0, 2)
             tmpfile.write('\n...\n')
 
+    if not fromaddr:
+        fromaddr = 'root@localhost'
+
+    s = smtplib.SMTP()
     for address in addresses:
+        # explicitly set different To addresses in different messages
+        # in case some recipient addresses are not intended to be exposed
+        # to other recipients
         tmpfile.seek(0)
-        mail = util.popen("""mail -s '%s' %s '%s'""" %(subject, fromarg, address), "w")
-        mail.writelines(tmpfile.readlines())
-        mail.close()
+        msg = MIMEText(tmpfile.read())
+        msg['Subject'] = subject
+        msg['From'] = fromaddr
+        msg['To'] = address
+
+        s.sendmail(fromaddr, [address], msg.as_string())
+
+    s.quit()
 
 if __name__ == "__main__":
     sys.exit(usage())
