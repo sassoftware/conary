@@ -139,8 +139,8 @@ class HTTPSConnection(httplib.HTTPConnection):
     inheriting.
 
     Currently supported "extra" features:
-     * Can pass in a list of peer certificate authorities.
-     * Can set the hostname used to check the peer's certificate.
+     - Can pass in a list of peer certificate authorities.
+     - Can set the hostname used to check the peer's certificate.
     """
     default_port = httplib.HTTPS_PORT
 

@@ -515,11 +515,11 @@ class TroveFinder(object):
         """
             Returns the labelPath to use when searching for this troveSpec,
             as determined by the following algorithm:
-            * if there are affinityTroves and the troveSpec doesn't specify
-              part of the label to search, return the affinityTrove labels
-            * if there's a labelPath specified to findTroves, use that
-            * If we cannot allow no label path to be passed in, error.
-            * Otherwise, return every label in the source that exists.
+                - if there are affinityTroves and the troveSpec doesn't specify
+                  part of the label to search, return the affinityTrove labels
+                - if there's a labelPath specified to findTroves, use that
+                - If we cannot allow no label path to be passed in, error.
+                - Otherwise, return every label in the source that exists.
         """
         if affinityTroves and (not versionStr or (':' not in versionStr
                                                   and '@' not in versionStr)):

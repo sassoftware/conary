@@ -307,8 +307,8 @@ def exportKey(keyId, keyRing, armored=False):
     @type keyId: str
     @param keyRing: the keyring from where the key is to be extracted
     @type keyRing: file or path
-    @param armor: If True, exports the key in a Radix-64 encoding (armor)
-    @type armor: bool
+    @param armored: If True, exports the key in a Radix-64 encoding (armor)
+    @type armored: bool
     @rtype: stream
     @return: the key in a stream
     """
@@ -339,8 +339,8 @@ def armorKeyData(keyData, stream):
     Write the Radix-64 encoded version of the key data.
 
     @param keyData: key data
-    @type key: str
-    @type stream: A stream open in write mode
+    @type keyData: str
+    @param stream: A stream open in write mode
     @type stream: file
     """
     assert(isinstance(keyData, str))
@@ -612,10 +612,8 @@ def parseAsciiArmor(asciiData, dest):
     @type asciiData: string or stream
     @param dest: a stream to deposit the message into
     @type dest: stream
-    @return: the unencoded PGP messsage, or None if the encoded message was
-        incorrect
-    @rtype: bool
     @return: True if data was decoded, False otherwise
+    @rtype: bool
     @raise PGPError: if the CRC does not match the message
     """
 

@@ -562,9 +562,12 @@ class SearchableTroveSource(AbstractTroveSource):
 
             @param versionFlavorDict: dict of available version flavor pairs
             @type versionFlavorDict: {version -> [flavor]}
-            @param flavorQueryList: requested flavors that this query must
+            @param flavorQuery: requested flavors that this query must
             match.
             @type flavorQuery: list of flavors
+            @param filterOptions: how to limit matching results for return
+            against the available troves.
+            @type filterOptions: L{FilterOptions}
             @param scoreCache: dict that will hold cached flavor scoring
         """
         if not filterOptions.splitByBranch:
@@ -631,22 +634,13 @@ class SearchableTroveSource(AbstractTroveSource):
         """
             @param versionFlavorDict: dict of available version flavor pairs
             @type versionFlavorDict: {version -> [flavor]}
-            @param flavorQueryList: requested flavors that this query must
+            @param flavorQuery: requested flavors that this query must
             match.
-            @type flavorQueryList: list of flavors
-            @param flavorCheck: How to match the flavorQuery against
-            the available flavors.
-            @type flavorCheck: One of _CHECK_TROVE_STRONG_FLAVOR
-            or _CHECK_TROVE_REG_FLAVOR
-            @param flavorFilter: how to limit matching results for return
+            @type flavorQuery: list of flavors
+            @param filterOptions: how to limit matching results for return
             against the available troves.
-            @type flavorFilter: one of _GET_TROVE_ALL_FLAVORS,
-            _GET_TROVE_AVAILABLE_FLAVORS, or _GET_TROVE_BEST_FLAVOR
-            @type latestFilter: one of _GET_TROVE_ALL_VERSIONS,
-            _GET_TROVE_VERY_LATEST
-            @param latestFilter: once packages are filtered by flavor
-            so that only matching flavors are available, this filter
-            chooses how to filter by version timestamp.
+            @type filterOptions: L{FilterOptions}
+            @param scoreCache: dict that will hold cached flavor scoring
         """
         flavorFilter = filterOptions.flavorFilter
         latestFilter = filterOptions.latestFilter

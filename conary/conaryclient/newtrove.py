@@ -55,7 +55,7 @@ class ClientNewTrove(object):
             @param factory: designate a factory associated with this source
             trove.
             @type factory: str
-            @type pkgCreatorData: arbitrary string set in
+            @param pkgCreatorData: arbitrary string set in
             _TROVEINFO_TAG_PKGCREATORDATA
             @type pkgCreatorData: str
         """

@@ -17,6 +17,7 @@ class BaseRequiresRecipe(Recipe):
     """
     NAME
     ====
+
     B{C{BaseRequiresRecipe}} - Base class which provides basic buildRequires
     for all recipes that follow the PackageRecipe approach to instantiating
     a destination directory.
@@ -65,6 +66,7 @@ PackageRecipe = '''class PackageRecipe(SourcePackageRecipe, BaseRequiresRecipe):
     """
     NAME
     ====
+
     B{C{PackageRecipe}} - Base class which provides Conary functionality
 
     SYNOPSIS
@@ -84,6 +86,7 @@ PackageRecipe = '''class PackageRecipe(SourcePackageRecipe, BaseRequiresRecipe):
 
     EXAMPLE
     =======
+
     A sample class that uses PackageRecipe to download source code from
     a web site, unpack it, run "make", then run "make install"::
 
@@ -125,6 +128,7 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
 
     DESCRIPTION
     ===========
+
     The C{r.GroupRecipe} class provides the original interface for creating
     groups that are stored in a Conary repository.
 
@@ -143,6 +147,7 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
 
     PARAMETERS
     ==========
+
     Several parameters may be set at the time of group creation.  Although
     these parameters are typically passed to C{r.createGroup()} for the
     base group, they should be set as variables in the recipe class.
@@ -184,6 +189,7 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
 
     METHODS
     =======
+
     The following methods are applicable in Conary group recipes:
 
         - L{add} : Adds a trove to a group
@@ -245,6 +251,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     DESCRIPTION
     ===========
+
     The C{r.GroupSetRecipe} class provides a set-oriented interface for
     creating groups that are stored in a Conary repository.
 
@@ -287,56 +294,57 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     METHODS
     =======
+
     The following recipe methods are available in Conary group set recipes:
 
         - L{Repository} : Creates an object representing a respository
-        with a default search label list and flavor.
+          with a default search label list and flavor.
         - L{SearchPath} : Creates an object in which to search for
-        troves or dependencies.
+          troves or dependencies.
         - L{Group} : Creates the primary group object.
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
-        troves.
+          troves.
 
     The following methods are available in C{Repository} objects:
 
-        - L{Repository.find} : Search the Repository for specified troves
-        - L{Repository.latestPackages} : Get latest normal packages of the
-        default flavor on the default label
+        - C{Repository.find} : Search the Repository for specified troves
+        - C{Repository.latestPackages} : Get latest normal packages of the
+          default flavor on the default label
 
     The following methods are available in C{SearchPath} objects:
 
-        - L{SearchPath.find} : Search the SearchPath for specified troves 
+        - C{SearchPath.find} : Search the SearchPath for specified troves 
 
     The following methods are available in C{TroveSet} objects:
 
-        - L{TroveSet.components} : Recursively search for named components
-        - L{TroveSet.createGroup} : Create a binary group
-        - L{TroveSet.depsNeeded} : Get troves satisfying dependencies
-        - L{TroveSet.difference} : Subtract one TroveSet from another (C{-})
-        - L{TroveSet.dump} : Debugging: print the contents of the TroveSet
-        - L{TroveSet.find} : Search the TroveSet for specified troves
-        - L{TroveSet.findByName} : Find troves by regular expression
-        - L{TroveSet.findBySourceName} : Find troves by the name of the source
-        package from which they were built
-        - L{TroveSet.flatten} : Resolve trove references recursively
-        - L{TroveSet.getInstall} : Get only install troves from set
-        - L{TroveSet.getOptional} : Get only optional troves from set
-        - L{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
-        - L{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
-        - L{TroveSet.makeInstall} : Make all troves install, or add all
-        provided troves as install troves
-        - L{TroveSet.makeOptional} : Make all troves optional, or add all
-        provided troves as optional troves
-        - L{TroveSet.members} : Resolve exactly one level of trove
-        references, return only those resolved references
-        - L{TroveSet.packages} : Resolve trove references recursively,
-        return packages
-        - L{TroveSet.replace} : Replace troves in the TroveSet with
-        matching-named troves from the replacement set
-        - L{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
-        - L{TroveSet.update} : Replace troves in the TroveSet with
-        all troves from the replacement set
+        - C{TroveSet.components} : Recursively search for named components
+        - C{TroveSet.createGroup} : Create a binary group
+        - C{TroveSet.depsNeeded} : Get troves satisfying dependencies
+        - C{TroveSet.difference} : Subtract one TroveSet from another (C{-})
+        - C{TroveSet.dump} : Debugging: print the contents of the TroveSet
+        - C{TroveSet.find} : Search the TroveSet for specified troves
+        - C{TroveSet.findByName} : Find troves by regular expression
+        - C{TroveSet.findBySourceName} : Find troves by the name of the source
+          package from which they were built
+        - C{TroveSet.flatten} : Resolve trove references recursively
+        - C{TroveSet.getInstall} : Get only install troves from set
+        - C{TroveSet.getOptional} : Get only optional troves from set
+        - C{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
+        - C{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
+        - C{TroveSet.makeInstall} : Make all troves install, or add all
+          provided troves as install troves
+        - C{TroveSet.makeOptional} : Make all troves optional, or add all
+          provided troves as optional troves
+        - C{TroveSet.members} : Resolve exactly one level of trove
+          references, return only those resolved references
+        - C{TroveSet.packages} : Resolve trove references recursively,
+          return packages
+        - C{TroveSet.replace} : Replace troves in the TroveSet with
+          matching-named troves from the replacement set
+        - C{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
+        - C{TroveSet.update} : Replace troves in the TroveSet with
+          all troves from the replacement set
 
     Except for C{TroveSet.dump}, which prints debugging information,
     each of these C{Repository}, C{SearchPath}, and C{TroveSet} methods
@@ -348,52 +356,52 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     This is an example recipe that uses the search path included in
     a product definition, if available, to provide a stable search.
     It adds to the base C{group-appliance-platform} the httpd, mod_ssl,
-    and php packages, as well as all the required dependencies.
+    and php packages, as well as all the required dependencies::
 
-    class GroupMyAppliance(GroupSetRecipe):
-        name = 'group-my-appliance'
-        version = '1.0'
+     class GroupMyAppliance(GroupSetRecipe):
+         name = 'group-my-appliance'
+         version = '1.0'
 
-        def setup(r):
-            r.dumpAll()
-            repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
-            if 'productDefinitionSearchPath' in r.macros:
-                # proper build with product definition
-                searchPath = r.SearchPath(repo[x].flatten() for x in
-                    r.macros.productDefinitionSearchPath.split('\\\\n'))
-            else:
-                # local test build
-                searchPath = r.SearchPath(
-                    repo['group-os=conary.rpath.com@rpl:2'].flatten())
-            base = searchPath['group-appliance-platform']
-            additions = searchPath.find(
-                'httpd',
-                'mod_ssl',
-                'php')
-            # We know that base is dependency-closed and consistent
-            # with the searchPath, so just get the extra deps we need
-            deps = (additions + base).depsNeeded(searchPath)
+         def setup(r):
+             r.dumpAll()
+             repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+             if 'productDefinitionSearchPath' in r.macros:
+                 # proper build with product definition
+                 searchPath = r.SearchPath(repo[x].flatten() for x in
+                     r.macros.productDefinitionSearchPath.split('\\\\n'))
+             else:
+                 # local test build
+                 searchPath = r.SearchPath(
+                     repo['group-os=conary.rpath.com@rpl:2'].flatten())
+             base = searchPath['group-appliance-platform']
+             additions = searchPath.find(
+                 'httpd',
+                 'mod_ssl',
+                 'php')
+             # We know that base is dependency-closed and consistent
+             # with the searchPath, so just get the extra deps we need
+             deps = (additions + base).depsNeeded(searchPath)
 
-            r.Group(base + additions + deps)
+             r.Group(base + additions + deps)
 
     Next, an example of building a platform derived from another platform,
-    adding all packages defined locally to the group:
+    adding all packages defined locally to the group::
 
-    class GroupMyPlatform(GroupSetRecipe):
-        name = 'group-my-platform'
-        version = '1.0'
+     class GroupMyPlatform(GroupSetRecipe):
+         name = 'group-my-platform'
+         version = '1.0'
 
-        def setup(r):
-            centOS = r.Repository('centos.rpath.com@rpath:centos-5', r.flavor)
-            local = r.Repository('repo.example.com@example:centos-5', r.flavor)
-            pkgs = centOS['group-packages']
-            std = centOS['group-standard']
-            localPackages = localRepo.latestPackages()
-            std += localPackages
-            pkgs += localPackages
-            stdGrp = std.createGroup('group-standard')
-            pkgGrp = pkgs.createGroup('group-packages')
-            r.Group(stdGrp + pkgGrp)
+         def setup(r):
+             centOS = r.Repository('centos.rpath.com@rpath:centos-5', r.flavor)
+             local = r.Repository('repo.example.com@example:centos-5', r.flavor)
+             pkgs = centOS['group-packages']
+             std = centOS['group-standard']
+             localPackages = localRepo.latestPackages()
+             std += localPackages
+             pkgs += localPackages
+             stdGrp = std.createGroup('group-standard')
+             pkgGrp = pkgs.createGroup('group-packages')
+             r.Group(stdGrp + pkgGrp)
     """
     name = 'groupset'
     internalAbstractBaseClass = 1
@@ -584,6 +592,7 @@ UserInfoRecipe = '''class UserInfoRecipe(UserGroupInfoRecipe,
     """
     NAME
     ====
+
     B{C{UserInfoRecipe}} - Build user info packages
 
     SYNOPSIS
@@ -600,7 +609,8 @@ UserInfoRecipe = '''class UserInfoRecipe(UserGroupInfoRecipe,
 
     EXAMPLE
     =======
-    A sample class that uses C{UserInfoRecipe} to define a user
+
+    A sample class that uses C{UserInfoRecipe} to define a user::
 
         class ExamplePackage(UserInfoRecipe):
             name = 'info-example'
@@ -626,6 +636,7 @@ GroupInfoRecipe = '''class GroupInfoRecipe(UserGroupInfoRecipe,
     """
     NAME
     ====
+
     B{C{GroupInfoRecipe}} - Build group info packages
 
     SYNOPSIS
@@ -645,7 +656,8 @@ GroupInfoRecipe = '''class GroupInfoRecipe(UserGroupInfoRecipe,
 
     EXAMPLE
     =======
-    A sample class that uses C{GroupInfoRecipe} to define a group
+
+    A sample class that uses C{GroupInfoRecipe} to define a group::
 
         class ExamplePackage(GroupInfoRecipe):
             name = 'info-example'
@@ -661,6 +673,7 @@ DerivedPackageRecipe = '''class DerivedPackageRecipe(AbstractDerivedPackageRecip
     """
     NAME
     ====
+
     B{C{DerivedPackageRecipe}} - Build derived packages
 
     SYNOPSIS
@@ -680,8 +693,9 @@ DerivedPackageRecipe = '''class DerivedPackageRecipe(AbstractDerivedPackageRecip
 
     EXAMPLE
     =======
+
     A sample class that uses DerivedPackageRecipe to replace contents of
-    a config file:
+    a config file::
 
         class ExamplePackage(DerivedPackageRecipe):
             name = 'example'
@@ -697,6 +711,7 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
     """
     NAME
     ====
+
     B{C{CapsuleRecipe}} - Build Capsule packages
 
     SYNOPSIS
@@ -716,8 +731,9 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
 
     EXAMPLE
     =======
+
     A sample class that uses CapsuleRecipe to create a Conary capsule package
-    containing a single RPM
+    containing a single RPM::
 
         class ExamplePackage(CapsuleRecipe):
             name = 'example'
@@ -740,6 +756,7 @@ DerivedCapsuleRecipe = '''class DerivedCapsuleRecipe(AbstractDerivedCapsuleRecip
     """
     NAME
     ====
+
     B{C{DerivedCapsuleRecipe}} - Build derived capsule packages
 
     SYNOPSIS
@@ -763,8 +780,9 @@ DerivedCapsuleRecipe = '''class DerivedCapsuleRecipe(AbstractDerivedCapsuleRecip
 
     EXAMPLE
     =======
+
     A sample class that uses DerivedCapsuleRecipe to replace contents of
-    a config file:
+    a config file::
 
         class ExampleCapsule(DerivedCapsuleRecipe):
             name = 'example'

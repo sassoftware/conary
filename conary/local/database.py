@@ -1354,7 +1354,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         @raises TroveMissing:
         @note:
             As this calls database functions, it could also raise any type of
-        DatabaseError defined in L{dbstore.sqlerrors}
+            DatabaseError defined in L{dbstore.sqlerrors}
         """
         l = self.getTroves([ (name, version, flavor) ], pristine = pristine,
                            withDeps = withDeps, withFiles = withFiles,
@@ -1920,7 +1920,7 @@ class Database(SqlDbRepository):
         database, but where there is no filesystem information to restore. If
         this is used it is assumed that the content/fileObj elements of the
         file lists are both None.
-        @type noteMissing: bool
+        @type asMissing: bool
         @rtype changeset.ChangeSet
         """
         cs = changeset.ChangeSet()

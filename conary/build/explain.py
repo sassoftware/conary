@@ -135,6 +135,8 @@ def _formatString(msg):
     return msg[2:-1]
 
 def _formatDocString(docString):
+    # first, handle literal blocks as much as we need do:
+    docString = docString.replace('::\n', ':\n')
     docStringRe = re.compile('[A-Z]\{[^{}]*\}')
     srch = re.search(docStringRe, docString)
     while srch:
