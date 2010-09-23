@@ -34,6 +34,39 @@ from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
 
+class windowsHelper:
+    def __init__(self, path, ipaddr):
+        import robj
+        from xobj import xobj
+        xmlTemplate = '''\
+<msi id="">
+    <path href="">%s</path>
+    <size>%i</size>
+</msi>'''
+
+        baseUrl = 'http://' + ipaddr + '/api'
+        api = robj.connect(baseUrl)
+        msis = api.msis
+        # post the xml with filename and size to create the resource
+        x = xmlTemplate % (os.path.split(path)[1], os.stat(path).st_size)
+        msis.append(xobj.parse(x))
+        self.resource = msis[-1]
+
+        # put the actual file contents
+        self.resource.path = open(path)
+        self.resource.refresh()
+
+        name = str(self.resource.name).split()
+        if len(name) > 1 and '.' in name[-1]:
+            name = '-'.join(name[:-1])
+        else:
+            name = '-'.join(name)
+        self.name = name
+        self.version = self.resource.version
+        self.platform = self.resource.platform
+        self.productCode = self.resource.productCode
+        self.upgradeCode = self.resource.upgradeCode
+
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
         pass
@@ -1450,33 +1483,6 @@ class addCapsule(_Source):
         assert(path==self.capsuleMagic.path)
         return self.capsuleMagic
 
-    def _getWinHelper(self, path):
-        if not self.recipe.cfg.windowsBuildService:
-            raise SourceError('MSI capsules cannot be added without a '
-                              'windowsBuildService defined in the conary '
-                              'configuration')
-        import robj
-        from xobj import xobj
-        xmlTemplate = '''\
-<msi id="">
-    <path href="">%s</path>
-    <size>%i</size>
-</msi>'''
-
-        baseUrl = 'http://' + self.recipe.cfg.windowsBuildService + '/api'
-        api = robj.connect(baseUrl)
-        msis = api.msis
-        # post the xml with filename and size to create the resource
-        x = xmlTemplate % (os.path.split(path)[1], os.stat(path).st_size)
-        msis.append(xobj.parse(x))
-        wh = msis[-1]
-
-        # put the actual file contents
-        wh.path = open(path)
-        wh.refresh()
-
-        return wh
-
     def doDownload(self):
         f = self._findSource()
 
@@ -1488,12 +1494,13 @@ class addCapsule(_Source):
         if self.capsuleType == 'rpm':
             pname = m.contents['name']
         elif self.capsuleType == 'msi':
-            self.recipe.winHelper = self._getWinHelper(f)
-            pname = str(self.recipe.winHelper.name).split()
-            if len(pname) > 1 and '.' in pname[-1]:
-                pname = '-'.join(pname[:-1])
-            else:
-                pname = '-'.join(pname)
+            if not self.recipe.cfg.windowsBuildService:
+                raise SourceError('MSI capsules cannot be added without a '
+                                  'windowsBuildService defined in the conary '
+                                  'configuration')
+            self.recipe.winHelper = windowsHelper(f,
+                self.recipe.cfg.windowsBuildService)
+            pname = self.recipe.winHelper.name
         else:
             raise SourceError('unknown capsule type %s', self.capsuleType)
 
