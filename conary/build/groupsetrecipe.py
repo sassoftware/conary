@@ -107,36 +107,35 @@ class GroupTupleSetMethods(object):
 
     The following methods are available in C{TroveSet} objects:
 
-        - C{TroveSet.components} : Recursively search for components
-        - C{TroveSet.createGroup} : Create a binary group
-        - C{TroveSet.depsNeeded} : Get troves satisfying dependencies
-        - C{TroveSet.difference} : Subtract one TroveSet from another (C{-})
-        - C{TroveSet.dump} : Debugging: print the contents of the TroveSet
-        - C{TroveSet.find} : Search the TroveSet for specified troves
-        - C{TroveSet.findByName} : Find troves by regular expression
-        - C{TroveSet.findBySourceName} : Find troves by the name of the source
+        - L{components} : Recursively search for components
+        - L{createGroup} : Create a binary group
+        - L{depsNeeded} : Get troves satisfying dependencies
+        - L{difference} : Subtract one TroveSet from another (C{-})
+        - L{dump} : Debugging: print the contents of the TroveSet
+        - L{find} : Search the TroveSet for specified troves
+        - L{findByName} : Find troves by regular expression
+        - L{findBySourceName} : Find troves by the name of the source
           package from which they were built
-        - C{TroveSet.flatten} : Resolve trove references recursively
-        - C{TroveSet.getInstall} : Get only install troves from set
-        - C{TroveSet.getOptional} : Get only optional troves from set
-        - C{TroveSet.isEmpty} : Assert that the TroveSet is entirely empty
-        - C{TroveSet.isNotEmpty} : Assert that the TroveSet contains something
-        - C{TroveSet.makeInstall} : Make all troves install, or add all
-          provided troves as install troves
-        - C{TroveSet.makeOptional} : Make all troves optional, or add all
-          provided troves as optional troves
-        - C{TroveSet.members} : Resolve exactly one level of trove
-          references, return only those resolved references
-        - C{TroveSet.packages} : Resolve trove references recursively,
-          return packages
-        - C{TroveSet.replace} : Replace troves in the TroveSet with
-          matching-named troves from the replacement set
-        - C{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
-        - C{TroveSet.update} : Replace troves in the TroveSet with
-          all troves from the replacement set
+        - L{flatten} : Resolve trove references recursively
+        - L{getInstall} : Get only install troves from set
+        - L{getOptional} : Get only optional troves from set
+        - L{isEmpty} : Assert that the TroveSet is entirely empty
+        - L{isNotEmpty} : Assert that the TroveSet contains something
+        - L{makeInstall} : Make all troves install, or add all provided
+          troves as install troves
+        - L{makeOptional} : Make all troves optional, or add all provided
+          troves as optional troves
+        - L{members} : Resolve exactly one level of trove references,
+          return only those resolved references
+        - L{packages} : Resolve trove references recursively, return packages
+        - L{replace} : Replace troves in the TroveSet with matching-named
+          troves from the replacement set
+        - L{union} : Get the union of all provided TroveSets (C{|}, C{+})
+        - L{update} : Replace troves in the TroveSet with all troves from
+          the replacement set
 
-    Except for C{TroveSet.dump}, which prints debugging information,
-    each of these methods returns a new TroveSet.
+    Except for C{dump}, which prints debugging information, each of these
+    methods returns a new TroveSet.
     '''
     _explainObjectName = 'TroveSet'
 
