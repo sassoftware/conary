@@ -38,26 +38,36 @@ NEGATIVE_CACHE_TTL = 60 * 60  # The TTL for negative cache entries (seconds)
 
 
 class laUrl(object):
+    '''This object splits a url string into its various components and stores
+    them as named attributes.  It also has several feature that are specific to
+    the lookaside cache.'''
 
-    def __init__(self, urlString, parent=None, extension=None):
+    supportedSchemes = set(('file', 'ftp', 'gopher', 'hdl', 'http', 'https',
+                            'imap', 'mailto', 'mms', 'news', 'nntp',
+                            'prospero', 'rsync', 'rtsp', 'rtspu', 'sftp',
+                            'shttp', 'sip', 'sips', 'snews', 'svn', 'svn+ssh',
+                            'telnet', 'wais'))
+
+    def __init__(self, urlString, parent=None, extension=None,
+                 isHostname=False):
         urlString = urllib.unquote(urlString)
-
-        # unfortunately urllib doesn't support unknown schemes so we have them
-        # parsed as http
-        for x in ('mirror', 'multiurl', 'lookaside'):
-            x += '://'
-            if urlString.startswith(x):
-                savedScheme = x
-                urlString = urlString.replace(x, 'http://', 1)
-                break
+        # unfortunately urlparse doesn't support unknown schemes so we
+        # parse them as http.
+        schemeTup = urlString.split('://', 1)
+        if len(schemeTup) > 1 and schemeTup[0] not in self.supportedSchemes:
+            savedScheme = schemeTup[0]
+            urlString = urlString.replace(savedScheme + '://', 'http://', 1)
+        elif len(schemeTup) == 1 and isHostname:
+            savedScheme = ''
+            urlString = 'http://' + urlString
         else:
             savedScheme = None
 
         (self.scheme, self.user, self.passwd, self.host, self.port,
          self.path, self.params, self.fragment) = util.urlSplit(urlString)
 
-        if savedScheme:
-            self.scheme = savedScheme[:-3]
+        if savedScheme is not None:
+            self.scheme = savedScheme
 
         if parent:
             self.path = os.sep.join((self.path, parent.path))

@@ -59,7 +59,7 @@ class MigrateTo_14(SchemaMigration):
                         start_transaction=False)
         self.cu.execute('CREATE INDEX tmpSha1sIdx ON tmpSha1s(streamId)')
         total = self.cu.execute('SELECT max(streamId) FROM FileStreams').fetchall()[0][0]
-        pct = 0
+        gpct = 0
         for idx, (streamId, fileId, stream) in \
                 enumerate(updateCursor.execute("SELECT streamId, fileId, stream FROM "
                                 "FileStreams ORDER BY StreamId")):
@@ -824,6 +824,14 @@ class MigrateTo_17(SchemaMigration):
         cu.execute("""select streamId, stream from filestreams
                       where sha1 is NULL and stream is not NULL""")
 
+        return True
+
+class MigrateTo_18(SchemaMigration):
+    Version = 18
+    def migrate(self):
+        cu = self.db.cursor()
+        cu.execute("alter table instances add column "
+                   "fingerprint     %(BINARY20)s" % self.db.keywords)
         return True
 
 def _getMigration(major):
