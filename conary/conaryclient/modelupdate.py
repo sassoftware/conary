@@ -10,7 +10,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-import itertools
+import itertools, re
 
 from conary import errors, trove, versions
 from conary.conaryclient import troveset, update
@@ -163,6 +163,31 @@ class RemoveAction(SysModelDelayedTupleSetAction):
                                     - removeSet)
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
                                     | removeSet)
+
+class SysModelExcludeTrovesAction(SysModelDelayedTupleSetAction):
+
+    def __init__(self, *args, **kwargs):
+        self.excludeTroves = kwargs.pop('excludeTroves')
+        SysModelDelayedTupleSetAction.__init__(self, *args, **kwargs)
+
+    def __call__(self, data):
+        installSet = set()
+        optionalSet = set()
+        for troveTup, inInstall, isExplicit in (
+                     self.primaryTroveSet._walk(data.troveCache,
+                                     newGroups = False,
+                                     recurse = True)):
+            if self.excludeTroves.match(troveTup[0]):
+                if inInstall or isExplicit:
+                    optionalSet.add(troveTup)
+            elif isExplicit:
+                if inInstall:
+                    installSet.add(troveTup)
+                else:
+                    optionalSet.add(troveTup)
+
+        self.outSet._setInstall(installSet)
+        self.outSet._setOptional(optionalSet)
 
 class SysModelFindAction(troveset.FindAction):
 
@@ -684,8 +709,12 @@ class SystemModelClient(object):
 
         # we need to explicitly fetch this before we can walk it
         preFetch = troveSet._action(ActionClass = SysModelFinalFetchAction)
-        availForDeps = preFetch._action(ActionClass = SysModelGetOptionalAction)
-        preFetch.g.realize(SysModelActionData(troveCache, self.cfg.flavor[0],
+        # handle exclude troves
+        final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
+                                    ActionClass = SysModelExcludeTrovesAction)
+        availForDeps = final._action(ActionClass = SysModelGetOptionalAction)
+        availForDeps.g.realize(SysModelActionData(troveCache,
+                                              self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
         existsTrv = trove.Trove("@update", versions.NewVersion(),
@@ -700,7 +729,7 @@ class SystemModelClient(object):
                 pins.add(tup)
                 targetTrv.addTrove(*tup)
 
-        for tup, inInstall, explicit in preFetch._walk(troveCache, recurse = True):
+        for tup, inInstall, explicit in final._walk(troveCache, recurse = True):
             if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
