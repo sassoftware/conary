@@ -10,7 +10,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-import itertools, re
+import itertools
 
 from conary import errors, trove, versions
 from conary.conaryclient import troveset, update
