@@ -25,12 +25,10 @@ class PathConflicts(policy.GroupEnforcementPolicy):
     '''
     NAME
     ====
-
     B{C{r.PathConflicts()}} - Raises errors when paths conflict
 
     SYNOPSIS
     ========
-
     C{r.PathConflicts(exceptions='/path/regexp/.*')}
     C{r.PathConflicts(exceptions=['/regexp/.*', '/other/foo.*'])}
     C{r.PathConflicts(exceptions=r.troveFilter('foo:runtime'))}
@@ -40,7 +38,6 @@ class PathConflicts(policy.GroupEnforcementPolicy):
 
     DESCRIPTION
     ===========
-
     Raises a GroupPathConflict error describing path conflicts,
     except for path conflicts specifically provided as exceptions.
 

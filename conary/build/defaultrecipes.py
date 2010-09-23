@@ -17,20 +17,17 @@ class BaseRequiresRecipe(Recipe):
     """
     NAME
     ====
-
     B{C{BaseRequiresRecipe}} - Base class which provides basic buildRequires
     for all recipes that follow the PackageRecipe approach to instantiating
     a destination directory.
 
     SYNOPSIS
     ========
-
     C{BaseRequiresRecipe} is inherited by the other *PackageRecipe,
     DerivedPackageRecipe and *InfoRecipe super classes.
 
     DESCRIPTION
     ===========
-
     The C{BaseRequiresRecipe} class provides Conary recipes with references to
     the essential troves which offer Conary's packaging requirements.
     (python, sqlite, and conary)
@@ -66,17 +63,14 @@ PackageRecipe = '''class PackageRecipe(SourcePackageRecipe, BaseRequiresRecipe):
     """
     NAME
     ====
-
     B{C{PackageRecipe}} - Base class which provides Conary functionality
 
     SYNOPSIS
     ========
-
     C{PackageRecipe} is inherited by the other *PackageRecipe super classes
 
     DESCRIPTION
     ===========
-
     The C{PackageRecipe} class provides Conary recipes with references to
     the essential troves which offer Conary's packaging requirements.
     (python, sqlite, gzip, bzip2, tar, cpio, and patch)
@@ -86,7 +80,6 @@ PackageRecipe = '''class PackageRecipe(SourcePackageRecipe, BaseRequiresRecipe):
 
     EXAMPLE
     =======
-
     A sample class that uses PackageRecipe to download source code from
     a web site, unpack it, run "make", then run "make install"::
 
@@ -122,13 +115,11 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
     """
     NAME
     ====
-
     B{C{r.GroupRecipe()}} - Provides the original type of recipe interface
     for creating groups.
 
     DESCRIPTION
     ===========
-
     The C{r.GroupRecipe} class provides the original interface for creating
     groups that are stored in a Conary repository.
 
@@ -147,7 +138,6 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
 
     PARAMETERS
     ==========
-
     Several parameters may be set at the time of group creation.  Although
     these parameters are typically passed to C{r.createGroup()} for the
     base group, they should be set as variables in the recipe class.
@@ -189,7 +179,6 @@ class GroupRecipe(_GroupRecipe, BaseRequiresRecipe):
 
     METHODS
     =======
-
     The following methods are applicable in Conary group recipes:
 
         - L{add} : Adds a trove to a group
@@ -245,13 +234,11 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     """
     NAME
     ====
-
     B{C{r.GroupSetRecipe()}} - Provides a set-oriented recipe interface
     for creating groups.
 
     DESCRIPTION
     ===========
-
     The C{r.GroupSetRecipe} class provides a set-oriented interface for
     creating groups that are stored in a Conary repository.
 
@@ -294,7 +281,6 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     METHODS
     =======
-
     The following recipe methods are available in Conary group set recipes:
 
         - L{Repository} : Creates an object representing a respository
@@ -352,7 +338,6 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
 
     EXAMPLE
     =======
-
     This is an example recipe that uses the search path included in
     a product definition, if available, to provide a stable search.
     It adds to the base C{group-appliance-platform} the httpd, mod_ssl,
@@ -412,18 +397,15 @@ BuildPackageRecipe = '''class BuildPackageRecipe(PackageRecipe):
     """
     NAME
     ====
-
     B{C{BuildPackageRecipe}} - Build packages requiring Make and shell
     utilities
 
     SYNOPSIS
     ========
-
     C{class I{className(BuildPackageRecipe):}}
 
     DESCRIPTION
     ===========
-
     The C{BuildPackageRecipe} class provides recipes with capabilities for
     building packages which require the C{make} utility, and additional,
     standard shell tools, (coreutils) and the programs needed to run
@@ -434,7 +416,6 @@ BuildPackageRecipe = '''class BuildPackageRecipe(PackageRecipe):
 
     EXAMPLE
     =======
-
     C{class DocbookDtds(BuildPackageRecipe):}
 
     Uses C{BuildPackageRecipe} to define the class for a Docbook Document Type
@@ -460,13 +441,11 @@ CPackageRecipe = '''class CPackageRecipe(BuildPackageRecipe):
     """
     NAME
     ====
-
     B{C{CPackageRecipe}} - Build packages consisting of binaries built from C
     source code
 
     SYNOPSIS
     ========
-
     C{class I{className(CPackageRecipe):}}
 
     DESCRIPTION
@@ -484,7 +463,6 @@ CPackageRecipe = '''class CPackageRecipe(BuildPackageRecipe):
 
     EXAMPLE
     =======
-
     C{class Bzip2(CPackageRecipe):}
 
     Defines the class for a C{bzip2} recipe using C{AutoPackageRecipe}.
@@ -514,17 +492,14 @@ AutoPackageRecipe = '''class AutoPackageRecipe(CPackageRecipe):
     """
     NAME
     ====
-
     B{C{AutoPackageRecipe}} - Build simple packages with auto* tools
 
     SYNOPSIS
     ========
-
     C{class I{className(AutoPackageRecipe):}}
 
     DESCRIPTION
     ===========
-
     The  C{AutoPackageRecipe} class provides a simple means for the
     creation of packages from minimal recipes, which are built from source
     code using the auto* tools, such as C{automake}, and C{autoconf}.
@@ -559,7 +534,6 @@ AutoPackageRecipe = '''class AutoPackageRecipe(CPackageRecipe):
 
     EXAMPLE
     =======
-
     C{class Gimp(AutoPackageRecipe):}
 
     Defines the class for a GNU Image Manipulation Program (Gimp) recipe using
@@ -592,24 +566,20 @@ UserInfoRecipe = '''class UserInfoRecipe(UserGroupInfoRecipe,
     """
     NAME
     ====
-
     B{C{UserInfoRecipe}} - Build user info packages
 
     SYNOPSIS
     ========
-
     C{UserInfoRecipe} is used to create packages that define a system user
 
     DESCRIPTION
     ===========
-
     The C{UserInfoRecipe} class provides an interface to define a system
     user through the C{r.User} method.  The C{r.User} method is also
     available in the C{PackageRecipe} class.
 
     EXAMPLE
     =======
-
     A sample class that uses C{UserInfoRecipe} to define a user::
 
         class ExamplePackage(UserInfoRecipe):
@@ -636,17 +606,14 @@ GroupInfoRecipe = '''class GroupInfoRecipe(UserGroupInfoRecipe,
     """
     NAME
     ====
-
     B{C{GroupInfoRecipe}} - Build group info packages
 
     SYNOPSIS
     ========
-
     C{GroupInfoRecipe} is used to create packages that define a system group
 
     DESCRIPTION
     ===========
-
     The C{GroupInfoRecipe} class provides an interface to define a system
     group through the C{r.Group} method.  The C{r.Group} method is also
     available in the C{PackageRecipe} class.
@@ -656,7 +623,6 @@ GroupInfoRecipe = '''class GroupInfoRecipe(UserGroupInfoRecipe,
 
     EXAMPLE
     =======
-
     A sample class that uses C{GroupInfoRecipe} to define a group::
 
         class ExamplePackage(GroupInfoRecipe):
@@ -673,18 +639,15 @@ DerivedPackageRecipe = '''class DerivedPackageRecipe(AbstractDerivedPackageRecip
     """
     NAME
     ====
-
     B{C{DerivedPackageRecipe}} - Build derived packages
 
     SYNOPSIS
     ========
-
     C{DerivedPackageRecipe} is used to modify shadows of existing binary
     packages
 
     DESCRIPTION
     ===========
-
     The C{DerivedPackageRecipe} class provides an interface to modify the
     contents of a shadowed binary trove without recooking from source.
 
@@ -693,7 +656,6 @@ DerivedPackageRecipe = '''class DerivedPackageRecipe(AbstractDerivedPackageRecip
 
     EXAMPLE
     =======
-
     A sample class that uses DerivedPackageRecipe to replace contents of
     a config file::
 
@@ -711,18 +673,15 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
     """
     NAME
     ====
-
     B{C{CapsuleRecipe}} - Build Capsule packages
 
     SYNOPSIS
     ========
-
     C{CapsuleRecipe} is used to create a package that contains an unmodified,
     foreign package.
 
     DESCRIPTION
     ===========
-
     The C{CapsuleRecipe} class provides an interface to create a capsule
     package.  A capsule package encapsulates an unmodified, foreign package that
     is created by another packaging system.  Currently only RPM is supported.
@@ -731,7 +690,6 @@ CapsuleRecipe = '''class CapsuleRecipe(AbstractCapsuleRecipe, BaseRequiresRecipe
 
     EXAMPLE
     =======
-
     A sample class that uses CapsuleRecipe to create a Conary capsule package
     containing a single RPM::
 
@@ -756,18 +714,15 @@ DerivedCapsuleRecipe = '''class DerivedCapsuleRecipe(AbstractDerivedCapsuleRecip
     """
     NAME
     ====
-
     B{C{DerivedCapsuleRecipe}} - Build derived capsule packages
 
     SYNOPSIS
     ========
-
     C{DerivedCapsuleRecipe} is used to modify shadows of existing binary
     capsule packages
 
     DESCRIPTION
     ===========
-
     The C{DerivedCapsuleRecipe} class provides an interface to modify the
     contents of a binary trove which contains a capsule without
     recooking from source.
@@ -780,7 +735,6 @@ DerivedCapsuleRecipe = '''class DerivedCapsuleRecipe(AbstractDerivedCapsuleRecip
 
     EXAMPLE
     =======
-
     A sample class that uses DerivedCapsuleRecipe to replace contents of
     a config file::
 

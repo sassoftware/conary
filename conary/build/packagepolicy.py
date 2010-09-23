@@ -170,17 +170,14 @@ class Config(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.Config()}} - Mark files as configuration files
 
     SYNOPSIS
     ========
-
     C{r.Config([I{filterexp}] || [I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Config} policy marks all files below C{%(sysconfdir)s}
     (that is, C{/etc}) and C{%(taghandlerdir)s} (that is,
     C{/usr/libexec/conary/tags/}), and any other files explicitly
@@ -197,7 +194,6 @@ class Config(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.Config(exceptions='%(sysconfdir)s/X11/xkb/xkbcomp')}
 
     The file C{/etc/X11/xkb/xkbcomp} is marked as an exception, since it is
@@ -335,17 +331,14 @@ class ComponentSpec(_filterSpec):
     """
     NAME
     ====
-
     B{C{r.ComponentSpec()}} - Determines which component each file is in
 
     SYNOPSIS
     ========
-
     C{r.ComponentSpec([I{componentname}, I{filterexp}] || [I{packagename}:I{componentname}, I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.ComponentSpec} policy includes the filter expressions that specify
     the default assignment of files to components.  The expressions are
     considered in the order in which they are evaluated in the recipe, and the
@@ -357,13 +350,11 @@ class ComponentSpec(_filterSpec):
 
     KEYWORDS
     ========
-
     B{catchall} : Specify the  component name which gets all otherwise
     unassigned files. Default: C{runtime}
 
     EXAMPLES
     ========
-
     C{r.ComponentSpec('manual', '%(contentdir)s/manual/')}
 
     Uses C{r.ComponentSpec} to specify that all files below the
@@ -545,17 +536,14 @@ class PackageSpec(_filterSpec):
     """
     NAME
     ====
-
     B{C{r.PackageSpec()}} - Determines which package each file is in
 
     SYNOPSIS
     ========
-
     C{r.PackageSpec(I{packagename}, I{filterexp})}
 
     DESCRIPTION
     ===========
-
     The C{r.PackageSpec()} policy determines which package each file
     is in. (Use C{r.ComponentSpec()} to specify the component without
     specifying the package, or to specify C{I{package}:I{component}}
@@ -563,7 +551,6 @@ class PackageSpec(_filterSpec):
 
     EXAMPLES
     ========
-
     C{r.PackageSpec('openssh-server', '%(sysconfdir)s/pam.d/sshd')}
 
     Specifies that the file C{%(sysconfdir)s/pam.d/sshd} is in the package
@@ -669,18 +656,15 @@ class InitialContents(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.InitialContents()}} - Mark only explicit inclusions as initial
     contents files
 
     SYNOPSIS
     ========
-
     C{InitialContents([I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     By default, C{r.InitialContents()} does not apply to any files.
     It is used to specify all files that Conary needs to mark as
     providing only initial contents.  When Conary installs or
@@ -694,7 +678,6 @@ class InitialContents(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.InitialContents('%(sysconfdir)s/conary/.*gpg')}
 
     The files C{%(sysconfdir)s/conary/.*gpg} are being marked as initial
@@ -738,17 +721,14 @@ class Transient(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.Transient()}} - Mark files that have transient contents
 
     SYNOPSIS
     ========
-
     C{r.Transient([I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Transient()} policy marks files as containing transient
     contents. It automatically marks the two most common uses of transient
     contents: python and emacs byte-compiled files
@@ -767,7 +747,6 @@ class Transient(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.Transient('%(libdir)s/firefox/extensions/')}
 
     Marks all the files in the directory C{%(libdir)s/firefox/extensions/} as
@@ -805,17 +784,14 @@ class TagDescription(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.TagDescription()}} - Marks tag description files
 
     SYNOPSIS
     ========
-
     C{r.TagDescription([I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.TagDescription} class marks tag description files as
     such so that conary handles them correctly. Every file in
     C{%(tagdescriptiondir)s/} is marked as a tag description file by default.
@@ -825,7 +801,6 @@ class TagDescription(policy.Policy):
 
     EXAMPLES
     ========
-
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
@@ -849,23 +824,19 @@ class TagHandler(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.TagHandler()}} - Mark tag handler files
 
     SYNOPSIS
     ========
-
     C{r.TagHandler([I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     All files in C{%(taghandlerdir)s/} are marked as a tag
     handler files.
 
     EXAMPLES
     ========
-
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
@@ -888,17 +859,14 @@ class TagSpec(_addInfo):
     """
     NAME
     ====
-
     B{C{r.TagSpec()}} - Apply tags defined by tag descriptions
 
     SYNOPSIS
     ========
-
     C{r.TagSpec([I{tagname}, I{filterexp}] || [I{tagname}, I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.TagSpec()} policy automatically applies tags defined by tag
     descriptions in both the current system and C{%(destdir)s} to all
     files in C{%(destdir)s}.
@@ -911,7 +879,6 @@ class TagSpec(_addInfo):
 
     EXAMPLES
     ========
-
     C{r.TagSpec('initscript', '%(initdir)s/')}
 
     Applies the C{initscript} tag to all files in the directory
@@ -1012,17 +979,14 @@ class MakeDevices(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.MakeDevices()}} - Make device nodes
 
     SYNOPSIS
     ========
-
     C{MakeDevices([I{path},] [I{type},] [I{major},] [I{minor},] [I{owner},] [I{groups},] [I{mode}])}
 
     DESCRIPTION
     ===========
-
     The C{r.MakeDevices()} policy creates device nodes.  Conary's
     policy of non-root builds requires that these nodes exist only in the
     package, and not in the filesystem, as only root may actually create
@@ -1031,7 +995,6 @@ class MakeDevices(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.MakeDevices(I{'/dev/tty', 'c', 5, 0, 'root', 'root', mode=0666, package=':dev'})}
 
     Creates the device node C{/dev/tty}, as type 'c' (character, as opposed to
@@ -1138,24 +1101,20 @@ class LinkType(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.LinkType()}} - Ensures only regular, non-configuration files are hardlinked
 
     SYNOPSIS
     ========
-
     C{r.LinkType([I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.LinkType()} policy ensures that only regular, non-configuration
     files are hardlinked.
 
 
     EXAMPLES
     ========
-
     This policy is not called explicitly.
     """
     bucket = policy.PACKAGE_CREATION
@@ -1177,17 +1136,14 @@ class LinkCount(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.LinkCount()}} - Restricts hardlinks across directories.
 
     SYNOPSIS
     ========
-
     C{LinkCount([I{filterexp}] | [I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.LinkCount()} policy restricts hardlinks across directories.
 
     It is generally an error to have hardlinks across directories, except when
@@ -1200,7 +1156,6 @@ class LinkCount(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.LinkCount(exceptions='/usr/share/zoneinfo/')}
 
     Uses C{r.LinkCount} to except zoneinfo files, located in
@@ -1268,17 +1223,14 @@ class ExcludeDirectories(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.ExcludeDirectories()}} - Exclude directories from package
 
     SYNOPSIS
     ========
-
     C{r.ExcludeDirectories([I{filterexp}] | [I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.ExcludeDirectories} policy causes directories to be
     excluded from the package by default.  Use
     C{r.ExcludeDirectories(exceptions=I{filterexp})} to set exceptions to this
@@ -1315,7 +1267,6 @@ class ExcludeDirectories(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.ExcludeDirectories(exceptions='/tftpboot')}
 
     Sets the directory C{/tftboot} as an exception to the
@@ -1363,17 +1314,14 @@ class ByDefault(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.ByDefault()}} - Determines components to be installed by default
 
     SYNOPSIS
     ========
-
     C{r.ByDefault([I{inclusions} || C{exceptions}=I{exceptions}])}
 
     DESCRIPTION
     ===========
-
     The C{r.ByDefault()} policy determines which components should
     be installed by default at the time the package is installed on the
     system.  The default setting for the C{ByDefault} policy is that the
@@ -1386,7 +1334,6 @@ class ByDefault(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.ByDefault(exceptions=[':manual'])}
 
     Uses C{r.ByDefault} to ignore C{:manual} components when enforcing the
@@ -1451,17 +1398,14 @@ class Ownership(_UserGroup):
     """
     NAME
     ====
-
     B{C{r.Ownership()}} - Set file ownership
 
     SYNOPSIS
     ========
-
     C{r.Ownership([I{username},] [I{groupname},] [I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Ownership()} policy sets user and group ownership of files when
     the default of C{root:root} is not appropriate.
 
@@ -1470,12 +1414,10 @@ class Ownership(_UserGroup):
 
     KEYWORDS
     ========
-
     None.
 
     EXAMPLES
     ========
-
     C{r.Ownership('apache', 'apache', '%(localstatedir)s/lib/php/session')}
 
     Sets ownership of C{%(localstatedir)s/lib/php/session} to owner
@@ -1577,17 +1519,14 @@ class UtilizeUser(_Utilize):
     """
     NAME
     ====
-
     B{C{r.UtilizeUser()}} - Marks files as requiring a user definition to exist
 
     SYNOPSIS
     ========
-
     C{r.UtilizeUser([I{username}, I{filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.UtilizeUser} policy marks files as requiring a user definition
     to exist even though the file is not owned by that user.
 
@@ -1597,7 +1536,6 @@ class UtilizeUser(_Utilize):
 
     EXAMPLES
     ========
-
     C{r.UtilizeUser('sshd', '%(sbindir)s/sshd')}
 
     Marks the file C{%(sbindir)s/sshd} as requiring the user definition
@@ -1613,18 +1551,15 @@ class UtilizeGroup(_Utilize):
     """
     NAME
     ====
-
     B{C{r.UtilizeGroup()}} - Marks files as requiring a user definition to
     exist
 
     SYNOPSIS
     ========
-
     C{r.UtilizeGroup([groupname, filterexp])}
 
     DESCRIPTION
     ===========
-
     The C{r.UtilizeGroup} policy marks files as requiring a group definition
     to exist even though the file is not owned by that group.
 
@@ -1634,7 +1569,6 @@ class UtilizeGroup(_Utilize):
 
     EXAMPLES
     ========
-
     C{r.UtilizeGroup('users', '%(sysconfdir)s/default/useradd')}
 
     Marks the file C{%(sysconfdir)s/default/useradd} as requiring the group
@@ -1650,19 +1584,16 @@ class ComponentRequires(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.ComponentRequires()}} - Create automatic intra-package,
     inter-component dependencies
 
     SYNOPSIS
     ========
-
     C{r.ComponentRequires([{'I{componentname}': I{requiringComponentSet}}] |
     [{'I{packagename}': {'I{componentname}': I{requiringComponentSet}}}])}
 
     DESCRIPTION
     ===========
-
     The C{r.ComponentRequires()} policy creates automatic,
     intra-package, inter-component dependencies, such as a corresponding
     dependency between C{:lib} and C{:data} components.
@@ -1695,7 +1626,6 @@ class ComponentRequires(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.ComponentRequires({'openssl': {'config': set(('runtime', 'lib'))}})}
 
     Uses C{r.ComponentRequires} to create dependencies in a top-level manner
@@ -1772,18 +1702,15 @@ class ComponentProvides(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.ComponentProvides()}} - Causes each trove to explicitly provide
     itself.
 
     SYNOPSIS
     ========
-
     C{r.ComponentProvides(I{flags})}
 
     DESCRIPTION
     ===========
-
     The C{r.ComponentProvides()} policy causes each trove to explicitly
     provide its name.  Call it to provide optional capability flags
     consisting of a single string, or a list, tuple, or set of strings,
@@ -1792,7 +1719,6 @@ class ComponentProvides(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.ComponentProvides("addcolumn")}
 
     Uses C{r.ComponentProvides} in the context of the sqlite recipe, and
@@ -2439,17 +2365,14 @@ class Provides(_dependency):
     """
     NAME
     ====
-
     B{C{r.Provides()}} - Creates dependency provision
 
     SYNOPSIS
     ========
-
     C{r.Provides([I{provision}, I{filterexp}] || [I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Provides()} policy marks files as providing certain features
     or characteristics, and can be called to explicitly provide things
     that cannot be automatically discovered. C{r.Provides} can also override
@@ -2484,7 +2407,6 @@ class Provides(_dependency):
 
     EXAMPLES
     ========
-
     C{r.Provides('file', '/usr/share/dict/words')}
 
     Demonstrates using C{r.Provides} to specify the file provision
@@ -3140,17 +3062,14 @@ class Requires(_addInfo, _dependency):
     """
     NAME
     ====
-
     B{C{r.Requires()}} - Creates dependency requirements
 
     SYNOPSIS
     ========
-
     C{r.Requires([I{/path/to/file}, I{filterexp}] || [I{packagename:component[(FLAGS)]}, I{filterexp}] || [I{exceptions=filterexp)}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Requires()} policy adds requirements for a file.
     You can pass in exceptions that should not have automatic requirement
     discovery done, such as example shell scripts outside of C{%(docdir)s}.
@@ -3205,7 +3124,6 @@ class Requires(_addInfo, _dependency):
 
     EXAMPLES
     ========
-
     C{r.Requires('mailbase:runtime', '%(sbindir)s/sendmail')}
 
     Demonstrates using C{r.Requires} to specify a manual requirement of the
@@ -4110,24 +4028,20 @@ class Flavor(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.Flavor()}} - Controls the Flavor mechanism
 
     SYNOPSIS
     ========
-
     C{r.Flavor([I{filterexp}] | [I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Flavor} policy marks files with the appropriate Flavor.
     To except a file's flavor from being marked, use:
     C{r.Flavor(exceptions='I{filterexp}')}.
 
     EXAMPLES
     ========
-
     C{r.Flavor(exceptions='%(crossprefix)s/lib/gcc-lib/.*')}
 
     Files in the directory C{%(crossprefix)s/lib/gcc-lib} are being excepted
@@ -4326,18 +4240,15 @@ class ProcessUserInfoPackage(_ProcessInfoPackage):
     """
     NAME
     ====
-
     B{C{r.ProcessUserInfoPackage()}} - Set dependencies and tags for User
     info packages
 
     SYNOPSIS
     ========
-
     C{r.ProcessUserInfoPackage()}
 
     DESCRIPTION
     ===========
-
     The C{r.ProcessUserInfoPackage} policy automatically sets up provides
     and requries, as well as tags for user info files create by the
     C{r.User} build action.
@@ -4385,18 +4296,15 @@ class ProcessGroupInfoPackage(_ProcessInfoPackage):
     """
     NAME
     ====
-
     B{C{r.ProcessGroupInfoPackage()}} - Set dependencies and tags for Group
     info packages
 
     SYNOPSIS
     ========
-
     C{r.ProcessGroupInfoPackage()}
 
     DESCRIPTION
     ===========
-
     The C{r.ProcessGroupInfoPackage} policy automatically sets up provides
     and requries, as well as tags for group info files create by the
     C{r.Group}  and C{r.SupplementalGroup} build actions.
@@ -4426,18 +4334,15 @@ class reportExcessBuildRequires(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.reportExcessBuildRequires()}} - suggest items to remove from C{buildRequires} list
 
     SYNOPSIS
     ========
-
     C{r.reportExcessBuildRequires('required:component')}
     C{r.reportExcessBuildRequires(['list:of', 'required:components'])}
 
     DESCRIPTION
     ===========
-
     The C{r.reportExcessBuildRequires()} policy is used to report
     together all suggestions for possible items to remove from the
     C{buildRequires} list.
@@ -4460,7 +4365,6 @@ class reportExcessBuildRequires(policy.Policy):
 
     EXAMPLES
     ========
-
     This policy is normally called only internally by other Conary
     policies.  However, a recipe can report build requirements
     that are known by the recipe maintainer to be required but

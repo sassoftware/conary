@@ -87,12 +87,10 @@ class GroupTupleSetMethods(object):
     '''
     NAME
     ====
-
     B{C{TroveSet}} - collection of trove references
 
     DESCRIPTION
     ===========
-
     A B{TroveSet} is an immutable collection of references to
     specific troves from a Conary repository, and set operations
     on those collections.  Each trove reference in a TroveSet is a
@@ -104,7 +102,6 @@ class GroupTupleSetMethods(object):
 
     METHODS
     =======
-
     The following methods are available in C{TroveSet} objects:
 
         - L{components} : Recursively search for components
@@ -143,17 +140,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.depsNeeded}} - Get troves satisfying dependencies
 
         SYNOPSIS
         ========
-
         C{troveset.depsNeeded(resolveSource, failOnUnresolved=True)}
 
         DESCRIPTION
         ===========
-
         Looks for unresolved dependencies in the trove set.  Those unmet
         dependencies (and their dependencies, recursively) are sought in
         the C{resolveSource}, which must be a C{TroveSet}, C{Repository}, or
@@ -165,14 +159,12 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{resolveSource} : Source against which to resolve dependencies
             - L{failOnUnresolved} (C{True}) : Whether to fail if not all
               dependencies can be resolved.
 
         EXAMPLES
         ========
-
         There are several significant use cases for C{depsNeeded}.
 
         The first use case is perhaps the most obvious; creating a group
@@ -226,18 +218,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.difference}} - Subtract one TroveSet from another (C{-})
 
         SYNOPSIS
         ========
-
         C{troveset.difference(other)}
         C{troveset - other}
 
         DESCRIPTION
         ===========
-
         Returns a new troveset which includes the members of the
         original set which are not in the troveset C{other}. The
         isInstall values of the troves in troveset C{other} are
@@ -258,18 +247,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.find}} - Search the TroveSet for specified troves
 
         SYNOPSIS
         ========
-
         C{troveset.find('troveSpec1', 'troveSpec2', ..., 'troveSpecN')}
         C{troveset['troveSpec']}
 
         DESCRIPTION
         ===========
-
         Returns a new C{troveset} containing all troves from the original
         troveset which match the given C{troveSpec}(s).  The original
         troveset's isInstall settings are preserved for each returned
@@ -277,7 +263,6 @@ class GroupTupleSetMethods(object):
 
         EXAMPLES
         ========
-
         C{groupOS = repos['group-os'].flatten()}
         C{allGlibcVersions = groupOS.find('glibc')}
         C{compatGlibc = groupOS['glibc=@rpl:1-compat']}
@@ -296,17 +281,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.findByName}} - Find troves by regular expression
 
         SYNOPSIS
         ========
-
         C{troveset.findByName(nameRegularExpression, emptyOkay = False)}
 
         DESCRIPTION
         ===========
-
         The original troveset is searched for troves whose names match
         C{nameRegularExpression}, and matching troves are returned in
         a new troveset.  The isInstall value is preserved from the
@@ -314,13 +296,11 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{emptyOkay} : Unless set to C{True}, raise an exception if
               no troves are found.
         
         EXAMPLES
         ========
-
         C{allGnomePackages = allPackages.findByName('^gnome-')}
 
         Returns a troveset containing all troves in the troveset
@@ -337,18 +317,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.findBySourceName}} - Find troves by the name of the source
         package from which they were built
 
         SYNOPSIS
         ========
-
         C{troveset.findBySourceName(sourceName)}
 
         DESCRIPTION
         ===========
-
         The original troveset is searched for troves which were built
         from source trove called C{sourceName}, and all matching
         troves are returned in a new troveset.  The isInstall value is
@@ -363,18 +340,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.components}} - Returns named components included in
         all members of the troveset, recursively.
 
         SYNOPSIS
         ========
-
         C{troveset.components(I{componentName1}, I{componentName2}, ...)}
 
         DESCRIPTION
         ===========
-
         Returns components included in all members of the troveset, found
         recursively, where the component name (C{runtime}, C{lib}, C{data},
         etc.) matches one of the component names provided.  The C{isInstalled}
@@ -384,7 +358,6 @@ class GroupTupleSetMethods(object):
 
         EXAMPLES
         ========
-
         C{groupOs = repos['group-os'].flatten()}
         C{allDebugInfo = groupOs.components('debuginfo')}
 
@@ -410,12 +383,10 @@ class GroupTupleSetMethods(object):
 
         SYNOPSIS
         ========
-
         C{troveset.flatten()}
 
         DESCRIPTION
         ===========
-
         The troveset returned consists of any existing trove referenced
         by the original troveset, directly or indirectly via groups.
         The C{isInstall} setting for each troves is inherited from
@@ -433,7 +404,6 @@ class GroupTupleSetMethods(object):
 
         EXAMPLES
         ========
-
         C{platGrp = repos['group-appliance-platform'].flatten()}
 
         Returns all the non-group troves included directly in
@@ -449,17 +419,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.getInstall}} - Returns only install members
 
         SYNOPSIS
         ========
-
         C{troveset.getInstall()}
 
         DESCRIPTION
         ===========
-
         Returns a new troveset which includes only the members of
         this troveset which are marked as install; optional members are
         omitted. All members of the returned set are marked as install.
@@ -470,17 +437,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.getOptional}} - Returns only optional members
 
         SYNOPSIS
         ========
-
         C{troveset.getOptional()}
 
         DESCRIPTION
         ===========
-
         Returns a new troveset which includes only the members of
         this troveset which are marked as optional; install members are
         omitted. All members of the returned set are marked as optional.
@@ -491,17 +455,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.isEmpty}} - Assert that troveset is empty
 
         SYNOPSIS
         ========
-
         C{troveset.isEmpty()}
 
         DESCRIPTION
         ===========
-
         Raises an exception is raised if the troveset contains any members.
         Otherwise, returns an identical (empty) troveset that may be ignored.
         """
@@ -511,17 +472,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.isNotEmpty}} - Assert that troveset is not empty
 
         SYNOPSIS
         ========
-
         C{troveset.isNotEmpty()}
 
         DESCRIPTION
         ===========
-
         Raises an exception is raised if the troveset contains no members.
         Otherwise, returns an identical troveset that may be ignored.
         """
@@ -531,18 +489,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.makeInstall}} - Make all troves install, or add all
         provided troves as install troves
 
         SYNOPSIS
         ========
-
         C{troveset.makeInstall(installTroveSet = None)}
 
         DESCRIPTION
         ===========
-
         If C{installTroveSet} troveset is provided as an argument, all
         members of that other troveset are included in the result as
         install members.  Any members of the original troveset which
@@ -554,7 +509,6 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{installTroveSet} : TroveSet providing all its members as install
         """
         return self._action(ActionClass = MakeInstallAction,
@@ -564,18 +518,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.makeOptional}} - Make all troves optional, or add all
         provided troves as optional troves
 
         SYNOPSIS
         ========
-
         C{troveset.makeOptional(optionalTroveSet = None)}
 
         DESCRIPTION
         ===========
-
         If C{optionalTroveSet} troveset is provided as an argument, all
         members of that other troveset are included in the result as
         optional members.  Any members of the original troveset which
@@ -587,7 +538,6 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{optionalTroveSet} : TroveSet providing all its members as optional
         """
         return self._action(ActionClass = MakeOptionalAction,
@@ -597,17 +547,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.members}} - Returns all members of the troveset
 
         SYNOPSIS
         ========
-
         C{troveset.members()}
 
         DESCRIPTION
         ===========
-
         All troves directly included by the troves in this troveset
         are returned as a new troveset. They are optional in the result
         only if they are optional in every member of this troveset which
@@ -619,17 +566,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.packages}} - Return recursively-search package references
 
         SYNOPSIS
         ========
-
         C{troveset.packages()}
 
         DESCRIPTION
         ===========
-
         Return all packages and filesets referenced directly or indirectly
         by this troveset. They are optional in the result only if they
         are optional in every member of this troveset which includes them.
@@ -640,19 +584,16 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.union}} - Get the union of all provided TroveSets (C{|}, C{+})
 
         SYNOPSIS
         ========
-
         C{troveset.union(other1, other2, ..., otherN)}
         C{troveset + other1 + other2}
         C{troveset | other1 | other2}
 
         DESCRIPTION
         ===========
-
         Return a troveset which includes all of the members of this trove
         as well as all of the members of the arguments. Troves are optional
         only if they are optional in all the trovesets they are part of.
@@ -663,17 +604,14 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.replace}} - Replace troves with matching-name troves
 
         SYNOPSIS
         ========
-
         C{troveset.replace(replaceSet)}
 
         DESCRIPTION
         ===========
-
         Look (recursively) for items in this troveset which can
         reasonably be replaced by members found in the replaceSet.
         The isInstall values are inherited from the original troveset.
@@ -697,12 +635,10 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{replaceSet} : TroveSet containing potential replacements
 
         EXAMPLES
         ========
-
         This operation is intended to implement the appropriate
         behavior for applying a group specifying a set of updated
         packages.  For example, if only the postgresql client is
@@ -724,18 +660,15 @@ class GroupTupleSetMethods(object):
         """
         NAME
         ====
-
         B{C{TroveSet.update}} - Replace troves in the TroveSet with
         all troves from the replacement set
 
         SYNOPSIS
         ========
-
         C{troveset.update(updateSet)}
 
         DESCRIPTION
         ===========
-
         Returns a troveset that is a recusive union of the original
         troveset and C{updateSet}, except that only where the names of
         troves overlap, the versions from C{updateSet} are used, though
@@ -750,12 +683,10 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{updateSet} : TroveSet providing all its contents
 
         EXAMPLES
         ========
-
         This is commonly used to update to new package versions while
         preserving the semantics of a source group.  This might be used
         to apply a "hotfix".  So if you are building a group based on
@@ -782,12 +713,10 @@ class GroupTupleSetMethods(object):
 
         SYNOPSIS
         ========
-
         C{troveset.createGroup(name, checkPathConflicts = True)}
 
         DESCRIPTION
         ===========
-
         Create a new group whose members are defined by this
         troveset, and call it C{name} (which must begin with
         "C{group-}").
@@ -798,7 +727,6 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-
             - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
@@ -889,19 +817,16 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     '''
     NAME
     ====
-
     B{C{SearchPath}} - Collection of troves in which to search
 
     DESCRIPTION
     ===========
-
     An object which searches multiple other objects in the order
     specified.  Troves can be looked up in the result, and the
     result can also be used for resolving dependencies.
 
     METHODS
     =======
-
         - L{find} : Search the SearchPath for specified troves
     '''
     _explainObjectName = 'SearchPath'
@@ -910,18 +835,15 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
         '''
         NAME
         ====
-
         B{C{SearchPath.find}} - Search the SearchPath for specified troves
 
         SYNOPSIS
         ========
-
         C{searchpath.find('troveSpec1', 'troveSpec2', ..., 'troveSpecN')}
         C{searchpath['troveSpec']}
 
         DESCRIPTION
         ===========
-
         The B{SearchPath} is searched for troves which match the given
         troveSpecs.  All matches are included as installed in the
         returned C{TroveSet}.
@@ -947,17 +869,14 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
     '''
     NAME
     ====
-
     B{C{Repository}} - Source of trove references
 
     SYNOPSIS
     ========
-
     C{r.Repository(defaultLabelList, baseFlavor)}
 
     DESCRIPTION
     ===========
-
     A B{Repository} object is used to look troves up in a repository,
     and provide references to those troves as B{TroveSet} objects.
     It has a list of default labels (or a single default label) and
@@ -966,7 +885,6 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
 
     METHODS
     =======
-
         - L{find} : Search the repository for specified troves
         - L{latestPackages} : All the latest normal packages on the
           default label(s)
@@ -977,18 +895,15 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
         '''
         NAME
         ====
-
         B{C{Repository.find}} - Search the Repository for specified troves
 
         SYNOPSIS
         ========
-
         C{repos.find('troveSpec1', 'troveSpec2', ..., 'troveSpecN')}
         C{repos['troveSpec']}
 
         DESCRIPTION
         ===========
-
         The B{Repository} is searched for troves which match the given
         troveSpecs.  All matches are included as installed in the
         returned C{TroveSet}.
@@ -1010,18 +925,15 @@ class GroupSearchSourceTroveSet(troveset.SearchSourceTroveSet):
         '''
         NAME
         ====
-
         B{C{Repository.latestPackages}} - Get latest normal packages of the
         default flavor on the default label
 
         SYNOPSIS
         ========
-
         C{repos.latestPackages()}
 
         DESCRIPTION
         ===========
-
         Returns a B{TroveSet} consisting of the latest packages and
         filesets on the default search label.  The troves returned are
         those which best match the default flavor.  Any troves which
@@ -1515,17 +1427,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         NAME
         ====
-
         B{C{dumpAll}} - Display copious output describing each action.
 
         SYNOPSYS
         ========
-
         C{r.dumpAll()}
 
         DESCRIPTION
         ===========
-
         Causes a GroupSetRecipe to print a textual listing of the
         entire contents of each TroveSet as it is populated.
 
@@ -1561,17 +1470,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         NAME
         ====
-
         B{C{GroupSetRecipe.writeDotGraph}}
 
         SYNOPSIS
         ========
-
         C{r.writeDotGraph('path')}
 
         DESCRIPTION
         ===========
-
         Writes a description of the internal graph represenstation of
         the elements of the GroupSetRecipe in C{dot} format.  This
         graph can be converted to SVG format using the dot command:
@@ -1593,12 +1499,10 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.Group(troveSet, checkPathConflicts = True)}
 
         DESCRIPTION
         ===========
-
         Set the passed B{TroveSet} as the contents of the primary
         group being built; the group that has the same name as
         the source component. The return value is a troveset which
@@ -1608,7 +1512,6 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
         '''
         return ts._createGroup(self.name,
@@ -1651,17 +1554,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         NAME
         ====
-
         B{C{GroupSetRecipe.track}}
 
         SYNOPSIS
         ========
-
         C{r.track('troveSpec')}
 
         DESCRIPTION
         ===========
-
         Prints out actions that match the provided C{troveSpec}.  Usually
         used when a trove is unexpectedly present or missing in one or
         more TroveSets (or their resulting groups), in order to learn why

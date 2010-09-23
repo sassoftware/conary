@@ -248,18 +248,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.Requires(I{requirement}, [I{groupName}])}
 
         DESCRIPTION
         ===========
-
         The C{r.Requires} command causes a group to have a runtime requirement
         of the trove requirement.
 
         PARAMETERS
         ==========
-
         The C{r.Requires()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -269,7 +266,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.Requires('tmpwatch')}
 
         Uses C{r.Requires} to specify that the trove C{tmpwatch} must be
@@ -286,17 +282,14 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.add(I{name}, [I{versionStr},] [I{flavor},] [I{source},] [I{byDefault},] [I{ref},] [I{requireLatest},] [I{components},] [I{groupName},] [I{searchPath}])}
 
         DESCRIPTION
         ===========
-
         The C{r.add()} command is used to add a trove to a group.
 
         PARAMETERS
         ==========
-
         The C{r.add()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -338,7 +331,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.add('gzip:runtime')}
 
         Adds the C{gzip:runtime} trove to the current group.
@@ -371,12 +363,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.remove(I{name}, [I{flavor},] [I{groupName},] [I{versionStr}], [I{allowNoMatch}])}
 
         DESCRIPTION
         ===========
-
         The C{r.remove} command removes a trove from the group which was
         previously added with C{r.addAll} or C{add} commands.
 
@@ -394,7 +384,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.remove()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -414,7 +403,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.remove('kernel:configs', flavor='kernel.smp')}
 
         Removes the trove C{kernel:configs} from the current group for the
@@ -434,18 +422,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.removeComponents(I{componentList}, [I{groupName}])}
 
         DESCRIPTION
         ===========
-
         The C{r.removeComponents} command specifies components which should
         not be installed by default when installing the group.
 
         PARAMETERS
         ==========
-
         The C{r.removeComponents()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -456,7 +441,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.removeComponents(['devel', 'devellib'])}
 
         Uses C{r.removeComponents} to specify that the C{:devel} and
@@ -474,18 +458,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.moveComponents(I{componentList}, I{fromGroup}, I{toGroup}, [I{byDefault}])}
 
         DESCRIPTION
         ===========
-
         The C{r.moveComponents} removes components from the fromGroup, and adds
         those components to the toGroup.
 
         PARAMETERS
         ==========
-
         The C{r.moveComponents()} command accepts the following parameters,
         with default values shown in parentheses where there is one:
 
@@ -503,7 +484,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.moveComponents(['devel', 'devellib'], 'group-core', 'group-devel')}
 
         Uses C{r.moveComponents} to specify that those C{:devel} and
@@ -522,18 +502,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.copyComponents(I{componentList}, I{fromGroup}, I{toGroup}, [I{byDefault}])}
 
         DESCRIPTION
         ===========
-
         The C{r.copyComponents} copies the listed component types from
         the fromGroup to the toGroup.
 
         PARAMETERS
         ==========
-
         The C{r.copyComponents()} command accepts the following parameters,
         with default values shown in parentheses where there is one:
 
@@ -551,7 +528,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.copyComponents(['devel', 'devellib'], 'group-core', 'group-devel')}
 
         Uses C{r.copyComponents} to specify that those C{:devel} and
@@ -568,12 +544,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.setSearchPath(I{pathspec})}
 
         DESCRIPTION
         ===========
-
         The C{r.setSearchPath} command specifies the searchPath used to search
         for troves.
 
@@ -601,7 +575,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.setSearchPath()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -609,7 +582,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.setSearchPath('myproject.rpath.org@rpl:1', 'group-dist=conary.rpath.com@rpl:1')}
 
         Uses C{r.setSearchPath} to specify troves are to be sought in the
@@ -625,18 +597,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.setByDefault(I{byDefault}, [I{groupName}])}
 
         DESCRIPTION
         ===========
-
         The C{r.setByDefault} command specifies whether troves are added to
         the group by default.
 
         PARAMETERS
         ==========
-
         The C{r.setByDefault()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -647,7 +616,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.setByDefault(False, groupName='group-ftools')}
 
         Specifies troves are not added to the group C{group-ftools} by default.
@@ -666,7 +634,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.addAll(I{name}, [I{versionStr}], [I{flavor},] [I{ref},]
         [I{requireLatest},] [I{recurse},] [I{groupName},] [I{use},]
         [I{searchPath},] [I{flatten},] [I{copyScripts},]
@@ -674,7 +641,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         DESCRIPTION
         ===========
-
         The C{r.addAll()} command is used to add all troves directly contained
         in a given reference to B{name} to the recipe.
 
@@ -688,7 +654,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.addAll()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -731,7 +696,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.addAll('group-core', 'conary.rpath.com@rpl:1')}
 
         Uses C{r.addAll} to add the troves referenced by C{group-core} to
@@ -760,12 +724,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.removeItemsAlsoInNewGroup(I{name}, [I{groupName},])}
 
         DESCRIPTION
         ===========
-
         The C{r.removeItemsAlsoInNewGroup()} command is used to remove a set of         troves from the current group.  The first group name specified is the
         set of troves to remove, the second group name specified
         is the group to remove troves from (the current default group is used
@@ -782,7 +744,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.removeItemsAlsoInNewGroup()} command accepts the following
         parameters, with default values shown in parentheses:
 
@@ -796,7 +757,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.removeItemsAlsoInNewGroup('group-core', groupName='group-extras')}
 
         Removes troves from group-extras if they are contained in group-core.
@@ -817,12 +777,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.removeItemsAlsoInGroup(I{name}, [I{versionStr}], [I{flavor},] [I{groupName},] [I{searchPath},])}
 
         DESCRIPTION
         ===========
-
         The C{r.removeItemsAlsoInGroup()} command is used to remove a set of
         troves from the current group.  The first group name specified is the
         set of troves to remove, the second group name specified
@@ -840,7 +798,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.removeItemsAlsoInNewGroup()} command accepts the following
         parameters, with default values shown in parentheses:
 
@@ -858,7 +815,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.removeItemsAlsoInGroup('group-core', 'conary.rpath.com@rpl:1', groupName='group-extras')}
 
         Removes troves from group-extras if they are contained in group-core.
@@ -883,14 +839,12 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.addCopy(I{name}, [I{flavor},] [I{groupName},] [I{recurse},]
         [I{ref},] [I{requireLatest},] [I{versionStr},] [I{copyScripts},]
         [I{copyCompatibilityClass}])}
 
         DESCRIPTION
         ===========
-
         The C{r.addCopy()} command is used to create a copy of the group
         with name I{name} and add that group to groupName.
 
@@ -906,7 +860,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.addCopy()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -944,7 +897,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.addCopy('group-core', 'conary.rpath.com@rpl:1')}
 
         Uses C{r.addCopy} to create a new group called C{group-core}, copy
@@ -976,18 +928,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.addNewGroup(I{name,} [I{byDefault},] [I{groupName}])}
 
         DESCRIPTION
         ===========
-
         The C{r.addNewGroup()} command is used to add one newly created group
         to another newly created group.
 
         PARAMETERS
         ==========
-
         The C{r.addNewGroup()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -1005,7 +954,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.addNewGroup('group-3d', groupName='group-graphics')}
 
         Adds the group C{group-3d} to the group C{group-graphics}.
@@ -1028,19 +976,16 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.setDefaultGroup(I{groupName})}
 
         DESCRIPTION
         ===========
-
         The C{r.setDefaultGroup} command specifies the current group which all
         commands will apply to if no B{groupName} is specified as a parameter
         to a given command.
 
         PARAMETERS
         ==========
-
         The C{r.setDefaultGroup()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -1048,7 +993,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.setDefaultGroup('group-consmod')}
 
         Defines the default group as C{group-consmod}.
@@ -1063,12 +1007,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.addResolveSource(I{name}, [I{versionStr}], [I{flavor}], [I{ref}])}
 
         DESCRIPTION
         ===========
-
         The C{r.addResolveSource} command adds a resolution source for
         resolving dependencies.  When you specify a resolve source, that
         source will be searched for dependencies, and your labelPath will
@@ -1081,7 +1023,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.addResolveSource()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -1098,7 +1039,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.addResolveSource('foo.example.com@foo:devel')}
 
         Uses C{r.addResolveSource} to specify dependency resolution should
@@ -1115,12 +1055,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.addReference(I{name}, [I{flavor},] [I{ref},] [I{versionStr}])}
 
         DESCRIPTION
         ===========
-
         The C{r.addReference} command adds a reference to a trove,
         (usually a group trove) which may then be passed to future invocations
         of C{r.add} or C{r.addAll} commands as the reference parameter.
@@ -1130,7 +1068,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.addReference()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -1147,7 +1084,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{coreRef = r.addReference('group-core', 'conary.rpath.com@rpl:1')}
         C{r.add('tmpwatch', ref=coreRef)}
 
@@ -1167,12 +1103,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.replace(I{name}, [I{groupName},]  [I{newVersionStr}], [I{newFlavor},], [I{allowNoMatch}], [I{searchPath}])}
 
         DESCRIPTION
         ===========
-
         The C{r.replace} command replaces all troves with a particular name
         with a new version of the trove.
 
@@ -1181,7 +1115,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.replace()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -1204,7 +1137,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         r.replace('distro-release')
 
         Uses C{r.replace} to remove all instances of the C{distro-release}
@@ -1233,18 +1165,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.setLabelPath(I{pathspec})}
 
         DESCRIPTION
         ===========
-
         The C{r.setLabelPath} command specifies the labelPath used to search
         for troves.
 
         PARAMETERS
         ==========
-
         The C{r.setLabelPath()} command accepts the following parameters,
         with default values shown in parentheses:
 
@@ -1252,7 +1181,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.setLabelPath('myproject.rpath.org@rpl:1', 'conary.rpath.com@rpl:1')}
 
         Uses C{r.setLabelPath} to specify troves are to be sought in the
@@ -1284,12 +1212,10 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.setCompatibilityClass(I{class})}
 
         DESCRIPTION
         ===========
-
         The C{r.setCompatibilityClass} command specifies the compatibility
         class for this trove. When a trove is updated from one compatibility
         class to another, the rollback stack is invalidated unless the
@@ -1298,7 +1224,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
         The C{r.setCompatibilityClass()} command accepts the following
         parameters.
 
@@ -1336,18 +1261,15 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.startGroup(I{name}, [I{autoResolve},] [I{byDefault},] [I{checkOnlyByDefaultDeps},] [I{checkPathConflicts},] [I{depCheck},] [I{groupName},] [I{imageGroup}])}
 
         DESCRIPTION
         ===========
-
         The C{r.startGroup} command starts a new group. This command
         aggregates createNewGroup, addNewGroup and setDefaultGroup.
 
         PARAMETERS
         ==========
-
         The C{r.startGroup()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -1378,7 +1300,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.startGroup('group-ftools')}
 
         Creates the group C{group-ftools}.
@@ -1414,17 +1335,14 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-
         C{r.createGroup(I{groupName}, [I{autoResolve},] [I{byDefault},] [I{checkOnlyByDefaultDeps},] [I{checkPathConflicts},] [I{depCheck},] [I{imageGroup}])}
 
         DESCRIPTION
         ===========
-
         The C{r.createGroup} command creates a new group.
 
         PARAMETERS
         ==========
-
         The C{r.createGroup()} command accepts the following parameters, with
         default values shown in parentheses:
 
@@ -1451,7 +1369,6 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         EXAMPLES
         ========
-
         C{r.createGroup('group-ftools')}
 
         Creates the group C{group-ftools}.
