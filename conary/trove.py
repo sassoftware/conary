@@ -1774,11 +1774,11 @@ class Trove(streams.StreamSet):
         dir, base = os.path.split(path)
         self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
         self.troveInfo.capsule.type.set('msi')
-        self.troveInfo.capsule.msi.name.set(winHelper.name.encode('utf-8'))
-        self.troveInfo.capsule.msi.version.set(winHelper.version.encode('utf-8'))
-        self.troveInfo.capsule.msi.platform.set(winHelper.platform.encode('utf-8'))
-        self.troveInfo.capsule.msi.productCode.set(winHelper.productCode.encode('utf-8'))
-        self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode.encode('utf-8'))
+        self.troveInfo.capsule.msi.name.set(winHelper.name)
+        self.troveInfo.capsule.msi.version.set(winHelper.version)
+        self.troveInfo.capsule.msi.platform.set(winHelper.platform)
+        self.troveInfo.capsule.msi.productCode.set(winHelper.productCode)
+        self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode)
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()

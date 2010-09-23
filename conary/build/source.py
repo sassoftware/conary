@@ -53,19 +53,19 @@ class windowsHelper:
         self.resource = msis[-1]
 
         # put the actual file contents
-        self.resource.path = open(path)
+        self.resource.path = open(path).read()
         self.resource.refresh()
 
-        name = str(self.resource.name).split()
+        name = self.resource.name.encode('utf-8').split()
         if len(name) > 1 and '.' in name[-1]:
             name = '-'.join(name[:-1])
         else:
             name = '-'.join(name)
         self.name = name
-        self.version = self.resource.version
-        self.platform = self.resource.platform
-        self.productCode = self.resource.productCode
-        self.upgradeCode = self.resource.upgradeCode
+        self.version = self.resource.version.encode('utf-8')
+        self.platform = self.resource.platform.encode('utf-8')
+        self.productCode = self.resource.productCode.encode('utf-8')
+        self.upgradeCode = self.resource.upgradeCode.encode('utf-8')
 
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
