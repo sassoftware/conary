@@ -38,4 +38,3 @@ try:
 except ImportError:
     # conary-build not installed
     pass
-
