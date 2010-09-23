@@ -119,24 +119,94 @@ def _wrapString(msg, on, off):
     msg = msg.replace(onCode, '').replace(offCode, '')
     return onCode + msg + offCode
 
-def _formatString(msg):
+def _bold(msg):
     if _useLess():
-        if msg[0] == 'B':
-            return _wrapString(msg[2:-1], 1, 21)
-        elif msg[0] == 'C':
-            # use underline for constant width because reverse video
-            # is too distracting in practice, due to appropriate
-            # widespread use of constant width
-            return _wrapString(msg[2:-1], 4, 24)
-        elif msg[0] == 'I':
-            # use reverse video instead of underline for italic to
-            # disambiguate from constant width
-            return _wrapString(msg[2:-1], 7, 27)
+        return _wrapString(msg, 1, 21)
+    return msg
+
+def _underline(msg):
+    if _useLess():
+        return _wrapString(msg, 4, 24)
+    return msg
+
+def _reverse(msg):
+    if _useLess():
+        return _wrapString(msg, 7, 27)
+    return msg
+
+def _formatString(msg):
+    if msg[0] == 'B':
+        return _bold(msg[2:-1])
+    elif msg[0] == 'C':
+        # use underline for constant width because reverse video
+        # is too distracting in practice, due to appropriate
+        # widespread use of constant width
+        return _underline(msg[2:-1])
+    elif msg[0] == 'I':
+        # use reverse video instead of underline for italic to
+        # disambiguate from constant width
+        return _reverse(msg[2:-1])
     return msg[2:-1]
 
+_headerChars = set('-=')
+def _isHeader(line1, line2):
+    # header is two strings:
+    # same length
+    if len(line1) != len(line2):
+        return False
+    line1 = line1.lstrip()
+    line2 = line2.lstrip()
+    # same initial whitespace length
+    if len(line1) != len(line2):
+        return False
+    # second line contains only - or = (this is close enough, we do not -=-=-)
+    if set(line2) - _headerChars:
+        return False
+    return True
+
+def _iterFormatHeaders(docLines):
+    lastLine = len(docLines) - 1
+    ignoreNext = False
+    for i in range(0, len(docLines)):
+        if ignoreNext:
+            ignoreNext = False
+            continue
+        if i < lastLine and _isHeader(docLines[i], docLines[i+1]):
+            ignoreNext = True
+            yield _bold(docLines[i].lstrip())
+            continue
+        yield docLines[i]
+
+def _formatHeaders(docString):
+    docLines = docString.split('\n')
+    return '\n'.join(_iterFormatHeaders(docLines))
+
+def _reindentGen(lines, indentLength):
+    four = '    '
+    for line in lines:
+        if line:
+            yield four + line[indentLength:]
+        else:
+            yield line
+
+def _reindent(text):
+    # consistently provide no more than 4 leading spaces 
+    # space sorts before any letters; use that to find shortest
+    # non-blank line
+    lines = text.split('\n')
+    outmostLine = [x for x in sorted(lines) if x][-1]
+    indentLength = len(outmostLine) - len(outmostLine.lstrip())
+    if indentLength <= 4:
+        return text
+    return '\n'.join(_reindentGen(lines, indentLength))
+
 def _formatDocString(docString):
-    # first, handle literal blocks as much as we need do:
+    # First, reindent to be consistent:
+    docString = _reindent(docString)
+    # Next, handle literal blocks as much as we need do:
     docString = docString.replace('::\n', ':\n')
+    # Next, reformat headers:
+    docString = _formatHeaders(docString)
     docStringRe = re.compile('[A-Z]\{[^{}]*\}')
     srch = re.search(docStringRe, docString)
     while srch:
@@ -159,31 +229,12 @@ def _pageDoc(title, docString):
     pydoc.pager("Conary API Documentation: %s\n" %
             _formatString('B{' + title + '}') + docString)
 
-def _reindentGen(lines, indentLength):
-    four = '    '
-    for line in lines:
-        if line:
-            yield four + line[indentLength:]
-        else:
-            yield line
-
-def _reindent(text):
-    # consistently provide no more than 4 leading spaces 
-    # space sorts before any letters; use that to find shortest
-    # non-blank line
-    lines = text.split('\n')
-    outmostLine = [x for x in sorted(lines) if x][-1]
-    indentLength = len(outmostLine) - len(outmostLine.lstrip())
-    if indentLength <= 4:
-        return text
-    return '\n'.join(_reindentGen(lines, indentLength))
-
 def _formatDoc(className, obj):
     name = obj.__name__
     docString = obj.__doc__
     if not docString:
         docString = 'No documentation available.'
-    _pageDoc('%s.%s' % (className, name), _reindent(docString))
+    _pageDoc('%s.%s' % (className, name), docString)
 
 def _parentName(klass):
     if hasattr(klass, '_explainObjectName'):
@@ -277,7 +328,6 @@ def docClass(cfg, recipeType):
         else:
             del display[key]
     text = r.__class__.__base__.__doc__
-    text = _reindent(text)
     if not text:
         text = 'No documentation available.'
     text += "\n\n" + '\n\n'.join(["B{%s Actions}:\n    %s" % x for x in sorted(display.iteritems())])
