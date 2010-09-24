@@ -292,6 +292,7 @@ def docObject(cfg, what):
         _formatDoc(found[0][0], found[0][1])
         return 0
     elif len(found) > 1:
+        found.sort()
         print ('Ambiguous recipe method "%s" is defined by the following '
                'classes:\n'
                '    %s\n'
