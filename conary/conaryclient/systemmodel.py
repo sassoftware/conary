@@ -24,6 +24,7 @@ implicitly added to the end of the search path.
 
 import os
 import shlex
+import stat
 import tempfile
 
 import conary.errors
@@ -440,11 +441,16 @@ class SystemModelFile(object):
         if fileName == None:
             fileName = self.fileName
         fileFullName = self.model.cfg.root+fileName
+        if util.exists(fileFullName):
+            fileMode = stat.S_IMODE(os.stat(fileFullName)[stat.ST_MODE])
+        else:
+            fileMode = 0644
 
         dirName = os.path.dirname(fileFullName)
         fd, tmpName = tempfile.mkstemp(prefix='system-model', dir=dirName)
         f = os.fdopen(fd, 'w')
         self.model.write(f)
+        os.chmod(tmpName, fileMode)
         os.rename(tmpName, fileFullName)
 
     def writeSnapshot(self):
