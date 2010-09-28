@@ -251,14 +251,17 @@ def buildCsList(client, troveList):
         csList.append((name, (None, None), (version, flavor), 0))
     return csList
 
-def addConfigFileContents(client, cs):
+def addConfigFileContents(client, cs, targetCs):
     """
     add file contents for config files to a changeset object
 
     @param client: the ConaryClient instance for accessing the repository
     @type client: conaryclient.ConaryClient
     @param cs: the changeset that needs config file contents added
-    @type cs: repository.changeset.ChangeSet
+    @type cs: repository.changeset.ReadOnlyChangeSet
+    @param targetCs: the changeset to add the contents too; it should be
+    merged into cs by the caller
+    @type targetCs: repository.changeset.ChangeSet
     @return: None
     """
     needed = []
@@ -284,8 +287,8 @@ def addConfigFileContents(client, cs):
         #                      %(path, sha1helper.md5ToString(pathid))
         # all the contents here are config files, so the isConfig parameter
         # is always true
-        cs.addFileContents(pathid, fileid, changeset.ChangedFileTypes.file,
-                           cont, True)
+        targetCs.addFileContents(pathid, fileid,
+                                 changeset.ChangedFileTypes.file, cont, True)
 
 def main(argv):
     sys.excepthook = util.genExcepthook()
@@ -325,11 +328,11 @@ def main(argv):
                                 callback = callback,
                                 recurse = False)
     del csList
-    # cs is a read-only change set, and files cannot be added to it
-    cs = changeset.ChangeSet(cs.freeze())
 
     # add the config file contents
-    addConfigFileContents(client, cs)
+    targetCs = changeset.ChangeSet()
+    addConfigFileContents(client, cs, targetCs)
+    cs.merge(targetCs)
 
     (fd, path) = tempfile.mkstemp()
     os.close(fd)

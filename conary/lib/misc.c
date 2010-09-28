@@ -17,6 +17,7 @@
 #include <Python.h>
 
 #include <ctype.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <malloc.h>
@@ -57,6 +58,7 @@ static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyObject * pyfchmod(PyObject *self, PyObject *args);
 static PyObject * py_fopen(PyObject *self, PyObject *args);
 static PyObject * py_struct_flock(PyObject *self, PyObject *args);
+static PyObject * rpmExpandMacro(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
@@ -89,6 +91,7 @@ static PyMethodDef MiscMethods[] = {
     { "fchmod", pyfchmod, METH_VARARGS },
     { "fopenIfExists", py_fopen, METH_VARARGS },
     { "structFlock", py_struct_flock, METH_VARARGS },
+    { "rpmExpandMacro", rpmExpandMacro, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -1617,6 +1620,51 @@ static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
     fl.l_pid = (pypid == Py_None) ? 0 : PYINT_AS_LONG(pypid);
     return PyString_FromStringAndSize((char *)&fl, sizeof(struct flock));
 }
+
+static PyObject * rpmExpandMacro(PyObject *self, PyObject *args) {
+    void * rpmso = NULL;
+    static int (*expandMacro)(void * in, void * context, char * out,
+                              size_t outSize) = NULL;
+    char * expansion;
+    char * input;
+    int bufSize;
+    char * libPath;
+
+    if (!PyArg_ParseTuple(args, "ss", &libPath, &input))
+        return NULL;
+
+    bufSize = strlen(input) * 100;
+    expansion = alloca(bufSize);
+    strcpy(expansion, input);
+
+    if (!expandMacro) {
+        rpmso = dlopen(libPath, RTLD_LAZY);
+
+        if (!rpmso) {
+            PyErr_SetString(PyExc_TypeError,
+                            "failed to load rpmModule for expandMacro");
+            return NULL;
+        }
+
+        expandMacro = dlsym(rpmso, "expandMacros");
+
+        if (!expandMacro) {
+            PyErr_SetString(PyExc_TypeError,
+                            "symbol expandMacro not found");
+            return NULL;
+        }
+    }
+
+    /* if this fails because the buffer isn't big enough, it prints a message
+       and continues. nice. */
+    expandMacro(NULL, NULL, expansion, bufSize);
+
+    return PyString_FromString(expansion);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 
 #define MODULE_DOCSTR "miscellaneous low-level C functions for conary"
 

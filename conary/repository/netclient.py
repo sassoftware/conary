@@ -14,11 +14,11 @@
 
 import base64
 import gzip
-import httplib
 import itertools
 import os
 import socket
-import sys, time
+import sys
+import time
 import urllib
 import xml
 import xmlrpclib
@@ -1749,7 +1749,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # by the proxy no matter what.
             forceProxy = server.usedProxy()
             try:
-                inF = transport.ConaryURLOpener(proxies = self.proxies,
+                inF = transport.ConaryURLOpener(proxies=self.proxies,
                                                 forceProxy=forceProxy).open(url)
             except transport.TransportError, e:
                 raise errors.RepositoryError(*e.args)
