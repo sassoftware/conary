@@ -1281,75 +1281,35 @@ class ChangesetFilter(BaseProxy):
                 fileKey, fileSha1))
         return ret
 
-class SimpleRepositoryFilter(ChangesetFilter):
-
-    forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
-    forceSingleCsJob = False
-    withCapsuleInjection = False
-
-    def __init__(self, cfg, basicUrl, repos):
+class BaseCachingChangesetFilter(ChangesetFilter):
+    def __init__(self, cfg, basicUrl):
         if cfg.changesetCacheDir:
             util.mkdirChain(cfg.changesetCacheDir)
             csCache = ChangesetCache(datastore.DataStore(cfg.changesetCacheDir))
         else:
             csCache = None
-
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
+
+class RepositoryFilterMixin(object):
+    forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
+    forceSingleCsJob = False
+
+    def __init__(self, repos):
         self.repos = repos
         self.callFactory = RepositoryCallFactory(repos, self.log)
 
-    def getFileContents(self, caller, authToken, clientVersion, fileList,
-                        authCheckOnly = False):
-        if self.cfg.excludeCapsuleContents:
-            # Are any of the requested files capsule related?
-            fcInfoList = self._getFileContentsCapsuleInfo(caller,
-                clientVersion, fileList)
-            fcInfoList = [ x for x in fcInfoList if x is not None ]
-            if fcInfoList:
-                raise errors.CapsuleServingDenied(
-                    "Request for contents for a file belonging to a capsule, "
-                    "based on capsules, from repository denying such operation")
+class SimpleRepositoryFilter(BaseCachingChangesetFilter, RepositoryFilterMixin):
+    withCapsuleInjection = False
 
-        return caller.getFileContents(clientVersion, fileList,
-            authCheckOnly = authCheckOnly)
+    def __init__(self, cfg, basicUrl, repos):
+        BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
+        RepositoryFilterMixin.__init__(self, repos)
 
-
-class ProxyRepositoryServer(ChangesetFilter):
-
-    SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
-    forceSingleCsJob = False
-    withCapsuleInjection = True
-
+class FileCachingChangesetFilter(BaseCachingChangesetFilter):
     def __init__(self, cfg, basicUrl):
-        util.mkdirChain(cfg.changesetCacheDir)
-        csCache = ChangesetCache(datastore.DataStore(cfg.changesetCacheDir))
-
+        BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         util.mkdirChain(cfg.proxyContentsDir)
         self.contents = datastore.DataStore(cfg.proxyContentsDir)
-
-        ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
-
-        self.callFactory = ProxyCallFactory()
-
-    def setBaseUrlOverride(self, rawUrl, headers, isSecure):
-        # Setting it to None here will make urlBase() do the right thing
-        proxyHost = headers.get('X-Conary-Proxy-Host', None)
-        if not proxyHost:
-            self._baseUrlOverride = None
-            return
-        # We really don't want to use rawUrl in the proxy, that points to the
-        # server and it won't help rewriting URLs with that address
-        self._baseUrlOverride = headers.get('X-Conary-Proxy-Host', None)
-
-        proto = (isSecure and "https") or "http"
-
-        if rawUrl.startswith('/'):
-            self._baseUrlOverride = '%s://%s%s' % (proto, proxyHost, rawUrl)
-        else:
-            items = list(urlparse.urlparse(rawUrl))
-            items[0] = proto
-            items[1] = proxyHost
-            self._baseUrlOverride = urlparse.urlunparse(items)
 
     def getFileContentsFromTrove(self, caller, authToken, clientVersion,
                                  troveName, version, flavor, pathList):
@@ -1482,7 +1442,8 @@ class ProxyRepositoryServer(ChangesetFilter):
                         fileInfoList)
                     for fileObj, ((filePath, fileSha1),
                             (encFileId, encVersion)) in zip(fileObjs, valList):
-                        self._cacheFileContents(encFileId, fileObj.f)
+                        fobj = self._compressStreamContents(fileObj.f)
+                        self._cacheFileContents(encFileId, fobj)
             neededFiles = newNeededFiles
 
         if neededFiles:
@@ -1569,6 +1530,55 @@ class ProxyRepositoryServer(ChangesetFilter):
         self.contents.addFile(fileObj, fileId + '-c',
                                       precompressed = True,
                                       integrityCheck = False)
+
+    def _compressStreamContents(self, src):
+        """
+        Compress the contents of the source stream
+        Return a stream
+        """
+        fobj = util.BoundedStringIO()
+        gz = util.gzip.GzipFile(mode="w", fileobj=fobj)
+        util.copyStream(src, gz)
+        gz.close()
+        fobj.seek(0)
+        return fobj
+
+class ProxyRepositoryServer(FileCachingChangesetFilter):
+
+    SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
+    forceSingleCsJob = False
+    withCapsuleInjection = True
+
+    def __init__(self, cfg, basicUrl):
+        FileCachingChangesetFilter.__init__(self, cfg, basicUrl)
+        self.callFactory = ProxyCallFactory()
+
+    def setBaseUrlOverride(self, rawUrl, headers, isSecure):
+        # Setting it to None here will make urlBase() do the right thing
+        proxyHost = headers.get('X-Conary-Proxy-Host', None)
+        if not proxyHost:
+            self._baseUrlOverride = None
+            return
+        # We really don't want to use rawUrl in the proxy, that points to the
+        # server and it won't help rewriting URLs with that address
+        self._baseUrlOverride = headers.get('X-Conary-Proxy-Host', None)
+
+        proto = (isSecure and "https") or "http"
+
+        if rawUrl.startswith('/'):
+            self._baseUrlOverride = '%s://%s%s' % (proto, proxyHost, rawUrl)
+        else:
+            items = list(urlparse.urlparse(rawUrl))
+            items[0] = proto
+            items[1] = proxyHost
+            self._baseUrlOverride = urlparse.urlunparse(items)
+
+class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin):
+    withCapsuleInjection = False
+
+    def __init__(self, cfg, basicUrl, repos):
+        FileCachingChangesetFilter.__init__(self, cfg, basicUrl)
+        RepositoryFilterMixin.__init__(self, repos)
 
 class ChangesetCache(object):
     __slots__ = ['dataStore', 'locksMap']
