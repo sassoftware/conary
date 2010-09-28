@@ -811,6 +811,10 @@ class SystemModelClient(object):
                     job = targetTrv.diff(existsTrv, absolute = False)[2]
 
                 log.info("resolving dependencies")
+                criticalJobs = criticalUpdateInfo.findCriticalJobs(job)
+                finalJobs = criticalUpdateInfo.findFinalJobs(job)
+                criticalOnly = criticalUpdateInfo.isCriticalOnlyUpdate()
+
                 result = check.depCheck(job,
                                         linkedJobs = linkedJobs,
                                         criticalJobs = criticalJobs,
@@ -826,7 +830,8 @@ class SystemModelClient(object):
                 criticalUpdates = []
             else:
                 splitJob = result.getChangeSetList()
-                criticalUpdates = result.getCriticalUpdates()
+                criticalUpdates = [ splitJob[x] for x in
+                                        result.getCriticalUpdates() ]
 
             if result.unsatisfiedList:
                 raise update.DepResolutionFailure(
