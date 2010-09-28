@@ -213,6 +213,7 @@ class CpioStream(object):
 class CpioExploder(CpioStream):
 
     def explode(self, destDir):
+        linkMap = {}
         for ent in self:
             try:
                 target = destDir + '/' + ent.filename
@@ -234,6 +235,13 @@ class CpioExploder(CpioStream):
                 elif stat.S_ISLNK(ent.header.mode):
                     os.symlink(ent.payload.read(),target)
                 elif stat.S_ISREG(ent.header.mode):
+                    # save hardlinks until after the file content is written
+                    if ent.header.nlink > 1 and ent.header.filesize == 0:
+                        l = linkMap.get(ent.header.inode, [])
+                        l.append(target)
+                        linkMap[ent.header.inode] = l
+                        continue
+
                     f = open(target, "w")
                     buf = ent.payload.read(64 * 1024)
                     while buf:
@@ -243,6 +251,18 @@ class CpioExploder(CpioStream):
                 else:
                     raise Error("unknown file mode 0%o for %s"
                                 % (ent.header.mode, ent.filename))
+
+                # create hardlinks after the file content is written
+                if ent.header.nlink > 1 and ent.header.filesize:
+                    l = linkMap.get(ent.header.inode, [])
+                    # the last entry with the same inode should contain the
+                    # contents so this list should always have at least one
+                    # entry
+                    assert(l)
+                    for t in l:
+                        os.link(target, t)
+                # create hardlinks after the file content is written
+
             except OSError, e:
                 if e.errno == errno.EEXIST:
                     pass
