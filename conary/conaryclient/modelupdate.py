@@ -323,11 +323,6 @@ class SysModelFlattenAction(SysModelDelayedTupleSetAction):
         self.outSet._setOptional(available)
         self.outSet._flat = True
 
-class SysModelGetOptionalAction(SysModelDelayedTupleSetAction):
-
-    def __call__(self, data):
-        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
-
 class SysModelReplaceAction(troveset.ReplaceAction):
 
     resultClass = SysModelDelayedTroveTupleSet
@@ -418,8 +413,9 @@ class SystemModelClient(object):
                 assert(0)
 
         searchPathItems.append(reposTroveSet)
-        searchTroveSet = SysModelSearchPathTroveSet(searchPathItems,
-                                                    graph = reposTroveSet.g)
+        searchPathTroveSet = SysModelSearchPathTroveSet(searchPathItems,
+                                                        graph = reposTroveSet.g)
+        searchTroveSet = searchPathTroveSet
 
         finalTroveSet = SysModelInitialTroveTupleSet(graph = searchTroveSet.g)
         for op in sysModel.systemItems:
@@ -482,7 +478,7 @@ class SystemModelClient(object):
                             [ flatten, searchTroveSet ],
                             graph = searchTroveSet.g)
 
-        finalTroveSet.searchPath = searchTroveSet
+        finalTroveSet.searchPath = searchPathTroveSet
 
         return finalTroveSet
 
@@ -712,8 +708,9 @@ class SystemModelClient(object):
         # handle exclude troves
         final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
                                     ActionClass = SysModelExcludeTrovesAction)
-        availForDeps = final._action(ActionClass = SysModelGetOptionalAction)
-        availForDeps.g.realize(SysModelActionData(troveCache,
+        depSearch = SysModelSearchPathTroveSet([ preFetch, searchPath ],
+                                               graph = preFetch.g)
+        depSearch.g.realize(SysModelActionData(troveCache,
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
@@ -736,7 +733,7 @@ class SystemModelClient(object):
         self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv, absolute = False)[2]
 
-        depResolveSource = searchPath._getResolveSource(
+        depResolveSource = depSearch._getResolveSource(
                         filterFn = targetTrv.isStrongReference)
         resolveMethod = depResolveSource.getResolveMethod()
 
