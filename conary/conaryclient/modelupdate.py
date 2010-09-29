@@ -733,8 +733,15 @@ class SystemModelClient(object):
         self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv, absolute = False)[2]
 
+        # don't resolve against local troves (we can do this because either
+        # they're installed and show up in the unresolveable list or they
+        # aren't installed and we don't know about them) or troves which are
+        # in the install set (since they're already in the install set,
+        # adding them to the install set won't help)
         depResolveSource = depSearch._getResolveSource(
-                        filterFn = targetTrv.isStrongReference)
+                        filterFn = lambda n, v, f :
+                            (v.isOnLocalHost() or
+                             targetTrv.isStrongReference(n,v,f)))
         resolveMethod = depResolveSource.getResolveMethod()
 
         uJob.setSearchSource(self.getSearchSource())
