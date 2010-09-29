@@ -1,0 +1,1 @@
+Bz2File.read() now returns the ammount of data that is requested.
