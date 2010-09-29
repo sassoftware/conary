@@ -365,17 +365,14 @@ class addArchive(_Source):
     """
     NAME
     ====
-
     B{C{r.addArchive()}} - Add a source code archive
 
     SYNOPSIS
     ========
-
     C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{sourceDir}=,] [I{debArchive}=])}
 
     DESCRIPTION
     ===========
-
     The C{r.addArchive()} class adds a source code archive consisting
     of an optionally compressed tar, cpio, xpi or zip archive,
     binary/source RPM, or binary dpkg .deb, and unpacks it to the
@@ -401,7 +398,6 @@ class addArchive(_Source):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addArchive}:
 
     B{dir} : Instructs C{r.addArchive} to change to the directory
@@ -460,7 +456,6 @@ class addArchive(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addArchive}
     from within a recipe:
 
@@ -780,23 +775,19 @@ class addPatch(_Source):
     """
     NAME
     ====
-
     B{C{r.addPatch()}} - Add a patch to source code
 
     SYNOPSIS
     ========
-
     C{r.addPatch(I{patchfilename}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=,] [I{sourceDir}=,] [I{patchName}=])}
 
     DESCRIPTION
     ===========
-
     The C{r.addPatch()} class adds a patch to be applied to the source code
     during the build phase.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addPatch}:
 
     B{backup} : The suffix to use when storing file versions before applying
@@ -873,7 +864,6 @@ class addPatch(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addPatch}
     from within a recipe:
 
@@ -1117,7 +1107,6 @@ class addSource(_Source):
     """
     NAME
     ====
-
     B{C{r.addSource()}} - Copy a file into build or destination directory
 
     SYNOPSIS
@@ -1126,13 +1115,11 @@ class addSource(_Source):
 
     DESCRIPTION
     ===========
-
     The C{r.addSource()} class copies a file into the build directory or
     destination directory.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addSource}:
 
     B{apply} : A command line to run after storing the file. Macros will be
@@ -1199,7 +1186,6 @@ class addSource(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addSource}
     from within a recipe:
 
@@ -1362,12 +1348,10 @@ class addCapsule(_Source):
 
     DESCRIPTION
     ===========
-
     The C{r.addCapsule()} class adds an encapsulated file to the package.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addCapsule}:
 
     B{dir} : The directory in which to store the file, relative to the build
@@ -1416,7 +1400,6 @@ class addCapsule(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addCapsule}
     from within a recipe:
 
@@ -1706,24 +1689,20 @@ class addAction(action.RecipeAction):
     """
     NAME
     ====
-
     B{C{r.addAction()}} - Executes a shell command
 
     SYNOPSIS
     ========
-
     C{r.addAction([I{action},] [I{dir}=,] [I{package})=,] [I{use}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addAction()} class executes a shell command during the source
     preparation stage, in a manner similar to C{r.Run}, except that
     C{r.Run} executes shell commands later, during the build stage.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -1744,7 +1723,6 @@ class addAction(action.RecipeAction):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addAction}
     from within a recipe:
 
@@ -1855,18 +1833,15 @@ class addGitSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addGitSnapshot()}} - Adds a snapshot from a git
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addGitSnapshot([I{url},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addGitSnapshot()} class extracts sources from a
     git repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -1874,7 +1849,6 @@ class addGitSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -1943,18 +1917,15 @@ class addMercurialSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addMercurialSnapshot()}} - Adds a snapshot from a mercurial
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addMercurialSnapshot([I{url},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addMercurialSnapshot()} class extracts sources from a
     mercurial repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -1962,7 +1933,6 @@ class addMercurialSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -2022,18 +1992,15 @@ class addCvsSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addCvsSnapshot()}} - Adds a snapshot from a CVS
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addCvsSnapshot([I{root},] [I{project},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addCvsSnapshot()} class extracts sources from a
     CVS repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -2041,7 +2008,6 @@ class addCvsSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -2102,18 +2068,15 @@ class addSvnSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addSvnSnapshot()}} - Adds a snapshot from a subversion
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addSvnSnapshot([I{url},] [I{project}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addSvnSnapshot()} class extracts sources from a
     subversion repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -2121,7 +2084,6 @@ class addSvnSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -2199,17 +2161,14 @@ class addBzrSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addBzrSnapshot()}} - Adds a snapshot from a bzr repository.
 
     SYNOPSIS
     ========
-
     C{r.addBzrSnapshot([I{url},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addBzrSnapshot()} class extracts sources from a
     bzr repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -2217,7 +2176,6 @@ class addBzrSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addBzrSnapshot}:
 
     B{tag} : Specify a specific tagged revision to checkout.
@@ -2323,17 +2281,14 @@ class addPostInstallScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPostInstallScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPostInstallScript} command specifies the post install script
     for a group. This script is run after the group has been installed
     for the first time (not when the group is being upgraded from a
@@ -2341,7 +2296,6 @@ class addPostInstallScript(TroveScript):
 
     PARAMETERS
     ==========
-
     The C{r.addPostInstallScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2356,24 +2310,20 @@ class addPreRollbackScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPreRollbackScript()}} - Specify the pre rollback script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPreRollbackScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPreRollbackScript} command specifies the pre rollback script
     for a group. This script is run before the group defining the script
     has been rolled back to a previously-installed version of the group.
 
     PARAMETERS
     ==========
-
     The C{r.addPreRollbackScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2389,24 +2339,20 @@ class addPostRollbackScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPostRollbackScript(I{sourcename}, I[{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPostRollbackScript} command specifies the post rollback
     script for a group. This script is run after the group defining the
     script has been rolled back to a previous version of the group.
 
     PARAMETERS
     ==========
-
     The C{r.addPostRollbackScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2431,24 +2377,20 @@ class addPostUpdateScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPostUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPostUpdateScript} command specifies the post update script
     for a group. This script is run after the group has been updated from
     a previously-installed version to the version defining the script.
 
     PARAMETERS
     ==========
-
     The C{r.addPostUpdateScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2463,24 +2405,20 @@ class addPreUpdateScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPreUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPreUpdateScript} command specifies the pre update script
     for a group. This script is run before the group is updated from
     a previously-installed version to the version defining the script.
 
     PARAMETERS
     ==========
-
     The C{r.addPreUpdateScript()} command accepts the following parameters,
     with default values shown in parentheses:
 

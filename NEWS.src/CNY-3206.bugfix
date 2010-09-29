@@ -1,3 +1,5 @@
 The repository commit email system has been modified to use python
 internal email and smtplib modules.  It no longer relies on an
 external mail program, and handles non-ascii characters correctly.
+It is also possible to provide a mailhost with the --mailhost
+argument; localhost is used as the default mailhost.

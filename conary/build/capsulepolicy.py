@@ -125,13 +125,11 @@ class MissingOkay(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.MissingOkay()}} - Mark as "missing Okay" only capsule-provided files
     so marked in their respective capsule.
 
     DESCRIPTION
     ===========
-
     This policy should not be called from recipes.
     """
     requires = (
@@ -216,17 +214,14 @@ class RPMProvides(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.RPMProvides()}} - Creates dependency provision for an RPM capsule
 
     SYNOPSIS
     ========
-
     C{r.RPMProvides([I{provision}, I{package} | I{package:component})}
 
     DESCRIPTION
     ===========
-
     The C{r.RPMProvides()} policy marks an rpm capsule as providing certain
     features or characteristics, and can be called to explicitly provide things
     that cannot be automatically discovered and are not provided by the RPM
@@ -237,7 +232,6 @@ class RPMProvides(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.RPMProvides('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
     """
     bucket = policy.PACKAGE_CREATION
@@ -299,17 +293,14 @@ class RPMRequires(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.RPMRequires()}} - Creates dependency requirement for an RPM capsule
 
     SYNOPSIS
     ========
-
     C{r.RPMRequires([I{requirement}, I{package} || I{package:component} || I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     The C{r.RPMRequires()} policy marks an rpm capsule as requiring certain
     features or characteristics, and can be called to explicitly provide things
     that cannot be automatically discovered and are not provided by the RPM
@@ -331,7 +322,6 @@ class RPMRequires(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.RPMRequires('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
     """
 
@@ -502,18 +492,15 @@ class PureCapsuleComponents(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.PureCapsuleComponents()}} - Ensure that components which contain a
     capsule do not contain any other files.
 
     SYNOPSIS
     ========
-
     C{r.PureCapsuleComponents(I{exceptions=filterexp}])}
 
     DESCRIPTION
     ===========
-
     This policy is used to ensure that if a component contains a capsule that
     it only contains files defined within that capsule. It should not normally
     be called.  It is, however, sometimes necessary to provide an exception to
@@ -522,7 +509,6 @@ class PureCapsuleComponents(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.PureCapsuleComponents( exceptions='foo.*conf')}
     """
     bucket = policy.ENFORCEMENT

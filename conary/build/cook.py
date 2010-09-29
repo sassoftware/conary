@@ -1213,13 +1213,14 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        try:
-            logFile.pushDescriptor('cook')
-            logBuildEnvironment(logFile, sourceVersion, policyTroves,
-                                    recipeObj.macros, cfg)
-        except:
-            logFile.close()
-            raise
+        else:
+            try:
+                logFile.pushDescriptor('cook')
+                logBuildEnvironment(logFile, sourceVersion, policyTroves,
+                                        recipeObj.macros, cfg)
+            except:
+                logFile.close()
+                raise
     try:
         logBuild and logFile.pushDescriptor('build')
         bldInfo.begin()

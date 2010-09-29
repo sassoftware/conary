@@ -28,18 +28,15 @@ class TestSuiteLinks(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.TestSuiteLinks()}} - Indicate extra files to link into the test
     directory
 
     SYNOPSIS
     ========
-
     C{r.TestSuiteLinks([I{filterexp}] || [I{fileMap='<builddir_path>' : '<destdir_path>'}])}
 
     DESCRIPTION
     ===========
-
     The C{r.TestSuiteLinks()} class is called from within a Conary recipe to
     indicate extra files which should be linked into the test suite directory.
 
@@ -57,7 +54,6 @@ class TestSuiteLinks(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.TestSuiteLinks(fileMap={'client/mysqladmin': '/usr/bin/mysqladmin'})}
 
     The fileMap convention of C{r.TestSuiteLinks()} is used to indicate an
@@ -264,17 +260,14 @@ class TestSuiteFiles(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.TestSuiteFiles}} - Indicate extra files to copy into the test directory
 
     SYNOPSIS
     ========
-
     C{r.TestSuiteFiles([filterexp])}
 
     DESCRIPTION
     ===========
-
     The C{r.TestSuiteFiles()} class is called from within a Conary recipe to
     indicate extra files which should be copied into the test suite directory.
     The filter expression is relative to the build directory, not the install
@@ -291,7 +284,6 @@ class TestSuiteFiles(policy.Policy):
 
     EXAMPLES
     ========
-
     C{r.TestSuiteFiles('MANIFEST')}
 
     The file C{MAINFEST} is marked to be copied into the package's test suite
@@ -381,12 +373,10 @@ class FixDirModes(policy.Policy):
     """
     NAME
     ====
-
     B{C{r.FixDirModes}} - Modifies directory permissions
 
     DESCRIPTION
     ===========
-
     The C{r.FixDirModes()} class modifies directory permissions which
     would otherwise prevent Conary from packaging C{%(destdir)s} as a
     non-root user.
@@ -397,7 +387,6 @@ class FixDirModes(policy.Policy):
 
     EXAMPLES
     ========
-
     This class is B{not} invoked from recipes directly.
     """
     # This policy must be run first so that other policies can be
