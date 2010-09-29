@@ -538,8 +538,6 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
             sys.stdout.flush()
             return None
 
-        if not infoArg and not testArg:
-            modelFile.writeSnapshot()
         keepExisting = kwargs.get('keepExisting')
         updateByDefault = kwargs.get('updateByDefault', True)
         applyList = cmdline.parseChangeList([], keepExisting,
@@ -721,6 +719,8 @@ def _updateTroves(cfg, applyList, **kwargs):
     if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
     try:
+        if model and modelFile:
+            modelFile.writeSnapshot()
         restartDir = client.applyUpdateJob(updJob, **applyKwargs)
     finally:
         updJob.close()
@@ -840,8 +840,6 @@ def updateAll(cfg, **kwargs):
             model.write(sys.stdout)
             sys.stdout.flush()
             return None
-        if not infoArg:
-            modelFile.writeSnapshot()
 
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
     kwargs['callback'] = UpdateCallback(cfg)
