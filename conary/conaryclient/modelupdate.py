@@ -628,7 +628,8 @@ class SystemModelClient(object):
     def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
                             split = True, fromChangesets = [],
                             criticalUpdateInfo=None, applyCriticalOnly = False,
-                            restartInfo = None):
+                            restartInfo = None,
+                            ignoreMissingDeps = False):
         """
         Populates an update job based on a set of trove update and erase
         operations.If self.cfg.autoResolve is set, dependencies
@@ -658,10 +659,15 @@ class SystemModelClient(object):
         location where the rest of an update job run was stored (after
         applying the critical update).
         @type restartInfo: string
+        @param ignoreMissingDeps: Do not raise DepResolutionFailure on
+        unresolved dependencies
+        @tye ignoreMissingDeps: bool
         @rtype: dict
 
         @raise ConaryError: if a C{sync} operation was requested, and
             relative changesets were specified.
+
+        @raise DepResolutionFailure: could not resolve dependencies
 
         @raise InternalConaryError: if a jobset was inconsistent.
 
@@ -837,12 +843,12 @@ class SystemModelClient(object):
                 criticalUpdates = [ splitJob[x] for x in
                                         result.getCriticalUpdates() ]
 
-            if result.unsatisfiedList:
+            if result.unsatisfiedList and (not ignoreMissingDeps):
                 raise update.DepResolutionFailure(
                             self.cfg, result.unsatisfiedList,
                             suggMap, result.unresolveableList, splitJob,
                             criticalUpdates)
-            elif result.unresolveableList:
+            elif result.unresolveableList and (not ignoreMissingDeps):
                 # this can't happen because dep resolution empties
                 # the unresolveableList into the unsatisfiedList to try
                 # and find matches
