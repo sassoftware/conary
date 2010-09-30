@@ -1609,7 +1609,7 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
         # changeset. So if exactly one type of file contents are requested, we
         # return immediately.
         if capsuleBasedFileList:
-            url, sizes = FileCachingChangesetFilter.getFileContents(
+            url, sizes = FileCachingChangesetFilter.getFileContents(self,
                 caller, authToken, clientVersion, capsuleBasedFileList,
                 authCheckOnly=authCheckOnly)
             if not otherFileList:
