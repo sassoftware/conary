@@ -1382,7 +1382,7 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
                     clientVersion, neededFiles, False)
             self._saveFileContents(neededFiles, url, sizes)
 
-        url, sizes = self._saveFileContentsChangeset(fileList)
+        url, sizes = self._saveFileContentsChangeset(clientVersion, fileList)
         return url, sizes
 
     def _saveFileContents(self, fileList, url, sizes):
