@@ -288,6 +288,8 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{SearchPath} : Creates an object in which to search for
           troves or dependencies.
         - L{Group} : Creates the primary group object.
+        - L{Script} : Creates a single script object.
+        - L{Scripts} : Associates script objects with script types.
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
           troves.

@@ -704,7 +704,7 @@ class GroupTupleSetMethods(object):
         return self._action(updateSet, ActionClass = GroupUpdateAction)
 
 
-    def createGroup(self, name, checkPathConflicts = True):
+    def createGroup(self, name, checkPathConflicts = True, scripts = None):
         """
         NAME
         ====
@@ -713,7 +713,7 @@ class GroupTupleSetMethods(object):
 
         SYNOPSIS
         ========
-        C{troveset.createGroup(name, checkPathConflicts = True)}
+        C{troveset.createGroup(name, checkPathConflicts=True, scripts=None)}
 
         DESCRIPTION
         ===========
@@ -727,14 +727,18 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-            - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{scripts} : Attach one or more scripts specified by a C{Scripts}
+           object (C{None})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
-                            ActionClass = CreateNewGroupAction)
+                            ActionClass = CreateNewGroupAction,
+                            scripts = scripts)
 
-    def _createGroup(self, name, checkPathConflicts = True):
+    def _createGroup(self, name, checkPathConflicts = True, scripts = None):
         return self._action(name, ActionClass = CreateGroupAction,
-                            checkPathConflicts = checkPathConflicts)
+                            checkPathConflicts = checkPathConflicts,
+                            scripts = scripts)
 
     __add__ = union
     __or__ = union
@@ -1004,14 +1008,17 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
 
-    def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
+    def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
+                 scripts = None):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.name = name
         self.checkPathConflicts = checkPathConflicts
+        self.scripts = scripts
 
     def __call__(self, data):
         grp = SG(data.groupRecipe.name,
                  checkPathConflicts = self.checkPathConflicts)
+
         data.groupRecipe._addGroup(self.name, grp)
         data.groupRecipe._setDefaultGroup(grp)
 
@@ -1019,6 +1026,10 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
                      self.primaryTroveSet, self.outSet, data)
 
     def _create(self, sg, ts, outSet, data):
+        if self.scripts is not None:
+            for script, scriptName in self.scripts.iterScripts():
+                sg.addScript(scriptName, script.contents, script.fromClass)
+
         sg.populate(ts, data.troveCache)
 
         outSet._setInstall([ (sg.name, versions.NewVersion(),
@@ -1032,9 +1043,11 @@ class CreateNewGroupAction(CreateGroupAction):
 
     resultClass = GroupLoggingDelayedTroveTupleSet
 
-    def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
+    def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
+                 scripts = None):
         CreateGroupAction.__init__(self, primaryTroveSet, name,
-                                   checkPathConflicts = checkPathConflicts)
+                                   checkPathConflicts = checkPathConflicts,
+                                   scripts = scripts)
 
     def __call__(self, data):
         newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
@@ -1376,6 +1389,112 @@ class SG(_SingleGroup):
     def getRequires(self):
         return deps.DependencySet()
 
+class GroupScript(object):
+    '''
+    NAME
+    ====
+    B{C{Script}} - Specify script contents and compatibility class
+
+    SYNOPSIS
+    ========
+    C{scriptObj = r.Script('#!/bin/sh...'I{, [fromClass = 1]})}
+
+    DESCRIPTION
+    ===========
+    A B{C{Script}} object holds the contents, and optionally the
+    compatibility class, of a script that can then be attached to
+    one or more groups.  The C{Scripts} object associates the
+    script with the type, and C{Group} and C{TroveSet.createGroup}
+    each take an optional C{scripts=} parameter to associate a
+    C{Scripts} object with a group being created.
+
+    EXAMPLE
+    =======
+    Create a script that attaches to multiple groups as multiple types::
+     
+     myTroves = repos.find(...)
+     fixup = r.Script("""#!/bin/sh
+         [ -x /opt/me/fixme ] && /opt/me/fixme""")
+     fixscripts = r.Scripts(preUpdate=fixup, preRollback=fixup)
+     r.Group(myTroves, scripts=fixscripts)
+    '''
+    _explainObjectName = 'Script'
+
+    def __init__(self, contents, fromClass = None):
+        self.contents = contents
+        self.fromClass = fromClass
+
+class GroupScripts(object):
+    '''
+    NAME
+    ====
+    B{C{Scripts}} - Associate scripts with types
+
+    SYNOPSIS
+    ========
+    C{scripts = r.Scripts(postInstall = script, preRollback = script, ...)}
+
+    DESCRIPTION
+    ===========
+    A C{Script} object holds the contents, and optionally the
+    compatibility class, of a script that can then be attached to
+    one or more groups.  The B{C{Scripts}} object associates the
+    script with the type, and C{Group} and C{TroveSet.createGroup}
+    each take an optional C{scripts=} parameter to associate a
+    C{Scripts} object with a group being created.
+
+    PARAMETERS
+    ==========
+    Each of the parameters specifies a script type and takes a C{Script}
+    to associate with that script type.
+
+     - C{postInstall} : Specifies a script to run after the installation
+       of any group to which this script is attached.
+     - C{preRollback} : Specifies a script to run before the rollback
+       of any group to which this script is attached.
+     - C{postRollback} : Specifies a script to run after the rollback
+       of any group to which this script is attached.
+     - C{preUpdate} : Specifies a script to run before the update
+       of any group to which this script is attached.
+     - C{postUpdate} : Specifies a script to run after the update
+       of any group to which this script is attached.
+
+    EXAMPLE
+    =======
+    Create a script that attaches to multiple groups as multiple types::
+     
+     innerTroves = repos.find(...)
+     myTroves = repos.find(...)
+     fixup = r.Script("""#!/bin/sh
+         [ -x /opt/me/fixme ] && /opt/me/fixme""")
+     fixscripts = r.Scripts(preUpdate=fixup, preRollback=fixup)
+     innerGroup = innerTroves.createGroup('group-inner', scripts=fixscripts)
+     r.Group(myTroves + innerGroup, scripts=fixscripts)
+
+    In general, you will not want to attach the same script to multiple
+    groups that will be updated at the same time.  Conary will not
+    "de-duplicate" the scripts, and they will be run more than once
+    if you do so.
+    '''
+    _explainObjectName = 'Scripts'
+
+    def __init__(self, postInstall = None,
+                       preRollback = None, postRollback = None,
+                       preUpdate = None, postUpdate = None):
+        self.postInstall = postInstall
+        self.preRollback = preRollback
+        self.postRollback = postRollback
+        self.preUpdate = preUpdate
+        self.postUpdate = postUpdate
+
+    def iterScripts(self):
+        for scriptName in ('postInstallScripts',
+                           'preRollbackScripts', 'postRollbackScripts',
+                           'preUpdateScripts', 'postUpdateScripts'):
+            script = getattr(self, scriptName[:-7])
+            if script is not None:
+                yield script, scriptName
+
 class _GroupSetRecipe(_BaseGroupRecipe):
 
     Flags = use.LocalFlags
@@ -1392,6 +1511,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         self.troveSource = repos
         self.repos = repos
+        self.Script = GroupScript
+        self.Scripts = GroupScripts
 
         self.labelPath = [ label ]
         self.buildLabel = label
@@ -1491,7 +1612,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
 
-    def Group(self, ts, checkPathConflicts = True):
+    def Group(self, ts, checkPathConflicts = True, scripts = None):
         '''
         NAME
         ====
@@ -1499,7 +1620,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-        C{r.Group(troveSet, checkPathConflicts = True)}
+        C{r.Group(troveSet, checkPathConflicts=True, scripts=None)}
 
         DESCRIPTION
         ===========
@@ -1512,10 +1633,15 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-        - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+
+         - C{checkPathConflicts} : Raise an error if any paths
+           overlap (C{True})
+         - C{scripts} : Attach one or more scripts specified by a C{Scripts}
+           object (C{None})
         '''
         return ts._createGroup(self.name,
-                               checkPathConflicts = checkPathConflicts)
+                               checkPathConflicts = checkPathConflicts,
+                               scripts = scripts)
 
     def Repository(self, labelList, flavor):
         # Documented in GroupSearchSourceTroveSet as "Repository" so that

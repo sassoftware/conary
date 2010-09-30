@@ -99,10 +99,19 @@ class DummySearchPath(groupsetrecipe.GroupSearchPathTroveSet):
     def __init__(self, *args, **kwargs):
         pass
 
+class DummyScript(groupsetrecipe.GroupScript):
+    def __init__(self, *args, **kwargs):
+        pass
+
+class DummyScripts(groupsetrecipe.GroupScripts):
+    def __init__(self, *args, **kwargs):
+        pass
+
 classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
           DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe,
           DummyGroupSetRecipe,
-          DummyTroveSet, DummyRepository, DummySearchPath ]
+          DummyTroveSet, DummyRepository, DummySearchPath,
+          DummyScript, DummyScripts ]
 
 def _useLess():
     if 'PAGER' in os.environ:
