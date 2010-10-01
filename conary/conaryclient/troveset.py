@@ -375,6 +375,15 @@ class DelayedTupleSet(TroveTupleSet):
         self.action(data)
         self.beenRealized(data)
 
+class StaticTroveTupleSet(TroveTupleSet):
+
+    def __init__(self, *args, **kwargs):
+        troveTuple = kwargs.pop('troveTuple', None)
+        TroveTupleSet.__init__(self, *args, **kwargs)
+        if troveTuple is not None:
+            self._setInstall(set(troveTuple))
+        self.realized = True
+
 class SearchSourceTroveSet(TroveSet):
 
     def _findTroves(self, troveTuple):

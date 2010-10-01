@@ -20,7 +20,7 @@ from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient.cmdline import parseTroveSpec
-from conary.conaryclient import troveset
+from conary.conaryclient import modelgraph, systemmodel, troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.lib import log
 from conary.repository import errors, netclient, searchsource
@@ -136,7 +136,7 @@ class GroupTupleSetMethods(object):
     '''
     _explainObjectName = 'TroveSet'
 
-    def depsNeeded(self, resolveSource, failOnUnresolved = True):
+    def depsNeeded(self, resolveSource = None, failOnUnresolved = True):
         """
         NAME
         ====
@@ -144,7 +144,7 @@ class GroupTupleSetMethods(object):
 
         SYNOPSIS
         ========
-        C{troveset.depsNeeded(resolveSource, failOnUnresolved=True)}
+        C{troveset.depsNeeded(resolveSource=None, failOnUnresolved=True)}
 
         DESCRIPTION
         ===========
@@ -159,7 +159,9 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-            - L{resolveSource} : Source against which to resolve dependencies
+            - L{resolveSource} : Source against which to resolve dependencies.
+            If None, no attempt at resolution is made but dependencies are
+            still checked.
             - L{failOnUnresolved} (C{True}) : Whether to fail if not all
               dependencies can be resolved.
 
@@ -1004,6 +1006,12 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+class CopyAction(GroupDelayedTupleSetAction):
+
+    def __call__(self, data):
+        self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
 class CreateGroupAction(GroupDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
@@ -1081,8 +1089,11 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
         jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList ]
 
         checker.addJobs(jobSet)
-        resolveMethod = (self.resolveTroveSet._getResolveSource().
-                                    getResolveMethod())
+        if self.resolveTroveSet:
+            resolveMethod = (self.resolveTroveSet._getResolveSource().
+                                        getResolveMethod())
+        else:
+            resolveMethod = None
 
         failedDeps, suggMap = checker.resolve(resolveMethod)
 
@@ -1389,6 +1400,12 @@ class SG(_SingleGroup):
     def getRequires(self):
         return deps.DependencySet()
 
+class ModelCompiler(modelgraph.AbstractModelCompiler):
+
+    SearchPathTroveSet = GroupSearchPathTroveSet
+    RemoveAction = GroupDifferenceAction
+    FlattenAction = FlattenAction
+
 class GroupScript(object):
     '''
     NAME
@@ -1675,6 +1692,41 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         See SearchPath.
         '''
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
+
+    def SystemModel(self, modelText, searchPath = None):
+        """
+        Turns a system model into a TroveSet. The optional searchPath
+        initializes the search path; search lines from the system model
+        are prepended. Returns a standard troveset with the extra attribute
+        searchPath, which is a TroveSet representing the final SearchPath
+        from the system model. This search path is often used for dependency
+        resolution, though unioning it with the optional portions of the
+        resulting trove set is the normal usage pattern. (Unioning with
+        only the optional portion is not functionally distinct from
+        unioning with the entire result, but is faster).
+
+        ts = r.SystemModel(modelAsListOfStrings)
+        needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+        finalSet = ts + needed
+
+        FIXME
+        """
+        if searchPath is None:
+            searchSource = searchsource.NetworkSearchSource(
+                                            self.repos, [], self.flavor)
+            searchPath = GroupSearchSourceTroveSet(searchSource,
+                                                   graph = self.g)
+
+        model = systemmodel.SystemModelText(None)
+        model.parse(modelText, fileName = '(recipe)')
+
+        comp = ModelCompiler(self.flavor, self.repos, self.g)
+        sysModelSet = comp.build(model, searchPath, None)
+
+        result = sysModelSet._action(ActionClass = CopyAction)
+        result.searchPath = sysModelSet.searchPath
+
+        return result
 
     def track(self, troveSpec):
         '''

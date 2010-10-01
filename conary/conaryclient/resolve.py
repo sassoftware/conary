@@ -511,6 +511,9 @@ class PythonDependencyChecker(object):
 
         suggMap = {}
         failedDeps = self.check()
+        if not resolveMethod:
+            return failedDeps, {}
+
         while resolveMethod.prepareForResolution(failedDeps):
             sugg = resolveMethod.resolveDependencies()
             newJob = resolveMethod.filterSuggestions(failedDeps, sugg,
