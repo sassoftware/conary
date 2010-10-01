@@ -37,23 +37,16 @@ from conary.repository import transport
 class windowsHelper:
     def __init__(self, path, ipaddr):
         import robj
-        from xobj import xobj
-        xmlTemplate = '''\
-<msi id="">
-    <path href="">%s</path>
-    <size>%i</size>
-</msi>'''
 
-        baseUrl = 'http://' + ipaddr + '/api'
-        api = robj.connect(baseUrl)
-        msis = api.msis
-        # post the xml with filename and size to create the resource
-        x = xmlTemplate % (os.path.split(path)[1], os.stat(path).st_size)
-        msis.append(xobj.parse(x))
-        self.resource = msis[-1]
+        api = robj.connect('http://%s/api' % ipaddr)
+        api.msis.append(dict(
+            path=os.path.split(path)[1],
+            size=os.stat(path).st_size,
+        ))
+        self.resource = api.msis[-1]
 
         # put the actual file contents
-        self.resource.path = open(path).read()
+        self.resource.path = open(path)
         self.resource.refresh()
 
         name = self.resource.name.encode('utf-8').split()
