@@ -157,11 +157,13 @@ class GroupTupleSetMethods(object):
         This is not a union operation; the contents of the returned
         troveset do not include the contents of the original troveset.
 
+        If no C{resolveSource} is provided, then depsNeeded asserts that
+        there are no unresolved dependencies.
+
         PARAMETERS
         ==========
-            - L{resolveSource} : Source against which to resolve dependencies.
-            If None, no attempt at resolution is made but dependencies are
-            still checked.
+            - L{resolveSource} : Source against which to resolve dependencies,
+              or None to assert that all dependencies are met.
             - L{failOnUnresolved} (C{True}) : Whether to fail if not all
               dependencies can be resolved.
 
