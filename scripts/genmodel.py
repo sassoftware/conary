@@ -298,10 +298,59 @@ if __name__ == '__main__':
     for searchItem in model.searchPath:
         finalModel.appendToSearchPath(searchItem)
 
+    searchTroveItems = []
+    deferredItems = []
+    specClass = None
+
+    def emitDeferred(specClass, deferredItems):
+        if deferredItems:
+            # list() to copy
+            finalModel.appendTroveOp(specClass(item=list(deferredItems)))
+            deferredItems[:] = []
+        
     for op in model.systemItems:
-        newOp = op.__class__(item = [ TrackFindAction.findMap.get(spec, spec)
-                                      for spec in op ] )
-        finalModel.appendTroveOp(newOp)
+        if specClass and specClass != op.__class__:
+            # we can only combine items from the same class
+            emitDeferred(specClass, deferredItems)
+
+        specClass = op.__class__
+        newSpecs = []
+        simpleSpecs = [ TrackFindAction.findMap.get(spec, spec) for spec in op ]
+        for newSpec in simpleSpecs:
+            # any remaining versions belong by default in search items,
+            # so that they are snapshotted in an updateall like other
+            # items.  This will preserve the semantics of branch affinity
+            # relative to what would have happened in the old update model
+            if newSpec.version is not None:
+                searchTroveName = newSpec.name.split(':')[0]
+                searchTroveSpec = TroveSpec(searchTroveName,
+                            newSpec.version, newSpec.flavor)
+                if searchTroveSpec not in searchTroveItems:
+                    searchTroveItems.append(searchTroveSpec)
+                newSpecs.append(TroveSpec(newSpec.name, None, newSpec.flavor))
+
+        if len(set([x.name.split(':')[0] for x in newSpecs+deferredItems])) > 1:
+            # newSpecs has trove names not mentioned in deferredItems,
+            # so do not combine
+            emitDeferred(specClass, deferredItems)
+            
+        deferredItems.extend(newSpecs)
+
+        if set([':' in x.name for x in newSpecs]) != set((True,)):
+            # something other than a component is listed; don't collapse
+            # any more
+            emitDeferred(specClass, deferredItems)
+
+    if deferredItems:
+        emitDeferred(specClass, deferredItems)
+
+    # The specific items from the searchPath have to come first, because
+    # they may override things on the stack.
+    oldSearchItems = [x.item for x in finalModel.searchPath]
+    finalModel.searchPath = []
+    for searchItem in list(reversed(searchTroveItems)) + oldSearchItems:
+        finalModel.appendToSearchPath(
+            systemmodel.SearchTrove(item=searchItem))
 
     TrackFindAction.remap = False
     finalJob, uJob = buildJobs(client, cache, model)
