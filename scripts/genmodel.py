@@ -13,7 +13,9 @@
 # full details.
 #
 
-import itertools, os, sys
+import itertools, fcntl, os, smtplib, sys, tempfile
+from email.MIMEText import MIMEText
+from email.MIMEMultipart import MIMEMultipart
 
 if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
@@ -147,6 +149,13 @@ def addEraseJob(model, job):
         updatedModel = False
 
     return updatedModel
+
+
+def getAnswer(question):
+    print question,
+    sys.stdout.flush()
+    return raw_input()
+
 
 if __name__ == '__main__':
     #log.setVerbosity(log.INFO)
@@ -367,5 +376,75 @@ if __name__ == '__main__':
         print 'a "conary sync" operation:'
 
         from conary.cmds import updatecmd
-        updatecmd.displayUpdateInfo(uJob, cfg)
 
+        # save the data in case we are going to email it
+        sys.stdout.flush()
+        outfd, outfn = tempfile.mkstemp()
+        os.unlink(outfn)
+        stdout = os.dup(sys.stdout.fileno())
+        os.dup2(outfd, sys.stdout.fileno())
+        fcntl.fcntl(stdout, fcntl.F_SETFD, 1)
+        try:
+            updatecmd.displayUpdateInfo(uJob, cfg)
+        finally:
+            sys.stdout.flush()
+            os.dup2(stdout, sys.stdout.fileno())
+            os.close(stdout)
+        os.lseek(outfd, 0, 0)
+        f = os.fdopen(outfd, 'r')
+        jobData = f.read()
+        f.close()
+        sys.stdout.write(jobData)
+
+    answer = getAnswer('Write model to disk? [y/N]: ')
+    if answer and answer[0].lower() == 'y':
+        smf = systemmodel.SystemModelFile(finalModel)
+        try:
+            smf.write()
+            print 'model written to %s' % smf.fileName
+        except:
+            outfd, outfn = tempfile.mkstemp()
+            smf.write(fileName=outfn)
+            print 'model written to %s' % outfn
+
+
+    # offer to send debugging data to rPath
+    answer = getAnswer(
+        'Send your system manifest, model, and unmodeled operation report\n'
+        "to rPath for rPath's debugging use? [y/N]:")
+    if answer and answer[0].lower() == 'y':
+        mailhost = getAnswer('What is your mail host? (localhost):')
+        if not mailhost:
+            mailhost='localhost'
+        sender = ''
+        while not sender:
+            sender = getAnswer('Send from what email address?')
+
+        recipient = 'sysmodel-report@rpath.com'
+
+        s = smtplib.SMTP(mailhost)
+        msg = MIMEMultipart()
+        msg['Subject'] = 'Conary sysmodel data report'
+        msg['From'] = sender
+        msg['To'] = recipient
+        msg.preamble = 'System model genmodel report'
+
+        manifest = '\n'.join(sorted('%s=%s[%s]' %x for x in db.iterAllTroves()))
+        manifestText = MIMEText(manifest, 'plain')
+        manifestText.add_header('Content-Disposition', 'attachment',
+            filename='manifest')
+        msg.attach(manifestText)
+
+        modelText = MIMEText(finalModel.format(), 'plain')
+        modelText.add_header('Content-Disposition', 'attachment',
+            filename='model')
+        msg.attach(modelText)
+
+        if finalJob:
+            jobText = MIMEText(jobData, 'plain')
+            jobText.add_header('Content-Disposition', 'attachment',
+                filename='finalJob')
+            msg.attach(jobText)
+
+        s.sendmail(sender, recipient, msg.as_string())
+        s.quit()
