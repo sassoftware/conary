@@ -401,10 +401,8 @@ class GroupTupleSetMethods(object):
 
         This is useful for creating flattened groups (removing group
         structure present in upstream groups but not desired in the
-        groups being built), for creating trovesets to use to look
-        up specific troves (for example, C{find} and C{findByName}),
-        and to include in SearchPaths, particularly for resolving
-        dependencies.
+        groups being built) and for creating trovesets to use to look
+        up specific troves (for example, C{find} and C{findByName}).
 
         EXAMPLES
         ========
