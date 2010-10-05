@@ -290,6 +290,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{Group} : Creates the primary group object.
         - L{Script} : Creates a single script object.
         - L{Scripts} : Associates script objects with script types.
+        - L{SystemModel} : Converts a system model to a TroveSet.
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
           troves.

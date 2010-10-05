@@ -1652,7 +1652,6 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-
          - C{checkPathConflicts} : Raise an error if any paths
            overlap (C{True})
          - C{scripts} : Attach one or more scripts specified by a C{Scripts}
@@ -1697,21 +1696,72 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
     def SystemModel(self, modelText, searchPath = None):
         """
-        Turns a system model into a TroveSet. The optional searchPath
-        initializes the search path; search lines from the system model
-        are prepended. Returns a standard troveset with the extra attribute
-        searchPath, which is a TroveSet representing the final SearchPath
-        from the system model. This search path is often used for dependency
-        resolution, though unioning it with the optional portions of the
-        resulting trove set is the normal usage pattern. (Unioning with
-        only the optional portion is not functionally distinct from
-        unioning with the entire result, but is faster).
+        NAME
+        ====
+        B{C{GroupSetRecipe.SystemModel}} - Convert system model to TroveSet
 
-        ts = r.SystemModel(modelAsListOfStrings)
-        needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
-        finalSet = ts + needed
 
-        FIXME
+        SYNOPSIS
+        ========
+        C{r.SystemModel(modelText, searchPath=None)}
+
+        DESCRIPTION
+        ===========
+        Turns a system model into a TroveSet. The optional
+        C{searchPath} initializes the search path; search lines from
+        the system model are prepended to any provided C{searchPath}.
+
+        Returns a standard troveset with an extra attribute called
+        C{searchPath}, which is a TroveSet representing the final
+        SearchPath from the system model.  This search path is
+        often used for dependency resolution, though unioning it
+        with the optional portions of the resulting trove set is
+        the normal usage pattern. (Unioning with only the optional
+        portion is not functionally distinct from unioning with
+        the entire result, but is faster).
+
+        PARAMETERS
+        ==========
+         - C{modelText} (Required) : the text of the model to execute
+         - C{searchPath} (Optional) : an initial search path, a fallback
+           sought after any items provided in the model.
+
+        EXAMPLE
+        =======
+        To build a group from a system defined by a system model, provide
+        the contents of the /etc/conary/system-model file as the
+        C{modelText}.  This may be completely literal (leading white
+        space is ignored in system models)::
+
+         ts = r.SystemModel('''
+             search group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30
+             install group-appliance-platform
+             install httpd
+             install mod_ssl
+         ''')
+         needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+         finalSet = ts + needed
+
+        If you are using a product definition and want to use the
+        search path it provides as the context for the model, it
+        might look like this::
+
+         repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+         if 'productDefinitionSearchPath' in r.macros:
+             # proper build with product definition
+             searchPath = r.SearchPath(repo[x] for x in
+                 r.macros.productDefinitionSearchPath.split('\\\\n'))
+         else:
+             # local test build against specific version
+             searchPath = r.SearchPath(
+                 repo['group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30'])
+         ts = r.SystemModel('''
+             install group-appliance-platform
+             install httpd
+             install mod_ssl
+         ''', searchPath=searchPath)
+         needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+         finalSet = ts + needed
         """
         if searchPath is None:
             searchSource = searchsource.NetworkSearchSource(
