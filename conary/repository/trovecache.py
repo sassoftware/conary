@@ -26,9 +26,6 @@ class TroveCache(trovesource.AbstractTroveSource):
     depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
     depCacheFileId = '\0' * 40
 
-    troveInfoPathId = 'SYSTEM-MODEL-TROVEINFO-CACHE----'
-    troveInfoFileId = '\0' * 40
-
     def __init__(self, troveSource):
         self.troveInfoCache = {}
         self.depCache = {}
@@ -202,25 +199,6 @@ class TroveCache(trovesource.AbstractTroveSource):
         cs.addFileContents(self.depCachePathId, self.depCacheFileId,
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(depStr), False)
-
-        troveInfoDict = {}
-        for infoType, infoCache in self.troveInfoCache.iteritems():
-            for troveTup, troveInfo in infoCache.iteritems():
-                if troveInfo is None:
-                    frz = None
-                else:
-                    frz = troveInfo.freeze()
-                    troveInfoDict.setdefault(troveTup, []).append(
-                                                (infoType, frz))
-
-        finalTroveInfoDict = dict(
-                ((x[0], x[1].asString(), x[2].freeze()), infoDict) for
-                x, infoDict in troveInfoDict.iteritems() )
-        troveInfoStr = cPickle.dumps(finalTroveInfoDict)
-
-        cs.addFileContents(self.troveInfoPathId, self.troveInfoFileId,
-                           changeset.ChangedFileTypes.file,
-                           filecontents.FromString(troveInfoStr), False)
 
         (_, cacheName) = tempfile.mkstemp(prefix=os.path.basename(path)+'.',
                                           dir=os.path.dirname(path))

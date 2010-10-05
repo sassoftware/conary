@@ -16,7 +16,7 @@ import itertools
 
 from conary import trove, versions
 from conary.deps import deps
-from conary.lib import graph
+from conary.lib import graph, sha1helper
 from conary.local import deptable
 from conary.repository import searchsource, trovesource
 
@@ -58,11 +58,15 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.depDb = None
 
         self.troveTupList = []
+        troveTupCollection = trove.TroveTupleList()
         for troveTup, inInstall, isExplicit in troveSet._walk(troveCache,
                                                     newGroups = False,
                                                     recurse = True):
             if not filterFn(*troveTup):
                 self.troveTupList.append(troveTup)
+                troveTupCollection.add(*troveTup)
+
+        self.troveTupSig = sha1helper.sha1String(troveTupCollection.freeze())
 
         self.inDepDb = [ False ] * len(self.troveTupList)
 
@@ -128,6 +132,9 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             suggMap[depSet] = newSolListList
 
         self.depDb.db.rollback()
+
+        if suggMap:
+            import epdb;epdb.st()
 
         return suggMap
 
