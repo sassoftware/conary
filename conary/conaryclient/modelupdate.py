@@ -33,7 +33,6 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.repos = repos
         self.callback = callback
         self.componentMap = {}
-        self._startingSizes = (0, 0)
         if changeSetList:
             csSource = trovesource.ChangesetFilesTroveSource(db)
             csSource.addChangeSets(changeSetList)
@@ -86,7 +85,8 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.cacheTroves(need)
 
     def cacheModified(self):
-        return (len(self.cache), len(self.depCache)) != self._startingSizes
+        return (len(self.cache), len(self.depCache),
+                len(self.depSolutionCache)) != self._startingSizes
 
     def getPackageComponents(self, troveTup):
         if self.troveIsCached(troveTup):

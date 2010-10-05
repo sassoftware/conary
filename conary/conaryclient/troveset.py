@@ -56,13 +56,15 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
     def __init__(self, troveCache, troveSet, flavor,
                  filterFn = lambda *args: False):
         self.depDb = None
+        self.troveSet = troveSet
+        self.filterFn = filterFn
 
         self.troveTupList = []
         troveTupCollection = trove.TroveTupleList()
-        for troveTup, inInstall, isExplicit in troveSet._walk(troveCache,
-                                                    newGroups = False,
-                                                    recurse = True):
-            if not filterFn(*troveTup):
+        for troveTup, inInstall, isExplicit in \
+                    self.troveSet._walk(troveCache, newGroups = False,
+                                        recurse = True):
+            if not self.filterFn(*troveTup):
                 self.troveTupList.append(troveTup)
                 troveTupCollection.add(*troveTup)
 
@@ -89,8 +91,19 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             return s
 
         reqNames = set()
+        finalDepList = []
+        cachedSuggMap = {}
         for dep in depList:
-            reqNames.update(_depClassAndName(dep))
+            cachedResult = self.troveCache.getDepSolution(self.troveTupSig,
+                                                          dep)
+            if cachedResult:
+                cachedSuggMap[dep] = cachedResult
+            else:
+                reqNames.update(_depClassAndName(dep))
+                finalDepList.append(dep)
+
+        if not finalDepList:
+            return cachedSuggMap
 
         emptyDep = deps.DependencySet()
         troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList)
@@ -123,18 +136,20 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
 
         self.depDb.commit()
 
-        suggMap = self.depDb.resolve(label, depList, leavesOnly=leavesOnly)
+        suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly)
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
                 newSolListList.append([ self.troveTupList[x] for x in solList ])
 
-            suggMap[depSet] = newSolListList
+            if newSolListList:
+                suggMap[depSet] = newSolListList
+                self.troveCache.addDepSolution(self.troveTupSig, depSet,
+                                               newSolListList)
 
         self.depDb.db.rollback()
 
-        if suggMap:
-            import epdb;epdb.st()
+        suggMap.update(cachedSuggMap)
 
         return suggMap
 
