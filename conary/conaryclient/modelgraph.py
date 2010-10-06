@@ -59,8 +59,12 @@ class AbstractModelCompiler(object):
                                                          self.flavor))
                 searchPathItems.append(repos)
             elif partialTup[0] is not None:
-                result = self.repos.findTrove([],
-                                              partialTup, self.flavor)
+                result = self.repos.findTroves([],
+                                              [ partialTup ], self.flavor,
+                                              allowMissing = True)
+                if not result:
+                    raise errors.TroveSpecsNotFound( [ partialTup ] )
+                result = result[partialTup]
                 assert(len(result) == 1)
                 ts = self.InitialTroveTupleSet(troveTuple = result,
                                                graph = self.g)

@@ -16,6 +16,7 @@ import itertools
 
 from conary import trove, versions
 from conary.deps import deps
+from conary.errors import TroveSpecsNotFound
 from conary.lib import graph, sha1helper
 from conary.local import deptable
 from conary.repository import searchsource, trovesource
@@ -558,17 +559,17 @@ class FindAction(ParallelAction):
                     l.extend([ (action.outSet, troveSpec)
                                     for troveSpec in action.troveSpecs ] )
 
-        notFound = []
+        notFound = set()
         for inSet, searchList in troveSpecsByInSet.iteritems():
             d = inSet._findTroves([ x[1] for x in searchList ])
             for outSet, troveSpec in searchList:
                 if troveSpec in d:
                     outSet._setInstall(d[troveSpec])
                 else:
-                    notFound.append(troveSpec)
+                    notFound.add(troveSpec)
 
         if notFound:
-            raise MissingTroves(notFound)
+            raise TroveSpecsNotFound(sorted(notFound))
 
     def __str__(self):
         if isinstance(self.troveSpecs[0], str):
@@ -780,27 +781,3 @@ class OperationGraph(graph.DirectedGraph):
                 else:
                     for node in nodeList:
                         node.realize(data)
-
-class MissingTroves(Exception):
-
-    def __init__(self, specList):
-        self.specList = specList
-
-    def __str__(self):
-        l = [ "Cannot find matches for " ]
-        for spec in self.specList:
-            item = []
-            item.append(spec[0])
-            if spec[1]:
-                item.append("=")
-                item.append(spec[1])
-
-            if spec[2]:
-                item.append("[")
-                item.append(spec[2])
-                item.append("]")
-
-            l.append("".join(item))
-
-        return " ".join(l)
-

@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
 
-from conary import conarycfg, conaryclient, trove, versions
+from conary import conarycfg, conaryclient, errors, trove, versions
 from conary.conaryclient import modelupdate, systemmodel
 from conary.deps import deps
 from conary.trovetup import TroveSpec
@@ -71,7 +71,7 @@ class TrackFindAction(OrigFindAction):
                         self.findMap.update( (x, attempt)
                                                 for x in origSpecs[-1] )
                         break
-                except troveset.MissingTroves:
+                except errors.TroveSpecsNotFound:
                     pass
 
         for action in actionList:
