@@ -607,7 +607,7 @@ class UnionAction(DelayedTupleSetAction):
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
-class ReplaceAction(DelayedTupleSetAction):
+class PatchAction(DelayedTupleSetAction):
 
     prefilter = FetchAction
 
@@ -615,7 +615,7 @@ class ReplaceAction(DelayedTupleSetAction):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
         self.updateTroveSet = updateTroveSet
 
-    def replaceAction(self, data):
+    def patchAction(self, data):
         before = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
         after = trove.Trove("@tsupdate", versions.NewVersion(),
@@ -661,7 +661,7 @@ class ReplaceAction(DelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
-    __call__ = replaceAction
+    __call__ = patchAction
 
     def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
@@ -696,7 +696,7 @@ class ReplaceAction(DelayedTupleSetAction):
             if newTuple != oldTuple:
                 optionalSet.add(oldTuple)
 
-class UpdateAction(ReplaceAction):
+class UpdateAction(PatchAction):
 
     def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):

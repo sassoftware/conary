@@ -125,7 +125,7 @@ class GroupTupleSetMethods(object):
         - L{members} : Resolve exactly one level of trove references,
           return only those resolved references
         - L{packages} : Resolve trove references recursively, return packages
-        - L{replace} : Replace troves in the TroveSet with matching-named
+        - L{patch} : Replace troves in the TroveSet with matching-named
           troves from the replacement set
         - L{union} : Get the union of all provided TroveSets (C{|}, C{+})
         - L{update} : Replace troves in the TroveSet with all troves from
@@ -602,25 +602,25 @@ class GroupTupleSetMethods(object):
         """
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
-    def replace(self, replaceSet):
+    def patch(self, patchSet):
         """
         NAME
         ====
-        B{C{TroveSet.replace}} - Replace troves with matching-name troves
+        B{C{TroveSet.patch}} - Replace troves with matching-name troves
 
         SYNOPSIS
         ========
-        C{troveset.replace(replaceSet)}
+        C{troveset.patch(patchSet)}
 
         DESCRIPTION
         ===========
         Look (recursively) for items in this troveset which can
-        reasonably be replaced by members found in the replaceSet.
+        reasonably be replaced by members found in the patchSet.
         The isInstall values are inherited from the original troveset.
-        Any items in replaceSet which do not appear to replace
+        Any items in patchSet which do not appear to replace
         members of this troveset are included as optional in the
         result.  Members of the original troveset which are outdated
-        by members of the replaceSet are also included as optional
+        by members of the patchSet are also included as optional
         in the returned troveset, to prevent them from inadvertently
         showing up as install troves due to other operations.
 
@@ -628,16 +628,16 @@ class GroupTupleSetMethods(object):
         which are installed in the original set are installed in
         the resulting set, and all other troves are available.
 
-        The difference between C{TroveSet.update} and C{TroveSet.replace} is
-        how new troves introduced in C{replaceSet} but not present in the
-        original set are handled.  With C{TroveSet.replace}, the new
-        troves from C{replaceSet} are not installed in the result; with
+        The difference between C{TroveSet.update} and C{TroveSet.patch} is
+        how new troves introduced in C{patchSet} but not present in the
+        original set are handled.  With C{TroveSet.patch}, the new
+        troves from C{patchSet} are not installed in the result; with
         C{TroveSet.update}, the new troves are installed in the result if
         they are installed in the C{updateSet}.
 
         PARAMETERS
         ==========
-            - L{replaceSet} : TroveSet containing potential replacements
+            - L{patchSet} : TroveSet containing potential replacements
 
         EXAMPLES
         ========
@@ -646,17 +646,17 @@ class GroupTupleSetMethods(object):
         packages.  For example, if only the postgresql client is
         in the current install set, and group-CVE-2015-1234 contains
         both the postgresql client and server in different packages,
-        then the replace operation will mark the existing postgresql
+        then the patch operation will mark the existing postgresql
         client as optional, add the new postgresql client as install,
         and add the new postgresql server as optional in the returned
         troveSet.
 
         base = repos['group-standard']
-        update = base.replace(repos['group-CVE-2015-1234'])
+        update = base.patch(repos['group-CVE-2015-1234'])
         groupStandard = update.createGroup('group-standard')
 
         """
-        return self._action(replaceSet, ActionClass = GroupReplaceAction)
+        return self._action(patchSet, ActionClass = GroupPatchAction)
 
     def update(self, updateSet):
         """
@@ -676,10 +676,10 @@ class GroupTupleSetMethods(object):
         troves overlap, the versions from C{updateSet} are used, though
         the choice of isInstall is honored from the original set.
 
-        The difference between C{TroveSet.update} and C{TroveSet.replace} is
+        The difference between C{TroveSet.update} and C{TroveSet.patch} is
         how new troves introduced in C{updateSet} but not present in the
-        original set are handled.  With C{TroveSet.replace}, the new
-        troves from C{replaceSet} are not installed in the result; with
+        original set are handled.  With C{TroveSet.patch}, the new
+        troves from C{patchSet} are not installed in the result; with
         C{TroveSet.update}, the new troves are installed in the result if
         they are installed in the C{updateSet}.
 
@@ -973,7 +973,7 @@ class GroupUnionAction(troveset.UnionAction):
 
     resultClass = GroupDelayedTroveTupleSet
 
-class GroupReplaceAction(troveset.ReplaceAction):
+class GroupPatchAction(troveset.PatchAction):
 
     resultClass = GroupDelayedTroveTupleSet
 

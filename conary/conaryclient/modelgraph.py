@@ -28,7 +28,7 @@ class AbstractModelCompiler(object):
 
     FetchAction = troveset.FetchAction
     InitialTroveTupleSet = troveset.StaticTroveTupleSet
-    ReplaceAction = troveset.ReplaceAction
+    PatchAction = troveset.PatchAction
     UnionAction = troveset.UnionAction
     UpdateAction = troveset.UpdateAction
 
@@ -125,9 +125,9 @@ class AbstractModelCompiler(object):
                 growSearchPath = False
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.RemoveAction)
-            elif isinstance(op, sysModel.ReplaceTroveOperation):
+            elif isinstance(op, sysModel.PatchTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
-                                        ActionClass = self.ReplaceAction)
+                                        ActionClass = self.PatchAction)
             elif isinstance(op, sysModel.UpdateTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UpdateAction)
