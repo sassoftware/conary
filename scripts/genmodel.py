@@ -337,6 +337,8 @@ if __name__ == '__main__':
                 if searchTroveSpec not in searchTroveItems:
                     searchTroveItems.append(searchTroveSpec)
                 newSpecs.append(TroveSpec(newSpec.name, None, newSpec.flavor))
+            else:
+                newSpecs.append(newSpec)
 
         if len(set([x.name.split(':')[0] for x in newSpecs+deferredItems])) > 1:
             # newSpecs has trove names not mentioned in deferredItems,
@@ -362,7 +364,7 @@ if __name__ == '__main__':
             systemmodel.SearchTrove(item=searchItem))
 
     TrackFindAction.remap = False
-    finalJob, uJob = buildJobs(client, cache, model)
+    finalJob, uJob = buildJobs(client, cache, finalModel)
     assert(finalJob == candidateJob)
 
     print "----"
