@@ -97,6 +97,10 @@ def orderByPackage(jobList):
     installMap = {}
     eraseMap = {}
     for job in jobList:
+        if trove.troveIsGroup(job[0]) and job[1][0] is None:
+            # skip groups we've decided to install
+            continue
+
         assert(not trove.troveIsFileSet(job[0]))
         assert(not trove.troveIsGroup(job[0]))
 
@@ -156,6 +160,82 @@ def getAnswer(question):
     sys.stdout.flush()
     return raw_input()
 
+def findParent(client, path, grpName):
+    releaseTroves = list(client.getDatabase().iterTrovesByPath(path))
+    assert(len(releaseTroves) == 1)
+
+    possibleGroupList = client.getRepos().getTroveReferences(
+            releaseTroves[0].getVersion().trailingLabel().getHost(),
+            [ releaseTroves[0].getNameVersionFlavor() ] )[0]
+
+    possibleGroupList = sorted(
+            [ x for x in possibleGroupList if x[0] == grpName ],
+            groupDataCompare)
+
+    return possibleGroupList[0]
+
+def groupDataCompare(tup1, tup2):
+    ver1 = tup1[1]
+    ver2 = tup2[1]
+
+    return cmp(ver1.trailingRevision().getVersion(),
+               ver2.trailingRevision().getVersion())
+
+def initialForesightModel(installedTroves, model):
+    allGroupTups = [ x for x in installedTroves
+                        if trove.troveIsGroup(x[0]) ]
+    allGroupTroves = db.getTroves(allGroupTups)
+
+    # simplistic, but we can't have loops in groups so good enough
+    groupTroves = []
+    for trv in allGroupTroves:
+        # look for groups first, and eliminate groups which are included in
+        # the other groups we find
+        includedElsewhere = False
+        for otherTrv in allGroupTroves:
+            if (otherTrv.isStrongReference(*trv.getNameVersionFlavor()) and
+                   otherTrv.includeTroveByDefault(*trv.getNameVersionFlavor())):
+                includedElsewhere = True
+                break
+
+        if not includedElsewhere:
+            groupTroves.append(trv)
+
+    if ('group-gnome-dist' in [ x[0] for x in allGroupTups ]):
+        trv = [ x for x in allGroupTroves
+                    if x.getName() == 'group-gnome-dist' ][0]
+        model.appendToSearchPath(systemmodel.SearchTrove(
+                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
+                                 str(trv.getFlavor()) ) ) )
+        model.appendToSearchPath(systemmodel.SearchTrove(
+                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
+                                 'is:x86' ) ))
+
+    for trv in groupTroves:
+        model.appendTroveOp(systemmodel.InstallTroveOperation(
+                item = [ TroveSpec(trv.getName(),
+                                   fmtVer(trv.getVersion()),
+                                   str(trv.getFlavor())) ] ))
+
+def initialRedHatModel(client, model):
+    groupOs = findParent(client, "/etc/redhat-release", "group-os")
+    groupRpath = findParent(client, "/usr/bin/conary", "group-rpath-packages")
+
+    model.appendToSearchPath(systemmodel.SearchTrove(
+                                item = TroveSpec(groupOs[0],
+                                                 fmtVer(groupOs[1]),
+                                                 str(groupOs[2]))))
+    model.appendToSearchPath(systemmodel.SearchTrove(
+                                item = TroveSpec(groupRpath[0],
+                                                 fmtVer(groupRpath[1]),
+                                                 str(groupRpath[2]))))
+
+    model.appendTroveOp(systemmodel.InstallTroveOperation(
+            item = [ TroveSpec("group-standard",
+                               fmtVer(groupOs[1]),
+                               str(groupOs[2])) ] ))
+
+    print "\t" + "\n\t".join(x[:-1] for x in model.iterFormat())
 
 if __name__ == '__main__':
     #log.setVerbosity(log.INFO)
@@ -178,42 +258,21 @@ if __name__ == '__main__':
     installedTroves = dict( (tup, pinned) for (tup, pinned)
                                 in db.iterAllTroves(withPins = True) )
 
-    # look for groups first, and eliminate groups which are included in
-    # the other groups we find
-    allGroupTups = [ x for x in installedTroves if trove.troveIsGroup(x[0]) ]
-    allGroupTroves = db.getTroves(allGroupTups)
-
-    # simplistic, but we can't have loops in groups so good enough
-    groupTroves = []
-    for trv in allGroupTroves:
-        includedElsewhere = False
-        for otherTrv in allGroupTroves:
-            if (otherTrv.isStrongReference(*trv.getNameVersionFlavor()) and
-                   otherTrv.includeTroveByDefault(*trv.getNameVersionFlavor())):
-                includedElsewhere = True
-                break
-
-        if not includedElsewhere:
-            groupTroves.append(trv)
-
     model = systemmodel.SystemModelText(cfg)
-
-    if ('group-gnome-dist' in [ x[0] for x in allGroupTups ]):
-        trv = [ x for x in allGroupTroves
-                    if x.getName() == 'group-gnome-dist' ][0]
-        model.appendToSearchPath(systemmodel.SearchTrove(
-                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
-                                 str(trv.getFlavor()) ) ) )
-        model.appendToSearchPath(systemmodel.SearchTrove(
-                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
-                                 'is:x86' ) ))
-
-    for trv in groupTroves:
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
-                item = [ TroveSpec(trv.getName(),
-                                   fmtVer(trv.getVersion()),
-                                   str(trv.getFlavor())) ] ))
-
+    if os.path.exists("/etc/redhat-release"):
+        initialRedHatModel(client, model)
+        componentPriorities = [ ( 'rpm', ),
+                                ( 'runtime', ),
+                                ( 'lib', ) ]
+    else:
+        initialForesightModel(installedTroves, model)
+        componentPriorities = [ ( 'runtime', 'doc' ),
+                                ( 'doc', ),
+                                ( 'runtime', ),
+                                ( 'devel', ),
+                                ( 'python', ),
+                                ( 'java', ),
+                                ( 'perl', ) ]
 
     allCandidates = []
     updatedModel = True
@@ -231,13 +290,7 @@ if __name__ == '__main__':
         updatedModel = False
 
         # look for packages to install/update
-        for priorityList in [ ( 'runtime', 'doc' ),
-                              ( 'doc', ),
-                              ( 'runtime', ),
-                              ( 'devel', ),
-                              ( 'python', ),
-                              ( 'java', ),
-                              ( 'perl', ) ]:
+        for priorityList in componentPriorities:
             for pkgTuple, jobList in installPackageMap.items():
                 componentSet = set( [ (pkgTuple[0] + ":" + x,
                                        pkgTuple[1], pkgTuple[2])
@@ -330,7 +383,7 @@ if __name__ == '__main__':
             # so that they are snapshotted in an updateall like other
             # items.  This will preserve the semantics of branch affinity
             # relative to what would have happened in the old update model
-            if newSpec.version is not None:
+            if False and newSpec.version is not None:
                 searchTroveName = newSpec.name.split(':')[0]
                 searchTroveSpec = TroveSpec(searchTroveName,
                             newSpec.version, newSpec.flavor)
@@ -338,7 +391,7 @@ if __name__ == '__main__':
                     searchTroveItems.append(searchTroveSpec)
                 newSpecs.append(TroveSpec(newSpec.name, None, newSpec.flavor))
             else:
-                newSpecs.append(newSpec)
+                newSpecs.append(newSpec);
 
         if len(set([x.name.split(':')[0] for x in newSpecs+deferredItems])) > 1:
             # newSpecs has trove names not mentioned in deferredItems,
@@ -365,7 +418,7 @@ if __name__ == '__main__':
 
     TrackFindAction.remap = False
     finalJob, uJob = buildJobs(client, cache, finalModel)
-    assert(finalJob == candidateJob)
+    assert(set(finalJob) == set(candidateJob))
 
     print "----"
     print "Final Model"
