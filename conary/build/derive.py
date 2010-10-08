@@ -58,63 +58,67 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir=None,
                       completed.
         @param callback:
     """
-    if callback is None:
-        callback = DeriveCallback()
 
-    if isinstance(troveSpec, tuple):
-        troveName, versionSpec, flavor = troveSpec
-        versionSpec = str(versionSpec)
-        troveSpec = cmdline.toTroveSpec(troveName, versionSpec, flavor)
-    else:
+    origDir = os.getcwd()
+    try:
+        if callback is None:
+            callback = DeriveCallback()
+
+        if isinstance(troveSpec, tuple):
+            troveName, versionSpec, flavor = troveSpec
+            versionSpec = str(versionSpec)
+            troveSpec = cmdline.toTroveSpec(troveName, versionSpec, flavor)
+        else:
+            troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
+
+        if isinstance(targetLabel, str):
+            targetLabel = Label(targetLabel)
+
         troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
+        result = repos.findTrove(cfg.buildLabel,
+                                 (troveName, versionSpec, flavor),
+                                 cfg.flavor)
+        # findTrove shouldn't return multiple items for one package anymore
+        # when a flavor is specified.
+        troveToDerive, = result
+        # displaying output along the screen allows there to be a record
+        # of what operations were performed.  Since this command is
+        # an aggregate of several commands I think that is appropriate,
+        # rather than simply using a progress callback.
+        log.info('Shadowing %s=%s[%s] onto %s' % (troveToDerive[0],
+                                                 troveToDerive[1],
+                                                 troveToDerive[2],
+                                                 targetLabel))
+        if info:
+            cfg.interactive = False
 
-    if isinstance(targetLabel, str):
-        targetLabel = Label(targetLabel)
+        error = branch.branch(repos, cfg, str(targetLabel),
+                              ['%s=%s[%s]'%troveToDerive],
+                              makeShadow=True, sourceOnly=True,
+                              binaryOnly=False, allowEmptyShadow=True,
+                              info=info)
+        if info or error:
+            return
+        shadowedVersion = troveToDerive[1].createShadow(targetLabel)
+        shadowedVersion = shadowedVersion.getSourceVersion(False)
+        troveName = troveName.split(':')[0]
 
-    troveName, versionSpec, flavor = cmdline.parseTroveSpec(troveSpec)
-    result = repos.findTrove(cfg.buildLabel, (troveName, versionSpec, flavor),
-                             cfg.flavor)
-    # findTrove shouldn't return multiple items for one package anymore
-    # when a flavor is specified.
-    troveToDerive, = result
-    # displaying output along the screen allows there to be a record
-    # of what operations were performed.  Since this command is
-    # an aggregate of several commands I think that is appropriate,
-    # rather than simply using a progress callback.
-    log.info('Shadowing %s=%s[%s] onto %s' % (troveToDerive[0],
-                                             troveToDerive[1],
-                                             troveToDerive[2],
-                                             targetLabel))
-    if info:
-        cfg.interactive = False
+        checkoutDir = checkoutDir or troveName
+        checkin.checkout(repos, cfg, checkoutDir,
+                         ["%s=%s" % (troveName, shadowedVersion)],
+                         callback=callback)
+        os.chdir(checkoutDir)
 
-    error = branch.branch(repos, cfg, str(targetLabel),
-                          ['%s=%s[%s]'%troveToDerive],
-                          makeShadow=True, sourceOnly=True,
-                          binaryOnly=False, allowEmptyShadow=True,
-                          info=info)
-    if info or error:
-        return
-    shadowedVersion = troveToDerive[1].createShadow(targetLabel)
-    shadowedVersion = shadowedVersion.getSourceVersion(False)
-    troveName = troveName.split(':')[0]
-
-    checkoutDir = checkoutDir or troveName
-    checkin.checkout(repos, cfg, checkoutDir,
-                     ["%s=%s" % (troveName, shadowedVersion)],
-                     callback=callback)
-    os.chdir(checkoutDir)
-
-    nvfs = repos.getTrovesBySource(troveToDerive[0]+':source',
-                                   troveToDerive[1].getSourceVersion())
-    trvs = repos.getTroves(nvfs)
-    hasCapsule = [ x for x in trvs if x.troveInfo.capsule.type() ]
-    if hasCapsule:
-        derivedRecipeType = 'DerivedCapsuleRecipe'
-        removeText = ''
-    else:
-        derivedRecipeType = 'DerivedPackageRecipe'
-        removeText = \
+        nvfs = repos.getTrovesBySource(troveToDerive[0]+':source',
+                                       troveToDerive[1].getSourceVersion())
+        trvs = repos.getTroves(nvfs)
+        hasCapsule = [ x for x in trvs if x.troveInfo.capsule.type() ]
+        if hasCapsule:
+            derivedRecipeType = 'DerivedCapsuleRecipe'
+            removeText = ''
+        else:
+            derivedRecipeType = 'DerivedPackageRecipe'
+            removeText = \
 """
         # This appliance uses PHP as a command interpreter but does
         # not include a web server, so remove the file that creates
@@ -122,11 +126,11 @@ def derive(repos, cfg, targetLabel, troveSpec, checkoutDir=None,
         r.Remove('/etc/httpd/conf.d/php.conf')
 """
 
-    log.info('Rewriting recipe file')
-    recipeName = troveName + '.recipe'
-    className = util.convertPackageNameToClassName(troveName)
+        log.info('Rewriting recipe file')
+        recipeName = troveName + '.recipe'
+        className = util.convertPackageNameToClassName(troveName)
 
-    derivedRecipe = """
+        derivedRecipe = """
 class %(className)sRecipe(%(recipeBaseClass)s):
     name = '%(name)s'
     version = '%(version)s'
@@ -157,47 +161,50 @@ class %(className)sRecipe(%(recipeBaseClass)s):
            recipeBaseClass=derivedRecipeType,
            removeText=removeText)
 
-    open(recipeName, 'w').write(derivedRecipe)
+        open(recipeName, 'w').write(derivedRecipe)
 
-    log.info('Removing extra files from checkout')
+        log.info('Removing extra files from checkout')
 
-    conaryState = state.ConaryStateFromFile('CONARY', repos)
-    sourceState = conaryState.getSourceState()
-    # clear the factory since we don't care about how the parent trove was
-    # created
-    sourceState.setFactory('')
+        conaryState = state.ConaryStateFromFile('CONARY', repos)
+        sourceState = conaryState.getSourceState()
+        # clear the factory since we don't care about how the parent trove was
+        # created
+        sourceState.setFactory('')
 
-    addRecipe=True
-    for (pathId, path, fileId, version) in list(sourceState.iterFileList()):
-        if path == recipeName:
-            addRecipe = False
-            continue
-        sourceState.removeFile(pathId)
-        if util.exists(path):
-            statInfo = os.lstat(path)
-            try:
-                if statInfo.st_mode & stat.S_IFDIR:
-                    os.rmdir(path)
-                else:
-                    os.unlink(path)
-            except OSError, e:
-                log.warning("cannot remove %s: %s" % (path, e.strerror))
+        addRecipe=True
+        for (pathId, path, fileId, version) in list(sourceState.iterFileList()):
+            if path == recipeName:
+                addRecipe = False
+                continue
+            sourceState.removeFile(pathId)
+            if util.exists(path):
+                statInfo = os.lstat(path)
+                try:
+                    if statInfo.st_mode & stat.S_IFDIR:
+                        os.rmdir(path)
+                    else:
+                        os.unlink(path)
+                except OSError, e:
+                    log.warning("cannot remove %s: %s" % (path, e.strerror))
 
-    conaryState.write('CONARY')
+        conaryState.write('CONARY')
 
-    if addRecipe:
-        checkin.addFiles([recipeName])
+        if addRecipe:
+            checkin.addFiles([recipeName])
 
-    if extract:
-        log.info('extracting files from %s=%s[%s]' % (troveToDerive))
-        # extract to _ROOT_
-        extractDir = os.path.join(os.getcwd(), '_ROOT_')
-        ts = [ (troveToDerive[0], (None, None),
-                (troveToDerive[1], troveToDerive[2]), True) ]
-        cs = repos.createChangeSet(ts, recurse = True)
-        ChangesetExploder(cs, extractDir)
-        # extract to _OLD_ROOT_
-        secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
-        cs = repos.createChangeSet(ts, recurse = True)
-        ChangesetExploder(cs, secondDir)
+        if extract:
+            log.info('extracting files from %s=%s[%s]' % (troveToDerive))
+            # extract to _ROOT_
+            extractDir = os.path.join(os.getcwd(), '_ROOT_')
+            ts = [ (troveToDerive[0], (None, None),
+                    (troveToDerive[1], troveToDerive[2]), True) ]
+            cs = repos.createChangeSet(ts, recurse = True)
+            ChangesetExploder(cs, extractDir)
+            # extract to _OLD_ROOT_
+            secondDir = os.path.join(os.getcwd(), '_OLD_ROOT_')
+            cs = repos.createChangeSet(ts, recurse = True)
+            ChangesetExploder(cs, secondDir)
 
+    finally:
+        # restore the original directory before we started
+        os.chdir(origDir)
