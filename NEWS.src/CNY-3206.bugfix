@@ -1,0 +1,2 @@
+The repository commit email system now can be given a mailhost with the
+--mailhost argument; localhost is used as the default mailhost.
