@@ -3257,13 +3257,13 @@ class Requires(_addInfo, _dependency):
         # Filter out trove deps that are not associated with a file.
         if len(args) >= 2:
             troves = []
+            component = re.compile('^[-a-zA-Z0-9]*:[a-zA-Z]+$')
             for arg in args[1:]:
                 arg = arg % self.recipe.macros
-                # FIXME: Need a better way to tell if something is a regex or
-                #        a path.
-                if '/' in arg or '\\' in arg or '^' in arg or '*' in arg:
+                # Make sure arg looks like a component
+                if not component.match(arg):
                     break
-                troves.append(arg)
+                troves.append(arg.lstrip(':'))
             else:
                 self.troveDeps[args[0]] = troves
                 args = ()
