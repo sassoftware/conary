@@ -200,7 +200,7 @@ class Database(BaseDatabase):
             cdb["port"] = -1
         try:
             self.dbh = pgsql.connect(**cdb)
-        except pgsql.InternalError:
+        except pgsql.DatabaseError:
             raise sqlerrors.DatabaseError("Could not connect to database", cdb)
 
         # reset the tempTables since we just lost them because of the (re)connect
