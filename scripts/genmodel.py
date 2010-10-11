@@ -160,7 +160,7 @@ def getAnswer(question):
     sys.stdout.flush()
     return raw_input()
 
-def findParent(client, path, grpName):
+def findParent(client, path, grpName, latest = False):
     releaseTroves = list(client.getDatabase().iterTrovesByPath(path))
     assert(len(releaseTroves) == 1)
 
@@ -171,6 +171,9 @@ def findParent(client, path, grpName):
     possibleGroupList = sorted(
             [ x for x in possibleGroupList if x[0] == grpName ],
             groupDataCompare)
+
+    if latest:
+        return possibleGroupList[-1]
 
     return possibleGroupList[0]
 
@@ -219,21 +222,28 @@ def initialForesightModel(installedTroves, model):
 
 def initialRedHatModel(client, model):
     groupOs = findParent(client, "/etc/redhat-release", "group-os")
-    groupRpath = findParent(client, "/usr/bin/conary", "group-rpath-packages")
+    groupRpath = findParent(client, "/usr/bin/conary", "group-rpath-packages",
+			    latest = True)
 
-    model.appendToSearchPath(systemmodel.SearchTrove(
-                                item = TroveSpec(groupOs[0],
-                                                 fmtVer(groupOs[1]),
-                                                 str(groupOs[2]))))
     model.appendToSearchPath(systemmodel.SearchTrove(
                                 item = TroveSpec(groupRpath[0],
                                                  fmtVer(groupRpath[1]),
                                                  str(groupRpath[2]))))
+    model.appendToSearchPath(systemmodel.SearchTrove(
+                                item = TroveSpec(groupOs[0],
+                                                 fmtVer(groupOs[1]),
+                                                 str(groupOs[2]))))
 
-    model.appendTroveOp(systemmodel.InstallTroveOperation(
-            item = [ TroveSpec("group-standard",
-                               fmtVer(groupOs[1]),
-                               str(groupOs[2])) ] ))
+    if 'rhel' in groupOs[1].asString():
+        model.appendTroveOp(systemmodel.InstallTroveOperation(
+                item = [ TroveSpec("group-rhel-standard",
+                                   fmtVer(groupOs[1]),
+                                   str(groupOs[2])) ] ))
+    else:
+        model.appendTroveOp(systemmodel.InstallTroveOperation(
+                item = [ TroveSpec("group-standard",
+                                   fmtVer(groupOs[1]),
+                                   str(groupOs[2])) ] ))
 
     print "\t" + "\n\t".join(x[:-1] for x in model.iterFormat())
 
