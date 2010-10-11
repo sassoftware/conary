@@ -327,7 +327,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
         self.out.write("[%s] %s" % (typ, errcode))
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, modelFile=None):
         """
         Initialize this callback object.
         @param cfg: Conary configuration
@@ -351,7 +351,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             showLabels = cfg.showLabels
             baseFlavors = cfg.flavor
             showComponents = cfg.showComponents
-            db = conaryclient.ConaryClient(cfg).db
+            db = conaryclient.ConaryClient(cfg, modelFile=modelFile).db
         else:
             fullVersions = showFlavors = showLabels = db = baseFlavors = None
             showComponents = None
@@ -469,7 +469,6 @@ def doUpdate(cfg, changeSpecs, **kwargs):
                                             allowChangeSets=True)
 
     _updateTroves(cfg, applyList, **kwargs)
-    # XXX fixme
     # Clean up after ourselves
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
@@ -582,12 +581,11 @@ def _updateTroves(cfg, applyList, **kwargs):
     applyKwargs['autoPinList'] = cfg.pinTroves
 
     model = kwargs.pop('systemModel', None)
-    if model:
-        modelFile = kwargs.pop('systemModelFile', None)
+    modelFile = kwargs.pop('systemModelFile', None)
 
     noRestart = applyKwargs.get('noRestart', False)
 
-    client = conaryclient.ConaryClient(cfg)
+    client = conaryclient.ConaryClient(cfg, modelFile=modelFile)
     client.setUpdateCallback(callback)
     if kwargs.pop('disconnected', False):
         client.disconnectRepos()
@@ -719,8 +717,6 @@ def _updateTroves(cfg, applyList, **kwargs):
     if not noRestart and updJob.getCriticalJobs():
         print "Performing critical system updates, will then restart update."
     try:
-        if model and modelFile:
-            modelFile.writeSnapshot()
         restartDir = client.applyUpdateJob(updJob, **applyKwargs)
     finally:
         updJob.close()

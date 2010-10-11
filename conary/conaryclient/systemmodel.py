@@ -152,10 +152,13 @@ class SystemModel:
     PatchTroveOperation = PatchTroveOperation
 
     def __init__(self, cfg):
+        self.cfg = cfg
+        self.reset()
+
+    def reset(self):
         self.searchPath = []
         self.systemItems = []
         self.indexes = {}
-        self.cfg = cfg
         # Keep track of modifications that do not involve setting
         # an operation as modified
         self.modelModified = False
@@ -285,10 +288,16 @@ class SystemModelText(SystemModel):
 
     def __init__(self, cfg):
         SystemModel.__init__(self, cfg)
+        self.reset()
+
+    def reset(self):
+        SystemModel.reset(self)
         self.commentLines = []
         self.filedata = []
 
     def parse(self, fileData=None, fileName='(internal)'):
+        self.reset()
+
         if fileData is not None:
             self.filedata = fileData
 
@@ -414,22 +423,23 @@ class SystemModelFile(object):
     def exists(self):
         return util.exists(self.fileFullName)
 
-    def read(self):
-        if self.snapshotExists():
-            readFileName = self.snapFullName
-        else:
-            readFileName = self.fileFullName
-        self.model.filedata = open(readFileName, 'r').readlines()
-        return readFileName, self.model.filedata
+    def read(self, fileName=None):
+        if fileName is None:
+            if self.snapshotExists():
+                fileName = self.snapFullName
+            else:
+                fileName = self.fileFullName
+        self.model.filedata = open(fileName, 'r').readlines()
+        return self.model.filedata, fileName
 
-    def parse(self, fileData=None):
+    def parse(self, fileName=None, fileData=None):
         if fileData is None:
-            readFileName, _ = self.read()
+            fileData, _ = self.read(fileName=fileName)
         else:
-            readFileName = None
+            fileName = None
             self.model.filedata = fileData
         self.model.parse(fileData=self.model.filedata,
-                         fileName=readFileName)
+                         fileName=fileName)
 
     def write(self, fileName=None):
         '''
@@ -461,6 +471,15 @@ class SystemModelFile(object):
     def closeSnapshot(self):
         '''
         Indicate that a model has been fully applied to the system by
-        renaming the snapshot over the previous model file.
+        renaming the snapshot, if it exists, over the previous model file.
         '''
-        os.rename(self.snapFullName, self.fileFullName)
+        if self.snapshotExists():
+            os.rename(self.snapFullName, self.fileFullName)
+
+    def deleteSnapshot(self):
+        '''
+        Remove any snapshot without applying it to a system; normally
+        as part of rolling back a partially-applied update.
+        '''
+        if self.snapshotExists():
+            os.unlink(self.snapFullName)

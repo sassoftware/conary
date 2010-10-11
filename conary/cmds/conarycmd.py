@@ -975,7 +975,7 @@ class _UpdateCommand(ConaryCommand):
         model = systemmodel.SystemModelText(cfg)
         modelFile = systemmodel.SystemModelFile(model)
 
-        callback = updatecmd.UpdateCallback(cfg)
+        callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
         if argSet.has_key('quiet'):
