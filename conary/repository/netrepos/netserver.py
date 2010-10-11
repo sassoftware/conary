@@ -48,7 +48,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 69 + 1)
+SERVER_VERSIONS = range(36, 70 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -3262,6 +3262,109 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in ret ]
         return ret
+
+    @accessReadOnly
+    def getDepsForTroveList(self, authToken, clientVersion, troveList,
+                            provides = True, requires = True):
+        """
+        Returns list of (provides, requires) for troves. For troves which
+        are missing or we do not have access to, None is returned.
+        """
+        self.log(2, troveList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                         [ [i,] + tup for i, tup in enumerate(troveList) ],
+                         ["idx","name","version", "flavor"],
+                         start_transaction=False)
+
+        req = []
+        prov = []
+        for tup in troveList:
+            req.append({})
+            prov.append({})
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+
+        tblList = []
+
+        if requires:
+            tblList.append( ('Requires', req) )
+        else:
+            req = [ '' ] * len(troveList)
+
+        if provides:
+            tblList.append( ('Provides', prov) )
+        else:
+            prov = [ '' ] * len(troveList)
+
+        for tableName, dsList in tblList:
+            start = time.time()
+            cu.execute("""
+                SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
+                    JOIN Items ON
+                        Items.item = tmpNVF.name
+                    JOIN Versions ON
+                        Versions.version = tmpNVF.version
+                    JOIN Flavors ON
+                        Flavors.flavor = tmpNVF.flavor
+                    JOIN Instances ON
+                        Items.itemId = Instances.itemId AND
+                        Versions.versionId = Instances.versionId AND
+                        Flavors.flavorId = Instances.flavorId
+                    JOIN UserGroupInstancesCache AS ugi
+                        USING (instanceId)
+                    JOIN %s USING (InstanceId)
+                    JOIN Dependencies AS D USING (depId)
+                WHERE
+                    ugi.userGroupId in (%s)
+            """ %  (tableName, ",".join("%d" % x for x in roleIds) ))
+
+            l = [ x for x in cu ]
+            last = None
+            flags = []
+            for idx, depClassId, depName, depFlag in l:
+                this = (idx, depClassId, depName)
+
+                if this != last:
+                    if last:
+                        dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+
+                    last = this
+                    flags = []
+
+                if depFlag != deptable.NO_FLAG_MAGIC:
+                    flags.append((depFlag, deps.FLAG_SENSE_REQUIRED))
+
+            if last:
+                dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+            flagMap = [ None, '', '~', '~!', '!' ]
+            for i, itemList in enumerate(dsList):
+                depList = itemList.items()
+                depList.sort()
+
+                if not depList:
+                    frz = ''
+                else:
+                    l = []
+                    for (depClassId, depName), depFlags in depList:
+                        l += [ '|', str(depClassId), '#', depName.replace(':', '::') ]
+                        lastFlag = None
+                        for flag in sorted(depFlags):
+                            if flag == lastFlag:
+                                continue
+
+                            l.append(':')
+                            l.append(flagMap[flag[1]])
+                            l.append(flag[0].replace(':', '::'))
+
+                    frz = ''.join(l[1:])
+
+                dsList[i] = frz
+
+        result = zip(prov, req)
+        return result
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):

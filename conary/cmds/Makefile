@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-# -*- python -*-
 #
-# Copyright (c) 2004-2010 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,17 +12,17 @@
 # full details.
 #
 
-import sys
+python_files = $(wildcard *.py)
+extra_dist = Makefile
 
-if __name__ == "__main__":
-    # ondemand importing for conary command line tool 
-    # - but don't impose it on others!  They can load it on their own if they
-    # want.
-    if '--debug-all' not in sys.argv:
-        from conary.lib import importer
-        importer.install()
+dist_files = $(python_files) $(extra_dist)
 
-from conary.cmds import conarycmd
+all: default-all
 
-if __name__ == "__main__":
-    sys.exit(conarycmd.main())
+install: pyfiles-install
+
+dist: default-dist
+
+clean: default-clean
+
+include ../../Make.rules
