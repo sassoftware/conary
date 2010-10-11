@@ -245,6 +245,10 @@ class RPMProvides(policy.Policy):
 
     provisionRe = re.compile('(.+?):([^()]+)\(?([^()]*)\)?')
 
+    def __init__(self, *args, **keywords):
+        policy.Policy.__init__(self, *args, **keywords)
+        self.mergeKmodSymbols = False
+
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
             name = args[1]
@@ -271,7 +275,13 @@ class RPMProvides(policy.Policy):
             self.provisions[name].addDep(
                 deps.dependencyClassesByName[depClass],
                 deps.Dependency(dep, flags))
-            policy.Policy.updateArgs(self, **keywords)
+
+        # CNY-3518: set the default for whether to merge modules --
+        # this should be passed in only from RPMRequires
+        if '_mergeKmodSymbols' in keywords:
+            self.mergeKmodSymbols = keywords.pop('_mergeKmodSymbols')
+
+        policy.Policy.updateArgs(self, **keywords)
 
 
     def do(self):
@@ -281,7 +291,7 @@ class RPMProvides(policy.Policy):
             if capsule and capsule[0] == 'rpm':
                 path = capsule[1]
                 h = rpmhelper.readHeader(file(path))
-                prov = h.getProvides()
+                prov = h.getProvides(mergeKmodSymbols=self.mergeKmodSymbols)
                 comp[1].provides.union(prov)
 
                 if self.provisions:
@@ -345,6 +355,7 @@ class RPMRequires(policy.Policy):
         self.excepts = set()
         self.requirements = {}
         self.filters = []
+        self.mergeKmodSymbols = False
 
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
@@ -394,6 +405,11 @@ class RPMRequires(policy.Policy):
             else:
                 self.exceptDeps.append(exceptDeps)
 
+        # CNY-3518: set the default for whether to merge modules
+        if 'mergeKmodSymbols' in keywords:
+            self.mergeKmodSymbols = keywords.pop('mergeKmodSymbols')
+            self.recipe.RPMProvides(_mergeKmodSymbols=self.mergeKmodSymbols)
+
         policy.Policy.updateArgs(self, **keywords)
 
     def preProcess(self):
@@ -426,7 +442,7 @@ class RPMRequires(policy.Policy):
                     continue
 
                 h = rpmhelper.readHeader(file(path))
-                rReqs, rProv = h.getDeps()
+                rReqs, rProv = h.getDeps(mergeKmodSymbols=self.mergeKmodSymbols)
 
                 # integrate user specified requirements
                 if self.requirements:

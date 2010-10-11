@@ -1432,6 +1432,7 @@ class _SingleGroup(object):
         return self.size
 
     def addScript(self, scriptName, contents, fromClass):
+        assert(hasattr(self, scriptName))
         if getattr(self, scriptName, None) is not None:
             raise RecipeFileError('script already set for group %s'
                                         % self.name)

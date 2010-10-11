@@ -101,6 +101,21 @@ class TroveNotFound(ConaryError):
     No trove was found or the match parameters were incorrectly specified.
     """
 
+class TroveSpecsNotFound(ConaryError):
+    """
+    Just like TroveNotFound, but takes TroveSpecs instead of arbitrary
+    strings.
+    """
+    def __init__(self, specList):
+        self.specList = specList
+
+    def __str__(self):
+        return ' '.join([ "No troves found matching:" ] + [
+                          item.asString() for item in self.specList ])
+
+    __repr__ = __str__
+
+
 class LatestRequired(TroveNotFound):
     """Returned from findTrove when flavor filtering results in an old trove"""
     def __init__(self, requireData):

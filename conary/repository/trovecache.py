@@ -26,14 +26,16 @@ class TroveCache(trovesource.AbstractTroveSource):
     depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
     depCacheFileId = '\0' * 40
 
-    troveInfoPathId = 'SYSTEM-MODEL-TROVEINFO-CACHE----'
-    troveInfoFileId = '\0' * 40
+    depSolutionsPathId = 'SYSTEM-MODEL-DEPENDENCY-SOLUTION'
+    depSolutionsFileId = '\0' * 40
 
     def __init__(self, troveSource):
         self.troveInfoCache = {}
         self.depCache = {}
+        self.depSolutionCache = {}
         self.cache = {}
         self.troveSource = troveSource
+        self._startingSizes = (0, 0, 0)
 
     def _addToCache(self, troveTupList, troves, _cached = None):
         for troveTup, trv in izip(troveTupList, troves):
@@ -61,6 +63,12 @@ class TroveCache(trovesource.AbstractTroveSource):
                                             callback = self.callback)
 
         self._addToCache(troveTupList, troves, _cached = _cached)
+
+    def addDepSolution(self, sig, depSet, result):
+        self.depSolutionCache[(sig, depSet)] = list(result)
+
+    def getDepSolution(self, sig, depSet):
+        return self.depSolutionCache.get( (sig, depSet), None )
 
     def getDepsForTroveList(self, troveTupList):
         # look in the dep cache and trove cache
@@ -188,7 +196,23 @@ class TroveCache(trovesource.AbstractTroveSource):
                         (deps.ThawDependencySet(frzDeps[0]),
                          deps.ThawDependencySet(frzDeps[1]))
 
-        self._startingSizes = ( len(self.cache), len(self.depCache) )
+        contType, depSolutions = cs.getFileContents(
+                           self.depSolutionsPathId, self.depSolutionsFileId)
+        pickled = depSolutions.get().read()
+        depSolutionsList = cPickle.loads(pickled)
+
+        for (sig, depSet, aResult) in depSolutionsList:
+            depSet = deps.ThawDependencySet(depSet)
+            allResults = []
+            for resultList in aResult:
+                allResults.append( [ (x[0], versions.VersionFromString(x[1]),
+                                     deps.ThawFlavor(x[2]) )
+                                    for x in resultList ] )
+
+            self.addDepSolution(sig, depSet, allResults)
+
+        self._startingSizes = ( len(self.cache), len(self.depCache),
+                                len(self.depSolutionCache) )
 
     def save(self, path):
         cs = changeset.ChangeSet()
@@ -203,27 +227,24 @@ class TroveCache(trovesource.AbstractTroveSource):
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(depStr), False)
 
-        troveInfoDict = {}
-        for infoType, infoCache in self.troveInfoCache.iteritems():
-            for troveTup, troveInfo in infoCache.iteritems():
-                if troveInfo is None:
-                    frz = None
-                else:
-                    frz = troveInfo.freeze()
-                    troveInfoDict.setdefault(troveTup, []).append(
-                                                (infoType, frz))
+        depSolutions = []
+        for (sig, depSet), aResult in self.depSolutionCache.iteritems():
+            allResults = []
 
-        finalTroveInfoDict = dict(
-                ((x[0], x[1].asString(), x[2].freeze()), infoDict) for
-                x, infoDict in troveInfoDict.iteritems() )
-        troveInfoStr = cPickle.dumps(finalTroveInfoDict)
+            for resultList in aResult:
+                allResults.append([ (x[0], x[1].asString(), x[2].freeze()) for
+                                     x in resultList ])
 
-        cs.addFileContents(self.troveInfoPathId, self.troveInfoFileId,
+            depSolutions.append( (sig, depSet.freeze(), allResults) )
+        depSolutionsStr = cPickle.dumps(depSolutions)
+
+        cs.addFileContents(self.depSolutionsPathId, self.depSolutionsFileId,
                            changeset.ChangedFileTypes.file,
-                           filecontents.FromString(troveInfoStr), False)
+                           filecontents.FromString(depSolutionsStr), False)
 
         (_, cacheName) = tempfile.mkstemp(prefix=os.path.basename(path)+'.',
                                           dir=os.path.dirname(path))
+
 
         try:
             cs.writeToFile(cacheName)

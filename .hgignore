@@ -4,4 +4,8 @@
 conary/constants.py$
 conary/pysqlite3/build
 conary/sqlite3
+# These are auto-generated stubs that must not be checked in:
+^conary/(commit|cscmd|fmtroves|metadata|query|queryrep|rollbacks|showchangeset|updatecmd|verify|branch|clone|cvc).py$
 NEWS.html
+# epydoc:
+^html/

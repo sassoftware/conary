@@ -34,17 +34,16 @@ from conary import conaryclient
 from conary import trovetup
 from conary import versions
 from conary.lib import log, util
-from conary.repository import searchsource
 
 # The schema for a system model is, roughly:
 #
 # searchPath := list of troveTuples|labels
 # systemItems := list of troveOperations
-# troveOperations := updateTroves | eraseTroves | installTroves | replaceTroves
+# troveOperations := updateTroves | eraseTroves | installTroves | patchTroves
 # updateTroves := list of troveTuples
 # eraseTroves := list of troveTuples
 # installTroves := list of troveTuples
-# replaceTroves := list of troveTuples
+# patchTroves := list of troveTuples
 
 
 def shellStr(s):
@@ -132,14 +131,14 @@ class EraseTroveOperation(TroveOperation):
 class InstallTroveOperation(TroveOperation):
     key = 'install'
 
-class ReplaceTroveOperation(TroveOperation):
-    key = 'replace'
+class PatchTroveOperation(TroveOperation):
+    key = 'patch'
 
 troveOpMap = {
     UpdateTroveOperation.key  : UpdateTroveOperation,
     EraseTroveOperation.key   : EraseTroveOperation,
     InstallTroveOperation.key : InstallTroveOperation,
-    ReplaceTroveOperation.key : ReplaceTroveOperation,
+    PatchTroveOperation.key   : PatchTroveOperation,
 }
 
 class SystemModel:
@@ -150,7 +149,7 @@ class SystemModel:
     UpdateTroveOperation = UpdateTroveOperation
     EraseTroveOperation = EraseTroveOperation
     InstallTroveOperation = InstallTroveOperation
-    ReplaceTroveOperation = ReplaceTroveOperation
+    PatchTroveOperation = PatchTroveOperation
 
     def __init__(self, cfg):
         self.searchPath = []
@@ -260,7 +259,7 @@ class SystemModelText(SystemModel):
         update troveSpec+
         erase troveSpec+
         install troveSpec+
-        replace troveSpec+
+        patch troveSpec+
 
     C{search} lines take a single troveSpec or label, which B{may} be
     enclosed in single or double quote characters.  Each C{search}
@@ -268,12 +267,12 @@ class SystemModelText(SystemModel):
     configuration item is implicitly appended to the specified
     C{searchPath}.
 
-    C{update}, C{erase}, C{install}, and C{replace} lines take
+    C{update}, C{erase}, C{install}, and C{patch} lines take
     one or more troveSpecs, which B{may} be enclosed in single
     or double quote characters, unless they contain characters
     that may be specially interpreted by a POSIX shell, in
     which case they B{must} be enclosed in quotes.  Each item
-    updated, installed, or replaced is C{prepended} to the search
+    updated, installed, or patch is C{prepended} to the search
     path used for C{subsequent} items, if it is not found explicitly
     via previous search path items.
 
