@@ -1384,15 +1384,18 @@ conary erase '%s=%s[%s]'
         oldTroves = [ (idx, (x[0], x[1][0], x[1][1]))
                         for idx, x in jobSet if x[1][0] ]
         pathHashesNeeded = [ x for (idx, x) in oldTroves
-                                    if x not in pathHashCache ]
-        newPathHashes = self.db.getPathHashesForTroveList(pathHashesNeeded)
-        pathHashCache.update(itertools.izip(pathHashesNeeded, newPathHashes))
-        oldJobs = [ (jobSet[idx], pathHashCache[info])
+                                    if x not in pathHashCache and
+                                    not trove.troveIsCollection(x[0]) ]
+        oldPathHashes = self.db.getPathHashesForTroveList(pathHashesNeeded)
+        pathHashCache.update(itertools.izip(pathHashesNeeded, oldPathHashes))
+        oldJobs = [ (jobSet[idx], pathHashCache.get(info, None))
                                     for (idx, info) in oldTroves ]
 
         getHashes = troveSource.getPathHashesForTroveList
-        newJobs = ((x, getHashes([(x[1][0], x[1][2][0], x[1][2][1])])[0])
-                   for x in jobSet if x[1][2][0])
+        justNewJobs = [ x for x in jobSet if x[1][2][0] ]
+        newTroves = [ (x[1][0], x[1][2][0], x[1][2][1]) for x in justNewJobs ]
+        newJobs = ( (x, hashes) for x, hashes in
+                        itertools.izip(justNewJobs, getHashes(newTroves)) )
 
         for ((idx, job), pathHashes) in itertools.chain(oldJobs, newJobs):
             if pathHashes is None:

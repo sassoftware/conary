@@ -16,10 +16,14 @@ import os
 
 from conary import errors
 from conary import state
+from conary import trovetup
 from conary.deps import deps
 from conary.lib import log, cfgtypes, api
 from conary.repository import changeset
 from conary.repository.filecontainer import BadContainer
+
+# For API compatibility:
+TroveSpecError = errors.TroveSpecError
 
 @api.publicApi
 def parseTroveSpec(specStr, allowEmptyName = True, withFrozenFlavor = False):
@@ -41,37 +45,8 @@ def parseTroveSpec(specStr, allowEmptyName = True, withFrozenFlavor = False):
 
     @raise TroveSpecError: Raised if the input string is not a valid TroveSpec
     """
-    origSpecStr = specStr
-    # CNY-3219: strip leading and trailing whitespaces around job
-    # specification
-    specStr = specStr.strip()
-    if specStr.find('[') > 0 and specStr[-1] == ']':
-        specStr = specStr[:-1]
-        l = specStr.split('[')
-        if len(l) != 2:
-            raise TroveSpecError(origSpecStr, "bad flavor spec")
-        specStr, flavorSpec = l
-        if withFrozenFlavor:
-            flavor = deps.ThawFlavor(flavorSpec)
-        else:
-            flavor = deps.parseFlavor(flavorSpec)
-        if flavor is None:
-            raise TroveSpecError(origSpecStr, "bad flavor spec")
-    else:
-        flavor = None
-
-    if specStr.find("=") >= 0:
-        l = specStr.split("=")
-        if len(l) != 2:
-            raise TroveSpecError(origSpecStr, "Too many ='s")
-        name, versionSpec = l
-    else:
-        name = specStr
-        versionSpec = None
-    if not name and not allowEmptyName:
-        raise TroveSpecError(origSpecStr, 'Trove name is required')
-
-    return (name, versionSpec, flavor)
+    return trovetup.TroveSpec(specStr,
+        allowEmptyName=allowEmptyName, withFrozenFlavor=withFrozenFlavor)
 
 def _getChangeSet(path):
         try:
@@ -298,11 +273,6 @@ def askYn(prompt, default=None):
             return default
         else:
             print "Unknown response '%s'." % resp
-
-class TroveSpecError(errors.ParseError):
-    def __init__(self, spec, error):
-        self.spec = spec
-        errors.ParseError.__init__(self, 'Error with spec "%s": %s' % (spec, error))
 
 def setContext(cfg, context=None, environ=None, searchCurrentDir=False):
     if environ is None:

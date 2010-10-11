@@ -51,6 +51,13 @@ class ParseError(ConaryError):
     """Base class for errors parsing input"""
     pass
 
+class TroveSpecError(ParseError):
+    """Error parsing a trove spec (parseTroveSpec or TroveSpec)"""
+    # Part of the conaryclient.cmdline.parseTroveSpec API
+    def __init__(self, spec, error):
+        self.spec = spec
+        ParseError.__init__(self, 'Error with spec "%s": %s' % (spec, error))
+
 class VersionStringError(ConaryError):
     """Base class for other version string specific error"""
     pass
@@ -93,6 +100,21 @@ class TroveNotFound(ConaryError):
     """
     No trove was found or the match parameters were incorrectly specified.
     """
+
+class TroveSpecsNotFound(ConaryError):
+    """
+    Just like TroveNotFound, but takes TroveSpecs instead of arbitrary
+    strings.
+    """
+    def __init__(self, specList):
+        self.specList = specList
+
+    def __str__(self):
+        return ' '.join([ "No troves found matching:" ] + [
+                          item.asString() for item in self.specList ])
+
+    __repr__ = __str__
+
 
 class LatestRequired(TroveNotFound):
     """Returned from findTrove when flavor filtering results in an old trove"""
