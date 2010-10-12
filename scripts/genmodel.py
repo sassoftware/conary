@@ -84,7 +84,7 @@ modelupdate.SysModelFindAction = TrackFindAction
 
 def buildJobs(client, cache, model):
     print "====== Candidate model " + "=" * 55
-    print "\t" + "\n\t".join(x[:-1] for x in model.iterFormat())
+    print "\t" + "\n\t".join(model.iterFormat())
 
     TrackFindAction.findMap = {}
     updJob = client.newUpdateJob()
@@ -258,7 +258,7 @@ def initialRedHatModel(client, model):
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
 
-    print "\t" + "\n\t".join(x[:-1] for x in model.iterFormat())
+    print "\t" + "\n\t".join(model.iterFormat())
 
     return mainLabels
 
@@ -548,7 +548,7 @@ if __name__ == '__main__':
 
     print "----"
     print "Final Model"
-    print "\t" + "\n\t".join(x[:-1] for x in finalModel.iterFormat())
+    print "\t" + "\n\t".join(finalModel.iterFormat())
 
 
     answer = getAnswer('Write model to disk? [y/N]:')

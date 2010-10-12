@@ -372,6 +372,13 @@ class SystemModelText(SystemModel):
                     '%s: Unrecognized command "%s" on line %d' %(
                     fileName, verb, index))
 
+    @staticmethod
+    def _stripNewline(txt):
+        'strip any (optional) final newline'
+        while txt.endswith('\n'):
+            txt = txt[:-1]
+        return txt
+
     def iterFormat(self):
         '''
         Serialize the current model, including preserved comments.
@@ -383,7 +390,7 @@ class SystemModelText(SystemModel):
 
         # First, emit all comments without an index as "header"
         for item in (x for x in self.noOps if x.index is None):
-            yield str(item) + '\n'
+            yield str(item)
 
         for i in range(lastIndexLine+1):
             if i in self.indexes:
@@ -391,25 +398,23 @@ class SystemModelText(SystemModel):
                 for item in self.indexes[i]:
                     # normally, this list is one item long
                     if item.modified:
-                        yield str(item) + '\n'
+                        yield str(item)
                     else:
-                        yield self.filedata[i]
-                        # handle models lacking trailing newlines
-                        if self.filedata[i] and self.filedata[i][-1] != '\n':
-                            yield '\n'
+                        yield self._stripNewline(self.filedata[i])
 
             # Last, emit any remaining lines
             if i == lastSearchLine:
-                for item in (x for x in self.searchPath
-                             if x.index is None):
-                    yield str(item) + '\n'
+                for item in (x for x in self.searchPath if x.index is None):
+                    yield str(item)
             if i == lastOpLine:
-                for item in (x for x in self.systemItems
-                             if x.index is None):
-                    yield str(item) + '\n'
+                for item in (x for x in self.systemItems if x.index is None):
+                    yield str(item)
+
+        # produce the final newline
+        yield ''
 
     def format(self):
-        return ''.join(self.iterFormat())
+        return '\n'.join(self.iterFormat())
 
     def write(self, f):
         f.write(self.format())
