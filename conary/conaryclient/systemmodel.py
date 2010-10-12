@@ -379,9 +379,6 @@ class SystemModelText(SystemModel):
         lastSearchLine = max([x.index for x in self.searchPath] + [0])
         lastNoOpLine = max([x.index for x in self.noOps] + [0])
         lastOpLine = max([x.index for x in self.systemItems] + [0])
-        newSearchItems = [x for x in self.searchPath if x.index is None]
-        newOperations = [x for x in self.systemItems if x.index is None]
-        newNoOps = [x for x in self.systemItems if x.index is None]
         lastIndexLine = max(lastSearchLine, lastOpLine, lastNoOpLine)
 
         # First, emit all comments without an index as "header"
