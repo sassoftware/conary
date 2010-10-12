@@ -17,9 +17,6 @@ file representation of the model.  This system model is written
 explicitly in terms of labels and versions, and is interpreted
 relative to system configuration items such as installLabelPath,
 flavor, pinTroves, excludeTroves, and so forth.
-
-If an installLabelPath is provided in the configuration, it is
-implicitly added to the end of the search path.
 """
 
 import os
@@ -266,9 +263,8 @@ class SystemModelText(SystemModel):
 
     C{search} lines take a single troveSpec or label, which B{may} be
     enclosed in single or double quote characters.  Each C{search}
-    item B{appends} to the search path.  The C{installLabelPath}
-    configuration item is implicitly appended to the specified
-    C{searchPath}.
+    item B{appends} to the search path.  All C{search} lines must
+    precede any operations.
 
     C{update}, C{erase}, C{install}, and C{patch} lines take
     one or more troveSpecs, which B{may} be enclosed in single
@@ -322,13 +318,15 @@ class SystemModelText(SystemModel):
                 if self.systemItems:
                     # If users provide a "search" line after a trove
                     # operation, they may expect it to be evaluated
-                    # later.  Warn them that this is not actually
-                    # going to happen.  (When adding "include", then
-                    # this warning should apply only to the outmost
-                    # file, not to included files.)
-                    log.warning('%s line %d:'
-                        ' "search %s" entry follows operations,'
-                        ' though it applies to earlier operations'
+                    # later.  This is not actually going to happen,
+                    # so raise an error.  (When adding "include",
+                    # include lines will be able to follow installs,
+                    # the search lines in an included model will apply
+                    # only within that model and not to the parent
+                    # model, and the same search ordering constraint
+                    # will apply within the model.)
+                    raise SystemModelError('%s line %d: "search %s":'
+                        ' search lines must precede all operations'
                         %(fileName, index, nouns))
                 # Handle it if quoted, but it doesn't need to be
                 nouns = ' '.join(shlex.split(nouns, comments=True))
