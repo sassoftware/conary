@@ -101,19 +101,24 @@ class SearchLabel(SearchElement):
     def asString(self):
         return shellStr(str(self.item))
 
-class NoOperation(_SystemModelItem):
-    'Represents comments and blank lines'
+class _TextItem(_SystemModelItem):
     def parse(self, text):
         self.item = text
+
+    def asString(self):
+        return self.item
 
     def __repr__(self):
         return "%s(text='%s', modified=%s, index=%s)" % (
             str(self.__class__).split('.')[-1],
             self.item, self.modified, self.index)
 
-    def asString(self):
-        return self.item
-    __str__ = asString
+class NoOperation(_TextItem):
+    'Represents comments and blank lines'
+    __str__ = _TextItem.asString
+
+class VersionOperation(_TextItem):
+    key = 'version'
 
 class TroveOperation(_SystemModelItem):
     def parse(self, text):
@@ -162,6 +167,7 @@ class SystemModel:
     EraseTroveOperation = EraseTroveOperation
     InstallTroveOperation = InstallTroveOperation
     PatchTroveOperation = PatchTroveOperation
+    VersionOperation = VersionOperation
 
     def __init__(self, cfg):
         self.cfg = cfg
@@ -172,6 +178,7 @@ class SystemModel:
         self.systemItems = []
         self.noOps = []
         self.indexes = {}
+        self.version = None
         # Keep track of modifications that do not involve setting
         # an operation as modified
         self.modelModified = False
@@ -194,6 +201,15 @@ class SystemModel:
         return (self.modelModified or
                 bool([x for x in self.searchPath + self.systemItems + self.noOps
                       if x.modified]))
+
+    def setVersion(self, item):
+        self.version = item
+        self._addIndex(item)
+
+    def getVersion(self):
+        if self.version is None:
+            return self.version
+        return self.version.asString()
 
     def appendToSearchPath(self, item):
         self.searchPath.append(item)
@@ -361,6 +377,10 @@ class SystemModelText(SystemModel):
                                              modified=False, index=index)
                 self.appendToSearchPath(searchItem)
 
+            elif verb == 'version':
+                self.setVersion(
+                    VersionOperation(text=line, modified=False, index=index))
+
             elif verb in troveOpMap:
                 self.appendTroveOpByName(verb,
                     text=shlex.split(nouns, comments=True),
@@ -386,11 +406,19 @@ class SystemModelText(SystemModel):
         lastSearchLine = max([x.index for x in self.searchPath] + [0])
         lastNoOpLine = max([x.index for x in self.noOps] + [0])
         lastOpLine = max([x.index for x in self.systemItems] + [0])
-        lastIndexLine = max(lastSearchLine, lastOpLine, lastNoOpLine)
+        # can only be one version
+        if self.version is not None:
+            verLine = self.version.index
+        else:
+            verLine = 0
+        lastIndexLine = max(lastSearchLine, lastOpLine, lastNoOpLine, verLine)
 
         # First, emit all comments without an index as "header"
         for item in (x for x in self.noOps if x.index is None):
             yield str(item)
+        # Now, emit the version if it is new (has no index)
+        if self.version is not None and self.version.index is None:
+            yield str(self.version)
 
         for i in range(lastIndexLine+1):
             if i in self.indexes:
