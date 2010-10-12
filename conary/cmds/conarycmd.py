@@ -1182,12 +1182,14 @@ class UpdateAllCommand(_UpdateCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = { 'systemModel': False }
+        kwargs['restartInfo'] = argSet.pop('restart-info', None)
+
         model = systemmodel.SystemModelText(cfg)
         modelFile = systemmodel.SystemModelFile(model)
         if modelFile.exists():
             kwargs['systemModel'] = model
             kwargs['systemModelFile'] = modelFile
-            if modelFile.snapshotExists():
+            if modelFile.snapshotExists() and kwargs['restartInfo'] is None:
                 log.error('The previous update was aborted; resume with "conary sync" or revert with "conary rollback 1"')
                 return 1
 
@@ -1228,7 +1230,6 @@ class UpdateAllCommand(_UpdateCommand):
 
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
-        kwargs['restartInfo'] = argSet.pop('restart-info', None)
 
         kwargs['checkPathConflicts'] = \
                                 not argSet.pop('no-conflict-check', False)
