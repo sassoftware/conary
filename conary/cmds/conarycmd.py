@@ -1063,7 +1063,8 @@ class _UpdateCommand(ConaryCommand):
             if otherArgs[1] == 'sync' and len(otherArgs) > 2:
                 log.error('The "sync" command cannot take trove arguments with a system model')
                 return 1
-            if otherArgs[1] != 'sync' and modelFile.snapshotExists():
+            if (otherArgs[1] != 'sync' and modelFile.snapshotExists()
+                and kwargs['restartInfo'] is None):
                 log.error('The previous update was aborted; resume with "conary sync" or revert with "conary rollback 1"')
                 return 1
             if otherArgs[1] == 'migrate':
