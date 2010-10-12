@@ -59,7 +59,7 @@ class _SystemModelItem:
         self.index = index
         assert(text is not None or item is not None)
         assert(not(text is None and item is None))
-        if item:
+        if item is not None:
             self.item = item
         else:
             self.parse(text=text)
@@ -100,6 +100,20 @@ class SearchLabel(SearchElement):
 
     def asString(self):
         return shellStr(str(self.item))
+
+class NoOperation(_SystemModelItem):
+    'Represents comments and blank lines'
+    def parse(self, text):
+        self.item = text
+
+    def __repr__(self):
+        return "%s(text='%s', modified=%s, index=%s)" % (
+            str(self.__class__).split('.')[-1],
+            self.item, self.modified, self.index)
+
+    def asString(self):
+        return self.item
+    __str__ = asString
 
 class TroveOperation(_SystemModelItem):
     def parse(self, text):
@@ -143,6 +157,7 @@ class SystemModel:
     # need to import this module when a model is provided
     SearchTrove = SearchTrove
     SearchLabel = SearchLabel
+    NoOperation = NoOperation
     UpdateTroveOperation = UpdateTroveOperation
     EraseTroveOperation = EraseTroveOperation
     InstallTroveOperation = InstallTroveOperation
@@ -155,6 +170,7 @@ class SystemModel:
     def reset(self):
         self.searchPath = []
         self.systemItems = []
+        self.noOps = []
         self.indexes = {}
         # Keep track of modifications that do not involve setting
         # an operation as modified
@@ -176,12 +192,19 @@ class SystemModel:
 
     def modified(self):
         return (self.modelModified or
-                bool([x for x in self.searchPath + self.systemItems
+                bool([x for x in self.searchPath + self.systemItems + self.noOps
                       if x.modified]))
 
     def appendToSearchPath(self, item):
         self.searchPath.append(item)
         self._addIndex(item)
+
+    def appendNoOperation(self, item):
+        self.noOps.append(item)
+        self._addIndex(item)
+
+    def appendNoOpByText(self, text, **kwargs):
+        self.appendNoOperation(NoOperation(text, **kwargs))
 
     def appendTroveOp(self, op, deDup=True):
         # First, remove trivially obvious duplication -- more
@@ -271,7 +294,7 @@ class SystemModelText(SystemModel):
     or double quote characters, unless they contain characters
     that may be specially interpreted by a POSIX shell, in
     which case they B{must} be enclosed in quotes.  Each item
-    updated, installed, or patch is C{prepended} to the search
+    updated, installed, or patched is C{prepended} to the search
     path used for C{subsequent} items, if it is not found explicitly
     via previous search path items.
 
@@ -304,7 +327,7 @@ class SystemModelText(SystemModel):
                 # empty lines are handled just like comments, and empty
                 # lines and comments are always looked up in the
                 # unmodified filedata, so we store only the index
-                self.commentLines.append(index)
+                self.appendNoOpByText(line, modified=False, index=index)
                 continue
 
             # non-empty, non-comment lines must be parsed 
@@ -353,21 +376,21 @@ class SystemModelText(SystemModel):
         '''
         Serialize the current model, including preserved comments.
         '''
-        commentLines = list(self.commentLines) # copy
-
         lastSearchLine = max([x.index for x in self.searchPath] + [0])
+        lastNoOpLine = max([x.index for x in self.noOps] + [0])
         lastOpLine = max([x.index for x in self.systemItems] + [0])
         newSearchItems = [x for x in self.searchPath if x.index is None]
         newOperations = [x for x in self.systemItems if x.index is None]
-        lastIndexLine = max(lastSearchLine, lastOpLine, max(commentLines + [0]))
+        newNoOps = [x for x in self.systemItems if x.index is None]
+        lastIndexLine = max(lastSearchLine, lastOpLine, lastNoOpLine)
+
+        # First, emit all comments without an index as "header"
+        for item in (x for x in self.noOps if x.index is None):
+            yield str(item) + '\n'
 
         for i in range(lastIndexLine+1):
-            # First, emit all prior comments in order
-            while commentLines and commentLines[0] <= i:
-                yield self.filedata[commentLines.pop(0)]
-
             if i in self.indexes:
-                # Next, emit all the specified lines
+                # Emit all the specified lines
                 for item in self.indexes[i]:
                     # normally, this list is one item long
                     if item.modified:
