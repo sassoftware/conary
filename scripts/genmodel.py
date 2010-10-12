@@ -205,15 +205,21 @@ def initialForesightModel(installedTroves, model):
         if not includedElsewhere:
             groupTroves.append(trv)
 
+    trv = None
     if ('group-gnome-dist' in [ x[0] for x in allGroupTups ]):
         trv = [ x for x in allGroupTroves
                     if x.getName() == 'group-gnome-dist' ][0]
+    elif ('group-kde-dist' in [ x[0] for x in allGroupTups ]):
+        trv = [ x for x in allGroupTroves
+                    if x.getName() == 'group-kde-dist' ][0]
+    if trv:
         model.appendToSearchPath(systemmodel.SearchTrove(
                 item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                  str(trv.getFlavor()) ) ) )
-        model.appendToSearchPath(systemmodel.SearchTrove(
-                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
-                                 'is:x86' ) ))
+        if 'x86_64' in str(trv.getFlavor()):
+            model.appendToSearchPath(systemmodel.SearchTrove(
+                    item = TroveSpec('group-world', fmtVer(trv.getVersion()),
+                                     'is:x86' ) ))
         mainLabels.add(trv.getVersion().trailingLabel().asString())
 
     for trv in groupTroves:
@@ -475,19 +481,43 @@ if __name__ == '__main__':
     finalJob, uJob = buildJobs(client, cache, finalModel)
     assert(set(finalJob) == set(candidateJob))
 
-    print "----"
-    print "Final Model"
-    print "\t" + "\n\t".join(x[:-1] for x in finalModel.iterFormat())
+    # Add comments to the model itself
+    for commentline in (
+        'This file is an attempt to describe an existing system.',
+        'It is intended to describe the "meaning" of the installed system.',
+        '',
+        'After this file is installed as /etc/conary/system-model any',
+        'following conary update/install/erase operations will be done',
+        'by modifying this file, then building a representation of the',
+        'new desired state of your local system described in the modified',
+        'file, and then updating your system to that new state.',
+        '',
+        'It is reasonable to edit this file with a text editor.',
+        'Conary will preserve whole-line comments (like this one)',
+        'when it edits this file, so you may use comments to describe',
+        'the purpose of your modifications.',
+        '',
+        'After you edit this file, run the command',
+        '  conary sync',
+        'This command will move your system to the state you have',
+        'described by your edits to this file, or will tell you',
+        'about errors you have introduced so that you can fix them.',
+        '',
+        'The "search" lines are read in order.  For this reason, you',
+        'may see packages on "search" lines of their own before you',
+        'see the main groups that describe the core of your system.',
+        'This means that those packages will be preferred when you',
+        'search for them.  Troves that are installed',
+        '',
+        'The "install" and "update" lines are relative only to things',
+        'mentioned earlier in this model, not relative to what has been',
+        'previously installed on your system.',
+        '',
+        ):
+        finalModel.appendNoOpByText('# %s' % commentline, modified=False)
 
     if finalJob:
-        print
-        print "The following additional operations would be needed to make the"
-        print "system match the model, and would be applied to the system by "
-        print 'a "conary sync" operation:'
-
         from conary.cmds import updatecmd
-
-        # save the data in case we are going to email it
         sys.stdout.flush()
         outfd, outfn = tempfile.mkstemp()
         os.unlink(outfn)
@@ -504,11 +534,30 @@ if __name__ == '__main__':
         f = os.fdopen(outfd, 'r')
         jobData = f.read()
         f.close()
-        sys.stdout.write(jobData)
+        for commentline in [
+            'Some of the troves on this system are not represented in the',
+            'following model, most likely because they appear to have been',
+            'included only to satisfy dependencies.  Please review the',
+            'following data and edit the system model to represent the',
+            'troves that you wish to have installed on your system.',
+            '',
+            'The following additional operations would be needed to make the',
+            'system match the model, and would be applied to the system by ',
+            'a "conary sync" operation:'] + jobData.split('\n') + ['']:
+            finalModel.appendNoOpByText('# %s' % commentline, modified=False)
+
+    print "----"
+    print "Final Model"
+    print "\t" + "\n\t".join(x[:-1] for x in finalModel.iterFormat())
+
 
     answer = getAnswer('Write model to disk? [y/N]:')
     if answer and answer[0].lower() == 'y':
-        smf = systemmodel.SystemModelFile(finalModel)
+        # SystemModelFile wants to parse -- don't let it, in case we are
+        # testing on a system that already has a model defined...
+        tempModel = systemmodel.SystemModelText(cfg)
+        smf = systemmodel.SystemModelFile(tempModel)
+        smf.model = finalModel
         try:
             smf.write()
             print 'model written to %s' % smf.fileName
