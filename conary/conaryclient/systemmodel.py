@@ -431,11 +431,8 @@ class SystemModelText(SystemModel):
                 for item in (x for x in self.systemItems if x.index is None):
                     yield str(item)
 
-        # produce the final newline
-        yield ''
-
     def format(self):
-        return '\n'.join(self.iterFormat())
+        return '\n'.join([x for x in self.iterFormat()] + [''])
 
     def write(self, f):
         f.write(self.format())
