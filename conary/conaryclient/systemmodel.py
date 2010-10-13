@@ -392,13 +392,6 @@ class SystemModelText(SystemModel):
                     '%s: Unrecognized command "%s" on line %d' %(
                     fileName, verb, index))
 
-    @staticmethod
-    def _stripNewline(txt):
-        'strip any (optional) final newline'
-        while txt.endswith('\n'):
-            txt = txt[:-1]
-        return txt
-
     def iterFormat(self):
         '''
         Serialize the current model, including preserved comments.
@@ -428,7 +421,7 @@ class SystemModelText(SystemModel):
                     if item.modified:
                         yield str(item)
                     else:
-                        yield self._stripNewline(self.filedata[i])
+                        yield self.filedata[i].rstrip('\n')
 
             # Last, emit any remaining lines
             if i == lastSearchLine:
