@@ -1,3 +1,72 @@
+Changes in 2.1.23:
+  o New Features:
+    * Support "data.tar.lzma" in .deb files (CNY-3491)
+    * respect RPM's _netsharedpath macro during capsule handling
+      (CNY-3503)
+
+  o Bug Fixes:
+    * Derived packages now work with packages containing shared files
+      and and ghost files. (RBLD-335)
+    * A bug introduced in Conary 2.1.21 that prevented `cvc promote`
+      from functioning has been corrected. (CNY-3490)
+
+Changes in 2.1.22:
+  o Bug Fixes:
+    * A bug introduced in Conary 2.1.21 that prevented `cvc cook` from
+      functioning has been corrected. (CNY-3490)
+    * Fix an inconsistency between Conary and RPM databases when RPM
+      fails to install a requested package. (CNY-3488)
+    * Rewrite derived package shadow creation code because the previous
+      attempt to support capsules was fragile and frankly a bad idea.
+      (RBLD-326)
+    * Fix exception when doing a repository cook when the recipe sources
+      a multiurl of mirrors. (CNY-3485)
+
+Changes in 2.1.21:
+  o New Features:
+    * The --no-recurse option is now allowed with the "conary migrate"
+      command. This can be used to rebuild a system from a manifest
+      file.
+    * A no-scripts option has been added.  If set, capsule scripts,
+      trove scripts, and tag scripts are skipped during an update.
+      (CNY-3452)
+    * Conary now records in /var/log/conary the order in which RPM
+      chooses to install encapsulated RPMs. (CNY-3460)
+    * When RPM fails to unpack a package when being invoked as non-root,
+      Conary will now warn about the failure but will not fail the
+      entire transaction. (CNY-3462)
+    * Conary now validates RPM capsule operations against the RPM
+      database as early as possible to flag errors when they occur.
+      (CNY-3455)
+
+  o Bug Fixes:
+    * Make negative openpgp key cache entries to avoid repeated server
+      queries for keys which don't exist (CNY-3450) (CNY-3450)
+    * Process directory creation for other file types (CNY-3451)
+    * Fixed a repository crash when converting a cached changeset for an
+      older client. (CNY-3453)
+    * The getCapsulesTroveList function was restored to sqldb for use in
+      recreatedb.
+    * Fixed signing of packages with pycrypto 2.1 (CNY-3465)
+    * Fixed a bug which caused an internal server error when the same
+      trove permission was applied to more than two roles. (CNY-3469)
+    * When multiple installed conary components shared an underlying RPM
+      capsule removing one of those components would result in the
+      conary database becoming out of sync with the rpm database
+      (CNY-3470)
+    * Changesets can contain shared files where one is a diff and the
+      other is not. The diff will be used (CNY-3483)
+
+  o Internal Changes:
+    * Hotspot profiling hooks have been removed. (CNY-3250)
+    * added cksig script for verifying (and fixing) signatures in a
+      repository
+    * Add argument to the API for cooking troves to allow someone to
+      specify a changeset file instead of committing the changeset to
+      the repository. (CNY-3466)
+    * The transport layer is now handling network errors more reliably.
+      (CNY-3429)
+
 Changes in 2.1.20:
   o Bug Fixes:
     * Injector code for relative changesets creates the new trove once

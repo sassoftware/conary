@@ -618,6 +618,9 @@ class addArchive(_Source):
                 elif debData.endswith('.xz'):
                     _uncompress = "xz -d -c"
                     actionPathBuildRequires.append('xz')
+                elif debData.endswith('.lzma'):
+                    _uncompress = "xz -d -c"
+                    actionPathBuildRequires.append('xz')
                 else:
                     # data.tar?  Alternatively, yet another
                     # compressed format that we need to add

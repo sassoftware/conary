@@ -31,7 +31,7 @@ from conary.lib import util
 from conary import callbacks
 from conary.build.mirror import Mirror
 from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
-
+from conary.repository import transport
 
 NETWORK_SCHEMES = ('http', 'https', 'ftp', 'mirror')
 
@@ -87,24 +87,31 @@ class laUrl(object):
     def __str__(self):
         return self.asStr()
 
-    def filePath(self, useParentPath=True):
+    def __repr__(self):
+        return "<%s.%s instance at %#x; url=%s>" % (
+            self.__class__.__module__, self.__class__.__name__,
+            id(self), self.asStr())
+
+    def getHostAndPath(self, useParentPath=True):
         if self.parent and useParentPath:
-            fragment = self.parent.fragment or ''
-            port = self.parent.port or ''
-            path = self.parent.path + (self.parent.params and '?%s'
-                                       % self.parent.params or '')
-            host = self.parent.host
-        else:
-            fragment = self.fragment or ''
-            port = self.port or ''
-            path = self.path + (self.params and '?%s' % self.params or '')
-            host = self.host
+            return self.parent.getHostAndPath()
+
+        host = self.host
+        if self.port:
+            host = self.host + ":" + str(self.port)
+        path = self.path + (self.params and '?%s'
+                            % self.params or '')
+        fragment = self.fragment
+
+        return (host, path, fragment)
+
+    def filePath(self, useParentPath=True):
+        (host, path, fragment) = self.getHostAndPath(useParentPath)
+
         if self.extension:
             path += '.' + self.extension
         if fragment:
             path += "#" + fragment
-        if port and host:
-            host += host + ":" + str(port)
 
         path = path.replace('/../', '/_../')
         if path[0] == '/':
@@ -347,9 +354,11 @@ class FileFinder(object):
         if isinstance(url, str):
             url = laUrl(url)
 
-        retries = 0
+        retries = 3
+        if self.cfg.proxy and not self.noproxyFilter.bypassProxy(url.host):
+            retries = 7
         inFile = None
-        while retries < 5:
+        for i in range(retries):
             try:
                 # set up a handler that tracks cookies to handle
                 # sites like Colabnet that want to set a session cookie
@@ -402,7 +411,7 @@ class FileFinder(object):
             except socket.error, err:
                 num, msg = err
                 if num == errno.ECONNRESET:
-                    log.info('Connection Reset by FTP server'
+                    log.info('Connection Reset by server'
                              'while retrieving %s.'
                              '  Retrying in 10 seconds.', urlStr, msg)
                     time.sleep(10)

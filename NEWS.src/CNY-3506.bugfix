@@ -1,0 +1,2 @@
+Platforms which we need to support rpm's netsharedpath don't necessarily have
+expandMacro in their python module; add our own binding in misc.c

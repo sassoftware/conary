@@ -11,25 +11,21 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-import itertools
 import os
 import pickle
 
 #conary imports
 from conary import conarycfg, errors, metadata, rollbacks, trove
-from conary.conaryclient import clone, resolve, update, filetypes, callbacks, mirror
+from conary.conaryclient import clone, cmdline, password, resolve, update
 from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
-from conary.repository import trovesource
 from conary.repository import searchsource
 from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
-from conary.conaryclient import cmdline
 from conary.conaryclient.clone import ClientClone
-from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
 from conary.conaryclient.newtrove import ClientNewTrove
 
@@ -95,7 +91,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         if not resolverClass:
             resolverClass = resolve.DependencySolver
 
-        self.resolver = resolverClass(self, cfg, self.repos, self.db)
+        self.resolver = resolverClass(self, cfg, self.db)
 
         # Set up the callbacks for the PGP key cache
         keyCache = openpgpkey.getKeyCache()
@@ -166,7 +162,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
                 cacheFp = open(cacheFile, "r")
                 cache = pickle.load(cacheFp)
                 cacheFp.close()
-            except IOError, EOFError:
+            except (IOError, EOFError):
                 if cacheOnly:
                     return {}
             else:
