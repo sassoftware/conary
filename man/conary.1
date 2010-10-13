@@ -30,6 +30,38 @@ what is installed on the system, is based on a text file called
 /etc/conary/system-model, which is modified by conary commands, but
 can also be modified by an administrator.
 
+The \fBsystem model\fP mode is intended to become the normal update
+mode for Conary-based systems in the future.  It works by creating a
+set of troves that define the system, and then moving the system to
+that definition.  It is conceptually similar to building a group into
+a repository and then migrating to that group.  Significant differences
+include:
+.IP -
+In a group, all trove references are absolute, but in a model, you
+can choose whether references are absolute.  Migrating to a specific
+version of a group will always move the system to the exact set of
+packages referenced, but re-applying a system model will update
+troves that are not pinned down to a specific version.
+.IP -
+There is no group name for the set of troves.
+.IP -
+There is no version for the set of troves.  (The \fBversion\fP
+operation in a system model does not provide conary versioning.)
+.IP -
+Path and version conflicts are not checked when assembling the set
+of troves.  (No group policy is run at all.)  This means that path
+and version conflicts will be found only while installing the packages.
+.TP 0
+
+A \fBsystem model\fP that installs only a single group will function
+similar to \fBmigrate\fP mode.  The most obvious difference is that
+\fBmigrate\fP mode honors variations in \fBbyDefault\fP settings in
+the system database (that is, an optional component of the trove(s)
+migrated to that has been installed on the system will still be
+installed after the migrate operation finishes), wherease a
+\fBsystem model\fP update honors those changes only if they are
+represented in the model itself.
+
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
@@ -64,7 +96,7 @@ Arguments include
 .B \-\-show-passwords
 Normally, conary config will mask paswords in repository maps, to avoid their
 accidental display.  You can override this masking with --show-passwords.
-.RE
+.TP 4
 .B \-\-show-lines
 Displays as comments the line number that each configuration item came
 from.  If no line is given, then that item is the default.  If an
@@ -155,7 +187,10 @@ Applies rollback \fI<identifier>\fP.  The \fI<identifier>\fP can be either
 an r.<sequence> rollback name as displayed by \fBrblist\fR, or a number.
 If an r.<sequence> rollback name is specified, the most recent rollbacks up
 to and including the one specified are applied.  If the number N is
-specified, the N most recent rollbacks are applied.
+specified, the N most recent rollbacks are applied.  If a \fBsystem
+model\fP is included in the rollback, the \fI/etc/conary/system-model\fP
+file will be \fBreplaced\fP (no merge operation is attempted) by the
+copy from the rollback stack.
 
 Arguments include
 .RS 4
@@ -182,6 +217,10 @@ If the \fItrovename\fR is preceded by a minus, the trove is erased as part
 of the operation.  If a -- is used in a troveSpec, the version and flavor
 before the -- (if any) specify the trove to erase from the local system,
 and the version and flavor after the -- (if any) specify the update version.
+
+In \fBsystem model\fP mode, the \fBconary install\fP command is the best
+way to add new troves to a system; \fBconary update\fP is normally
+used only to change the version or flavor of the trove previously installed.
 .RS 4
 .TP
 .B \-\-exclude-troves \fIregexp-list\fR
@@ -296,7 +335,8 @@ the command line and only uses the flavors you explicitly specify.
 .TP
 .B install
 The \fBconary install\fP command is an alias for \fBconary
-update \-\-keep\-existing\fR.
+update \-\-keep\-existing\fR.  In \fBsystem model\fP mode, it is
+the recommended way to add new troves to a system.
 .TP
 .B updateall
 Iterates through all the top-level troves installed on the system
@@ -356,9 +396,10 @@ and displays any differences.
 .TP 4
 .B \-\-all
 Verify all troves on the system.
+.TP 4
 .B \-\-diff
-Display changes as a git compatible diff (see \fBhttp://git-scm-com\fR for more
-information).
+Display changes as a git-compatible diff (see \fBhttp://git-scm.com\fP
+for more information).
 .TP
 .B \-\-hash
 Normally files are assumed to be unchanged if their size and mtime have
@@ -639,9 +680,8 @@ Conary also includes some more advanced update commands that should not be used 
 .B migrate [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 \fBWARNING\fP: This command is only useful in situations where a group defines 
 exactly what you wish to update your system to.  It will erase everything
-installed on your system that is not specified to be migrated to.  For this 
-reason, this command must be run with --interactive.  If you're not sure you
-want to use this command, you probably don't.
+installed on your system that is not specified to be migrated to.  If you
+are not sure you want to use this command, you probably don't.
 
 Migrate system to \fItrovename\fP so that when the migration is done, only
 the troves specified on this command line and their children are installed, and 
@@ -794,12 +834,87 @@ and can also live independently as files.
 .RE
 .TP
 .B Primary Troves in a Changeset
-The \fBprimary troves\fP in a changeset are generally the top-level troves in that changeset.  If a changeset was created by cooking a package, then the packages in the changeset are primary, but the components are not.  Similary, if looking a group changeset, then groups in that changeset that are not included in any other groups will be primary.  If the changeset was created by running \fIconary changeset foo:runtime\fP, then \fIfoo:runtime\fP will be a primary trove.
+The \fBprimary troves\fP in a changeset are generally the top-level
+troves in that changeset.  If a changeset was created by cooking
+a package, then the packages in the changeset are primary, but
+the components are not.  Similary, if looking a group changeset,
+then groups in that changeset that are not included in any other
+groups will be primary.  If the changeset was created by running
+\fIconary changeset foo:runtime\fP, then \fIfoo:runtime\fP will be
+a primary trove.
 .\"
 .\"
 .\"
 .SH FILES
 .\" do not put excess space in the file list
+.PD 0
+.TP 4
+.I /etc/conary/system-model
+If the \fI/etc/conary/system-model\fP file exists, it contains the
+system model.  In this file, Conary will preserve blank lines and
+full-line comments.  Trailing comments are not preserved when Conary
+modifies lines.  See the previous description of system models.
+The \fI/etc/conary/system-model.next\fP file is temporarily used
+during update operations that modify the system model, so that a
+failed update operation can be either reverted or resumed after
+a transient failure.
+.PD
+.RS 4
+.TP 4
+.B search \fItroveSpec\fP|\fIlabel\fP
+A \fBsearch\fP line, like an element of a \fBsearchPath\fP in a Conary
+group, lists either a label or a trove to add to the search path used for
+finding other troves in the model.  It is like \fB$PATH\fP on the command
+line in that it is searched from beginning to end, and therefore more
+specific elements should be listed first.  The \fBconary updateall\fP
+command line causes all \fItroveSpec\fPs on \fBsearch\fP lines to be
+updated to reference the most recent versions of those troves found in
+the repositories at the time the command is run.
+.TP 4
+.B install \fItroveSpec+\fP
+One or more troves to install.  If the troveSpec is incomplete, the search
+path will be used to find the troves.  That is, \fBinstall foo\fP will only
+be found via the search path; \fBinstall pkg=label\fP will install the
+flavor and version of \fBpkg\fP on \fBlabel\fP that is found on the search
+path, or the latest version of \fBpkg\fP on \fBlabel\fP if it is not found
+on the search path.
+
+Any troves listed which are not found via the search path are added to the
+\fBbeginning\fP of the search path for subsequent operations.  (This only
+works if there is enough information in the \fItroveSpec\fP to locate the
+trove.)
+
+\fBinstall\fP honors the isInstall (byDefault) settings of the troves found.
+.TP 4
+.B update \fItroveSpec+\fP
+One or more troves to update, relative to the previous trove operations
+(\fBnot\fP relative to the state of the installed system).  This will
+honor the existing isInstall (byDefault) settings of the troves being
+replaced; it is commonly used to choose a different version of a
+package (for example, an older version, newer version, or version on a
+different label).
+.TP 4
+.B erase \fItroveSpec+\fP
+Make previously-referenced troves optional.  Note that a trove erased
+from the model may still be re-introduced to the system to resolve
+dependencies.
+.TP 4
+.B patch \fItroveSpec+\fP
+One or more troves that are the source of patch information, relative
+to the previous trove operations.  These are usually groups.  This
+operation replaces conflicting versions of previously-mentioned troves,
+without adding new trove names to the set of troves to install.
+(Dependency resolution may still cause other troves from the patch
+set to be included on the system.)  This operation is intended for
+operations like applying a group that contains exactly the set of
+packages that comprise a patch/errata set, to allow the base OS version
+to remain stable while applying a specific set of required patches.
+.TP 4
+.B version \fIversionString\fP
+Currently ignored on system; may be used when importing a system
+model into a group.
+.RE
+
 .PD 0
 .TP 4
 .I /etc/conaryrc
@@ -1052,6 +1167,10 @@ Original file contents of configuration files Conary tracks.
 .I /var/lib/conarydb/rollbacks
 Changeset files representing rollbacks (listed via \fBconary
 rblist\fP).
+.I /var/lib/conarydb/manifest
+Text list of all installed troves.
+.I /var/lib/conarydb/modelcache
+Cached trove data used for system-model based updates.
 .TP
 .I /etc/conary/arch
 Directory containing architecture definition files.
@@ -1068,13 +1187,13 @@ Directory containing files that define the default behavior of ComponentSpec, th
 .\" FIXME: need a man page describing use flag definition files
 .\"
 .\"
-.\"
+
 .SH BUGS
 There are no bugs, only undocumented features.  You can report
 undocumented features at https://issues.rpath.com/
 .\"
 .\"
-.\"
+
 .SH "SEE ALSO"
 cvc(1)
 .br

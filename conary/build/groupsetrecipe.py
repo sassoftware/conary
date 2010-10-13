@@ -825,11 +825,15 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     ====
     B{C{SearchPath}} - Collection of troves in which to search
 
+    SYNOPSIS
+    ========
+    C{sp = r.SearchPath('troveSpec1', 'label1', ..., 'troveOrLabelN')}
+
     DESCRIPTION
     ===========
-    An object which searches multiple other objects in the order
-    specified.  Troves can be looked up in the result, and the
-    result can also be used for resolving dependencies.
+    An object which searches multiple other objects (troves or labels)
+    in the order specified.  Troves can be looked up in the result, and
+    the result can also be used for resolving dependencies.
 
     METHODS
     =======

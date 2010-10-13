@@ -330,7 +330,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
           references, return only those resolved references
         - C{TroveSet.packages} : Resolve trove references recursively,
           return packages
-        - C{TroveSet.replace} : Replace troves in the TroveSet with
+        - C{TroveSet.patch} : Replace troves in the TroveSet with
           matching-named troves from the replacement set
         - C{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
         - C{TroveSet.update} : Replace troves in the TroveSet with
