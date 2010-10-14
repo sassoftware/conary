@@ -361,6 +361,9 @@ class Policy(BasePolicy):
         self.recipe = recipe
         self.macros = recipe.macros
 
+        if not self._isSupportedTarget():
+            return
+
         if self.rootdir:
             self.rootdir = util.normpath(self.rootdir % self.macros)
 
