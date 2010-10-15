@@ -979,7 +979,7 @@ class TroveStore:
         cu.execute(sql3)
 
         callback.updatingDatabase('latest', 4, 5)
-        if self.db.driver == 'postgresql':
+        if self.db.driver in [ 'postgresql', 'pgpool' ]:
             cu.execute("DELETE FROM LatestCache USING tmpNewTroves WHERE"
                         "   LatestCache.itemId = tmpNewTroves.itemId AND "
                        "    LatestCache.branchId = tmpNewTroves.branchId AND "
@@ -1179,7 +1179,7 @@ class TroveStore:
 
         # for PostgreSQL we have to force an execution plan that
         # uses the join order as coded in the query
-        if self.db.driver == 'postgresql':
+        if self.db.driver in [ 'postgresql', 'pgpool' ]:
             cu.execute("set join_collapse_limit to 2")
             cu.execute("set enable_seqscan to off")
 
@@ -1202,7 +1202,7 @@ class TroveStore:
         troveTrovesCursor = util.PushIterator(troveTrovesCursor)
 
         # revert changes we forced on the postgresql optimizer
-        if self.db.driver == 'postgresql':
+        if self.db.driver in [ 'postgresql', 'pgpool' ]:
             cu.execute("set join_collapse_limit to default")
             cu.execute("set enable_seqscan to default")
 
