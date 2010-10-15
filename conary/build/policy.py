@@ -24,6 +24,9 @@ import types
 from conary.lib import util, log, graph, sha1helper
 from conary.build import action, errors, filter, trovefilter
 
+from conary.build.action import TARGET_LINUX
+from conary.build.action import TARGET_WINDOWS
+
 # buckets (enum -- but may possibly work someday as bitmask for policy
 # that could run more than once in different contexts)
 TESTSUITE            = 1 << 0
@@ -566,6 +569,7 @@ class GroupPolicy(BasePolicy):
         'exceptions': None,
         'inclusions': None,
     }
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, recipe, **keywords):
         """

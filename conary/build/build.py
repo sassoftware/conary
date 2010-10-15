@@ -34,14 +34,20 @@ import re
 import shutil
 import stat
 import sys
+import time
 import tempfile
 import textwrap
 
 #conary imports
+from conary.errors import TroveNotFound
 from conary.build import action, errors
 from conary.lib import fixedglob, digestlib, log, util
 from conary.build.use import Use
+from conary.build.source import WindowsHelper
 from conary.build.manifest import Manifest, ExplicitManifest
+
+from conary.build.action import TARGET_LINUX
+from conary.build.action import TARGET_WINDOWS
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -98,6 +104,10 @@ class BuildAction(action.RecipeAction):
                 self.manifest = Manifest(package=self.package, recipe=recipe)
 
     def doAction(self):
+        if not self._isSupportedTarget():
+            log.warning('Action %s, not supported for target os' % self.__class__.__name__)
+            return
+
         if self.debug:
             from conary.lib import debugger
             debugger.set_trace()
@@ -3906,6 +3916,242 @@ class SupplementalGroup(Group):
     keywordOrder = ['user', 'name', 'preferred_gid']
 
 
+class BuildMSI(BuildAction):
+    """
+    NAME
+    ====
+    B{C{r.BuildMSI()}} - Packages a zip archive into an MSI to be
+    encapsulated.
+
+    SYNOPSIS
+    ========
+    C{r.BuildMSI('I{archive}', dest='I{conontent_installation_path}',
+        manufacturer='I{manufacturer}', description='I{description}')}
+
+    DESCRIPTION
+    ===========
+    The C{r.BuildMSI} class utilizes an external Windows Build Service to build
+    an MSI from a specially formatted zip archive.
+
+    The zip archive is expected to have at least one top level directory named
+    "contents" that contains the files to be extracted to the B{dest} directory
+    and optionally a "rpath" directory, containing scripts and other setup
+    informaiton.
+
+    KEYWORDS
+    ========
+    B{dest} : Destination directory for the "content" directory contents.
+
+    B{manufacturer} : (None) The "Manufacturer" that will be displayed in the
+    installed software view on a Windows system.
+
+    B{description} : (None) The "Description" that will be displayed in the
+    installed software view on a Windows system.
+
+    EXAMPLES
+    ========
+    C{r.BuildMSI('mypackage-1.2.3.4.zip',
+        dest=r'\%ProgramFiles%\MyPackage\',
+        manufacturer='Example Corp.',
+        description='Web application for demonstrating Windows packaging.')}
+    """
+
+    keywords = {
+        'dest': '%ProgramFiles%\%(name)s',
+        'manufacturer': None,
+        'description': None,
+    }
+    keywordOrder = ('dest', 'manufacturer', 'description', )
+
+    supported_targets = (TARGET_WINDOWS, )
+
+    def __init__(self, recipe, *args, **kwargs):
+        BuildAction.__init__(self, recipe, **kwargs)
+
+        assert(len(args) == 1)
+        self.archiveName = args[0]
+
+        if self.manufacturer is None:
+            self.manufacturer = ''
+        if self.description is None:
+            self.description = ''
+
+        self.name = self.recipe.name
+        self.version = self.recipe.version
+
+        self._checkVersion()
+
+    def _checkVersion(self):
+        parts = self.version.split('.')
+        if len(parts) != 4 or not [ x.isdigit() for x in parts ]:
+            raise TypeError, ('MSI package versions must be a four integers '
+                'sepatated by \'.\' (ex. 1.2.3.4)')
+
+    def do(self, macros):
+        """
+        Coordinate with a Windows Build Service to build an MSI that can be
+        encapsulated.
+        """
+
+        self.package = self.package % macros
+
+        # Get the full path to the archive.
+        archivePath = action._expandOnePath(self.archiveName, macros)
+        archiveName = os.path.basename(archivePath)
+
+        # Get a connection to the build service
+        wbsc = self._getWBSClient()
+
+        # Create a package resource that we can add all of our
+        # information to.
+        wbsc.packages.append(dict(
+            type='app',
+            createdBy='conary',
+        ))
+        pkg = wbsc.packages[-1]
+
+        # Configure the package resource for our metadata.
+        jobCfg = pkg.capsuleJobConfig[0]
+        jobCfg.version = self.version
+        jobCfg.product.name = self.name
+        jobCfg.product.manufacturer = self.manufacturer
+        jobCfg.product.package.description = self.description
+
+        # FIXME: None of these values should need to be hard coded. They
+        #        should be defaults in the Windows Build Service.
+        jobCfg.product.icon = 'icon.ico'
+        jobCfg.product.packageName = 'Setup'
+        jobCfg.product.allUsers = 'true'
+
+        # Note: In the future there may be other types of applications that
+        #       are not 'app'.
+        jobCfg.product.app = dict(destDir=self.dest)
+
+        # Get the previous upgrade code if available.
+        upgradeCode = self._getUpgradeCode()
+        if upgradeCode is not None:
+            jobCfg.product.upgradeCode = upgradeCode
+
+        # Persist the config on the server.
+        jobCfg.persist()
+
+        # Now that the job is configured, create a file resource that we
+        # can attach contents to.
+        pkg.files.append(dict(
+            path=archiveName,
+            size=os.stat(archivePath).st_size,
+        ))
+        pkgfile = pkg.files[-1]
+
+        # Upload the archive to the Windows Build Service to initiate the job.
+        pkgfile.path = open(archivePath)
+
+        # Trigger the MSI packaging job.
+        pkg.capsule = pkg.HTTPData(
+            data=dict(
+                type='capsule',
+                createdBy='conary',
+            ),
+            method='POST', tag='job',
+        )
+
+        # Wait for the job to complete.
+        self._waitForJob(pkg.capsule)
+
+        # Download the msi from the build service.
+        log.info('Downloading built MSI')
+        results = pkg.capsule.resultResource
+
+        # Look for the MSI, there should be only one.
+        for rf in results.resultFiles:
+            if rf.type == 'msi':
+                msifh = rf.path
+                break
+
+        # Copy the MSI into the %(builddir)s
+        msiPath = action._expandOnePath('%(name)s-%(version)s.msi', macros)
+        util.copyfileobj(msifh, open(msiPath, 'w'))
+
+        # Add the MSI to the recipe
+        self.recipe._addCapsule(msiPath, 'msi', self.package)
+
+        # Store MSI metadata to be stored in troveInfo
+        self.recipe.winHelper = WindowsHelper()
+        self.recipe.winHelper.name = self.name
+        self.recipe.winHelper.version = self.version
+        self.recipe.winHelper.productCode = str(results.productCode)
+        self.recipe.winHelper.upgradeCode = str(results.upgradeCode)
+
+    def _getWBSClient(self):
+        """
+        Get a connection to the Windows Build Service.
+        @return connection to the base api of the build service
+        @rtype robj.proxy.rObjProxy
+        """
+
+        import robj
+
+        wbs = self.recipe.cfg.windowsBuildService
+        if not wbs:
+            raise RuntimeError, ('Building MSIs requires a Windows Build '
+                'Service be specified in the conary configuration.')
+
+        if not wbs.startswith('http'):
+            wbs = 'http://%s/api' % wbs
+
+        api = robj.connect(wbs)
+        return api
+
+    def _getUpgradeCode(self):
+        """
+        If there is a previous version of this package, check for an update
+        guid in trove info.
+        @return an update guid if available, otherwise None
+        @rtype str or None
+        """
+
+        repos = self.recipe.getRepos()
+
+        # Find the latest binary version of this package.
+        try:
+            spec = repos.findTrove(self.recipe.cfg.buildLabel,
+                (self.package, None, None))
+            name, version, flavor = spec[0]
+        except TroveNotFound:
+            return None
+
+        # Check if there is an existing upgradeCode
+        trv = repos.getTrove(name, version, flavor)
+        upgradeCode = trv.troveInfo.capsule.msi.upgradeCode()
+
+        if upgradeCode:
+            return upgradeCode
+
+        return None
+
+    def _waitForJob(self, job, interval=1):
+        """
+        Wait for a job to complete, reporting progress along the way.
+        @param job Job resource to poll.
+        @type job robj.proxy.rObjProxy
+        @param interval (optional) time to wait between polls (default: 1)
+        @type interval int
+        """
+
+        while str(job.status) not in ('Failed', 'Completed'):
+            time.sleep(1)
+            log.info('Building MSI: %s %s%% done' % (job.status, job.progress))
+            job.refresh()
+
+        if job.status == 'Failed':
+            jobLog = job.logs.read()
+            # Strip off binary bits on the font of the file
+            jobLog = jobLog[3:]
+            raise RuntimeError, ('The Windows Build Service failed to build '
+                'the msi with the following error: %s\n%s'
+                % (job.message, jobLog))
+
+
 class UserGroupError(errors.CookError):
     def __init__(self, msg):
         self.msg = msg
@@ -3915,4 +4161,3 @@ class UserGroupError(errors.CookError):
 
     def __str__(self):
         return repr(self)
-
