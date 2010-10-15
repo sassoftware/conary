@@ -27,6 +27,9 @@ import traceback
 from conary.lib import debugger, log, util
 from conary.local import database
 
+TARGET_LINUX = 'linux'
+TARGET_WINDOWS = 'windows'
+
 # build.py and policy.py need some common definitions
 
 def checkUse(use):
@@ -61,6 +64,8 @@ class Action:
 
     keywords = { 'debug' : False }
 
+    supported_targets = (TARGET_LINUX, )
+
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
         # keywords will be in the class object, not the instance
@@ -79,12 +84,26 @@ class Action:
                     raise
 
     def doAction(self):
+        if not self._isSupportedTarget():
+            log.warning('Action %s not supported for target OS'
+                % self.__class__.__name__)
+            return
         if self.debug:
             debugger.set_trace()
         self.do()
 
     def do(self):
         pass
+
+    def _isSupportedTarget(self):
+        if not hasattr(self, 'recipe'):
+            return True
+
+        target = self.recipe.macros.targetos
+        if not target or 'linux' in target:
+            target = TARGET_LINUX
+
+        return target in self.supported_targets
 
     def _applyDefaults(self):
         """
@@ -192,8 +211,11 @@ class RecipeAction(Action):
 
     # virtual method for actually executing the action
     def doAction(self):
-        if self.debug:
-            debugger.set_trace()
+        if not self._isSupportedTarget():
+            log.warning('Action %s not supported for target OS'
+                % self.__class__.__name__)
+            return
+
         if self.use:
             try:
                 if self.linenum is None:

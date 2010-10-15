@@ -34,11 +34,25 @@ from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
 
-class windowsHelper:
-    def __init__(self, path, ipaddr):
+from conary.build.action import TARGET_LINUX
+from conary.build.action import TARGET_WINDOWS
+
+class WindowsHelper:
+    def __init__(self):
+        self.name = None
+        self.platform = None
+        self.version = None
+        self.productCode = None
+        self.upgradeCode = None
+
+    def extractMSIInfo(self, path, wbs):
         import robj
 
-        api = robj.connect('http://%s/api' % ipaddr)
+        # This is here for backwards compatibility.
+        if not wbs.startswith('http'):
+            wbs = 'http://%s/api' % wbs
+
+        api = robj.connect(wbs)
         api.msis.append(dict(
             path=os.path.split(path)[1],
             size=os.stat(path).st_size,
@@ -60,6 +74,7 @@ class windowsHelper:
         self.productCode = self.resource.productCode.encode('utf-8')
         self.upgradeCode = self.resource.upgradeCode.encode('utf-8')
 
+
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
         pass
@@ -78,6 +93,8 @@ class _Source(_AnySource):
                 'httpHeaders': {},
                 'package': None,
                 'sourceDir': None}
+
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS, )
 
     def __init__(self, recipe, *args, **keywords):
         self.archivePath = None
@@ -1470,13 +1487,10 @@ class addCapsule(_Source):
         if self.capsuleType == 'rpm':
             pname = m.contents['name']
         elif self.capsuleType == 'msi':
+            self.recipe.winHelper = WindowsHelper()
             if not self.recipe.cfg.windowsBuildService:
-                class foo:
-                    pass
-                self.recipe.winHelper = foo()
                 self.recipe.winHelper.name = self.recipe.name
                 self.recipe.winHelper.version = m.contents['version']
-                self.recipe.winHelper.platform = m.contents['version']
                 self.recipe.winHelper.platform = m.contents['version']
                 self.recipe.winHelper.productCode = m.contents['version']
                 self.recipe.winHelper.upgradeCode = m.contents['version']
@@ -1484,7 +1498,7 @@ class addCapsule(_Source):
                 #                  'windowsBuildService defined in the conary '
                 #                  'configuration')
             else:
-                self.recipe.winHelper = windowsHelper(f,
+                self.recipe.winHelper.extractMSIInfo(f,
                     self.recipe.cfg.windowsBuildService)
             pname = self.recipe.winHelper.name
         else:
