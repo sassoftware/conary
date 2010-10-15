@@ -99,7 +99,10 @@ class Action:
         if not hasattr(self, 'recipe'):
             return True
 
-        target = self.recipe.macros.targetos
+        target = None
+        if 'targetos' in self.recipe.macros:
+            target = self.recipe.macros.targetos
+
         if not target or 'linux' in target:
             target = TARGET_LINUX
 
