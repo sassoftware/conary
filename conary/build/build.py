@@ -4139,17 +4139,19 @@ class BuildMSI(BuildAction):
         """
 
         while str(job.status) not in ('Failed', 'Completed'):
-            time.sleep(1)
+            time.sleep(interval)
             log.info('Building MSI: %s %s%% done' % (job.status, job.progress))
             job.refresh()
 
+        # Report the WBS job log as part of the build log
+        jobLog = job.logs.read()
+        # Strip off binary bits on the font of the file
+        jobLog = jobLog[3:]
+        log.info('Windows Build Service job log:\n%s' % jobLog)
+
         if job.status == 'Failed':
-            jobLog = job.logs.read()
-            # Strip off binary bits on the font of the file
-            jobLog = jobLog[3:]
             raise RuntimeError, ('The Windows Build Service failed to build '
-                'the msi with the following error: %s\n%s'
-                % (job.message, jobLog))
+                'the msi with the following error: %s' % job.message)
 
 
 class UserGroupError(errors.CookError):
