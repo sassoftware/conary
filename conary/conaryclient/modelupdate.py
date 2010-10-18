@@ -690,6 +690,9 @@ class SystemModelClient(object):
                 finalJobs = criticalUpdateInfo.findFinalJobs(job)
                 criticalOnly = criticalUpdateInfo.isCriticalOnlyUpdate()
 
+                linkedJobs = self._findOverlappingJobs(job, troveCache,
+                                          pathHashCache = pathHashCache)
+
                 result = check.depCheck(job,
                                         linkedJobs = linkedJobs,
                                         criticalJobs = criticalJobs,
