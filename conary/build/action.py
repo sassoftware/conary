@@ -85,8 +85,8 @@ class Action:
 
     def doAction(self):
         if not self._isSupportedTarget():
-            log.warning('Action %s not supported for target OS'
-                % self.__class__.__name__)
+            log.warning('Action %s not supported for target OS %s'
+                % self.__class__.__name__, self._getTarget())
             return
         if self.debug:
             debugger.set_trace()
@@ -95,16 +95,21 @@ class Action:
     def do(self):
         pass
 
-    def _isSupportedTarget(self):
-        if not hasattr(self, 'recipe'):
-            return True
-
+    def _getTarget(self)
         target = None
         if 'targetos' in self.recipe.macros:
             target = self.recipe.macros.targetos
 
         if not target or 'linux' in target:
             target = TARGET_LINUX
+
+        return target
+
+    def _isSupportedTarget(self):
+        if not hasattr(self, 'recipe'):
+            return True
+
+        target = self._getTarget()
 
         return target in self.supported_targets
 
