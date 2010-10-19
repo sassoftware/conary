@@ -4044,7 +4044,8 @@ class BuildMSI(BuildAction):
         archiveName = os.path.basename(archivePath)
 
         # Get component info from previous builds
-        componentInfo = self._getComponentInfo()
+#        componentInfo = self._getComponentInfo()
+        componentInfo = ()
 
         # Get a connection to the build service
         wbsc = self._getWBSClient()
@@ -4153,16 +4154,16 @@ class BuildMSI(BuildAction):
 
         # FIXME: This is working around a bug in robj/xobj and may need to
         #        change in the near future.
-        self.recipe.winHelper.components = [
-            (x.component.uuid.encode('utf-8'),
-             x.component.path.encode('utf-8'))
-            for x in results.package.components
-        ]
+        #self.recipe.winHelper.components = [
+        #    (x.component.uuid.encode('utf-8'),
+        #     x.component.path.encode('utf-8'))
+        #    for x in results.package.components
+        #]
 
         # Copy forward old info.
-        for comp in componentInfo:
-            if comp not in self.recipe.winHelper.components:
-                self.recipe.winHelper.components.append(comp)
+        #for comp in componentInfo:
+        #    if comp not in self.recipe.winHelper.components:
+        #        self.recipe.winHelper.components.append(comp)
 
     def _getWBSClient(self):
         """
