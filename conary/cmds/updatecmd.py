@@ -629,6 +629,9 @@ def _updateTroves(cfg, applyList, **kwargs):
                     log.info("loading %s", tcPath)
                     tc.load(tcPath)
             ts = client.systemModelGraph(model, changeSetList = changeSetList)
+            modelGraph = kwargs.get('modelGraph', None)
+            if modelGraph is not None:
+                ts.g.generateDotFile(modelGraph)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
