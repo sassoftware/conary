@@ -3956,12 +3956,34 @@ class BuildMSI(BuildAction):
         description='Web application for demonstrating Windows packaging.')}
     """
 
+    APPLICATION_APP = 'app'
+    APPLICATION_WEBAPP = 'webApp'
+
+    APPLICATION_TYPES = (
+        APPLICATION_APP,
+        APPLICATION_WEBAPP,
+    )
+
     keywords = {
-        'dest': '%ProgramFiles%\%(name)s',
         'manufacturer': None,
         'description': None,
+        'applicationType': APPLICATION_APP,
+
+        # Option for both "app" and "webapp", mutually exclusive
+        # with webSiteDir.
+        'dest': None,
+
+        # Web Application flags
+        'defaultDocument': None,
+        'webSite': None,
+        'alias': None,
+        'webSiteDir': None,
+        'applicationName': None,
     }
-    keywordOrder = ('dest', 'manufacturer', 'description', )
+
+    keywordOrder = ('dest', 'manufacturer', 'description', 'applictionType',
+        'defaultDocument', 'webSite', 'alias', 'webSiteDir',
+        'applicationName', )
 
     supported_targets = (TARGET_WINDOWS, )
 
@@ -3971,6 +3993,10 @@ class BuildMSI(BuildAction):
         assert(len(args) == 1)
         self.archiveName = args[0]
 
+        if self.applicationType not in self.APPLICATION_TYPES:
+            raise TypeError, ('%s not a supported applicationType (suported '
+                'types: %s)' % (self.applicationType, self.APPLICATION_TYPES))
+
         if self.manufacturer is None:
             self.manufacturer = ''
         if self.description is None:
@@ -3979,6 +4005,7 @@ class BuildMSI(BuildAction):
         self.name = self.recipe.name
         self.version = self.recipe.version
 
+        self._checkArgs()
         self._checkVersion()
 
     def _checkVersion(self):
@@ -3986,6 +4013,22 @@ class BuildMSI(BuildAction):
         if len(parts) != 4 or not [ x.isdigit() for x in parts ]:
             raise TypeError, ('MSI package versions must be a four integers '
                 'sepatated by \'.\' (ex. 1.2.3.4)')
+
+    def _checkArgs(self):
+        if self.applicationType == self.APPLICATION_APP:
+            self._requireArgs('dest', )
+        elif self.applicationType == self.APPLICATION_WEBAPP:
+            self._requireArgs('defaultDocument', 'webSite', 'alias',
+                'applicationName')
+            if not (bool(self.dest is None) ^ bool(self.webSiteDir is None)):
+                raise TypeError, 'Either "dest" or "webSiteDir" must be set'
+        self._requireArgs('manufacturer', )
+
+    def _requireArgs(self, *args):
+        for arg in args:
+            if getattr(self, arg) is None:
+                raise TypeError, ('"%s" is required for applications of type %s'
+                    % (arg, self.applicationType))
 
     def do(self, macros):
         """
@@ -4016,6 +4059,7 @@ class BuildMSI(BuildAction):
         jobCfg.product.name = self.name
         jobCfg.product.manufacturer = self.manufacturer
         jobCfg.product.package.description = self.description
+        jobCfg.product.type = self.applicationType
 
         # FIXME: None of these values should need to be hard coded. They
         #        should be defaults in the Windows Build Service.
@@ -4023,9 +4067,22 @@ class BuildMSI(BuildAction):
         jobCfg.product.packageName = 'Setup'
         jobCfg.product.allUsers = 'true'
 
-        # Note: In the future there may be other types of applications that
-        #       are not 'app'.
-        jobCfg.product.app = dict(destDir=self.dest)
+        # Application specific configuration
+        if self.applicationType == self.APPLICATION_APP:
+            jobCfg.product.app = dict(
+                destDir=self.dest
+            )
+        elif self.applicationType == self.APPLICATION_WEBAPP:
+            jobCfg.product.webApp = dict(
+                defaultDocument=self.defaultDocument,
+                webSite=self.webSite,
+                alias=self.alias,
+                applicationName=self.applicationName,
+            )
+            if self.dest:
+                jobCfg.product.webApp.dest = self.dest
+            else:
+                jobCfg.product.webApp.webSiteDir = self.webSiteDir
 
         # Get the previous upgrade code if available.
         upgradeCode = self._getUpgradeCode()
@@ -4151,7 +4208,8 @@ class BuildMSI(BuildAction):
 
         if job.status == 'Failed':
             raise RuntimeError, ('The Windows Build Service failed to build '
-                'the msi with the following error: %s' % job.message)
+                'the msi with the following error: %s\n%s'
+                % (job.message, jobLog))
 
 
 class UserGroupError(errors.CookError):
