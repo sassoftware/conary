@@ -39,6 +39,7 @@ import tempfile
 import textwrap
 
 #conary imports
+from conary import trove
 from conary.errors import TroveNotFound
 from conary.build import action, errors
 from conary.lib import fixedglob, digestlib, log, util
@@ -4042,6 +4043,9 @@ class BuildMSI(BuildAction):
         archivePath = action._expandOnePath(self.archiveName, macros)
         archiveName = os.path.basename(archivePath)
 
+        # Get component info from previous builds
+        componentInfo = self._getComponentInfo()
+
         # Get a connection to the build service
         wbsc = self._getWBSClient()
 
@@ -4067,22 +4071,30 @@ class BuildMSI(BuildAction):
         jobCfg.product.packageName = 'Setup'
         jobCfg.product.allUsers = 'true'
 
+        # Send component information
+        jobCfg.product.components = []
+        for uuid, path in componentInfo:
+            jobCfg.product.components.append(dict(
+                uuid=uuid,
+                path=path,
+            ), post=False)
+
         # Application specific configuration
         if self.applicationType == self.APPLICATION_APP:
             jobCfg.product.app = dict(
-                destDir=self.dest
+                destDir=self.dest % macros
             )
         elif self.applicationType == self.APPLICATION_WEBAPP:
             jobCfg.product.webApp = dict(
-                defaultDocument=self.defaultDocument,
-                webSite=self.webSite,
-                alias=self.alias,
-                applicationName=self.applicationName,
+                defaultDocument=self.defaultDocument % macros,
+                webSite=self.webSite % macros,
+                alias=self.alias % macros,
+                applicationName=self.applicationName % macros,
             )
             if self.dest:
-                jobCfg.product.webApp.dest = self.dest
+                jobCfg.product.webApp.dest = self.dest % macros
             else:
-                jobCfg.product.webApp.webSiteDir = self.webSiteDir
+                jobCfg.product.webApp.webSiteDir = self.webSiteDir % macros
 
         # Get the previous upgrade code if available.
         upgradeCode = self._getUpgradeCode()
@@ -4139,6 +4151,19 @@ class BuildMSI(BuildAction):
         self.recipe.winHelper.productCode = str(results.productCode)
         self.recipe.winHelper.upgradeCode = str(results.upgradeCode)
 
+        # FIXME: This is working around a bug in robj/xobj and may need to
+        #        change in the near future.
+        self.recipe.winHelper.components = [
+            (x.component.uuid.encode('utf-8'),
+             x.component.path.encode('utf-8'))
+            for x in results.package.components
+        ]
+
+        # Copy forward old info.
+        for comp in componentInfo:
+            if comp not in self.recipe.winHelper.components:
+                self.recipe.winHelper.components.append(comp)
+
     def _getWBSClient(self):
         """
         Get a connection to the Windows Build Service.
@@ -4159,12 +4184,11 @@ class BuildMSI(BuildAction):
         api = robj.connect(wbs)
         return api
 
-    def _getUpgradeCode(self):
+    def _getPreviousCapsuleInfo(self):
         """
-        If there is a previous version of this package, check for an update
-        guid in trove info.
-        @return an update guid if available, otherwise None
-        @rtype str or None
+        If there is a previous version of this package, retrieve the trove
+        capsule info.
+        @return capsule trove info or None
         """
 
         repos = self.recipe.getRepos()
@@ -4177,14 +4201,51 @@ class BuildMSI(BuildAction):
         except TroveNotFound:
             return None
 
+        capsuleInfo = repos.getTroveInfo(trove._TROVEINFO_TAG_CAPSULE,
+            ((name, version, flavor), ))
+
+        if capsuleInfo[0]:
+            return capsuleInfo[0]
+
+        return None
+
+    def _getUpgradeCode(self):
+        """
+        If there is a previous version of this package, check for an update
+        guid in trove info.
+        @return an update guid if available, otherwise None
+        @rtype str or None
+        """
+
+        capsuleInfo = self._getPreviousCapsuleInfo()
+        if not capsuleInfo:
+            return None
+
         # Check if there is an existing upgradeCode
-        trv = repos.getTrove(name, version, flavor)
-        upgradeCode = trv.troveInfo.capsule.msi.upgradeCode()
+        upgradeCode = capsuleInfo.msi.upgradeCode()
 
         if upgradeCode:
             return upgradeCode
 
         return None
+
+    def _getComponentInfo(self):
+        """
+        Check the previous version, if there is one, for any MSI component
+        informaiton.
+        """
+
+        capsuleInfo = self._getPreviousCapsuleInfo()
+        if not capsuleInfo:
+            return []
+
+        # Check for component information
+        componentInfo = capsuleInfo.msi.components
+
+        if not componentInfo:
+            return []
+
+        return [ (uuid(), path()) for uuid, path in componentInfo ]
 
     def _waitForJob(self, job, interval=1):
         """

@@ -44,6 +44,7 @@ class WindowsHelper:
         self.version = None
         self.productCode = None
         self.upgradeCode = None
+        self.components = []
 
     def extractMSIInfo(self, path, wbs):
         import robj
@@ -73,6 +74,9 @@ class WindowsHelper:
         self.platform = self.resource.platform.encode('utf-8')
         self.productCode = self.resource.productCode.encode('utf-8')
         self.upgradeCode = self.resource.upgradeCode.encode('utf-8')
+
+        self.components = [ (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
+            for x in self.resource.components ]
 
 
 class _AnySource(action.RecipeAction):

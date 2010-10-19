@@ -1019,10 +1019,14 @@ _TROVECAPSULE_MSI_VERSION     = 1
 _TROVECAPSULE_MSI_PLATFORM    = 2
 _TROVECAPSULE_MSI_PCODE       = 3
 _TROVECAPSULE_MSI_UCODE       = 4
+_TROVECAPSULE_MSI_COMPONENTS  = 5
 
 _RPM_OBSOLETE_NAME    = 0
 _RPM_OBSOLETE_FLAGS   = 1
 _RPM_OBSOLETE_VERSION = 2
+
+_MSI_COMPONENT_UUID   = 0
+_MSI_COMPONENT_PATH   = 1
 
 class SingleRpmObsolete(streams.StreamSet):
 
@@ -1079,17 +1083,41 @@ class TroveRpmCapsule(streams.StreamSet):
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
 
+class MsiComponent(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _MSI_COMPONENT_UUID     : (DYNAMIC, streams.StringStream, 'uuid'),
+        _MSI_COMPONENT_PATH     : (DYNAMIC, streams.StringStream, 'path'),
+    }
+
+    def __cmp__(self, other):
+        return (cmp(self.uuid(), other.uuid()) or
+                cmp(self.freeze(), other.freeze()))
+
+class MsiComponents(streams.StreamCollection):
+    streamDict = { 1 : MsiComponent }
+
+    def add(self, uuid, path):
+        comp = MsiComponent()
+        comp.uuid.set(uuid)
+        comp.path.set(path)
+        self.addStream(1, comp)
+
 class TroveMsiCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
-        _TROVECAPSULE_MSI_NAME    : (DYNAMIC, streams.StringStream, 'name' ),
-        _TROVECAPSULE_MSI_VERSION : (DYNAMIC, streams.StringStream, 'version' ),
-        _TROVECAPSULE_MSI_PLATFORM: (DYNAMIC, streams.StringStream,
-                                     'platform' ),
-        _TROVECAPSULE_MSI_PCODE: (DYNAMIC, streams.StringStream,
-                                  'productCode' ),
-        _TROVECAPSULE_MSI_UCODE: (DYNAMIC, streams.StringStream,
-                                     'upgradeCode' ),
+        _TROVECAPSULE_MSI_NAME      :
+            (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_MSI_VERSION   :
+            (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_MSI_PLATFORM  :
+            (DYNAMIC, streams.StringStream, 'platform' ),
+        _TROVECAPSULE_MSI_PCODE     :
+            (DYNAMIC, streams.StringStream, 'productCode' ),
+        _TROVECAPSULE_MSI_UCODE     :
+            (DYNAMIC, streams.StringStream, 'upgradeCode' ),
+        _TROVECAPSULE_MSI_COMPONENTS:
+            (DYNAMIC, MsiComponents, 'components')
     }
 
     def reset(self):
@@ -1779,6 +1807,8 @@ class Trove(streams.StreamSet):
         self.troveInfo.capsule.msi.platform.set(winHelper.platform)
         self.troveInfo.capsule.msi.productCode.set(winHelper.productCode)
         self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode)
+        for uuid, path in winHelper.components:
+            self.troveInfo.capsule.msi.components.add(uuid, path)
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()
