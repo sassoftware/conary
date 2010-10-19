@@ -95,7 +95,7 @@ class Action:
     def do(self):
         pass
 
-    def _getTarget(self)
+    def _getTarget(self):
         target = None
         if 'targetos' in self.recipe.macros:
             target = self.recipe.macros.targetos
