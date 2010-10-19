@@ -4012,8 +4012,8 @@ class BuildMSI(BuildAction):
     def _checkVersion(self):
         parts = self.version.split('.')
         if len(parts) != 4 or not [ x.isdigit() for x in parts ]:
-            raise TypeError, ('MSI package versions must be a four integers '
-                'sepatated by \'.\' (ex. 1.2.3.4)')
+            raise TypeError, ('MSI package versions must be four integers '
+                'separated by "." (e.g. "1.2.3.4")')
 
     def _checkArgs(self):
         if self.applicationType == self.APPLICATION_APP:
