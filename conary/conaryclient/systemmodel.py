@@ -37,11 +37,12 @@ from conary.lib import log, util
 # searchItem := troveTuples or label
 # systemItem := searchItem or list of troveOperations
 # troveOperations := updateTroves | eraseTroves | installTroves | patchTroves
-#                    | searchItem
+#                    | offerTroves | searchItem
 # updateTroves := list of troveTuples
 # eraseTroves := list of troveTuples
 # installTroves := list of troveTuples
 # patchTroves := list of troveTuples
+# offerTroves := list of troveTuples
 
 
 def shellStr(s):
@@ -145,6 +146,9 @@ class EraseTroveOperation(TroveOperation):
 class InstallTroveOperation(TroveOperation):
     key = 'install'
 
+class OfferTroveOperation(TroveOperation):
+    key = 'offer'
+
 class PatchTroveOperation(TroveOperation):
     key = 'patch'
 
@@ -152,6 +156,7 @@ troveOpMap = {
     UpdateTroveOperation.key  : UpdateTroveOperation,
     EraseTroveOperation.key   : EraseTroveOperation,
     InstallTroveOperation.key : InstallTroveOperation,
+    OfferTroveOperation.key   : OfferTroveOperation,
     PatchTroveOperation.key   : PatchTroveOperation,
 }
 
@@ -165,6 +170,7 @@ class SystemModel:
     UpdateTroveOperation = UpdateTroveOperation
     EraseTroveOperation = EraseTroveOperation
     InstallTroveOperation = InstallTroveOperation
+    OfferTroveOperation = OfferTroveOperation
     PatchTroveOperation = PatchTroveOperation
     VersionOperation = VersionOperation
 
@@ -293,6 +299,7 @@ class SystemModelText(SystemModel):
         update troveSpec+
         erase troveSpec+
         install troveSpec+
+        offer troveSpec+
         patch troveSpec+
 
     C{search} lines take a single troveSpec or label, which B{may} be
@@ -300,7 +307,7 @@ class SystemModelText(SystemModel):
     lines represents a place to search for troves to install on
     or make available to the system.
 
-    C{update}, C{erase}, C{install}, and C{patch} lines take
+    C{update}, C{erase}, C{install}, C{offer}, and C{patch} lines take
     one or more troveSpecs, which B{may} be enclosed in single
     or double quote characters, unless they contain characters
     that may be specially interpreted by a POSIX shell, in
@@ -323,7 +330,7 @@ class SystemModelText(SystemModel):
     Whole-line comments are retained, and ordering is preserved
     with respect to non-comment lines.
 
-    Partial-line comments are ignored, and not retained when a
+    Partial-line comments are ignored, and are not retained when a
     line is modified.
     '''
 

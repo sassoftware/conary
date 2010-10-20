@@ -601,7 +601,6 @@ class UnionAction(DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, *args):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
-        self.troveSets = [ primaryTroveSet ] + list(args)
 
     def __call__(self, data):
         # this ordering means that if it's in the install set anywhere, it
@@ -612,6 +611,16 @@ class UnionAction(DelayedTupleSetAction):
 
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
+
+class OptionalAction(DelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, *args):
+        DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
+
+    def __call__(self, data):
+        for troveSet in self._inputSets:
+            self.outSet._setOptional(troveSet._getOptionalSet())
+            self.outSet._setOptional(troveSet._getInstallSet())
 
 class PatchAction(DelayedTupleSetAction):
 

@@ -30,6 +30,7 @@ class AbstractModelCompiler(object):
     InitialTroveTupleSet = troveset.StaticTroveTupleSet
     PatchAction = troveset.PatchAction
     UnionAction = troveset.UnionAction
+    OptionalAction = troveset.OptionalAction
     UpdateAction = troveset.UpdateAction
 
     def __init__(self, flavor, repos, graph):
@@ -45,7 +46,8 @@ class AbstractModelCompiler(object):
 
             for troveTup in op:
                 name = troveTup[0]
-                if trove.troveIsComponent(name):
+                if (isinstance(op, sysModel.OfferTroveOperation) or
+                    trove.troveIsComponent(name)):
                     collections.add(name.split(':')[0])
                 elif trove.troveIsGroup(name):
                     collections.add(name)
@@ -144,6 +146,9 @@ class AbstractModelCompiler(object):
             elif isinstance(op, sysModel.UpdateTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UpdateAction)
+            elif isinstance(op, sysModel.OfferTroveOperation):
+                finalTroveSet = finalTroveSet._action(matches,
+                                        ActionClass = self.OptionalAction)
             else:
                 assert(0)
 
