@@ -55,6 +55,7 @@ class AbstractModelCompiler(object):
         # this represents the path from "search" lines
         newSearchPath = []
         totalSearchSet = reposTroveSet
+        rebuildTotalSearchSet = False
         # the "total search" searches the current troveset first, then the
         # search path. we only reset this when an operation changed the
         # working troveset in a way which would affect later operations,
