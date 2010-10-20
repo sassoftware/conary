@@ -361,7 +361,6 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
         else:
             csTroveSet = None
 
-        # create the initial search path from the installLabelPath
         reposTroveSet = self._createRepositoryTroveSet(csTroveSet = csTroveSet)
         dbTroveSet = self._createDatabaseTroveSet(csTroveSet = csTroveSet)
 
