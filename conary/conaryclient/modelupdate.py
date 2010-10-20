@@ -96,6 +96,12 @@ class SystemModelTroveCache(trovecache.TroveCache):
 
         return self.componentMap[troveTup]
 
+class DatabaseTroveSet(troveset.SearchSourceTroveSet):
+
+    # this class changes the name of the node in the dot graph. handy.
+
+    pass
+
 class SysModelRemoveAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, removeTroveSet = None):
@@ -346,9 +352,9 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
             path = [ csTroveSet ]
 
         dbSearchSource = searchsource.SearchSource(self.db, self.cfg.flavor)
-        dbTroveSet = troveset.SearchSourceTroveSet(dbSearchSource)
-        path.append(dbTroveSet)
+        dbTroveSet = DatabaseTroveSet(dbSearchSource)
 
+        path.append(dbTroveSet)
         return SysModelSearchPathTroveSet(path, graph = self.g)
 
     def build(self, sysModel, changeSetList = []):
@@ -578,9 +584,10 @@ class SystemModelClient(object):
         # handle exclude troves
         final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
                                     ActionClass = SysModelExcludeTrovesAction)
-        depSearch = SysModelSearchPathTroveSet([ preFetch, searchPath ],
-                                               graph = preFetch.g)
-        depSearch.g.realize(SysModelActionData(troveCache,
+        #depSearch = SysModelSearchPathTroveSet([ preFetch, searchPath ],
+                                               #graph = preFetch.g)
+        depSearch = searchPath
+        final.g.realize(SysModelActionData(troveCache,
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 

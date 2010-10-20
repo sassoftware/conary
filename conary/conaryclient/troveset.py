@@ -400,6 +400,12 @@ class DelayedTupleSet(TroveTupleSet):
 
 class StaticTroveTupleSet(TroveTupleSet):
 
+    def __str__(self):
+        if self._getInstallSet():
+            return list(self._getInstallSet())[0][0]
+
+        return TroveTupleSet.__str__(self)
+
     def __init__(self, *args, **kwargs):
         troveTuple = kwargs.pop('troveTuple', None)
         TroveTupleSet.__init__(self, *args, **kwargs)

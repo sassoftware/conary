@@ -864,25 +864,19 @@ a transient failure.
 .B search \fItroveSpec\fP|\fIlabel\fP
 A \fBsearch\fP line, like an element of a \fBsearchPath\fP in a Conary
 group, lists either a label or a trove to add to the search path used for
-finding other troves in the model.  It is like \fB$PATH\fP on the command
-line in that it is searched from beginning to end, and therefore more
-specific elements should be listed first.  The \fBconary updateall\fP
+finding other troves in the model.  Unlike \fB$PATH\fP on the command
+line, it is searched starting from the most recently-added item; so the
+last item listed is searched first.  The \fBconary updateall\fP
 command line causes all \fItroveSpec\fPs on \fBsearch\fP lines to be
 updated to reference the most recent versions of those troves found in
 the repositories at the time the command is run.
 .TP 4
 .B install \fItroveSpec+\fP
-One or more troves to install.  If the troveSpec is incomplete, the search
-path will be used to find the troves.  That is, \fBinstall foo\fP will only
-be found via the search path; \fBinstall pkg=label\fP will install the
-flavor and version of \fBpkg\fP on \fBlabel\fP that is found on the search
-path, or the latest version of \fBpkg\fP on \fBlabel\fP if it is not found
-on the search path.
-
-Any troves listed which are not found via the search path are added to the
-\fBbeginning\fP of the search path for subsequent operations.  (This only
-works if there is enough information in the \fItroveSpec\fP to locate the
-trove.)
+One or more troves to install.  The trove is first looked up in the
+troves already added to the model (by \fBinstall\fP, \fBupdate\fP,
+or \fBpatch\fPlines), and after that by looking on the search path
+as specified by \fBsearch\fP lines.  This line corresponds to a
+\fBconary install\fP or \fBconary update --keep-existing\fP command.
 
 \fBinstall\fP honors the isInstall (byDefault) settings of the troves found.
 .TP 4
@@ -892,7 +886,8 @@ One or more troves to update, relative to the previous trove operations
 honor the existing isInstall (byDefault) settings of the troves being
 replaced; it is commonly used to choose a different version of a
 package (for example, an older version, newer version, or version on a
-different label).
+different label).  This line corresponds to a \fBconary update\fP
+command.
 .TP 4
 .B erase \fItroveSpec+\fP
 Make previously-referenced troves optional.  Note that a trove erased

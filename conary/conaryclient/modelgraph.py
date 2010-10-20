@@ -40,6 +40,9 @@ class AbstractModelCompiler(object):
     def build(self, sysModel, reposTroveSet, dbTroveSet):
         collections = set()
         for op in sysModel.systemItems:
+            if isinstance(op, sysModel.SearchOperation):
+                continue
+
             for troveTup in op:
                 name = troveTup[0]
                 if trove.troveIsComponent(name):
@@ -47,42 +50,54 @@ class AbstractModelCompiler(object):
                 elif trove.troveIsGroup(name):
                     collections.add(name)
 
-        # now build new search path elements
-        #import epdb;epdb.serve()
-        searchPathItems = []
-        for searchItem in sysModel.searchPath:
-            partialTup = searchItem.item
-            if isinstance(partialTup, versions.Label):
-                repos = troveset.SearchSourceTroveSet(
-                        searchsource.NetworkSearchSource(self.repos,
-                                                         [ partialTup ],
-                                                         self.flavor))
-                searchPathItems.append(repos)
-            elif partialTup[0] is not None:
-                result = self.repos.findTroves([],
-                                              [ partialTup ], self.flavor,
-                                              allowMissing = True)
-                if not result:
-                    raise errors.TroveSpecsNotFound( [ partialTup ] )
-                result = result[partialTup]
-                assert(len(result) == 1)
-                ts = self.InitialTroveTupleSet(troveTuple = result,
-                                               graph = self.g)
-                # get the trove itself
-                fetched = ts._action(ActionClass = self.FetchAction)
-                flattened = fetched._action(ActionClass = self.FlattenAction)
-                searchPathItems.append(flattened)
-            else:
-                assert(0)
+        # this represents the path from "search" lines
+        newSearchPath = []
+        totalSearchSet = reposTroveSet
+        # the "total search" searches the current troveset first, then the
+        # search path. we only reset this when an operation changed the
+        # working troveset in a way which would affect later operations,
+        # after searchTroveSet chagnes
+        # changed the current troveset in a way which a
 
-        searchPathItems.append(reposTroveSet)
+        # finalTroveSet is the current working set of what's been selected
+        # so far
+        finalTroveSet = self.InitialTroveTupleSet(graph = reposTroveSet.g)
 
-        searchPathTroveSet = self.SearchPathTroveSet(searchPathItems,
-                                                     graph = self.g)
-        searchTroveSet = searchPathTroveSet
-
-        finalTroveSet = self.InitialTroveTupleSet(graph = searchTroveSet.g)
         for op in sysModel.systemItems:
+            if isinstance(op, sysModel.SearchOperation):
+                partialTup = op.item
+                if isinstance(partialTup, versions.Label):
+                    newSearchTroveSet = troveset.SearchSourceTroveSet(
+                            searchsource.NetworkSearchSource(self.repos,
+                                                             [ partialTup ],
+                                                             self.flavor))
+                    newSearchSet = newSearchTroveSet
+                elif partialTup[0] is not None:
+                    result = self.repos.findTroves([],
+                                                  [ partialTup ], self.flavor,
+                                                  allowMissing = True)
+                    if not result:
+                        raise errors.TroveSpecsNotFound( [ partialTup ] )
+                    result = result[partialTup]
+                    assert(len(result) == 1)
+                    ts = self.InitialTroveTupleSet(troveTuple = result,
+                                                   graph = self.g)
+                    # get the trove itself
+                    newSearchSet = ts._action(ActionClass = self.FlattenAction)
+                else:
+                    assert(0)
+
+                newSearchPath.insert(0, newSearchSet)
+                rebuildTotalSearchSet = True
+                continue
+
+            if rebuildTotalSearchSet:
+                totalSearchSet = self.SearchPathTroveSet( newSearchPath +
+                                                           [ totalSearchSet ],
+                                                         graph = self.g)
+                newSearchPath = []
+                rebuildTotalSearchSet = False
+
             searchSpecs = []
             localSpecs = []
             for troveSpec in op:
@@ -100,7 +115,7 @@ class AbstractModelCompiler(object):
                 searchSpecs.append(troveSpec)
 
             if searchSpecs:
-                searchMatches = searchTroveSet.find(*searchSpecs)
+                searchMatches = totalSearchSet.find(*searchSpecs)
             else:
                 searchMatches = None
 
@@ -117,12 +132,10 @@ class AbstractModelCompiler(object):
             else:
                 matches = localMatches
 
-            growSearchPath = True
             if isinstance(op, sysModel.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UnionAction)
             elif isinstance(op, sysModel.EraseTroveOperation):
-                growSearchPath = False
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.RemoveAction)
             elif isinstance(op, sysModel.PatchTroveOperation):
@@ -134,20 +147,21 @@ class AbstractModelCompiler(object):
             else:
                 assert(0)
 
-            if growSearchPath:
-                growSearchPath = False
-                for troveSpec in op:
-                    if troveSpec.name in collections:
-                        growSearchPath = True
+            flatten = matches._action(ActionClass =
+                                        self.FlattenAction)
+            newSearchPath.insert(0, flatten)
 
-                if growSearchPath:
-                    flatten = matches._action(ActionClass =
-                                                self.FlattenAction)
-                    searchTroveSet = self.SearchPathTroveSet(
-                            [ flatten, searchTroveSet ],
-                            graph = searchTroveSet.g)
+            for troveSpec in op:
+                if troveSpec.name in collections:
+                    rebuildTotalSearchSet = True
+                    break
 
-        finalTroveSet.searchPath = searchPathTroveSet
+        if newSearchPath:
+            totalSearchSet = self.SearchPathTroveSet( newSearchPath +
+                                                       [ totalSearchSet ],
+                                                     graph = self.g)
+
+        finalTroveSet.searchPath = totalSearchSet
 
         return finalTroveSet
 

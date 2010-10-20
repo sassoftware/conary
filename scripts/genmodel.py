@@ -213,13 +213,13 @@ def initialForesightModel(installedTroves, model):
         trv = [ x for x in allGroupTroves
                     if x.getName() == 'group-kde-dist' ][0]
     if trv:
-        model.appendToSearchPath(systemmodel.SearchTrove(
-                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
-                                 str(trv.getFlavor()) ) ) )
         if 'x86_64' in str(trv.getFlavor()):
-            model.appendToSearchPath(systemmodel.SearchTrove(
+            model.appendTroveOp(systemmodel.SearchTrove(
                     item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                      'is:x86' ) ))
+        model.appendTroveOp(systemmodel.SearchTrove(
+                item = TroveSpec('group-world', fmtVer(trv.getVersion()),
+                                 str(trv.getFlavor()) ) ) )
         mainLabels.add(trv.getVersion().trailingLabel().asString())
 
     for trv in groupTroves:
@@ -236,16 +236,16 @@ def initialRedHatModel(client, model):
 			    latest = True)
     mainLabels = set()
 
-    model.appendToSearchPath(systemmodel.SearchTrove(
-                                item = TroveSpec(groupRpath[0],
-                                                 fmtVer(groupRpath[1]),
-                                                 str(groupRpath[2]))))
-    mainLabels.add(groupRpath[1].trailingLabel().asString())
-    model.appendToSearchPath(systemmodel.SearchTrove(
+    model.appendTroveOp(systemmodel.SearchTrove(
                                 item = TroveSpec(groupOs[0],
                                                  fmtVer(groupOs[1]),
                                                  str(groupOs[2]))))
     mainLabels.add(groupOs[1].trailingLabel().asString())
+    model.appendTroveOp(systemmodel.SearchTrove(
+                                item = TroveSpec(groupRpath[0],
+                                                 fmtVer(groupRpath[1]),
+                                                 str(groupRpath[2]))))
+    mainLabels.add(groupRpath[1].trailingLabel().asString())
 
     if 'rhel' in groupOs[1].asString():
         model.appendTroveOp(systemmodel.InstallTroveOperation(
@@ -385,8 +385,9 @@ if __name__ == '__main__':
         print "%s -> %s" % (big, little)
 
     finalModel = systemmodel.SystemModelText(cfg)
-    for searchItem in model.searchPath:
-        finalModel.appendToSearchPath(searchItem)
+    for searchItem in [x for x in model.systemItems
+                       if isinstance(x, systemmodel.SearchTrove)]:
+        finalModel.appendTroveOp(searchItem)
 
     searchTroveItems = []
     deferredItems = []
@@ -412,6 +413,10 @@ if __name__ == '__main__':
             emitDeferred(specClass, deferredItems)
 
         specClass = op.__class__
+        if isinstance(op, systemmodel.SearchTrove):
+            # already handled above
+            continue
+
         newSpecs = []
         simpleSpecs = [ (TrackFindAction.findMap.get(spec, spec), spec)
                         for spec in op ]
@@ -432,13 +437,14 @@ if __name__ == '__main__':
             if 'local@' in spec.version:
                 # never simplify any local versions
                 newSpecs.append(spec);
-            elif (specClass in searchOps
-                and newSpec.version is not None
-                and newSpec.version.split('/')[0] not in mainLabels):
+            elif specClass in searchOps and newSpec.version is not None:
                 searchTroveName = newSpec.name.split(':')[0]
                 searchTroveSpec = TroveSpec(searchTroveName,
-                                            spec.version, spec.flavor)
+                                            spec.version, newSpec.flavor)
                 if searchTroveSpec not in searchTroveItems:
+                    emitDeferred(specClass, deferredItems)
+                    finalModel.appendTroveOp(
+                        systemmodel.SearchTrove(item=searchTroveSpec))
                     searchTroveItems.append(searchTroveSpec)
 
                 if searchNameCount.get(searchTroveName, 0) > 1:
@@ -449,8 +455,7 @@ if __name__ == '__main__':
                     # use the simplified flavor
                     flavor = newSpec.flavor
 
-                newSpecs.append(TroveSpec(newSpec.name,
-                    spec.version.split('/')[0], flavor))
+                newSpecs.append(TroveSpec(newSpec.name, None, flavor))
             else:
                 newSpecs.append(newSpec);
 
@@ -468,14 +473,6 @@ if __name__ == '__main__':
 
     if deferredItems:
         emitDeferred(specClass, deferredItems)
-
-    # The specific items from the searchPath have to come first, because
-    # they may override things on the stack.
-    oldSearchItems = [x.item for x in finalModel.searchPath]
-    finalModel.searchPath = []
-    for searchItem in list(reversed(searchTroveItems)) + oldSearchItems:
-        finalModel.appendToSearchPath(
-            systemmodel.SearchTrove(item=searchItem))
 
     TrackFindAction.remap = False
     finalJob, uJob = buildJobs(client, cache, finalModel)
@@ -502,12 +499,6 @@ if __name__ == '__main__':
         'This command will move your system to the state you have',
         'described by your edits to this file, or will tell you',
         'about errors you have introduced so that you can fix them.',
-        '',
-        'The "search" lines are read in order.  For this reason, you',
-        'may see packages on "search" lines of their own before you',
-        'see the main groups that describe the core of your system.',
-        'This means that those packages will be preferred when you',
-        'search for them.  Troves that are installed',
         '',
         'The "install" and "update" lines are relative only to things',
         'mentioned earlier in this model, not relative to what has been',
