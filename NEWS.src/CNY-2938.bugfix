@@ -1,1 +1,0 @@
-Fixed a hard-to-trigger crash when opening a build logger PTY fails.
