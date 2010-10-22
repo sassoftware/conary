@@ -85,7 +85,13 @@ def makeImportedModule(name, pathname, desc, scope):
 
         def __getattr__(self, key):
             mod = _loadModule()
-            return getattr(mod, key)
+            try:
+                return getattr(mod, key)
+            except AttributeError:
+                # A nicer error to compensate for the extra stack frame the
+                # lazy importer adds.
+                raise AttributeError("Module %r has no attribute %r" % (name,
+                    key))
 
         def __setattr__(self, key, value):
             mod = _loadModule()

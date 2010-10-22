@@ -31,15 +31,16 @@ import traceback
 
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
-from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory, capsulerecipe
+from conary.build import buildinfo, buildpackage, lookaside, use
+from conary.build import recipe, grouprecipe, loadrecipe, factory
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util, magic
 from conary.local import database
-from conary.repository import changeset, errors, filecontents
+from conary.repository import changeset, errors
+from conary.conaryclient import callbacks as client_callbacks
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
 
@@ -156,7 +157,7 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-class CookCallback(conaryclient.callbacks.ChangesetCallback, callbacks.CookCallback):
+class CookCallback(client_callbacks.ChangesetCallback, callbacks.CookCallback):
 
     def buildingChangeset(self):
         self._message('Building changeset...')
@@ -1208,13 +1209,14 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        try:
-            logFile.pushDescriptor('cook')
-            logBuildEnvironment(logFile, sourceVersion, policyTroves,
-                                    recipeObj.macros, cfg)
-        except:
-            logFile.close()
-            raise
+        else:
+            try:
+                logFile.pushDescriptor('cook')
+                logBuildEnvironment(logFile, sourceVersion, policyTroves,
+                                        recipeObj.macros, cfg)
+            except:
+                logFile.close()
+                raise
     try:
         logBuild and logFile.pushDescriptor('build')
         bldInfo.begin()
@@ -1993,7 +1995,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
              emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,
-             downloadOnly = False, groupOptions = None):
+             downloadOnly = False, groupOptions = None, changeSetFile=None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -2015,8 +2017,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @type downloadOnly: boolean
     @param macros: set of macros for the build
     @type macros: dict
+    @param changeSetFile: file to write changeset out to.
+    @type changeSetFile: str
     """
-    changeSetFile = None
     targetLabel = None
 
     use.track(True)
@@ -2218,10 +2221,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof = cProfile.Profile()
                 prof.enable()
                 lsprof = True
-            elif profile:
-                import hotshot
-                prof = hotshot.Profile('conary-cook.prof')
-                prof.start()
             # child, set ourself to be the foreground process
             os.setpgrp()
 
@@ -2281,8 +2280,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof.disable()
                 prof.dump_stats('conary-cook.lsprof')
                 prof.print_stats()
-            elif profile:
-                prof.stop()
             os._exit(0)
         else:
             # parent process, no need for the write side of the pipe
