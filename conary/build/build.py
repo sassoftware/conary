@@ -4044,8 +4044,7 @@ class BuildMSI(BuildAction):
         archiveName = os.path.basename(archivePath)
 
         # Get component info from previous builds
-#        componentInfo = self._getComponentInfo()
-        componentInfo = ()
+        componentInfo = self._getComponentInfo()
 
         # Get a connection to the build service
         wbsc = self._getWBSClient()
@@ -4152,18 +4151,15 @@ class BuildMSI(BuildAction):
         self.recipe.winHelper.productCode = str(results.productCode)
         self.recipe.winHelper.upgradeCode = str(results.upgradeCode)
 
-        # FIXME: This is working around a bug in robj/xobj and may need to
-        #        change in the near future.
-        #self.recipe.winHelper.components = [
-        #    (x.component.uuid.encode('utf-8'),
-        #     x.component.path.encode('utf-8'))
-        #    for x in results.package.components
-        #]
+        self.recipe.winHelper.components = [
+            (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
+            for x in results.package.components
+        ]
 
         # Copy forward old info.
-        #for comp in componentInfo:
-        #    if comp not in self.recipe.winHelper.components:
-        #        self.recipe.winHelper.components.append(comp)
+        for comp in componentInfo:
+            if comp not in self.recipe.winHelper.components:
+                self.recipe.winHelper.components.append(comp)
 
     def _getWBSClient(self):
         """
@@ -4246,7 +4242,7 @@ class BuildMSI(BuildAction):
         if not componentInfo:
             return []
 
-        return [ (uuid(), path()) for uuid, path in componentInfo ]
+        return [ (x.uuid(), x.path()) for _, x in componentInfo.iterAll() ]
 
     def _waitForJob(self, job, interval=1):
         """
