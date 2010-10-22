@@ -12,10 +12,10 @@
 # full details.
 #
 
-import itertools, rpm, os, pwd, stat, tempfile
+import itertools, re, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
-from conary.lib import util, log
+from conary.lib import elf, misc, util, log
 from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors
 from conary.repository import filecontents
@@ -127,6 +127,14 @@ class Callback:
 
 class RpmCapsuleOperation(SingleCapsuleOperation):
 
+    def __init__(self, *args, **kwargs):
+        SingleCapsuleOperation.__init__(self, *args, **kwargs)
+
+        self.netSharedPath = set()
+        nsp = rpmExpandMacro('%_netsharedpath')
+        if nsp != '%_netsharedpath':
+            self.netSharedPath = set(nsp.split(':'))
+
     @staticmethod
     def _canonicalNvra(n, v, r, a):
         return "%s-%s-%s.%s" % (n, v, r, a)
@@ -196,12 +204,34 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
             self.fsJob.addToRestoreSize(thisSize)
 
-        for trv in self.removes:
-            ts.addErase("%s-%s-%s.%s" % (
-                    trv.troveInfo.capsule.rpm.name(),
-                    trv.troveInfo.capsule.rpm.version(),
-                    trv.troveInfo.capsule.rpm.release(),
-                    trv.troveInfo.capsule.rpm.arch()))
+        # don't remove RPMs if we have another reference to that RPM
+        # in the conary database
+        #
+        # by the time we get here, the erase items have already been
+        # removed from the local database, so see if anything left needs
+        # these nevra's
+
+        # if we're installing the same nvra we're removing, don't remove
+        # that nvra after installing it. that would be silly, and it just
+        # makes our database ops more expensive anyway
+        removeNvras -= installNvras
+        # look for things with the same name
+        afterInstall = set(self.db.findByNames(
+                                [ x.getName() for x in self.removes ]))
+        # but not things we're just now installing
+        afterInstall -= set( x[0].getNewNameVersionFlavor()
+                             for x in self.installs )
+        # now find the RPMs those previously installed items need
+        neededNvras = set((trv.troveInfo.capsule.rpm.name(),
+                           trv.troveInfo.capsule.rpm.version(),
+                           trv.troveInfo.capsule.rpm.release(),
+                           trv.troveInfo.capsule.rpm.arch())
+               for trv in self.db.iterTroves(afterInstall)
+               if trv.troveInfo.capsule.type() == trove._TROVECAPSULE_TYPE_RPM)
+        # and don't remove those things
+        removeNvras -= neededNvras
+        for nvra in removeNvras:
+            ts.addErase("%s-%s-%s.%s" % nvra)
 
         ts.check()
         ts.order()
@@ -244,11 +274,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         if probs:
             raise ValueError(str(probs))
 
-        enforceUnpackFailures = not os.geteuid()
+        # CNY-3488: it's potentially harmful to enforce this here
         self._CheckRPMDBContents(installNvras, ts,
             'RPM failed to install requested packages: ',
             unpackFailures=unpackFailures,
-            enforceUnpackFailures=enforceUnpackFailures)
+            enforceUnpackFailures=False)
 
     def install(self, flags, troveCs):
         ACTION_RESTORE = 1
@@ -301,6 +331,13 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
 
         for fileInfo in trv.iterFileList():
             pathId, path, fileId, version = fileInfo
+
+            if os.path.dirname(path) in self.netSharedPath:
+                # we do nothing. really. nothing.
+                #
+                # we don't back it up. we don't mark it as removed in
+                # our database. we don't look for conflicts. nothing.
+                continue
 
             if pathId in changedByPathId:
                 fileObj = fileObjsByPathId[pathId]
@@ -479,3 +516,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 self.fsJob._remove(fsFileObj, path, fullPath,
                                    'removing rpm owned file %s',
                                    ignoreMissing = True)
+
+def rpmExpandMacro(str):
+    rawRpmModulePath = rpm._rpm.__file__
+    sonames = [ x[1] for x in elf.inspect(rawRpmModulePath)[0]
+                    if x[0] == 'soname']
+    rpmLibs = [ x for x in sonames if re.match('librpm[-\.].*so', x) ]
+    assert(len(rpmLibs) == 1)
+    return misc.rpmExpandMacro(rpmLibs[0], str)

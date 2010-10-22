@@ -195,7 +195,7 @@ class _RpmHeader(object):
     localere = re.compile('locale\((.*)\)')
     kmodre = re.compile('(kernel|ksym)\((.*)\)')
 
-    def _getDepsetFromHeader(self, tags):
+    def _getDepsetFromHeader(self, tags, mergeKmodSymbols=False):
         if isinstance(tags, tuple):
             assert len(tags) == 2
             rpmdeps = self.get(tags[0], [])
@@ -264,14 +264,20 @@ class _RpmHeader(object):
                         modname = "%s:%s" % (modname, ver)
                     else:
                         log.warning("dependency '%s' is expected to have "
-                                    "a hexidecimal hash >= 8 characters "
+                                    "a hexadecimal hash >= 8 characters "
                                     "for a version. Instead it has a "
                                     "version of '%s' which will be "
                                     "ignored." % (dep, ver))
 
-                    flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
-                    depset.addDep(deps.RpmDependencies,
-                                  deps.Dependency(m.group(1), flags))
+                    if mergeKmodSymbols:
+                        flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
+                        depset.addDep(deps.RpmDependencies,
+                                      deps.Dependency(m.group(1), flags))
+                    else:
+                        modname = '%s[%s]' % (m.group(1), modname)
+                        flags = []
+                        depset.addDep(deps.RpmDependencies,
+                                      deps.Dependency(modname, flags))
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
@@ -281,21 +287,26 @@ class _RpmHeader(object):
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 
-    def getDeps(self):
+    def getDeps(self, mergeKmodSymbols=False):
         """
         Create two dependency sets that represent the requires and
         provides described in this RPM header object.
 
+        @param mergeKmodSymbols: merge kernel module symbols into a
+        single dependency (False)
         @return: (requires, provides)
         @rtype: two-tuple of deps.DependencySet instances
         """
-        return self.getRequires(), self.getProvides()
+        return (self.getRequires(mergeKmodSymbols=mergeKmodSymbols),
+                self.getProvides(mergeKmodSymbols=mergeKmodSymbols))
 
-    def getProvides(self):
-        return self._getDepsetFromHeader((PROVIDENAME, PROVIDEVERSION, ))
+    def getProvides(self, mergeKmodSymbols=False):
+        return self._getDepsetFromHeader((PROVIDENAME, PROVIDEVERSION, ),
+                                         mergeKmodSymbols=mergeKmodSymbols)
 
-    def getRequires(self):
-        return self._getDepsetFromHeader((REQUIRENAME, REQUIREVERSION, ))
+    def getRequires(self, mergeKmodSymbols=False):
+        return self._getDepsetFromHeader((REQUIRENAME, REQUIREVERSION, ),
+                                         mergeKmodSymbols=mergeKmodSymbols)
 
     def __getitem__(self, tag):
         if tag == OLDFILENAMES and tag not in self.entries:

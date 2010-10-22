@@ -15,7 +15,6 @@
 #
 
 import cPickle
-import hotshot.stats
 import sys
 
 def progress(msg):
@@ -40,9 +39,6 @@ if filename.endswith('.pickle'):
         usage()
     f = open(filename)
     stats = cPickle.load(f)
-elif filename.endswith('.prof'):
-    progress('loading %s' %filename)
-    stats = hotshot.stats.load(filename)
 else:
     import pstats
     progress('loading %s' %filename)

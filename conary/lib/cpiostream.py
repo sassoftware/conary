@@ -34,6 +34,7 @@ import stat
 import StringIO
 import struct
 import sys
+import errno
 
 class Error(Exception):
     "Base exception"
@@ -212,35 +213,61 @@ class CpioStream(object):
 class CpioExploder(CpioStream):
 
     def explode(self, destDir):
+        linkMap = {}
         for ent in self:
-            target = destDir + '/' + ent.filename
-            parent = os.path.dirname(target)
-            if not os.path.exists(parent):
-                os.makedirs(parent)
+            try:
+                target = destDir + '/' + ent.filename
 
-            if stat.S_ISCHR(ent.header.mode):
-                os.mknod(target, stat.S_IFCHR,
-                         os.makedev(ent.rdevmajor, ent.rdevminor))
-            elif stat.S_ISBLK(ent.header.mode):
-                os.mknod(target, stat.S_IFBLK,
-                         os.makedev(ent.rdevmajor, ent.rdevminor))
-            elif stat.S_ISDIR(ent.header.mode):
-                os.mkdir(target)
-            elif stat.S_ISFIFO(ent.header.mode):
-                os.mkfifo(target)
-            elif stat.S_ISLNK(ent.header.mode):
-                os.symlink(ent.payload.read(),target)
-            elif stat.S_ISREG(ent.header.mode):
-                f = open(target, "w")
-                buf = ent.payload.read(64 * 1024)
-                while buf:
-                    f.write(buf)
+                parent = os.path.dirname(target)
+                if not os.path.exists(parent):
+                    os.makedirs(parent)
+
+                if stat.S_ISCHR(ent.header.mode):
+                    os.mknod(target, stat.S_IFCHR,
+                             os.makedev(ent.rdevmajor, ent.rdevminor))
+                elif stat.S_ISBLK(ent.header.mode):
+                    os.mknod(target, stat.S_IFBLK,
+                             os.makedev(ent.rdevmajor, ent.rdevminor))
+                elif stat.S_ISDIR(ent.header.mode):
+                    os.mkdir(target)
+                elif stat.S_ISFIFO(ent.header.mode):
+                    os.mkfifo(target)
+                elif stat.S_ISLNK(ent.header.mode):
+                    os.symlink(ent.payload.read(),target)
+                elif stat.S_ISREG(ent.header.mode):
+                    # save hardlinks until after the file content is written
+                    if ent.header.nlink > 1 and ent.header.filesize == 0:
+                        l = linkMap.get(ent.header.inode, [])
+                        l.append(target)
+                        linkMap[ent.header.inode] = l
+                        continue
+
+                    f = open(target, "w")
                     buf = ent.payload.read(64 * 1024)
-                f.close()
-            else:
-                raise Error("unknown file mode 0%o for %s"
+                    while buf:
+                        f.write(buf)
+                        buf = ent.payload.read(64 * 1024)
+                    f.close()
+                else:
+                    raise Error("unknown file mode 0%o for %s"
                                 % (ent.header.mode, ent.filename))
 
+                # create hardlinks after the file content is written
+                if ent.header.nlink > 1 and ent.header.filesize:
+                    l = linkMap.get(ent.header.inode, [])
+                    # the last entry with the same inode should contain the
+                    # contents so this list should always have at least one
+                    # entry
+                    assert(l)
+                    for t in l:
+                        os.link(target, t)
+                # create hardlinks after the file content is written
+
+            except OSError, e:
+                if e.errno == errno.EEXIST:
+                    pass
+                else:
+                    raise
             if not stat.S_ISLNK(ent.header.mode):
                 os.chmod(target, ent.header.mode & 0777)
 
