@@ -19,7 +19,7 @@ from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import log
 from conary.lib.openpgpfile import KeyNotFound
-from conary.updatecmd import parseTroveSpec
+from conary.cmds.updatecmd import parseTroveSpec
 from conary.repository import errors
 
 class SignatureCallback(callbacks.SignatureCallback, callbacks.LineOutput):

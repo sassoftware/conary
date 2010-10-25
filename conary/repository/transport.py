@@ -32,7 +32,6 @@ import xmlrpclib
 import urllib
 import warnings
 import zlib
-import errors
 
 try:
     from cStringIO import StringIO
@@ -52,7 +51,6 @@ LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
                   socket.gethostname()])
 
 from conary.lib import util
-from conary.lib import log as clog
 
 
 class InfoURL(urllib.addinfourl):
@@ -141,8 +139,8 @@ class HTTPSConnection(httplib.HTTPConnection):
     inheriting.
 
     Currently supported "extra" features:
-     * Can pass in a list of peer certificate authorities.
-     * Can set the hostname used to check the peer's certificate.
+     - Can pass in a list of peer certificate authorities.
+     - Can set the hostname used to check the peer's certificate.
     """
     default_port = httplib.HTTPS_PORT
 

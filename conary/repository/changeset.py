@@ -976,14 +976,14 @@ class ChangeSet(streams.StreamSet):
 
     def removeCommitted(self, repos):
         """
-        Walk a changeset and remove and items which are already in the
+        Walk the changeset and removes any items which are already in the
         repositories. Returns a changeset which will commit without causing
         duplicate trove errors. If everything in the changeset has already
         been committed, return False. If there are items left for commit,
         return True.
 
-        @param cs: Changeset to filter
-        @type cs: repository.changeset.ChangeSet
+        @param repos: repository to check for duplicates
+        @type repos: repository.netclient.NetworkRepositoryClient
         @rtype: repository.changeset.ChangeSet or None
         """
         newTroveInfoList = [ x.getNewNameVersionFlavor() for x in

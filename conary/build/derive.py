@@ -20,7 +20,7 @@ resulting packages to the repository.
 import os
 import stat
 
-from conary import branch
+from conary.cmds import branch
 from conary import checkin
 from conary import state
 from conary.conaryclient import cmdline

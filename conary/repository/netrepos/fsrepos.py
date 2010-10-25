@@ -368,15 +368,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         excludeAutoSource = False,
                         mirrorMode = False, roleIds = None):
         """
-        @param troveList: a list of (troveName, flavor, oldVersion, newVersion,
-        absolute) tuples.
+        @param origTroveList: a list of
+        C{(troveName, flavor, oldVersion, newVersion, absolute)} tuples.
 
-        if oldVersion == None and absolute == 0, then the trove is assumed
-        to be new for the purposes of the change set
+        If C{oldVersion == None} and C{absolute == 0}, then the trove is
+        assumed to be new for the purposes of the change set.
 
-        if newVersion == None then the trove is being removed
+        If C{newVersion == None} then the trove is being removed.
 
-        if recurse is set, this yields one result for the entire troveList.
+        If recurse is set, this yields one result for the entire troveList.
+
         If recurse is not set, it yields one result per troveList entry.
 
         @param excludeCapsuleContents: If True, troves which include capsules

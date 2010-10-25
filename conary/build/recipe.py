@@ -181,6 +181,7 @@ class Recipe(object):
                                  'SourcePackageRecipe',
                                  'BaseRequiresRecipe',
                                  'GroupRecipe', '_GroupRecipe',
+                                 'GroupSetRecipe', '_GroupSetRecipe',
                                  'RedirectRecipe',
                                  'AbstractDerivedPackageRecipe',
                                  'DerivedPackageRecipe',
