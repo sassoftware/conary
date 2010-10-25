@@ -657,16 +657,31 @@ class PatchAction(DelayedTupleSetAction):
         beforeInfo = {}
         installSet = set()
         optionalSet = set()
+        installSetSwitch = set()
         for troveTup, inInstallSet, explicit in \
                   self.primaryTroveSet._walk(data.troveCache, recurse = True):
             if troveTup[0] in updateNames:
                 before.addTrove(troveTup[0], troveTup[1], troveTup[2])
                 beforeInfo[troveTup] = (inInstallSet, explicit)
+
+                if (not inInstallSet and troveTup in afterInfo and
+                    afterInfo[troveTup][1]):
+                    installSetSwitch.add(troveTup)
             elif explicit:
                 if inInstallSet:
                     installSet.add(troveTup)
                 else:
                     optionalSet.add(troveTup)
+
+        # these troves were not in the install set of the working set, but
+        # explicitly mentioned in the model command we're handling. that
+        # not only overrides the working set for this trove, but for anything
+        # else it includes
+        for troveTup in installSetSwitch:
+            for (subTroveTup, inInstallSet, explicit) in \
+                                data.troveCache.iterTroveListInfo(troveTup):
+                before.delTrove(subTroveTup[0], subTroveTup[1],
+                                subTroveTup[2], True)
 
         troveMapping = after.diff(before)[2]
         # this completely misses anything where the only change is
@@ -710,11 +725,10 @@ class PatchAction(DelayedTupleSetAction):
         else:
             # we've mapped an update; turn off the old version (by
             # marking it as optional) and include the new one with the
-            # same defaultness as the old one had. if it is explicit
-            # in the new one, we always include it
+            # same defaultness as the old one had.
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
             inInstallSet, isExplicit = afterInfo[newTuple]
-            if (isExplicit and inInstallSet) or wasInInstallSet:
+            if wasInInstallSet:
                 installSet.add(newTuple)
             else:
                 optionalSet.add(newTuple)
