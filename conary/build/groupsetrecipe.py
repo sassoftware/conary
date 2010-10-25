@@ -23,6 +23,7 @@ from conary.conaryclient.cmdline import parseTroveSpec
 from conary.conaryclient import modelgraph, systemmodel, troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.lib import log
+from conary.local import deptable
 from conary.repository import errors, netclient, searchsource
 from conary.deps import deps
 
@@ -1094,7 +1095,10 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
 
         checker.addJobs(jobSet)
         if self.resolveTroveSet:
-            resolveMethod = (self.resolveTroveSet._getResolveSource().
+            # might be nice to share a single depDb across all instances
+            # of this class?
+            resolveMethod = (self.resolveTroveSet._getResolveSource(
+                                    depDb = deptable.DependencyDatabase()).
                                         getResolveMethod())
         else:
             resolveMethod = None

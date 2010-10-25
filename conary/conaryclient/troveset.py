@@ -55,8 +55,9 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
     """
 
     def __init__(self, troveCache, troveSet, flavor,
-                 filterFn = lambda *args: False):
-        self.depDb = None
+                 filterFn = lambda *args: False, depDb = None):
+        assert(depDb)
+        self.depDb = depDb
         self.troveSet = troveSet
         self.filterFn = filterFn
 
@@ -79,7 +80,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.setFlavorPreferencesByFlavor(flavor)
         self.searchWithFlavor()
         self.searchLeavesOnly()
-        self.depDb = deptable.DependencyDatabase()
+        # maps troveId's from the dependency database into self.troveTupList
+        self.depTroveIdMap = {}
         self.providesIndex = None
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
@@ -133,18 +135,22 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 if self.inDepDb[i]:
                     continue
 
-                depLoader.addRaw(i, troveDeps[i][0], emptyDep)
+                depTroveId = depLoader.addRaw(troveDeps[i][0], emptyDep)
+                self.depTroveIdMap[depTroveId] = i
                 self.inDepDb[i] = True
 
         depLoader.done()
         self.depDb.commit()
 
-        suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly)
-                                     
+        suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly,
+                                     troveIdList = self.depTroveIdMap.keys())
+
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
-                newSolListList.append([ self.troveTupList[x] for x in solList ])
+                newSolListList.append([
+                        self.troveTupList[self.depTroveIdMap[x]]
+                        for x in solList ])
 
             if newSolListList:
                 suggMap[depSet] = newSolListList
@@ -213,12 +219,13 @@ class TroveTupleSet(TroveSet):
 
         return self._troveSource
 
-    def _getResolveSource(self, filterFn = lambda *args: False):
+    def _getResolveSource(self, filterFn = lambda *args: False,
+                          depDb = None):
         if self._resolveSource is None:
             resolveTroveSource = ResolveTroveTupleSetTroveSource(
                                         self.g.actionData.troveCache, self,
                                         self.g.actionData.flavor,
-                                        filterFn = filterFn)
+                                        filterFn = filterFn, depDb = depDb)
             self._resolveSource = TroveTupleSetSearchSource(
                                     resolveTroveSource, self,
                                     self.g.actionData.flavor)
@@ -422,7 +429,7 @@ class SearchSourceTroveSet(TroveSet):
         return self.searchSource.findTroves(troveTuple, requireLatest = True,
                                             allowMissing = True)
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, depDb = None):
         return self.searchSource
 
     def _getSearchSource(self):
@@ -442,10 +449,11 @@ class SearchPathTroveSet(SearchSourceTroveSet):
         for i, troveSet in enumerate(troveSetList):
             graph.addEdge(troveSet, self, value = str(i + 1))
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, depDb = None):
         # we search differently then we resolve; resolving is recursive
         # while searching isn't
-        sourceList = [ ts._getResolveSource() for ts in self.troveSetList ]
+        sourceList = [ ts._getResolveSource(debDb = depDb)
+                            for ts in self.troveSetList ]
         return searchsource.SearchSourceStack(*sourceList)
 
     def realize(self, data):

@@ -17,6 +17,7 @@ from conary import trove, versions
 from conary.conaryclient import modelgraph, troveset, update
 from conary.deps import deps
 from conary.lib import log, util
+from conary.local import deptable
 from conary.repository import searchsource, trovecache, trovesource
 
 class SysModelActionData(troveset.ActionData):
@@ -294,15 +295,17 @@ class SysModelFlattenAction(troveset.DelayedTupleSetAction):
 
 class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
-    def _getResolveSource(self, filterFn):
+    def _getResolveSource(self, depDb, filterFn):
         # don't bother with items in the install set; those are being installed
         # already so aren't a good choice for suggestions
         sourceList = []
         for ts in self.troveSetList:
             if isinstance(ts, troveset.TroveTupleSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+                sourceList.append(ts._getResolveSource(filterFn = filterFn,
+                                                       depDb = depDb))
             elif isinstance(ts, SysModelSearchPathTroveSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+                sourceList.append(ts._getResolveSource(filterFn = filterFn,
+                                                       depDb = depDb))
             else:
                 sourceList.append(ts._getResolveSource())
 
@@ -615,7 +618,9 @@ class SystemModelClient(object):
         # aren't installed and we don't know about them) or troves which are
         # in the install set (since they're already in the install set,
         # adding them to the install set won't help)
+        depDb = deptable.DependencyDatabase()
         depResolveSource = depSearch._getResolveSource(
+                        depDb = depDb,
                         filterFn = lambda n, v, f :
                             (v.isOnLocalHost() or
                              targetTrv.isStrongReference(n,v,f)))
