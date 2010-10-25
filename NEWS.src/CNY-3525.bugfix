@@ -1,0 +1,3 @@
+promoting groups which include multiple groups with the same name (either
+strongly or weakly) when those groups come from source components with
+different names no longer fails
