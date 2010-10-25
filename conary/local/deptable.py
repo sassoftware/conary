@@ -1269,6 +1269,9 @@ class BulkDependencyLoader:
         self.workTables._populateTmpTable([], troveId, trove.getRequires(),
                                           trove.getProvides())
 
+    def addRaw(self, troveId, provides, requires):
+        self.workTables._populateTmpTable([], troveId, requires, provides);
+
     def done(self):
         self.workTables.merge(intoDatabase = True)
 
@@ -1598,9 +1601,12 @@ class DependencyDatabase(DependencyTables):
         cu = self.db.cursor()
         self._add(cu, troveId, provides, requires)
 
-    def delete(self):
+    def bulkLoader(self):
         cu = self.db.cursor()
-        DependencyDatabase.delete(self, cu, troveId)
+        return BulkDependencyLoader(self.db, cu)
+
+    def delete(self):
+        raise NotImplementedError
 
     def commit(self):
         self.db.commit()

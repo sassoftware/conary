@@ -122,6 +122,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                     else:
                         val.append(i)
 
+        depLoader = self.depDb.bulkLoader()
 
         for classAndName in reqNames:
             val = self.providesIndex.get(classAndName)
@@ -132,12 +133,14 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 if self.inDepDb[i]:
                     continue
 
-                self.depDb.add(i, troveDeps[i][0], emptyDep)
+                depLoader.addRaw(i, troveDeps[i][0], emptyDep)
                 self.inDepDb[i] = True
 
+        depLoader.done()
         self.depDb.commit()
 
         suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly)
+                                     
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
