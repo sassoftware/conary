@@ -202,6 +202,9 @@ class application(object):
                     "authentication is not allowed over unsecured "
                     "connections.\r\n")
 
+        if self.repositoryServer:
+            self.repositoryServer.reopen()
+
         method = self.environ['REQUEST_METHOD']
         if method == 'POST':
             return self._iter_post()
