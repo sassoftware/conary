@@ -39,6 +39,7 @@ try:
     SSLVerificationError = SSL.Checker.SSLVerificationError
 except ImportError:
     SSL = None
+
     class SSLVerificationError(Exception):
         # If M2Crypto is not installed, no verification is performed, so this
         # is just a placeholder to simplify exception handling
@@ -46,6 +47,7 @@ except ImportError:
 
 LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
                   socket.gethostname()])
+
 
 class HTTPSConnection(httplib.HTTPConnection):
     """
@@ -111,6 +113,103 @@ class HTTPSConnection(httplib.HTTPConnection):
         checker = SSL.Checker.Checker()
         return checker(cert, host)
 
+
+class _ConnectionIterator(object):
+    __slots__ = ('connSpec', 'proxyMap', 'protocols',
+            'retries', 'proxyRetries',
+            'proxyLists', '_listIndex', '_retryCount', '_timer', '_iter',
+            )
+    ProxyTypeName = dict(http='HTTP', https='HTTP')
+
+    def __init__(self, connSpec, proxyMap, protocols, retries, proxyRetries):
+        self.connSpec = connSpec
+        self.proxyMap = proxyMap
+        self.retries = retries
+        self.proxyRetries = proxyRetries
+        self.protocols = protocols
+        self._retryCount = 0
+        self._timer = BackoffTimer()
+        self._iter = self.proxyMap.getProxyIter(self.connSpec, self.protocols)
+
+    def __iter__(self):
+        return self
+
+    @property
+    def retryCount(self):
+        return self._retryCount
+
+    def next(self):
+        if self._retryCount > self.retries:
+            raise StopIteration
+
+        try:
+            proxy = self._iter.next()
+            # XXX It is most certainly not enough to increment the retry
+            # count in the proxy case. It will make sure that we don't
+            # iterate indefinitely, but it will not sleep at all.
+            self._retryCount += 1
+        except StopIteration:
+            if self._retryCount > self.retries:
+                raise
+            if self._retryCount != 0:
+                # Sleep and try again, per RFC 2616 s. 8.2.4
+                self._timer.sleep()
+            self._retryCount += 1
+            return (self.connSpec, None)
+        except errors.ProxyListExhausted, e:
+            ei = sys.exc_info()
+            proxyErrors = [ x[1]
+                for x in self.proxyMap.iterBlacklist(stale=True)
+                    if x[1].host in e.failedProxies ]
+            proxyError = proxyErrors[-1]
+            if len(proxyErrors) > 1:
+                errMsg = " %d proxies failed. Last error:" % (
+                    len(proxyErrors), )
+            else:
+                errMsg = ""
+            errMsg = "Proxy error:%s %s" % (errMsg,
+                self._formatProxyError(proxyError))
+            raise (TransportError, errMsg, ei[2])
+        return (self.connSpec, proxy)
+
+    def markFailedProxy(self, proxy, error=None):
+        if error:
+            errorMsg = " (%s)" % str(error)
+        else:
+            errorMsg = ""
+        log.info("Marking proxy %r as failed%s" % (
+            proxy.asString(withAuth=True), errorMsg))
+        self.proxyMap.blacklistUrl(proxy, error=error)
+
+    def _formatProxyError(self, proxyError):
+        tmpl = "%s (via %s proxy %r)"
+        if proxyError.exception:
+            if isinstance(proxyError.exception, socket.error) and \
+                        not hasattr(proxyError.exception, 'errno') and \
+                        len(proxyError.exception.args) >= 2:
+                # python 2.4
+                errMsg = "[Errno %s] %s" % (proxyError.exception.args[0],
+                    " ".join(proxyError.exception.args[1:]))
+            else:
+                errMsg = str(proxyError.exception)
+        else:
+            errMsg = "(unknown)"
+        proxyType = proxyError.host.requestProtocol
+        ppType = self.ProxyTypeName.get(proxyType, proxyType)
+        return tmpl % (errMsg, ppType,
+            proxyError.host.asString(withAuth=True))
+
+
+class Connection(object):
+    __slots__ = ( 'url', 'selector', 'connection', 'headers' )
+
+    def __init__(self, url, selector, connection, headers):
+        self.connection = connection
+        self.headers = headers
+        self.url = url
+        self.selector = selector
+
+
 class ConnectionManager(object):
     CONN_PLAIN = 0
     CONN_PROXY = 2
@@ -120,102 +219,11 @@ class ConnectionManager(object):
 
     URL = util.URL
     ProxyURL = util.ProxyURL
+    Connection = Connection
+    _ConnectionIterator = _ConnectionIterator
 
     # Map schemes in the target URL to a proxyMap protocol.
-    ProtocolMaps = dict(http = [ 'http:http' ], https = [ 'http:https' ])
-
-    class _ConnectionIterator(object):
-        __slots__ = [ 'connSpec', 'proxyMap', 'protocols',
-            'retries', 'proxyRetries',
-            'proxyLists', '_listIndex', '_retryCount', '_timer', '_iter', ]
-        ProxyTypeName = dict(http = 'HTTP', https = 'HTTP')
-
-        def __init__(self, connSpec, proxyMap, protocols, retries, proxyRetries):
-            self.connSpec = connSpec
-            self.proxyMap = proxyMap
-            self.retries = retries
-            self.proxyRetries = proxyRetries
-            self.protocols = protocols
-            self._retryCount = 0
-            self._timer = BackoffTimer()
-            self._iter = self.proxyMap.getProxyIter(self.connSpec, self.protocols)
-
-        def __iter__(self):
-            return self
-
-        @property
-        def retryCount(self):
-            return self._retryCount
-
-        def next(self):
-            if self._retryCount > self.retries:
-                raise StopIteration
-
-            try:
-                proxy = self._iter.next()
-                # XXX It is most certainly not enough to increment the retry
-                # count in the proxy case. It will make sure that we don't
-                # iterate indefinitely, but it will not sleep at all.
-                self._retryCount += 1
-            except StopIteration:
-                if self._retryCount > self.retries:
-                    raise
-                if self._retryCount != 0:
-                    # Sleep and try again, per RFC 2616 s. 8.2.4
-                    self._timer.sleep()
-                self._retryCount += 1
-                return (self.connSpec, None)
-            except errors.ProxyListExhausted, e:
-                ei = sys.exc_info()
-                proxyErrors = [ x[1]
-                    for x in self.proxyMap.iterBlacklist(stale=True)
-                        if x[1].host in e.failedProxies ]
-                proxyError = proxyErrors[-1]
-                if len(proxyErrors) > 1:
-                    errMsg = " %d proxies failed. Last error:" % (
-                        len(proxyErrors), )
-                else:
-                    errMsg = ""
-                errMsg = "Proxy error:%s %s" % (errMsg,
-                    self._formatProxyError(proxyError))
-                raise TransportError, errMsg, ei[2]
-            return (self.connSpec, proxy)
-
-        def markFailedProxy(self, proxy, error=None):
-            if error:
-                errorMsg = " (%s)" % str(error)
-            else:
-                errorMsg = ""
-            log.info("Marking proxy %r as failed%s" % (
-                proxy.asString(withAuth=True), errorMsg))
-            self.proxyMap.blacklistUrl(proxy, error=error)
-
-        def _formatProxyError(self, proxyError):
-            tmpl = "%s (via %s proxy %r)"
-            if proxyError.exception:
-                if isinstance(proxyError.exception, socket.error) and \
-                            not hasattr(proxyError.exception, 'errno') and \
-                            len(proxyError.exception.args) >= 2:
-                    # python 2.4
-                    errMsg = "[Errno %s] %s" % (proxyError.exception.args[0],
-                        " ".join(proxyError.exception.args[1:]))
-                else:
-                    errMsg = str(proxyError.exception)
-            else:
-                errMsg = "(unknown)"
-            proxyType =  proxyError.host.requestProtocol
-            ppType = self.ProxyTypeName.get(proxyType, proxyType)
-            return tmpl % (errMsg, ppType,
-                proxyError.host.asString(withAuth=True))
-
-
-    class Connection(object):
-        __slots__ = [ 'url', 'selector', 'connection', 'headers' ]
-        def __init__(self, url, selector, connection, headers):
-            self.connection = connection
-            self.headers = headers
-            self.url = url
-            self.selector = selector
+    ProtocolMaps = dict(http=['http:http'], https=['http:https'])
 
     def __init__(self, proxyMap, caCerts=None, retries=None,
             proxyRetries=None, forceProxy=False, localhosts=None,
@@ -229,7 +237,7 @@ class ConnectionManager(object):
         self.proxyUsed = None
         self.userAgent = userAgent
 
-    def getConnectionIterator(self, url, ssl = None):
+    def getConnectionIterator(self, url, ssl=None):
         connSpec = self.newUrl(url, ssl=ssl)
         protocols = tuple(self.ProtocolMaps[connSpec.protocol])
         connIter = self._ConnectionIterator(connSpec, self.proxyMap,
@@ -237,7 +245,7 @@ class ConnectionManager(object):
         return connIter
 
     @classmethod
-    def newUrl(cls, url, defaultPort = None, ssl = None):
+    def newUrl(cls, url, defaultPort=None, ssl=None):
         if isinstance(url, cls.URL):
             return url
         protocol = (ssl and 'https') or 'http'
@@ -259,10 +267,10 @@ class ConnectionManager(object):
 
     def proxy_ssl(self, endpoint, proxy):
         proxyHost, proxyPort = self._splitport((proxy.host, proxy.port),
-            defaultPort = 3128)
+                defaultPort=3128)
         endpointHost, endpointPort = self._splitport(
-            (endpoint.host, endpoint.port),
-            defaultPort = httplib.HTTPS_PORT, getIP=False)
+                (endpoint.host, endpoint.port),
+                defaultPort=httplib.HTTPS_PORT, getIP=False)
         if ':' in proxyHost:
             family = socket.AF_INET6
         else:
@@ -360,9 +368,11 @@ class ConnectionManager(object):
     def _addAuthHeader(cls, headers, headerName, userpass):
         if not userpass:
             return
+        encoded = base64.b64encode(str(userpass))
         headers.append(
-            (headerName, util.ProtectedTemplate('Basic ${auth}',
-                auth = util.ProtectedString(base64.b64encode(str(userpass))))))
+                (headerName, util.ProtectedTemplate('Basic ${auth}',
+                    auth=util.ProtectedString(encoded)))
+                )
 
     def getIPAddress(self, connSpec):
         try:
@@ -402,20 +412,20 @@ class ConnectionManager(object):
 
             if connType & self.CONN_SSL:
                 if self.caCerts and not SSL:
-                    # There are two places to do cert checking but we only want to
-                    # warn once, so check for this early.
-                    warnings.warn('m2crypto not installed; server certificates '
-                            'will not be validated')
+                    # There are two places to do cert checking but we only want
+                    # to warn once, so check for this early.
+                    warnings.warn('m2crypto not installed; server '
+                            'certificates will not be validated')
 
                 if self.caCerts and SSL:
-                    # If cert checking is requested use our HTTPSConnection (which
-                    # uses m2crypto)
+                    # If cert checking is requested use our HTTPSConnection
+                    # (which uses m2crypto)
                     commonName = nexthop.host
                     hndl = HTTPSConnection(nexthopHP, caCerts=self.caCerts,
                                            commonName=commonName)
                 else:
-                    # Either no cert checking was requested, or we don't have the
-                    # module to support it, so use vanilla httplib.
+                    # Either no cert checking was requested, or we don't have
+                    # the module to support it, so use vanilla httplib.
                     hndl = httplib.HTTPSConnection(nexthopHP)
             else:
                 # Target: proxy or origin server
@@ -449,11 +459,15 @@ class ConnectionManager(object):
         npFilt = util.noproxyFilter()
         return npFilt.bypassProxy(endpoint.host)
 
+
 class HttpData(object):
-    __slots__ = [ 'data', 'method', 'size', 'headers', 'compress',
-                  'contentType', 'callback', 'chunked', 'bufferSize',
-                  'rateLimit', ]
+    __slots__ = ( 'data', 'method', 'size', 'headers', 'compress',
+            'contentType', 'callback', 'chunked', 'bufferSize',
+            'rateLimit',
+            )
+
     BUFFER_SIZE = 8192
+
     def __init__(self, data=None, method=None, size=None, headers=None,
                  contentType=None, compress=False, callback=None, chunked=None,
                  bufferSize=None, rateLimit=None):
@@ -519,7 +533,7 @@ class HttpData(object):
             if chunk > size:
                 chunk = size
             # first send the hex-encoded size
-            c.send('%x\r\n' %chunk)
+            c.send('%x\r\n' % chunk)
             # then the chunk of data
             util.copyfileobj(self.data, c, bufSize=chunk,
                              callback=self.callback,
@@ -527,10 +541,11 @@ class HttpData(object):
                              total=total)
             # send \r\n after the chunked data
             c.send("\r\n")
-            total =+ chunk
+            total += chunk
             size -= chunk
         # terminate the chunked encoding
         c.send('0\r\n\r\n')
+
 
 class URLOpener(urllib.FancyURLopener):
     '''Replacement class for urllib.FancyURLopener'''
@@ -568,8 +583,9 @@ class URLOpener(urllib.FancyURLopener):
             retries=kw.pop('retries', None),
             proxyRetries=kw.pop('proxyRetries', None),
             caCerts=kw.pop('caCerts', None),
-            localhosts = self.localhosts,
-            userAgent = self.user_agent)
+            localhosts=self.localhosts,
+            userAgent=self.user_agent,
+            )
         # Make sure urllib won't try to interpret the proxies from the
         # environment
         kw['proxies'] = {}
@@ -708,7 +724,8 @@ class URLOpener(urllib.FancyURLopener):
         else:
             self.handleProxyErrors(errcode)
             urlString = conn.url.asString(withAuth=True)
-            return self.http_error(urlString, fp, errcode, errmsg, headers, data)
+            return self.http_error(urlString, fp, errcode, errmsg, headers,
+                    data)
 
     def handleProxyErrors(self, errcode, tb=None):
         e = None
@@ -728,9 +745,10 @@ class URLOpener(urllib.FancyURLopener):
     def _processSocketError(self, error):
         if not self.proxyHost:
             return
-        msgTempl =  "%s (via %s proxy %s)"
+        msgTempl = "%s (via %s proxy %s)"
         proxyType = self.proxyHost.requestProtocol
-        ppType = self.connmgr._ConnectionIterator.ProxyTypeName.get(proxyType, proxyType)
+        ppType = self.connmgr._ConnectionIterator.ProxyTypeName.get(
+                proxyType, proxyType)
         msgError = msgTempl % (error[1], ppType, self.proxyHost.hostport)
         error.args = (error[0], msgError)
         if hasattr(error, 'strerror'):
@@ -776,13 +794,14 @@ class URLOpener(urllib.FancyURLopener):
     def http_error_default(self, url, fp, errcode, errmsg, headers, data=None):
         raise TransportError("Unable to open %s: %s" % (url, errmsg))
 
+
 class IPCache(object):
     """
     A global IP cache
     """
 
     # Maps hostname to a list of IP addresses, as returned by getaddrinfo.
-    _cache = util.TimestampedMap(delta = 600)
+    _cache = util.TimestampedMap(delta=600)
 
     @staticmethod
     def _resolve(host):
@@ -794,7 +813,7 @@ class IPCache(object):
         if host in LocalHosts:
             return [host]
         # Fetch fresh results only first
-        ret = cls._cache.get(host, None, stale = False)
+        ret = cls._cache.get(host, None, stale=False)
         if ret is not None:
             return ret
         try:
@@ -803,12 +822,12 @@ class IPCache(object):
             if not resetResolver and not stale:
                 raise
             if stale:
-                ret = cls._cache.get(host, None, stale = True)
+                ret = cls._cache.get(host, None, stale=True)
                 if ret is not None:
                     return ret
             # Recursively call ourselves
             util.res_init()
-            return cls.get(host, resetResolver = False, stale = False)
+            return cls.get(host, resetResolver=False, stale=False)
         else:
             # [(family, type, proto, canonname, (host, port, ...))]
             results = [x[4][0] for x in results]
@@ -822,6 +841,7 @@ class IPCache(object):
     @classmethod
     def clear(cls):
         cls._cache.clear()
+
 
 class BackoffTimer(object):
     """Helper for functions that need an exponential backoff."""
@@ -837,6 +857,7 @@ class BackoffTimer(object):
         self.delay *= self.factor
         self.delay = random.normalvariate(self.delay, self.delay * self.jitter)
 
+
 class InfoURL(urllib.addinfourl):
     def __init__(self, fp, headers, url, protocolVersion, code=None, msg=None):
         urllib.addinfourl.__init__(self, fp, headers, url)
@@ -844,9 +865,14 @@ class InfoURL(urllib.addinfourl):
         self.code = code
         self.msg = msg
 
-class AbortError(Exception): pass
 
-class TransportError(Exception): pass
+class AbortError(Exception):
+    pass
+
+
+class TransportError(Exception):
+    pass
+
 
 class ProxyError(Exception):
     def __init__(self, exception, *args, **kwargs):
