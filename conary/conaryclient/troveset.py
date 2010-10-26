@@ -452,7 +452,7 @@ class SearchPathTroveSet(SearchSourceTroveSet):
     def _getResolveSource(self, depDb = None):
         # we search differently then we resolve; resolving is recursive
         # while searching isn't
-        sourceList = [ ts._getResolveSource(debDb = depDb)
+        sourceList = [ ts._getResolveSource(depDb = depDb)
                             for ts in self.troveSetList ]
         return searchsource.SearchSourceStack(*sourceList)
 
