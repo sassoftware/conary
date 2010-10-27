@@ -193,7 +193,7 @@ class TroveSet(object):
 
         action = ActionClass(self, *args, **kwargs)
         troveSet = action.getResultTupleSet(graph = self.g)
-        inputSets = action.getInputSets(graph = self.g)
+        inputSets = action.getInputSets()
 
         self.g.addNode(troveSet)
 
@@ -478,24 +478,24 @@ class DelayedTupleSetAction(Action):
     resultClass = DelayedTupleSet
 
     def __init__(self, primaryTroveSet, *args):
-        self.primaryTroveSet = primaryTroveSet
-        self._inputSets = [ self.primaryTroveSet ]
-        self._inputSets += [ x for x in args if isinstance(x, TroveTupleSet) ]
+        inputSets = [ primaryTroveSet ]
+        inputSets += [ x for x in args if isinstance(x, TroveTupleSet) ]
+        self._inputSets = self._applyFilters(inputSets)
+        self.primaryTroveSet = self._inputSets[0]
 
-    def _applyFilters(self, l, graph = None):
+    def _applyFilters(self, l):
+        if not self.prefilter:
+            return l
+
         r = []
-        for (ts, filterAction) in l:
-            newTs = ts._action(ActionClass = filterAction)
+        for ts in l:
+            newTs = ts._action(ActionClass = self.prefilter)
             r.append(newTs)
 
         return r
 
-    def getInputSets(self, graph = None):
-        if self.prefilter is None:
-            return self._inputSets
-
-        return self._applyFilters(
-                [ (ts, self.prefilter) for ts in self._inputSets ] )
+    def getInputSets(self):
+        return self._inputSets
 
     def getResultTupleSet(self, graph = None):
         self.outSet = self.resultClass(action = self, graph = graph)
