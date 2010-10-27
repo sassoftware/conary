@@ -899,6 +899,8 @@ class _UpdateCommand(ConaryCommand):
         'exact-flavors' : 'Only match troves whose flavors match exactly',
         'info'          : 'Display what update would have done',
         'model'         : 'Display the new model that would have been applied',
+        'model-graph'   : (VERBOSE_HELP,
+                           'Write graph of model to specified file'),
         'no-deps'       : 'Do not raise errors due to dependency failures',
         'no-recurse'    : (VERBOSE_HELP, 
                            'Do not install/erase children of specified trove'),
@@ -948,6 +950,7 @@ class _UpdateCommand(ConaryCommand):
         d["keep-required"] = NO_PARAM
         d["info"] = '-i', NO_PARAM
         d["model"] = NO_PARAM
+        d["model-graph"] = ONE_PARAM
         d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
@@ -975,7 +978,7 @@ class _UpdateCommand(ConaryCommand):
         model = systemmodel.SystemModelText(cfg)
         modelFile = systemmodel.SystemModelFile(model)
 
-        callback = updatecmd.UpdateCallback(cfg)
+        callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
         if cfg.quiet:
             callback = callbacks.UpdateCallback()
         if argSet.has_key('quiet'):
@@ -1022,6 +1025,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
         kwargs['model'] = argSet.pop('model', False)
+        kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['keepExisting'] = argSet.pop('keep-existing',
             otherArgs[1] == 'install') # install implies --keep-existing
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
@@ -1063,7 +1067,8 @@ class _UpdateCommand(ConaryCommand):
             if otherArgs[1] == 'sync' and len(otherArgs) > 2:
                 log.error('The "sync" command cannot take trove arguments with a system model')
                 return 1
-            if otherArgs[1] != 'sync' and modelFile.snapshotExists():
+            if (otherArgs[1] != 'sync' and modelFile.snapshotExists()
+                and kwargs['restartInfo'] is None):
                 log.error('The previous update was aborted; resume with "conary sync" or revert with "conary rollback 1"')
                 return 1
             if otherArgs[1] == 'migrate':
@@ -1165,6 +1170,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["just-db"] = NO_PARAM
         argDef["keep-required"] = NO_PARAM
         argDef["model"] = NO_PARAM
+        argDef["model-graph"] = ONE_PARAM
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
@@ -1181,16 +1187,19 @@ class UpdateAllCommand(_UpdateCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = { 'systemModel': False }
+        kwargs['restartInfo'] = argSet.pop('restart-info', None)
+
         model = systemmodel.SystemModelText(cfg)
         modelFile = systemmodel.SystemModelFile(model)
         if modelFile.exists():
             kwargs['systemModel'] = model
             kwargs['systemModelFile'] = modelFile
-            if modelFile.snapshotExists():
+            if modelFile.snapshotExists() and kwargs['restartInfo'] is None:
                 log.error('The previous update was aborted; resume with "conary sync" or revert with "conary rollback 1"')
                 return 1
 
         kwargs['model'] = argSet.pop('model', False)
+        kwargs['modelGraph'] = argSet.pop('model-graph', None)
 
         noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
         if noRestart and cfg.root == '/':
@@ -1227,7 +1236,6 @@ class UpdateAllCommand(_UpdateCommand):
 
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['applyCriticalOnly'] = argSet.pop('apply-critical', False)
-        kwargs['restartInfo'] = argSet.pop('restart-info', None)
 
         kwargs['checkPathConflicts'] = \
                                 not argSet.pop('no-conflict-check', False)

@@ -33,6 +33,7 @@ def usage(exitcode=1):
     sys.stderr.write("\n".join((
      "Usage: commitaction [commitaction args] ",
      "         --module '/path/to/changemail [--sourceuser <user>]",
+     "         [--mailhost <mailhost>] ",
      "         [--from <fromaddress>] [--binaryuser <user>] ",
      "         [--user <user>] [--email <email>]*'",
      ""
@@ -58,6 +59,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         'from': options.ONE_PARAM,
         'email': options.MULT_PARAM,
         'maxsize': options.ONE_PARAM,
+        'mailhost': options.ONE_PARAM,
     }
 
     # create an argv[0] for processArgs to ignore
@@ -118,6 +120,7 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
     sys.stdout.flush()
     oldStdOut = os.dup(sys.stdout.fileno())
     os.dup2(tmpfd, 1)
+    mailhost = argSet.pop('mailhost', 'localhost')
 
     if srcMap:
         sources = sorted(srcMap.keys())
@@ -148,7 +151,7 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
         if sourceuser:
             print 'Committed by: %s' %sourceuser
 
-        sendMail(tmpfile, subject, fromaddr, maxsize, argSet['email'])
+        sendMail(tmpfile, subject, fromaddr, maxsize, argSet['email'], mailhost)
 
     if pkgMap or grpMap:
         # stdout is the tmpfile
@@ -192,12 +195,12 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
                         ', '.join(flavor.split(',')))
                 print
 
-        sendMail(tmpfile, subject, fromaddr, maxsize, argSet['email'])
+        sendMail(tmpfile, subject, fromaddr, maxsize, argSet['email'], mailhost)
         os.dup2(oldStdOut, 1)
 
     return 0
 
-def sendMail(tmpfile, subject, fromaddr, maxsize, addresses):
+def sendMail(tmpfile, subject, fromaddr, maxsize, addresses, mailhost='localhost'):
     # stdout is the tmpfile, so make sure it has been flushed!
     sys.stdout.flush()
 
@@ -213,6 +216,7 @@ def sendMail(tmpfile, subject, fromaddr, maxsize, addresses):
         fromaddr = 'root@localhost'
 
     s = smtplib.SMTP()
+    s.connect(mailhost)
     for address in addresses:
         # explicitly set different To addresses in different messages
         # in case some recipient addresses are not intended to be exposed

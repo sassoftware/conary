@@ -12,12 +12,22 @@
 # full details.
 #
 
-all: subdirs constants.py
+all: subdirs constants.py stubs
 
 SUBDIRS=build local repository server lib pysqlite3 deps web \
         conaryclient dbstore ScanDeps cmds
 
-python_files = $(wildcard *.py) constants.py
+# These are stubs that must be maintained for as long as there is
+# active code that uses any of these modules that needs to work
+# against conary 2.1 or earlier.  If in doubt, leave these here.
+compat_modules=commit.py cscmd.py fmtroves.py metadata.py \
+	query.py queryrep.py rollbacks.py showchangeset.py \
+	updatecmd.py verify.py branch.py clone.py
+
+# constants.py, cvc.py, and compat_modules have to be listed
+# explicitly here because they are generated and therefore might
+# not exist when the wildcard is run
+python_files = $(wildcard *.py) constants.py cvc.py $(compat_modules)
 
 extra_files = \
 	Makefile		\
@@ -27,7 +37,13 @@ dist_files = $(python_files) $(extra_files)
 
 generated_files = *.pyo *.pyc 
 
-.PHONY: clean dist install subdirs
+.PHONY: clean dist install subdirs stubs
+
+stubs:
+	for cmd in $(compat_modules); do \
+	  echo "from conary.cmds.$$(basename $${cmd} .py) import *" > $$cmd ; \
+	done; \
+	echo 'from conary.cmds.cvccmd import *' > cvc.py
 
 subdirs: default-subdirs
 
@@ -45,5 +61,6 @@ clean: clean-subdirs default-clean
 	rm -rf sqlite sqlite3
 	rm -f constants.py
 	rm -rf pysqlite3-0.0.0-py2.6.egg-info
+	rm -f $(compat_modules) cvc.py
 
 include ../Make.rules

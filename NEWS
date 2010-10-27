@@ -1,3 +1,32 @@
+Changes in 2.1.25:
+  o New Features:
+    * It is now possible to choose whether to merge kernel module
+      symbols into a single Conary dependency when importing RPM kernels
+      and modules.  The new default is not to merge the symbols, to
+      enable multiple interdependent kernel modules. (CNY-3518)
+
+  o Bug Fixes:
+    * The repository commit email system now can be given a mailhost
+      with the --mailhost argument; localhost is used as the default
+      mailhost. (CNY-3206)
+
+Changes in 2.1.24:
+  o Bug Fixes:
+    * Documentation for the "user" configuration option has been added
+      to the conary.1 man page. (document-user-config)
+    * Platforms which we need to support rpm's netsharedpath don't
+      necessarily have expandMacro in their python module; add our own
+      binding in misc.c (CNY-3506)
+    * The repository commit email system has been modified to use python
+      internal email and smtplib modules.  It no longer relies on an
+      external mail program, and handles non-ascii characters correctly.
+      (CNY-3206)
+    * Fixed a hard-to-trigger crash when opening a build logger PTY
+      fails. (CNY-2938)
+    * Added hardlinked file support to CpioStream. (CNY-3504)
+    * Bz2File.read() now returns the ammount of data that is requested.
+      (CNY-3513)
+
 Changes in 2.1.23:
   o New Features:
     * Support "data.tar.lzma" in .deb files (CNY-3491)

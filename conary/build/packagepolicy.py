@@ -3184,6 +3184,7 @@ class Requires(_addInfo, _dependency):
         self._CILPolicyProvides = {}
         self.pythonSysPathMap = {}
         self.pythonModuleFinderMap = {}
+        self.troveDeps = {}
         policy.Policy.__init__(self, *args, **keywords)
         self.depCache = self.dbDepCacheClass(self._getDb())
 
@@ -3253,6 +3254,20 @@ class Requires(_addInfo, _dependency):
             self.recipe._reqExceptDeps = []
         self.recipe._reqExceptDeps.extend(self.exceptDeps)
 
+        # Filter out trove deps that are not associated with a file.
+        if len(args) >= 2:
+            troves = []
+            component = re.compile('^[-a-zA-Z0-9]*:[a-zA-Z]+$')
+            for arg in args[1:]:
+                arg = arg % self.recipe.macros
+                # Make sure arg looks like a component
+                if not component.match(arg):
+                    break
+                troves.append(arg.lstrip(':'))
+            else:
+                self.troveDeps[args[0]] = troves
+                args = ()
+
         _dependency.updateArgs(self, *args, **keywords)
         _addInfo.updateArgs(self, *args, **keywords)
 
@@ -3288,6 +3303,40 @@ class Requires(_addInfo, _dependency):
 
     def postProcess(self):
         self._delPythonRequiresModuleFinder()
+
+        components = {}
+        for comp in self.recipe.autopkg.getComponents():
+            components[comp.getName()] = comp
+            shortName = comp.getName().split(':')[1]
+
+            # Mark copmonent names with duplicates
+            if shortName in components:
+                components[shortName] = None
+            else:
+                components[shortName] = comp
+
+        # r.Requires('foo:runtime', 'msi')
+        # r.Requires('foo:runtime', ':msi')
+        # r.Requires('foo:runtime', 'bar:msi')
+        depClass = deps.TroveDependencies
+        for info, troves in self.troveDeps.iteritems():
+            # Sanity check inputs.
+            if ':' not in info:
+                self.error('package dependency %s not allowed', info)
+                return
+            for trove in troves:
+                if trove not in components:
+                    self.error('no component named %s', trove)
+                    return
+                if components[trove] is None:
+                    self.error('specified component name matches multiple '
+                        'components %s', trove)
+                    return
+
+            # Add the trove dependency.
+            dep = deps.Dependency(info)
+            for trove in troves:
+                components[trove].requires.addDep(depClass, dep)
 
     def doFile(self, path):
         pkgs = self.recipe.autopkg.findComponents(path)

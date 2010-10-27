@@ -319,7 +319,7 @@ class TroveFinder(object):
     def findTroves(self, troveSpecs, allowMissing=False):
         """
             Creates the required query classes and then executes
-            the queries, either raising a raising errors.TroveNotFound
+            the queries, either raising errors.TroveNotFound
             or returning a dict of results.
         """
         queryOptions = self.queryOptions

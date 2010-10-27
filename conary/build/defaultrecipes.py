@@ -261,9 +261,10 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
     Repositories and TroveSets can be combined in order in a C{SearchPath}
     object.  A C{SearchPath} object can be used both for looking up
     troves and as a source of troves for dependency resolution.
-    TroveSets in a SearchPath are not searched recursively; only the
-    troves mentioned explicitly are searched.  (Use C{TroveSet.flatten()}
-    if you want to search a TroveSet recursively.)
+    TroveSets in a SearchPath are searched recursively only when used
+    to look up dependencies; only the troves mentioned explicitly are
+    searched using C{find}.  (Use C{TroveSet.flatten()} if you want to
+    search a TroveSet recursively using C{find}.)
 
     Finally, the ultimate purpose of a group recipe is to create a
     new binary group or set of groups.  TroveSets have a C{createGroup}
@@ -288,6 +289,9 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{SearchPath} : Creates an object in which to search for
           troves or dependencies.
         - L{Group} : Creates the primary group object.
+        - L{Script} : Creates a single script object.
+        - L{Scripts} : Associates script objects with script types.
+        - L{SystemModel} : Converts a system model to a TroveSet.
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
           troves.
@@ -326,7 +330,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
           references, return only those resolved references
         - C{TroveSet.packages} : Resolve trove references recursively,
           return packages
-        - C{TroveSet.replace} : Replace troves in the TroveSet with
+        - C{TroveSet.patch} : Replace troves in the TroveSet with
           matching-named troves from the replacement set
         - C{TroveSet.union} : Get the union of all provided TroveSets (C{|}, C{+})
         - C{TroveSet.update} : Replace troves in the TroveSet with
@@ -352,12 +356,12 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
              repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
              if 'productDefinitionSearchPath' in r.macros:
                  # proper build with product definition
-                 searchPath = r.SearchPath(repo[x].flatten() for x in
+                 searchPath = r.SearchPath(repo[x] for x in
                      r.macros.productDefinitionSearchPath.split('\\\\n'))
              else:
                  # local test build
                  searchPath = r.SearchPath(
-                     repo['group-os=conary.rpath.com@rpl:2'].flatten())
+                     repo['group-os=conary.rpath.com@rpl:2'])
              base = searchPath['group-appliance-platform']
              additions = searchPath.find(
                  'httpd',

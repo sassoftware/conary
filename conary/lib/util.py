@@ -1181,8 +1181,12 @@ class BZ2File:
                 if self.leftover:
                     # we have some uncompressed stuff left, return
                     # it
-                    rc = self.leftover[:]
-                    self.leftover = None
+                    if len(self.leftover) > bytes:
+                        rc = self.leftover[:bytes]
+                        self.leftover = self.leftover[bytes:]
+                    else:
+                        rc = self.leftover[:]
+                        self.leftover = None
                     return rc
                 # done returning all data, return None as the EOF
                 return None

@@ -17,7 +17,6 @@ import errno
 import fcntl
 import gzip
 import os
-import pty
 import re
 import select
 import signal
@@ -707,7 +706,7 @@ class Logger:
         self.restoreTerminalControl = (sys.stdin.isatty() and
             os.tcgetpgrp(0) == os.getpid())
 
-        masterFd, slaveFd = pty.openpty()
+        masterFd, slaveFd = os.openpty()
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
 
         pid = os.fork()

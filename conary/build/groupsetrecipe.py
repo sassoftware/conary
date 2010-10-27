@@ -20,9 +20,10 @@ from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient.cmdline import parseTroveSpec
-from conary.conaryclient import troveset
+from conary.conaryclient import modelgraph, systemmodel, troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.lib import log
+from conary.local import deptable
 from conary.repository import errors, netclient, searchsource
 from conary.deps import deps
 
@@ -125,7 +126,7 @@ class GroupTupleSetMethods(object):
         - L{members} : Resolve exactly one level of trove references,
           return only those resolved references
         - L{packages} : Resolve trove references recursively, return packages
-        - L{replace} : Replace troves in the TroveSet with matching-named
+        - L{patch} : Replace troves in the TroveSet with matching-named
           troves from the replacement set
         - L{union} : Get the union of all provided TroveSets (C{|}, C{+})
         - L{update} : Replace troves in the TroveSet with all troves from
@@ -136,7 +137,7 @@ class GroupTupleSetMethods(object):
     '''
     _explainObjectName = 'TroveSet'
 
-    def depsNeeded(self, resolveSource, failOnUnresolved = True):
+    def depsNeeded(self, resolveSource = None, failOnUnresolved = True):
         """
         NAME
         ====
@@ -144,7 +145,7 @@ class GroupTupleSetMethods(object):
 
         SYNOPSIS
         ========
-        C{troveset.depsNeeded(resolveSource, failOnUnresolved=True)}
+        C{troveset.depsNeeded(resolveSource=None, failOnUnresolved=True)}
 
         DESCRIPTION
         ===========
@@ -157,9 +158,13 @@ class GroupTupleSetMethods(object):
         This is not a union operation; the contents of the returned
         troveset do not include the contents of the original troveset.
 
+        If no C{resolveSource} is provided, then depsNeeded asserts that
+        there are no unresolved dependencies.
+
         PARAMETERS
         ==========
-            - L{resolveSource} : Source against which to resolve dependencies
+            - L{resolveSource} : Source against which to resolve dependencies,
+              or None to assert that all dependencies are met.
             - L{failOnUnresolved} (C{True}) : Whether to fail if not all
               dependencies can be resolved.
 
@@ -397,10 +402,8 @@ class GroupTupleSetMethods(object):
 
         This is useful for creating flattened groups (removing group
         structure present in upstream groups but not desired in the
-        groups being built), for creating trovesets to use to look
-        up specific troves (for example, C{find} and C{findByName}),
-        and to include in SearchPaths, particularly for resolving
-        dependencies.
+        groups being built) and for creating trovesets to use to look
+        up specific troves (for example, C{find} and C{findByName}).
 
         EXAMPLES
         ========
@@ -600,25 +603,25 @@ class GroupTupleSetMethods(object):
         """
         return self._action(ActionClass = GroupUnionAction, *troveSetList)
 
-    def replace(self, replaceSet):
+    def patch(self, patchSet):
         """
         NAME
         ====
-        B{C{TroveSet.replace}} - Replace troves with matching-name troves
+        B{C{TroveSet.patch}} - Replace troves with matching-name troves
 
         SYNOPSIS
         ========
-        C{troveset.replace(replaceSet)}
+        C{troveset.patch(patchSet)}
 
         DESCRIPTION
         ===========
         Look (recursively) for items in this troveset which can
-        reasonably be replaced by members found in the replaceSet.
+        reasonably be replaced by members found in the patchSet.
         The isInstall values are inherited from the original troveset.
-        Any items in replaceSet which do not appear to replace
+        Any items in patchSet which do not appear to replace
         members of this troveset are included as optional in the
         result.  Members of the original troveset which are outdated
-        by members of the replaceSet are also included as optional
+        by members of the patchSet are also included as optional
         in the returned troveset, to prevent them from inadvertently
         showing up as install troves due to other operations.
 
@@ -626,16 +629,16 @@ class GroupTupleSetMethods(object):
         which are installed in the original set are installed in
         the resulting set, and all other troves are available.
 
-        The difference between C{TroveSet.update} and C{TroveSet.replace} is
-        how new troves introduced in C{replaceSet} but not present in the
-        original set are handled.  With C{TroveSet.replace}, the new
-        troves from C{replaceSet} are not installed in the result; with
+        The difference between C{TroveSet.update} and C{TroveSet.patch} is
+        how new troves introduced in C{patchSet} but not present in the
+        original set are handled.  With C{TroveSet.patch}, the new
+        troves from C{patchSet} are not installed in the result; with
         C{TroveSet.update}, the new troves are installed in the result if
         they are installed in the C{updateSet}.
 
         PARAMETERS
         ==========
-            - L{replaceSet} : TroveSet containing potential replacements
+            - L{patchSet} : TroveSet containing potential replacements
 
         EXAMPLES
         ========
@@ -644,17 +647,17 @@ class GroupTupleSetMethods(object):
         packages.  For example, if only the postgresql client is
         in the current install set, and group-CVE-2015-1234 contains
         both the postgresql client and server in different packages,
-        then the replace operation will mark the existing postgresql
+        then the patch operation will mark the existing postgresql
         client as optional, add the new postgresql client as install,
         and add the new postgresql server as optional in the returned
         troveSet.
 
         base = repos['group-standard']
-        update = base.replace(repos['group-CVE-2015-1234'])
+        update = base.patch(repos['group-CVE-2015-1234'])
         groupStandard = update.createGroup('group-standard')
 
         """
-        return self._action(replaceSet, ActionClass = GroupReplaceAction)
+        return self._action(patchSet, ActionClass = GroupPatchAction)
 
     def update(self, updateSet):
         """
@@ -674,10 +677,10 @@ class GroupTupleSetMethods(object):
         troves overlap, the versions from C{updateSet} are used, though
         the choice of isInstall is honored from the original set.
 
-        The difference between C{TroveSet.update} and C{TroveSet.replace} is
+        The difference between C{TroveSet.update} and C{TroveSet.patch} is
         how new troves introduced in C{updateSet} but not present in the
-        original set are handled.  With C{TroveSet.replace}, the new
-        troves from C{replaceSet} are not installed in the result; with
+        original set are handled.  With C{TroveSet.patch}, the new
+        troves from C{patchSet} are not installed in the result; with
         C{TroveSet.update}, the new troves are installed in the result if
         they are installed in the C{updateSet}.
 
@@ -704,7 +707,7 @@ class GroupTupleSetMethods(object):
         return self._action(updateSet, ActionClass = GroupUpdateAction)
 
 
-    def createGroup(self, name, checkPathConflicts = True):
+    def createGroup(self, name, checkPathConflicts = True, scripts = None):
         """
         NAME
         ====
@@ -713,7 +716,7 @@ class GroupTupleSetMethods(object):
 
         SYNOPSIS
         ========
-        C{troveset.createGroup(name, checkPathConflicts = True)}
+        C{troveset.createGroup(name, checkPathConflicts=True, scripts=None)}
 
         DESCRIPTION
         ===========
@@ -727,14 +730,18 @@ class GroupTupleSetMethods(object):
 
         PARAMETERS
         ==========
-            - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{scripts} : Attach one or more scripts specified by a C{Scripts}
+           object (C{None})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
-                            ActionClass = CreateNewGroupAction)
+                            ActionClass = CreateNewGroupAction,
+                            scripts = scripts)
 
-    def _createGroup(self, name, checkPathConflicts = True):
+    def _createGroup(self, name, checkPathConflicts = True, scripts = None):
         return self._action(name, ActionClass = CreateGroupAction,
-                            checkPathConflicts = checkPathConflicts)
+                            checkPathConflicts = checkPathConflicts,
+                            scripts = scripts)
 
     __add__ = union
     __or__ = union
@@ -819,11 +826,15 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     ====
     B{C{SearchPath}} - Collection of troves in which to search
 
+    SYNOPSIS
+    ========
+    C{sp = r.SearchPath('troveSpec1', 'label1', ..., 'troveOrLabelN')}
+
     DESCRIPTION
     ===========
-    An object which searches multiple other objects in the order
-    specified.  Troves can be looked up in the result, and the
-    result can also be used for resolving dependencies.
+    An object which searches multiple other objects (troves or labels)
+    in the order specified.  Troves can be looked up in the result, and
+    the result can also be used for resolving dependencies.
 
     METHODS
     =======
@@ -967,7 +978,7 @@ class GroupUnionAction(troveset.UnionAction):
 
     resultClass = GroupDelayedTroveTupleSet
 
-class GroupReplaceAction(troveset.ReplaceAction):
+class GroupPatchAction(troveset.PatchAction):
 
     resultClass = GroupDelayedTroveTupleSet
 
@@ -1000,18 +1011,27 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+class CopyAction(GroupDelayedTupleSetAction):
+
+    def __call__(self, data):
+        self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
 class CreateGroupAction(GroupDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
 
-    def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
+    def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
+                 scripts = None):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.name = name
         self.checkPathConflicts = checkPathConflicts
+        self.scripts = scripts
 
     def __call__(self, data):
         grp = SG(data.groupRecipe.name,
                  checkPathConflicts = self.checkPathConflicts)
+
         data.groupRecipe._addGroup(self.name, grp)
         data.groupRecipe._setDefaultGroup(grp)
 
@@ -1019,6 +1039,10 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
                      self.primaryTroveSet, self.outSet, data)
 
     def _create(self, sg, ts, outSet, data):
+        if self.scripts is not None:
+            for script, scriptName in self.scripts.iterScripts():
+                sg.addScript(scriptName, script.contents, script.fromClass)
+
         sg.populate(ts, data.troveCache)
 
         outSet._setInstall([ (sg.name, versions.NewVersion(),
@@ -1032,9 +1056,11 @@ class CreateNewGroupAction(CreateGroupAction):
 
     resultClass = GroupLoggingDelayedTroveTupleSet
 
-    def __init__(self, primaryTroveSet, name, checkPathConflicts = True):
+    def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
+                 scripts = None):
         CreateGroupAction.__init__(self, primaryTroveSet, name,
-                                   checkPathConflicts = checkPathConflicts)
+                                   checkPathConflicts = checkPathConflicts,
+                                   scripts = scripts)
 
     def __call__(self, data):
         newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
@@ -1068,8 +1094,14 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
         jobSet = [ (n, (None, None), (v, f), False) for (n,v,f) in troveList ]
 
         checker.addJobs(jobSet)
-        resolveMethod = (self.resolveTroveSet._getResolveSource().
-                                    getResolveMethod())
+        if self.resolveTroveSet:
+            # might be nice to share a single depDb across all instances
+            # of this class?
+            resolveMethod = (self.resolveTroveSet._getResolveSource(
+                                    depDb = deptable.DependencyDatabase()).
+                                        getResolveMethod())
+        else:
+            resolveMethod = None
 
         failedDeps, suggMap = checker.resolve(resolveMethod)
 
@@ -1376,6 +1408,118 @@ class SG(_SingleGroup):
     def getRequires(self):
         return deps.DependencySet()
 
+class ModelCompiler(modelgraph.AbstractModelCompiler):
+
+    SearchPathTroveSet = GroupSearchPathTroveSet
+    RemoveAction = GroupDifferenceAction
+    FlattenAction = FlattenAction
+
+class GroupScript(object):
+    '''
+    NAME
+    ====
+    B{C{Script}} - Specify script contents and compatibility class
+
+    SYNOPSIS
+    ========
+    C{scriptObj = r.Script('#!/bin/sh...'I{, [fromClass = 1]})}
+
+    DESCRIPTION
+    ===========
+    A B{C{Script}} object holds the contents, and optionally the
+    compatibility class, of a script that can then be attached to
+    one or more groups.  The C{Scripts} object associates the
+    script with the type, and C{Group} and C{TroveSet.createGroup}
+    each take an optional C{scripts=} parameter to associate a
+    C{Scripts} object with a group being created.
+
+    EXAMPLE
+    =======
+    Create a script that attaches to multiple groups as multiple types::
+     
+     myTroves = repos.find(...)
+     fixup = r.Script("""#!/bin/sh
+         [ -x /opt/me/fixme ] && /opt/me/fixme""")
+     fixscripts = r.Scripts(preUpdate=fixup, preRollback=fixup)
+     r.Group(myTroves, scripts=fixscripts)
+    '''
+    _explainObjectName = 'Script'
+
+    def __init__(self, contents, fromClass = None):
+        self.contents = contents
+        self.fromClass = fromClass
+
+class GroupScripts(object):
+    '''
+    NAME
+    ====
+    B{C{Scripts}} - Associate scripts with types
+
+    SYNOPSIS
+    ========
+    C{scripts = r.Scripts(postInstall = script, preRollback = script, ...)}
+
+    DESCRIPTION
+    ===========
+    A C{Script} object holds the contents, and optionally the
+    compatibility class, of a script that can then be attached to
+    one or more groups.  The B{C{Scripts}} object associates the
+    script with the type, and C{Group} and C{TroveSet.createGroup}
+    each take an optional C{scripts=} parameter to associate a
+    C{Scripts} object with a group being created.
+
+    PARAMETERS
+    ==========
+    Each of the parameters specifies a script type and takes a C{Script}
+    to associate with that script type.
+
+     - C{postInstall} : Specifies a script to run after the installation
+       of any group to which this script is attached.
+     - C{preRollback} : Specifies a script to run before the rollback
+       of any group to which this script is attached.
+     - C{postRollback} : Specifies a script to run after the rollback
+       of any group to which this script is attached.
+     - C{preUpdate} : Specifies a script to run before the update
+       of any group to which this script is attached.
+     - C{postUpdate} : Specifies a script to run after the update
+       of any group to which this script is attached.
+
+    EXAMPLE
+    =======
+    Create a script that attaches to multiple groups as multiple types::
+     
+     innerTroves = repos.find(...)
+     myTroves = repos.find(...)
+     fixup = r.Script("""#!/bin/sh
+         [ -x /opt/me/fixme ] && /opt/me/fixme""")
+     fixscripts = r.Scripts(preUpdate=fixup, preRollback=fixup)
+     innerGroup = innerTroves.createGroup('group-inner', scripts=fixscripts)
+     r.Group(myTroves + innerGroup, scripts=fixscripts)
+
+    In general, you will not want to attach the same script to multiple
+    groups that will be updated at the same time.  Conary will not
+    "de-duplicate" the scripts, and they will be run more than once
+    if you do so.
+    '''
+    _explainObjectName = 'Scripts'
+
+    def __init__(self, postInstall = None,
+                       preRollback = None, postRollback = None,
+                       preUpdate = None, postUpdate = None):
+        self.postInstall = postInstall
+        self.preRollback = preRollback
+        self.postRollback = postRollback
+        self.preUpdate = preUpdate
+        self.postUpdate = postUpdate
+
+    def iterScripts(self):
+        for scriptName in ('postInstallScripts',
+                           'preRollbackScripts', 'postRollbackScripts',
+                           'preUpdateScripts', 'postUpdateScripts'):
+            script = getattr(self, scriptName[:-7])
+            if script is not None:
+                yield script, scriptName
+
 class _GroupSetRecipe(_BaseGroupRecipe):
 
     Flags = use.LocalFlags
@@ -1392,6 +1536,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         self.troveSource = repos
         self.repos = repos
+        self.Script = GroupScript
+        self.Scripts = GroupScripts
 
         self.labelPath = [ label ]
         self.buildLabel = label
@@ -1491,7 +1637,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
 
-    def Group(self, ts, checkPathConflicts = True):
+    def Group(self, ts, checkPathConflicts = True, scripts = None):
         '''
         NAME
         ====
@@ -1499,7 +1645,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         SYNOPSIS
         ========
-        C{r.Group(troveSet, checkPathConflicts = True)}
+        C{r.Group(troveSet, checkPathConflicts=True, scripts=None)}
 
         DESCRIPTION
         ===========
@@ -1512,10 +1658,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         PARAMETERS
         ==========
-        - L{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{checkPathConflicts} : Raise an error if any paths
+           overlap (C{True})
+         - C{scripts} : Attach one or more scripts specified by a C{Scripts}
+           object (C{None})
         '''
         return ts._createGroup(self.name,
-                               checkPathConflicts = checkPathConflicts)
+                               checkPathConflicts = checkPathConflicts,
+                               scripts = scripts)
 
     def Repository(self, labelList, flavor):
         # Documented in GroupSearchSourceTroveSet as "Repository" so that
@@ -1549,6 +1699,92 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         See SearchPath.
         '''
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
+
+    def SystemModel(self, modelText, searchPath = None):
+        """
+        NAME
+        ====
+        B{C{GroupSetRecipe.SystemModel}} - Convert system model to TroveSet
+
+
+        SYNOPSIS
+        ========
+        C{r.SystemModel(modelText, searchPath=None)}
+
+        DESCRIPTION
+        ===========
+        Turns a system model into a TroveSet. The optional
+        C{searchPath} initializes the search path; search lines from
+        the system model are prepended to any provided C{searchPath}.
+
+        Returns a standard troveset with an extra attribute called
+        C{searchPath}, which is a TroveSet representing the final
+        SearchPath from the system model.  This search path is
+        often used for dependency resolution, though unioning it
+        with the optional portions of the resulting trove set is
+        the normal usage pattern. (Unioning with only the optional
+        portion is not functionally distinct from unioning with
+        the entire result, but is faster).
+
+        PARAMETERS
+        ==========
+         - C{modelText} (Required) : the text of the model to execute
+         - C{searchPath} (Optional) : an initial search path, a fallback
+           sought after any items provided in the model.
+
+        EXAMPLE
+        =======
+        To build a group from a system defined by a system model, provide
+        the contents of the /etc/conary/system-model file as the
+        C{modelText}.  This may be completely literal (leading white
+        space is ignored in system models)::
+
+         ts = r.SystemModel('''
+             search group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30
+             install group-appliance-platform
+             install httpd
+             install mod_ssl
+         ''')
+         needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+         finalSet = ts + needed
+
+        If you are using a product definition and want to use the
+        search path it provides as the context for the model, it
+        might look like this::
+
+         repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+         if 'productDefinitionSearchPath' in r.macros:
+             # proper build with product definition
+             searchPath = r.SearchPath(repo[x] for x in
+                 r.macros.productDefinitionSearchPath.split('\\\\n'))
+         else:
+             # local test build against specific version
+             searchPath = r.SearchPath(
+                 repo['group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30'])
+         ts = r.SystemModel('''
+             install group-appliance-platform
+             install httpd
+             install mod_ssl
+         ''', searchPath=searchPath)
+         needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+         finalSet = ts + needed
+        """
+        if searchPath is None:
+            searchSource = searchsource.NetworkSearchSource(
+                                            self.repos, [], self.flavor)
+            searchPath = GroupSearchSourceTroveSet(searchSource,
+                                                   graph = self.g)
+
+        model = systemmodel.SystemModelText(None)
+        model.parse(modelText, fileName = '(recipe)')
+
+        comp = ModelCompiler(self.flavor, self.repos, self.g)
+        sysModelSet = comp.build(model, searchPath, None)
+
+        result = sysModelSet._action(ActionClass = CopyAction)
+        result.searchPath = sysModelSet.searchPath
+
+        return result
 
     def track(self, troveSpec):
         '''

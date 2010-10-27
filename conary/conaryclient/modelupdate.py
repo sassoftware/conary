@@ -1,4 +1,5 @@
-
+#
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,10 +13,11 @@
 
 import itertools
 
-from conary import errors, trove, versions
-from conary.conaryclient import troveset, update
+from conary import trove, versions
+from conary.conaryclient import modelgraph, troveset, update
 from conary.deps import deps
 from conary.lib import log, util
+from conary.local import deptable
 from conary.repository import searchsource, trovecache, trovesource
 
 class SysModelActionData(troveset.ActionData):
@@ -32,7 +34,6 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.repos = repos
         self.callback = callback
         self.componentMap = {}
-        self._startingSizes = (0, 0)
         if changeSetList:
             csSource = trovesource.ChangesetFilesTroveSource(db)
             csSource.addChangeSets(changeSetList)
@@ -85,7 +86,8 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.cacheTroves(need)
 
     def cacheModified(self):
-        return (len(self.cache), len(self.depCache)) != self._startingSizes
+        return (len(self.cache), len(self.depCache),
+                len(self.depSolutionCache)) != self._startingSizes
 
     def getPackageComponents(self, troveTup):
         if self.troveIsCached(troveTup):
@@ -95,65 +97,17 @@ class SystemModelTroveCache(trovecache.TroveCache):
 
         return self.componentMap[troveTup]
 
-class SysModelTupleSetMethods(object):
+class DatabaseTroveSet(troveset.SearchSourceTroveSet):
 
-    def remove(self, removeTroveSet = None):
-        return self._action(ActionClass = RemoveAction,
-                            removeTroveSet = removeTroveSet)
+    # this class changes the name of the node in the dot graph. handy.
 
-    def replace(self, replaceTroveSet = None):
-        return self._action(replaceTroveSet,
-                            ActionClass = SysModelReplaceAction)
+    pass
 
-    def union(self, *troveSetList):
-        return self._action(ActionClass = SysModelUnionAction, *troveSetList)
-
-    def update(self, replaceTroveSet = None):
-        return self._action(replaceTroveSet,
-                            ActionClass = SysModelUpdateAction)
-
-
-class SysModelDelayedTroveTupleSet(SysModelTupleSetMethods,
-                                   troveset.DelayedTupleSet):
-
-    def __init__(self, *args, **kwargs):
-        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
-        self._flat = False
-
-    def _walk(self, *args, **kwargs):
-        if self._flat:
-            # this is easy
-            result = []
-
-            for (troveTup) in self._getInstallSet():
-                result.append( (troveTup, True, True) )
-
-            for (troveTup) in self._getOptionalSet():
-                result.append( (troveTup, False, True) )
-
-            return result
-
-        return troveset.DelayedTupleSet._walk(self, *args, **kwargs)
-
-class SysModelDelayedTupleSetAction(troveset.DelayedTupleSetAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
-class SysModelInitialTroveTupleSet(SysModelTupleSetMethods,
-                                   troveset.TroveTupleSet):
-
-    def __init__(self, *args, **kwargs):
-        troveTuple = kwargs.pop('troveTuple', None)
-        troveset.TroveTupleSet.__init__(self, *args, **kwargs)
-        if troveTuple is not None:
-            self._setInstall(set(troveTuple))
-        self.realized = True
-
-class RemoveAction(SysModelDelayedTupleSetAction):
+class SysModelRemoveAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, removeTroveSet = None):
-        SysModelDelayedTupleSetAction.__init__(self, primaryTroveSet,
-                                               removeTroveSet)
+        troveset.DelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                                removeTroveSet)
         self.removeTroveSet = removeTroveSet
 
     def __call__(self, data):
@@ -164,11 +118,11 @@ class RemoveAction(SysModelDelayedTupleSetAction):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
                                     | removeSet)
 
-class SysModelExcludeTrovesAction(SysModelDelayedTupleSetAction):
+class SysModelExcludeTrovesAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, *args, **kwargs):
         self.excludeTroves = kwargs.pop('excludeTroves')
-        SysModelDelayedTupleSetAction.__init__(self, *args, **kwargs)
+        troveset.DelayedTupleSetAction.__init__(self, *args, **kwargs)
 
     def __call__(self, data):
         installSet = set()
@@ -191,8 +145,6 @@ class SysModelExcludeTrovesAction(SysModelDelayedTupleSetAction):
 
 class SysModelFindAction(troveset.FindAction):
 
-    resultClass = SysModelDelayedTroveTupleSet
-
     # this not only finds, but it fetches and finds as well. it's a pretty
     # convienent way of handling redirects
 
@@ -202,11 +154,11 @@ class SysModelFindAction(troveset.FindAction):
         fetchActions = []
         for action in actionList:
             action.outSet.realized = True
-            newAction = SysModelFetchAction(action.outSet, all = True)
+            newAction = troveset.FetchAction(action.outSet, all = True)
             newAction.getResultTupleSet(action.primaryTroveSet.g)
             fetchActions.append(newAction)
 
-        SysModelFetchAction.__call__(fetchActions[0], fetchActions, data)
+        troveset.FetchAction.__call__(fetchActions[0], fetchActions, data)
 
         redirects = []
         for action in actionList:
@@ -284,11 +236,7 @@ class SysModelFindAction(troveset.FindAction):
                     q.add((match, inInstall))
 
 
-class SysModelFetchAction(troveset.FetchAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
-class SysModelFinalFetchAction(SysModelFetchAction):
+class SysModelFinalFetchAction(troveset.FetchAction):
 
     def _fetch(self, actionList, data):
         troveTuples = set()
@@ -304,9 +252,31 @@ class SysModelFinalFetchAction(SysModelFetchAction):
 
         data.troveCache.getTroves(troveTuples, withFiles = False)
 
-class SysModelFlattenAction(SysModelDelayedTupleSetAction):
+class FlattenedTroveTupleSet(troveset.DelayedTupleSet):
 
-    prefilter = SysModelFetchAction
+    def __init__(self, *args, **kwargs):
+        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
+        self._flat = False
+
+    def _walk(self, *args, **kwargs):
+        if self._flat:
+            # this is easy
+            result = []
+
+            for (troveTup) in self._getInstallSet():
+                result.append( (troveTup, True, True) )
+
+            for (troveTup) in self._getOptionalSet():
+                result.append( (troveTup, False, True) )
+
+            return result
+
+        return troveset.DelayedTupleSet._walk(self, *args, **kwargs)
+
+class SysModelFlattenAction(troveset.DelayedTupleSetAction):
+
+    prefilter = troveset.FetchAction
+    resultClass = FlattenedTroveTupleSet
 
     def __call__(self, data):
         installs = []
@@ -323,34 +293,19 @@ class SysModelFlattenAction(SysModelDelayedTupleSetAction):
         self.outSet._setOptional(available)
         self.outSet._flat = True
 
-class SysModelGetOptionalAction(SysModelDelayedTupleSetAction):
-
-    def __call__(self, data):
-        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
-
-class SysModelReplaceAction(troveset.ReplaceAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
-class SysModelUnionAction(troveset.UnionAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
-class SysModelUpdateAction(troveset.UpdateAction):
-
-    resultClass = SysModelDelayedTroveTupleSet
-
 class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
-    def _getResolveSource(self, filterFn):
+    def _getResolveSource(self, depDb, filterFn):
         # don't bother with items in the install set; those are being installed
         # already so aren't a good choice for suggestions
         sourceList = []
         for ts in self.troveSetList:
             if isinstance(ts, troveset.TroveTupleSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+                sourceList.append(ts._getResolveSource(filterFn = filterFn,
+                                                       depDb = depDb))
             elif isinstance(ts, SysModelSearchPathTroveSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+                sourceList.append(ts._getResolveSource(filterFn = filterFn,
+                                                       depDb = depDb))
             else:
                 sourceList.append(ts._getResolveSource())
 
@@ -367,124 +322,18 @@ class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
         return False
 
-class SystemModelClient(object):
+class ModelCompiler(modelgraph.AbstractModelCompiler):
 
-    def systemModelGraph(self, sysModel, changeSetList = []):
-        collections = set()
-        for op in sysModel.systemItems:
-            for troveTup in op:
-                name = troveTup[0]
-                if trove.troveIsComponent(name):
-                    collections.add(name.split(':')[0])
-                elif trove.troveIsGroup(name):
-                    collections.add(name)
+    SearchPathTroveSet = SysModelSearchPathTroveSet
 
-        if changeSetList:
-            csTroveSource = trovesource.ChangesetFilesTroveSource(
-                                                        self.getDatabase())
-            csTroveSource.addChangeSets(changeSetList)
-            csSearchSource = searchsource.SearchSource(csTroveSource,
-                                                       self.cfg.flavor)
-            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource)
-        else:
-            csTroveSet = None
+    FlattenAction = SysModelFlattenAction
+    RemoveAction = SysModelRemoveAction
 
-        # create the initial search path from the installLabelPath
-        reposTroveSet = self._createRepositoryTroveSet(csTroveSet = csTroveSet)
-        dbTroveSet = self._createDatabaseTroveSet(graph = reposTroveSet.g,
-                                                  csTroveSet = csTroveSet)
-
-        # now build new search path elements
-        searchPathItems = []
-        for searchItem in sysModel.searchPath:
-            partialTup = searchItem.item
-            if isinstance(partialTup, versions.Label):
-                repos = troveset.SearchSourceTroveSet(
-                        searchsource.NetworkSearchSource(self.getRepos(),
-                                                         [ partialTup ],
-                                                         self.cfg.flavor))
-                searchPathItems.append(repos)
-            elif partialTup[0] is not None:
-                result = self.repos.findTrove(self.cfg.installLabelPath,
-                                              partialTup, self.cfg.flavor)
-                assert(len(result) == 1)
-                ts = SysModelInitialTroveTupleSet(troveTuple = result,
-                                                  graph = reposTroveSet.g)
-                # get the trove itself
-                fetched = ts._action(ActionClass = SysModelFetchAction)
-                flattened = fetched._action(ActionClass = SysModelFlattenAction)
-                searchPathItems.append(flattened)
-            else:
-                assert(0)
-
-        searchPathItems.append(reposTroveSet)
-        searchTroveSet = SysModelSearchPathTroveSet(searchPathItems,
-                                                    graph = reposTroveSet.g)
-
-        finalTroveSet = SysModelInitialTroveTupleSet(graph = searchTroveSet.g)
-        for op in sysModel.systemItems:
-            searchSpecs = []
-            localSpecs = []
-            for troveSpec in op:
-                if (troveSpec.version is not None and
-                                    troveSpec.version[0] == '/'):
-                    try:
-                        verObj = versions.VersionFromString(troveSpec.version)
-                        if verObj.isInLocalNamespace():
-                            localSpecs.append(troveSpec)
-                            break
-
-                    except (errors.VersionStringError, errors.ParseError):
-                        pass
-
-                searchSpecs.append(troveSpec)
-
-            if searchSpecs:
-                searchMatches = searchTroveSet.find(*searchSpecs)
-            else:
-                searchMatches = None
-
-            if localSpecs:
-                localMatches = dbTroveSet.find(*localSpecs)
-            else:
-                localMatches = None
-
-            if searchMatches and localMatches:
-                matches = searchMatches.union(localMatches)
-            elif searchMatches:
-                matches = searchMatches
-            else:
-                matches = localMatches
-
-            growSearchPath = True
-            if isinstance(op, sysModel.InstallTroveOperation):
-                finalTroveSet = finalTroveSet.union(matches)
-            elif isinstance(op, sysModel.EraseTroveOperation):
-                growSearchPath = False
-                finalTroveSet = finalTroveSet.remove(matches)
-            elif isinstance(op, sysModel.ReplaceTroveOperation):
-                finalTroveSet = finalTroveSet.replace(matches)
-            elif isinstance(op, sysModel.UpdateTroveOperation):
-                finalTroveSet = finalTroveSet.update(matches)
-            else:
-                assert(0)
-
-            if growSearchPath:
-                growSearchPath = False
-                for troveSpec in op:
-                    if troveSpec.name in collections:
-                        growSearchPath = True
-
-                if growSearchPath:
-                    flatten = matches._action(ActionClass =
-                                                SysModelFlattenAction)
-                    searchTroveSet = SysModelSearchPathTroveSet(
-                            [ flatten, searchTroveSet ],
-                            graph = searchTroveSet.g)
-
-        finalTroveSet.searchPath = searchTroveSet
-
-        return finalTroveSet
+    def __init__(self, cfg, repos, db):
+        self.db =  db
+        g = troveset.OperationGraph()
+        self.cfg = cfg
+        modelgraph.AbstractModelCompiler.__init__(self, cfg.flavor, repos, g)
 
     def _createRepositoryTroveSet(self, csTroveSet = None):
         if csTroveSet is None:
@@ -492,27 +341,47 @@ class SystemModelClient(object):
         else:
             path = [ csTroveSet ]
 
-        g = troveset.OperationGraph()
         repos = troveset.SearchSourceTroveSet(
-                searchsource.NetworkSearchSource(self.getRepos(),
-                                                 [],
+                searchsource.NetworkSearchSource(self.repos, [],
                                                  self.cfg.flavor))
         path.append(repos)
 
-        return SysModelSearchPathTroveSet(path, graph = g)
+        return SysModelSearchPathTroveSet(path, graph = self.g)
 
-    def _createDatabaseTroveSet(self, graph = None, csTroveSet = None):
+    def _createDatabaseTroveSet(self, csTroveSet = None):
         if csTroveSet is None:
             path = []
         else:
             path = [ csTroveSet ]
 
-        db = self.getDatabase()
-        dbSearchSource = searchsource.SearchSource(db, self.cfg.flavor)
-        dbTroveSet = troveset.SearchSourceTroveSet(dbSearchSource)
-        path.append(dbTroveSet)
+        dbSearchSource = searchsource.SearchSource(self.db, self.cfg.flavor)
+        dbTroveSet = DatabaseTroveSet(dbSearchSource)
 
-        return SysModelSearchPathTroveSet(path, graph = graph)
+        path.append(dbTroveSet)
+        return SysModelSearchPathTroveSet(path, graph = self.g)
+
+    def build(self, sysModel, changeSetList = []):
+        if changeSetList:
+            csTroveSource = trovesource.ChangesetFilesTroveSource(self.db)
+            csTroveSource.addChangeSets(changeSetList)
+            csSearchSource = searchsource.SearchSource(csTroveSource,
+                                                       self.cfg.flavor)
+            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource)
+        else:
+            csTroveSet = None
+
+        reposTroveSet = self._createRepositoryTroveSet(csTroveSet = csTroveSet)
+        dbTroveSet = self._createDatabaseTroveSet(csTroveSet = csTroveSet)
+
+        return modelgraph.AbstractModelCompiler.build(self, sysModel,
+                                                      reposTroveSet, dbTroveSet)
+
+
+class SystemModelClient(object):
+
+    def systemModelGraph(self, sysModel, changeSetList = []):
+        c = ModelCompiler(self.cfg, self.getRepos(), self.getDatabase())
+        return c.build(sysModel, changeSetList)
 
     def _processSysmodelJobList(self, origJobList, updJob, troveCache):
         # this is just like _processJobList, but it's forked to use the
@@ -632,7 +501,8 @@ class SystemModelClient(object):
     def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
                             split = True, fromChangesets = [],
                             criticalUpdateInfo=None, applyCriticalOnly = False,
-                            restartInfo = None):
+                            restartInfo = None,
+                            ignoreMissingDeps = False):
         """
         Populates an update job based on a set of trove update and erase
         operations.If self.cfg.autoResolve is set, dependencies
@@ -662,10 +532,15 @@ class SystemModelClient(object):
         location where the rest of an update job run was stored (after
         applying the critical update).
         @type restartInfo: string
+        @param ignoreMissingDeps: Do not raise DepResolutionFailure on
+        unresolved dependencies
+        @tye ignoreMissingDeps: bool
         @rtype: dict
 
         @raise ConaryError: if a C{sync} operation was requested, and
             relative changesets were specified.
+
+        @raise DepResolutionFailure: could not resolve dependencies
 
         @raise InternalConaryError: if a jobset was inconsistent.
 
@@ -712,8 +587,10 @@ class SystemModelClient(object):
         # handle exclude troves
         final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
                                     ActionClass = SysModelExcludeTrovesAction)
-        availForDeps = final._action(ActionClass = SysModelGetOptionalAction)
-        availForDeps.g.realize(SysModelActionData(troveCache,
+        #depSearch = SysModelSearchPathTroveSet([ preFetch, searchPath ],
+                                               #graph = preFetch.g)
+        depSearch = searchPath
+        final.g.realize(SysModelActionData(troveCache,
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
@@ -736,8 +613,17 @@ class SystemModelClient(object):
         self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv, absolute = False)[2]
 
-        depResolveSource = searchPath._getResolveSource(
-                        filterFn = targetTrv.isStrongReference)
+        # don't resolve against local troves (we can do this because either
+        # they're installed and show up in the unresolveable list or they
+        # aren't installed and we don't know about them) or troves which are
+        # in the install set (since they're already in the install set,
+        # adding them to the install set won't help)
+        depDb = deptable.DependencyDatabase()
+        depResolveSource = depSearch._getResolveSource(
+                        depDb = depDb,
+                        filterFn = lambda n, v, f :
+                            (v.isOnLocalHost() or
+                             targetTrv.isStrongReference(n,v,f)))
         resolveMethod = depResolveSource.getResolveMethod()
 
         uJob.setSearchSource(self.getSearchSource())
@@ -811,6 +697,13 @@ class SystemModelClient(object):
                     job = targetTrv.diff(existsTrv, absolute = False)[2]
 
                 log.info("resolving dependencies")
+                criticalJobs = criticalUpdateInfo.findCriticalJobs(job)
+                finalJobs = criticalUpdateInfo.findFinalJobs(job)
+                criticalOnly = criticalUpdateInfo.isCriticalOnlyUpdate()
+
+                linkedJobs = self._findOverlappingJobs(job, troveCache,
+                                          pathHashCache = pathHashCache)
+
                 result = check.depCheck(job,
                                         linkedJobs = linkedJobs,
                                         criticalJobs = criticalJobs,
@@ -826,14 +719,15 @@ class SystemModelClient(object):
                 criticalUpdates = []
             else:
                 splitJob = result.getChangeSetList()
-                criticalUpdates = result.getCriticalUpdates()
+                criticalUpdates = [ splitJob[x] for x in
+                                        result.getCriticalUpdates() ]
 
-            if result.unsatisfiedList:
+            if result.unsatisfiedList and (not ignoreMissingDeps):
                 raise update.DepResolutionFailure(
                             self.cfg, result.unsatisfiedList,
                             suggMap, result.unresolveableList, splitJob,
                             criticalUpdates)
-            elif result.unresolveableList:
+            elif result.unresolveableList and (not ignoreMissingDeps):
                 # this can't happen because dep resolution empties
                 # the unresolveableList into the unsatisfiedList to try
                 # and find matches

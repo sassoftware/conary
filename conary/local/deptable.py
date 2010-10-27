@@ -1264,10 +1264,17 @@ class BulkDependencyLoader:
 
     def __init__(self, db, cu):
         self.workTables = DependencyWorkTables(db, cu)
+        self.nextTroveId = 0
 
     def add(self, trove, troveId):
         self.workTables._populateTmpTable([], troveId, trove.getRequires(),
                                           trove.getProvides())
+
+    def addRaw(self, provides, requires):
+        troveId = self.nextTroveId
+        self.nextTroveId += 1
+        self.workTables._populateTmpTable([], troveId, requires, provides);
+        return troveId
 
     def done(self):
         self.workTables.merge(intoDatabase = True)
@@ -1372,7 +1379,7 @@ class DependencyTables:
 
         return restrictJoin, restrictWhere
 
-    def _restrictResolveByTrove(self, *args):
+    def _restrictResolveByTrove(self):
         """ Restricts deps to being solved by the given instanceIds or
             their children
         """
@@ -1528,8 +1535,20 @@ class DependencyTables:
         self.db.rollback()
         return result
 
-    def resolveToIds(self, depSetList):
-        return self._resolveToIds(depSetList)
+    def resolveToIds(self, depSetList, troveIdList = None):
+        if troveIdList:
+            cu = self.db.cursor()
+            schema.resetTable(cu, "tmpInstances")
+            self.db.bulkload('tmpInstances', [ (x,) for x in troveIdList ],
+                             [ 'instanceId' ], start_transaction = False)
+            restrictBy = ()
+            restrictor = self._restrictResolveByTrove
+        else:
+            restrictBy = None
+            restrictor = None
+
+        return self._resolveToIds(depSetList, restrictor = restrictor,
+                                  restrictBy = restrictBy)
 
 
     def getLocalProvides(self, depSetList):
@@ -1590,7 +1609,10 @@ class DependencyDatabase(DependencyTables):
     def __init__(self, path=":memory:", driver="sqlite"):
         db = dbstore.connect(path, driver=driver, timeout=30000)
         db.loadSchema()
+        cu = db.cursor()
         schema.setupTempDepTables(db)
+        cu.execute("CREATE TEMPORARY TABLE tmpInstances "
+                   "(instanceId INTEGER)", start_transaction = False)
         schema.createDependencies(db)
         DependencyTables.__init__(self, db)
 
@@ -1598,12 +1620,16 @@ class DependencyDatabase(DependencyTables):
         cu = self.db.cursor()
         self._add(cu, troveId, provides, requires)
 
-    def delete(self):
+    def bulkLoader(self):
         cu = self.db.cursor()
-        DependencyDatabase.delete(self, cu, troveId)
+        return BulkDependencyLoader(self.db, cu)
+
+    def delete(self):
+        raise NotImplementedError
 
     def commit(self):
         self.db.commit()
 
-    def resolve(self, label, depSetList, leavesOnly=False):
-        return self.resolveToIds(list(depSetList))
+    def resolve(self, label, depSetList, leavesOnly=False,
+                troveIdList = None):
+        return self.resolveToIds(list(depSetList), troveIdList = troveIdList)

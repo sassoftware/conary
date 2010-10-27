@@ -16,7 +16,8 @@ import itertools
 
 from conary import trove, versions
 from conary.deps import deps
-from conary.lib import graph
+from conary.errors import TroveSpecsNotFound
+from conary.lib import graph, sha1helper
 from conary.local import deptable
 from conary.repository import searchsource, trovesource
 
@@ -54,15 +55,22 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
     """
 
     def __init__(self, troveCache, troveSet, flavor,
-                 filterFn = lambda *args: False):
-        self.depDb = None
+                 filterFn = lambda *args: False, depDb = None):
+        assert(depDb)
+        self.depDb = depDb
+        self.troveSet = troveSet
+        self.filterFn = filterFn
 
         self.troveTupList = []
-        for troveTup, inInstall, isExplicit in troveSet._walk(troveCache,
-                                                    newGroups = False,
-                                                    recurse = True):
-            if not filterFn(*troveTup):
+        troveTupCollection = trove.TroveTupleList()
+        for troveTup, inInstall, isExplicit in \
+                    self.troveSet._walk(troveCache, newGroups = False,
+                                        recurse = True):
+            if not self.filterFn(*troveTup):
                 self.troveTupList.append(troveTup)
+                troveTupCollection.add(*troveTup)
+
+        self.troveTupSig = sha1helper.sha1String(troveTupCollection.freeze())
 
         self.inDepDb = [ False ] * len(self.troveTupList)
 
@@ -72,7 +80,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.setFlavorPreferencesByFlavor(flavor)
         self.searchWithFlavor()
         self.searchLeavesOnly()
-        self.depDb = deptable.DependencyDatabase()
+        # maps troveId's from the dependency database into self.troveTupList
+        self.depTroveIdMap = {}
         self.providesIndex = None
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
@@ -85,8 +94,19 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             return s
 
         reqNames = set()
+        finalDepList = []
+        cachedSuggMap = {}
         for dep in depList:
-            reqNames.update(_depClassAndName(dep))
+            cachedResult = self.troveCache.getDepSolution(self.troveTupSig,
+                                                          dep)
+            if cachedResult:
+                cachedSuggMap[dep] = cachedResult
+            else:
+                reqNames.update(_depClassAndName(dep))
+                finalDepList.append(dep)
+
+        if not finalDepList:
+            return cachedSuggMap
 
         emptyDep = deps.DependencySet()
         troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList)
@@ -104,6 +124,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                     else:
                         val.append(i)
 
+        depLoader = self.depDb.bulkLoader()
 
         for classAndName in reqNames:
             val = self.providesIndex.get(classAndName)
@@ -114,20 +135,31 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 if self.inDepDb[i]:
                     continue
 
-                self.depDb.add(i, troveDeps[i][0], emptyDep)
+                depTroveId = depLoader.addRaw(troveDeps[i][0], emptyDep)
+                self.depTroveIdMap[depTroveId] = i
                 self.inDepDb[i] = True
 
+        depLoader.done()
         self.depDb.commit()
 
-        suggMap = self.depDb.resolve(label, depList, leavesOnly=leavesOnly)
+        suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly,
+                                     troveIdList = self.depTroveIdMap.keys())
+
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
-                newSolListList.append([ self.troveTupList[x] for x in solList ])
+                newSolListList.append([
+                        self.troveTupList[self.depTroveIdMap[x]]
+                        for x in solList ])
 
-            suggMap[depSet] = newSolListList
+            if newSolListList:
+                suggMap[depSet] = newSolListList
+                self.troveCache.addDepSolution(self.troveTupSig, depSet,
+                                               newSolListList)
 
         self.depDb.db.rollback()
+
+        suggMap.update(cachedSuggMap)
 
         return suggMap
 
@@ -187,12 +219,13 @@ class TroveTupleSet(TroveSet):
 
         return self._troveSource
 
-    def _getResolveSource(self, filterFn = lambda *args: False):
+    def _getResolveSource(self, filterFn = lambda *args: False,
+                          depDb = None):
         if self._resolveSource is None:
             resolveTroveSource = ResolveTroveTupleSetTroveSource(
                                         self.g.actionData.troveCache, self,
                                         self.g.actionData.flavor,
-                                        filterFn = filterFn)
+                                        filterFn = filterFn, depDb = depDb)
             self._resolveSource = TroveTupleSetSearchSource(
                                     resolveTroveSource, self,
                                     self.g.actionData.flavor)
@@ -375,12 +408,28 @@ class DelayedTupleSet(TroveTupleSet):
         self.action(data)
         self.beenRealized(data)
 
+class StaticTroveTupleSet(TroveTupleSet):
+
+    def __str__(self):
+        if self._getInstallSet():
+            return list(self._getInstallSet())[0][0]
+
+        return TroveTupleSet.__str__(self)
+
+    def __init__(self, *args, **kwargs):
+        troveTuple = kwargs.pop('troveTuple', None)
+        TroveTupleSet.__init__(self, *args, **kwargs)
+        if troveTuple is not None:
+            self._setInstall(set(troveTuple))
+        self.realized = True
+
 class SearchSourceTroveSet(TroveSet):
 
     def _findTroves(self, troveTuple):
-        return self.searchSource.findTroves(troveTuple, requireLatest = True)
+        return self.searchSource.findTroves(troveTuple, requireLatest = True,
+                                            allowMissing = True)
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, depDb = None):
         return self.searchSource
 
     def _getSearchSource(self):
@@ -400,10 +449,11 @@ class SearchPathTroveSet(SearchSourceTroveSet):
         for i, troveSet in enumerate(troveSetList):
             graph.addEdge(troveSet, self, value = str(i + 1))
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, depDb = None):
         # we search differently then we resolve; resolving is recursive
         # while searching isn't
-        sourceList = [ ts._getResolveSource() for ts in self.troveSetList ]
+        sourceList = [ ts._getResolveSource(depDb = depDb)
+                            for ts in self.troveSetList ]
         return searchsource.SearchSourceStack(*sourceList)
 
     def realize(self, data):
@@ -526,10 +576,17 @@ class FindAction(ParallelAction):
                     l.extend([ (action.outSet, troveSpec)
                                     for troveSpec in action.troveSpecs ] )
 
+        notFound = set()
         for inSet, searchList in troveSpecsByInSet.iteritems():
             d = inSet._findTroves([ x[1] for x in searchList ])
             for outSet, troveSpec in searchList:
-                outSet._setInstall(d[troveSpec])
+                if troveSpec in d:
+                    outSet._setInstall(d[troveSpec])
+                else:
+                    notFound.add(troveSpec)
+
+        if notFound:
+            raise TroveSpecsNotFound(sorted(notFound))
 
     def __str__(self):
         if isinstance(self.troveSpecs[0], str):
@@ -555,7 +612,6 @@ class UnionAction(DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, *args):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
-        self.troveSets = [ primaryTroveSet ] + list(args)
 
     def __call__(self, data):
         # this ordering means that if it's in the install set anywhere, it
@@ -567,7 +623,17 @@ class UnionAction(DelayedTupleSetAction):
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
-class ReplaceAction(DelayedTupleSetAction):
+class OptionalAction(DelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, *args):
+        DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
+
+    def __call__(self, data):
+        for troveSet in self._inputSets:
+            self.outSet._setOptional(troveSet._getOptionalSet())
+            self.outSet._setOptional(troveSet._getInstallSet())
+
+class PatchAction(DelayedTupleSetAction):
 
     prefilter = FetchAction
 
@@ -575,7 +641,7 @@ class ReplaceAction(DelayedTupleSetAction):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
         self.updateTroveSet = updateTroveSet
 
-    def replaceAction(self, data):
+    def patchAction(self, data):
         before = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
         after = trove.Trove("@tsupdate", versions.NewVersion(),
@@ -591,16 +657,31 @@ class ReplaceAction(DelayedTupleSetAction):
         beforeInfo = {}
         installSet = set()
         optionalSet = set()
+        installSetSwitch = set()
         for troveTup, inInstallSet, explicit in \
                   self.primaryTroveSet._walk(data.troveCache, recurse = True):
             if troveTup[0] in updateNames:
                 before.addTrove(troveTup[0], troveTup[1], troveTup[2])
                 beforeInfo[troveTup] = (inInstallSet, explicit)
+
+                if (not inInstallSet and troveTup in afterInfo and
+                    afterInfo[troveTup][1]):
+                    installSetSwitch.add(troveTup)
             elif explicit:
                 if inInstallSet:
                     installSet.add(troveTup)
                 else:
                     optionalSet.add(troveTup)
+
+        # these troves were not in the install set of the working set, but
+        # explicitly mentioned in the model command we're handling. that
+        # not only overrides the working set for this trove, but for anything
+        # else it includes
+        for troveTup in installSetSwitch:
+            for (subTroveTup, inInstallSet, explicit) in \
+                                data.troveCache.iterTroveListInfo(troveTup):
+                before.delTrove(subTroveTup[0], subTroveTup[1],
+                                subTroveTup[2], True)
 
         troveMapping = after.diff(before)[2]
         # this completely misses anything where the only change is
@@ -621,7 +702,7 @@ class ReplaceAction(DelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
-    __call__ = replaceAction
+    __call__ = patchAction
 
     def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
@@ -644,11 +725,10 @@ class ReplaceAction(DelayedTupleSetAction):
         else:
             # we've mapped an update; turn off the old version (by
             # marking it as optional) and include the new one with the
-            # same defaultness as the old one had. if it is explicit
-            # in the new one, we always include it
+            # same defaultness as the old one had.
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
             inInstallSet, isExplicit = afterInfo[newTuple]
-            if (isExplicit and inInstallSet) or wasInInstallSet:
+            if wasInInstallSet:
                 installSet.add(newTuple)
             else:
                 optionalSet.add(newTuple)
@@ -656,7 +736,7 @@ class ReplaceAction(DelayedTupleSetAction):
             if newTuple != oldTuple:
                 optionalSet.add(oldTuple)
 
-class UpdateAction(ReplaceAction):
+class UpdateAction(PatchAction):
 
     def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
@@ -741,4 +821,3 @@ class OperationGraph(graph.DirectedGraph):
                 else:
                     for node in nodeList:
                         node.realize(data)
-
