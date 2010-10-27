@@ -442,8 +442,9 @@ class SystemModelFile(object):
     system is in transition.
     '''
 
-    def __init__(self, model, fileName='/etc/conary/system-model',
-            snapshotExt='.next'):
+    def __init__(self, model, fileName=None, snapshotExt='.next'):
+        if fileName is None:
+            fileName = model.cfg.modelPath
         self.fileName = fileName
         self.snapName = fileName + snapshotExt
         self.root = model.cfg.root

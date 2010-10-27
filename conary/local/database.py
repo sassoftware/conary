@@ -247,11 +247,12 @@ class RollbackStack:
         # need to restore it even if it didn't previously exist
         if util.exists(saveSysModel):
             if self.modelFile is None:
+                # We are rolling back from a rollback that contains
+                # a system model on a system without a system model
+                # This fake cfg object is enough.
                 class fakeCfg:
-                    # we only need .root to exist to write the file;
-                    # for now, not passing full cfg objects around
-                    # for this corner case
                     root = self.root
+                    modelPath = self.modelPath
                 # have to import here to avoid import loop
                 from conary.conaryclient import systemmodel
                 self.modelFile = systemmodel.SystemModelFile(
@@ -337,10 +338,11 @@ class RollbackStack:
             rb = self.getRollback(rollbackName)
             yield (rollbackName, rb)
 
-    def __init__(self, rbDir, root, modelFile):
+    def __init__(self, rbDir, root, modelPath, modelFile):
         self.dir = rbDir
-        self.root = root
         self.modelFile = modelFile
+        self.modelPath = modelPath
+        self.root = root
         self.statusPath = self.dir + '/status'
 
         if not os.path.exists(self.dir):
@@ -2834,13 +2836,15 @@ class Database(SqlDbRepository):
                     'journal file exists. use revert command to '
                     'undo the previous (failed) operation')
 
-    def __init__(self, root, path, timeout=None, modelFile=None):
+    def __init__(self, root, path, modelPath=None, timeout=None, modelFile=None):
         """
         Instantiate a database object
         @param root: the path to '/' for this operation
         @type root: string
         @param path: the path to the database relative to 'root'
         @type path: string
+        @param modelPath: path to which model files should be written
+        @type modelPath: string
         @param modelFile: optional model file (will journal snapshot)
         @type modelFile: L{conary.conaryclient.systemmodel.SystemModelFile}
         @return: None
@@ -2854,6 +2858,7 @@ class Database(SqlDbRepository):
         """
 
         self.root = root
+        self.modelPath = modelPath
 
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
@@ -2874,6 +2879,7 @@ class Database(SqlDbRepository):
             self.rollbackStatus = self.rollbackCache + "/status"
             try:
                 self.rollbackStack = RollbackStack(self.rollbackCache, root,
+                                                   self.modelPath,
                                                    self.modelFile)
             except OpenError, e:
                 raise OpenError(top, e.msg)

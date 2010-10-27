@@ -84,7 +84,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
         self.repos = None
 
         self.cfg = cfg
-        self.db = database.Database(cfg.root, cfg.dbPath, modelFile=modelFile)
+        self.db = database.Database(cfg.root, cfg.dbPath, cfg.modelPath,
+                                    modelFile=modelFile)
         if repos:
             self.repos = repos
         else:
