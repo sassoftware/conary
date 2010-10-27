@@ -264,16 +264,16 @@ class GroupTupleSetMethods(object):
         Returns a new C{troveset} containing all troves from the original
         troveset which match the given C{troveSpec}(s).  The original
         troveset's isInstall settings are preserved for each returned
-        trove.  The contents of the TroveSet are not sought recursively.
+        trove.  The contents of the TroveSet are sought recursively.
 
         EXAMPLES
         ========
-        C{groupOS = repos['group-os'].flatten()}
+        C{groupOS = repos['group-os']}
         C{allGlibcVersions = groupOS.find('glibc')}
         C{compatGlibc = groupOS['glibc=@rpl:1-compat']}
 
-        This sets C{groupOS} to be a TroveSet containing the recursive
-        contents of C{group-os} -- all the troves included in group-os.
+        This sets C{groupOS} to be a TroveSet containing the version of
+        C{group-os} found on the default label for Repository C{repos}.
         It then finds all versions/flavors of glibc referenced (there
         could be more than one) and creates an C{allGlibcVersions}
         TroveSet that contains references to all of them, and another
@@ -297,7 +297,9 @@ class GroupTupleSetMethods(object):
         The original troveset is searched for troves whose names match
         C{nameRegularExpression}, and matching troves are returned in
         a new troveset.  The isInstall value is preserved from the
-        original troveset being searched.
+        original troveset being searched.  Unlike C{find}, the original
+        troveset is not searched recursively; use C{troveset.flatten()}
+        explicitly if you need to search recursively.
 
         PARAMETERS
         ==========
@@ -309,7 +311,7 @@ class GroupTupleSetMethods(object):
         C{allGnomePackages = allPackages.findByName('^gnome-')}
 
         Returns a troveset containing all troves in the troveset
-        C{allPackages} with a name starting with C{^gnome-}
+        C{allPackages} with a name starting with C{gnome-}
 
         C{allTroves = repos['group-os'].flatten()}
         C{allGroups = allTroves.findByName('^group-')}
@@ -334,7 +336,18 @@ class GroupTupleSetMethods(object):
         The original troveset is searched for troves which were built
         from source trove called C{sourceName}, and all matching
         troves are returned in a new troveset.  The isInstall value is
-        preserved from the original troveset being searched.
+        preserved from the original troveset being searched.  Unlike
+        C{find}, the original troveset is not searched recursively;
+        use C{troveset.flatten()} explicitly if you need to search
+        recursively.
+
+        EXAMPLES
+        ========
+        C{allTroves = repos['group-os'].flatten()}
+        C{allPGPackages = allTroves.findBySourceName('postgresql')}
+
+        Returns a troveset containing all troves in the troveset
+        C{allTroves} that were built from C{postgresql:source}
         """
         return self._action(sourceName,
                             ActionClass = FindBySourceNameAction)
@@ -346,7 +359,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
         B{C{TroveSet.components}} - Returns named components included in
-        all members of the troveset, recursively.
+        all members of the troveset.
 
         SYNOPSIS
         ========
@@ -359,7 +372,8 @@ class GroupTupleSetMethods(object):
         etc.) matches one of the component names provided.  The C{isInstalled}
         setting for each component in the returned troveset is determined
         only by whether the component is installed or optional in the
-        package that contains it.
+        package that contains it.  This does not implicitly recurse, so
+        to find components of packages in a group, use C{flatten()}
 
         EXAMPLES
         ========
