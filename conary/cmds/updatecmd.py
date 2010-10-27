@@ -481,7 +481,6 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     kwargs.setdefault('model', False)
     kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
     infoArg = kwargs.get('info', False)
-    testArg = kwargs.get('test', False)
     restartInfo = kwargs.get('restartInfo', None)
     patchArgs = kwargs.pop('patchSpec', None)
     fromChangesets = []
