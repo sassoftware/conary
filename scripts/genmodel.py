@@ -34,7 +34,8 @@ from conary.conaryclient import modelupdate, systemmodel
 from conary.deps import deps
 from conary.trovetup import TroveSpec
 
-from conary.lib import log  # pyflakes=ignore
+# pyflakes=ignore
+from conary.lib import log
 
 OrigFindAction = modelupdate.SysModelFindAction
 class TrackFindAction(OrigFindAction):

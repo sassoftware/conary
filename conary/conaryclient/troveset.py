@@ -18,7 +18,6 @@ from conary import trove, versions
 from conary.deps import deps
 from conary.errors import TroveSpecsNotFound
 from conary.lib import graph, sha1helper
-from conary.local import deptable
 from conary.repository import searchsource, trovesource
 
 class SimpleFilteredTroveSource(trovesource.SimpleTroveSource):

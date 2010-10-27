@@ -480,8 +480,6 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     kwargs.setdefault('updateByDefault', True) # erase is not default case
     kwargs.setdefault('model', False)
     kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
-    infoArg = kwargs.get('info', False)
-    testArg = kwargs.get('test', False)
     restartInfo = kwargs.get('restartInfo', None)
     fromChangesets = []
     applyList = []
