@@ -30,13 +30,13 @@ from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
 
 from conary import conarycfg, conaryclient, errors, trove, versions
-from conary.conaryclient import modelupdate, systemmodel
+from conary.conaryclient import cml, modelupdate, systemmodel
 from conary.deps import deps
 from conary.trovetup import TroveSpec
 
 from conary.lib import log  # pyflakes=ignore
 
-OrigFindAction = modelupdate.SysModelFindAction
+OrigFindAction = modelupdate.CMLFindAction
 class TrackFindAction(OrigFindAction):
 
     findMap = {}
@@ -80,7 +80,7 @@ class TrackFindAction(OrigFindAction):
 
         return result
 
-modelupdate.SysModelFindAction = TrackFindAction
+modelupdate.CMLFindAction = TrackFindAction
 
 def buildJobs(client, cache, model):
     print "====== Candidate model " + "=" * 55
@@ -88,7 +88,7 @@ def buildJobs(client, cache, model):
 
     TrackFindAction.findMap = {}
     updJob = client.newUpdateJob()
-    ts = client.systemModelGraph(model)
+    ts = client.cmlGraph(model)
     client._updateFromTroveSetGraph(updJob, ts, cache, ignoreMissingDeps = True)
 
     return list(itertools.chain(*updJob.getJobs())), updJob
@@ -125,11 +125,11 @@ def fmtVer(v):
 
 def addInstallJob(model, job):
     if job[2][1] is not None:
-        newOp = systemmodel.UpdateTroveOperation(
+        newOp = cml.UpdateTroveOperation(
                 item = [ TroveSpec(job[0], fmtVer(job[1][0]),
                                      str(job[1][1])) ] )
     else:
-        newOp = systemmodel.InstallTroveOperation(
+        newOp = cml.InstallTroveOperation(
                 item = [ TroveSpec(job[0], fmtVer(job[1][0]),
                                      str(job[1][1])) ] )
 
@@ -142,7 +142,7 @@ def addInstallJob(model, job):
     return updatedModel
 
 def addEraseJob(model, job):
-    newOp = systemmodel.EraseTroveOperation(
+    newOp = cml.EraseTroveOperation(
                 item = [ TroveSpec(job[0], job[2][0].asString(),
                                    str(job[2][1])) ])
 
@@ -214,16 +214,16 @@ def initialForesightModel(installedTroves, model):
                     if x.getName() == 'group-kde-dist' ][0]
     if trv:
         if 'x86_64' in str(trv.getFlavor()):
-            model.appendTroveOp(systemmodel.SearchTrove(
+            model.appendTroveOp(cml.SearchTrove(
                     item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                      'is:x86' ) ))
-        model.appendTroveOp(systemmodel.SearchTrove(
+        model.appendTroveOp(cml.SearchTrove(
                 item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                  str(trv.getFlavor()) ) ) )
         mainLabels.add(trv.getVersion().trailingLabel().asString())
 
     for trv in groupTroves:
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
+        model.appendTroveOp(cml.InstallTroveOperation(
                 item = [ TroveSpec(trv.getName(),
                                    fmtVer(trv.getVersion()),
                                    str(trv.getFlavor())) ] ))
@@ -236,24 +236,24 @@ def initialRedHatModel(client, model):
 			    latest = True)
     mainLabels = set()
 
-    model.appendTroveOp(systemmodel.SearchTrove(
+    model.appendTroveOp(cml.SearchTrove(
                                 item = TroveSpec(groupOs[0],
                                                  fmtVer(groupOs[1]),
                                                  str(groupOs[2]))))
     mainLabels.add(groupOs[1].trailingLabel().asString())
-    model.appendTroveOp(systemmodel.SearchTrove(
+    model.appendTroveOp(cml.SearchTrove(
                                 item = TroveSpec(groupRpath[0],
                                                  fmtVer(groupRpath[1]),
                                                  str(groupRpath[2]))))
     mainLabels.add(groupRpath[1].trailingLabel().asString())
 
     if 'rhel' in groupOs[1].asString():
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
+        model.appendTroveOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-rhel-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
     else:
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
+        model.appendTroveOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
@@ -276,14 +276,14 @@ if __name__ == '__main__':
     localTroves = set([ (x[0], versions.VersionFromString(x[1]),
                          deps.ThawFlavor(x[2])) for x in cu ])
 
-    cache = modelupdate.SystemModelTroveCache(db, client.getRepos())
+    cache = modelupdate.CMLTroveCache(db, client.getRepos())
     cache.load("/var/lib/conarydb/modelcache")
     cache.cacheTroves(localTroves)
 
     installedTroves = dict( (tup, pinned) for (tup, pinned)
                                 in db.iterAllTroves(withPins = True) )
 
-    model = systemmodel.SystemModelText(cfg)
+    model = cml.CML(cfg)
     if os.path.exists("/etc/redhat-release"):
         mainLabels = initialRedHatModel(client, model)
         componentPriorities = [ ( 'rpm', ),
@@ -384,16 +384,16 @@ if __name__ == '__main__':
     for big, little in TrackFindAction.findMap.iteritems():
         print "%s -> %s" % (big, little)
 
-    finalModel = systemmodel.SystemModelText(cfg)
+    finalModel = cml.CML(cfg)
     for searchItem in [x for x in model.systemItems
-                       if isinstance(x, systemmodel.SearchTrove)]:
+                       if isinstance(x, cml.SearchTrove)]:
         finalModel.appendTroveOp(searchItem)
 
     searchTroveItems = []
     deferredItems = []
     specClass = None
-    searchOps = (systemmodel.UpdateTroveOperation,
-                 systemmodel.InstallTroveOperation)
+    searchOps = (cml.UpdateTroveOperation,
+                 cml.InstallTroveOperation)
 
     searchTroveSpecs = itertools.chain(
         *(op.item for op in model.systemItems if isinstance(op, searchOps))
@@ -413,7 +413,7 @@ if __name__ == '__main__':
             emitDeferred(specClass, deferredItems)
 
         specClass = op.__class__
-        if isinstance(op, systemmodel.SearchTrove):
+        if isinstance(op, cml.SearchTrove):
             # already handled above
             continue
 
@@ -444,7 +444,7 @@ if __name__ == '__main__':
                 if searchTroveSpec not in searchTroveItems:
                     emitDeferred(specClass, deferredItems)
                     finalModel.appendTroveOp(
-                        systemmodel.SearchTrove(item=searchTroveSpec))
+                        cml.SearchTrove(item=searchTroveSpec))
                     searchTroveItems.append(searchTroveSpec)
 
                 if searchNameCount.get(searchTroveName, 0) > 1:
@@ -546,7 +546,7 @@ if __name__ == '__main__':
     if answer and answer[0].lower() == 'y':
         # SystemModelFile wants to parse -- don't let it, in case we are
         # testing on a system that already has a model defined...
-        tempModel = systemmodel.SystemModelText(cfg)
+        tempModel = cml.CML(cfg)
         smf = systemmodel.SystemModelFile(tempModel)
         smf.model = finalModel
         try:

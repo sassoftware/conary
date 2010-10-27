@@ -20,7 +20,7 @@ from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient.cmdline import parseTroveSpec
-from conary.conaryclient import modelgraph, systemmodel, troveset
+from conary.conaryclient import cml, modelgraph, troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.lib import log
 from conary.local import deptable
@@ -1746,46 +1746,47 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
-    def SystemModel(self, modelText, searchPath = None):
+    def CML(self, modelText, searchPath = None):
         """
         NAME
         ====
-        B{C{GroupSetRecipe.SystemModel}} - Convert system model to TroveSet
+        B{C{GroupSetRecipe.CML}} - Build TroveSet from CML specification
 
 
         SYNOPSIS
         ========
-        C{r.SystemModel(modelText, searchPath=None)}
+        C{r.CML(modelText, searchPath=None)}
 
         DESCRIPTION
         ===========
-        Turns a system model into a TroveSet. The optional
-        C{searchPath} initializes the search path; search lines from
-        the system model are prepended to any provided C{searchPath}.
+        Builds a TroveSet from a specification in Conary Modelling
+        Lanuage (CML). The optional C{searchPath} initializes the
+        search path; search lines from the system model are prepended
+        to any provided C{searchPath}.
 
         Returns a standard troveset with an extra attribute called
         C{searchPath}, which is a TroveSet representing the final
-        SearchPath from the system model.  This search path is
-        often used for dependency resolution, though unioning it
-        with the optional portions of the resulting trove set is
-        the normal usage pattern. (Unioning with only the optional
-        portion is not functionally distinct from unioning with
-        the entire result, but is faster).
+        SearchPath from the model.  This search path is often used
+        for dependency resolution, though unioning it with the
+        optional portions of the resulting trove set is the normal
+        usage pattern. (Unioning with only the optional portion
+        is not functionally distinct from unioning with the entire
+        result, but is faster).
 
         PARAMETERS
         ==========
-         - C{modelText} (Required) : the text of the model to execute
+         - C{modelText} (Required) : the text of the model in CML
          - C{searchPath} (Optional) : an initial search path, a fallback
            sought after any items provided in the model.
 
         EXAMPLE
         =======
-        To build a group from a system defined by a system model, provide
+        To build a group from a system defined in CML, provide
         the contents of the /etc/conary/system-model file as the
         C{modelText}.  This may be completely literal (leading white
-        space is ignored in system models)::
+        space is ignored in CML)::
 
-         ts = r.SystemModel('''
+         ts = r.CML('''
              search group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30
              install group-appliance-platform
              install httpd
@@ -1807,7 +1808,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
              # local test build against specific version
              searchPath = r.SearchPath(
                  repo['group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30'])
-         ts = r.SystemModel('''
+         ts = r.CML('''
              install group-appliance-platform
              install httpd
              install mod_ssl
@@ -1821,7 +1822,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
             searchPath = GroupSearchSourceTroveSet(searchSource,
                                                    graph = self.g)
 
-        model = systemmodel.SystemModelText(None)
+        model = cml.CML(None)
         model.parse(modelText, fileName = '(recipe)')
 
         comp = ModelCompiler(self.flavor, self.repos, self.g)

@@ -622,7 +622,7 @@ def _updateTroves(cfg, applyList, **kwargs):
             changeSetList = kwargs.get('fromChangesets', [])
             criticalUpdates = kwargs.get('criticalUpdateInfo', None)
 
-            tc = modelupdate.SystemModelTroveCache(client.getDatabase(),
+            tc = modelupdate.CMLTroveCache(client.getDatabase(),
                                                    client.getRepos(),
                                                    callback = callback,
                                                    changeSetList =
@@ -632,7 +632,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                 if os.path.exists(tcPath):
                     log.info("loading %s", tcPath)
                     tc.load(tcPath)
-            ts = client.systemModelGraph(model, changeSetList = changeSetList)
+            ts = client.cmlGraph(model, changeSetList = changeSetList)
             if modelGraph is not None:
                 ts.g.generateDotFile(modelGraph)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,

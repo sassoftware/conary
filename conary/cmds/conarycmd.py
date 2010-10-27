@@ -56,6 +56,7 @@ from conary.cmds import verify
 from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
+from conary.conaryclient import cml
 from conary.conaryclient import systemmodel
 from conary.repository import trovesource
 
@@ -975,7 +976,7 @@ class _UpdateCommand(ConaryCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = { 'systemModel': False }
-        model = systemmodel.SystemModelText(cfg)
+        model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
 
         callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
@@ -1198,7 +1199,7 @@ class UpdateAllCommand(_UpdateCommand):
         kwargs = { 'systemModel': False }
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
 
-        model = systemmodel.SystemModelText(cfg)
+        model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
         if modelFile.exists():
             kwargs['systemModel'] = model

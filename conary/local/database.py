@@ -253,9 +253,9 @@ class RollbackStack:
                     root = self.root
                     modelPath = self.modelPath
                 # have to import here to avoid import loop
-                from conary.conaryclient import systemmodel
+                from conary.conaryclient import cml, systemmodel
                 self.modelFile = systemmodel.SystemModelFile(
-                    model=systemmodel.SystemModelText(fakeCfg()))
+                    model=cml.CML(fakeCfg()))
             self.modelFile.parse(fileName=saveSysModel)
             self.modelFile.write()
             os.unlink(saveSysModel)

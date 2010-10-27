@@ -18,7 +18,7 @@ from conary.repository import searchsource
 class AbstractModelCompiler(object):
 
     """
-    Converts SystemModel objects into TroveSet graphs.
+    Converts CM objects into TroveSet graphs.
     """
 
     SearchPathTroveSet = None
@@ -38,15 +38,15 @@ class AbstractModelCompiler(object):
         self.repos = repos
         self.g = graph
 
-    def build(self, sysModel, reposTroveSet, dbTroveSet):
+    def build(self, model, reposTroveSet, dbTroveSet):
         collections = set()
-        for op in sysModel.systemItems:
-            if isinstance(op, sysModel.SearchOperation):
+        for op in model.systemItems:
+            if isinstance(op, model.SearchOperation):
                 continue
 
             for troveTup in op:
                 name = troveTup[0]
-                if (isinstance(op, sysModel.OfferTroveOperation) or
+                if (isinstance(op, model.OfferTroveOperation) or
                     trove.troveIsComponent(name)):
                     collections.add(name.split(':')[0])
                 elif trove.troveIsGroup(name):
@@ -66,8 +66,8 @@ class AbstractModelCompiler(object):
         # so far
         finalTroveSet = self.InitialTroveTupleSet(graph = reposTroveSet.g)
 
-        for op in sysModel.systemItems:
-            if isinstance(op, sysModel.SearchOperation):
+        for op in model.systemItems:
+            if isinstance(op, model.SearchOperation):
                 partialTup = op.item
                 if isinstance(partialTup, versions.Label):
                     newSearchTroveSet = troveset.SearchSourceTroveSet(
@@ -135,19 +135,19 @@ class AbstractModelCompiler(object):
             else:
                 matches = localMatches
 
-            if isinstance(op, sysModel.InstallTroveOperation):
+            if isinstance(op, model.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UnionAction)
-            elif isinstance(op, sysModel.EraseTroveOperation):
+            elif isinstance(op, model.EraseTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.RemoveAction)
-            elif isinstance(op, sysModel.PatchTroveOperation):
+            elif isinstance(op, model.PatchTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.PatchAction)
-            elif isinstance(op, sysModel.UpdateTroveOperation):
+            elif isinstance(op, model.UpdateTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UpdateAction)
-            elif isinstance(op, sysModel.OfferTroveOperation):
+            elif isinstance(op, model.OfferTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.OptionalAction)
             else:
