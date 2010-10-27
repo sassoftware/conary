@@ -280,7 +280,7 @@ class GroupTupleSetMethods(object):
         C{compatGlibc} that contains refernces to all flavors of glibc
         that are on a label matching C{@rpl:1-compat}.
         """
-        return self._action(ActionClass = GroupFindAction, *troveSpecs)
+        return self._action(ActionClass = GroupTroveSetFindAction, *troveSpecs)
 
     def findByName(self, namePattern, emptyOkay = False):
         """
@@ -1291,6 +1291,7 @@ class MembersAction(GroupDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
     justStrong = True
+    includeTop = False
 
     def __call__(self, data):
         for (troveTuple, installSet) in itertools.chain(
@@ -1301,6 +1302,12 @@ class MembersAction(GroupDelayedTupleSetAction):
             installs = []
             available = []
 
+            if self.includeTop:
+                if installSet:
+                    installs.append(troveTuple)
+                else:
+                    available.append(troveTuple)
+
             for (refTrove, byDefault, isStrong) in \
                         data.troveCache.iterTroveListInfo(troveTuple):
                 if self.justStrong and not isStrong:
@@ -1308,7 +1315,7 @@ class MembersAction(GroupDelayedTupleSetAction):
 
                 if byDefault:
                     installs.append(refTrove)
-                elif not byDefault:
+                else:
                     available.append(refTrove)
 
             self.outSet._setInstall(installs)
@@ -1317,6 +1324,30 @@ class MembersAction(GroupDelayedTupleSetAction):
 class FlattenAction(MembersAction):
 
     justStrong = False
+    includeTop = True
+
+    @classmethod
+    def Create(klass, primaryTroveSet):
+        if hasattr(primaryTroveSet, "_flattened"):
+            return primaryTroveSet._flattened
+
+        resultSet = super(FlattenAction, klass).Create(primaryTroveSet)
+        primaryTroveSet._flattened = resultSet
+        return resultSet
+
+class GroupTroveSetFindAction(troveset.FindAction):
+
+    prefilter = FlattenAction
+    resultClass = GroupDelayedTroveTupleSet
+
+    def _applyFilters(self, l):
+        assert(len(l) == 1)
+        if hasattr(l[0], "_flattened"):
+            return [ l[0]._flattened ]
+
+        result = troveset.FindAction._applyFilters(self, l)
+        l[0]._flattened = result[0]
+        return result
 
 class PackagesAction(GroupDelayedTupleSetAction):
 
