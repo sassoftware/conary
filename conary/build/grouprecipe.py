@@ -1843,97 +1843,6 @@ class TroveCache(trovecache.TroveCache):
     def __getattr__(self, key):
         return getattr(self.troveSource, key)
 
-    def getDepsForTroveList(self, troveTupList):
-        # look in the dep cache and trove cache
-        result = [ None ] * len(troveTupList)
-        for i, tup in enumerate(troveTupList):
-            result[i] = self.depCache.get(tup)
-            if result[i] is None and self.troveIsCached(tup):
-                trv = self.getTrove(tup)
-                result[i] = (trv.getProvides(), trv.getRequires())
-            elif result[i] is None and trove.troveIsPackage(tup[0]):
-                # packages provide only themselves; querying the repository
-                # to figure that out seems unnecessarily complicated
-                result[i] = deps.parseDep('trove: %s' % tup[0])
-
-        needed = [ (i, troveTup) for i, (troveTup, depSet) in
-                            enumerate(izip(troveTupList, result))
-                            if depSet is None ]
-        if not needed:
-            return result
-
-        # use the getDepsForTroveList call; it raises an error if it needs
-        # to access some repositories which don't support it
-        try:
-            depList = self.repos.getDepsForTroveList([ x[1] for x in needed ])
-        except netclient.PartialResultsError, e:
-            # we can't use this call everywhere; handle what we can and we'll
-            # deal with the None's later
-            depList = e.partialResults
-
-        for (i, troveTup), depInfo in izip(needed, depList):
-            self.depCache[troveTup] = depInfo
-            result[i] = depInfo
-
-        # see if anything else is None; if so, we need to cache the complete
-        needed = [ (i, troveTup) for i, troveTup in
-                            enumerate(troveTupList) if result[i] is None ]
-
-        trvs = self.getTroves([ x[1] for x in needed])
-        for (i, troveTup), trv in izip(needed, trvs):
-            result[i] = (trv.getProvides(), trv.getRequires())
-
-        return result
-
-    def getSizes(self, troveTupList):
-        return [ x() for x in
-                 self.getTroveInfo(trove._TROVEINFO_TAG_SIZE, troveTupList) ]
-
-    def getTroveInfo(self, infoType, troveTupList):
-        troveTupList = list(troveTupList)
-        infoCache = self.troveInfoCache.setdefault(infoType, {})
-
-        result = [ None ] * len(troveTupList)
-        for i, tup in enumerate(troveTupList):
-            result[i] = infoCache.get(tup)
-            if result[i] is None and self.troveIsCached(tup):
-                trv = self.getTrove(tup)
-                result[i] = getattr(trv.troveInfo,
-                                    trv.troveInfo.streamDict[infoType][2])
-
-        needed = [ (i, troveTup) for i, (troveTup, depSet) in
-                            enumerate(izip(troveTupList, result))
-                            if depSet is None ]
-        if not needed:
-            return result
-
-        troveInfoList = self.repos.getTroveInfo(infoType,
-                                                [ x[1] for x in needed ])
-        for (i, troveTup), troveInfo in izip(needed, troveInfoList):
-            infoCache[troveTup] = troveInfo
-            result[i] = troveInfo
-
-        return result
-
-    def getPathHashesForTroveList(self, troveList):
-        return self.getTroveInfo(trove._TROVEINFO_TAG_PATH_HASHES, troveList)
-
-    def getTroves(self, troveList, *args, **kw):
-        self.cacheTroves(troveList)
-        return [self[x] for x in troveList]
-
-    def getTrove(self, troveTup, *args, **kw):
-        self.cacheTroves([troveTup])
-        return self[troveTup]
-
-    def troveIsCached(self, troveTup):
-        return troveTup in self
-
-    def cacheTroves(self, troveTupList):
-        troveTupList = [x for x in troveTupList if x not in self]
-        if not troveTupList:
-            return
-
     def _caching(self, troveTupList):
         self.callback.gettingTroveDefinitions(len(troveTupList))
 
@@ -2036,9 +1945,6 @@ class TroveCache(trovecache.TroveCache):
                     yield troveTup
             elif weakRefs:
                 yield troveTup
-
-    def iterTroveListInfo(self, troveTup):
-        return(self[troveTup].iterTroveListInfo())
 
     def includeByDefault(self, troveTup, childTrove):
         return self.cache[troveTup].includeTroveByDefault(*childTrove)
