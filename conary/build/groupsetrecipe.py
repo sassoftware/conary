@@ -789,21 +789,22 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
             log.info("\tOptional")
             display(self._getOptionalSet())
 
-        matches = []
-        foundMatch = False
+        if data.groupRecipe._trackDict:
+            matches = []
+            foundMatch = False
 
-        try:
-            matches = self._findTroves(data.groupRecipe._trackDict.keys())
-        except errors.TroveNotFound:
-            matches = {}
+            try:
+                matches = self._findTroves(data.groupRecipe._trackDict.keys())
+            except errors.TroveNotFound:
+                matches = {}
 
-        if matches:
-            log.info("Tracking matches found in results for action %s"
-                     % str(self.action) + self._lineNumStr)
-            for (parsedSpec, matchList) in matches.iteritems():
-                log.info("\tMatches for %s"
-                                % data.groupRecipe._trackDict[parsedSpec])
-                display(matchList)
+            if matches:
+                log.info("Tracking matches found in results for action %s"
+                         % str(self.action) + self._lineNumStr)
+                for (parsedSpec, matchList) in matches.iteritems():
+                    log.info("\tMatches for %s"
+                                    % data.groupRecipe._trackDict[parsedSpec])
+                    display(matchList)
 
     def dump(self):
         self._dump = True
