@@ -139,6 +139,8 @@ class WindowsHelper:
                 self.volumes[int(i.INDEX)] = info
 
             self.volume = self.volumes[self.volumeIndex]
+            self.name = '-'.join(self.volume['name'].split())
+
         finally:
             # clean up
             image.delete()
@@ -1580,8 +1582,7 @@ class addCapsule(_Source):
                 self.recipe.winHelper.extractWIMInfo(f,
                     self.recipe.cfg.windowsBuildService,
                     volumeIndex=self.wimVolumeIndex)
-            pname = self.recipe.winHelper.volume['name']
-            pname = '-'.join(pname.split())
+            pname = self.recipe.winHelper.name
         else:
             raise SourceError('unknown capsule type %s', self.capsuleType)
 
