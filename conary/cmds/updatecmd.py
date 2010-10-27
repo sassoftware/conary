@@ -483,6 +483,7 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     infoArg = kwargs.get('info', False)
     testArg = kwargs.get('test', False)
     restartInfo = kwargs.get('restartInfo', None)
+    patchArgs = kwargs.pop('patchSpec', None)
     fromChangesets = []
     applyList = []
 
@@ -523,6 +524,9 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
 
         if addArgs:
             sysmodel.appendTroveOpByName(updateName, text=addArgs)
+
+        if patchArgs:
+            sysmodel.appendTroveOpByName('patch', text=patchArgs)
 
         for cs in fromChangesets:
             for trvInfo in cs.getPrimaryTroveList():

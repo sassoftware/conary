@@ -1084,6 +1084,9 @@ class _UpdateCommand(ConaryCommand):
             if 'sync' in kwargs and kwargs['sync']:
                 log.error('The --sync-to-parents argument cannot be used with a system model')
                 return 1
+            if otherArgs[1] == 'patch':
+                kwargs['patchSpec'] = otherArgs[2:]
+                otherArgs[2:] = []
             retval = updatecmd.doModelUpdate(cfg,
                 model, modelFile, otherArgs[2:], **kwargs)
         elif len(otherArgs) >= 3:
@@ -1103,6 +1106,12 @@ class InstallCommand(_UpdateCommand):
     commands = [ "install" ]
     help = 'Install software on the system'
 _register(InstallCommand)
+
+
+class PatchCommand(_UpdateCommand):
+    commands = [ "patch" ]
+    help = 'Patch software on the system'
+_register(PatchCommand)
 
 
 class EraseCommand(_UpdateCommand):
