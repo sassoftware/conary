@@ -236,8 +236,7 @@ class RollbackStack:
             os.write(ofd, ''.join(self.modelFile.read()[0]))
             os.close(ofd)
             if self.modelFile.model.modified():
-                # Do NOT opJournal the snapshot; we want it to still
-                # exist after a failure
+                opJournal.create(self.modelFile.snapFullName)
                 self.modelFile.writeSnapshot()
 
         return Rollback(rbDir)
