@@ -480,7 +480,6 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
     kwargs.setdefault('updateByDefault', True) # erase is not default case
     kwargs.setdefault('model', False)
     kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
-    infoArg = kwargs.get('info', False)
     restartInfo = kwargs.get('restartInfo', None)
     patchArgs = kwargs.pop('patchSpec', None)
     fromChangesets = []
@@ -638,7 +637,12 @@ def _updateTroves(cfg, applyList, **kwargs):
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
-            if tc.cacheModified():
+            if tc.cacheModified() and os.access(tcPath, os.W_OK):
+                # --info as non-root normally unable to write to the
+                # cache file, but should be allowed to proceed; since
+                # --info as root is often followed by an actual install,
+                # it makes sense to save new data to the cache even in
+                # the --info case when the cache is writeable
                 log.info("saving %s", tcPath)
                 tc.save(tcPath)
         else:
