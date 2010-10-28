@@ -83,7 +83,7 @@ class WindowsHelper:
         # clean up
         self.resource.delete()
 
-    def extractWIMInfo(self, path, wbs, volumeIndex):
+    def extractWIMInfo(self, path, wbs, volumeIndex=1):
         self.volumeIndex = volumeIndex
 
         import robj
@@ -116,12 +116,12 @@ class WindowsHelper:
 
             file_res.refresh()
             self.wimInfoXml = file_res.wimInfo.read()
-            wimInfo = xobj.parse(self.wimInfoXml)
+            self.wimInfo = xobj.parse(self.wimInfoXml)
 
             self.volumes = {}
 
-            if type(wimInfo.WIM.IMAGE) is list:
-                for i in wimInfo.WIM.IMAGE:
+            if type(self.wimInfo.WIM.IMAGE) is list:
+                for i in self.wimInfo.WIM.IMAGE:
                     info = {}
                     info['name'] = i.NAME.encode('utf-8')
                     info['version'] = "%s.%s.%s" % \
@@ -130,7 +130,7 @@ class WindowsHelper:
                          i.WINDOWS.VERSION.BUILD.encode('utf-8'))
                     self.volumes[int(i.INDEX)] = info
             else:
-                i = wimInfo.WIM.IMAGE
+                i = self.wimInfo.WIM.IMAGE
                 info = {}
                 info['name'] = i.NAME.encode('utf-8')
                 info['version'] = "%s.%s.%s" % \
@@ -138,6 +138,9 @@ class WindowsHelper:
                          i.WINDOWS.VERSION.MINOR.encode('utf-8'), \
                          i.WINDOWS.VERSION.BUILD.encode('utf-8'))
                 self.volumes[int(i.INDEX)] = info
+
+            if self.volumeIndex not in self.volumes:
+                self.volumeIndex = self.volumes.keys()[0]
 
             self.volume = self.volumes[self.volumeIndex]
             self.name = '-'.join(self.volume['name'].split())
