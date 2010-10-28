@@ -4146,7 +4146,7 @@ class BuildMSI(BuildAction):
 
         # Store MSI metadata to be stored in troveInfo
         self.recipe.winHelper = WindowsHelper()
-        self.recipe.winHelper.name = self.name
+        self.recipe.winHelper.productName = self.name
         self.recipe.winHelper.version = self.version
         self.recipe.winHelper.productCode = str(results.productCode)
         self.recipe.winHelper.upgradeCode = str(results.upgradeCode)

@@ -40,6 +40,7 @@ from conary.build.action import TARGET_WINDOWS
 class WindowsHelper:
     def __init__(self):
         self.path = None
+        self.components = []
 
     def extractMSIInfo(self, path, wbs):
         import robj
