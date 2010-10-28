@@ -40,6 +40,11 @@ from conary.build.action import TARGET_WINDOWS
 class WindowsHelper:
     def __init__(self):
         self.path = None
+        self.version = None
+        self.platform = None
+        self.productName = None
+        self.productCode = None
+        self.upgradeCode = None
         self.components = []
 
     def extractMSIInfo(self, path, wbs):
