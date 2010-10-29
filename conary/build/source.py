@@ -25,6 +25,7 @@ import shlex
 import sys
 import tempfile
 import stat
+import httplib
 
 from conary.lib import debugger, digestlib, log, magic, sha1helper
 from conary import rpmhelper
@@ -86,7 +87,11 @@ class WindowsHelper:
         #    for x in self.resource.components ]
 
         # clean up
-        self.resource.delete()
+        try:
+            self.resource.delete()
+        except httplib.ResponseNotReady:
+            pass
+
 
     def extractWIMInfo(self, path, wbs, volumeIndex=1):
         self.volumeIndex = volumeIndex
@@ -112,7 +117,7 @@ class WindowsHelper:
             name = os.path.basename(path)
             fobj = open(path, 'rb')
             size = os.fstat(fobj.fileno()).st_size
-            image.files.append({'path': name,
+            image.files.append({'path': name + '.wim',
                                    'type': self.fileType,
                                    'size': size,})
             file_res = image.files[-1]
@@ -122,7 +127,6 @@ class WindowsHelper:
             file_res.refresh()
             self.wimInfoXml = file_res.wimInfo.read()
             self.wimInfo = xobj.parse(self.wimInfoXml)
-
             self.volumes = {}
 
             if type(self.wimInfo.WIM.IMAGE) is list:
@@ -152,7 +156,10 @@ class WindowsHelper:
 
         finally:
             # clean up
-            image.delete()
+            try:
+                image.delete()
+            except httplib.ResponseNotReady:
+                pass
 
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
