@@ -3847,8 +3847,11 @@ class Requires(_addInfo, _dependency):
             return
 
         macros = self.recipe.macros
-        self.perlPath, perlIncPath, _ = self._getperl(macros, self.recipe)
-        self.perlIncArgs = ' '.join('-I'+x for x in perlIncPath)
+        self.perlPath, perlIncPath, perlDestInc = self._getperl(macros, self.recipe)
+        if perlDestInc:
+            self.perlIncArgs = perlDestInc
+        else:
+            self.perlIncArgs = ' '.join('-I'+x for x in perlIncPath)
 
     def _getPerlReqs(self, path, fullpath):
         if self.perlReqs is None:
