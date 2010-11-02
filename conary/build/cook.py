@@ -74,6 +74,9 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo,
         elif capsuleInfo[0] == 'msi':
             p.addMsiCapsule(os.path.basename(capsulePath),
                             newVersion, fileObj.fileId(), winHelper)
+        elif capsuleInfo[0] == 'wim':
+            p.addWimCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
         else:
             # This shouldn't be able to happen
             raise
@@ -2019,6 +2022,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @param changeSetFile: file to write changeset out to.
     @type changeSetFile: str
     """
+
     targetLabel = None
 
     use.track(True)

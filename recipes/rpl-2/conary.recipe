@@ -133,7 +133,7 @@ class Conary(CPackageRecipe):
         r.UtilizeUser('emerge', '%(libdir)s/.*/conary/cvc.py')
         # emerge really requires all of conary-build, so if
         # it moves to cvc we can remove this whiteout
-        r.Requires(exceptDeps=('%(bindir)s/conary',
+        r.Requires(exceptDeps=('(%(bindir)s/conary|conarycmd.py)',
                                'python: conary.build.cook'))
         # CNY-3314 -- conary.commit should not depend on conary.cvc
         r.Requires(exceptDeps=('.*/conary/commit\.py.*$',
@@ -161,7 +161,7 @@ class Conary(CPackageRecipe):
         # MySQL is optional.
         r.Requires(exceptDeps='python: MySQLdb.*')
         # postgresql is also optional
-        r.Requires(exceptDeps='python: pgdb')
+        r.Requires(exceptDeps='python: pgsql')
 
         r.AutoDoc('EULA_Conary_Dual_License.txt')
 

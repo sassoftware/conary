@@ -25,6 +25,7 @@ import shlex
 import sys
 import tempfile
 import stat
+import httplib
 
 from conary.lib import debugger, digestlib, log, magic, sha1helper
 from conary import rpmhelper
@@ -39,15 +40,19 @@ from conary.build.action import TARGET_WINDOWS
 
 class WindowsHelper:
     def __init__(self):
-        self.name = None
-        self.platform = None
+        self.path = None
         self.version = None
+        self.platform = None
+        self.productName = None
         self.productCode = None
         self.upgradeCode = None
         self.components = []
 
     def extractMSIInfo(self, path, wbs):
         import robj
+
+        self.fileType = 'msi'
+        self.path = path
 
         # This is here for backwards compatibility.
         if not wbs.startswith('http'):
@@ -64,7 +69,8 @@ class WindowsHelper:
         self.resource.path = open(path)
         self.resource.refresh()
 
-        name = self.resource.name.encode('utf-8').split()
+        self.productName = self.resource.name.encode('utf-8')
+        name = self.productName.split()
         if len(name) > 1 and '.' in name[-1]:
             name = '-'.join(name[:-1])
         else:
@@ -80,6 +86,80 @@ class WindowsHelper:
         #self.components = [ (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
         #    for x in self.resource.components ]
 
+        # clean up
+        try:
+            self.resource.delete()
+        except httplib.ResponseNotReady:
+            pass
+
+
+    def extractWIMInfo(self, path, wbs, volumeIndex=1):
+        self.volumeIndex = volumeIndex
+
+        import robj
+        from xobj import xobj
+
+        self.fileType = 'wim'
+        self.path = path
+
+        # This is here for backwards compatibility.
+        if not wbs.startswith('http'):
+            wbs = 'http://%s/api' % wbs
+
+        # create the resource
+        api = robj.connect(wbs)
+        api.images.append({'createdBy': 'conary-build'})
+
+        try:
+            image = api.images[-1]
+
+            # upload the image
+            name = os.path.basename(path)
+            fobj = open(path, 'rb')
+            size = os.fstat(fobj.fileno()).st_size
+            image.files.append({'path': name + '.wim',
+                                   'type': self.fileType,
+                                   'size': size,})
+            file_res = image.files[-1]
+            data = robj.HTTPData(data=fobj, size=size, chunked=True)
+            file_res.path = data
+
+            file_res.refresh()
+            self.wimInfoXml = file_res.wimInfo.read()
+            self.wimInfo = xobj.parse(self.wimInfoXml)
+            self.volumes = {}
+
+            if type(self.wimInfo.WIM.IMAGE) is list:
+                for i in self.wimInfo.WIM.IMAGE:
+                    info = {}
+                    info['name'] = i.NAME.encode('utf-8')
+                    info['version'] = "%s.%s.%s" % \
+                        (i.WINDOWS.VERSION.MAJOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.MINOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.BUILD.encode('utf-8'))
+                    self.volumes[int(i.INDEX)] = info
+            else:
+                i = self.wimInfo.WIM.IMAGE
+                info = {}
+                info['name'] = i.NAME.encode('utf-8')
+                info['version'] = "%s.%s.%s" % \
+                    (i.WINDOWS.VERSION.MAJOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.MINOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.BUILD.encode('utf-8'))
+                self.volumes[int(i.INDEX)] = info
+
+            if self.volumeIndex not in self.volumes:
+                self.volumeIndex = self.volumes.keys()[0]
+
+            self.volume = self.volumes[self.volumeIndex]
+            self.name = '-'.join(self.volume['name'].split())
+
+        finally:
+            # clean up
+            try:
+                image.delete()
+            except httplib.ResponseNotReady:
+                pass
 
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
@@ -1428,6 +1508,7 @@ class addCapsule(_Source):
 
     keywords = {'ignoreConflictingPaths': set(),
                 'ignoreAllConflictingTimes': False,
+                'wimVolumeIndex' : 1,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -1496,16 +1577,27 @@ class addCapsule(_Source):
             self.recipe.winHelper = WindowsHelper()
             if not self.recipe.cfg.windowsBuildService:
                 self.recipe.winHelper.name = self.recipe.name
-                self.recipe.winHelper.version = m.contents['version']
-                self.recipe.winHelper.platform = m.contents['version']
-                self.recipe.winHelper.productCode = m.contents['version']
-                self.recipe.winHelper.upgradeCode = m.contents['version']
+                self.recipe.winHelper.version = \
+                    self.recipe.winHelper.platform = \
+                    self.recipe.winHelper.productCode = \
+                    self.recipe.winHelper.upgradeCode = m.contents['version']
                 #raise SourceError('MSI capsules cannot be added without a '
                 #                  'windowsBuildService defined in the conary '
                 #                  'configuration')
             else:
                 self.recipe.winHelper.extractMSIInfo(f,
                     self.recipe.cfg.windowsBuildService)
+            pname = self.recipe.winHelper.name
+        elif self.capsuleType == 'wim':
+            self.recipe.winHelper = WindowsHelper()
+            if not self.recipe.cfg.windowsBuildService:
+                raise SourceError('WIM capsules cannot be added without a '
+                                  'windowsBuildService defined in the conary '
+                                  'configuration')
+            else:
+                self.recipe.winHelper.extractWIMInfo(f,
+                    self.recipe.cfg.windowsBuildService,
+                    volumeIndex=self.wimVolumeIndex)
             pname = self.recipe.winHelper.name
         else:
             raise SourceError('unknown capsule type %s', self.capsuleType)
@@ -1546,6 +1638,8 @@ class addCapsule(_Source):
             self.doRPM(f, destDir)
         elif self.capsuleType == 'msi':
             self.doMSI(f, destDir)
+        elif self.capsuleType == 'wim':
+            self.doWIM(f, destDir)
 
     def doRPM(self,f,destDir):
         # read ownership, permissions, file type, etc.
@@ -1671,6 +1765,12 @@ class addCapsule(_Source):
         _extractScriptsFromRPM(f, scriptDir)
 
     def doMSI(self, f, destDir):
+        totalPathList = []
+        self.manifest.recordRelativePaths(totalPathList)
+        self.manifest.create()
+        self.recipe._addCapsule(f, self.capsuleType, self.package)
+
+    def doWIM(self, f, destDir):
         totalPathList = []
         self.manifest.recordRelativePaths(totalPathList)
         self.manifest.create()
