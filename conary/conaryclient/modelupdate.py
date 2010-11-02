@@ -602,9 +602,9 @@ class CMLClient(object):
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
-        existsTrv = trove.Trove("@update", versions.NewVersion(),
+        existsTrv = trove.Trove("@model", versions.NewVersion(),
                                 deps.Flavor(), None)
-        targetTrv = trove.Trove("@update", versions.NewVersion(),
+        targetTrv = trove.Trove("@model", versions.NewVersion(),
                                 deps.Flavor(), None)
 
         pins = set()
@@ -704,7 +704,7 @@ class CMLClient(object):
                 if job is None:
                     job = targetTrv.diff(existsTrv, absolute = False)[2]
 
-                log.info("resolving dependencies")
+                log.info("resolving dependencies (job length %d)", len(job))
                 criticalJobs = criticalUpdateInfo.findCriticalJobs(job)
                 finalJobs = criticalUpdateInfo.findFinalJobs(job)
                 criticalOnly = criticalUpdateInfo.isCriticalOnlyUpdate()

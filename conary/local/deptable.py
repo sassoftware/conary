@@ -1614,6 +1614,7 @@ class DependencyDatabase(DependencyTables):
         cu.execute("CREATE TEMPORARY TABLE tmpInstances "
                    "(instanceId INTEGER)", start_transaction = False)
         schema.createDependencies(db)
+        self._bulkLoader = None
         DependencyTables.__init__(self, db)
 
     def add(self, troveId, provides, requires):
@@ -1621,8 +1622,11 @@ class DependencyDatabase(DependencyTables):
         self._add(cu, troveId, provides, requires)
 
     def bulkLoader(self):
-        cu = self.db.cursor()
-        return BulkDependencyLoader(self.db, cu)
+        if self._bulkLoader is None:
+            cu = self.db.cursor()
+            self._bulkLoader = BulkDependencyLoader(self.db, cu)
+
+        return self._bulkLoader
 
     def delete(self):
         raise NotImplementedError

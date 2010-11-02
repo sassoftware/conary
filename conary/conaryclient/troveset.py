@@ -142,6 +142,9 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         depLoader.done()
         self.depDb.commit()
 
+        if not self.depTroveIdMap:
+            return cachedSuggMap
+
         suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly,
                                      troveIdList = self.depTroveIdMap.keys())
 
