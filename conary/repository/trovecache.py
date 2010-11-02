@@ -253,6 +253,9 @@ class TroveCache(trovesource.AbstractTroveSource):
             else:
                 os.chmod(cacheName, 0644)
             os.rename(cacheName, path)
+        except IOError:
+            # may not have permissions; say, not running as root
+            pass
         finally:
             if os.path.exists(cacheName):
                 os.remove(cacheName)
