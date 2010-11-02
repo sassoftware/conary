@@ -1007,7 +1007,7 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.componentNames = set(componentNames)
 
-    def __call__(self, data):
+    def componentsAction(self, data):
         installSet = set()
         optionalSet = set()
 
@@ -1026,11 +1026,15 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+    __call__ = componentsAction
+
 class CopyAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def copyAction(self, data):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+    __call__ = copyAction
 
 class CreateGroupAction(GroupDelayedTupleSetAction):
 
@@ -1043,7 +1047,7 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
         self.checkPathConflicts = checkPathConflicts
         self.scripts = scripts
 
-    def __call__(self, data):
+    def createGroupAction(self, data):
         grp = SG(data.groupRecipe.name,
                  checkPathConflicts = self.checkPathConflicts)
 
@@ -1052,6 +1056,8 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
         self._create(data.groupRecipe.defaultGroup,
                      self.primaryTroveSet, self.outSet, data)
+
+    __call__ = createGroupAction
 
     def _create(self, sg, ts, outSet, data):
         if self.scripts is not None:
@@ -1077,10 +1083,12 @@ class CreateNewGroupAction(CreateGroupAction):
                                    checkPathConflicts = checkPathConflicts,
                                    scripts = scripts)
 
-    def __call__(self, data):
+    def createNewGroupAction(self, data):
         newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
         data.groupRecipe._addGroup(self.name, newGroup)
         self._create(newGroup, self.primaryTroveSet, self.outSet, data)
+
+    __call__ = createNewGroupAction
 
 class DepsNeededAction(GroupDelayedTupleSetAction):
 
@@ -1093,7 +1101,7 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
         self.failOnUnresolved = failOnUnresolved
         self.resolveTroveSet = resolveTroveSet
 
-    def __call__(self, data):
+    def depsNeededAction(self, data):
         checker = PythonDependencyChecker(
                         data.troveCache,
                         ignoreDepClasses = [ deps.AbiDependency,
@@ -1132,15 +1140,21 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
 
+    __call__ = depsNeededAction
+
 class GetInstalledAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def getInstalledAction(self, data):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+
+    __call__= getInstalledAction
 
 class GetOptionalAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def getOptionalAction(self, data):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+    __call__= getOptionalAction
 
 class FindByNameAction(GroupDelayedTupleSetAction):
 
@@ -1149,7 +1163,7 @@ class FindByNameAction(GroupDelayedTupleSetAction):
         self.namePattern = namePattern
         self.emptyOkay = emptyOkay
 
-    def __call__(self, data):
+    def findByNameAction(self, data):
 
         def _gather(troveTupleSet, nameRegex):
             s = set()
@@ -1168,13 +1182,15 @@ class FindByNameAction(GroupDelayedTupleSetAction):
         if (not self.emptyOkay and not install and not optional):
             raise CookError("findByName() matched no trove names")
 
+    __call__= findByNameAction
+
 class FindBySourceNameAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, sourceName):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.sourceName = sourceName
 
-    def __call__(self, data):
+    def findBySourceNameAction(self, data):
         troveTuples = (
             list(itertools.izip(itertools.repeat(True),
                            self.primaryTroveSet._getInstallSet())) +
@@ -1203,9 +1219,11 @@ class FindBySourceNameAction(GroupDelayedTupleSetAction):
         if (not installs and not optional):
             raise CookError("findBySourceName() matched no trove names")
 
+    __call__ = findBySourceNameAction
+
 class IsEmptyAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def isEmptyAction(self, data):
         if (self.primaryTroveSet._getInstallSet() or
             self.primaryTroveSet._getOptionalSet()):
 
@@ -1213,9 +1231,11 @@ class IsEmptyAction(GroupDelayedTupleSetAction):
 
         # self.outSet is already empty
 
+    __call__ = isEmptyAction
+
 class IsNotEmptyAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def isNotEmptyAction(self, data):
         if (not self.primaryTroveSet._getInstallSet() and
             not self.primaryTroveSet._getOptionalSet()):
 
@@ -1224,11 +1244,13 @@ class IsNotEmptyAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
 
+    __call__ = isNotEmptyAction
+
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
     resultClass = GroupLoggingDelayedTroveTupleSet
 
-    def __call__(self, data):
+    def latestPackageFromSearchSourceAction(self, data):
         troveSource = self.primaryTroveSet.searchSource.getTroveSource()
 
         # data hiding? what's that
@@ -1268,6 +1290,8 @@ class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(resultTupList)
 
+    __call__ = latestPackageFromSearchSourceAction
+
 class MakeInstallAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, installTroveSet = None):
@@ -1275,7 +1299,7 @@ class MakeInstallAction(GroupDelayedTupleSetAction):
                                             installTroveSet)
         self.installTroveSet = installTroveSet
 
-    def __call__(self, data):
+    def makeInstallAction(self, data):
         if self.installTroveSet:
             self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
             self.outSet._setInstall(
@@ -1285,6 +1309,8 @@ class MakeInstallAction(GroupDelayedTupleSetAction):
             self.outSet._setInstall(self.primaryTroveSet._getInstallSet() |
                                     self.primaryTroveSet._getOptionalSet())
 
+    __call__ = makeInstallAction
+
 class MakeOptionalAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, optionalTroveSet = None):
@@ -1292,7 +1318,7 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
                                             optionalTroveSet)
         self.optionalTroveSet = optionalTroveSet
 
-    def __call__(self, data):
+    def makeOptionalAction(self, data):
         if self.optionalTroveSet:
             self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
             self.outSet._setOptional(
@@ -1302,13 +1328,15 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
             self.outSet._setOptional(self.primaryTroveSet._getInstallSet() |
                                      self.primaryTroveSet._getOptionalSet())
 
+    __call__ = makeOptionalAction
+
 class MembersAction(GroupDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
     justStrong = True
     includeTop = False
 
-    def __call__(self, data):
+    def membersAction(self, data):
         for (troveTuple, installSet) in itertools.chain(
                 itertools.izip(self.primaryTroveSet._getInstallSet(),
                                itertools.repeat(True)),
@@ -1335,6 +1363,8 @@ class MembersAction(GroupDelayedTupleSetAction):
 
             self.outSet._setInstall(installs)
             self.outSet._setOptional(available)
+
+    __call__ = membersAction
 
 class FlattenAction(MembersAction):
 
@@ -1371,7 +1401,7 @@ class PackagesAction(GroupDelayedTupleSetAction):
     def __init__(self, primaryTroveSet):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
 
-    def __call__(self, data):
+    def packagesAction(self, data):
         installSet = set()
         optionalSet = set()
 
@@ -1391,6 +1421,8 @@ class PackagesAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
+
+    __call__ = packagesAction
 
 class SG(_SingleGroup):
 

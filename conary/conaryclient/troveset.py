@@ -507,13 +507,15 @@ class ParallelAction(DelayedTupleSetAction):
 
 class DifferenceAction(DelayedTupleSetAction):
 
-    def __call__(self, data):
+    def differenceAction(self, data):
         left = self.primaryTroveSet
         right = self.right
         all = right._getInstallSet().union(right._getInstallSet())
 
         self.outSet._setInstall(left._getInstallSet().difference(all))
         self.outSet._setOptional(left._getOptionalSet().difference(all))
+
+    __call__ = differenceAction
 
     def __init__(self, primaryTroveSet, other):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, other)
@@ -532,12 +534,14 @@ class FetchAction(ParallelAction):
         ParallelAction.__init__(self, primaryTroveSet)
         self.fetchAll = all
 
-    def __call__(self, actionList, data):
+    def fetchAction(self, actionList, data):
         for action in actionList:
             action.outSet._setOptional(action.primaryTroveSet._getOptionalSet())
             action.outSet._setInstall(action.primaryTroveSet._getInstallSet())
 
         self._fetch(actionList, data);
+
+    __call__ = fetchAction
 
     def _fetch(self, actionList, data):
         troveTuples = set()
@@ -561,7 +565,7 @@ class FindAction(ParallelAction):
         ParallelAction.__init__(self, primaryTroveSet)
         self.troveSpecs = troveSpecs
 
-    def __call__(self, actionList, data):
+    def findAction(self, actionList, data):
         troveSpecsByInSet = {}
         for action in actionList:
             l = troveSpecsByInSet.setdefault(action.primaryTroveSet, [])
@@ -588,6 +592,8 @@ class FindAction(ParallelAction):
         if notFound:
             raise TroveSpecsNotFound(sorted(notFound))
 
+    __call__ = findAction
+
     def __str__(self):
         if isinstance(self.troveSpecs[0], str):
             n1 = self.troveSpecs[0].split('=')[0]
@@ -613,7 +619,7 @@ class UnionAction(DelayedTupleSetAction):
     def __init__(self, primaryTroveSet, *args):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
 
-    def __call__(self, data):
+    def unionAction(self, data):
         # this ordering means that if it's in the install set anywhere, it
         # will be in the install set in the union
         tsList = self._inputSets
@@ -623,15 +629,19 @@ class UnionAction(DelayedTupleSetAction):
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
+    __call__ = unionAction
+
 class OptionalAction(DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, *args):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
 
-    def __call__(self, data):
+    def optionalAction(self, data):
         for troveSet in self._inputSets:
             self.outSet._setOptional(troveSet._getOptionalSet())
             self.outSet._setOptional(troveSet._getInstallSet())
+
+    __call__ = optionalAction
 
 class PatchAction(DelayedTupleSetAction):
 

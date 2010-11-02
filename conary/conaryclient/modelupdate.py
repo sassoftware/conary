@@ -110,7 +110,7 @@ class CMLRemoveAction(troveset.DelayedTupleSetAction):
                                                 removeTroveSet)
         self.removeTroveSet = removeTroveSet
 
-    def __call__(self, data):
+    def cmlRemoveAction(self, data):
         removeSet = (self.removeTroveSet._getOptionalSet() |
                      self.removeTroveSet._getInstallSet())
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet()
@@ -118,13 +118,15 @@ class CMLRemoveAction(troveset.DelayedTupleSetAction):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
                                     | removeSet)
 
+    __call__ = cmlRemoveAction
+
 class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, *args, **kwargs):
         self.excludeTroves = kwargs.pop('excludeTroves')
         troveset.DelayedTupleSetAction.__init__(self, *args, **kwargs)
 
-    def __call__(self, data):
+    def cmlExcludeTrovesAction(self, data):
         installSet = set()
         optionalSet = set()
         for troveTup, inInstall, isExplicit in (
@@ -143,12 +145,14 @@ class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+    __call__ = cmlExcludeTrovesAction
+
 class CMLFindAction(troveset.FindAction):
 
     # this not only finds, but it fetches and finds as well. it's a pretty
     # convienent way of handling redirects
 
-    def __call__(self, actionList, data):
+    def cmlFindAction(self, actionList, data):
         troveset.FindAction.__call__(self, actionList, data)
 
         fetchActions = []
@@ -191,6 +195,8 @@ class CMLFindAction(troveset.FindAction):
 
             action.outSet._setOptional(optionalSet)
             action.outSet._setInstall(installSet)
+
+    __call__ = cmlFindAction
 
     def _redirects(self, data, redirectList, optionalSet, installSet):
         q = util.IterableQueue()
@@ -278,7 +284,7 @@ class CMLFlattenAction(troveset.DelayedTupleSetAction):
     prefilter = troveset.FetchAction
     resultClass = FlattenedTroveTupleSet
 
-    def __call__(self, data):
+    def cmlFlattenAction(self, data):
         installs = []
         available = []
 
@@ -292,6 +298,8 @@ class CMLFlattenAction(troveset.DelayedTupleSetAction):
         self.outSet._setInstall(installs)
         self.outSet._setOptional(available)
         self.outSet._flat = True
+
+    __call__ = cmlFlattenAction
 
 class CMLSearchPath(troveset.SearchPathTroveSet):
 
