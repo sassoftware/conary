@@ -27,6 +27,7 @@ class AbstractModelCompiler(object):
     RemoveAction = None
 
     FetchAction = troveset.FetchAction
+    FindAction = troveset.FindAction
     InitialTroveTupleSet = troveset.StaticTroveTupleSet
     PatchAction = troveset.PatchAction
     UnionAction = troveset.UnionAction
@@ -94,13 +95,6 @@ class AbstractModelCompiler(object):
                 rebuildTotalSearchSet = True
                 continue
 
-            if rebuildTotalSearchSet:
-                totalSearchSet = self.SearchPathTroveSet( newSearchPath +
-                                                           [ totalSearchSet ],
-                                                         graph = self.g)
-                newSearchPath = []
-                rebuildTotalSearchSet = False
-
             searchSpecs = []
             localSpecs = []
             for troveSpec in op:
@@ -116,6 +110,22 @@ class AbstractModelCompiler(object):
                         pass
 
                 searchSpecs.append(troveSpec)
+
+            if isinstance(op, model.EraseTroveOperation):
+                flattenedTroveSet = finalTroveSet._action(*searchSpecs,
+                                        ActionClass = self.FlattenAction)
+                eraseMatches = flattenedTroveSet._action(*searchSpecs,
+                                        ActionClass = self.FindAction)
+                finalTroveSet = finalTroveSet._action(eraseMatches,
+                                        ActionClass = self.RemoveAction)
+                continue
+
+            if rebuildTotalSearchSet:
+                totalSearchSet = self.SearchPathTroveSet( newSearchPath +
+                                                           [ totalSearchSet ],
+                                                         graph = self.g)
+                newSearchPath = []
+                rebuildTotalSearchSet = False
 
             if searchSpecs:
                 searchMatches = totalSearchSet.find(*searchSpecs)
@@ -138,9 +148,6 @@ class AbstractModelCompiler(object):
             if isinstance(op, model.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UnionAction)
-            elif isinstance(op, model.EraseTroveOperation):
-                finalTroveSet = finalTroveSet._action(matches,
-                                        ActionClass = self.RemoveAction)
             elif isinstance(op, model.PatchTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.PatchAction)
