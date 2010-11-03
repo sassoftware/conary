@@ -607,6 +607,34 @@ class GroupTupleSetMethods(object):
         """
         return self._action(ActionClass = PackagesAction, *packageList)
 
+    def scripts(self):
+        """
+        NAME
+        ====
+        B{C{TroveSet.scripts}} - Return scripts for a trove
+
+        SYNOPSIS
+        ========
+        C{troveset.scripts()}
+
+        DESCRIPTION
+        ===========
+        Returns a Scripts object which includes all of the scripts for the
+        trove included in this TroveSet. If this TroveSet is empty or contains
+        multiple troves, an exception is raised.
+
+        EXAMPLES
+        ========
+        This creates a new group which includes the scripts from a group
+        which is already in the repository.
+
+        existingGrp = repos['group-standard']
+        thisGrpContents = repos['pkg']
+        r.Group(thisGrpContents, scripts = existingGrp.scripts()
+        """
+        stubTroveSet = self._action(ActionClass = ScriptsAction)
+        return stubTroveSet.groupScripts
+
     def union(self, *troveSetList):
         """
         NAME
@@ -1046,7 +1074,12 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
                  scripts = None):
-        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        if hasattr(scripts, "ts"):
+            GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                                scripts.ts)
+        else:
+            GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+
         self.name = name
         self.checkPathConflicts = checkPathConflicts
         self.scripts = scripts
@@ -1428,6 +1461,43 @@ class PackagesAction(GroupDelayedTupleSetAction):
 
     __call__ = packagesAction
 
+class ScriptsAction(GroupDelayedTupleSetAction):
+
+    prefilter = troveset.FetchAction
+
+    def __init__(self, *args, **kwargs):
+        GroupDelayedTupleSetAction.__init__(self, *args, **kwargs)
+
+    def getResultTupleSet(self, *args, **kwargs):
+        ts = GroupDelayedTupleSetAction.getResultTupleSet(self, *args, **kwargs)
+        ts.groupScripts = GroupScripts()
+        # this loop is gross. we use it to get the right dependencies on things
+        # which use the scripts though
+        ts.groupScripts.ts = ts
+        return ts
+
+    def scriptsAction(self, data):
+        totalSet = (self.primaryTroveSet._getInstallSet() |
+                    self.primaryTroveSet._getOptionalSet())
+        if not totalSet:
+            raise CookError("Empty trove set for scripts()")
+        elif len(totalSet) > 1:
+            raise CookError("Multiple troves in trove set for scripts()")
+
+        troveTup = list(totalSet)[0]
+        trv = data.troveCache.getTroves([ troveTup ])[0]
+        groupScripts = self.outSet.groupScripts
+
+        for scriptName in GroupScripts._scriptNames:
+            trvScript = getattr(trv.troveInfo.scripts, scriptName[:-7])
+            if not trvScript.script():
+                continue
+
+            selfScript = getattr(groupScripts, scriptName[:-7])
+            selfScript.set(trvScript.script())
+
+    __call__ = scriptsAction
+
 class SG(_SingleGroup):
 
     def __init__(self, *args, **kwargs):
@@ -1531,6 +1601,10 @@ class GroupScript(object):
         self.contents = contents
         self.fromClass = fromClass
 
+    def set(self, contents, fromClass = None):
+        self.contents = contents
+        self.fromClass = fromClass
+
 class GroupScripts(object):
     '''
     NAME
@@ -1584,22 +1658,25 @@ class GroupScripts(object):
     if you do so.
     '''
     _explainObjectName = 'Scripts'
+    _scriptNames = ('postInstallScripts', 'preRollbackScripts',
+                    'postRollbackScripts', 'preUpdateScripts',
+                    'postUpdateScripts')
 
-    def __init__(self, postInstall = None,
-                       preRollback = None, postRollback = None,
-                       preUpdate = None, postUpdate = None):
-        self.postInstall = postInstall
-        self.preRollback = preRollback
-        self.postRollback = postRollback
-        self.preUpdate = preUpdate
-        self.postUpdate = postUpdate
+    def __init__(self, **kwargs):
+        for scriptName in self._scriptNames:
+            contents = kwargs.pop(scriptName[:-7], None)
+            if contents is None:
+                contents = GroupScript(None)
+            setattr(self, scriptName[:-7], contents)
+
+        if kwargs:
+            raise TypeError("GroupScripts() got an unexpected keyword "
+                           "argument '%s'" % kwargs.keys()[0])
 
     def iterScripts(self):
-        for scriptName in ('postInstallScripts',
-                           'preRollbackScripts', 'postRollbackScripts',
-                           'preUpdateScripts', 'postUpdateScripts'):
+        for scriptName in self._scriptNames:
             script = getattr(self, scriptName[:-7])
-            if script is not None:
+            if script is not None and script.contents is not None:
                 yield script, scriptName
 
 class _GroupSetRecipe(_BaseGroupRecipe):
