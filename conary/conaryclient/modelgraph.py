@@ -85,9 +85,11 @@ class AbstractModelCompiler(object):
                     result = result[partialTup]
                     assert(len(result) == 1)
                     ts = self.InitialTroveTupleSet(troveTuple = result,
-                                                   graph = self.g)
+                                                   graph = self.g,
+                                                   index = op.index)
                     # get the trove itself
-                    newSearchSet = ts._action(ActionClass = self.FlattenAction)
+                    newSearchSet = ts._action(ActionClass = self.FlattenAction,
+                                              index = op.index)
                 else:
                     assert(0)
 
@@ -113,11 +115,14 @@ class AbstractModelCompiler(object):
 
             if isinstance(op, model.EraseTroveOperation):
                 flattenedTroveSet = finalTroveSet._action(*searchSpecs,
-                        **dict(ActionClass=self.FlattenAction))
+                        **dict(ActionClass=self.FlattenAction,
+                               index = op.index))
                 eraseMatches = flattenedTroveSet._action(*searchSpecs,
-                        **dict(ActionClass=self.FindAction))
+                        **dict(ActionClass=self.FindAction,
+                               index = op.index))
                 finalTroveSet = finalTroveSet._action(eraseMatches,
-                        ActionClass=self.RemoveAction)
+                        ActionClass=self.RemoveAction,
+                        index = op.index)
                 continue
 
             if rebuildTotalSearchSet:
@@ -139,7 +144,8 @@ class AbstractModelCompiler(object):
 
             if searchMatches and localMatches:
                 matches = searchMatches._action(localMatches,
-                                                ActionClass = self.UnionAction)
+                                                ActionClass = self.UnionAction,
+                                                index = op.index)
             elif searchMatches:
                 matches = searchMatches
             else:
@@ -147,21 +153,25 @@ class AbstractModelCompiler(object):
 
             if isinstance(op, model.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
-                                        ActionClass = self.UnionAction)
+                                        ActionClass = self.UnionAction,
+                                        index = op.index)
             elif isinstance(op, model.PatchTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
-                                        ActionClass = self.PatchAction)
+                                        ActionClass = self.PatchAction,
+                                        index = op.index)
             elif isinstance(op, model.UpdateTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
-                                        ActionClass = self.UpdateAction)
+                                        ActionClass = self.UpdateAction,
+                                        index = op.index)
             elif isinstance(op, model.OfferTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
-                                        ActionClass = self.OptionalAction)
+                                        ActionClass = self.OptionalAction,
+                                        index = op.index)
             else:
                 assert(0)
 
-            flatten = matches._action(ActionClass =
-                                        self.FlattenAction)
+            flatten = matches._action(ActionClass = self.FlattenAction,
+                                      index = op.index)
             newSearchPath.insert(0, flatten)
 
             for troveSpec in op:

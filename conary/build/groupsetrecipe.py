@@ -27,6 +27,16 @@ from conary.local import deptable
 from conary.repository import errors, netclient, searchsource
 from conary.deps import deps
 
+def findRecipeLineNumber():
+    line = None
+
+    for frame in inspect.stack():
+        if frame[1].endswith('.recipe'):
+            line = frame[2]
+            break
+
+    return line
+
 class GroupSetTroveCache(object):
 
     def __init__(self, groupRecipe, cache):
@@ -764,20 +774,14 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
                                 troveset.DelayedTupleSet):
 
     def __init__(self, *args, **kwargs):
-        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
         self._dump = False
-        self._lineNum = None
         self._lineNumStr = ''
+        index = findRecipeLineNumber()
+        if index is not None:
+            kwargs['index'] = index
+            self._lineNumStr = ':' + str(index)
 
-        # caller's caller
-        for frame in inspect.stack():
-            if frame[1].endswith('.recipe'):
-                self._lineNum = frame[2]
-                self._lineNumStr = ':' + str(self._lineNum)
-                break
-
-    def __str__(self):
-        return troveset.DelayedTupleSet.__str__(self) + self._lineNumStr
+        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
 
     def beenRealized(self, data):
         def display(tupleSet):
@@ -1855,7 +1859,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
                                                    graph = self.g)
 
         model = cml.CML(None)
-        model.parse(modelText, fileName = '(recipe)')
+        lineNum = findRecipeLineNumber()
+        model.parse(modelText, fileName = '(recipe):%d' % lineNum)
 
         comp = ModelCompiler(self.flavor, self.repos, self.g)
         sysModelSet = comp.build(model, searchPath, None)

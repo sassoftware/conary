@@ -180,22 +180,24 @@ class TroveTupleSetSearchSource(searchsource.SearchSource):
 
 class TroveSet(object):
 
-    def __init__(self, graph = None):
+    def __init__(self, graph = None, index = None):
         assert(graph)
         self.realized = False
         self.g = graph
+        self.index = index
 
     def __str__(self):
         return self.__class__.__name__
 
     def _action(self, *args, **kwargs):
         ActionClass = kwargs.pop('ActionClass')
+        index = kwargs.pop('index', None)
         edgeList = kwargs.pop('edgeList', None)
         if isinstance(edgeList, (list, tuple, set)):
             edgeList = iter(edgeList)
 
         action = ActionClass(self, *args, **kwargs)
-        troveSet = action.getResultTupleSet(graph = self.g)
+        troveSet = action.getResultTupleSet(graph = self.g, index = index)
         inputSets = action.getInputSets()
 
         self.g.addNode(troveSet)
@@ -395,13 +397,16 @@ class TroveTupleSet(TroveSet):
 
 class DelayedTupleSet(TroveTupleSet):
 
-    def __init__(self, graph = None, action = None):
+    def __init__(self, graph = None, action = None, index = None):
         assert(graph)
         assert(action)
-        TroveTupleSet.__init__(self, graph = graph)
+        TroveTupleSet.__init__(self, graph = graph, index = index)
         self.action = action
 
     def __str__(self):
+        if self.index is not None:
+            return str(self.action) + ':' + str(self.index)
+
         return str(self.action)
 
     def beenRealized(self, data):
@@ -438,16 +443,17 @@ class SearchSourceTroveSet(TroveSet):
     def _getSearchSource(self):
         return self.searchSource
 
-    def __init__(self, searchSource, graph = graph):
-        TroveSet.__init__(self, graph = graph)
+    def __init__(self, searchSource, graph = graph, index = None):
+        TroveSet.__init__(self, graph = graph, index = index)
         self.realized = (searchSource is not None)
         self.searchSource = searchSource
 
 class SearchPathTroveSet(SearchSourceTroveSet):
 
-    def __init__(self, troveSetList, graph = None):
+    def __init__(self, troveSetList, graph = None, index = None):
         self.troveSetList = troveSetList
-        SearchSourceTroveSet.__init__(self, None, graph = graph)
+        SearchSourceTroveSet.__init__(self, None, graph = graph,
+                                      index = index)
 
         for i, troveSet in enumerate(troveSetList):
             graph.addEdge(troveSet, self, value = str(i + 1))
@@ -500,8 +506,9 @@ class DelayedTupleSetAction(Action):
     def getInputSets(self):
         return self._inputSets
 
-    def getResultTupleSet(self, graph = None):
-        self.outSet = self.resultClass(action = self, graph = graph)
+    def getResultTupleSet(self, graph = None, index = None):
+        self.outSet = self.resultClass(action = self, graph = graph,
+                                       index = index)
         return self.outSet
 
 class ParallelAction(DelayedTupleSetAction):
