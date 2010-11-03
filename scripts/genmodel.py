@@ -31,6 +31,7 @@ sys.excepthook = util.genExcepthook(debug=True)
 
 from conary import conarycfg, conaryclient, errors, trove, versions
 from conary.conaryclient import cml, modelupdate, systemmodel
+from conary.cmds import updatecmd
 from conary.deps import deps
 from conary.trovetup import TroveSpec
 
@@ -102,8 +103,10 @@ def orderByPackage(jobList):
             # skip groups we've decided to install
             continue
 
-        assert(not trove.troveIsFileSet(job[0]))
-        assert(not trove.troveIsGroup(job[0]))
+        if trove.troveIsFileSet(job[0]):
+            print 'ignoring fileset %s' %job[0]
+        if trove.troveIsGroup(job[0]):
+            print 'ignoring group not in platform set %s' %job[0]
 
         pkgName = job[0].split(":")[0]
         if job[1][0] is not None:
@@ -480,7 +483,16 @@ if __name__ == '__main__':
 
     TrackFindAction.remap = False
     finalJob, uJob = buildJobs(client, cache, finalModel)
-    assert(set(finalJob) == set(candidateJob))
+
+    candidateJobSet = set(candidateJob)
+    finalJobSet = set(finalJob)
+    if candidateJobSet != finalJobSet:
+        print 'Simplifying the model to remove explicit version references'
+        print 'changed the model.  Review the changes.'
+        addedJobs = finalJobSet - candidateJobSet
+        removedJobs = candidateJobSet - finalJobSet
+        updatecmd.displayChangedJobs(addedJobs, removedJobs, cfg)
+        getAnswer('Press return to continue.')
 
     # Add comments to the model itself
     for commentline in (
@@ -512,7 +524,6 @@ if __name__ == '__main__':
         finalModel.appendNoOpByText('# %s' % commentline, modified=False)
 
     if finalJob:
-        from conary.cmds import updatecmd
         sys.stdout.flush()
         outfd, outfn = tempfile.mkstemp()
         os.unlink(outfn)
