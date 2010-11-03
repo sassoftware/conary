@@ -35,7 +35,8 @@ class CMLTroveCache(trovecache.TroveCache):
         self.callback = callback
         self.componentMap = {}
         if changeSetList:
-            csSource = trovesource.ChangesetFilesTroveSource(db)
+            csSource = trovesource.ChangesetFilesTroveSource(db,
+                                                             storeDeps = True)
             csSource.addChangeSets(changeSetList)
             troveSource = trovesource.SourceStack(csSource, repos)
         else:
@@ -370,7 +371,8 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     def build(self, model, changeSetList = []):
         if changeSetList:
-            csTroveSource = trovesource.ChangesetFilesTroveSource(self.db)
+            csTroveSource = trovesource.ChangesetFilesTroveSource(self.db,
+                                                             storeDeps = True)
             csTroveSource.addChangeSets(changeSetList)
             csSearchSource = searchsource.SearchSource(csTroveSource,
                                                        self.cfg.flavor)
