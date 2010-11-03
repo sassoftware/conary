@@ -13,7 +13,7 @@
 # full details.
 #
 
-import itertools, fcntl, os, smtplib, sys, tempfile
+import itertools, fcntl, optparse, os, smtplib, sys, tempfile
 from email.MIMEText import MIMEText
 from email.MIMEMultipart import MIMEMultipart
 
@@ -269,6 +269,12 @@ def initialRedHatModel(client, model):
 if __name__ == '__main__':
     #log.setVerbosity(log.INFO)
 
+    parser = optparse.OptionParser()
+    parser.add_option("--simplify", "-s", dest = "simplify", default = False,
+                      action = "store_true",
+                      help = "ignore components likely to be for dep closure")
+    options, args = parser.parse_args()
+
     cfg = conarycfg.ConaryConfiguration(readConfigFiles = True)
     cfg.initializeFlavors()
 
@@ -325,13 +331,14 @@ if __name__ == '__main__':
         # look for packages to install/update
         for priorityList in componentPriorities:
             for pkgTuple, jobList in installPackageMap.items():
-                componentSet = set( [ (pkgTuple[0] + ":" + x,
-                                       pkgTuple[1], pkgTuple[2])
-                                      for x in priorityList ] )
                 newInstalls = set([ (x[0], x[1][0], x[1][1]) for x in jobList ])
-                if (componentSet - newInstalls):
-                    # are all of the components we care about present
-                    continue
+                if options.simplify:
+                    componentSet = set( [ (pkgTuple[0] + ":" + x,
+                                           pkgTuple[1], pkgTuple[2])
+                                          for x in priorityList ] )
+                    if (componentSet - newInstalls):
+                        # are all of the components we care about present
+                        continue
 
                 if pkgTuple in newInstalls:
                     print "   updating model for job", jobList
