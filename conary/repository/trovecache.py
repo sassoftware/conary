@@ -242,23 +242,28 @@ class TroveCache(trovesource.AbstractTroveSource):
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(depSolutionsStr), False)
 
-        (_, cacheName) = tempfile.mkstemp(prefix=os.path.basename(path)+'.',
-                                          dir=os.path.dirname(path))
-
+        fd, cacheName = tempfile.mkstemp(
+                prefix=os.path.basename(path) + '.',
+                dir=os.path.dirname(path))
+        os.close(fd)
 
         try:
-            cs.writeToFile(cacheName)
-            if util.exists(path):
-                os.chmod(cacheName, os.stat(path).st_mode)
-            else:
-                os.chmod(cacheName, 0644)
-            os.rename(cacheName, path)
-        except IOError:
-            # may not have permissions; say, not running as root
-            pass
+            try:
+                cs.writeToFile(cacheName)
+                if util.exists(path):
+                    os.chmod(cacheName, os.stat(path).st_mode)
+                else:
+                    os.chmod(cacheName, 0644)
+                os.rename(cacheName, path)
+            except (IOError, OSError):
+                # may not have permissions; say, not running as root
+                pass
         finally:
-            if os.path.exists(cacheName):
-                os.remove(cacheName)
+            try:
+                if os.path.exists(cacheName):
+                    os.remove(cacheName)
+            except OSError:
+                pass
 
     def troveIsCached(self, troveTup):
         return troveTup in self.cache

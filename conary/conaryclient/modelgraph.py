@@ -113,11 +113,11 @@ class AbstractModelCompiler(object):
 
             if isinstance(op, model.EraseTroveOperation):
                 flattenedTroveSet = finalTroveSet._action(*searchSpecs,
-                                        ActionClass = self.FlattenAction)
+                        **dict(ActionClass=self.FlattenAction))
                 eraseMatches = flattenedTroveSet._action(*searchSpecs,
-                                        ActionClass = self.FindAction)
+                        **dict(ActionClass=self.FindAction))
                 finalTroveSet = finalTroveSet._action(eraseMatches,
-                                        ActionClass = self.RemoveAction)
+                        ActionClass=self.RemoveAction)
                 continue
 
             if rebuildTotalSearchSet:
