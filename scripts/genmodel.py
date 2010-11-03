@@ -305,11 +305,12 @@ if __name__ == '__main__':
 
     allCandidates = []
     updatedModel = True
+    lastPass = False
     # remember that job order is backwards! it's trying to move from
     # what's there to what the model says; we want to undo those operations
     while updatedModel:
         candidateJob, uJob = buildJobs(client, cache, model)
-        if candidateJob in allCandidates:
+        if lastPass or (candidateJob in allCandidates):
             break
 
         allCandidates.append(candidateJob)
@@ -363,6 +364,8 @@ if __name__ == '__main__':
 
             for compJob in jobList:
                 updatedModel = (addInstallJob(model, compJob) or updatedModel)
+
+        lastPass = updatedModel
 
     # handle erases separately
     erases = (set(erasePackageMap.keys())
