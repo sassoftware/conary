@@ -266,7 +266,7 @@ class TroveCache(trovesource.AbstractTroveSource):
         try:
             contType, versionTimeStamps = cs.getFileContents(
                                self.timeStampsPathId, self.timeStampsFileId)
-        except Exception, KeyError:
+        except KeyError:
             pass
         else:
             pickled = versionTimeStamps.get().read()
