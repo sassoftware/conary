@@ -21,6 +21,8 @@ from conary import callbacks
 from conary import conaryclient
 from conary import display
 from conary import errors
+from conary import trove
+from conary import trovetup
 from conary.deps import deps
 from conary.lib import api
 from conary.lib import log
@@ -454,9 +456,8 @@ def doUpdate(cfg, changeSpecs, **kwargs):
 
             fromChangesets.append(cs)
             changeSpecs.remove(item)
-            for trvInfo in cs.getPrimaryTroveList():
-                changeSpecs.append("%s=%s[%s]" % (trvInfo[0],
-                      trvInfo[1].asString(), deps.formatFlavor(trvInfo[2])))
+            for troveTuple in cs.getPrimaryTroveList():
+                changeSpecs.append(trovetup.TroveTuple(*troveTuple).asString())
 
     if kwargs.get('restartInfo', None):
         # We don't care about applyList, we will set it later
@@ -499,12 +500,12 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                     if not (x.startswith('+') or x.startswith('-'))]
 
         # find any default arguments that represent changesets
-        for i, defArg in enumerate(defArgs):
+        for defArg in list(defArgs):
             if util.exists(defArg):
                 try:
-                    cs = changeset.ChangeSetFromFile(defArgs[i])
-                    fromChangesets.append(cs)
-                    defArgs.pop(i)
+                    cs = changeset.ChangeSetFromFile(defArg)
+                    fromChangesets.append((cs, defArg))
+                    defArgs.remove(defArg)
                 except filecontainer.BadContainer:
                     # not a changeset, must be a trove name
                     pass
@@ -526,13 +527,33 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
         if patchArgs:
             sysmodel.appendTroveOpByName('patch', text=patchArgs)
 
-        for cs in fromChangesets:
-            for trvInfo in cs.getPrimaryTroveList():
-                sysmodel.appendTroveOpByName(updateName, text='%s=%s[%s]' % (
-                    trvInfo[0],
-                    trvInfo[1].asString(),
-                    deps.formatFlavor(trvInfo[2])))
-        kwargs['fromChangesets'] = fromChangesets
+        disallowedChangesets = []
+        for cs, argName in fromChangesets:
+            for troveTuple in cs.getPrimaryTroveList():
+                # group and redirect changesets will break the model the
+                # next time it is run, so prevent them from getting in
+                # the model in the first place
+                if troveTuple[1].isOnLocalHost():
+                    if troveTuple[0].startswith('group-'):
+                        disallowedChangesets.append((argName, 'group',
+                            trovetup.TroveTuple(*troveTuple).asString()))
+                        continue
+                    trvCs = cs.getNewTroveVersion(*troveTuple)
+                    if trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
+                        disallowedChangesets.append((argName, 'redirect',
+                            trovetup.TroveTuple(*troveTuple).asString()))
+                        continue
+                sysmodel.appendTroveOpByName(updateName,
+                    text=trovetup.TroveTuple(*troveTuple).asString())
+
+        if disallowedChangesets:
+            raise errors.ConaryError(
+                'group and redirect changesets on a local label'
+                ' cannot be installed:\n    ' + '\n    '.join(
+                    '%s contains local %s: %s' % x
+                    for x in disallowedChangesets))
+
+        kwargs['fromChangesets'] = [x[0] for x in fromChangesets]
 
         if kwargs.pop('model'):
             sysmodel.write(sys.stdout)
