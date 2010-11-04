@@ -1,1 +1,0 @@
-Fixed perl dependency calculation for the case when perl itself is being built.
