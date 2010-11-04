@@ -653,13 +653,20 @@ class OptionalAction(DelayedTupleSetAction):
 
     __call__ = optionalAction
 
-class PatchAction(DelayedTupleSetAction):
+class AbstractModifyAction(DelayedTupleSetAction):
 
     prefilter = FetchAction
 
     def __init__(self, primaryTroveSet, updateTroveSet):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
         self.updateTroveSet = updateTroveSet
+
+    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
+                     installSet, optionalSet):
+        raise NotImplementedError
+
+    def _preprocess(self, data, beforeInfo, afterInfo):
+        pass
 
     def patchAction(self, data):
         before = trove.Trove("@tsupdate", versions.NewVersion(),
@@ -712,11 +719,13 @@ class PatchAction(DelayedTupleSetAction):
                 troveMapping.append( (troveTup[0], troveTup[1:3],
                                       troveTup[1:3], False) )
 
+        self._preprocess(data, beforeInfo, afterInfo)
+
         for (trvName, (oldVersion, oldFlavor),
                       (newVersion, newFlavor), isAbsolute) in troveMapping:
             oldTuple = (trvName, oldVersion, oldFlavor)
             newTuple = (trvName, newVersion, newFlavor)
-            self._handleTrove(beforeInfo, afterInfo, oldTuple, newTuple,
+            self._handleTrove(data, beforeInfo, afterInfo, oldTuple, newTuple,
                               installSet, optionalSet)
 
         self.outSet._setInstall(installSet)
@@ -724,10 +733,28 @@ class PatchAction(DelayedTupleSetAction):
 
     __call__ = patchAction
 
-    def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
+class PatchAction(AbstractModifyAction):
+
+    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
-        oldVersion = oldTuple[1]
-        newVersion = newTuple[1]
+        if oldTuple[1] and newTuple[1]:
+            oldVersion = data.troveCache.getTimestamps([ oldTuple ])[0]
+            newVersion = data.troveCache.getTimestamps([ newTuple ])[0]
+
+            if (oldVersion > newVersion):
+                # the old one is newer than the new one. leave it where we
+                # found it
+                wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
+                if wasExplicit:
+                    if wasInInstallSet:
+                        installSet.add(oldTuple)
+                    else:
+                        optionalSet.add(oldTuple)
+
+                return
+        else:
+            oldVersion = oldTuple[1]
+            newVersion = newTuple[1]
 
         if not oldVersion:
             # something in the update doesn't map to something we
@@ -756,9 +783,14 @@ class PatchAction(DelayedTupleSetAction):
             if newTuple != oldTuple:
                 optionalSet.add(oldTuple)
 
-class UpdateAction(PatchAction):
+    def _preprocess(self, data, beforeInfo, afterInfo):
+        # populate the cache with timestamped versions as a bulk operation
+        data.troveCache.getTimestamps( beforeInfo.keys() + afterInfo.keys() )
 
-    def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
+
+class UpdateAction(AbstractModifyAction):
+
+    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
         oldVersion = oldTuple[1]
         newVersion = newTuple[1]

@@ -87,8 +87,7 @@ class CMLTroveCache(trovecache.TroveCache):
         self.cacheTroves(need)
 
     def cacheModified(self):
-        return (len(self.cache), len(self.depCache),
-                len(self.depSolutionCache)) != self._startingSizes
+        return self._getSizeTuple() != self._startingSizes
 
     def getPackageComponents(self, troveTup):
         if self.troveIsCached(troveTup):
