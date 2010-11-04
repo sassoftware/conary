@@ -35,8 +35,8 @@ from conary.cmds import updatecmd
 from conary.deps import deps
 from conary.trovetup import TroveSpec
 
-# pyflakes=ignore
-from conary.lib import log
+from conary.lib import log #  pyflakes=ignore
+
 
 OrigFindAction = modelupdate.CMLFindAction
 class TrackFindAction(OrigFindAction):
