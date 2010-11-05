@@ -244,6 +244,8 @@ class CMLFindAction(troveset.FindAction):
 
 class CMLFinalFetchAction(troveset.FetchAction):
 
+    prefilter = troveset.FetchAction
+
     def _fetch(self, actionList, data):
         troveTuples = set()
 
