@@ -519,7 +519,10 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                    ignoreMissing = True)
 
 def rpmExpandMacro(str):
-    rawRpmModulePath = rpm._rpm.__file__
+    if getattr(rpm, '_rpm', ''):
+        rawRpmModulePath = rpm._rpm.__file__
+    else:
+        rawRpmModulePath = rpm.__file__
     sonames = [ x[1] for x in elf.inspect(rawRpmModulePath)[0]
                     if x[0] == 'soname']
     rpmLibs = [ x for x in sonames if re.match('librpm[-\.].*so', x) ]

@@ -56,6 +56,7 @@ from conary.cmds import verify
 from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
+from conary.conaryclient import cml
 from conary.conaryclient import systemmodel
 from conary.repository import trovesource
 
@@ -975,7 +976,7 @@ class _UpdateCommand(ConaryCommand):
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = { 'systemModel': False }
-        model = systemmodel.SystemModelText(cfg)
+        model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
 
         callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
@@ -1084,6 +1085,9 @@ class _UpdateCommand(ConaryCommand):
             if 'sync' in kwargs and kwargs['sync']:
                 log.error('The --sync-to-parents argument cannot be used with a system model')
                 return 1
+            if otherArgs[1] == 'patch':
+                kwargs['patchSpec'] = otherArgs[2:]
+                otherArgs[2:] = []
             retval = updatecmd.doModelUpdate(cfg,
                 model, modelFile, otherArgs[2:], **kwargs)
         elif len(otherArgs) >= 3:
@@ -1103,6 +1107,12 @@ class InstallCommand(_UpdateCommand):
     commands = [ "install" ]
     help = 'Install software on the system'
 _register(InstallCommand)
+
+
+class PatchCommand(_UpdateCommand):
+    commands = [ "patch" ]
+    help = 'Patch software on the system'
+_register(PatchCommand)
 
 
 class EraseCommand(_UpdateCommand):
@@ -1189,7 +1199,7 @@ class UpdateAllCommand(_UpdateCommand):
         kwargs = { 'systemModel': False }
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
 
-        model = systemmodel.SystemModelText(cfg)
+        model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
         if modelFile.exists():
             kwargs['systemModel'] = model

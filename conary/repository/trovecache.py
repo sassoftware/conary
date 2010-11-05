@@ -29,13 +29,17 @@ class TroveCache(trovesource.AbstractTroveSource):
     depSolutionsPathId = 'SYSTEM-MODEL-DEPENDENCY-SOLUTION'
     depSolutionsFileId = '\0' * 40
 
+    timeStampsPathId = 'SYSTEM-MODEL-TIMESTAMP-CACHE----'
+    timeStampsFileId = '\0' * 40
+
     def __init__(self, troveSource):
         self.troveInfoCache = {}
         self.depCache = {}
         self.depSolutionCache = {}
+        self.timeStampCache = {}
         self.cache = {}
         self.troveSource = troveSource
-        self._startingSizes = (0, 0, 0)
+        self._startingSizes = (0, 0, 0, 0)
 
     def _addToCache(self, troveTupList, troves, _cached = None):
         for troveTup, trv in izip(troveTupList, troves):
@@ -51,6 +55,10 @@ class TroveCache(trovesource.AbstractTroveSource):
 
     def _cached(self, troveTupList, troveList):
         pass
+
+    def _getSizeTuple(self):
+        return ( len(self.cache), len(self.depCache),
+                 len(self.depSolutionCache), len(self.timeStampCache) )
 
     def cacheTroves(self, troveTupList, _cached = None):
         troveTupList = [x for x in troveTupList if x not in self.cache]
@@ -126,6 +134,50 @@ class TroveCache(trovesource.AbstractTroveSource):
                 tiList[i] = x()
 
         return tiList
+
+    def getTimestamps(self, troveTupList):
+        # look in the dep cache and trove cache
+        result = [ None ] * len(troveTupList)
+        for i, tup in enumerate(troveTupList):
+            result[i] = self.timeStampCache.get(tup[0:2])
+            if result[i] is None and self.troveIsCached(tup):
+                trv = self.cache[tup]
+                result[i] = trv.getVersion()
+
+        needed = [ (i, troveTup) for i, (troveTup, depSet) in
+                            enumerate(izip(troveTupList, result))
+                            if depSet is None ]
+        if not needed:
+            return result
+
+        # use the timeStamps call; it raises an error if it needs
+        # to access some repositories which don't support it
+        log.info("Getting timeStamps for %d troves" % len(needed))
+        try:
+            depList = self.troveSource.getTimestamps(
+                                                [ x[1] for x in needed ])
+        except netclient.PartialResultsError, e:
+            # we can't use this call everywhere; handle what we can and we'll
+            # deal with the None's later
+            depList = e.partialResults
+
+        for (i, troveTup), timeStampedVersion in izip(needed, depList):
+            # timeStampedVersion can be None if we got partial results due to
+            # old servers
+            if timeStampedVersion is not None:
+                self.timeStampCache[troveTup[0:2]] = timeStampedVersion
+                result[i] = timeStampedVersion
+
+        # see if anything else is None; if so, we need to cache the complete
+        needed = [ (i, troveTup) for i, troveTup in
+                            enumerate(troveTupList) if result[i] is None ]
+
+        trvs = self.getTroves([ x[1] for x in needed])
+        for (i, troveTup), trv in izip(needed, trvs):
+            result[i] = trv.getVersion()
+
+        return result
+
 
     def getTroveInfo(self, infoType, troveTupList):
         troveTupList = list(troveTupList)
@@ -211,8 +263,20 @@ class TroveCache(trovesource.AbstractTroveSource):
 
             self.addDepSolution(sig, depSet, allResults)
 
-        self._startingSizes = ( len(self.cache), len(self.depCache),
-                                len(self.depSolutionCache) )
+        try:
+            contType, versionTimeStamps = cs.getFileContents(
+                               self.timeStampsPathId, self.timeStampsFileId)
+        except KeyError:
+            pass
+        else:
+            pickled = versionTimeStamps.get().read()
+            timeStampList = cPickle.loads(pickled)
+
+            for (name, frozenVersion) in timeStampList:
+                thawed = versions.ThawVersion(frozenVersion)
+                self.timeStampCache[(name, thawed)] = thawed
+
+        self._startingSizes = self._getSizeTuple()
 
     def save(self, path):
         cs = changeset.ChangeSet()
@@ -242,20 +306,37 @@ class TroveCache(trovesource.AbstractTroveSource):
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(depSolutionsStr), False)
 
-        (_, cacheName) = tempfile.mkstemp(prefix=os.path.basename(path)+'.',
-                                          dir=os.path.dirname(path))
+        timeStamps = []
+        for (name, baseVersion), version in self.timeStampCache.items():
+            timeStamps.append( (timeStamps, version.freeze()) )
+        timeStampsStr = cPickle.dumps(timeStamps)
 
+        cs.addFileContents(self.timeStampsPathId, self.timeStampsFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString(timeStampsStr), False)
+
+        fd, cacheName = tempfile.mkstemp(
+                prefix=os.path.basename(path) + '.',
+                dir=os.path.dirname(path))
+        os.close(fd)
 
         try:
-            cs.writeToFile(cacheName)
-            if util.exists(path):
-                os.chmod(cacheName, os.stat(path).st_mode)
-            else:
-                os.chmod(cacheName, 0644)
-            os.rename(cacheName, path)
+            try:
+                cs.writeToFile(cacheName)
+                if util.exists(path):
+                    os.chmod(cacheName, os.stat(path).st_mode)
+                else:
+                    os.chmod(cacheName, 0644)
+                os.rename(cacheName, path)
+            except (IOError, OSError):
+                # may not have permissions; say, not running as root
+                pass
         finally:
-            if os.path.exists(cacheName):
-                os.remove(cacheName)
+            try:
+                if os.path.exists(cacheName):
+                    os.remove(cacheName)
+            except OSError:
+                pass
 
     def troveIsCached(self, troveTup):
         return troveTup in self.cache

@@ -1415,8 +1415,9 @@ class ReadOnlyChangeSet(ChangeSet):
                 rc = self._nextFile()
 
         if name != key and name != pathId:
-            raise KeyError, 'pathId %s is not in the changeset' % \
-                            sha1helper.md5ToString(pathId)
+            if len(pathId) == 16:
+                pathId = sha1helper.md5ToString(pathId)
+            raise KeyError, 'pathId %s is not in the changeset' % pathId
         else:
             return (tag, cont)
 

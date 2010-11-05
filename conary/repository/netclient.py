@@ -2761,6 +2761,40 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return [ base64.decodestring(x) for x in
                     self.c[host].getNewPGPKeys(mark) ]
 
+    def getTimestamps(self, troveList):
+        # partialTroveList is a list of (name, version) or
+        # (name, version, flavor) tuples. result is a parallel list of
+        # versions with timestamp information included. if any timestamps
+        # cannot be found on a repository, None is returned for those
+        # elements.
+        byServer = {}
+        for (i, troveTup) in enumerate(troveList):
+            l = byServer.setdefault(troveTup[1].getHost(), [])
+            l.append((i, troveTup[0:2]))
+
+        partialOnly = False
+        results = [ None ] * len(troveList)
+        for host, l in byServer.iteritems():
+            if self.c[host].getProtocolVersion() < 70:
+                partialOnly = True
+                continue
+
+            tl = [ (x[1][0], self.fromVersion(x[1][1]) ) for x in l ]
+            hostResult = self.c[host].getTimestamps(tl)
+
+            for ((idx, troveTup), timeStamps) in itertools.izip(l, hostResult):
+                if timeStamps == 0:
+                    results[idx] = None
+                else:
+                    results[idx] = troveList[idx][1].copy()
+                    results[idx].setTimeStamps(
+                                 [ float(x) for x in timeStamps.split(':') ])
+
+        if partialOnly:
+            raise PartialResultsError(results)
+
+        return results
+
     def getDepsForTroveList(self, troveList):
         # for old servers, UnsupportedCallError is raised, and the caller
         # is expected to handle it. we do it this way because the outer

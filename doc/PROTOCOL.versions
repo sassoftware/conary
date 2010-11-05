@@ -1,6 +1,6 @@
 # this file documents the wire protocol changes for conary.
 Version 70:
-  - added getDepsForTroveList
+  - added getDepsForTroveList, getTimestamps
 
 Version 69:
   - added getCommitProgress

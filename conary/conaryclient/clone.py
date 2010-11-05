@@ -500,11 +500,12 @@ class ClientClone(object):
                     needed.append(info)
                     seen.add(info)
 
-            srcsNeeded = [ (n,v,f) for n,v,f in needed if not
-                    trove.troveIsComponent(n) and n not in sourceByPackage ]
+            srcsNeeded = [ (n,v,f) for n,v,f in needed if
+                                (not trove.troveIsComponent(n) and
+                                 (n,v,f) not in sourceByPackage) ]
             srcList = troveCache.getTroveInfo(
                             trove._TROVEINFO_TAG_SOURCENAME, srcsNeeded)
-            sourceByPackage.update( (x[0],y()) for x, y in
+            sourceByPackage.update( (x,y()) for x, y in
                                         itertools.izip(srcsNeeded, srcList) )
 
             newToClone = []
@@ -516,7 +517,9 @@ class ClientClone(object):
                     sourceName = None
                 elif trove.troveIsComponent(troveTup[0]):
                     try:
-                        sourceName = sourceByPackage[troveTup[0].split(":")[0]]
+                        sourceName = sourceByPackage[
+                                (troveTup[0].split(":")[0], troveTup[1],
+                                 troveTup[2])]
                     except KeyError:
                         # XXX This can't happen because groups have to include
                         # packages, not components. However, the test suite
@@ -524,7 +527,7 @@ class ClientClone(object):
                         # guess because it's good enough for the tests.
                         sourceName = troveTup[0].split(":")[0] + ":source"
                 else:
-                    sourceName = sourceByPackage[troveTup[0]]
+                    sourceName = sourceByPackage[troveTup]
 
                 if chooser.shouldClone(troveTup, sourceName):
                     if not chooser.isExcluded(troveTup):

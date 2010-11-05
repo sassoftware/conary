@@ -13,7 +13,7 @@
 # full details.
 #
 
-import itertools, fcntl, os, smtplib, sys, tempfile
+import itertools, fcntl, optparse, os, smtplib, sys, tempfile
 from email.MIMEText import MIMEText
 from email.MIMEMultipart import MIMEMultipart
 
@@ -30,13 +30,15 @@ from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
 
 from conary import conarycfg, conaryclient, errors, trove, versions
-from conary.conaryclient import modelupdate, systemmodel
+from conary.conaryclient import cml, modelupdate, systemmodel
+from conary.cmds import updatecmd
 from conary.deps import deps
 from conary.trovetup import TroveSpec
 
-from conary.lib import log  # pyflakes=ignore
+# pyflakes=ignore
+from conary.lib import log
 
-OrigFindAction = modelupdate.SysModelFindAction
+OrigFindAction = modelupdate.CMLFindAction
 class TrackFindAction(OrigFindAction):
 
     findMap = {}
@@ -80,7 +82,7 @@ class TrackFindAction(OrigFindAction):
 
         return result
 
-modelupdate.SysModelFindAction = TrackFindAction
+modelupdate.CMLFindAction = TrackFindAction
 
 def buildJobs(client, cache, model):
     print "====== Candidate model " + "=" * 55
@@ -88,7 +90,7 @@ def buildJobs(client, cache, model):
 
     TrackFindAction.findMap = {}
     updJob = client.newUpdateJob()
-    ts = client.systemModelGraph(model)
+    ts = client.cmlGraph(model)
     client._updateFromTroveSetGraph(updJob, ts, cache, ignoreMissingDeps = True)
 
     return list(itertools.chain(*updJob.getJobs())), updJob
@@ -101,8 +103,10 @@ def orderByPackage(jobList):
             # skip groups we've decided to install
             continue
 
-        assert(not trove.troveIsFileSet(job[0]))
-        assert(not trove.troveIsGroup(job[0]))
+        if trove.troveIsFileSet(job[0]):
+            print 'ignoring fileset %s' %job[0]
+        if trove.troveIsGroup(job[0]):
+            print 'ignoring group not in platform set %s' %job[0]
 
         pkgName = job[0].split(":")[0]
         if job[1][0] is not None:
@@ -125,11 +129,11 @@ def fmtVer(v):
 
 def addInstallJob(model, job):
     if job[2][1] is not None:
-        newOp = systemmodel.UpdateTroveOperation(
+        newOp = cml.UpdateTroveOperation(
                 item = [ TroveSpec(job[0], fmtVer(job[1][0]),
                                      str(job[1][1])) ] )
     else:
-        newOp = systemmodel.InstallTroveOperation(
+        newOp = cml.InstallTroveOperation(
                 item = [ TroveSpec(job[0], fmtVer(job[1][0]),
                                      str(job[1][1])) ] )
 
@@ -142,7 +146,7 @@ def addInstallJob(model, job):
     return updatedModel
 
 def addEraseJob(model, job):
-    newOp = systemmodel.EraseTroveOperation(
+    newOp = cml.EraseTroveOperation(
                 item = [ TroveSpec(job[0], job[2][0].asString(),
                                    str(job[2][1])) ])
 
@@ -214,16 +218,16 @@ def initialForesightModel(installedTroves, model):
                     if x.getName() == 'group-kde-dist' ][0]
     if trv:
         if 'x86_64' in str(trv.getFlavor()):
-            model.appendTroveOp(systemmodel.SearchTrove(
+            model.appendTroveOp(cml.SearchTrove(
                     item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                      'is:x86' ) ))
-        model.appendTroveOp(systemmodel.SearchTrove(
+        model.appendTroveOp(cml.SearchTrove(
                 item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                  str(trv.getFlavor()) ) ) )
         mainLabels.add(trv.getVersion().trailingLabel().asString())
 
     for trv in groupTroves:
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
+        model.appendTroveOp(cml.InstallTroveOperation(
                 item = [ TroveSpec(trv.getName(),
                                    fmtVer(trv.getVersion()),
                                    str(trv.getFlavor())) ] ))
@@ -236,24 +240,24 @@ def initialRedHatModel(client, model):
 			    latest = True)
     mainLabels = set()
 
-    model.appendTroveOp(systemmodel.SearchTrove(
+    model.appendTroveOp(cml.SearchTrove(
                                 item = TroveSpec(groupOs[0],
                                                  fmtVer(groupOs[1]),
                                                  str(groupOs[2]))))
     mainLabels.add(groupOs[1].trailingLabel().asString())
-    model.appendTroveOp(systemmodel.SearchTrove(
+    model.appendTroveOp(cml.SearchTrove(
                                 item = TroveSpec(groupRpath[0],
                                                  fmtVer(groupRpath[1]),
                                                  str(groupRpath[2]))))
     mainLabels.add(groupRpath[1].trailingLabel().asString())
 
     if 'rhel' in groupOs[1].asString():
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
+        model.appendTroveOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-rhel-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
     else:
-        model.appendTroveOp(systemmodel.InstallTroveOperation(
+        model.appendTroveOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
@@ -264,6 +268,12 @@ def initialRedHatModel(client, model):
 
 if __name__ == '__main__':
     #log.setVerbosity(log.INFO)
+
+    parser = optparse.OptionParser()
+    parser.add_option("--simplify", "-s", dest = "simplify", default = False,
+                      action = "store_true",
+                      help = "ignore components likely to be for dep closure")
+    options, args = parser.parse_args()
 
     cfg = conarycfg.ConaryConfiguration(readConfigFiles = True)
     cfg.initializeFlavors()
@@ -276,14 +286,14 @@ if __name__ == '__main__':
     localTroves = set([ (x[0], versions.VersionFromString(x[1]),
                          deps.ThawFlavor(x[2])) for x in cu ])
 
-    cache = modelupdate.SystemModelTroveCache(db, client.getRepos())
+    cache = modelupdate.CMLTroveCache(db, client.getRepos())
     cache.load("/var/lib/conarydb/modelcache")
     cache.cacheTroves(localTroves)
 
     installedTroves = dict( (tup, pinned) for (tup, pinned)
                                 in db.iterAllTroves(withPins = True) )
 
-    model = systemmodel.SystemModelText(cfg)
+    model = cml.CML(cfg)
     if os.path.exists("/etc/redhat-release"):
         mainLabels = initialRedHatModel(client, model)
         componentPriorities = [ ( 'rpm', ),
@@ -304,11 +314,12 @@ if __name__ == '__main__':
 
     allCandidates = []
     updatedModel = True
+    lastPass = False
     # remember that job order is backwards! it's trying to move from
     # what's there to what the model says; we want to undo those operations
     while updatedModel:
         candidateJob, uJob = buildJobs(client, cache, model)
-        if candidateJob in allCandidates:
+        if lastPass or (candidateJob in allCandidates):
             break
 
         allCandidates.append(candidateJob)
@@ -320,13 +331,14 @@ if __name__ == '__main__':
         # look for packages to install/update
         for priorityList in componentPriorities:
             for pkgTuple, jobList in installPackageMap.items():
-                componentSet = set( [ (pkgTuple[0] + ":" + x,
-                                       pkgTuple[1], pkgTuple[2])
-                                      for x in priorityList ] )
                 newInstalls = set([ (x[0], x[1][0], x[1][1]) for x in jobList ])
-                if (componentSet - newInstalls):
-                    # are all of the components we care about present
-                    continue
+                if options.simplify:
+                    componentSet = set( [ (pkgTuple[0] + ":" + x,
+                                           pkgTuple[1], pkgTuple[2])
+                                          for x in priorityList ] )
+                    if (componentSet - newInstalls):
+                        # are all of the components we care about present
+                        continue
 
                 if pkgTuple in newInstalls:
                     print "   updating model for job", jobList
@@ -363,6 +375,8 @@ if __name__ == '__main__':
             for compJob in jobList:
                 updatedModel = (addInstallJob(model, compJob) or updatedModel)
 
+        lastPass = updatedModel
+
     # handle erases separately
     erases = (set(erasePackageMap.keys())
                         - set(installPackageMap.keys()))
@@ -384,16 +398,16 @@ if __name__ == '__main__':
     for big, little in TrackFindAction.findMap.iteritems():
         print "%s -> %s" % (big, little)
 
-    finalModel = systemmodel.SystemModelText(cfg)
+    finalModel = cml.CML(cfg)
     for searchItem in [x for x in model.systemItems
-                       if isinstance(x, systemmodel.SearchTrove)]:
+                       if isinstance(x, cml.SearchTrove)]:
         finalModel.appendTroveOp(searchItem)
 
     searchTroveItems = []
     deferredItems = []
     specClass = None
-    searchOps = (systemmodel.UpdateTroveOperation,
-                 systemmodel.InstallTroveOperation)
+    searchOps = (cml.UpdateTroveOperation,
+                 cml.InstallTroveOperation)
 
     searchTroveSpecs = itertools.chain(
         *(op.item for op in model.systemItems if isinstance(op, searchOps))
@@ -413,7 +427,7 @@ if __name__ == '__main__':
             emitDeferred(specClass, deferredItems)
 
         specClass = op.__class__
-        if isinstance(op, systemmodel.SearchTrove):
+        if isinstance(op, cml.SearchTrove):
             # already handled above
             continue
 
@@ -444,7 +458,7 @@ if __name__ == '__main__':
                 if searchTroveSpec not in searchTroveItems:
                     emitDeferred(specClass, deferredItems)
                     finalModel.appendTroveOp(
-                        systemmodel.SearchTrove(item=searchTroveSpec))
+                        cml.SearchTrove(item=searchTroveSpec))
                     searchTroveItems.append(searchTroveSpec)
 
                 if searchNameCount.get(searchTroveName, 0) > 1:
@@ -476,7 +490,16 @@ if __name__ == '__main__':
 
     TrackFindAction.remap = False
     finalJob, uJob = buildJobs(client, cache, finalModel)
-    assert(set(finalJob) == set(candidateJob))
+
+    candidateJobSet = set(candidateJob)
+    finalJobSet = set(finalJob)
+    if candidateJobSet != finalJobSet:
+        print 'Simplifying the model to remove explicit version references'
+        print 'changed the model.  Review the changes.'
+        addedJobs = finalJobSet - candidateJobSet
+        removedJobs = candidateJobSet - finalJobSet
+        updatecmd.displayChangedJobs(addedJobs, removedJobs, cfg)
+        getAnswer('Press return to continue.')
 
     # Add comments to the model itself
     for commentline in (
@@ -508,7 +531,6 @@ if __name__ == '__main__':
         finalModel.appendNoOpByText('# %s' % commentline, modified=False)
 
     if finalJob:
-        from conary.cmds import updatecmd
         sys.stdout.flush()
         outfd, outfn = tempfile.mkstemp()
         os.unlink(outfn)
@@ -546,7 +568,7 @@ if __name__ == '__main__':
     if answer and answer[0].lower() == 'y':
         # SystemModelFile wants to parse -- don't let it, in case we are
         # testing on a system that already has a model defined...
-        tempModel = systemmodel.SystemModelText(cfg)
+        tempModel = cml.CML(cfg)
         smf = systemmodel.SystemModelFile(tempModel)
         smf.model = finalModel
         try:

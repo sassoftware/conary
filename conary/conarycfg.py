@@ -558,6 +558,7 @@ class ConaryContext(ConfigSection):
     mirrorDirs            =  (CfgPathList, ('~/.conary/mirrors',
                                             '/etc/conary/distro/mirrors',
                                             '/etc/conary/mirrors',))
+    modelPath             =  '/etc/conary/system-model'
     name                  =  None
     quiet                 =  CfgBool
     pinTroves             =  CfgRegExpList

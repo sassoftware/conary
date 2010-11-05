@@ -1201,7 +1201,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         for info in troveList:
             cs = self.troveCsMap.get(info, None)
             if cs is None:
-                retList.append(None)
+                retList.append(-1)
                 continue
 
             trvCs = cs.getNewTroveVersion(*info)
@@ -1217,12 +1217,10 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
         for info in troveList:
             cs = self.troveCsMap.get(info, None)
             if cs is None:
-                # this isn't supported, and raises NotimplementedException
-                return SearchableTroveSource.getDepsForTroveList(self,
-                                                                 troveList)
-
-            trvCs = cs.getNewTroveVersion(*info)
-            retList.append((trvCs.getProvides(), trvCs.getRequires()))
+                retList.append(None)
+            else:
+                trvCs = cs.getNewTroveVersion(*info)
+                retList.append((trvCs.getProvides(), trvCs.getRequires()))
 
         return retList
 

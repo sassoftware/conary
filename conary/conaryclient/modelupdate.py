@@ -17,16 +17,17 @@ from conary import trove, versions
 from conary.conaryclient import modelgraph, troveset, update
 from conary.deps import deps
 from conary.lib import log, util
+from conary.local import deptable
 from conary.repository import searchsource, trovecache, trovesource
 
-class SysModelActionData(troveset.ActionData):
+class CMLActionData(troveset.ActionData):
 
     def __init__(self, troveCache, flavor, repos, cfg):
         troveset.ActionData.__init__(self, troveCache, flavor)
         self.repos = repos
         self.cfg = cfg
 
-class SystemModelTroveCache(trovecache.TroveCache):
+class CMLTroveCache(trovecache.TroveCache):
 
     def __init__(self, db, repos, changeSetList = [], callback = None):
         self.db = db
@@ -34,7 +35,8 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.callback = callback
         self.componentMap = {}
         if changeSetList:
-            csSource = trovesource.ChangesetFilesTroveSource(db)
+            csSource = trovesource.ChangesetFilesTroveSource(db,
+                                                             storeDeps = True)
             csSource.addChangeSets(changeSetList)
             troveSource = trovesource.SourceStack(csSource, repos)
         else:
@@ -85,8 +87,7 @@ class SystemModelTroveCache(trovecache.TroveCache):
         self.cacheTroves(need)
 
     def cacheModified(self):
-        return (len(self.cache), len(self.depCache),
-                len(self.depSolutionCache)) != self._startingSizes
+        return self._getSizeTuple() != self._startingSizes
 
     def getPackageComponents(self, troveTup):
         if self.troveIsCached(troveTup):
@@ -102,14 +103,14 @@ class DatabaseTroveSet(troveset.SearchSourceTroveSet):
 
     pass
 
-class SysModelRemoveAction(troveset.DelayedTupleSetAction):
+class CMLRemoveAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, removeTroveSet = None):
         troveset.DelayedTupleSetAction.__init__(self, primaryTroveSet,
                                                 removeTroveSet)
         self.removeTroveSet = removeTroveSet
 
-    def __call__(self, data):
+    def cmlRemoveAction(self, data):
         removeSet = (self.removeTroveSet._getOptionalSet() |
                      self.removeTroveSet._getInstallSet())
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet()
@@ -117,13 +118,15 @@ class SysModelRemoveAction(troveset.DelayedTupleSetAction):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
                                     | removeSet)
 
-class SysModelExcludeTrovesAction(troveset.DelayedTupleSetAction):
+    __call__ = cmlRemoveAction
+
+class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, *args, **kwargs):
         self.excludeTroves = kwargs.pop('excludeTroves')
         troveset.DelayedTupleSetAction.__init__(self, *args, **kwargs)
 
-    def __call__(self, data):
+    def cmlExcludeTrovesAction(self, data):
         installSet = set()
         optionalSet = set()
         for troveTup, inInstall, isExplicit in (
@@ -142,12 +145,14 @@ class SysModelExcludeTrovesAction(troveset.DelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
-class SysModelFindAction(troveset.FindAction):
+    __call__ = cmlExcludeTrovesAction
+
+class CMLFindAction(troveset.FindAction):
 
     # this not only finds, but it fetches and finds as well. it's a pretty
     # convienent way of handling redirects
 
-    def __call__(self, actionList, data):
+    def cmlFindAction(self, actionList, data):
         troveset.FindAction.__call__(self, actionList, data)
 
         fetchActions = []
@@ -190,6 +195,8 @@ class SysModelFindAction(troveset.FindAction):
 
             action.outSet._setOptional(optionalSet)
             action.outSet._setInstall(installSet)
+
+    __call__ = cmlFindAction
 
     def _redirects(self, data, redirectList, optionalSet, installSet):
         q = util.IterableQueue()
@@ -235,7 +242,7 @@ class SysModelFindAction(troveset.FindAction):
                     q.add((match, inInstall))
 
 
-class SysModelFinalFetchAction(troveset.FetchAction):
+class CMLFinalFetchAction(troveset.FetchAction):
 
     def _fetch(self, actionList, data):
         troveTuples = set()
@@ -272,12 +279,12 @@ class FlattenedTroveTupleSet(troveset.DelayedTupleSet):
 
         return troveset.DelayedTupleSet._walk(self, *args, **kwargs)
 
-class SysModelFlattenAction(troveset.DelayedTupleSetAction):
+class CMLFlattenAction(troveset.DelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
     resultClass = FlattenedTroveTupleSet
 
-    def __call__(self, data):
+    def cmlFlattenAction(self, data):
         installs = []
         available = []
 
@@ -292,24 +299,28 @@ class SysModelFlattenAction(troveset.DelayedTupleSetAction):
         self.outSet._setOptional(available)
         self.outSet._flat = True
 
-class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
+    __call__ = cmlFlattenAction
 
-    def _getResolveSource(self, filterFn):
+class CMLSearchPath(troveset.SearchPathTroveSet):
+
+    def _getResolveSource(self, depDb, filterFn):
         # don't bother with items in the install set; those are being installed
         # already so aren't a good choice for suggestions
         sourceList = []
         for ts in self.troveSetList:
             if isinstance(ts, troveset.TroveTupleSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn))
-            elif isinstance(ts, SysModelSearchPathTroveSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn))
+                sourceList.append(ts._getResolveSource(filterFn = filterFn,
+                                                       depDb = depDb))
+            elif isinstance(ts, CMLSearchPath):
+                sourceList.append(ts._getResolveSource(filterFn = filterFn,
+                                                       depDb = depDb))
             else:
                 sourceList.append(ts._getResolveSource())
 
         return searchsource.SearchSourceStack(*sourceList)
 
     def find(self, *troveSpecs):
-        return self._action(ActionClass = SysModelFindAction, *troveSpecs)
+        return self._action(ActionClass = CMLFindAction, *troveSpecs)
 
     def hasOptionalTrove(self, troveTup):
         for ts in self.troveSetList:
@@ -321,10 +332,10 @@ class SysModelSearchPathTroveSet(troveset.SearchPathTroveSet):
 
 class ModelCompiler(modelgraph.AbstractModelCompiler):
 
-    SearchPathTroveSet = SysModelSearchPathTroveSet
+    SearchPathTroveSet = CMLSearchPath
 
-    FlattenAction = SysModelFlattenAction
-    RemoveAction = SysModelRemoveAction
+    FlattenAction = CMLFlattenAction
+    RemoveAction = CMLRemoveAction
 
     def __init__(self, cfg, repos, db):
         self.db =  db
@@ -343,7 +354,7 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
                                                  self.cfg.flavor))
         path.append(repos)
 
-        return SysModelSearchPathTroveSet(path, graph = self.g)
+        return CMLSearchPath(path, graph = self.g)
 
     def _createDatabaseTroveSet(self, csTroveSet = None):
         if csTroveSet is None:
@@ -355,11 +366,12 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
         dbTroveSet = DatabaseTroveSet(dbSearchSource)
 
         path.append(dbTroveSet)
-        return SysModelSearchPathTroveSet(path, graph = self.g)
+        return CMLSearchPath(path, graph = self.g)
 
-    def build(self, sysModel, changeSetList = []):
+    def build(self, model, changeSetList = []):
         if changeSetList:
-            csTroveSource = trovesource.ChangesetFilesTroveSource(self.db)
+            csTroveSource = trovesource.ChangesetFilesTroveSource(self.db,
+                                                             storeDeps = True)
             csTroveSource.addChangeSets(changeSetList)
             csSearchSource = searchsource.SearchSource(csTroveSource,
                                                        self.cfg.flavor)
@@ -370,17 +382,17 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
         reposTroveSet = self._createRepositoryTroveSet(csTroveSet = csTroveSet)
         dbTroveSet = self._createDatabaseTroveSet(csTroveSet = csTroveSet)
 
-        return modelgraph.AbstractModelCompiler.build(self, sysModel,
+        return modelgraph.AbstractModelCompiler.build(self, model,
                                                       reposTroveSet, dbTroveSet)
 
 
-class SystemModelClient(object):
+class CMLClient(object):
 
-    def systemModelGraph(self, sysModel, changeSetList = []):
+    def cmlGraph(self, model, changeSetList = []):
         c = ModelCompiler(self.cfg, self.getRepos(), self.getDatabase())
-        return c.build(sysModel, changeSetList)
+        return c.build(model, changeSetList)
 
-    def _processSysmodelJobList(self, origJobList, updJob, troveCache):
+    def _processCMLJobList(self, origJobList, updJob, troveCache):
         # this is just like _processJobList, but it's forked to use the
         # sysmodel trove cache instead of a changeset with all of the troves
         # in it
@@ -580,20 +592,20 @@ class SystemModelClient(object):
         searchPath = troveSet.searchPath
 
         # we need to explicitly fetch this before we can walk it
-        preFetch = troveSet._action(ActionClass = SysModelFinalFetchAction)
+        preFetch = troveSet._action(ActionClass = CMLFinalFetchAction)
         # handle exclude troves
         final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
-                                    ActionClass = SysModelExcludeTrovesAction)
-        #depSearch = SysModelSearchPathTroveSet([ preFetch, searchPath ],
+                                    ActionClass = CMLExcludeTrovesAction)
+        #depSearch = CMLSearchPath([ preFetch, searchPath ],
                                                #graph = preFetch.g)
         depSearch = searchPath
-        final.g.realize(SysModelActionData(troveCache,
+        final.g.realize(CMLActionData(troveCache,
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
-        existsTrv = trove.Trove("@update", versions.NewVersion(),
+        existsTrv = trove.Trove("@model", versions.NewVersion(),
                                 deps.Flavor(), None)
-        targetTrv = trove.Trove("@update", versions.NewVersion(),
+        targetTrv = trove.Trove("@model", versions.NewVersion(),
                                 deps.Flavor(), None)
 
         pins = set()
@@ -615,7 +627,9 @@ class SystemModelClient(object):
         # aren't installed and we don't know about them) or troves which are
         # in the install set (since they're already in the install set,
         # adding them to the install set won't help)
+        depDb = deptable.DependencyDatabase()
         depResolveSource = depSearch._getResolveSource(
+                        depDb = depDb,
                         filterFn = lambda n, v, f :
                             (v.isOnLocalHost() or
                              targetTrv.isStrongReference(n,v,f)))
@@ -691,7 +705,7 @@ class SystemModelClient(object):
                 if job is None:
                     job = targetTrv.diff(existsTrv, absolute = False)[2]
 
-                log.info("resolving dependencies")
+                log.info("resolving dependencies (job length %d)", len(job))
                 criticalJobs = criticalUpdateInfo.findCriticalJobs(job)
                 finalJobs = criticalUpdateInfo.findFinalJobs(job)
                 criticalOnly = criticalUpdateInfo.isCriticalOnlyUpdate()
@@ -733,7 +747,7 @@ class SystemModelClient(object):
 
         # this prevents us from using the changesetList as a searchSource
         log.info("processing job list")
-        self._processSysmodelJobList(job, uJob, troveCache)
+        self._processCMLJobList(job, uJob, troveCache)
         log.info("combining jobs")
         self._combineJobs(uJob, splitJob, criticalUpdates)
         log.info("combining jobs")

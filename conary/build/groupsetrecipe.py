@@ -20,11 +20,22 @@ from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.build.recipe import loadMacros
 from conary.conaryclient.cmdline import parseTroveSpec
-from conary.conaryclient import modelgraph, systemmodel, troveset
+from conary.conaryclient import cml, modelgraph, troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
 from conary.lib import log
+from conary.local import deptable
 from conary.repository import errors, netclient, searchsource
 from conary.deps import deps
+
+def findRecipeLineNumber():
+    line = None
+
+    for frame in inspect.stack():
+        if frame[1].endswith('.recipe'):
+            line = frame[2]
+            break
+
+    return line
 
 class GroupSetTroveCache(object):
 
@@ -263,23 +274,23 @@ class GroupTupleSetMethods(object):
         Returns a new C{troveset} containing all troves from the original
         troveset which match the given C{troveSpec}(s).  The original
         troveset's isInstall settings are preserved for each returned
-        trove.  The contents of the TroveSet are not sought recursively.
+        trove.  The contents of the TroveSet are sought recursively.
 
         EXAMPLES
         ========
-        C{groupOS = repos['group-os'].flatten()}
+        C{groupOS = repos['group-os']}
         C{allGlibcVersions = groupOS.find('glibc')}
         C{compatGlibc = groupOS['glibc=@rpl:1-compat']}
 
-        This sets C{groupOS} to be a TroveSet containing the recursive
-        contents of C{group-os} -- all the troves included in group-os.
+        This sets C{groupOS} to be a TroveSet containing the version of
+        C{group-os} found on the default label for Repository C{repos}.
         It then finds all versions/flavors of glibc referenced (there
         could be more than one) and creates an C{allGlibcVersions}
         TroveSet that contains references to all of them, and another
         C{compatGlibc} that contains refernces to all flavors of glibc
         that are on a label matching C{@rpl:1-compat}.
         """
-        return self._action(ActionClass = GroupFindAction, *troveSpecs)
+        return self._action(ActionClass = GroupTroveSetFindAction, *troveSpecs)
 
     def findByName(self, namePattern, emptyOkay = False):
         """
@@ -296,7 +307,9 @@ class GroupTupleSetMethods(object):
         The original troveset is searched for troves whose names match
         C{nameRegularExpression}, and matching troves are returned in
         a new troveset.  The isInstall value is preserved from the
-        original troveset being searched.
+        original troveset being searched.  Unlike C{find}, the original
+        troveset is not searched recursively; use C{troveset.flatten()}
+        explicitly if you need to search recursively.
 
         PARAMETERS
         ==========
@@ -308,7 +321,7 @@ class GroupTupleSetMethods(object):
         C{allGnomePackages = allPackages.findByName('^gnome-')}
 
         Returns a troveset containing all troves in the troveset
-        C{allPackages} with a name starting with C{^gnome-}
+        C{allPackages} with a name starting with C{gnome-}
 
         C{allTroves = repos['group-os'].flatten()}
         C{allGroups = allTroves.findByName('^group-')}
@@ -333,7 +346,18 @@ class GroupTupleSetMethods(object):
         The original troveset is searched for troves which were built
         from source trove called C{sourceName}, and all matching
         troves are returned in a new troveset.  The isInstall value is
-        preserved from the original troveset being searched.
+        preserved from the original troveset being searched.  Unlike
+        C{find}, the original troveset is not searched recursively;
+        use C{troveset.flatten()} explicitly if you need to search
+        recursively.
+
+        EXAMPLES
+        ========
+        C{allTroves = repos['group-os'].flatten()}
+        C{allPGPackages = allTroves.findBySourceName('postgresql')}
+
+        Returns a troveset containing all troves in the troveset
+        C{allTroves} that were built from C{postgresql:source}
         """
         return self._action(sourceName,
                             ActionClass = FindBySourceNameAction)
@@ -345,7 +369,7 @@ class GroupTupleSetMethods(object):
         NAME
         ====
         B{C{TroveSet.components}} - Returns named components included in
-        all members of the troveset, recursively.
+        all members of the troveset.
 
         SYNOPSIS
         ========
@@ -358,7 +382,8 @@ class GroupTupleSetMethods(object):
         etc.) matches one of the component names provided.  The C{isInstalled}
         setting for each component in the returned troveset is determined
         only by whether the component is installed or optional in the
-        package that contains it.
+        package that contains it.  This does not implicitly recurse, so
+        to find components of packages in a group, use C{flatten()}
 
         EXAMPLES
         ========
@@ -582,6 +607,34 @@ class GroupTupleSetMethods(object):
         """
         return self._action(ActionClass = PackagesAction, *packageList)
 
+    def scripts(self):
+        """
+        NAME
+        ====
+        B{C{TroveSet.scripts}} - Return scripts for a trove
+
+        SYNOPSIS
+        ========
+        C{troveset.scripts()}
+
+        DESCRIPTION
+        ===========
+        Returns a Scripts object which includes all of the scripts for the
+        trove included in this TroveSet. If this TroveSet is empty or contains
+        multiple troves, an exception is raised.
+
+        EXAMPLES
+        ========
+        This creates a new group which includes the scripts from a group
+        which is already in the repository.
+
+        existingGrp = repos['group-standard']
+        thisGrpContents = repos['pkg']
+        r.Group(thisGrpContents, scripts = existingGrp.scripts()
+        """
+        stubTroveSet = self._action(ActionClass = ScriptsAction)
+        return stubTroveSet.groupScripts
+
     def union(self, *troveSetList):
         """
         NAME
@@ -749,20 +802,14 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
                                 troveset.DelayedTupleSet):
 
     def __init__(self, *args, **kwargs):
-        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
         self._dump = False
-        self._lineNum = None
         self._lineNumStr = ''
+        index = findRecipeLineNumber()
+        if index is not None:
+            kwargs['index'] = index
+            self._lineNumStr = ':' + str(index)
 
-        # caller's caller
-        for frame in inspect.stack():
-            if frame[1].endswith('.recipe'):
-                self._lineNum = frame[2]
-                self._lineNumStr = ':' + str(self._lineNum)
-                break
-
-    def __str__(self):
-        return troveset.DelayedTupleSet.__str__(self) + self._lineNumStr
+        troveset.DelayedTupleSet.__init__(self, *args, **kwargs)
 
     def beenRealized(self, data):
         def display(tupleSet):
@@ -788,21 +835,22 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
             log.info("\tOptional")
             display(self._getOptionalSet())
 
-        matches = []
-        foundMatch = False
+        if data.groupRecipe._trackDict:
+            matches = []
+            foundMatch = False
 
-        try:
-            matches = self._findTroves(data.groupRecipe._trackDict.keys())
-        except errors.TroveNotFound:
-            matches = {}
+            try:
+                matches = self._findTroves(data.groupRecipe._trackDict.keys())
+            except errors.TroveNotFound:
+                matches = {}
 
-        if matches:
-            log.info("Tracking matches found in results for action %s"
-                     % str(self.action) + self._lineNumStr)
-            for (parsedSpec, matchList) in matches.iteritems():
-                log.info("\tMatches for %s"
-                                % data.groupRecipe._trackDict[parsedSpec])
-                display(matchList)
+            if matches:
+                log.info("Tracking matches found in results for action %s"
+                         % str(self.action) + self._lineNumStr)
+                for (parsedSpec, matchList) in matches.iteritems():
+                    log.info("\tMatches for %s"
+                                    % data.groupRecipe._trackDict[parsedSpec])
+                    display(matchList)
 
     def dump(self):
         self._dump = True
@@ -991,7 +1039,7 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.componentNames = set(componentNames)
 
-    def __call__(self, data):
+    def componentsAction(self, data):
         installSet = set()
         optionalSet = set()
 
@@ -1010,11 +1058,15 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+    __call__ = componentsAction
+
 class CopyAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def copyAction(self, data):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+    __call__ = copyAction
 
 class CreateGroupAction(GroupDelayedTupleSetAction):
 
@@ -1022,12 +1074,17 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
                  scripts = None):
-        GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+        if hasattr(scripts, "ts"):
+            GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                                scripts.ts)
+        else:
+            GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
+
         self.name = name
         self.checkPathConflicts = checkPathConflicts
         self.scripts = scripts
 
-    def __call__(self, data):
+    def createGroupAction(self, data):
         grp = SG(data.groupRecipe.name,
                  checkPathConflicts = self.checkPathConflicts)
 
@@ -1036,6 +1093,8 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
         self._create(data.groupRecipe.defaultGroup,
                      self.primaryTroveSet, self.outSet, data)
+
+    __call__ = createGroupAction
 
     def _create(self, sg, ts, outSet, data):
         if self.scripts is not None:
@@ -1061,10 +1120,12 @@ class CreateNewGroupAction(CreateGroupAction):
                                    checkPathConflicts = checkPathConflicts,
                                    scripts = scripts)
 
-    def __call__(self, data):
+    def createNewGroupAction(self, data):
         newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
         data.groupRecipe._addGroup(self.name, newGroup)
         self._create(newGroup, self.primaryTroveSet, self.outSet, data)
+
+    __call__ = createNewGroupAction
 
 class DepsNeededAction(GroupDelayedTupleSetAction):
 
@@ -1077,7 +1138,7 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
         self.failOnUnresolved = failOnUnresolved
         self.resolveTroveSet = resolveTroveSet
 
-    def __call__(self, data):
+    def depsNeededAction(self, data):
         checker = PythonDependencyChecker(
                         data.troveCache,
                         ignoreDepClasses = [ deps.AbiDependency,
@@ -1094,7 +1155,10 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
 
         checker.addJobs(jobSet)
         if self.resolveTroveSet:
-            resolveMethod = (self.resolveTroveSet._getResolveSource().
+            # might be nice to share a single depDb across all instances
+            # of this class?
+            resolveMethod = (self.resolveTroveSet._getResolveSource(
+                                    depDb = deptable.DependencyDatabase()).
                                         getResolveMethod())
         else:
             resolveMethod = None
@@ -1113,15 +1177,21 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
 
+    __call__ = depsNeededAction
+
 class GetInstalledAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def getInstalledAction(self, data):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
+
+    __call__= getInstalledAction
 
 class GetOptionalAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def getOptionalAction(self, data):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+    __call__= getOptionalAction
 
 class FindByNameAction(GroupDelayedTupleSetAction):
 
@@ -1130,7 +1200,7 @@ class FindByNameAction(GroupDelayedTupleSetAction):
         self.namePattern = namePattern
         self.emptyOkay = emptyOkay
 
-    def __call__(self, data):
+    def findByNameAction(self, data):
 
         def _gather(troveTupleSet, nameRegex):
             s = set()
@@ -1149,13 +1219,15 @@ class FindByNameAction(GroupDelayedTupleSetAction):
         if (not self.emptyOkay and not install and not optional):
             raise CookError("findByName() matched no trove names")
 
+    __call__= findByNameAction
+
 class FindBySourceNameAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, sourceName):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
         self.sourceName = sourceName
 
-    def __call__(self, data):
+    def findBySourceNameAction(self, data):
         troveTuples = (
             list(itertools.izip(itertools.repeat(True),
                            self.primaryTroveSet._getInstallSet())) +
@@ -1184,9 +1256,11 @@ class FindBySourceNameAction(GroupDelayedTupleSetAction):
         if (not installs and not optional):
             raise CookError("findBySourceName() matched no trove names")
 
+    __call__ = findBySourceNameAction
+
 class IsEmptyAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def isEmptyAction(self, data):
         if (self.primaryTroveSet._getInstallSet() or
             self.primaryTroveSet._getOptionalSet()):
 
@@ -1194,9 +1268,11 @@ class IsEmptyAction(GroupDelayedTupleSetAction):
 
         # self.outSet is already empty
 
+    __call__ = isEmptyAction
+
 class IsNotEmptyAction(GroupDelayedTupleSetAction):
 
-    def __call__(self, data):
+    def isNotEmptyAction(self, data):
         if (not self.primaryTroveSet._getInstallSet() and
             not self.primaryTroveSet._getOptionalSet()):
 
@@ -1205,11 +1281,13 @@ class IsNotEmptyAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
 
+    __call__ = isNotEmptyAction
+
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
     resultClass = GroupLoggingDelayedTroveTupleSet
 
-    def __call__(self, data):
+    def latestPackageFromSearchSourceAction(self, data):
         troveSource = self.primaryTroveSet.searchSource.getTroveSource()
 
         # data hiding? what's that
@@ -1249,6 +1327,8 @@ class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(resultTupList)
 
+    __call__ = latestPackageFromSearchSourceAction
+
 class MakeInstallAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, installTroveSet = None):
@@ -1256,7 +1336,7 @@ class MakeInstallAction(GroupDelayedTupleSetAction):
                                             installTroveSet)
         self.installTroveSet = installTroveSet
 
-    def __call__(self, data):
+    def makeInstallAction(self, data):
         if self.installTroveSet:
             self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
             self.outSet._setInstall(
@@ -1266,6 +1346,8 @@ class MakeInstallAction(GroupDelayedTupleSetAction):
             self.outSet._setInstall(self.primaryTroveSet._getInstallSet() |
                                     self.primaryTroveSet._getOptionalSet())
 
+    __call__ = makeInstallAction
+
 class MakeOptionalAction(GroupDelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, optionalTroveSet = None):
@@ -1273,7 +1355,7 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
                                             optionalTroveSet)
         self.optionalTroveSet = optionalTroveSet
 
-    def __call__(self, data):
+    def makeOptionalAction(self, data):
         if self.optionalTroveSet:
             self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
             self.outSet._setOptional(
@@ -1283,12 +1365,15 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
             self.outSet._setOptional(self.primaryTroveSet._getInstallSet() |
                                      self.primaryTroveSet._getOptionalSet())
 
+    __call__ = makeOptionalAction
+
 class MembersAction(GroupDelayedTupleSetAction):
 
     prefilter = troveset.FetchAction
     justStrong = True
+    includeTop = False
 
-    def __call__(self, data):
+    def membersAction(self, data):
         for (troveTuple, installSet) in itertools.chain(
                 itertools.izip(self.primaryTroveSet._getInstallSet(),
                                itertools.repeat(True)),
@@ -1297,6 +1382,12 @@ class MembersAction(GroupDelayedTupleSetAction):
             installs = []
             available = []
 
+            if self.includeTop:
+                if installSet:
+                    installs.append(troveTuple)
+                else:
+                    available.append(troveTuple)
+
             for (refTrove, byDefault, isStrong) in \
                         data.troveCache.iterTroveListInfo(troveTuple):
                 if self.justStrong and not isStrong:
@@ -1304,15 +1395,41 @@ class MembersAction(GroupDelayedTupleSetAction):
 
                 if byDefault:
                     installs.append(refTrove)
-                elif not byDefault:
+                else:
                     available.append(refTrove)
 
             self.outSet._setInstall(installs)
             self.outSet._setOptional(available)
 
+    __call__ = membersAction
+
 class FlattenAction(MembersAction):
 
     justStrong = False
+    includeTop = True
+
+    @classmethod
+    def Create(klass, primaryTroveSet):
+        if hasattr(primaryTroveSet, "_flattened"):
+            return primaryTroveSet._flattened
+
+        resultSet = super(FlattenAction, klass).Create(primaryTroveSet)
+        primaryTroveSet._flattened = resultSet
+        return resultSet
+
+class GroupTroveSetFindAction(troveset.FindAction):
+
+    prefilter = FlattenAction
+    resultClass = GroupDelayedTroveTupleSet
+
+    def _applyFilters(self, l):
+        assert(len(l) == 1)
+        if hasattr(l[0], "_flattened"):
+            return [ l[0]._flattened ]
+
+        result = troveset.FindAction._applyFilters(self, l)
+        l[0]._flattened = result[0]
+        return result
 
 class PackagesAction(GroupDelayedTupleSetAction):
 
@@ -1321,7 +1438,7 @@ class PackagesAction(GroupDelayedTupleSetAction):
     def __init__(self, primaryTroveSet):
         GroupDelayedTupleSetAction.__init__(self, primaryTroveSet)
 
-    def __call__(self, data):
+    def packagesAction(self, data):
         installSet = set()
         optionalSet = set()
 
@@ -1341,6 +1458,45 @@ class PackagesAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
+
+    __call__ = packagesAction
+
+class ScriptsAction(GroupDelayedTupleSetAction):
+
+    prefilter = troveset.FetchAction
+
+    def __init__(self, *args, **kwargs):
+        GroupDelayedTupleSetAction.__init__(self, *args, **kwargs)
+
+    def getResultTupleSet(self, *args, **kwargs):
+        ts = GroupDelayedTupleSetAction.getResultTupleSet(self, *args, **kwargs)
+        ts.groupScripts = GroupScripts()
+        # this loop is gross. we use it to get the right dependencies on things
+        # which use the scripts though
+        ts.groupScripts.ts = ts
+        return ts
+
+    def scriptsAction(self, data):
+        totalSet = (self.primaryTroveSet._getInstallSet() |
+                    self.primaryTroveSet._getOptionalSet())
+        if not totalSet:
+            raise CookError("Empty trove set for scripts()")
+        elif len(totalSet) > 1:
+            raise CookError("Multiple troves in trove set for scripts()")
+
+        troveTup = list(totalSet)[0]
+        trv = data.troveCache.getTroves([ troveTup ])[0]
+        groupScripts = self.outSet.groupScripts
+
+        for scriptName in GroupScripts._scriptNames:
+            trvScript = getattr(trv.troveInfo.scripts, scriptName[:-7])
+            if not trvScript.script():
+                continue
+
+            selfScript = getattr(groupScripts, scriptName[:-7])
+            selfScript.set(trvScript.script())
+
+    __call__ = scriptsAction
 
 class SG(_SingleGroup):
 
@@ -1445,6 +1601,10 @@ class GroupScript(object):
         self.contents = contents
         self.fromClass = fromClass
 
+    def set(self, contents, fromClass = None):
+        self.contents = contents
+        self.fromClass = fromClass
+
 class GroupScripts(object):
     '''
     NAME
@@ -1498,22 +1658,25 @@ class GroupScripts(object):
     if you do so.
     '''
     _explainObjectName = 'Scripts'
+    _scriptNames = ('postInstallScripts', 'preRollbackScripts',
+                    'postRollbackScripts', 'preUpdateScripts',
+                    'postUpdateScripts')
 
-    def __init__(self, postInstall = None,
-                       preRollback = None, postRollback = None,
-                       preUpdate = None, postUpdate = None):
-        self.postInstall = postInstall
-        self.preRollback = preRollback
-        self.postRollback = postRollback
-        self.preUpdate = preUpdate
-        self.postUpdate = postUpdate
+    def __init__(self, **kwargs):
+        for scriptName in self._scriptNames:
+            contents = kwargs.pop(scriptName[:-7], None)
+            if contents is None:
+                contents = GroupScript(None)
+            setattr(self, scriptName[:-7], contents)
+
+        if kwargs:
+            raise TypeError("GroupScripts() got an unexpected keyword "
+                           "argument '%s'" % kwargs.keys()[0])
 
     def iterScripts(self):
-        for scriptName in ('postInstallScripts',
-                           'preRollbackScripts', 'postRollbackScripts',
-                           'preUpdateScripts', 'postUpdateScripts'):
+        for scriptName in self._scriptNames:
             script = getattr(self, scriptName[:-7])
-            if script is not None:
+            if script is not None and script.contents is not None:
                 yield script, scriptName
 
 class _GroupSetRecipe(_BaseGroupRecipe):
@@ -1696,46 +1859,47 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
-    def SystemModel(self, modelText, searchPath = None):
+    def CML(self, modelText, searchPath = None):
         """
         NAME
         ====
-        B{C{GroupSetRecipe.SystemModel}} - Convert system model to TroveSet
+        B{C{GroupSetRecipe.CML}} - Build TroveSet from CML specification
 
 
         SYNOPSIS
         ========
-        C{r.SystemModel(modelText, searchPath=None)}
+        C{r.CML(modelText, searchPath=None)}
 
         DESCRIPTION
         ===========
-        Turns a system model into a TroveSet. The optional
-        C{searchPath} initializes the search path; search lines from
-        the system model are prepended to any provided C{searchPath}.
+        Builds a TroveSet from a specification in Conary Modelling
+        Lanuage (CML). The optional C{searchPath} initializes the
+        search path; search lines from the system model are prepended
+        to any provided C{searchPath}.
 
         Returns a standard troveset with an extra attribute called
         C{searchPath}, which is a TroveSet representing the final
-        SearchPath from the system model.  This search path is
-        often used for dependency resolution, though unioning it
-        with the optional portions of the resulting trove set is
-        the normal usage pattern. (Unioning with only the optional
-        portion is not functionally distinct from unioning with
-        the entire result, but is faster).
+        SearchPath from the model.  This search path is often used
+        for dependency resolution, though unioning it with the
+        optional portions of the resulting trove set is the normal
+        usage pattern. (Unioning with only the optional portion
+        is not functionally distinct from unioning with the entire
+        result, but is faster).
 
         PARAMETERS
         ==========
-         - C{modelText} (Required) : the text of the model to execute
+         - C{modelText} (Required) : the text of the model in CML
          - C{searchPath} (Optional) : an initial search path, a fallback
            sought after any items provided in the model.
 
         EXAMPLE
         =======
-        To build a group from a system defined by a system model, provide
+        To build a group from a system defined in CML, provide
         the contents of the /etc/conary/system-model file as the
         C{modelText}.  This may be completely literal (leading white
-        space is ignored in system models)::
+        space is ignored in CML)::
 
-         ts = r.SystemModel('''
+         ts = r.CML('''
              search group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30
              install group-appliance-platform
              install httpd
@@ -1757,7 +1921,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
              # local test build against specific version
              searchPath = r.SearchPath(
                  repo['group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30'])
-         ts = r.SystemModel('''
+         ts = r.CML('''
              install group-appliance-platform
              install httpd
              install mod_ssl
@@ -1771,8 +1935,9 @@ class _GroupSetRecipe(_BaseGroupRecipe):
             searchPath = GroupSearchSourceTroveSet(searchSource,
                                                    graph = self.g)
 
-        model = systemmodel.SystemModelText(None)
-        model.parse(modelText, fileName = '(recipe)')
+        model = cml.CML(None)
+        lineNum = findRecipeLineNumber()
+        model.parse(modelText, fileName = '(recipe):%d' % lineNum)
 
         comp = ModelCompiler(self.flavor, self.repos, self.g)
         sysModelSet = comp.build(model, searchPath, None)

@@ -236,6 +236,9 @@ class Row(object):
         self.data = self.data[:index] + self.data[index+1:]
         return value
 
+    def __contains__(self, key):
+        return key in self.fields
+
     # But the item slot is magic
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):

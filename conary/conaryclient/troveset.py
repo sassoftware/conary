@@ -55,8 +55,9 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
     """
 
     def __init__(self, troveCache, troveSet, flavor,
-                 filterFn = lambda *args: False):
-        self.depDb = None
+                 filterFn = lambda *args: False, depDb = None):
+        assert(depDb)
+        self.depDb = depDb
         self.troveSet = troveSet
         self.filterFn = filterFn
 
@@ -79,7 +80,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.setFlavorPreferencesByFlavor(flavor)
         self.searchWithFlavor()
         self.searchLeavesOnly()
-        self.depDb = deptable.DependencyDatabase()
+        # maps troveId's from the dependency database into self.troveTupList
+        self.depTroveIdMap = {}
         self.providesIndex = None
 
     def resolveDependencies(self, label, depList, leavesOnly=False):
@@ -122,6 +124,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                     else:
                         val.append(i)
 
+        depLoader = self.depDb.bulkLoader()
 
         for classAndName in reqNames:
             val = self.providesIndex.get(classAndName)
@@ -132,16 +135,25 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 if self.inDepDb[i]:
                     continue
 
-                self.depDb.add(i, troveDeps[i][0], emptyDep)
+                depTroveId = depLoader.addRaw(troveDeps[i][0], emptyDep)
+                self.depTroveIdMap[depTroveId] = i
                 self.inDepDb[i] = True
 
+        depLoader.done()
         self.depDb.commit()
 
-        suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly)
+        if not self.depTroveIdMap:
+            return cachedSuggMap
+
+        suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly,
+                                     troveIdList = self.depTroveIdMap.keys())
+
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
-                newSolListList.append([ self.troveTupList[x] for x in solList ])
+                newSolListList.append([
+                        self.troveTupList[self.depTroveIdMap[x]]
+                        for x in solList ])
 
             if newSolListList:
                 suggMap[depSet] = newSolListList
@@ -168,23 +180,25 @@ class TroveTupleSetSearchSource(searchsource.SearchSource):
 
 class TroveSet(object):
 
-    def __init__(self, graph = None):
+    def __init__(self, graph = None, index = None):
         assert(graph)
         self.realized = False
         self.g = graph
+        self.index = index
 
     def __str__(self):
         return self.__class__.__name__
 
     def _action(self, *args, **kwargs):
         ActionClass = kwargs.pop('ActionClass')
+        index = kwargs.pop('index', None)
         edgeList = kwargs.pop('edgeList', None)
         if isinstance(edgeList, (list, tuple, set)):
             edgeList = iter(edgeList)
 
         action = ActionClass(self, *args, **kwargs)
-        troveSet = action.getResultTupleSet(graph = self.g)
-        inputSets = action.getInputSets(graph = self.g)
+        troveSet = action.getResultTupleSet(graph = self.g, index = index)
+        inputSets = action.getInputSets()
 
         self.g.addNode(troveSet)
 
@@ -210,12 +224,13 @@ class TroveTupleSet(TroveSet):
 
         return self._troveSource
 
-    def _getResolveSource(self, filterFn = lambda *args: False):
+    def _getResolveSource(self, filterFn = lambda *args: False,
+                          depDb = None):
         if self._resolveSource is None:
             resolveTroveSource = ResolveTroveTupleSetTroveSource(
                                         self.g.actionData.troveCache, self,
                                         self.g.actionData.flavor,
-                                        filterFn = filterFn)
+                                        filterFn = filterFn, depDb = depDb)
             self._resolveSource = TroveTupleSetSearchSource(
                                     resolveTroveSource, self,
                                     self.g.actionData.flavor)
@@ -382,13 +397,16 @@ class TroveTupleSet(TroveSet):
 
 class DelayedTupleSet(TroveTupleSet):
 
-    def __init__(self, graph = None, action = None):
+    def __init__(self, graph = None, action = None, index = None):
         assert(graph)
         assert(action)
-        TroveTupleSet.__init__(self, graph = graph)
+        TroveTupleSet.__init__(self, graph = graph, index = index)
         self.action = action
 
     def __str__(self):
+        if self.index is not None:
+            return str(self.action) + ':' + str(self.index)
+
         return str(self.action)
 
     def beenRealized(self, data):
@@ -419,30 +437,32 @@ class SearchSourceTroveSet(TroveSet):
         return self.searchSource.findTroves(troveTuple, requireLatest = True,
                                             allowMissing = True)
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, depDb = None):
         return self.searchSource
 
     def _getSearchSource(self):
         return self.searchSource
 
-    def __init__(self, searchSource, graph = graph):
-        TroveSet.__init__(self, graph = graph)
+    def __init__(self, searchSource, graph = graph, index = None):
+        TroveSet.__init__(self, graph = graph, index = index)
         self.realized = (searchSource is not None)
         self.searchSource = searchSource
 
 class SearchPathTroveSet(SearchSourceTroveSet):
 
-    def __init__(self, troveSetList, graph = None):
+    def __init__(self, troveSetList, graph = None, index = None):
         self.troveSetList = troveSetList
-        SearchSourceTroveSet.__init__(self, None, graph = graph)
+        SearchSourceTroveSet.__init__(self, None, graph = graph,
+                                      index = index)
 
         for i, troveSet in enumerate(troveSetList):
             graph.addEdge(troveSet, self, value = str(i + 1))
 
-    def _getResolveSource(self):
+    def _getResolveSource(self, depDb = None):
         # we search differently then we resolve; resolving is recursive
         # while searching isn't
-        sourceList = [ ts._getResolveSource() for ts in self.troveSetList ]
+        sourceList = [ ts._getResolveSource(depDb = depDb)
+                            for ts in self.troveSetList ]
         return searchsource.SearchSourceStack(*sourceList)
 
     def realize(self, data):
@@ -467,27 +487,28 @@ class DelayedTupleSetAction(Action):
     resultClass = DelayedTupleSet
 
     def __init__(self, primaryTroveSet, *args):
-        self.primaryTroveSet = primaryTroveSet
-        self._inputSets = [ self.primaryTroveSet ]
-        self._inputSets += [ x for x in args if isinstance(x, TroveTupleSet) ]
+        inputSets = [ primaryTroveSet ]
+        inputSets += [ x for x in args if isinstance(x, TroveTupleSet) ]
+        self._inputSets = self._applyFilters(inputSets)
+        self.primaryTroveSet = self._inputSets[0]
 
-    def _applyFilters(self, l, graph = None):
+    def _applyFilters(self, l):
+        if not self.prefilter:
+            return l
+
         r = []
-        for (ts, filterAction) in l:
-            newTs = ts._action(ActionClass = filterAction)
+        for ts in l:
+            newTs = ts._action(ActionClass = self.prefilter)
             r.append(newTs)
 
         return r
 
-    def getInputSets(self, graph = None):
-        if self.prefilter is None:
-            return self._inputSets
+    def getInputSets(self):
+        return self._inputSets
 
-        return self._applyFilters(
-                [ (ts, self.prefilter) for ts in self._inputSets ] )
-
-    def getResultTupleSet(self, graph = None):
-        self.outSet = self.resultClass(action = self, graph = graph)
+    def getResultTupleSet(self, graph = None, index = None):
+        self.outSet = self.resultClass(action = self, graph = graph,
+                                       index = index)
         return self.outSet
 
 class ParallelAction(DelayedTupleSetAction):
@@ -496,13 +517,15 @@ class ParallelAction(DelayedTupleSetAction):
 
 class DifferenceAction(DelayedTupleSetAction):
 
-    def __call__(self, data):
+    def differenceAction(self, data):
         left = self.primaryTroveSet
         right = self.right
         all = right._getInstallSet().union(right._getInstallSet())
 
         self.outSet._setInstall(left._getInstallSet().difference(all))
         self.outSet._setOptional(left._getOptionalSet().difference(all))
+
+    __call__ = differenceAction
 
     def __init__(self, primaryTroveSet, other):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, other)
@@ -521,12 +544,14 @@ class FetchAction(ParallelAction):
         ParallelAction.__init__(self, primaryTroveSet)
         self.fetchAll = all
 
-    def __call__(self, actionList, data):
+    def fetchAction(self, actionList, data):
         for action in actionList:
             action.outSet._setOptional(action.primaryTroveSet._getOptionalSet())
             action.outSet._setInstall(action.primaryTroveSet._getInstallSet())
 
         self._fetch(actionList, data);
+
+    __call__ = fetchAction
 
     def _fetch(self, actionList, data):
         troveTuples = set()
@@ -550,7 +575,7 @@ class FindAction(ParallelAction):
         ParallelAction.__init__(self, primaryTroveSet)
         self.troveSpecs = troveSpecs
 
-    def __call__(self, actionList, data):
+    def findAction(self, actionList, data):
         troveSpecsByInSet = {}
         for action in actionList:
             l = troveSpecsByInSet.setdefault(action.primaryTroveSet, [])
@@ -577,6 +602,8 @@ class FindAction(ParallelAction):
         if notFound:
             raise TroveSpecsNotFound(sorted(notFound))
 
+    __call__ = findAction
+
     def __str__(self):
         if isinstance(self.troveSpecs[0], str):
             n1 = self.troveSpecs[0].split('=')[0]
@@ -602,7 +629,7 @@ class UnionAction(DelayedTupleSetAction):
     def __init__(self, primaryTroveSet, *args):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
 
-    def __call__(self, data):
+    def unionAction(self, data):
         # this ordering means that if it's in the install set anywhere, it
         # will be in the install set in the union
         tsList = self._inputSets
@@ -612,23 +639,34 @@ class UnionAction(DelayedTupleSetAction):
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
+    __call__ = unionAction
+
 class OptionalAction(DelayedTupleSetAction):
 
     def __init__(self, primaryTroveSet, *args):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, *args)
 
-    def __call__(self, data):
+    def optionalAction(self, data):
         for troveSet in self._inputSets:
             self.outSet._setOptional(troveSet._getOptionalSet())
             self.outSet._setOptional(troveSet._getInstallSet())
 
-class PatchAction(DelayedTupleSetAction):
+    __call__ = optionalAction
+
+class AbstractModifyAction(DelayedTupleSetAction):
 
     prefilter = FetchAction
 
     def __init__(self, primaryTroveSet, updateTroveSet):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
         self.updateTroveSet = updateTroveSet
+
+    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
+                     installSet, optionalSet):
+        raise NotImplementedError
+
+    def _preprocess(self, data, beforeInfo, afterInfo):
+        pass
 
     def patchAction(self, data):
         before = trove.Trove("@tsupdate", versions.NewVersion(),
@@ -646,16 +684,31 @@ class PatchAction(DelayedTupleSetAction):
         beforeInfo = {}
         installSet = set()
         optionalSet = set()
+        installSetSwitch = set()
         for troveTup, inInstallSet, explicit in \
                   self.primaryTroveSet._walk(data.troveCache, recurse = True):
             if troveTup[0] in updateNames:
                 before.addTrove(troveTup[0], troveTup[1], troveTup[2])
                 beforeInfo[troveTup] = (inInstallSet, explicit)
+
+                if (not inInstallSet and troveTup in afterInfo and
+                    afterInfo[troveTup][1]):
+                    installSetSwitch.add(troveTup)
             elif explicit:
                 if inInstallSet:
                     installSet.add(troveTup)
                 else:
                     optionalSet.add(troveTup)
+
+        # these troves were not in the install set of the working set, but
+        # explicitly mentioned in the model command we're handling. that
+        # not only overrides the working set for this trove, but for anything
+        # else it includes
+        for troveTup in installSetSwitch:
+            for (subTroveTup, inInstallSet, explicit) in \
+                                data.troveCache.iterTroveListInfo(troveTup):
+                before.delTrove(subTroveTup[0], subTroveTup[1],
+                                subTroveTup[2], True)
 
         troveMapping = after.diff(before)[2]
         # this completely misses anything where the only change is
@@ -666,11 +719,13 @@ class PatchAction(DelayedTupleSetAction):
                 troveMapping.append( (troveTup[0], troveTup[1:3],
                                       troveTup[1:3], False) )
 
+        self._preprocess(data, beforeInfo, afterInfo)
+
         for (trvName, (oldVersion, oldFlavor),
                       (newVersion, newFlavor), isAbsolute) in troveMapping:
             oldTuple = (trvName, oldVersion, oldFlavor)
             newTuple = (trvName, newVersion, newFlavor)
-            self._handleTrove(beforeInfo, afterInfo, oldTuple, newTuple,
+            self._handleTrove(data, beforeInfo, afterInfo, oldTuple, newTuple,
                               installSet, optionalSet)
 
         self.outSet._setInstall(installSet)
@@ -678,10 +733,28 @@ class PatchAction(DelayedTupleSetAction):
 
     __call__ = patchAction
 
-    def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
+class PatchAction(AbstractModifyAction):
+
+    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
-        oldVersion = oldTuple[1]
-        newVersion = newTuple[1]
+        if oldTuple[1] and newTuple[1]:
+            oldVersion = data.troveCache.getTimestamps([ oldTuple ])[0]
+            newVersion = data.troveCache.getTimestamps([ newTuple ])[0]
+
+            if (oldVersion > newVersion):
+                # the old one is newer than the new one. leave it where we
+                # found it
+                wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
+                if wasExplicit:
+                    if wasInInstallSet:
+                        installSet.add(oldTuple)
+                    else:
+                        optionalSet.add(oldTuple)
+
+                return
+        else:
+            oldVersion = oldTuple[1]
+            newVersion = newTuple[1]
 
         if not oldVersion:
             # something in the update doesn't map to something we
@@ -699,11 +772,10 @@ class PatchAction(DelayedTupleSetAction):
         else:
             # we've mapped an update; turn off the old version (by
             # marking it as optional) and include the new one with the
-            # same defaultness as the old one had. if it is explicit
-            # in the new one, we always include it
+            # same defaultness as the old one had.
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
             inInstallSet, isExplicit = afterInfo[newTuple]
-            if (isExplicit and inInstallSet) or wasInInstallSet:
+            if wasInInstallSet:
                 installSet.add(newTuple)
             else:
                 optionalSet.add(newTuple)
@@ -711,9 +783,14 @@ class PatchAction(DelayedTupleSetAction):
             if newTuple != oldTuple:
                 optionalSet.add(oldTuple)
 
-class UpdateAction(PatchAction):
+    def _preprocess(self, data, beforeInfo, afterInfo):
+        # populate the cache with timestamped versions as a bulk operation
+        data.troveCache.getTimestamps( beforeInfo.keys() + afterInfo.keys() )
 
-    def _handleTrove(self, beforeInfo, afterInfo, oldTuple, newTuple,
+
+class UpdateAction(AbstractModifyAction):
+
+    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
         oldVersion = oldTuple[1]
         newVersion = newTuple[1]
