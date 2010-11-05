@@ -101,17 +101,36 @@ class SingleCapsuleOperation(CapsuleOperation):
             oldTrv = None
             trv = trove.Trove(troveCs)
 
-        if oldTrv and oldTrv.troveInfo.capsule == trv.troveInfo.capsule:
+        #if oldTrv and oldTrv.troveInfo.capsule == trv.troveInfo.capsule:
             # the capsule hasn't changed, so don't reinstall it
-            return None
-        elif oldTrv:
-            self.remove(oldTrv)
+            #return None
 
         for pathId, path, fileId, version in trv.iterFileList(capsules = True):
             # there should only be one...
             break
 
         assert(pathId == trove.CAPSULE_PATHID)
+
+        if oldTrv:
+            for oldPathId, oldPath, oldFileId, oldVersion in \
+                            oldTrv.iterFileList(capsules = True):
+                # there should only be one...
+                break
+
+            assert(oldPathId == trove.CAPSULE_PATHID)
+            if (oldFileId == fileId or
+                    oldTrv.troveInfo.capsule == trv.troveInfo.capsule):
+                # good enough. this means changing capsule information
+                # in trove info won't fool us into trying to reinstall
+                # capsules which haven't changed. we check the capsule
+                # information as well because derived packages change
+                # the capsule fileIds. ugh.
+                #
+                # we do it in this order to make sure the test suite tests
+                # both sides of the "or" above
+                return
+
+            self.remove(oldTrv)
 
         # is the capsule new or changed?
         changedFileInfos = [ x for x in troveCs.getChangedFileList()
