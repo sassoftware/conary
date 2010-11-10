@@ -392,7 +392,16 @@ class CMLClient(object):
 
     def cmlGraph(self, model, changeSetList = []):
         c = ModelCompiler(self.cfg, self.getRepos(), self.getDatabase())
-        return c.build(model, changeSetList)
+        troveSet = c.build(model, changeSetList)
+
+        # we need to explicitly fetch this before we can walk it
+        preFetch = troveSet._action(ActionClass = CMLFinalFetchAction)
+        # handle exclude troves
+        final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
+                                    ActionClass = CMLExcludeTrovesAction)
+        final.searchPath = troveSet.searchPath
+
+        return final
 
     def _processCMLJobList(self, origJobList, updJob, troveCache):
         # this is just like _processJobList, but it's forked to use the
@@ -593,15 +602,10 @@ class CMLClient(object):
 
         searchPath = troveSet.searchPath
 
-        # we need to explicitly fetch this before we can walk it
-        preFetch = troveSet._action(ActionClass = CMLFinalFetchAction)
-        # handle exclude troves
-        final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
-                                    ActionClass = CMLExcludeTrovesAction)
         #depSearch = CMLSearchPath([ preFetch, searchPath ],
                                                #graph = preFetch.g)
         depSearch = searchPath
-        final.g.realize(CMLActionData(troveCache,
+        troveSet.g.realize(CMLActionData(troveCache,
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
@@ -617,7 +621,8 @@ class CMLClient(object):
                 pins.add(tup)
                 targetTrv.addTrove(*tup)
 
-        for tup, inInstall, explicit in final._walk(troveCache, recurse = True):
+        for tup, inInstall, explicit in \
+                                troveSet._walk(troveCache, recurse = True):
             if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
