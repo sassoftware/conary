@@ -74,22 +74,11 @@ class AbstractModelCompiler(object):
                     newSearchTroveSet = troveset.SearchSourceTroveSet(
                             searchsource.NetworkSearchSource(self.repos,
                                                              [ partialTup ],
-                                                             self.flavor))
+                                                             self.flavor),
+                            graph = reposTroveSet.g)
                     newSearchSet = newSearchTroveSet
                 elif partialTup[0] is not None:
-                    result = self.repos.findTroves([],
-                                                  [ partialTup ], self.flavor,
-                                                  allowMissing = True)
-                    if not result:
-                        raise errors.TroveSpecsNotFound( [ partialTup ] )
-                    result = result[partialTup]
-                    assert(len(result) == 1)
-                    ts = self.InitialTroveTupleSet(troveTuple = result,
-                                                   graph = self.g,
-                                                   index = op.index)
-                    # get the trove itself
-                    newSearchSet = ts._action(ActionClass = self.FlattenAction,
-                                              index = op.index)
+                    newSearchSet = reposTroveSet.find(partialTup)
                 else:
                     assert(0)
 
@@ -170,9 +159,7 @@ class AbstractModelCompiler(object):
             else:
                 assert(0)
 
-            flatten = matches._action(ActionClass = self.FlattenAction,
-                                      index = op.index)
-            newSearchPath.insert(0, flatten)
+            newSearchPath.insert(0, matches)
 
             for troveSpec in op:
                 if troveSpec.name in collections:

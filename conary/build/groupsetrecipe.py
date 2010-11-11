@@ -1704,8 +1704,9 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.searchSource = searchsource.NetworkSearchSource(
                 repos, self.labelPath, flavor)
         self.macros = macros.Macros(ignoreUnknown=lightInstance)
-        self.world = GroupSearchSourceTroveSet(self.searchSource)
         self.g = troveset.OperationGraph()
+        self.world = GroupSearchSourceTroveSet(self.searchSource,
+                                               graph = self.g)
 
         self._dumpAll = False
         self._trackDict = {}

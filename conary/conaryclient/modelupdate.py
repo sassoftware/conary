@@ -353,7 +353,8 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
         repos = troveset.SearchSourceTroveSet(
                 searchsource.NetworkSearchSource(self.repos, [],
-                                                 self.cfg.flavor))
+                                                 self.cfg.flavor),
+                graph = self.g)
         path.append(repos)
 
         return CMLSearchPath(path, graph = self.g)
@@ -365,7 +366,7 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
             path = [ csTroveSet ]
 
         dbSearchSource = searchsource.SearchSource(self.db, self.cfg.flavor)
-        dbTroveSet = DatabaseTroveSet(dbSearchSource)
+        dbTroveSet = DatabaseTroveSet(dbSearchSource, graph = self.g)
 
         path.append(dbTroveSet)
         return CMLSearchPath(path, graph = self.g)
@@ -377,7 +378,8 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
             csTroveSource.addChangeSets(changeSetList)
             csSearchSource = searchsource.SearchSource(csTroveSource,
                                                        self.cfg.flavor)
-            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource)
+            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource,
+                                                       graph = self.g)
         else:
             csTroveSet = None
 
