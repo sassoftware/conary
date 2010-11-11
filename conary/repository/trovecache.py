@@ -83,7 +83,12 @@ class TroveCache(trovesource.AbstractTroveSource):
         result = [ None ] * len(troveTupList)
         for i, tup in enumerate(troveTupList):
             result[i] = self.depCache.get(tup)
-            if result[i] is None and self.troveIsCached(tup):
+            if result[i] is not None:
+                if type(result[i][0]) is str:
+                    result[i] = (deps.ThawDependencySet(result[i][0]),
+                                 deps.ThawDependencySet(result[i][1]))
+                    self.depCache[tup] = result[i]
+            elif result[i] is None and self.troveIsCached(tup):
                 trv = self.cache[tup]
                 result[i] = (trv.getProvides(), trv.getRequires())
             elif result[i] is None and trove.troveIsPackage(tup[0]):
@@ -241,12 +246,10 @@ class TroveCache(trovesource.AbstractTroveSource):
         contType, depContents = cs.getFileContents(
                            self.depCachePathId, self.depCacheFileId)
         pickled = depContents.get().read()
-        depDict = cPickle.loads(pickled)
-        for (frzTup, frzDeps) in depDict.iteritems():
-            self.depCache[ (frzTup[0], versions.VersionFromString(frzTup[1]),
-                            deps.ThawFlavor(frzTup[2])) ] = \
-                        (deps.ThawDependencySet(frzDeps[0]),
-                         deps.ThawDependencySet(frzDeps[1]))
+        depList = cPickle.loads(pickled)
+        for (name, frzVersion, frzFlavor, prov, req) in depList:
+            self.depCache[ (name, versions.VersionFromString(frzVersion),
+                            deps.ThawFlavor(frzFlavor)) ] = (prov, req)
 
         contType, depSolutions = cs.getFileContents(
                            self.depSolutionsPathId, self.depSolutionsFileId)
@@ -283,9 +286,17 @@ class TroveCache(trovesource.AbstractTroveSource):
         for trv in self.cache.values():
             cs.newTrove(trv.diff(None, absolute = True)[0])
 
-        depDict = dict ( ((str(x[0]), x[1].asString(), x[2].freeze()), (y[0].freeze(), y[1].freeze()))
-                         for x, y in self.depCache.iteritems() )
-        depStr = cPickle.dumps(depDict)
+        depList = []
+        for troveTup, (prov, req) in self.depCache.iteritems():
+            if type(prov) is not str:
+                prov = prov.freeze()
+            if type(req) is not str:
+                req = req.freeze()
+
+            depList.append((troveTup[0], troveTup[1].asString(),
+                            troveTup[2].freeze(), prov, req))
+
+        depStr = cPickle.dumps(depList)
 
         cs.addFileContents(self.depCachePathId, self.depCacheFileId,
                            changeset.ChangedFileTypes.file,
