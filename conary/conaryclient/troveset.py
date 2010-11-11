@@ -619,10 +619,28 @@ class FindAction(ParallelAction):
 
         notFound = set()
         for inSet, searchList in troveSpecsByInSet.iteritems():
-            d = inSet._findTroves([ x[1] for x in searchList ])
-            for outSet, troveSpec in searchList:
+            cacheable = set()
+            cached = set()
+            for i, (outSet, troveSpec) in enumerate(searchList):
+                if troveSpec.version and '/' in troveSpec.version:
+                    match = data.troveCache.getFindResult(troveSpec)
+                    if match is None:
+                        cacheable.add(i)
+                    else:
+                        cached.add(i)
+                        outSet._setInstall(match)
+
+            d = inSet._findTroves([ x[1] for i, x in enumerate(searchList)
+                                            if i not in cached ])
+            for i, (outSet, troveSpec) in enumerate(searchList):
+                if i in cached:
+                    continue
+
                 if troveSpec in d:
                     outSet._setInstall(d[troveSpec])
+                    if i in cacheable:
+                        data.troveCache.addFindResult(troveSpec,
+                                                      d[troveSpec])
                 else:
                     notFound.add(troveSpec)
 

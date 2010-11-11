@@ -29,6 +29,9 @@ class TroveCache(trovesource.AbstractTroveSource):
     depSolutionsPathId = 'SYSTEM-MODEL-DEPENDENCY-SOLUTION'
     depSolutionsFileId = '\0' * 40
 
+    findCachePathId = 'SYSTEM-MODEL-FIND-CACHE---------'
+    findCacheFileId = '\0' * 40
+
     timeStampsPathId = 'SYSTEM-MODEL-TIMESTAMP-CACHE----'
     timeStampsFileId = '\0' * 40
 
@@ -39,7 +42,8 @@ class TroveCache(trovesource.AbstractTroveSource):
         self.timeStampCache = {}
         self.cache = {}
         self.troveSource = troveSource
-        self._startingSizes = (0, 0, 0, 0)
+        self.findCache = {}
+        self._startingSizes = self._getSizeTuple()
 
     def _addToCache(self, troveTupList, troves, _cached = None):
         for troveTup, trv in izip(troveTupList, troves):
@@ -58,7 +62,8 @@ class TroveCache(trovesource.AbstractTroveSource):
 
     def _getSizeTuple(self):
         return ( len(self.cache), len(self.depCache),
-                 len(self.depSolutionCache), len(self.timeStampCache) )
+                 len(self.depSolutionCache), len(self.timeStampCache),
+                 len(self.findCache) )
 
     def cacheTroves(self, troveTupList, _cached = None):
         troveTupList = [x for x in troveTupList if x not in self.cache]
@@ -71,6 +76,12 @@ class TroveCache(trovesource.AbstractTroveSource):
                                             callback = self.callback)
 
         self._addToCache(troveTupList, troves, _cached = _cached)
+
+    def addFindResult(self, spec, result):
+        self.findCache[(None, spec)] = result
+
+    def getFindResult(self, spec):
+        return self.findCache.get((None, spec))
 
     def addDepSolution(self, sig, depSet, result):
         self.depSolutionCache[(sig, depSet)] = list(result)
@@ -266,6 +277,10 @@ class TroveCache(trovesource.AbstractTroveSource):
 
             self.addDepSolution(sig, depSet, allResults)
 
+        contType, fileCache = cs.getFileContents(
+                           self.findCachePathId, self.findCacheFileId)
+        self.findCache = cPickle.loads(fileCache.get().read())
+
         try:
             contType, versionTimeStamps = cs.getFileContents(
                                self.timeStampsPathId, self.timeStampsFileId)
@@ -316,6 +331,12 @@ class TroveCache(trovesource.AbstractTroveSource):
         cs.addFileContents(self.depSolutionsPathId, self.depSolutionsFileId,
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(depSolutionsStr), False)
+
+        cs.addFileContents(self.findCachePathId, self.findCacheFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString(
+                                cPickle.dumps(self.findCache)),
+                           False)
 
         timeStamps = []
         for (name, baseVersion), version in self.timeStampCache.items():
