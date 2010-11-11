@@ -108,7 +108,9 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
             return cachedSuggMap
 
         emptyDep = deps.DependencySet()
-        troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList)
+        troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList,
+                                                        provides = True,
+                                                        requires = False)
 
         if self.providesIndex is None:
             index = {}

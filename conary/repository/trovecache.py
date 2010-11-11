@@ -61,7 +61,11 @@ class TroveCache(trovesource.AbstractTroveSource):
         pass
 
     def _getSizeTuple(self):
-        return ( len(self.cache), len(self.depCache),
+        return ( len(self.cache),
+                 sum([ len([ x[0] for x in self.depCache.itervalues()
+                                 if x[0] is not None ]),
+                       len([ x[1] for x in self.depCache.itervalues()
+                                 if x[1] is not None ]) ] ),
                  len(self.depSolutionCache), len(self.timeStampCache),
                  len(self.findCache) )
 
@@ -89,17 +93,46 @@ class TroveCache(trovesource.AbstractTroveSource):
     def getDepSolution(self, sig, depSet):
         return self.depSolutionCache.get( (sig, depSet), None )
 
-    def getDepsForTroveList(self, troveTupList):
+    def getDepCacheEntry(self, troveTup):
+        result = self.depCache.get(troveTup)
+        if result is None:
+            return None
+
+        origResult = result
+        if type(result[0]) is str:
+            result = (deps.ThawDependencySet(result[0]), result[1])
+
+        if type(result[1]) is str:
+            result = (result[0], deps.ThawDependencySet(result[1]))
+
+        if result != origResult:
+            self.depCache[troveTup] = result
+
+        return result
+
+    def getDepsForTroveList(self, troveTupList, provides = True,
+                            requires = True):
+        def missingNeeded(depTuple):
+            if depTuple is None: return True
+            if provides and depTuple[0] is None: return True
+            if requires and depTuple[1] is None: return True
+
+            return False
+
+        def mergeCacheEntry(troveTup, depTuple):
+            existing = self.depCache.get(depTuple)
+            if existing is None:
+                self.depCache[troveTup] = depInfo
+            else:
+                self.depCache[troveTup] = (depTuple[0] or existing[0],
+                                           depTuple[1] or existing[1])
+
         # look in the dep cache and trove cache
         result = [ None ] * len(troveTupList)
         for i, tup in enumerate(troveTupList):
-            result[i] = self.depCache.get(tup)
-            if result[i] is not None:
-                if type(result[i][0]) is str:
-                    result[i] = (deps.ThawDependencySet(result[i][0]),
-                                 deps.ThawDependencySet(result[i][1]))
-                    self.depCache[tup] = result[i]
-            elif result[i] is None and self.troveIsCached(tup):
+            result[i] = self.getDepCacheEntry(tup)
+
+            if result[i] is None and self.troveIsCached(tup):
                 trv = self.cache[tup]
                 result[i] = (trv.getProvides(), trv.getRequires())
             elif result[i] is None and trove.troveIsPackage(tup[0]):
@@ -108,9 +141,9 @@ class TroveCache(trovesource.AbstractTroveSource):
                 result[i] = (deps.parseDep('trove: %s' % tup[0]),
                              deps.DependencySet())
 
-        needed = [ (i, troveTup) for i, (troveTup, depSet) in
+        needed = [ (i, troveTup) for i, (troveTup, depSets) in
                             enumerate(izip(troveTupList, result))
-                            if depSet is None ]
+                            if missingNeeded(depSets)  ]
         if not needed:
             return result
 
@@ -119,7 +152,9 @@ class TroveCache(trovesource.AbstractTroveSource):
         log.info("Getting deps for %d troves" % len(needed))
         try:
             depList = self.troveSource.getDepsForTroveList(
-                                                [ x[1] for x in needed ])
+                                                [ x[1] for x in needed ],
+                                                provides = provides,
+                                                requires = requires)
         except netclient.PartialResultsError, e:
             # we can't use this call everywhere; handle what we can and we'll
             # deal with the None's later
@@ -129,7 +164,7 @@ class TroveCache(trovesource.AbstractTroveSource):
             # depInfo can be None if we got partial results due to
             # old servers
             if depInfo is not None:
-                self.depCache[troveTup] = depInfo
+                mergeCacheEntry(troveTup, depInfo)
                 result[i] = depInfo
 
         # see if anything else is None; if so, we need to cache the complete
@@ -303,9 +338,9 @@ class TroveCache(trovesource.AbstractTroveSource):
 
         depList = []
         for troveTup, (prov, req) in self.depCache.iteritems():
-            if type(prov) is not str:
+            if type(prov) is not str and prov is not None:
                 prov = prov.freeze()
-            if type(req) is not str:
+            if type(req) is not str and req is not None:
                 req = req.freeze()
 
             depList.append((troveTup[0], troveTup[1].asString(),
