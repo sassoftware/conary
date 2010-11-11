@@ -100,7 +100,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                                                           dep)
             if cachedResult:
                 cachedSuggMap[dep] = cachedResult
-            else:
+            elif cachedResult is None:
                 reqNames.update(_depClassAndName(dep))
                 finalDepList.append(dep)
 
@@ -142,6 +142,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.depDb.commit()
 
         if not self.depTroveIdMap:
+            for depSet in depList:
+                self.troveCache.addDepSolution(self.troveTupSig, depSet, [])
             return cachedSuggMap
 
         suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly,
@@ -158,6 +160,10 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 suggMap[depSet] = newSolListList
                 self.troveCache.addDepSolution(self.troveTupSig, depSet,
                                                newSolListList)
+
+        for depSet in finalDepList:
+            if depSet not in suggMap:
+                self.troveCache.addDepSolution(self.troveTupSig, depSet, [])
 
         self.depDb.db.rollback()
 
