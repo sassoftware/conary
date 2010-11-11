@@ -61,14 +61,12 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.filterFn = filterFn
 
         self.troveTupList = []
-        troveTupCollection = trove.TroveTupleList()
         for troveTup, inInstall, isExplicit in \
                     self.troveSet._walk(troveCache, newGroups = False,
                                         recurse = True):
             if not self.filterFn(*troveTup):
                 self.troveTupList.append(troveTup)
 
-        s = troveTupCollection.freeze()
         self.troveTupSig = self.troveSet._getSignature(troveCache)
 
         self.inDepDb = [ False ] * len(self.troveTupList)
