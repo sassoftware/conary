@@ -133,8 +133,8 @@ class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
                      self.primaryTroveSet._walk(data.troveCache,
                                      newGroups = False,
                                      recurse = True)):
-            if self.excludeTroves.match(troveTup[0]):
-                if inInstall or isExplicit:
+            if (not isExplicit) and self.excludeTroves.match(troveTup[0]):
+                if inInstall:
                     optionalSet.add(troveTup)
             elif isExplicit:
                 if inInstall:

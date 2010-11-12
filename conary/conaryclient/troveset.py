@@ -732,6 +732,7 @@ class AbstractModifyAction(DelayedTupleSetAction):
             afterInfo[troveTup] = (inInstallSet, explicit)
             updateNames.add(troveTup[0])
 
+        import epdb;epdb.st('f')
         beforeInfo = {}
         installSet = set()
         optionalSet = set()
