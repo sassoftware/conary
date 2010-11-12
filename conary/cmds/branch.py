@@ -19,9 +19,9 @@ import itertools
 
 from conary import conaryclient
 from conary import errors
-from conary import updatecmd
+from conary.cmds import updatecmd
 from conary.lib import log
-from conaryclient import cmdline
+from conary.conaryclient import cmdline
 from conary.conarycfg import selectSignatureKey
 
 def _getBranchType(binaryOnly, sourceOnly):
