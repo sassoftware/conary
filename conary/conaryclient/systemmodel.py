@@ -73,7 +73,7 @@ class SystemModelFile(object):
             fileName = None
             self.model.filedata = fileData
         self.model.parse(fileData=self.model.filedata,
-                         fileName=fileName)
+                         context=fileName)
 
     def write(self, fileName=None):
         '''

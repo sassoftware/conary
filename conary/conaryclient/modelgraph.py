@@ -41,7 +41,7 @@ class AbstractModelCompiler(object):
 
     def build(self, model, reposTroveSet, dbTroveSet):
         collections = set()
-        for op in model.systemItems:
+        for op in model.modelOps:
             if isinstance(op, model.SearchOperation):
                 continue
 
@@ -67,7 +67,7 @@ class AbstractModelCompiler(object):
         # so far
         finalTroveSet = self.InitialTroveTupleSet(graph = reposTroveSet.g)
 
-        for op in model.systemItems:
+        for op in model.modelOps:
             if isinstance(op, model.SearchOperation):
                 partialTup = op.item
                 if isinstance(partialTup, versions.Label):

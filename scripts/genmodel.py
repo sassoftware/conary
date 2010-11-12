@@ -137,8 +137,8 @@ def addInstallJob(model, job):
                 item = [ TroveSpec(job[0], fmtVer(job[1][0]),
                                      str(job[1][1])) ] )
 
-    if newOp not in model.systemItems:
-        model.appendTroveOp(newOp)
+    if newOp not in model.modelOps:
+        model.appendOp(newOp)
         updatedModel = True
     else:
         updatedModel = False
@@ -150,8 +150,8 @@ def addEraseJob(model, job):
                 item = [ TroveSpec(job[0], job[2][0].asString(),
                                    str(job[2][1])) ])
 
-    if newOp not in model.systemItems:
-        model.appendTroveOp(newOp)
+    if newOp not in model.modelOps:
+        model.appendOp(newOp)
         updatedModel = True
     else:
         updatedModel = False
@@ -218,16 +218,16 @@ def initialForesightModel(installedTroves, model):
                     if x.getName() == 'group-kde-dist' ][0]
     if trv:
         if 'x86_64' in str(trv.getFlavor()):
-            model.appendTroveOp(cml.SearchTrove(
+            model.appendOp(cml.SearchTrove(
                     item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                      'is:x86' ) ))
-        model.appendTroveOp(cml.SearchTrove(
+        model.appendOp(cml.SearchTrove(
                 item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                  str(trv.getFlavor()) ) ) )
         mainLabels.add(trv.getVersion().trailingLabel().asString())
 
     for trv in groupTroves:
-        model.appendTroveOp(cml.InstallTroveOperation(
+        model.appendOp(cml.InstallTroveOperation(
                 item = [ TroveSpec(trv.getName(),
                                    fmtVer(trv.getVersion()),
                                    str(trv.getFlavor())) ] ))
@@ -240,24 +240,24 @@ def initialRedHatModel(client, model):
 			    latest = True)
     mainLabels = set()
 
-    model.appendTroveOp(cml.SearchTrove(
+    model.appendOp(cml.SearchTrove(
                                 item = TroveSpec(groupOs[0],
                                                  fmtVer(groupOs[1]),
                                                  str(groupOs[2]))))
     mainLabels.add(groupOs[1].trailingLabel().asString())
-    model.appendTroveOp(cml.SearchTrove(
+    model.appendOp(cml.SearchTrove(
                                 item = TroveSpec(groupRpath[0],
                                                  fmtVer(groupRpath[1]),
                                                  str(groupRpath[2]))))
     mainLabels.add(groupRpath[1].trailingLabel().asString())
 
     if 'rhel' in groupOs[1].asString():
-        model.appendTroveOp(cml.InstallTroveOperation(
+        model.appendOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-rhel-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
     else:
-        model.appendTroveOp(cml.InstallTroveOperation(
+        model.appendOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
@@ -399,9 +399,9 @@ if __name__ == '__main__':
         print "%s -> %s" % (big, little)
 
     finalModel = cml.CML(cfg)
-    for searchItem in [x for x in model.systemItems
-                       if isinstance(x, cml.SearchTrove)]:
-        finalModel.appendTroveOp(searchItem)
+    for searchOp in [x for x in model.modelOps
+                     if isinstance(x, cml.SearchTrove)]:
+        finalModel.appendOp(searchOp)
 
     searchTroveItems = []
     deferredItems = []
@@ -410,7 +410,7 @@ if __name__ == '__main__':
                  cml.InstallTroveOperation)
 
     searchTroveSpecs = itertools.chain(
-        *(op.item for op in model.systemItems if isinstance(op, searchOps))
+        *(op.item for op in model.modelOps if isinstance(op, searchOps))
     )
     searchNames = [x.name.split(':')[0] for x in searchTroveSpecs]
     searchNameCount = dict((x, searchNames.count(x)) for x in set(searchNames))
@@ -418,10 +418,10 @@ if __name__ == '__main__':
     def emitDeferred(specClass, deferredItems):
         if deferredItems:
             # list() to copy
-            finalModel.appendTroveOp(specClass(item=list(deferredItems)))
+            finalModel.appendOp(specClass(item=list(deferredItems)))
             deferredItems[:] = []
 
-    for op in model.systemItems:
+    for op in model.modelOps:
         if specClass and specClass != op.__class__:
             # we can only combine items from the same class
             emitDeferred(specClass, deferredItems)
@@ -457,7 +457,7 @@ if __name__ == '__main__':
                                             spec.version, newSpec.flavor)
                 if searchTroveSpec not in searchTroveItems:
                     emitDeferred(specClass, deferredItems)
-                    finalModel.appendTroveOp(
+                    finalModel.appendOp(
                         cml.SearchTrove(item=searchTroveSpec))
                     searchTroveItems.append(searchTroveSpec)
 
