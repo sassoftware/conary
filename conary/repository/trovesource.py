@@ -287,7 +287,9 @@ class AbstractTroveSource:
     def getPathHashesForTroveList(self, troveList):
         raise NotImplementedError
 
-    def getDepsForTroveList(self, troveList):
+    def getDepsForTroveList(self, troveList, provides = True, requires = True):
+        # provides/requires are hints only; implementations may return
+        # both if preferred
         raise NotImplementedError
 
 # constants mostly stolen from netrepos/netserver
@@ -1210,7 +1212,7 @@ class ChangesetFilesTroveSource(SearchableTroveSource):
 
         return retList
 
-    def getDepsForTroveList(self, troveList):
+    def getDepsForTroveList(self, troveList, provides = True, requires = True):
         # returns a list of (prov, req) pairs
         retList = []
 
@@ -1624,7 +1626,8 @@ class SourceStack(object):
 
         return results
 
-    def getDepsForTroveList(self, troveInfoList):
+    def getDepsForTroveList(self, troveInfoList, provides = True,
+                            requires = True):
         results = [ None ] * len(troveInfoList)
         for source in self.sources:
             need = [ (i, troveInfo) for i, (troveInfo, depTuple) in
