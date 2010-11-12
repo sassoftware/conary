@@ -927,7 +927,6 @@ class OperationGraph(graph.DirectedGraph):
                         node.realize(data)
 
     def trace(self, troveSpecList):
-        transpose = self.transpose()
         ordering = self.getTotalOrdering()
 
         for node in ordering:
