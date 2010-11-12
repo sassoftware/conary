@@ -219,8 +219,9 @@ class TroveSet(object):
 
 class TroveTupleSet(TroveSet):
 
-    def _findTroves(self, troveTuple):
-        return self._getSearchSource().findTroves(troveTuple)
+    def _findTroves(self, troveTuple, allowMissing = False):
+        return self._getSearchSource().findTroves(troveTuple,
+                                                  allowMissing = allowMissing)
 
     def _getTroveSource(self):
         if self._troveSource is None:
@@ -732,7 +733,6 @@ class AbstractModifyAction(DelayedTupleSetAction):
             afterInfo[troveTup] = (inInstallSet, explicit)
             updateNames.add(troveTup[0])
 
-        import epdb;epdb.st('f')
         beforeInfo = {}
         installSet = set()
         optionalSet = set()
@@ -925,3 +925,18 @@ class OperationGraph(graph.DirectedGraph):
                 else:
                     for node in nodeList:
                         node.realize(data)
+
+    def trace(self, troveSpecList):
+        transpose = self.transpose()
+        ordering = self.getTotalOrdering()
+
+        for node in ordering:
+            if isinstance(node, TroveTupleSet):
+                if node.index is None:
+                    continue
+
+                matches = node._findTroves(troveSpecList, allowMissing = True)
+                for troveSpec, matchList in matches.iteritems():
+                    print 'trace line %s matched "%s": %s' % (
+                         str(node.index), str(troveSpec),
+                         " ".join([ "%s=%s[%s]" % x for x in matchList ]) )

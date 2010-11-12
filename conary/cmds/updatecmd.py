@@ -605,6 +605,8 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     model = kwargs.pop('systemModel', None)
     modelFile = kwargs.pop('systemModelFile', None)
+    modelGraph = kwargs.pop('modelGraph', None)
+    modelTrace = kwargs.pop('modelTrace', None)
 
     noRestart = applyKwargs.get('noRestart', False)
 
@@ -616,7 +618,6 @@ def _updateTroves(cfg, applyList, **kwargs):
     # even though we no longer differentiate forceMigrate, we still
     # remove it from kwargs to avoid confusing prepareUpdateJob
     kwargs.pop('forceMigrate', False)
-    modelGraph = kwargs.pop('modelGraph', None)
     restartInfo = kwargs.get('restartInfo', None)
 
     # Initialize the critical update set
@@ -658,6 +659,8 @@ def _updateTroves(cfg, applyList, **kwargs):
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
+            if modelTrace is not None:
+                ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
                 tc.save(tcPath)
