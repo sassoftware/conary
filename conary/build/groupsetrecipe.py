@@ -1938,7 +1938,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         model = cml.CML(None)
         lineNum = findRecipeLineNumber()
-        model.parse(modelText, fileName = '(recipe):%d' % lineNum)
+        model.parse(modelText, context = '(recipe):%d' % lineNum)
 
         comp = ModelCompiler(self.flavor, self.repos, self.g)
         sysModelSet = comp.build(model, searchPath, None)
