@@ -335,7 +335,7 @@ class CMLSearchPath(troveset.SearchPathTroveSet):
 class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = CMLSearchPath
-
+    FindAction = CMLFindAction
     FlattenAction = CMLFlattenAction
     RemoveAction = CMLRemoveAction
 

@@ -27,6 +27,7 @@ class AbstractModelCompiler(object):
     RemoveAction = None
 
     FetchAction = troveset.FetchAction
+    EraseFindAction = troveset.FindAction
     FindAction = troveset.FindAction
     InitialTroveTupleSet = troveset.StaticTroveTupleSet
     PatchAction = troveset.PatchAction
@@ -95,7 +96,7 @@ class AbstractModelCompiler(object):
                         verObj = versions.VersionFromString(troveSpec.version)
                         if verObj.isInLocalNamespace():
                             localSpecs.append(troveSpec)
-                            break
+                            continue
 
                     except (errors.VersionStringError, errors.ParseError):
                         pass
@@ -103,12 +104,20 @@ class AbstractModelCompiler(object):
                 searchSpecs.append(troveSpec)
 
             if isinstance(op, model.EraseTroveOperation):
-                flattenedTroveSet = finalTroveSet._action(*searchSpecs,
-                        **dict(ActionClass=self.FlattenAction,
-                               index = op.index))
-                eraseMatches = flattenedTroveSet._action(*searchSpecs,
-                        **dict(ActionClass=self.FindAction,
-                               index = op.index))
+                newMatches = []
+                for spec in searchSpecs:
+                    newMatches.append(
+                        finalTroveSet._action(spec,
+                                          ActionClass = self.EraseFindAction,
+                                          index = spec.location) )
+
+                if len(newMatches) > 1:
+                    eraseMatches = newMatches[0]._action(
+                        ActionClass = self.UnionAction,
+                        index = op.index, *newMatches[1:])
+                else:
+                    eraseMatches = newMatches[0]
+
                 finalTroveSet = finalTroveSet._action(eraseMatches,
                         ActionClass=self.RemoveAction,
                         index = op.index)
@@ -122,7 +131,18 @@ class AbstractModelCompiler(object):
                 rebuildTotalSearchSet = False
 
             if searchSpecs:
-                searchMatches = totalSearchSet.find(*searchSpecs)
+                newMatches = []
+                for spec in searchSpecs:
+                    newMatches.append(
+                        totalSearchSet._action(spec,
+                                               ActionClass = self.FindAction,
+                                               index = spec.location) )
+                if len(newMatches) > 1:
+                    searchMatches = newMatches[0]._action(
+                        ActionClass = self.UnionAction,
+                        index = op.index, *newMatches[1:])
+                else:
+                    searchMatches = newMatches[0]
             else:
                 searchMatches = None
 
