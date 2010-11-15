@@ -411,9 +411,15 @@ class TroveTupleSet(TroveSet):
             if not recurse:
                 continue
 
-            for subTroveTup, subIsInstall, subIsExplicit in \
-                            troveCache.iterTroveListInfo(troveTup):
-                handle(subTroveTup, depth + 1, inInstallSet and subIsInstall)
+            if inInstallSet or not trove.troveIsPackage(troveTup[0]):
+                for subTroveTup, subIsInstall, subIsExplicit in \
+                                troveCache.iterTroveListInfo(troveTup):
+                    handle(subTroveTup, depth + 1,
+                           inInstallSet and subIsInstall)
+            else:
+                for componentName in troveCache.getPackageComponents(troveTup):
+                    handle((componentName, troveTup[1], troveTup[2]),
+                           depth + 1, False)
 
         for (troveTup), (depth, isInstall) in results.iteritems():
             if (newGroups

@@ -256,6 +256,9 @@ class TroveCache(trovesource.AbstractTroveSource):
 
         return result
 
+    def getPackageComponents(self, troveTup):
+        return [ x[0][0] for x in self.iterTroveListInfo(troveTup) ]
+
     def getPathHashesForTroveList(self, troveList):
         return self.getTroveInfo(trove._TROVEINFO_TAG_PATH_HASHES, troveList)
 
