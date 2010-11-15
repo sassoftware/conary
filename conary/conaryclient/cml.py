@@ -128,7 +128,7 @@ class _CMOperation(object):
         self.modified = modified
         self.index = index
         if index is not None:
-            self.location = CMLocation(line=index+1, context=context,
+            self.location = CMLocation(line=index, context=context,
                                        op=weakref.ref(self))
         else:
             self.location = None
@@ -447,6 +447,8 @@ class CML(CM):
 
         for index, line in enumerate(self.filedata):
             line = line.strip()
+            # Use 1-indexed line numbers that users will recognize
+            index = index + 1
 
             if line.startswith('#') or not line:
                 # empty lines are handled just like comments, and empty
@@ -494,13 +496,13 @@ class CML(CM):
         '''
         Serialize the current model, including preserved comments.
         '''
-        lastNoOpLine = max([x.index for x in self.noOps] + [0])
-        lastOpLine = max([x.index for x in self.modelOps] + [0])
+        lastNoOpLine = max([x.index for x in self.noOps] + [1])
+        lastOpLine = max([x.index for x in self.modelOps] + [1])
         # can only be one version
         if self.version is not None:
             verLine = self.version.index
         else:
-            verLine = 0
+            verLine = 1
         lastIndexLine = max(lastOpLine, lastNoOpLine, verLine)
 
         # First, emit all comments without an index as "header"
@@ -519,7 +521,7 @@ class CML(CM):
                     if item.modified:
                         yield item.format()
                     else:
-                        yield self.filedata[i].rstrip('\n')
+                        yield self.filedata[i-1].rstrip('\n')
 
             # Last, emit any remaining lines
             if i == lastOpLine:
