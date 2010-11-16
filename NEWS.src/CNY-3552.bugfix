@@ -1,0 +1,2 @@
+Another instance where passwords could be exposed in extended tracebacks has
+been fixed.
