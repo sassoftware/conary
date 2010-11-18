@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+import copy
 import os
 import itertools
 import sys
@@ -659,8 +661,27 @@ def _updateTroves(cfg, applyList, **kwargs):
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
+            newModel = copy.deepcopy(model)
             if modelTrace is not None:
                 ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
+
+            if newModel.suggestSimplifications(ts.g):
+                log.info("possible system model simplifications found")
+                ts2 = client.cmlGraph(newModel, changeSetList = changeSetList)
+                updJob2 = client.newUpdateJob()
+                suggMap2 = client._updateFromTroveSetGraph(updJob2, ts2, tc,
+                                        fromChangesets = changeSetList,
+                                        criticalUpdateInfo = criticalUpdates)
+
+                if (suggMap == suggMap2 and
+                    updJob.getJobs() == updJob2.getJobs()):
+                    log.info("simplified model verfied; using it instead")
+                    model = newModel
+                    ts = ts2
+                    updJob = updJob2
+                    suggMap = suggMap2
+                    modelFile.model = model
+
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
                 tc.save(tcPath)

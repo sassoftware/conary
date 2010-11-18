@@ -131,7 +131,18 @@ class CMTroveSpec(trovetup.TroveSpec):
             name = name.replace('==', '=')
         name, version, flavor = trovetup.TroveSpec(
             name, version, flavor, **kwargs)
-        return tuple.__new__(cls, (name, version, flavor))
+
+        newTuple = tuple.__new__(cls, (name, version, flavor))
+        if newTuple.version:
+            newTuple.pinned = '==' in newTuple.version
+            newTuple._has_branch = '/' in newTuple.version[1:]
+        else:
+            newTuple.pinned = False
+            newTuple._has_branch = False
+
+        newTuple.snapshot = not newTuple.pinned and newTuple._has_branch
+
+        return newTuple
 
     def __init__(self, *args, **kwargs):
         self.pinned = '==' in args[0]
@@ -159,6 +170,9 @@ class CMTroveSpec(trovetup.TroveSpec):
     def __eq__(self, other):
         # We need to use indices so that we can compare to pure tuples,
         # as well as to trovetup.TroveSpec and to CMTroveSpec
+        if not isinstance(other, tuple):
+            return False
+
         return self[0:3] == other[0:3]
 
     # CMTroveSpec objects are pickled into the model cache, but there
@@ -169,7 +183,6 @@ class CMTroveSpec(trovetup.TroveSpec):
         return None
     def __setstate__(self, state):
         pass
-
 
 class _CMOperation(object):
     def __init__(self, text=None, item=None, modified=True,
@@ -208,11 +221,6 @@ class _CMOperation(object):
         return "%s(text='%s', modified=%s, index=%s)" % (
             self.__class__.__name__,
             self.asString(), self.modified, self.index)
-
-    def __eq__(self, other):
-        # index and modified explicitly not compared, because this is
-        # used to compare new items to previously-existing items
-        return self.item == other.item
 
 class SearchOperation(_CMOperation):
     key = 'search'
@@ -267,6 +275,18 @@ class TroveOperation(_CMOperation):
         if isinstance(text, str):
             text = [text]
         self.item = [CMTroveSpec(x) for x in text]
+
+    def isEmpty(self):
+        return not(self.item)
+
+    def removeSpec(self, spec):
+        self.item.remove(spec)
+        self.modified = True
+
+    def replaceSpec(self, spec, newSpec):
+        i = self.item.index(spec)
+        self.item[i] = newSpec
+        self.modified = True
 
     def __repr__(self):
         return "%s(text=%s, modified=%s, index=%s)" % (
@@ -339,6 +359,15 @@ class CM:
         # an operation as modified
         self.modelModified = False
 
+    def copy(self):
+        new = self.__class__(self.cfg, self.context)
+        new.modelOps = list(self.modelOps)
+        new.noOps = list(self.noOps)
+        new.indexes = dict(self.indexes)
+        new.version = self.version
+        new.modelModified = self.modelModified
+        return new
+
     def _addIndex(self, op):
         # normally, this list is one item long except for index None
         l = self.indexes.setdefault(op.index, [])
@@ -373,24 +402,6 @@ class CM:
         self.appendNoOperation(NoOperation(text, **kwargs))
 
     def appendOp(self, op, deDup=True):
-        # First, remove trivially obvious duplication -- more
-        # complex duplicates may be removed after building the graph
-        if isinstance(op, EraseTroveOperation) and self.modelOps and deDup:
-            otherOp = self.modelOps[-1]
-            if op == otherOp:
-                if isinstance(otherOp, (UpdateTroveOperation,
-                                        InstallTroveOperation)):
-                    # erasing exactly the immediately-previous
-                    # update or install item should remove that
-                    # immediately-previous item, rather than add
-                    # an explicit "erase" trove operation to the list
-                    self.modelOps.pop()
-                    self._removeIndex(otherOp)
-                    return
-                elif (isinstance(otherOp, EraseTroveOperation)):
-                    # do not add identical adjacent erase operations
-                    return
-
         self.modelOps.append(op)
         self._addIndex(op)
 
@@ -398,6 +409,19 @@ class CM:
         self._removeIndex(op)
         while op in self.modelOps:
             self.modelOps.remove(op)
+        self.modelModified = True
+
+    def removeSpec(self, op, spec):
+        op.removeSpec(spec)
+        if op.isEmpty():
+            self.removeOp(op)
+
+    def replaceOp(self, op, newOp):
+        self.modelModified = True
+        self._removeIndex(op)
+        i = self.modelOps.index(op)
+        self.modelOps[i] = newOp
+        self._addIndex(newOp)
 
     def appendTroveOpByName(self, key, *args, **kwargs):
         deDup = kwargs.pop('deDup', True)
@@ -455,6 +479,117 @@ class CM:
                 if op.item in replaceSpecs:
                     op.update(replaceSpecs[op.item])
 
+    class InstallEraseSimplification(object):
+
+        oldOpClass = InstallTroveOperation
+        newOpClass = EraseTroveOperation
+
+        @staticmethod
+        def check(g, oldOp, oldSpec, newOp, newSpec):
+            oldSet = g.matchesByIndex(oldOp.getLocation(oldSpec))
+            newSet = g.matchesByIndex(newOp.getLocation(newSpec))
+            if (oldSet != newSet):
+                return False
+
+            return None
+
+    class UpdateEraseSimplification(object):
+
+        oldOpClass = UpdateTroveOperation
+        newOpClass = EraseTroveOperation
+
+        @staticmethod
+        def check(g, oldOp, oldSpec, newOp, newSpec):
+            # FIXME: This does not seem to catch all expected cases
+            oldSet = g.matchesByIndex(oldOp.getLocation(oldSpec))
+            newSet = g.matchesByIndex(newOp.getLocation(newSpec))
+            if (oldSet != newSet):
+                return (EraseTroveOperation, oldSpec)
+
+            return None
+
+    class InstallUpdateSimplification(object):
+
+        oldOpClass = InstallTroveOperation
+        newOpClass = UpdateTroveOperation
+
+        @staticmethod
+        def check(g, oldOp, oldSpec, newOp, newSpec):
+            return (InstallTroveOperation, newSpec)
+
+    class UpdateUpdateSimplification(object):
+
+        oldOpClass = UpdateTroveOperation
+        newOpClass = UpdateTroveOperation
+
+        @staticmethod
+        def check(g, oldOp, oldSpec, newOp, newSpec):
+            return (UpdateTroveOperation, newSpec)
+
+    def _simplificationCandidate(self, l):
+        types = ( self.InstallEraseSimplification,
+                  self.UpdateEraseSimplification,
+                  self.InstallUpdateSimplification,
+                  self.UpdateUpdateSimplification )
+
+        i = len(l) - 1
+        while i > 0:
+            for simpClass in types:
+                if not isinstance(l[i][0], simpClass.newOpClass):
+                    continue
+
+                match = False
+                for j, (op, spec) in enumerate(reversed(l[0:i])):
+                    if isinstance(op, simpClass.oldOpClass):
+                        match = True
+                        yield (j, i, simpClass)
+
+                if match:
+                    return
+
+            i -= 1
+
+        return
+
+    def suggestSimplifications(self, g):
+        byName = {}
+        changed = False
+        for op in self.modelOps:
+            if (isinstance(op, TroveOperation)):
+                for spec in op:
+                    byName.setdefault(spec.name, []).append((op, spec))
+
+        for troveName, opList in byName.iteritems():
+            for (oldIdx, newIdx, simplifyClass) in \
+                                        self._simplificationCandidate(opList):
+                oldOp, oldSpec = opList[oldIdx]
+                newOp, newSpec = opList[newIdx]
+                result = simplifyClass.check(g, oldOp, oldSpec, newOp, newSpec)
+                if result is False:
+                    continue
+
+                self.removeSpec(oldOp, oldSpec)
+
+                if result is None:
+                    self.removeSpec(newOp, newSpec)
+                else:
+                    (replaceOpClass, replaceSpec) = result
+                    if isinstance(newOp, replaceOpClass):
+                        if newSpec != replaceSpec:
+                            self.newOp.replaceSpec(newSpec, replaceSpec)
+                    else:
+                        replaceOp = replaceOpClass(item = [ replaceSpec ],
+                                                   index = newOp.index)
+                        if len([ x for x in newOp]) == 1:
+                            self.replaceOp(newOp, replaceOp)
+                        else:
+                            self.removeSpec(newOp, newSpec)
+                            self.appendOp(replaceOp)
+
+                changed = True
+                break
+
+        return changed
 
 class CML(CM):
     '''
@@ -508,9 +643,13 @@ class CML(CM):
     line is modified.
     '''
 
+    def copy(self):
+        new = CM.copy(self)
+        new.filedata = list(self.filedata)
+        return new
+
     def reset(self):
         CM.reset(self)
-        self.commentLines = []
         self.filedata = []
 
     def parse(self, fileData=None, context=None):
