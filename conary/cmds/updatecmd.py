@@ -25,6 +25,7 @@ from conary import display
 from conary import errors
 from conary import trove
 from conary import trovetup
+from conary import versions
 from conary.deps import deps
 from conary.lib import api
 from conary.lib import log
@@ -522,6 +523,31 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
 
         updateName = { False: 'update',
                        True: 'install' }[kwargs['keepExisting']]
+
+        branchArgs = {}
+        for index, spec in enumerate(addArgs):
+            try:
+                troveSpec = trovetup.TroveSpec(spec)
+                version = versions.Label(troveSpec.version)
+                branchArgs[troveSpec] = index
+            except:
+                # Any exception is a parse failure in one of the
+                # two steps, and so we do not convert that argument
+                pass
+       
+        if branchArgs:
+            client = conaryclient.ConaryClient(cfg)
+            repos = client.getRepos()
+            foundTroves = repos.findTroves(cfg.installLabelPath,
+                                           branchArgs.keys(),
+                                           defaultFlavor = cfg.flavor)
+            for troveSpec in foundTroves:
+                index = branchArgs[troveSpec]
+                foundTrove = foundTroves[troveSpec][0]
+                addArgs[index] = addArgs[index].replace(
+                    troveSpec.version,
+                    '%s/%s' %(foundTrove[1].trailingLabel(),
+                              foundTrove[1].trailingRevision()))
 
         if addArgs:
             sysmodel.appendTroveOpByName(updateName, text=addArgs)
