@@ -332,6 +332,27 @@ class CMLSearchPath(troveset.SearchPathTroveSet):
 
         return False
 
+class ModelGraph(troveset.OperationGraph):
+
+    def matchesByIndex(self, location):
+        # returns a set of trove tuples for the matches which were found
+        # for the given location
+        result = set()
+        for ts in self.nodesByIndexAndAction(location,
+                                             troveset.FindAction):
+            result.update(ts._getInstallSet())
+
+        return result
+
+    def nodesByIndexAndAction(self, location, actionType):
+        matches = []
+        for node in self.iterNodes():
+            if node.index == location:
+                if isinstance(node.action, actionType):
+                    matches.append(node)
+
+        return matches
+
 class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = CMLSearchPath
@@ -341,7 +362,7 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     def __init__(self, cfg, repos, db):
         self.db =  db
-        g = troveset.OperationGraph()
+        g = ModelGraph()
         self.cfg = cfg
         modelgraph.AbstractModelCompiler.__init__(self, cfg.flavor, repos, g)
 
