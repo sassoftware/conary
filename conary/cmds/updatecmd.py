@@ -860,7 +860,7 @@ def updateAll(cfg, **kwargs):
     infoArg = kwargs.get('info', False)
 
     if model and modelFile and modelFile.exists() and restartInfo is None:
-        model.refreshSearchPath()
+        model.refreshVersionSnapshots()
         if modelArg:
             model.write(sys.stdout)
             sys.stdout.flush()

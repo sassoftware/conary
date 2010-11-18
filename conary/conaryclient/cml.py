@@ -20,7 +20,6 @@ pinTroves, excludeTroves, and so forth.
 """
 
 import shlex
-import weakref
 
 from conary.conaryclient.update import UpdateError
 from conary import conaryclient
@@ -63,57 +62,107 @@ class CMError(UpdateError):
     pass
 
 
-class CMLocation(_namedtuple('CMLocation', 'line context op')):
+class CMLocation(_namedtuple('CMLocation', 'line context op spec')):
     """
     line: line number (should be 1-indexed)
     context: file name or other similar context, or C{None}
-    op: weakref to containing operation, or C{None}
+    op: containing operation, or C{None}
+    spec: containing operation, or C{None}
     """
+
+    def __new__(cls, line, context=None, op=None, spec=None):
+        if isinstance(line, cls):
+            if context is None:
+                context = line.context
+            else:
+                context = context
+            if op is None:
+                op = line.op
+            else:
+                op = op
+            if spec is None:
+                spec = line.spec
+            else:
+                spec = spec
+            line = line.line
+        return tuple.__new__(cls, (line, context, op, spec))
+
     def __repr__(self):
-        return "%s(line=%r, context=%r)" % (
-            self.__class__.__name__, self.line, self.context)
+        op = None
+        if self.op:
+            op = self.op
+        spec = None
+        if self.spec:
+            op = self.spec
+        return "%s(line=%r, context=%r, op=%r, spec=%r)" % (
+            self.__class__.__name__, self.line, self.context, op, spec)
 
     def __str__(self):
-        if self.context is not None:
-            return ':'.join((str(self.context), str(self.line)))
-        return str(self.line)
+        if self.context:
+            context = str(self.context)
+        else:
+            context = ''
+        if self.spec:
+            spec = self.spec.asString()
+        else:
+            spec = ''
+        return ':'.join((x for x in (context, str(self.line), spec) if x))
     asString = __str__
 
 
 class CMTroveSpec(trovetup.TroveSpec):
     '''
-    Exactly like L{trovetup.TroveSpec} except that it also implements
-    an optional C{location} which defaults to C{None}; if C{location}
-    is not C{None}, then C{__str__} prepends the location.
+    Like parent class L{trovetup.TroveSpec} except that:
+     - Parses a version separator of C{==} to be like C{=} but sets
+       the C{pinned} member to C{True} (defaults to C{False}).
+     - Has a C{snapshot} member that determines whether the version
+       should be updated to latest, and a C{labelSpec()} method
+       used to get the label on which to look for the latest version.
+    Note that equality is tested only on name, version, and flavor,
+    and that it is acceptable to test equality against an instance of
+    C{trovetup.TroveSpec} or a simple C{(name, version, flavor)}
+    tuple.
     '''
-    def __new__(cls, name, version=None, flavor=None, location=None, **kwargs):
+    def __new__(cls, name, version=None, flavor=None, **kwargs):
+        if isinstance(name, (tuple, list)):
+            name = list(name)
+            name[0] = name[0].replace('==', '=')
+        else:
+            name = name.replace('==', '=')
         name, version, flavor = trovetup.TroveSpec(
             name, version, flavor, **kwargs)
         return tuple.__new__(cls, (name, version, flavor))
 
     def __init__(self, *args, **kwargs):
-        if len(args) == 4:
-            self.location = args[3]
-        elif 'location' in kwargs:
-            self.location = kwargs['location']
+        self.pinned = '==' in args[0]
+        if self.version is not None:
+            self._has_branch = '/' in self.version[1:]
         else:
-            self.location = None
+            self._has_branch = False
+        self.snapshot = not self.pinned and self._has_branch
 
-    def __str__(self):
-        if self.location is not None:
-            return ': '.join((str(self.location), self.asString()))
-        return self.asString()
+    def labelSpec(self):
+        # This is used only to look up newest versions on a label
+        assert(self._has_branch)
+        return self.name, self.version.rsplit('/', 1)[0], self.flavor
 
-    format = trovetup.TroveSpec.asString
+    def asString(self, withTimestamp=False):
+        s = trovetup.TroveSpec.asString(self, withTimestamp=withTimestamp)
+        if self.pinned:
+            s = s.replace('=', '==', 1)
+        return s
+
+    __str__ = asString
+
+    format = asString
 
     def __eq__(self, other):
-        # location is not considered, and need to use indices so
-        # that we can compare to pure tuples, as well as to
-        # trovetup.TroveSpec and to CMTroveSpec
+        # We need to use indices so that we can compare to pure tuples,
+        # as well as to trovetup.TroveSpec and to CMTroveSpec
         return self[0:3] == other[0:3]
 
     # CMTroveSpec objects are pickled into the model cache, but there
-    # only the TroveSpec parts are used, so we just leave out the location
+    # only the TroveSpec parts are used
     def __getnewargs__(self):
         return (self.name, self.version, self.flavor)
     def __getstate__(self):
@@ -127,17 +176,20 @@ class _CMOperation(object):
                  index=None, context=None):
         self.modified = modified
         self.index = index
-        if index is not None:
-            self.location = CMLocation(line=index, context=context,
-                                       op=weakref.ref(self))
-        else:
-            self.location = None
+        self.context = context
         assert(text is not None or item is not None)
         assert(not(text is None and item is None))
         if item is not None:
             self.item = item
         else:
             self.parse(text=text)
+
+    def __iter__(self):
+        yield self.item
+
+    def getLocation(self, spec = None):
+        return CMLocation(self.index, context = self.context, op = self,
+                          spec = spec)
 
     def update(self, item, modified=True):
         self.parse(item)
@@ -170,7 +222,7 @@ class SearchOperation(_CMOperation):
 
 class SearchTrove(SearchOperation):
     def parse(self, text):
-        self.item = CMTroveSpec(text, location=self.location)
+        self.item = CMTroveSpec(text)
 
 class SearchLabel(SearchOperation):
     def parse(self, text):
@@ -214,7 +266,7 @@ class TroveOperation(_CMOperation):
     def parse(self, text):
         if isinstance(text, str):
             text = [text]
-        self.item = [CMTroveSpec(x, location=self.location) for x in text]
+        self.item = [CMTroveSpec(x) for x in text]
 
     def __repr__(self):
         return "%s(text=%s, modified=%s, index=%s)" % (
@@ -353,38 +405,55 @@ class CM:
         self.appendOp(op, deDup=deDup)
         return op
 
-    def refreshSearchPath(self):
+    def _iterOpTroveItems(self):
+        for op in self.modelOps:
+            if isinstance(op, (SearchTrove, TroveOperation)):
+                for item in op:
+                    yield item
+
+    def refreshVersionSnapshots(self):
         cfg = self.cfg
         cclient = conaryclient.ConaryClient(cfg)
         repos = cclient.getRepos()
 
-        # Find SearchTroves with any version specified, and remove any 
-        # trailingRevision
-        # {oldTroveKey: index}
-        searchOpsOld = dict((y.item[0:3], x)
-                            for x, y in enumerate(self.modelOps)
-                            if isinstance(y, SearchTrove)
-                            and y.item[1] is not None)
-        # {newTroveKey: oldTroveKey}
-        searchOpsNew = dict(((x[0], x[1].rsplit('/', 1)[0], x[2]), x)
-                            for x in searchOpsOld.keys())
-        searchTroves = searchOpsOld.keys() + searchOpsNew.keys()
+        origOps = set()
+        newOps = {}  # {TroveSpec: [CMTroveSpec, ...]}
+        for item in self._iterOpTroveItems():
+            if isinstance(item, CMTroveSpec) and item.snapshot:
+                l = origOps.add(item)
+                newSpec = item.labelSpec()
+                l = newOps.setdefault(newSpec, [])
+                l.append(item)
+
+        allOpSpecs = list(origOps) + newOps.keys()
 
         foundTroves = repos.findTroves(cfg.installLabelPath, 
-            searchTroves, defaultFlavor = cfg.flavor)
+            allOpSpecs, defaultFlavor = cfg.flavor)
 
-        for troveKey in foundTroves.keys():
-            if troveKey in searchOpsNew:
-                oldTroveKey = searchOpsNew[troveKey]
-                if foundTroves[troveKey] != foundTroves[oldTroveKey]:
-                    # found a new version, replace
-                    foundTrove = foundTroves[troveKey][0]
-                    newVersion = foundTrove[1]
-                    newverstr = '%s/%s' %(newVersion.trailingLabel(),
-                                          newVersion.trailingRevision())
-                    item = (oldTroveKey[0], newverstr, oldTroveKey[2])
-                    index = searchOpsOld[oldTroveKey]
-                    self.modelOps[index].update(item)
+        # Calculate the appropriate replacements from the lookup
+        replaceSpecs = {} # CMTroveSpec: TroveSpec
+        for troveKey in foundTroves:
+            if troveKey in newOps:
+                for oldTroveKey in newOps[troveKey]:
+                    if foundTroves[troveKey] != foundTroves[oldTroveKey]:
+                        # found a new version, create replacement troveSpec
+                        foundTrove = foundTroves[troveKey][0]
+                        newVersion = foundTrove[1]
+                        newverstr = '%s/%s' %(newVersion.trailingLabel(),
+                                              newVersion.trailingRevision())
+                        troveTup = (oldTroveKey[0], newverstr, oldTroveKey[2])
+                        replaceSpecs[oldTroveKey] = troveTup
+
+        # Apply the replacement specs to the model
+        for op in self.modelOps:
+            if isinstance(op, TroveOperation):
+                newItem = [replaceSpecs.get(x, x) for x in op.item]
+                if newItem != op.item:
+                    # at least one spec was replaced; update the line
+                    op.update(newItem)
+            elif isinstance(op, SearchTrove):
+                if op.item in replaceSpecs:
+                    op.update(replaceSpecs[op.item])
 
 
 class CML(CM):
@@ -404,6 +473,13 @@ class CML(CM):
     enclosed in single or double quote characters.  Each of these
     lines represents a place to search for troves to install on
     or make available to the system.
+
+    The C{troveSpec} entries in a model are nearly identical to
+    a C{troveSpec} on the comand line, except that a single C{=}
+    beween the name and the version means that the version can be
+    updated by a C{conary updateall} operation, and a double C{==}
+    between the name and the version means that updateall should
+    not modify the version.
 
     C{update}, C{erase}, C{install}, C{offer}, and C{patch} lines take
     one or more troveSpecs, which B{may} be enclosed in single

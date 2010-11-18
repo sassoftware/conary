@@ -109,18 +109,18 @@ class AbstractModelCompiler(object):
                     newMatches.append(
                         finalTroveSet._action(spec,
                                           ActionClass = self.EraseFindAction,
-                                          index = spec.location) )
+                                          index = op.getLocation(spec) ) )
 
                 if len(newMatches) > 1:
                     eraseMatches = newMatches[0]._action(
                         ActionClass = self.UnionAction,
-                        index = op.index, *newMatches[1:])
+                        index = op.getLocation(), *newMatches[1:])
                 else:
                     eraseMatches = newMatches[0]
 
                 finalTroveSet = finalTroveSet._action(eraseMatches,
                         ActionClass=self.RemoveAction,
-                        index = op.index)
+                        index = op.getLocation())
                 continue
 
             if rebuildTotalSearchSet:
@@ -136,11 +136,11 @@ class AbstractModelCompiler(object):
                     newMatches.append(
                         totalSearchSet._action(spec,
                                                ActionClass = self.FindAction,
-                                               index = spec.location) )
+                                               index = op.getLocation(spec) ) )
                 if len(newMatches) > 1:
                     searchMatches = newMatches[0]._action(
                         ActionClass = self.UnionAction,
-                        index = op.index, *newMatches[1:])
+                        index = op.getLocation(), *newMatches[1:])
                 else:
                     searchMatches = newMatches[0]
             else:
@@ -154,7 +154,7 @@ class AbstractModelCompiler(object):
             if searchMatches and localMatches:
                 matches = searchMatches._action(localMatches,
                                                 ActionClass = self.UnionAction,
-                                                index = op.index)
+                                                index = op.getLocation())
             elif searchMatches:
                 matches = searchMatches
             else:
@@ -163,19 +163,19 @@ class AbstractModelCompiler(object):
             if isinstance(op, model.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UnionAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             elif isinstance(op, model.PatchTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.PatchAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             elif isinstance(op, model.UpdateTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UpdateAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             elif isinstance(op, model.OfferTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.OptionalAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             else:
                 assert(0)
 
