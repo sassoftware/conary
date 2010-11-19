@@ -2069,13 +2069,25 @@ class LZMAFile:
         if self.childpid == 0:
             try:
                 os.close(self.infd)
+                if isinstance(fileobj, gzip.GzipFile):
+                    # We can't rely on the underlying file descriptor to feed
+                    # correct data.
+                    # This should really be made to use the read() method of
+                    # fileobj
+                    f = tempfile.TemporaryFile()
+                    copyfileobj(fileobj, f)
+                    f.seek(0)
+                    fileobj.close()
+                    fileobj = f
                 os.close(0)
                 os.close(1)
+
                 fd = fileobj.fileno()
                 # this undoes any buffering
                 os.lseek(fd, fileobj.tell(), 0)
+
                 os.dup2(fd, 0)
-                os.close(fd)
+                fileobj.close() # This closes fd
                 os.dup2(outfd, 1)
                 os.close(outfd)
                 os.execv(self.executable, commandLine)
