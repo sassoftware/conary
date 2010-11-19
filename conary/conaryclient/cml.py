@@ -93,7 +93,7 @@ class CMLocation(_namedtuple('CMLocation', 'line context op spec')):
             op = self.op
         spec = None
         if self.spec:
-            op = self.spec
+            spec = self.spec
         return "%s(line=%r, context=%r, op=%r, spec=%r)" % (
             self.__class__.__name__, self.line, self.context, op, spec)
 
