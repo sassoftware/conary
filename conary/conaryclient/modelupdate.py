@@ -353,6 +353,41 @@ class ModelGraph(troveset.OperationGraph):
 
         return matches
 
+    def installIsNoop(self, troveCache, location):
+        nodes = self.nodesByIndexAndAction(location, troveset.FindAction)
+        # look for where this node goes into a union
+        assert(len(nodes) == 1)
+        node = nodes[0]
+        del nodes
+        findTroveTuples = set(node._getInstallSet())
+
+        # don't follow the fetch/searchpath child
+        origUnion = [ x for x in self.getChildren(node)
+                        if isinstance(x.action, troveset.UnionAction) ]
+        assert(len(origUnion) == 1)
+        origUnion = origUnion[0]
+
+        stubGraph = ModelGraph()
+        unionParents = [ x for x in origUnion.action._inputSets
+                            if x != node ]
+        unionAction = troveset.UnionAction(unionParents[0], unionParents[1:])
+        newUnion = unionAction.getResultTupleSet(graph = stubGraph)
+        newUnion.realize(None)
+
+        for troveTup, _, _ in \
+                        newUnion._walk(troveCache, recurse = True):
+            findTroveTuples.discard(troveTup)
+
+        return (not findTroveTuples)
+
+    def getUpdateMapping(self, location):
+        nodes = self.nodesByIndexAndAction(location, troveset.UpdateAction)
+        assert(len(nodes) == 1)
+        node = nodes[0]
+        del nodes
+
+        return node.updateMap
+
 class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = CMLSearchPath

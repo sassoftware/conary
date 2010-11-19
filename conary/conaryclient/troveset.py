@@ -731,6 +731,11 @@ class AbstractModifyAction(DelayedTupleSetAction):
                              deps.Flavor())
         after = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
+
+        # store the mapping of what changed for explicit troves; we peek
+        # at this for CM simplification
+        explicitTups = set()
+
         afterInfo = {}
         updateNames = set()
         for troveTup, inInstallSet, explicit in \
@@ -738,6 +743,8 @@ class AbstractModifyAction(DelayedTupleSetAction):
             after.addTrove(troveTup[0], troveTup[1], troveTup[2])
             afterInfo[troveTup] = (inInstallSet, explicit)
             updateNames.add(troveTup[0])
+            if explicit:
+                explicitTups.add(troveTup)
 
         beforeInfo = {}
         installSet = set()
@@ -779,12 +786,19 @@ class AbstractModifyAction(DelayedTupleSetAction):
 
         self._preprocess(data, beforeInfo, afterInfo)
 
+        self.outSet.updateMap = {}
         for (trvName, (oldVersion, oldFlavor),
                       (newVersion, newFlavor), isAbsolute) in troveMapping:
             oldTuple = (trvName, oldVersion, oldFlavor)
             newTuple = (trvName, newVersion, newFlavor)
             self._handleTrove(data, beforeInfo, afterInfo, oldTuple, newTuple,
                               installSet, optionalSet)
+
+            if newTuple in explicitTups:
+                if oldTuple[1] is not None:
+                    self.outSet.updateMap[newTuple] = oldTuple
+                else:
+                    self.outSet.updateMap[newTuple] = None
 
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)

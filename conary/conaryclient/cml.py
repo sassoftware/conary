@@ -493,11 +493,14 @@ class CM:
         newOpClass = EraseTroveOperation
 
         @staticmethod
-        def check(g, oldOp, oldSpec, newOp, newSpec):
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
             oldSet = g.matchesByIndex(oldOp.getLocation(oldSpec))
             newSet = g.matchesByIndex(newOp.getLocation(newSpec))
-            if (oldSet != newSet):
+            if (oldSet & newSet) != oldSet:
                 return False
+
+            if g.installIsNoop(troveCache, oldOp.getLocation(oldSpec)):
+                return (EraseTroveOperation, newSpec)
 
             return None
 
@@ -507,14 +510,30 @@ class CM:
         newOpClass = EraseTroveOperation
 
         @staticmethod
-        def check(g, oldOp, oldSpec, newOp, newSpec):
-            # FIXME: This does not seem to catch all expected cases
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
             oldSet = g.matchesByIndex(oldOp.getLocation(oldSpec))
             newSet = g.matchesByIndex(newOp.getLocation(newSpec))
-            if (oldSet != newSet):
-                return (EraseTroveOperation, oldSpec)
+            assert(oldSet is not None)
+            assert(newSet is not None)
+            if (oldSet & newSet) != oldSet:
+                return False
 
-            return None
+            updateMap = g.getUpdateMapping(oldOp.getLocation())
+            if not updateMap:
+                # the update was a noop
+                return (EraseTroveOperation, newSpec)
+
+            newInstall = True
+            for troveTup in oldSet:
+                if updateMap[troveTup] is not None:
+                    newInstall = False
+
+            if newInstall:
+                # this is a fresh install; we can cancel the update and
+                # erase operations
+                return None
+
+            return (EraseTroveOperation, CMTroveSpec(oldSpec.name, None, None))
 
     class InstallUpdateSimplification(object):
 
@@ -522,7 +541,7 @@ class CM:
         newOpClass = UpdateTroveOperation
 
         @staticmethod
-        def check(g, oldOp, oldSpec, newOp, newSpec):
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
             return (InstallTroveOperation, newSpec)
 
     class UpdateUpdateSimplification(object):
@@ -531,7 +550,7 @@ class CM:
         newOpClass = UpdateTroveOperation
 
         @staticmethod
-        def check(g, oldOp, oldSpec, newOp, newSpec):
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
             return (UpdateTroveOperation, newSpec)
 
     def _simplificationCandidate(self, l):
@@ -559,7 +578,7 @@ class CM:
 
         return
 
-    def suggestSimplifications(self, g):
+    def suggestSimplifications(self, troveCache, g):
         byName = {}
         changed = False
         for op in self.modelOps:
@@ -572,7 +591,8 @@ class CM:
                                         self._simplificationCandidate(opList):
                 oldOp, oldSpec = opList[oldIdx]
                 newOp, newSpec = opList[newIdx]
-                result = simplifyClass.check(g, oldOp, oldSpec, newOp, newSpec)
+                result = simplifyClass.check(troveCache, g, oldOp, oldSpec,
+                                             newOp, newSpec)
                 if result is False:
                     continue
 
@@ -584,7 +604,7 @@ class CM:
                     (replaceOpClass, replaceSpec) = result
                     if isinstance(newOp, replaceOpClass):
                         if newSpec != replaceSpec:
-                            self.newOp.replaceSpec(newSpec, replaceSpec)
+                            newOp.replaceSpec(newSpec, replaceSpec)
                     else:
                         replaceOp = replaceOpClass(item = [ replaceSpec ],
                                                    index = newOp.index)

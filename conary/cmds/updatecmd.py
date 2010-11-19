@@ -687,26 +687,34 @@ def _updateTroves(cfg, applyList, **kwargs):
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
-            newModel = copy.deepcopy(model)
             if modelTrace is not None:
                 ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
 
-            if newModel.suggestSimplifications(ts.g):
+            finalModel = copy.deepcopy(model)
+            if model.suggestSimplifications(tc, ts.g):
                 log.info("possible system model simplifications found")
-                ts2 = client.cmlGraph(newModel, changeSetList = changeSetList)
+                ts2 = client.cmlGraph(model, changeSetList = changeSetList)
                 updJob2 = client.newUpdateJob()
-                suggMap2 = client._updateFromTroveSetGraph(updJob2, ts2, tc,
+                try:
+                    suggMap2 = client._updateFromTroveSetGraph(updJob2, ts2,
+                                        tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
+                except errors.TroveNotFound:
+                    log.info("bad model generated; bailing")
+                else:
+                    if (suggMap == suggMap2 and
+                        updJob.getJobs() == updJob2.getJobs()):
+                        log.info("simplified model verfied; using it instead")
+                        ts = ts2
+                        finalModel = model
+                        updJob = updJob2
+                        suggMap = suggMap2
+                    else:
+                        log.info("simplified model changed result; ignoring")
 
-                if (suggMap == suggMap2 and
-                    updJob.getJobs() == updJob2.getJobs()):
-                    log.info("simplified model verfied; using it instead")
-                    model = newModel
-                    ts = ts2
-                    updJob = updJob2
-                    suggMap = suggMap2
-                    modelFile.model = model
+            model = finalModel
+            modelFile.model = finalModel
 
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
