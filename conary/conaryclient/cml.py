@@ -140,18 +140,21 @@ class CMTroveSpec(trovetup.TroveSpec):
         else:
             newTuple.pinned = False
             newTuple._has_branch = False
+            newTuple.local = False
 
-        newTuple.snapshot = not newTuple.pinned and newTuple._has_branch
+        newTuple.snapshot = (not newTuple.pinned and not newTuple.local
+                             and newTuple._has_branch)
 
         return newTuple
 
     def __init__(self, *args, **kwargs):
         self.pinned = '==' in args[0]
-        self.local = '@local' in args[0]
         if self.version is not None:
             self._has_branch = '/' in self.version[1:]
+            self.local = '@local' in self.version
         else:
             self._has_branch = False
+            self.local = False
         self.snapshot = not self.pinned and not self.local and self._has_branch
 
     def labelSpec(self):
