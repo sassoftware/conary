@@ -775,6 +775,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if not updJob.jobs:
         # Nothing to do
+        print 'Update would not modify system'
         updJob.close()
         client.close()
         return
