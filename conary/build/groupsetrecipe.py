@@ -1704,8 +1704,9 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.searchSource = searchsource.NetworkSearchSource(
                 repos, self.labelPath, flavor)
         self.macros = macros.Macros(ignoreUnknown=lightInstance)
-        self.world = GroupSearchSourceTroveSet(self.searchSource)
         self.g = troveset.OperationGraph()
+        self.world = GroupSearchSourceTroveSet(self.searchSource,
+                                               graph = self.g)
 
         self._dumpAll = False
         self._trackDict = {}
@@ -1937,7 +1938,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         model = cml.CML(None)
         lineNum = findRecipeLineNumber()
-        model.parse(modelText, fileName = '(recipe):%d' % lineNum)
+        model.parse(modelText, context = '(recipe):%d' % lineNum)
 
         comp = ModelCompiler(self.flavor, self.repos, self.g)
         sysModelSet = comp.build(model, searchPath, None)

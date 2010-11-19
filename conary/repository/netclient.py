@@ -2795,7 +2795,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return results
 
-    def getDepsForTroveList(self, troveList):
+    def getDepsForTroveList(self, troveList, provides = True, requires = True):
         # for old servers, UnsupportedCallError is raised, and the caller
         # is expected to handle it. we do it this way because the outer
         # layers often want to cache a complete trove in this case instead
@@ -2815,10 +2815,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             tl = [ (x[1][0], self.fromVersion(x[1][1]),
                              self.fromFlavor(x[1][2]))
                    for x in l ]
-            result = self.c[host].getDepsForTroveList(tl)
+            result = self.c[host].getDepsForTroveList(tl, provides = provides,
+                                                      requires = requires)
 
+            provSet = None
+            reqSet = None
             for ((idx, troveTup), (prov, req)) in itertools.izip(l, result):
-                results[idx] = (self.toDepSet(prov), self.toDepSet(req))
+                if provides:
+                    provSet = self.toDepSet(prov)
+                if requires:
+                    reqSet = self.toDepSet(req)
+
+                results[idx] = (provSet, reqSet)
 
         if partialOnly:
             raise PartialResultsError(results)

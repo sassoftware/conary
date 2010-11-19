@@ -33,7 +33,7 @@ from conary import conarycfg, conaryclient, errors, trove, versions
 from conary.conaryclient import cml, modelupdate, systemmodel
 from conary.cmds import updatecmd
 from conary.deps import deps
-from conary.trovetup import TroveSpec
+TroveSpec = cml.CMTroveSpec
 
 # pyflakes=ignore
 from conary.lib import log
@@ -137,8 +137,8 @@ def addInstallJob(model, job):
                 item = [ TroveSpec(job[0], fmtVer(job[1][0]),
                                      str(job[1][1])) ] )
 
-    if newOp not in model.systemItems:
-        model.appendTroveOp(newOp)
+    if newOp not in model.modelOps:
+        model.appendOp(newOp)
         updatedModel = True
     else:
         updatedModel = False
@@ -150,8 +150,8 @@ def addEraseJob(model, job):
                 item = [ TroveSpec(job[0], job[2][0].asString(),
                                    str(job[2][1])) ])
 
-    if newOp not in model.systemItems:
-        model.appendTroveOp(newOp)
+    if newOp not in model.modelOps:
+        model.appendOp(newOp)
         updatedModel = True
     else:
         updatedModel = False
@@ -192,7 +192,6 @@ def initialForesightModel(installedTroves, model):
     allGroupTups = [ x for x in installedTroves
                         if trove.troveIsGroup(x[0]) ]
     allGroupTroves = db.getTroves(allGroupTups)
-    mainLabels = set()
 
     # simplistic, but we can't have loops in groups so good enough
     groupTroves = []
@@ -218,53 +217,47 @@ def initialForesightModel(installedTroves, model):
                     if x.getName() == 'group-kde-dist' ][0]
     if trv:
         if 'x86_64' in str(trv.getFlavor()):
-            model.appendTroveOp(cml.SearchTrove(
+            model.appendOp(cml.SearchTrove(
                     item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                      'is:x86' ) ))
-        model.appendTroveOp(cml.SearchTrove(
+        model.appendOp(cml.SearchTrove(
                 item = TroveSpec('group-world', fmtVer(trv.getVersion()),
                                  str(trv.getFlavor()) ) ) )
-        mainLabels.add(trv.getVersion().trailingLabel().asString())
 
     for trv in groupTroves:
-        model.appendTroveOp(cml.InstallTroveOperation(
+        model.appendOp(cml.InstallTroveOperation(
                 item = [ TroveSpec(trv.getName(),
                                    fmtVer(trv.getVersion()),
                                    str(trv.getFlavor())) ] ))
 
-    return mainLabels
 
 def initialRedHatModel(client, model):
     groupOs = findParent(client, "/etc/redhat-release", "group-os")
     groupRpath = findParent(client, "/usr/bin/conary", "group-rpath-packages",
 			    latest = True)
-    mainLabels = set()
 
-    model.appendTroveOp(cml.SearchTrove(
+    model.appendOp(cml.SearchTrove(
                                 item = TroveSpec(groupOs[0],
                                                  fmtVer(groupOs[1]),
                                                  str(groupOs[2]))))
-    mainLabels.add(groupOs[1].trailingLabel().asString())
-    model.appendTroveOp(cml.SearchTrove(
+    model.appendOp(cml.SearchTrove(
                                 item = TroveSpec(groupRpath[0],
                                                  fmtVer(groupRpath[1]),
                                                  str(groupRpath[2]))))
-    mainLabels.add(groupRpath[1].trailingLabel().asString())
 
     if 'rhel' in groupOs[1].asString():
-        model.appendTroveOp(cml.InstallTroveOperation(
+        model.appendOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-rhel-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
     else:
-        model.appendTroveOp(cml.InstallTroveOperation(
+        model.appendOp(cml.InstallTroveOperation(
                 item = [ TroveSpec("group-standard",
                                    fmtVer(groupOs[1]),
                                    str(groupOs[2])) ] ))
 
     print "\t" + "\n\t".join(model.iterFormat())
 
-    return mainLabels
 
 if __name__ == '__main__':
     #log.setVerbosity(log.INFO)
@@ -295,12 +288,12 @@ if __name__ == '__main__':
 
     model = cml.CML(cfg)
     if os.path.exists("/etc/redhat-release"):
-        mainLabels = initialRedHatModel(client, model)
+        initialRedHatModel(client, model)
         componentPriorities = [ ( 'rpm', ),
                                 ( 'runtime', ),
                                 ( 'lib', ) ]
     else:
-        mainLabels = initialForesightModel(installedTroves, model)
+        initialForesightModel(installedTroves, model)
         componentPriorities = [ ( 'runtime', 'doc' ),
                                 ( 'doc', ),
                                 ( 'runtime', ),
@@ -399,29 +392,30 @@ if __name__ == '__main__':
         print "%s -> %s" % (big, little)
 
     finalModel = cml.CML(cfg)
-    for searchItem in [x for x in model.systemItems
-                       if isinstance(x, cml.SearchTrove)]:
-        finalModel.appendTroveOp(searchItem)
+    for searchOp in [x for x in model.modelOps
+                     if isinstance(x, cml.SearchTrove)]:
+        finalModel.appendOp(searchOp)
 
-    searchTroveItems = []
+    troveNameList = []
+    addOps = (cml.UpdateTroveOperation,
+              cml.InstallTroveOperation)
+
+    addTroveSpecs = itertools.chain(
+        *(op.item for op in model.modelOps if isinstance(op, addOps))
+    )
+    addNames = [x.name.split(':')[0] for x in addTroveSpecs]
+
+    addNameCount = dict((x, addNames.count(x)) for x in set(addNames))
     deferredItems = []
     specClass = None
-    searchOps = (cml.UpdateTroveOperation,
-                 cml.InstallTroveOperation)
-
-    searchTroveSpecs = itertools.chain(
-        *(op.item for op in model.systemItems if isinstance(op, searchOps))
-    )
-    searchNames = [x.name.split(':')[0] for x in searchTroveSpecs]
-    searchNameCount = dict((x, searchNames.count(x)) for x in set(searchNames))
 
     def emitDeferred(specClass, deferredItems):
         if deferredItems:
             # list() to copy
-            finalModel.appendTroveOp(specClass(item=list(deferredItems)))
+            finalModel.appendOp(specClass(item=list(deferredItems)))
             deferredItems[:] = []
 
-    for op in model.systemItems:
+    for op in model.modelOps:
         if specClass and specClass != op.__class__:
             # we can only combine items from the same class
             emitDeferred(specClass, deferredItems)
@@ -435,33 +429,17 @@ if __name__ == '__main__':
         simpleSpecs = [ (TrackFindAction.findMap.get(spec, spec), spec)
                         for spec in op ]
         for newSpec, spec in simpleSpecs:
-            # any remaining versions belong by default in search items
-            # if they did not come from the groups, so that they are
-            # snapshotted in an updateall like other items.  This will
-            # preserve the semantics of branch affinity relative to what
-            # would have happened in the old update model.  Note that
-            # what we really want to test for is whether the updates
-            # came in through the previous search path, but we do not
-            # have that information, so we assume that if they are on
-            # the mainLabels they came in through the search path that
-            # already exists and don't add another entry, but leave
-            # the fixed version for the user to clarify.  Local cooks
-            # don't really have anything to update to, so leave them
-            # alone.
             if 'local@' in spec.version:
                 # never simplify any local versions
                 newSpecs.append(spec);
-            elif specClass in searchOps and newSpec.version is not None:
-                searchTroveName = newSpec.name.split(':')[0]
-                searchTroveSpec = TroveSpec(searchTroveName,
-                                            spec.version, newSpec.flavor)
-                if searchTroveSpec not in searchTroveItems:
-                    emitDeferred(specClass, deferredItems)
-                    finalModel.appendTroveOp(
-                        cml.SearchTrove(item=searchTroveSpec))
-                    searchTroveItems.append(searchTroveSpec)
+            elif specClass in addOps and newSpec.version is not None:
+                addTroveName = newSpec.name.split(':')[0]
+                addTroveSpec = TroveSpec(addTroveName,
+                                         spec.version, newSpec.flavor)
+                if addTroveSpec not in troveNameList:
+                    troveNameList.append(addTroveSpec)
 
-                if searchNameCount.get(searchTroveName, 0) > 1:
+                if addNameCount.get(addTroveName, 0) > 1:
                     # if there is more than one of this name, assume they
                     # might be differentiated by flavor
                     flavor = spec.flavor
@@ -469,7 +447,9 @@ if __name__ == '__main__':
                     # use the simplified flavor
                     flavor = newSpec.flavor
 
-                newSpecs.append(TroveSpec(newSpec.name, None, flavor))
+                newSpecs.append(TroveSpec(newSpec.name, newSpec.version, flavor))
+            elif specClass == cml.EraseTroveOperation:
+                newSpecs.append(TroveSpec(newSpec.name, None, newSpec.flavor))
             else:
                 newSpecs.append(newSpec);
 

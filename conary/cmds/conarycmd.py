@@ -902,6 +902,8 @@ class _UpdateCommand(ConaryCommand):
         'model'         : 'Display the new model that would have been applied',
         'model-graph'   : (VERBOSE_HELP,
                            'Write graph of model to specified file'),
+        'model-trace'   : (VERBOSE_HELP,
+                           'Display model actions involving specified troves'),
         'no-deps'       : 'Do not raise errors due to dependency failures',
         'no-recurse'    : (VERBOSE_HELP, 
                            'Do not install/erase children of specified trove'),
@@ -952,6 +954,7 @@ class _UpdateCommand(ConaryCommand):
         d["info"] = '-i', NO_PARAM
         d["model"] = NO_PARAM
         d["model-graph"] = ONE_PARAM
+        d["model-trace"] = MULT_PARAM
         d["no-deps"] = NO_PARAM
         d["no-recurse"] = NO_PARAM
         d["no-resolve"] = NO_PARAM
@@ -1027,6 +1030,7 @@ class _UpdateCommand(ConaryCommand):
         kwargs['info'] = argSet.pop('info', False)
         kwargs['model'] = argSet.pop('model', False)
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
+        kwargs['modelTrace'] = argSet.pop('model-trace', None)
         kwargs['keepExisting'] = argSet.pop('keep-existing',
             otherArgs[1] == 'install') # install implies --keep-existing
         kwargs['keepJournal'] = argSet.pop('keep-journal', False)
@@ -1181,6 +1185,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["keep-required"] = NO_PARAM
         argDef["model"] = NO_PARAM
         argDef["model-graph"] = ONE_PARAM
+        argDef["model-trace"] = MULT_PARAM
         argDef["no-conflict-check"] = NO_PARAM
         argDef["no-deps"] = NO_PARAM
         argDef["no-resolve"] = NO_PARAM
@@ -1210,6 +1215,7 @@ class UpdateAllCommand(_UpdateCommand):
 
         kwargs['model'] = argSet.pop('model', False)
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
+        kwargs['modelTrace'] = argSet.pop('model-trace', None)
 
         noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
         if noRestart and cfg.root == '/':

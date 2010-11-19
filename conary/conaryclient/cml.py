@@ -21,23 +21,35 @@ pinTroves, excludeTroves, and so forth.
 
 import shlex
 
-import conary.errors
 from conary.conaryclient.update import UpdateError
 from conary import conaryclient
+from conary import errors
 from conary import trovetup
 from conary import versions
 
+from conary.lib.compat import namedtuple as _namedtuple
+
 # The schema for a system model is, roughly:
 #
-# searchItem := troveTuples or label
-# systemItem := searchItem or list of troveOperations
+# searchOp := troveTuples or label
+# systemOp := searchOp or list of troveOperations
 # troveOperations := updateTroves | eraseTroves | installTroves | patchTroves
-#                    | offerTroves | searchItem
+#                    | offerTroves | searchOp
 # updateTroves := list of troveTuples
 # eraseTroves := list of troveTuples
 # installTroves := list of troveTuples
 # patchTroves := list of troveTuples
 # offerTroves := list of troveTuples
+
+
+# There are four kinds of string formatting used in these objects:
+# * __str__() is the most minimal representation of the contents as
+#   a python string
+# * __repr__() is used only for good representation in debugging contexts
+# * asString() is the string representation as it will be consumed,
+#   with shlex if appropriate for that object type
+# * format() (defined for types that represent file contents) has the
+#   CML file representation, including type/key
 
 
 def shellStr(s):
@@ -50,16 +62,152 @@ class CMError(UpdateError):
     pass
 
 
-class _CMItem:
-    def __init__(self, text=None, item=None, modified=True, index=None):
+class CMLocation(_namedtuple('CMLocation', 'line context op spec')):
+    """
+    line: line number (should be 1-indexed)
+    context: file name or other similar context, or C{None}
+    op: containing operation, or C{None}
+    spec: containing operation, or C{None}
+    """
+
+    def __new__(cls, line, context=None, op=None, spec=None):
+        if isinstance(line, cls):
+            if context is None:
+                context = line.context
+            else:
+                context = context
+            if op is None:
+                op = line.op
+            else:
+                op = op
+            if spec is None:
+                spec = line.spec
+            else:
+                spec = spec
+            line = line.line
+        return tuple.__new__(cls, (line, context, op, spec))
+
+    def __repr__(self):
+        op = None
+        if self.op:
+            op = self.op
+        spec = None
+        if self.spec:
+            spec = self.spec
+        return "%s(line=%r, context=%r, op=%r, spec=%r)" % (
+            self.__class__.__name__, self.line, self.context, op, spec)
+
+    def __str__(self):
+        if self.context:
+            context = str(self.context)
+        else:
+            context = ''
+        if self.spec:
+            spec = self.spec.asString()
+        else:
+            spec = ''
+        return ':'.join((x for x in (context, str(self.line), spec) if x))
+    asString = __str__
+
+
+class CMTroveSpec(trovetup.TroveSpec):
+    '''
+    Like parent class L{trovetup.TroveSpec} except that:
+     - Parses a version separator of C{==} to be like C{=} but sets
+       the C{pinned} member to C{True} (defaults to C{False}).
+     - Has a C{snapshot} member that determines whether the version
+       should be updated to latest, and a C{labelSpec()} method
+       used to get the label on which to look for the latest version.
+    Note that equality is tested only on name, version, and flavor,
+    and that it is acceptable to test equality against an instance of
+    C{trovetup.TroveSpec} or a simple C{(name, version, flavor)}
+    tuple.
+    '''
+    def __new__(cls, name, version=None, flavor=None, **kwargs):
+        if isinstance(name, (tuple, list)):
+            name = list(name)
+            name[0] = name[0].replace('==', '=')
+        else:
+            name = name.replace('==', '=')
+        name, version, flavor = trovetup.TroveSpec(
+            name, version, flavor, **kwargs)
+
+        newTuple = tuple.__new__(cls, (name, version, flavor))
+        if newTuple.version:
+            newTuple.pinned = '==' in newTuple.version
+            newTuple.local = '@local' in newTuple.version
+            newTuple._has_branch = '/' in newTuple.version[1:]
+        else:
+            newTuple.pinned = False
+            newTuple._has_branch = False
+            newTuple.local = False
+
+        newTuple.snapshot = (not newTuple.pinned and not newTuple.local
+                             and newTuple._has_branch)
+
+        return newTuple
+
+    def __init__(self, *args, **kwargs):
+        self.pinned = '==' in args[0]
+        if self.version is not None:
+            self._has_branch = '/' in self.version[1:]
+            self.local = '@local' in self.version
+        else:
+            self._has_branch = False
+            self.local = False
+        self.snapshot = not self.pinned and not self.local and self._has_branch
+
+    def labelSpec(self):
+        # This is used only to look up newest versions on a label
+        assert(self._has_branch)
+        return self.name, self.version.rsplit('/', 1)[0], self.flavor
+
+    def asString(self, withTimestamp=False):
+        s = trovetup.TroveSpec.asString(self, withTimestamp=withTimestamp)
+        if self.pinned:
+            s = s.replace('=', '==', 1)
+        return s
+
+    __str__ = asString
+
+    format = asString
+
+    def __eq__(self, other):
+        # We need to use indices so that we can compare to pure tuples,
+        # as well as to trovetup.TroveSpec and to CMTroveSpec
+        if not isinstance(other, tuple):
+            return False
+
+        return self[0:3] == other[0:3]
+
+    # CMTroveSpec objects are pickled into the model cache, but there
+    # only the TroveSpec parts are used
+    def __getnewargs__(self):
+        return (self.name, self.version, self.flavor)
+    def __getstate__(self):
+        return None
+    def __setstate__(self, state):
+        pass
+
+class _CMOperation(object):
+    def __init__(self, text=None, item=None, modified=True,
+                 index=None, context=None):
         self.modified = modified
         self.index = index
+        self.context = context
         assert(text is not None or item is not None)
         assert(not(text is None and item is None))
         if item is not None:
             self.item = item
         else:
             self.parse(text=text)
+
+    def __iter__(self):
+        yield self.item
+
+    def getLocation(self, spec = None):
+        return CMLocation(self.index, context = self.context, op = self,
+                          spec = spec)
 
     def update(self, item, modified=True):
         self.parse(item)
@@ -68,69 +216,97 @@ class _CMItem:
     def parse(self, text=None):
         raise NotImplementedError
 
-    def __str__(self):
+    def format(self):
         return self.key + ' ' + self.asString()
+
+    def __str__(self):
+        return str(self.item)
 
     def __repr__(self):
         return "%s(text='%s', modified=%s, index=%s)" % (
-            str(self.__class__).split('.')[-1],
+            self.__class__.__name__,
             self.asString(), self.modified, self.index)
 
-    def __eq__(self, other):
-        # index and modified explicitly not compared, because this is
-        # used to compare new items to previously-existing items
-        return self.item == other.item
-
-class SearchOperation(_CMItem):
+class SearchOperation(_CMOperation):
     key = 'search'
 
     def asString(self):
-        return shellStr(str(self.item))
+        return shellStr(self.item.asString())
 
 class SearchTrove(SearchOperation):
     def parse(self, text):
-        self.item = trovetup.TroveSpec(text)
+        self.item = CMTroveSpec(text)
 
 class SearchLabel(SearchOperation):
     def parse(self, text):
         self.item = versions.Label(text)
 
-class _TextItem(_CMItem):
+
+class _TextOp(_CMOperation):
     def parse(self, text):
         self.item = text
 
-    def asString(self):
+    def __str__(self):
         return self.item
+    asString = __str__
 
     def __repr__(self):
         return "%s(text='%s', modified=%s, index=%s)" % (
-            str(self.__class__).split('.')[-1],
-            self.item, self.modified, self.index)
+            self.__class__.__name__, self.item, self.modified, self.index)
 
-class NoOperation(_TextItem):
+class NoOperation(_TextOp):
     'Represents comments and blank lines'
-    __str__ = _TextItem.asString
+    format = _TextOp.__str__
 
-class VersionOperation(_TextItem):
+class VersionOperation(_TextOp):
+    '''
+    Version string for this model.  This is not a schema version;
+    it is a version identifier for the contents of the model.
+    This must be a legal conary upstream version, because it is
+    used to provide the conary upstream version when building the
+    model into a group.
+    '''
     key = 'version'
+    def parse(self, text):
+        # ensure that this is a legal conary upstream version
+        rev = versions.Revision(text + '-1')
+        if rev.buildCount != None:
+            raise errors.ParseError('%s: not a conary upstream version' % text)
+        _TextOp.parse(self, text)
 
-class TroveOperation(_CMItem):
+
+class TroveOperation(_CMOperation):
     def parse(self, text):
         if isinstance(text, str):
             text = [text]
-        self.item = [trovetup.TroveSpec(x) for x in text]
+        self.item = [CMTroveSpec(x) for x in text]
+
+    def isEmpty(self):
+        return not(self.item)
+
+    def removeSpec(self, spec):
+        self.item.remove(spec)
+        self.modified = True
+
+    def replaceSpec(self, spec, newSpec):
+        i = self.item.index(spec)
+        self.item[i] = newSpec
+        self.modified = True
 
     def __repr__(self):
-        return "%s(text=['%s'], modified=%s, index=%s)" % (
-            str(self.__class__).split('.')[-1],
-            "', '".join(str(x) for x in self.item),
+        return "%s(text=%s, modified=%s, index=%s)" % (
+            self.__class__.__name__,
+            str([x.asString() for x in self.item]),
             self.modified, self.index)
+
+    def __str__(self):
+        return ' '.join(x.asString() for x in self.item)
 
     def __iter__(self):
         return iter(self.item)
 
     def asString(self):
-        return ' '.join(shellStr(str(x)) for x in self.item)
+        return ' '.join(shellStr(x.asString()) for x in self.item)
 
 class UpdateTroveOperation(TroveOperation):
     key = 'update'
@@ -169,12 +345,18 @@ class CM:
     PatchTroveOperation = PatchTroveOperation
     VersionOperation = VersionOperation
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, context=None):
+        '''
+        @type cfg: L{conarycfg.ConaryConfiguration}
+        @param context: optional description of source of data (e.g. filename)
+        @type context: string
+        '''
         self.cfg = cfg
+        self.context = context
         self.reset()
 
     def reset(self):
-        self.systemItems = []
+        self.modelOps = []
         self.noOps = []
         self.indexes = {}
         self.version = None
@@ -182,107 +364,260 @@ class CM:
         # an operation as modified
         self.modelModified = False
 
-    def _addIndex(self, item):
-        # normally, this list is one item long except for index None
-        l = self.indexes.setdefault(item.index, [])
-        if item not in l:
-            l.append(item)
+    def copy(self):
+        new = self.__class__(self.cfg, self.context)
+        new.modelOps = list(self.modelOps)
+        new.noOps = list(self.noOps)
+        new.indexes = dict(self.indexes)
+        new.version = self.version
+        new.modelModified = self.modelModified
+        return new
 
-    def _removeIndex(self, item):
-        l = self.indexes.get(item.index, [])
-        while item in l:
-            l.remove(item)
+    def _addIndex(self, op):
+        # normally, this list is one item long except for index None
+        l = self.indexes.setdefault(op.index, [])
+        if op not in l:
+            l.append(op)
+
+    def _removeIndex(self, op):
+        l = self.indexes.get(op.index, [])
+        while op in l:
+            l.remove(op)
             self.modelModified = True
         if not l:
-            self.indexes.pop(item.index)
+            self.indexes.pop(op.index)
 
     def modified(self):
         return (self.modelModified or
-                bool([x for x in self.systemItems + self.noOps
+                bool([x for x in self.modelOps + self.noOps
                       if x.modified]))
 
-    def setVersion(self, item):
-        self.version = item
-        self._addIndex(item)
+    def setVersion(self, op):
+        self.version = op
+        self._addIndex(op)
 
     def getVersion(self):
-        if self.version is None:
-            return self.version
-        return self.version.asString()
+        return self.version
 
-    def appendNoOperation(self, item):
-        self.noOps.append(item)
-        self._addIndex(item)
+    def appendNoOperation(self, op):
+        self.noOps.append(op)
+        self._addIndex(op)
 
     def appendNoOpByText(self, text, **kwargs):
         self.appendNoOperation(NoOperation(text, **kwargs))
 
-    def appendTroveOp(self, op, deDup=True):
-        # First, remove trivially obvious duplication -- more
-        # complex duplicates may be removed after building the graph
-        if isinstance(op, EraseTroveOperation) and self.systemItems and deDup:
-            otherOp = self.systemItems[-1]
-            if op == otherOp:
-                if isinstance(otherOp, (UpdateTroveOperation,
-                                        InstallTroveOperation)):
-                    # erasing exactly the immediately-previous
-                    # update or install item should remove that
-                    # immediately-previous item, rather than add
-                    # an explicit "erase" trove operation to the list
-                    self.systemItems.pop()
-                    self._removeIndex(op)
-                    return
-                elif (isinstance(otherOp, EraseTroveOperation)):
-                    # do not add identical adjacent erase operations
-                    return
-
-        self.systemItems.append(op)
+    def appendOp(self, op, deDup=True):
+        self.modelOps.append(op)
         self._addIndex(op)
 
-    def removeTroveOp(self, op):
+    def removeOp(self, op):
         self._removeIndex(op)
-        while op in self.systemItems:
-            self.systemItems.remove(op)
+        while op in self.modelOps:
+            self.modelOps.remove(op)
+        self.modelModified = True
+
+    def removeSpec(self, op, spec):
+        op.removeSpec(spec)
+        if op.isEmpty():
+            self.removeOp(op)
+
+    def replaceOp(self, op, newOp):
+        self.modelModified = True
+        self._removeIndex(op)
+        i = self.modelOps.index(op)
+        self.modelOps[i] = newOp
+        self._addIndex(newOp)
 
     def appendTroveOpByName(self, key, *args, **kwargs):
         deDup = kwargs.pop('deDup', True)
         op = troveOpMap[key](*args, **kwargs)
-        self.appendTroveOp(op, deDup=deDup)
+        self.appendOp(op, deDup=deDup)
         return op
 
-    def refreshSearchPath(self):
+    def _iterOpTroveItems(self):
+        for op in self.modelOps:
+            if isinstance(op, (SearchTrove, TroveOperation)):
+                for item in op:
+                    yield item
+
+    def refreshVersionSnapshots(self):
         cfg = self.cfg
         cclient = conaryclient.ConaryClient(cfg)
         repos = cclient.getRepos()
 
-        # Find SearchTroves with any version specified, and remove any 
-        # trailingRevision
-        # {oldTroveKey: index}
-        searchItemsOld = dict((y.item, x)
-                              for x, y in enumerate(self.systemItems)
-                              if isinstance(y, SearchTrove)
-                              and y.item[1] is not None)
-        # {newTroveKey: oldTroveKey}
-        searchItemsNew = dict(((x[0], x[1].rsplit('/', 1)[0], x[2]), x)
-                              for x in searchItemsOld.keys())
-        searchTroves = searchItemsOld.keys() + searchItemsNew.keys()
+        origOps = set()
+        newOps = {}  # {TroveSpec: [CMTroveSpec, ...]}
+        for item in self._iterOpTroveItems():
+            if isinstance(item, CMTroveSpec) and item.snapshot:
+                l = origOps.add(item)
+                newSpec = item.labelSpec()
+                l = newOps.setdefault(newSpec, [])
+                l.append(item)
+
+        allOpSpecs = list(origOps) + newOps.keys()
+
+        if not allOpSpecs:
+            return
 
         foundTroves = repos.findTroves(cfg.installLabelPath, 
-            searchTroves, defaultFlavor = cfg.flavor)
+            allOpSpecs, defaultFlavor = cfg.flavor)
 
-        for troveKey in foundTroves.keys():
-            if troveKey in searchItemsNew:
-                oldTroveKey = searchItemsNew[troveKey]
-                if foundTroves[troveKey] != foundTroves[oldTroveKey]:
-                    # found a new version, replace
-                    foundTrove = foundTroves[troveKey][0]
-                    newVersion = foundTrove[1]
-                    newverstr = '%s/%s' %(newVersion.trailingLabel(),
-                                          newVersion.trailingRevision())
-                    item = (oldTroveKey[0], newverstr, oldTroveKey[2])
-                    index = searchItemsOld[oldTroveKey]
-                    self.systemItems[index].update(item)
+        # Calculate the appropriate replacements from the lookup
+        replaceSpecs = {} # CMTroveSpec: TroveSpec
+        for troveKey in foundTroves:
+            if troveKey in newOps:
+                for oldTroveKey in newOps[troveKey]:
+                    if foundTroves[troveKey] != foundTroves[oldTroveKey]:
+                        # found a new version, create replacement troveSpec
+                        foundTrove = foundTroves[troveKey][0]
+                        newVersion = foundTrove[1]
+                        newverstr = '%s/%s' %(newVersion.trailingLabel(),
+                                              newVersion.trailingRevision())
+                        troveTup = (oldTroveKey[0], newverstr, oldTroveKey[2])
+                        replaceSpecs[oldTroveKey] = troveTup
 
+        # Apply the replacement specs to the model
+        for op in self.modelOps:
+            if isinstance(op, TroveOperation):
+                newItem = [replaceSpecs.get(x, x) for x in op.item]
+                if newItem != op.item:
+                    # at least one spec was replaced; update the line
+                    op.update(newItem)
+            elif isinstance(op, SearchTrove):
+                if op.item in replaceSpecs:
+                    op.update(replaceSpecs[op.item])
+
+    class InstallEraseSimplification(object):
+
+        oldOpClass = InstallTroveOperation
+        newOpClass = EraseTroveOperation
+
+        @staticmethod
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
+            oldSet = g.matchesByIndex(oldOp.getLocation(oldSpec))
+            newSet = g.matchesByIndex(newOp.getLocation(newSpec))
+            if (oldSet & newSet) != oldSet:
+                return False
+
+            if g.installIsNoop(troveCache, oldOp.getLocation(oldSpec)):
+                return (EraseTroveOperation, newSpec)
+
+            return None
+
+    class UpdateEraseSimplification(object):
+
+        oldOpClass = UpdateTroveOperation
+        newOpClass = EraseTroveOperation
+
+        @staticmethod
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
+            oldSet = g.matchesByIndex(oldOp.getLocation(oldSpec))
+            newSet = g.matchesByIndex(newOp.getLocation(newSpec))
+            assert(oldSet is not None)
+            assert(newSet is not None)
+            if (oldSet & newSet) != oldSet:
+                return False
+
+            updateMap = g.getUpdateMapping(oldOp.getLocation())
+            if not updateMap:
+                # the update was a noop
+                return (EraseTroveOperation, newSpec)
+
+            newInstall = True
+            for troveTup in oldSet:
+                if updateMap[troveTup] is not None:
+                    newInstall = False
+
+            if newInstall:
+                # this is a fresh install; we can cancel the update and
+                # erase operations
+                return None
+
+            return (EraseTroveOperation, CMTroveSpec(oldSpec.name, None, None))
+
+    class InstallUpdateSimplification(object):
+
+        oldOpClass = InstallTroveOperation
+        newOpClass = UpdateTroveOperation
+
+        @staticmethod
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
+            return (InstallTroveOperation, newSpec)
+
+    class UpdateUpdateSimplification(object):
+
+        oldOpClass = UpdateTroveOperation
+        newOpClass = UpdateTroveOperation
+
+        @staticmethod
+        def check(troveCache, g, oldOp, oldSpec, newOp, newSpec):
+            return (UpdateTroveOperation, newSpec)
+
+    def _simplificationCandidate(self, l):
+        types = ( self.InstallEraseSimplification,
+                  self.UpdateEraseSimplification,
+                  self.InstallUpdateSimplification,
+                  self.UpdateUpdateSimplification )
+
+        i = len(l) - 1
+        while i > 0:
+            for simpClass in types:
+                if not isinstance(l[i][0], simpClass.newOpClass):
+                    continue
+
+                match = False
+                for j, (op, spec) in enumerate(reversed(l[0:i])):
+                    if isinstance(op, simpClass.oldOpClass):
+                        match = True
+                        yield (j, i, simpClass)
+
+                if match:
+                    return
+
+            i -= 1
+
+        return
+
+    def suggestSimplifications(self, troveCache, g):
+        byName = {}
+        changed = False
+        for op in self.modelOps:
+            if (isinstance(op, TroveOperation)):
+                for spec in op:
+                    byName.setdefault(spec.name, []).append((op, spec))
+
+        for troveName, opList in byName.iteritems():
+            for (oldIdx, newIdx, simplifyClass) in \
+                                        self._simplificationCandidate(opList):
+                oldOp, oldSpec = opList[oldIdx]
+                newOp, newSpec = opList[newIdx]
+                result = simplifyClass.check(troveCache, g, oldOp, oldSpec,
+                                             newOp, newSpec)
+                if result is False:
+                    continue
+
+                self.removeSpec(oldOp, oldSpec)
+
+                if result is None:
+                    self.removeSpec(newOp, newSpec)
+                else:
+                    (replaceOpClass, replaceSpec) = result
+                    if isinstance(newOp, replaceOpClass):
+                        if newSpec != replaceSpec:
+                            newOp.replaceSpec(newSpec, replaceSpec)
+                    else:
+                        replaceOp = replaceOpClass(item = [ replaceSpec ],
+                                                   index = newOp.index)
+                        if len([ x for x in newOp]) == 1:
+                            self.replaceOp(newOp, replaceOp)
+                        else:
+                            self.removeSpec(newOp, newSpec)
+                            self.appendOp(replaceOp)
+
+                changed = True
+                break
+
+        return changed
 
 class CML(CM):
     '''
@@ -301,6 +636,13 @@ class CML(CM):
     enclosed in single or double quote characters.  Each of these
     lines represents a place to search for troves to install on
     or make available to the system.
+
+    The C{troveSpec} entries in a model are nearly identical to
+    a C{troveSpec} on the comand line, except that a single C{=}
+    beween the name and the version means that the version can be
+    updated by a C{conary updateall} operation, and a double C{==}
+    between the name and the version means that updateall should
+    not modify the version.
 
     C{update}, C{erase}, C{install}, C{offer}, and C{patch} lines take
     one or more troveSpecs, which B{may} be enclosed in single
@@ -329,29 +671,34 @@ class CML(CM):
     line is modified.
     '''
 
-    def __init__(self, cfg):
-        CM.__init__(self, cfg)
-        self.reset()
+    def copy(self):
+        new = CM.copy(self)
+        new.filedata = list(self.filedata)
+        return new
 
     def reset(self):
         CM.reset(self)
-        self.commentLines = []
         self.filedata = []
 
-    def parse(self, fileData=None, fileName='(internal)'):
+    def parse(self, fileData=None, context=None):
         self.reset()
+        if context is not None:
+            self.context = context
 
         if fileData is not None:
             self.filedata = fileData
 
         for index, line in enumerate(self.filedata):
             line = line.strip()
+            # Use 1-indexed line numbers that users will recognize
+            index = index + 1
 
             if line.startswith('#') or not line:
                 # empty lines are handled just like comments, and empty
                 # lines and comments are always looked up in the
                 # unmodified filedata, so we store only the index
-                self.appendNoOpByText(line, modified=False, index=index)
+                self.appendNoOpByText(line,
+                    modified=False, index=index, context=self.context)
                 continue
 
             # non-empty, non-comment lines must be parsed 
@@ -359,54 +706,55 @@ class CML(CM):
                 verb, nouns = line.split(None, 1)
             except:
                 raise CMError('%s: Invalid statement on line %d' %(
-                                       fileName, index))
+                                       self.context, index))
 
             if verb == 'version':
-                self.setVersion(
-                    VersionOperation(text=line, modified=False, index=index))
+                nouns = nouns.split('#')[0].strip()
+                self.setVersion(VersionOperation(text=nouns,
+                    modified=False, index=index, context=self.context))
 
             elif verb == 'search':
                 # Handle it if quoted, but it doesn't need to be
                 nouns = ' '.join(shlex.split(nouns, comments=True))
                 try:
-                    searchItem = SearchLabel(text=nouns,
-                                             modified=False, index=index)
-                except conary.errors.ParseError:
-                    searchItem = SearchTrove(text=nouns,
-                                             modified=False, index=index)
-                self.appendTroveOp(searchItem)
+                    searchOp = SearchLabel(text=nouns,
+                       modified=False, index=index, context=self.context)
+                except errors.ParseError:
+                    searchOp = SearchTrove(text=nouns,
+                       modified=False, index=index, context=self.context)
+                self.appendOp(searchOp)
 
             elif verb in troveOpMap:
                 self.appendTroveOpByName(verb,
                     text=shlex.split(nouns, comments=True),
-                    modified=False, index=index,
+                    modified=False, index=index, context=self.context,
                     deDup=False)
 
             else:
                 raise CMError(
                     '%s: Unrecognized command "%s" on line %d' %(
-                    fileName, verb, index))
+                    self.context, verb, index))
 
     def iterFormat(self):
         '''
         Serialize the current model, including preserved comments.
         '''
-        lastNoOpLine = max([x.index for x in self.noOps] + [0])
-        lastOpLine = max([x.index for x in self.systemItems] + [0])
+        lastNoOpLine = max([x.index for x in self.noOps] + [1])
+        lastOpLine = max([x.index for x in self.modelOps] + [1])
         # can only be one version
         if self.version is not None:
             verLine = self.version.index
         else:
-            verLine = 0
+            verLine = 1
         lastIndexLine = max(lastOpLine, lastNoOpLine, verLine)
 
         # First, emit all comments without an index as "header"
         for item in (x for x in self.noOps if x.index is None):
-            yield str(item)
+            yield item.format()
 
         # Now, emit the version if it is new (has no index)
         if self.version is not None and self.version.index is None:
-            yield str(self.version)
+            yield self.version.format()
 
         for i in range(lastIndexLine+1):
             if i in self.indexes:
@@ -414,14 +762,14 @@ class CML(CM):
                 for item in self.indexes[i]:
                     # normally, this list is one item long
                     if item.modified:
-                        yield str(item)
+                        yield item.format()
                     else:
-                        yield self.filedata[i].rstrip('\n')
+                        yield self.filedata[i-1].rstrip('\n')
 
             # Last, emit any remaining lines
             if i == lastOpLine:
-                for item in (x for x in self.systemItems if x.index is None):
-                    yield str(item)
+                for item in (x for x in self.modelOps if x.index is None):
+                    yield item.format()
 
     def format(self):
         return '\n'.join([x for x in self.iterFormat()] + [''])
