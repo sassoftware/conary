@@ -135,6 +135,7 @@ class CMTroveSpec(trovetup.TroveSpec):
         newTuple = tuple.__new__(cls, (name, version, flavor))
         if newTuple.version:
             newTuple.pinned = '==' in newTuple.version
+            newTuple.local = '@local' in newTuple.version
             newTuple._has_branch = '/' in newTuple.version[1:]
         else:
             newTuple.pinned = False
@@ -146,11 +147,12 @@ class CMTroveSpec(trovetup.TroveSpec):
 
     def __init__(self, *args, **kwargs):
         self.pinned = '==' in args[0]
+        self.local = '@local' in args[0]
         if self.version is not None:
             self._has_branch = '/' in self.version[1:]
         else:
             self._has_branch = False
-        self.snapshot = not self.pinned and self._has_branch
+        self.snapshot = not self.pinned and not self.local and self._has_branch
 
     def labelSpec(self):
         # This is used only to look up newest versions on a label
@@ -450,6 +452,9 @@ class CM:
                 l.append(item)
 
         allOpSpecs = list(origOps) + newOps.keys()
+
+        if not allOpSpecs:
+            return
 
         foundTroves = repos.findTroves(cfg.installLabelPath, 
             allOpSpecs, defaultFlavor = cfg.flavor)
