@@ -14,6 +14,7 @@
 import base64
 
 from conary import errors
+from conary.lib import util
 
 class PermissionDenied(errors.WebError):
     def __str__(self):
@@ -35,7 +36,9 @@ def getAuth(req):
         authToken = authString.split(":", 1)
         if len(authToken) != 2:
             # No password
-            authToken.append('')
+            authToken.append(util.ProtectedString(''))
+        else:
+            authToken[1] = util.ProtectedString(authToken[1])
 
     try:
         entitlementList = parseEntitlement(
