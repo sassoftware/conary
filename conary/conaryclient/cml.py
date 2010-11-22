@@ -202,6 +202,13 @@ class _CMOperation(object):
         else:
             self.parse(text=text)
 
+    def __eq__(self, other):
+        return (self.__class__ == other.__class__ and
+                self.index == other.index and
+                self.modified == other.modified and
+                self.context == other.context and
+                self.item == other.item)
+
     def __iter__(self):
         yield self.item
 
@@ -618,6 +625,23 @@ class CM:
                 break
 
         return changed
+
+    def getMissingLocalTroves(self, troveCache, troveSet):
+        troveTups = set(troveTup
+                        for troveTup, inInstall, isExplicit
+                        in troveSet._walk(troveCache, recurse = True)
+                        if inInstall)
+
+        localTroveTups = set()
+        for op in self.modelOps:
+            if not isinstance(op, TroveOperation):
+                continue
+            for spec in op:
+                if spec.local:
+                    localTroveTups.update(
+                        troveSet.g.matchesByIndex(op.getLocation(spec)))
+
+        return localTroveTups - troveTups
 
 class CML(CM):
     '''
