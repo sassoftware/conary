@@ -469,9 +469,9 @@ class StaticTroveTupleSet(TroveTupleSet):
 
 class SearchSourceTroveSet(TroveSet):
 
-    def _findTroves(self, troveTuple):
+    def _findTroves(self, troveTuple, allowMissing = True):
         return self.searchSource.findTroves(troveTuple, requireLatest = True,
-                                            allowMissing = True)
+                                            allowMissing = allowMissing)
 
     def _getResolveSource(self, depDb = None):
         return self.searchSource
