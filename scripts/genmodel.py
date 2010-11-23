@@ -29,14 +29,11 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
 
-from conary import conarycfg, conaryclient, errors, trove, versions
+from conary import conarycfg, conaryclient, trove, versions
 from conary.conaryclient import cml, modelupdate, systemmodel, troveset
 from conary.cmds import updatecmd
 from conary.deps import deps
 TroveSpec = cml.CMTroveSpec
-
-# pyflakes=ignore
-from conary.lib import log
 
 def buildSimplificationMap(g):
     findMap = {}
