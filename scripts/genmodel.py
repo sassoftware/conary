@@ -476,6 +476,8 @@ if __name__ == '__main__':
         updatecmd.displayChangedJobs(addedJobs, removedJobs, cfg)
         getAnswer('Press return to continue.')
 
+    commentLines = []
+
     # Add comments to the model itself
     for commentline in (
         'This file is an attempt to describe an existing system.',
@@ -503,7 +505,7 @@ if __name__ == '__main__':
         'previously installed on your system.',
         '',
         ):
-        finalModel.appendNoOpByText('# %s' % commentline, modified=False)
+        commentLines.append(commentline)
 
     if finalJob:
         sys.stdout.flush()
@@ -532,12 +534,22 @@ if __name__ == '__main__':
             'The following additional operations would be needed to make the',
             'system match the model, and would be applied to the system by ',
             'a "conary sync" operation:'] + jobData.split('\n') + ['']:
-            finalModel.appendNoOpByText('# %s' % commentline, modified=False)
+            commentLines.append(commentline)
+        print
+        print 'Some of the troves on this system are NOT represented'
+        print 'in the model.  If you apply this model, the following'
+        print 'operations will be applied to your system:'
+        print
+        print jobData
+        getAnswer('Press return to continue.')
 
     print "----"
     print "Final Model"
     print "\t" + "\n\t".join(finalModel.iterFormat())
 
+    # Add the comments to the file without filling up the output
+    for commentline in commentLines:
+        finalModel.appendNoOpByText('# %s' % commentline, modified=False)
 
     answer = getAnswer('Write model to disk? [y/N]:')
     if answer and answer[0].lower() == 'y':
