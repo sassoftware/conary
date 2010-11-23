@@ -173,7 +173,7 @@ def groupDataCompare(tup1, tup2):
 def initialForesightModel(installedTroves, model):
     allGroupTups = [ x for x in installedTroves
                         if trove.troveIsGroup(x[0]) ]
-    allGroupTroves = [ x for x in db.getTroves(allGroupTups) if x.getName() != 'group-patton' ]
+    allGroupTroves = db.getTroves(allGroupTups)
 
     # simplistic, but we can't have loops in groups so good enough
     groupTroves = []
