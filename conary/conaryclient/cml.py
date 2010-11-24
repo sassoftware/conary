@@ -21,11 +21,12 @@ pinTroves, excludeTroves, and so forth.
 
 import shlex
 
-from conary.conaryclient.update import UpdateError
 from conary import conaryclient
 from conary import errors
 from conary import trovetup
 from conary import versions
+from conary.conaryclient import cmdline
+from conary.conaryclient.update import UpdateError
 
 from conary.lib.compat import namedtuple as _namedtuple
 
@@ -201,6 +202,13 @@ class _CMOperation(object):
             self.item = item
         else:
             self.parse(text=text)
+
+    def __eq__(self, other):
+        return (self.__class__ == other.__class__ and
+                self.index == other.index and
+                self.modified == other.modified and
+                self.context == other.context and
+                self.item == other.item)
 
     def __iter__(self):
         yield self.item
@@ -619,6 +627,23 @@ class CM:
 
         return changed
 
+    def getMissingLocalTroves(self, troveCache, troveSet):
+        troveTups = set(troveTup
+                        for troveTup, inInstall, isExplicit
+                        in troveSet._walk(troveCache, recurse = True)
+                        if inInstall)
+
+        localTroveTups = set()
+        for op in self.modelOps:
+            if not isinstance(op, TroveOperation):
+                continue
+            for spec in op:
+                if spec.local:
+                    localTroveTups.update(
+                        troveSet.g.matchesByIndex(op.getLocation(spec)))
+
+        return localTroveTups - troveTups
+
 class CML(CM):
     '''
     Implements the abstract system model persisting in a text format,
@@ -705,8 +730,8 @@ class CML(CM):
             try:
                 verb, nouns = line.split(None, 1)
             except:
-                raise CMError('%s: Invalid statement on line %d' %(
-                                       self.context, index))
+                raise CMError('%s: Invalid statement "%s"'
+                              %(CMLocation(index, self.context), line))
 
             if verb == 'version':
                 nouns = nouns.split('#')[0].strip()
@@ -715,25 +740,37 @@ class CML(CM):
 
             elif verb == 'search':
                 # Handle it if quoted, but it doesn't need to be
-                nouns = ' '.join(shlex.split(nouns, comments=True))
+                try:
+                    nouns = ' '.join(shlex.split(nouns, comments=True))
+                except ValueError, e:
+                    raise CMError('%s: %s' %(
+                        CMLocation(index, self.context), str(e)))
                 try:
                     searchOp = SearchLabel(text=nouns,
                        modified=False, index=index, context=self.context)
                 except errors.ParseError:
-                    searchOp = SearchTrove(text=nouns,
-                       modified=False, index=index, context=self.context)
+                    try:
+                        searchOp = SearchTrove(text=nouns,
+                           modified=False, index=index, context=self.context)
+                    except cmdline.TroveSpecError, e:
+                        raise CMError('%s: %s' %(
+                            CMLocation(index, self.context), str(e)))
                 self.appendOp(searchOp)
 
             elif verb in troveOpMap:
-                self.appendTroveOpByName(verb,
-                    text=shlex.split(nouns, comments=True),
-                    modified=False, index=index, context=self.context,
-                    deDup=False)
+                try:
+                    self.appendTroveOpByName(verb,
+                        text=shlex.split(nouns, comments=True),
+                        modified=False, index=index, context=self.context,
+                        deDup=False)
+                except ValueError, e:
+                    raise CMError('%s: %s' %(
+                        CMLocation(index, self.context), str(e)))
 
             else:
                 raise CMError(
-                    '%s: Unrecognized command "%s" on line %d' %(
-                    self.context, verb, index))
+                    '%s: Unrecognized command "%s"' %(
+                    CMLocation(index, self.context), verb))
 
     def iterFormat(self):
         '''

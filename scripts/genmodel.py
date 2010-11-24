@@ -29,71 +29,53 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary.lib import util
 sys.excepthook = util.genExcepthook(debug=True)
 
-from conary import conarycfg, conaryclient, errors, trove, versions
-from conary.conaryclient import cml, modelupdate, systemmodel
+from conary import conarycfg, conaryclient, trove, versions
+from conary.conaryclient import cml, modelupdate, systemmodel, troveset
 from conary.cmds import updatecmd
 from conary.deps import deps
 TroveSpec = cml.CMTroveSpec
 
-# pyflakes=ignore
-from conary.lib import log
-
-OrigFindAction = modelupdate.CMLFindAction
-class TrackFindAction(OrigFindAction):
-
+def buildSimplificationMap(g):
     findMap = {}
-    remap = False
 
-    def __call__(self, actionList, data):
-        result = OrigFindAction.__call__(self, actionList, data)
-        if not self.remap:
-            return result
+    for node in g.iterNodes():
+        if (not hasattr(node, 'action') or
+                not isinstance(node.action, troveset.FindAction)):
+            continue
 
-        origSpecs = []
-        origResults = []
-        from conary.conaryclient import troveset
-        for action in actionList:
-            origSpecs.append(action.troveSpecs)
-            origResults.append(action.outSet)
+        action = node.action
 
-            assert(len(action.troveSpecs) == 1)
-            o = action.troveSpecs[0]
-            for attempt in [ TroveSpec(o[0], None, None),
-                             TroveSpec(o[0], None, o[2]),
-                             TroveSpec(o[0], o[1], None) ]:
-                if attempt[1] and 'local' in attempt[1]:
-                    continue
+        assert(len(action.troveSpecs) == 1)
+        o = action.troveSpecs[0]
 
-                action.troveSpecs = [ attempt ]
-                action.outSet = troveset.TroveTupleSet(graph = action.outSet.g)
+        parentSets = action.getInputSets()
+        assert(len(parentSets) == 1)
+        parent = parentSets[0]
 
-                try:
-                    OrigFindAction.__call__(self, [ action ], data)
-                    if (action.outSet.installSet == origResults[-1].installSet):
-                        self.findMap.update( (x, attempt)
-                                                for x in origSpecs[-1] )
-                        break
-                except errors.TroveSpecsNotFound:
-                    pass
+        for attempt in [ TroveSpec(o[0], None, None),
+                         TroveSpec(o[0], None, o[2]),
+                         TroveSpec(o[0], o[1], None) ]:
+            if attempt[1] and 'local' in attempt[1]:
+                continue
 
-        for action in actionList:
-            action.troveSpecs = origSpecs.pop(0)
-            action.outSet = origResults.pop(0)
+            otherMatches = parent._findTroves([ attempt ],
+                                            allowMissing = True )
+            if (otherMatches and
+                   set(otherMatches.get(attempt)) == node._getInstallSet()):
+                findMap[o] = attempt
+                break
 
-        return result
-
-modelupdate.CMLFindAction = TrackFindAction
+    return findMap
 
 def buildJobs(client, cache, model):
     print "====== Candidate model " + "=" * 55
     print "\t" + "\n\t".join(model.iterFormat())
 
-    TrackFindAction.findMap = {}
     updJob = client.newUpdateJob()
     ts = client.cmlGraph(model)
     client._updateFromTroveSetGraph(updJob, ts, cache, ignoreMissingDeps = True)
 
-    return list(itertools.chain(*updJob.getJobs())), updJob
+    return list(itertools.chain(*updJob.getJobs())), updJob, ts
 
 def orderByPackage(jobList):
     installMap = {}
@@ -265,7 +247,9 @@ if __name__ == '__main__':
     parser = optparse.OptionParser()
     parser.add_option("--simplify", "-s", dest = "simplify", default = False,
                       action = "store_true",
-                      help = "ignore components likely to be for dep closure")
+                      help = "never explicitly install packages which "
+                             "include components which were likely installed "
+                             "for dependency closure")
     options, args = parser.parse_args()
 
     cfg = conarycfg.ConaryConfiguration(readConfigFiles = True)
@@ -305,13 +289,16 @@ if __name__ == '__main__':
                                 ( 'java', ),
                                 ( 'perl', ) ]
 
+    if not options.simplify:
+        componentPriorities.append((),)
+
     allCandidates = []
     updatedModel = True
     lastPass = False
     # remember that job order is backwards! it's trying to move from
     # what's there to what the model says; we want to undo those operations
     while updatedModel:
-        candidateJob, uJob = buildJobs(client, cache, model)
+        candidateJob, uJob, finalTs = buildJobs(client, cache, model)
         if lastPass or (candidateJob in allCandidates):
             break
 
@@ -324,19 +311,28 @@ if __name__ == '__main__':
         # look for packages to install/update
         for priorityList in componentPriorities:
             for pkgTuple, jobList in installPackageMap.items():
+                if trove.troveIsGroup(pkgTuple[0]):
+                    continue
+
                 newInstalls = set([ (x[0], x[1][0], x[1][1]) for x in jobList ])
-                if options.simplify:
-                    componentSet = set( [ (pkgTuple[0] + ":" + x,
-                                           pkgTuple[1], pkgTuple[2])
-                                          for x in priorityList ] )
-                    if (componentSet - newInstalls):
-                        # are all of the components we care about present
-                        continue
+                componentSet = set( [ (pkgTuple[0] + ":" + x,
+                                       pkgTuple[1], pkgTuple[2])
+                                      for x in priorityList ] )
+                if (componentSet - newInstalls):
+                    # are all of the components we care about present
+                    continue
 
                 if pkgTuple in newInstalls:
                     print "   updating model for job", jobList
-                    installJob = [ x for x in jobList if
-                                   (x[0], x[1][0], x[1][1]) == pkgTuple ]
+                    if len(jobList) == 2:
+                        # pick out the one component we use
+                        installJob = [ x for x in jobList if
+                                       (x[0], x[1][0], x[1][1]) != pkgTuple ]
+                    else:
+                        # pick out the package
+                        installJob = [ x for x in jobList if
+                                       (x[0], x[1][0], x[1][1]) == pkgTuple ]
+
                     assert(len(installJob) == 1)
                     updatedModel = (addInstallJob(model, installJob[0]) or
                                     updatedModel)
@@ -383,12 +379,12 @@ if __name__ == '__main__':
             for job in jobList:
                 updatedModel = addEraseJob(model, job) or updatedModel
 
-    TrackFindAction.remap = True
-    candidateJob, uJob = buildJobs(client, cache, model)
+    candidateJob, uJob.final, Ts = buildJobs(client, cache, model)
 
     print "-----"
+    findMap = buildSimplificationMap(finalTs.g)
     print "simplification map"
-    for big, little in TrackFindAction.findMap.iteritems():
+    for big, little in findMap.iteritems():
         print "%s -> %s" % (big, little)
 
     finalModel = cml.CML(cfg)
@@ -426,7 +422,7 @@ if __name__ == '__main__':
             continue
 
         newSpecs = []
-        simpleSpecs = [ (TrackFindAction.findMap.get(spec, spec), spec)
+        simpleSpecs = [ (findMap.get(spec, spec), spec)
                         for spec in op ]
         for newSpec, spec in simpleSpecs:
             if 'local@' in spec.version:
@@ -468,8 +464,7 @@ if __name__ == '__main__':
     if deferredItems:
         emitDeferred(specClass, deferredItems)
 
-    TrackFindAction.remap = False
-    finalJob, uJob = buildJobs(client, cache, finalModel)
+    finalJob, uJob, ts = buildJobs(client, cache, finalModel)
 
     candidateJobSet = set(candidateJob)
     finalJobSet = set(finalJob)
@@ -480,6 +475,8 @@ if __name__ == '__main__':
         removedJobs = candidateJobSet - finalJobSet
         updatecmd.displayChangedJobs(addedJobs, removedJobs, cfg)
         getAnswer('Press return to continue.')
+
+    commentLines = []
 
     # Add comments to the model itself
     for commentline in (
@@ -508,7 +505,7 @@ if __name__ == '__main__':
         'previously installed on your system.',
         '',
         ):
-        finalModel.appendNoOpByText('# %s' % commentline, modified=False)
+        commentLines.append(commentline)
 
     if finalJob:
         sys.stdout.flush()
@@ -537,12 +534,22 @@ if __name__ == '__main__':
             'The following additional operations would be needed to make the',
             'system match the model, and would be applied to the system by ',
             'a "conary sync" operation:'] + jobData.split('\n') + ['']:
-            finalModel.appendNoOpByText('# %s' % commentline, modified=False)
+            commentLines.append(commentline)
+        print
+        print 'Some of the troves on this system are NOT represented'
+        print 'in the model.  If you apply this model, the following'
+        print 'operations will be applied to your system:'
+        print
+        print jobData
+        getAnswer('Press return to continue.')
 
     print "----"
     print "Final Model"
     print "\t" + "\n\t".join(finalModel.iterFormat())
 
+    # Add the comments to the file without filling up the output
+    for commentline in commentLines:
+        finalModel.appendNoOpByText('# %s' % commentline, modified=False)
 
     answer = getAnswer('Write model to disk? [y/N]:')
     if answer and answer[0].lower() == 'y':

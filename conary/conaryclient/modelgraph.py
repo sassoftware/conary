@@ -40,6 +40,24 @@ class AbstractModelCompiler(object):
         self.repos = repos
         self.g = graph
 
+    def _splitFind(self, actionClass, searchSet, specList, op):
+        if not specList:
+            return None
+
+        matches = []
+        for spec in specList:
+            matches.append(
+                searchSet._action(spec, ActionClass = actionClass,
+                                  index = op.getLocation(spec) ) )
+        if len(matches) > 1:
+            matchSet = matches[0]._action(ActionClass = self.UnionAction,
+                                          index = op.getLocation(),
+                                          *matches[1:])
+        else:
+            matchSet = matches[0]
+
+        return matchSet
+
     def build(self, model, reposTroveSet, dbTroveSet):
         collections = set()
         for op in model.modelOps:
@@ -104,19 +122,8 @@ class AbstractModelCompiler(object):
                 searchSpecs.append(troveSpec)
 
             if isinstance(op, model.EraseTroveOperation):
-                newMatches = []
-                for spec in searchSpecs:
-                    newMatches.append(
-                        finalTroveSet._action(spec,
-                                          ActionClass = self.EraseFindAction,
-                                          index = op.getLocation(spec) ) )
-
-                if len(newMatches) > 1:
-                    eraseMatches = newMatches[0]._action(
-                        ActionClass = self.UnionAction,
-                        index = op.getLocation(), *newMatches[1:])
-                else:
-                    eraseMatches = newMatches[0]
+                eraseMatches = self._splitFind(self.EraseFindAction,
+                                               finalTroveSet, searchSpecs, op)
 
                 finalTroveSet = finalTroveSet._action(eraseMatches,
                         ActionClass=self.RemoveAction,
@@ -130,26 +137,10 @@ class AbstractModelCompiler(object):
                 newSearchPath = []
                 rebuildTotalSearchSet = False
 
-            if searchSpecs:
-                newMatches = []
-                for spec in searchSpecs:
-                    newMatches.append(
-                        totalSearchSet._action(spec,
-                                               ActionClass = self.FindAction,
-                                               index = op.getLocation(spec) ) )
-                if len(newMatches) > 1:
-                    searchMatches = newMatches[0]._action(
-                        ActionClass = self.UnionAction,
-                        index = op.getLocation(), *newMatches[1:])
-                else:
-                    searchMatches = newMatches[0]
-            else:
-                searchMatches = None
-
-            if localSpecs:
-                localMatches = dbTroveSet.find(*localSpecs)
-            else:
-                localMatches = None
+            searchMatches = self._splitFind(self.FindAction, totalSearchSet,
+                                            searchSpecs, op)
+            localMatches = self._splitFind(self.FindAction, dbTroveSet,
+                                           localSpecs, op)
 
             if searchMatches and localMatches:
                 matches = searchMatches._action(localMatches,

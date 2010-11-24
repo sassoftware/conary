@@ -1776,7 +1776,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         NAME
         ====
-        B{C{GroupSetRecipe.writeDotGraph}}
+        B{C{GroupSetRecipe.writeDotGraph}} - write "dot" graph for recipe
 
         SYNOPSIS
         ========
