@@ -1322,17 +1322,24 @@ followLocalChanges: %s
         oldTrv = self.db.getTrove(withFiles = False,
                                   pristine = False,
                                   *replacedInfo)
-        oldHashes = _getPathHashes(troveSource, self.db,
-                                   oldTrv, inDb = True)
-        newHashes = _getPathHashes(uJob.getTroveSource(),
-                                   self.db, trv, inDb = False)
 
-        if not newHashes.compatibleWith(oldHashes):
-            if force:
-                return None
-            else:
-                raise UpdatePinnedTroveError(replacedInfo,
-                                             newInfo)
+        # RPM capsules can overlap; there is special handling
+        # for that
+        if not (oldTrv.troveInfo.capsule.type() ==
+                 trove._TROVECAPSULE_TYPE_RPM and
+                trv.troveInfo.capsule.type() ==
+                 trove._TROVECAPSULE_TYPE_RPM):
+            oldHashes = _getPathHashes(troveSource, self.db,
+                                       oldTrv, inDb = True)
+            newHashes = _getPathHashes(uJob.getTroveSource(),
+                                       self.db, trv, inDb = False)
+
+            if not newHashes.compatibleWith(oldHashes):
+                if force:
+                    return None
+                else:
+                    raise UpdatePinnedTroveError(replacedInfo,
+                                                 newInfo)
 
         log.lowlevel('old and new versions are compatible')
         if not force:

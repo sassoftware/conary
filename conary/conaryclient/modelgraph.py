@@ -27,6 +27,7 @@ class AbstractModelCompiler(object):
     RemoveAction = None
 
     FetchAction = troveset.FetchAction
+    EraseFindAction = troveset.FindAction
     FindAction = troveset.FindAction
     InitialTroveTupleSet = troveset.StaticTroveTupleSet
     PatchAction = troveset.PatchAction
@@ -39,9 +40,27 @@ class AbstractModelCompiler(object):
         self.repos = repos
         self.g = graph
 
+    def _splitFind(self, actionClass, searchSet, specList, op):
+        if not specList:
+            return None
+
+        matches = []
+        for spec in specList:
+            matches.append(
+                searchSet._action(spec, ActionClass = actionClass,
+                                  index = op.getLocation(spec) ) )
+        if len(matches) > 1:
+            matchSet = matches[0]._action(ActionClass = self.UnionAction,
+                                          index = op.getLocation(),
+                                          *matches[1:])
+        else:
+            matchSet = matches[0]
+
+        return matchSet
+
     def build(self, model, reposTroveSet, dbTroveSet):
         collections = set()
-        for op in model.systemItems:
+        for op in model.modelOps:
             if isinstance(op, model.SearchOperation):
                 continue
 
@@ -67,29 +86,18 @@ class AbstractModelCompiler(object):
         # so far
         finalTroveSet = self.InitialTroveTupleSet(graph = reposTroveSet.g)
 
-        for op in model.systemItems:
+        for op in model.modelOps:
             if isinstance(op, model.SearchOperation):
                 partialTup = op.item
                 if isinstance(partialTup, versions.Label):
                     newSearchTroveSet = troveset.SearchSourceTroveSet(
                             searchsource.NetworkSearchSource(self.repos,
                                                              [ partialTup ],
-                                                             self.flavor))
+                                                             self.flavor),
+                            graph = reposTroveSet.g)
                     newSearchSet = newSearchTroveSet
                 elif partialTup[0] is not None:
-                    result = self.repos.findTroves([],
-                                                  [ partialTup ], self.flavor,
-                                                  allowMissing = True)
-                    if not result:
-                        raise errors.TroveSpecsNotFound( [ partialTup ] )
-                    result = result[partialTup]
-                    assert(len(result) == 1)
-                    ts = self.InitialTroveTupleSet(troveTuple = result,
-                                                   graph = self.g,
-                                                   index = op.index)
-                    # get the trove itself
-                    newSearchSet = ts._action(ActionClass = self.FlattenAction,
-                                              index = op.index)
+                    newSearchSet = reposTroveSet.find(partialTup)
                 else:
                     assert(0)
 
@@ -106,7 +114,7 @@ class AbstractModelCompiler(object):
                         verObj = versions.VersionFromString(troveSpec.version)
                         if verObj.isInLocalNamespace():
                             localSpecs.append(troveSpec)
-                            break
+                            continue
 
                     except (errors.VersionStringError, errors.ParseError):
                         pass
@@ -114,15 +122,12 @@ class AbstractModelCompiler(object):
                 searchSpecs.append(troveSpec)
 
             if isinstance(op, model.EraseTroveOperation):
-                flattenedTroveSet = finalTroveSet._action(*searchSpecs,
-                        **dict(ActionClass=self.FlattenAction,
-                               index = op.index))
-                eraseMatches = flattenedTroveSet._action(*searchSpecs,
-                        **dict(ActionClass=self.FindAction,
-                               index = op.index))
+                eraseMatches = self._splitFind(self.EraseFindAction,
+                                               finalTroveSet, searchSpecs, op)
+
                 finalTroveSet = finalTroveSet._action(eraseMatches,
                         ActionClass=self.RemoveAction,
-                        index = op.index)
+                        index = op.getLocation())
                 continue
 
             if rebuildTotalSearchSet:
@@ -132,20 +137,15 @@ class AbstractModelCompiler(object):
                 newSearchPath = []
                 rebuildTotalSearchSet = False
 
-            if searchSpecs:
-                searchMatches = totalSearchSet.find(*searchSpecs)
-            else:
-                searchMatches = None
-
-            if localSpecs:
-                localMatches = dbTroveSet.find(*localSpecs)
-            else:
-                localMatches = None
+            searchMatches = self._splitFind(self.FindAction, totalSearchSet,
+                                            searchSpecs, op)
+            localMatches = self._splitFind(self.FindAction, dbTroveSet,
+                                           localSpecs, op)
 
             if searchMatches and localMatches:
                 matches = searchMatches._action(localMatches,
                                                 ActionClass = self.UnionAction,
-                                                index = op.index)
+                                                index = op.getLocation())
             elif searchMatches:
                 matches = searchMatches
             else:
@@ -154,25 +154,23 @@ class AbstractModelCompiler(object):
             if isinstance(op, model.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UnionAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             elif isinstance(op, model.PatchTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.PatchAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             elif isinstance(op, model.UpdateTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UpdateAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             elif isinstance(op, model.OfferTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.OptionalAction,
-                                        index = op.index)
+                                        index = op.getLocation())
             else:
                 assert(0)
 
-            flatten = matches._action(ActionClass = self.FlattenAction,
-                                      index = op.index)
-            newSearchPath.insert(0, flatten)
+            newSearchPath.insert(0, matches)
 
             for troveSpec in op:
                 if troveSpec.name in collections:

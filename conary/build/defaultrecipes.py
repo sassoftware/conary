@@ -295,6 +295,7 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
         - L{dumpAll} : Displays copious output describing each action.
         - L{track} : Displays less copious output describing specific
           troves.
+        - L{writeDotGraph} : Writes "dot" graph of recipe structure.
 
     The following methods are available in C{Repository} objects:
 

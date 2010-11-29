@@ -131,6 +131,8 @@ class WindowsHelper:
 
             if type(self.wimInfo.WIM.IMAGE) is list:
                 for i in self.wimInfo.WIM.IMAGE:
+                    if not hasattr(i, 'WINDOWS'):
+                        continue
                     info = {}
                     info['name'] = i.NAME.encode('utf-8')
                     info['version'] = "%s.%s.%s" % \

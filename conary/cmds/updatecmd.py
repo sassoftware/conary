@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+import copy
 import os
 import itertools
 import sys
@@ -23,6 +25,7 @@ from conary import display
 from conary import errors
 from conary import trove
 from conary import trovetup
+from conary import versions
 from conary.deps import deps
 from conary.lib import api
 from conary.lib import log
@@ -521,11 +524,30 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
         updateName = { False: 'update',
                        True: 'install' }[kwargs['keepExisting']]
 
-        if addArgs:
-            sysmodel.appendTroveOpByName(updateName, text=addArgs)
-
-        if patchArgs:
-            sysmodel.appendTroveOpByName('patch', text=patchArgs)
+        branchArgs = {}
+        for index, spec in enumerate(addArgs):
+            try:
+                troveSpec = trovetup.TroveSpec(spec)
+                version = versions.Label(troveSpec.version)
+                branchArgs[troveSpec] = index
+            except:
+                # Any exception is a parse failure in one of the
+                # two steps, and so we do not convert that argument
+                pass
+       
+        if branchArgs:
+            client = conaryclient.ConaryClient(cfg)
+            repos = client.getRepos()
+            foundTroves = repos.findTroves(cfg.installLabelPath,
+                                           branchArgs.keys(),
+                                           defaultFlavor = cfg.flavor)
+            for troveSpec in foundTroves:
+                index = branchArgs[troveSpec]
+                foundTrove = foundTroves[troveSpec][0]
+                addArgs[index] = addArgs[index].replace(
+                    troveSpec.version,
+                    '%s/%s' %(foundTrove[1].trailingLabel(),
+                              foundTrove[1].trailingRevision()))
 
         disallowedChangesets = []
         for cs, argName in fromChangesets:
@@ -543,8 +565,9 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                         disallowedChangesets.append((argName, 'redirect',
                             trovetup.TroveTuple(*troveTuple).asString()))
                         continue
-                sysmodel.appendTroveOpByName(updateName,
-                    text=trovetup.TroveTuple(*troveTuple).asString())
+
+                addArgs.append(
+                    trovetup.TroveTuple(*troveTuple).asString())
 
         if disallowedChangesets:
             raise errors.ConaryError(
@@ -552,6 +575,13 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                 ' cannot be installed:\n    ' + '\n    '.join(
                     '%s contains local %s: %s' % x
                     for x in disallowedChangesets))
+
+        if addArgs:
+            sysmodel.appendTroveOpByName(updateName, text=addArgs)
+
+        if patchArgs:
+            sysmodel.appendTroveOpByName('patch', text=patchArgs)
+
 
         kwargs['fromChangesets'] = [x[0] for x in fromChangesets]
 
@@ -605,6 +635,8 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     model = kwargs.pop('systemModel', None)
     modelFile = kwargs.pop('systemModelFile', None)
+    modelGraph = kwargs.pop('modelGraph', None)
+    modelTrace = kwargs.pop('modelTrace', None)
 
     noRestart = applyKwargs.get('noRestart', False)
 
@@ -616,7 +648,6 @@ def _updateTroves(cfg, applyList, **kwargs):
     # even though we no longer differentiate forceMigrate, we still
     # remove it from kwargs to avoid confusing prepareUpdateJob
     kwargs.pop('forceMigrate', False)
-    modelGraph = kwargs.pop('modelGraph', None)
     restartInfo = kwargs.get('restartInfo', None)
 
     # Initialize the critical update set
@@ -658,6 +689,35 @@ def _updateTroves(cfg, applyList, **kwargs):
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
                                         criticalUpdateInfo = criticalUpdates)
+            if modelTrace is not None:
+                ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
+
+            finalModel = copy.deepcopy(model)
+            if model.suggestSimplifications(tc, ts.g):
+                log.info("possible system model simplifications found")
+                ts2 = client.cmlGraph(model, changeSetList = changeSetList)
+                updJob2 = client.newUpdateJob()
+                try:
+                    suggMap2 = client._updateFromTroveSetGraph(updJob2, ts2,
+                                        tc,
+                                        fromChangesets = changeSetList,
+                                        criticalUpdateInfo = criticalUpdates)
+                except errors.TroveNotFound:
+                    log.info("bad model generated; bailing")
+                else:
+                    if (suggMap == suggMap2 and
+                        updJob.getJobs() == updJob2.getJobs()):
+                        log.info("simplified model verfied; using it instead")
+                        ts = ts2
+                        finalModel = model
+                        updJob = updJob2
+                        suggMap = suggMap2
+                    else:
+                        log.info("simplified model changed result; ignoring")
+
+            model = finalModel
+            modelFile.model = finalModel
+
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
                 tc.save(tcPath)
@@ -685,6 +745,17 @@ def _updateTroves(cfg, applyList, **kwargs):
         updJob.close()
         client.close()
         return
+
+    if model:
+        missingLocalTroves = model.getMissingLocalTroves(tc, ts)
+        if missingLocalTroves:
+            print 'Update would leave references to missing local troves:'
+            for troveTup in missingLocalTroves:
+                if not isinstance(troveTup, trovetup.TroveTuple):
+                    troveTup = trovetup.TroveTuple(troveTup)
+                print "\t" + str(troveTup)
+            client.close()
+            return
 
     if suggMap:
         callback.done()
@@ -717,6 +788,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if not updJob.jobs:
         # Nothing to do
+        print 'Update would not modify system'
         updJob.close()
         client.close()
         return
@@ -857,7 +929,7 @@ def updateAll(cfg, **kwargs):
     infoArg = kwargs.get('info', False)
 
     if model and modelFile and modelFile.exists() and restartInfo is None:
-        model.refreshSearchPath()
+        model.refreshVersionSnapshots()
         if modelArg:
             model.write(sys.stdout)
             sys.stdout.flush()

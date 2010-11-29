@@ -3305,7 +3305,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             provides = True, requires = True):
         """
         Returns list of (provides, requires) for troves. For troves which
-        are missing or we do not have access to, None is returned.
+        are missing or we do not have access to, {} is returned. Empty
+        strings are returned for for provides if provides parameter is
+        False; same for requires.
         """
         self.log(2, troveList)
         cu = self.db.cursor()

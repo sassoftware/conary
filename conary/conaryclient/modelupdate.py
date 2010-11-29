@@ -133,8 +133,8 @@ class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
                      self.primaryTroveSet._walk(data.troveCache,
                                      newGroups = False,
                                      recurse = True)):
-            if self.excludeTroves.match(troveTup[0]):
-                if inInstall or isExplicit:
+            if (not isExplicit) and self.excludeTroves.match(troveTup[0]):
+                if inInstall:
                     optionalSet.add(troveTup)
             elif isExplicit:
                 if inInstall:
@@ -244,6 +244,8 @@ class CMLFindAction(troveset.FindAction):
 
 class CMLFinalFetchAction(troveset.FetchAction):
 
+    prefilter = troveset.FetchAction
+
     def _fetch(self, actionList, data):
         troveTuples = set()
 
@@ -330,16 +332,72 @@ class CMLSearchPath(troveset.SearchPathTroveSet):
 
         return False
 
+class ModelGraph(troveset.OperationGraph):
+
+    def matchesByIndex(self, location):
+        # returns a set of trove tuples for the matches which were found
+        # for the given location
+        result = set()
+        for ts in self.nodesByIndexAndAction(location,
+                                             troveset.FindAction):
+            result.update(ts._getInstallSet())
+
+        return result
+
+    def nodesByIndexAndAction(self, location, actionType):
+        matches = []
+        for node in self.iterNodes():
+            if node.index == location:
+                if isinstance(node.action, actionType):
+                    matches.append(node)
+
+        return matches
+
+    def installIsNoop(self, troveCache, location):
+        nodes = self.nodesByIndexAndAction(location, troveset.FindAction)
+        # look for where this node goes into a union
+        assert(len(nodes) == 1)
+        node = nodes[0]
+        del nodes
+        findTroveTuples = set(node._getInstallSet())
+
+        # don't follow the fetch/searchpath child
+        origUnion = [ x for x in self.getChildren(node)
+                        if isinstance(x.action, troveset.UnionAction) ]
+        assert(len(origUnion) == 1)
+        origUnion = origUnion[0]
+
+        stubGraph = ModelGraph()
+        unionParents = [ x for x in origUnion.action._inputSets
+                            if x != node ]
+        unionAction = troveset.UnionAction(unionParents[0], unionParents[1:])
+        newUnion = unionAction.getResultTupleSet(graph = stubGraph)
+        newUnion.realize(None)
+
+        for troveTup, _, _ in \
+                        newUnion._walk(troveCache, recurse = True):
+            findTroveTuples.discard(troveTup)
+
+        return (not findTroveTuples)
+
+    def getUpdateMapping(self, location):
+        nodes = self.nodesByIndexAndAction(location, troveset.UpdateAction)
+        assert(len(nodes) == 1)
+        node = nodes[0]
+        del nodes
+
+        return node.updateMap
+
 class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = CMLSearchPath
-
+    FindAction = CMLFindAction
     FlattenAction = CMLFlattenAction
     RemoveAction = CMLRemoveAction
 
     def __init__(self, cfg, repos, db):
         self.db =  db
-        g = troveset.OperationGraph()
+        g = ModelGraph()
         self.cfg = cfg
         modelgraph.AbstractModelCompiler.__init__(self, cfg.flavor, repos, g)
 
@@ -351,7 +409,8 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
         repos = troveset.SearchSourceTroveSet(
                 searchsource.NetworkSearchSource(self.repos, [],
-                                                 self.cfg.flavor))
+                                                 self.cfg.flavor),
+                graph = self.g)
         path.append(repos)
 
         return CMLSearchPath(path, graph = self.g)
@@ -363,7 +422,7 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
             path = [ csTroveSet ]
 
         dbSearchSource = searchsource.SearchSource(self.db, self.cfg.flavor)
-        dbTroveSet = DatabaseTroveSet(dbSearchSource)
+        dbTroveSet = DatabaseTroveSet(dbSearchSource, graph = self.g)
 
         path.append(dbTroveSet)
         return CMLSearchPath(path, graph = self.g)
@@ -375,7 +434,8 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
             csTroveSource.addChangeSets(changeSetList)
             csSearchSource = searchsource.SearchSource(csTroveSource,
                                                        self.cfg.flavor)
-            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource)
+            csTroveSet = troveset.SearchSourceTroveSet(csSearchSource,
+                                                       graph = self.g)
         else:
             csTroveSet = None
 
@@ -390,7 +450,16 @@ class CMLClient(object):
 
     def cmlGraph(self, model, changeSetList = []):
         c = ModelCompiler(self.cfg, self.getRepos(), self.getDatabase())
-        return c.build(model, changeSetList)
+        troveSet = c.build(model, changeSetList)
+
+        # we need to explicitly fetch this before we can walk it
+        preFetch = troveSet._action(ActionClass = CMLFinalFetchAction)
+        # handle exclude troves
+        final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
+                                    ActionClass = CMLExcludeTrovesAction)
+        final.searchPath = troveSet.searchPath
+
+        return final
 
     def _processCMLJobList(self, origJobList, updJob, troveCache):
         # this is just like _processJobList, but it's forked to use the
@@ -591,15 +660,10 @@ class CMLClient(object):
 
         searchPath = troveSet.searchPath
 
-        # we need to explicitly fetch this before we can walk it
-        preFetch = troveSet._action(ActionClass = CMLFinalFetchAction)
-        # handle exclude troves
-        final = preFetch._action(excludeTroves = self.cfg.excludeTroves,
-                                    ActionClass = CMLExcludeTrovesAction)
         #depSearch = CMLSearchPath([ preFetch, searchPath ],
                                                #graph = preFetch.g)
         depSearch = searchPath
-        final.g.realize(CMLActionData(troveCache,
+        troveSet.g.realize(CMLActionData(troveCache,
                                               self.cfg.flavor[0],
                                               self.repos, self.cfg))
 
@@ -615,7 +679,8 @@ class CMLClient(object):
                 pins.add(tup)
                 targetTrv.addTrove(*tup)
 
-        for tup, inInstall, explicit in final._walk(troveCache, recurse = True):
+        for tup, inInstall, explicit in \
+                                troveSet._walk(troveCache, recurse = True):
             if inInstall and tup[0:3] not in pins:
                 targetTrv.addTrove(*tup[0:3])
 
