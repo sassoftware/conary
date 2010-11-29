@@ -899,6 +899,8 @@ class _UpdateCommand(ConaryCommand):
                           'which will remain installed',
         'exact-flavors' : 'Only match troves whose flavors match exactly',
         'info'          : 'Display what update would have done',
+        'ignore-model'  : (VERBOSE_HELP,
+                           'Do not use the system-model file, even if present'),
         'model'         : 'Display the new model that would have been applied',
         'model-graph'   : (VERBOSE_HELP,
                            'Write graph of model to specified file'),
@@ -952,6 +954,7 @@ class _UpdateCommand(ConaryCommand):
         d["keep-journal"] = NO_PARAM            # don't document this
         d["keep-required"] = NO_PARAM
         d["info"] = '-i', NO_PARAM
+        d["ignore-model"] = NO_PARAM
         d["model"] = NO_PARAM
         d["model-graph"] = ONE_PARAM
         d["model-trace"] = MULT_PARAM
@@ -1028,6 +1031,7 @@ class _UpdateCommand(ConaryCommand):
                                 not argSet.pop('no-conflict-check', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
+        kwargs['ignoreModel'] = argSet.pop('ignore-model', False)
         kwargs['model'] = argSet.pop('model', False)
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['modelTrace'] = argSet.pop('model-trace', None)
@@ -1048,7 +1052,7 @@ class _UpdateCommand(ConaryCommand):
         #
         kwargs['syncChildren'] = False
         kwargs['syncUpdate'] = False
-        if not modelFile.exists():
+        if not modelFile.exists() and not kwargs.get('ignore-model'):
             # this argument handling does not make sense for a modeled system
             kwargs.pop('model')
             if otherArgs[1] == 'sync':
@@ -1068,7 +1072,7 @@ class _UpdateCommand(ConaryCommand):
 
         if argSet: return self.usage()
 
-        if modelFile.exists():
+        if modelFile.exists() and not kwargs.pop('ignoreModel'):
             if otherArgs[1] == 'sync' and len(otherArgs) > 2:
                 log.error('The "sync" command cannot take trove arguments with a system model')
                 return 1
@@ -1183,6 +1187,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["info"] = '-i', NO_PARAM
         argDef["just-db"] = NO_PARAM
         argDef["keep-required"] = NO_PARAM
+        argDef["ignore-model"] = NO_PARAM
         argDef["model"] = NO_PARAM
         argDef["model-graph"] = ONE_PARAM
         argDef["model-trace"] = MULT_PARAM
@@ -1206,7 +1211,7 @@ class UpdateAllCommand(_UpdateCommand):
 
         model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
-        if modelFile.exists():
+        if modelFile.exists() and not argSet.pop('ignore-model', False):
             kwargs['systemModel'] = model
             kwargs['systemModelFile'] = modelFile
             if modelFile.snapshotExists() and kwargs['restartInfo'] is None:
