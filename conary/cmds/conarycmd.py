@@ -1031,7 +1031,7 @@ class _UpdateCommand(ConaryCommand):
                                 not argSet.pop('no-conflict-check', False)
         kwargs['justDatabase'] = argSet.pop('just-db', False)
         kwargs['info'] = argSet.pop('info', False)
-        kwargs['ignoreModel'] = argSet.pop('ignore-model', False)
+        ignoreModel = argSet.pop('ignore-model', False)
         kwargs['model'] = argSet.pop('model', False)
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['modelTrace'] = argSet.pop('model-trace', None)
@@ -1052,7 +1052,7 @@ class _UpdateCommand(ConaryCommand):
         #
         kwargs['syncChildren'] = False
         kwargs['syncUpdate'] = False
-        if not modelFile.exists() and not kwargs.get('ignore-model'):
+        if not modelFile.exists() and not ignoreModel:
             # this argument handling does not make sense for a modeled system
             kwargs.pop('model')
             if otherArgs[1] == 'sync':
@@ -1072,7 +1072,7 @@ class _UpdateCommand(ConaryCommand):
 
         if argSet: return self.usage()
 
-        if modelFile.exists() and not kwargs.pop('ignoreModel'):
+        if modelFile.exists() and not ignoreModel:
             if otherArgs[1] == 'sync' and len(otherArgs) > 2:
                 log.error('The "sync" command cannot take trove arguments with a system model')
                 return 1
