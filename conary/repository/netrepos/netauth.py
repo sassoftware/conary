@@ -1170,7 +1170,6 @@ class NetworkAuthorization:
             if not roleIds:
                 return []
 
-            # XXX gafton said he'd clean this up
             cu.execute("""SELECT entGroup FROM EntitlementOwners
                             JOIN EntitlementGroups USING (entGroupId)
                             WHERE ownerGroupId IN (%s)""" %
@@ -1181,15 +1180,16 @@ class NetworkAuthorization:
     def getEntitlementClassesRoles(self, authToken, classList):
         if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-
         cu = self.db.cursor()
 
-        # XXX gafton said he'd clean this up
+        placeholders = ','.join(['?' for x in classList])
+        names = classList
         cu.execute("""SELECT entGroup, userGroup FROM EntitlementGroups
                         LEFT OUTER JOIN EntitlementAccessMap USING (entGroupId)
                         LEFT OUTER JOIN UserGroups USING (userGroupId)
                         WHERE entGroup IN (%s)"""
-                   % ",".join([ "'%s'" % x for x in classList]))
+            % (placeholders,), names)
+
         d = {}
         for entClass, role in cu:
             l = d.setdefault(entClass, [])
@@ -1210,35 +1210,38 @@ class NetworkAuthorization:
         """
         if not self.authCheck(authToken, admin = True):
             raise errors.InsufficientPermission
-
         cu = self.db.cursor()
 
-        # this would be faster with temporary tables; I doubt it matters
-        # XXX gafton said he'd clean this up
+        # Get entitlement group ids
+        placeholders = ','.join(['?' for x in classInfo])
+        names = classInfo.keys()
         cu.execute("""SELECT entGroup, entGroupId FROM EntitlementGroups
                       WHERE entGroup IN (%s)""" %
-                   ",".join([ "'%s'" % x for x in classInfo ]))
-        entClassMap = dict(x for x in cu)
+            (placeholders,), names)
+        entClassMap = dict(cu)
         if len(entClassMap) != len(classInfo):
             raise errors.RoleNotFound
 
-        # XXX gafton said he'd clean this up
-        rolesNeeded = set(itertools.chain(*classInfo.itervalues()))
+        # Get user group ids
+        rolesNeeded = list(set(itertools.chain(*classInfo.itervalues())))
         if rolesNeeded:
+            placeholders = ','.join(['?' for x in rolesNeeded])
             cu.execute("""SELECT userGroup, userGroupId FROM UserGroups
                               WHERE userGroup IN (%s)""" %
-                       ",".join([ "'%s'" % x for x in rolesNeeded ]))
-            roleMap = dict(x for x in cu)
+                    (placeholders,), rolesNeeded)
+            roleMap = dict(cu)
         else:
             roleMap = {}
         if len(roleMap) != len(rolesNeeded):
             raise errors.RoleNotFound
 
-        # XXX gafton said he'd clean this up
+        # Clear any existing entries for the specified entitlement classes
+        entClassIds = ','.join(['%d' % x for x in entClassMap.itervalues()])
         cu.execute("""DELETE FROM EntitlementAccessMap
                       WHERE entGroupId IN (%s)""" %
-                   ",".join([ "%d" % x for x in entClassMap.itervalues() ]))
+                (entClassIds,))
 
+        # Add new entries.
         for entClass, roles in classInfo.iteritems():
             for role in roles:
                 cu.execute("""INSERT INTO EntitlementAccessMap
