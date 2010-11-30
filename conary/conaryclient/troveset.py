@@ -713,22 +713,7 @@ class OptionalAction(DelayedTupleSetAction):
 
 class AbstractModifyAction(DelayedTupleSetAction):
 
-    prefilter = FetchAction
-
-    def __init__(self, primaryTroveSet, updateTroveSet):
-        DelayedTupleSetAction.__init__(self, primaryTroveSet, updateTroveSet)
-        self.updateTroveSet = updateTroveSet
-
-    def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
-                     installSet, optionalSet):
-        raise NotImplementedError
-
-    def _preprocess(self, data, beforeInfo, afterInfo):
-        pass
-
-    def patchAction(self, data):
-        before = trove.Trove("@tsupdate", versions.NewVersion(),
-                             deps.Flavor())
+    def buildAfter(self, troveCache):
         after = trove.Trove("@tsupdate", versions.NewVersion(),
                              deps.Flavor())
 
@@ -739,54 +724,55 @@ class AbstractModifyAction(DelayedTupleSetAction):
         afterInfo = {}
         updateNames = set()
         for troveTup, inInstallSet, explicit in \
-                  self.updateTroveSet._walk(data.troveCache, recurse = True):
+                  self.updateTroveSet._walk(troveCache, recurse = True):
             after.addTrove(troveTup[0], troveTup[1], troveTup[2])
             afterInfo[troveTup] = (inInstallSet, explicit)
             updateNames.add(troveTup[0])
             if explicit:
                 explicitTups.add(troveTup)
 
+        return after, afterInfo, updateNames, explicitTups
+
+    def buildBefore(self, troveCache, updateNames):
+        before = trove.Trove("@tsupdate", versions.NewVersion(),
+                             deps.Flavor())
+
         beforeInfo = {}
         installSet = set()
         optionalSet = set()
-        installSetSwitch = set()
         for troveTup, inInstallSet, explicit in \
-                  self.primaryTroveSet._walk(data.troveCache, recurse = True):
+                  self.primaryTroveSet._walk(troveCache, recurse = True):
             if troveTup[0] in updateNames:
                 before.addTrove(troveTup[0], troveTup[1], troveTup[2])
                 beforeInfo[troveTup] = (inInstallSet, explicit)
-
-                if (not inInstallSet and troveTup in afterInfo and
-                    afterInfo[troveTup][1]):
-                    installSetSwitch.add(troveTup)
             elif explicit:
                 if inInstallSet:
                     installSet.add(troveTup)
                 else:
                     optionalSet.add(troveTup)
 
-        # these troves were not in the install set of the working set, but
-        # explicitly mentioned in the model command we're handling. that
-        # not only overrides the working set for this trove, but for anything
-        # else it includes
-        for troveTup in installSetSwitch:
-            for (subTroveTup, inInstallSet, explicit) in \
-                                data.troveCache.iterTroveListInfo(troveTup):
-                before.delTrove(subTroveTup[0], subTroveTup[1],
-                                subTroveTup[2], True)
+        return before, beforeInfo, installSet, optionalSet
+
+class PatchAction(AbstractModifyAction):
+
+    prefilter = FetchAction
+
+    def __init__(self, primaryTroveSet, updateTroveSet):
+        AbstractModifyAction.__init__(self, primaryTroveSet, updateTroveSet)
+        self.updateTroveSet = updateTroveSet
+
+    def patchAction(self, data):
+        before = trove.Trove("@tsupdate", versions.NewVersion(),
+                             deps.Flavor())
+
+        after, afterInfo, updateNames, explicitTups = self.buildAfter(data.troveCache)
+        before, beforeInfo, installSet, optionalSet = self.buildBefore(data.troveCache, updateNames)
 
         troveMapping = after.diff(before)[2]
-        # this completely misses anything where the only change is
-        # byDefault status
-        for troveTup in (set(after.iterTroveList(strongRefs = True)) &
-                         set(before.iterTroveList(strongRefs = True))):
-            if beforeInfo[troveTup] != afterInfo[troveTup]:
-                troveMapping.append( (troveTup[0], troveTup[1:3],
-                                      troveTup[1:3], False) )
 
-        self._preprocess(data, beforeInfo, afterInfo)
+        # populate the cache with timestamped versions as a bulk operation
+        data.troveCache.getTimestamps( beforeInfo.keys() + afterInfo.keys() )
 
-        self.outSet.updateMap = {}
         for (trvName, (oldVersion, oldFlavor),
                       (newVersion, newFlavor), isAbsolute) in troveMapping:
             oldTuple = (trvName, oldVersion, oldFlavor)
@@ -794,18 +780,10 @@ class AbstractModifyAction(DelayedTupleSetAction):
             self._handleTrove(data, beforeInfo, afterInfo, oldTuple, newTuple,
                               installSet, optionalSet)
 
-            if newTuple in explicitTups:
-                if oldTuple[1] is not None:
-                    self.outSet.updateMap[newTuple] = oldTuple
-                else:
-                    self.outSet.updateMap[newTuple] = None
-
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
     __call__ = patchAction
-
-class PatchAction(AbstractModifyAction):
 
     def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
@@ -855,12 +833,57 @@ class PatchAction(AbstractModifyAction):
             if newTuple != oldTuple:
                 optionalSet.add(oldTuple)
 
-    def _preprocess(self, data, beforeInfo, afterInfo):
-        # populate the cache with timestamped versions as a bulk operation
-        data.troveCache.getTimestamps( beforeInfo.keys() + afterInfo.keys() )
-
-
 class UpdateAction(AbstractModifyAction):
+
+    prefilter = FetchAction
+
+    def __init__(self, primaryTroveSet, updateTroveSet):
+        AbstractModifyAction.__init__(self, primaryTroveSet, updateTroveSet)
+        self.updateTroveSet = updateTroveSet
+
+    def updateAction(self, data):
+        after, afterInfo, updateNames, explicitTups = self.buildAfter(data.troveCache)
+        before, beforeInfo, installSet, optionalSet = self.buildBefore(data.troveCache, updateNames)
+
+        for troveTup in beforeInfo:
+            # these troves were not in the install set of the working set, but
+            # explicitly mentioned in the model command we're handling. that
+            # not only overrides the working set for this trove, but for anything
+            # else it includes
+            if (not beforeInfo[troveTup][0] and troveTup in afterInfo and
+                    afterInfo[troveTup][1]):
+                for (subTroveTup, inInstallSet, explicit) in \
+                                    data.troveCache.iterTroveListInfo(troveTup):
+                    before.delTrove(subTroveTup[0], subTroveTup[1],
+                                    subTroveTup[2], True)
+
+        troveMapping = after.diff(before)[2]
+        # this completely misses anything where the only change is
+        # byDefault status
+        for troveTup in (set(after.iterTroveList(strongRefs = True)) &
+                         set(before.iterTroveList(strongRefs = True))):
+            if beforeInfo[troveTup] != afterInfo[troveTup]:
+                troveMapping.append( (troveTup[0], troveTup[1:3],
+                                      troveTup[1:3], False) )
+
+        self.outSet.updateMap = {}
+        for (trvName, (oldVersion, oldFlavor),
+                      (newVersion, newFlavor), isAbsolute) in troveMapping:
+            oldTuple = (trvName, oldVersion, oldFlavor)
+            newTuple = (trvName, newVersion, newFlavor)
+            self._handleTrove(data, beforeInfo, afterInfo, oldTuple, newTuple,
+                              installSet, optionalSet)
+
+            if newTuple in explicitTups:
+                if oldTuple[1] is not None:
+                    self.outSet.updateMap[newTuple] = oldTuple
+                else:
+                    self.outSet.updateMap[newTuple] = None
+
+        self.outSet._setInstall(installSet)
+        self.outSet._setOptional(optionalSet)
+
+    __call__ = updateAction
 
     def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
                      installSet, optionalSet):
