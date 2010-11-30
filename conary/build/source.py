@@ -1436,8 +1436,6 @@ class addCapsule(_Source):
     NAME
     ====
 
-    **************** UPDATE ME FOR MSI SUPPORT AT SOME POINT ************
-
     B{C{r.addCapsule()}} - Add an encapsulated file
 
     SYNOPSIS
@@ -1496,6 +1494,9 @@ class addCapsule(_Source):
     B{ignoreAllConflictingTimes} : When checking for conflicts between
     files contained in multiple capsules, ignore the mtime on the files.
 
+    B{wimVolumeIndex} : The image index of a Windows Imaging Formatted file that
+    will be reprented in this package.
+
     EXAMPLES
     ========
     The following examples demonstrate invocations of C{r.addCapsule}
@@ -1505,7 +1506,19 @@ class addCapsule(_Source):
 
     The example above is a typical, simple invocation of C{r.addCapsule()}
     which adds the file C{foo.rpm} as a capsule file and creates the C{:rpm}
-    component
+    component.
+
+    C{r.addCapsule('Setup.msi')}
+
+    The example above is a typical, simple invocation of C{r.addCapsule()}
+    which adds the file C{Setup.msi} as a capsule and creates the C{:msi}
+    component.
+
+    C{r.addCapsule('sample.wim')}
+
+    The example above is a typical, simple invocation of C{r.addCapsule()}
+    which adds the file C{sample.wim} as a capsule and creates the C{:wim}
+    component.
     """
 
     keywords = {'ignoreConflictingPaths': set(),
