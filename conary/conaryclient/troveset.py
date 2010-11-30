@@ -956,6 +956,15 @@ class OperationGraph(graph.DirectedGraph):
 
                 matches = node._findTroves(troveSpecList, allowMissing = True)
                 for troveSpec, matchList in matches.iteritems():
-                    print 'trace line %s matched "%s": %s' % (
-                         str(node.index), str(troveSpec),
-                         " ".join([ "%s=%s[%s]" % x for x in matchList ]) )
+                    installMatches = set(matchList) & node._getInstallSet()
+                    optionalMatches = set(matchList) & node._getOptionalSet()
+                    if installMatches:
+                        print 'trace line %s matched install set "%s": %s' % (
+                             str(node), str(troveSpec),
+                             " ".join([ "%s=%s[%s]" % x
+                             for x in installMatches ]) )
+                    if optionalMatches:
+                        print 'trace line %s matched optional set "%s": %s' % (
+                             str(node), str(troveSpec),
+                             " ".join([ "%s=%s[%s]" % x
+                             for x in optionalMatches ]) )
