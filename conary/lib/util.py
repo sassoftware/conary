@@ -2039,7 +2039,18 @@ def convertPackageNameToClassName(pkgname):
 class LZMAFile:
 
     def read(self, limit = 4096):
-        return os.read(self.infd, limit)
+        # Read exactly the specified amount of bytes. Since the underlying
+        # file descriptor is a pipe, os.read may return with fewer than
+        # expected bytes, so we need to iterate
+        buffers = []
+        pos = 0
+        while pos < limit:
+            buf = os.read(self.infd, limit - pos)
+            if not buf:
+                break
+            buffers.append(buf)
+            pos += len(buf)
+        return ''.join(buffers)
 
     def close(self):
         if self.childpid:
