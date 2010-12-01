@@ -1052,7 +1052,7 @@ class _UpdateCommand(ConaryCommand):
         #
         kwargs['syncChildren'] = False
         kwargs['syncUpdate'] = False
-        if not modelFile.exists() and not ignoreModel:
+        if ignoreModel or not modelFile.exists():
             # this argument handling does not make sense for a modeled system
             kwargs.pop('model')
             if otherArgs[1] == 'sync':
