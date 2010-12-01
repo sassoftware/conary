@@ -206,7 +206,7 @@ class CpioStream(object):
             return None
         if len(buf) != amt:
             raise ShortReadError("Expected %d bytes, got %d" % (
-                CpioHeader.HeaderLength, len(buf)))
+                amt, len(buf)))
         self._currentPosition += amt
         return buf
 
