@@ -53,8 +53,8 @@ from conary.state import ConaryState, ConaryStateFromFile, SourceState
 nonCfgRe = re.compile(r'^.*\.(%s)$' % '|'.join((
     'bz2', 'ccs', 'data', 'eps', 'gif', 'gz', 'ico', 'img',
     'jar', 'jpeg', 'jpg', 'lss', 'pdf', 'png', 'ps',
-    'rpm', 'run',
-    'tar', 'tbz', 'tbz2', 'tgz', 'tiff', 'ttf',
+    'msi', 'rpm', 'run',
+    'tar', 'tbz', 'tbz2', 'tgz', 'tiff', 'ttf', 'wim',
     'zip',
 )))
 cfgRe = re.compile(r'(^.*\.(%s)|(^|/)(%s))$' % ('|'.join((
