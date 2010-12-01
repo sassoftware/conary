@@ -2052,7 +2052,7 @@ class LZMAFile:
 
     def __init__(self, fileobj = None):
         self.executable = None
-        for executable, args in (('xz', ('-dc',)), ('unlzma', ())):
+        for executable, args in (('xz', ('-dc',)), ('unlzma', ('-dc',))):
             for pathElement in os.getenv('PATH', '').split(os.path.pathsep):
                 fullpath = os.sep.join((pathElement, executable))
                 if os.path.exists(fullpath):
