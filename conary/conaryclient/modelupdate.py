@@ -103,23 +103,6 @@ class DatabaseTroveSet(troveset.SearchSourceTroveSet):
 
     pass
 
-class CMLRemoveAction(troveset.DelayedTupleSetAction):
-
-    def __init__(self, primaryTroveSet, removeTroveSet = None):
-        troveset.DelayedTupleSetAction.__init__(self, primaryTroveSet,
-                                                removeTroveSet)
-        self.removeTroveSet = removeTroveSet
-
-    def cmlRemoveAction(self, data):
-        removeSet = (self.removeTroveSet._getOptionalSet() |
-                     self.removeTroveSet._getInstallSet())
-        self.outSet._setInstall(self.primaryTroveSet._getInstallSet()
-                                    - removeSet)
-        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
-                                    | removeSet)
-
-    __call__ = cmlRemoveAction
-
 class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
 
     def __init__(self, *args, **kwargs):
@@ -393,7 +376,6 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
     SearchPathTroveSet = CMLSearchPath
     FindAction = CMLFindAction
     FlattenAction = CMLFlattenAction
-    RemoveAction = CMLRemoveAction
 
     def __init__(self, cfg, repos, db):
         self.db =  db

@@ -24,13 +24,13 @@ class AbstractModelCompiler(object):
     SearchPathTroveSet = None
 
     FlattenAction = None
-    RemoveAction = None
 
     FetchAction = troveset.FetchAction
     EraseFindAction = troveset.FindAction
     FindAction = troveset.FindAction
     InitialTroveTupleSet = troveset.StaticTroveTupleSet
     PatchAction = troveset.PatchAction
+    RemoveAction = troveset.RemoveAction
     UnionAction = troveset.UnionAction
     OptionalAction = troveset.OptionalAction
     UpdateAction = troveset.UpdateAction

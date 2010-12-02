@@ -720,6 +720,22 @@ class OptionalAction(DelayedTupleSetAction):
 
     __call__ = optionalAction
 
+class RemoveAction(DelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, removeTroveSet = None):
+        DelayedTupleSetAction.__init__(self, primaryTroveSet, removeTroveSet)
+        self.removeTroveSet = removeTroveSet
+
+    def removeAction(self, data):
+        removeSet = (self.removeTroveSet._getOptionalSet() |
+                     self.removeTroveSet._getInstallSet())
+        self.outSet._setInstall(self.primaryTroveSet._getInstallSet()
+                                    - removeSet)
+        self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
+                                    | removeSet)
+
+    __call__ = removeAction
+
 class AbstractModifyAction(DelayedTupleSetAction):
 
     def buildAfter(self, troveCache):
