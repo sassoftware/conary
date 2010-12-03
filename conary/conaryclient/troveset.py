@@ -722,17 +722,25 @@ class OptionalAction(DelayedTupleSetAction):
 
 class RemoveAction(DelayedTupleSetAction):
 
+    prefilter = FetchAction
+
     def __init__(self, primaryTroveSet, removeTroveSet = None):
         DelayedTupleSetAction.__init__(self, primaryTroveSet, removeTroveSet)
         self.removeTroveSet = removeTroveSet
 
     def removeAction(self, data):
-        removeSet = (self.removeTroveSet._getOptionalSet() |
+        explicitRemoveSet = (self.removeTroveSet._getOptionalSet() |
                      self.removeTroveSet._getInstallSet())
+
+        implicitRemoveSet = (set(
+            [ x[0] for x in self.removeTroveSet._walk(data.troveCache,
+                                                      recurse = True) ] )
+            - explicitRemoveSet)
+
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet()
-                                    - removeSet)
+                                    - explicitRemoveSet - implicitRemoveSet)
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
-                                    | removeSet)
+                                    | explicitRemoveSet)
 
     __call__ = removeAction
 
@@ -945,7 +953,7 @@ class UpdateAction(AbstractModifyAction):
                               installSet, optionalSet)
 
             if newTuple in explicitTups:
-                if oldTuple[1] is not None:
+                if oldTuple[1] is not None and oldTuple != newTuple:
                     self.outSet.updateMap[newTuple] = oldTuple
                 else:
                     self.outSet.updateMap[newTuple] = None

@@ -577,7 +577,9 @@ class CM:
                 for j, (op, spec) in enumerate(reversed(l[0:i])):
                     if isinstance(op, simpClass.oldOpClass):
                         match = True
-                        yield (j, i, simpClass)
+                        # this i - j - 1 returns the index of this (op, spec)
+                        # in l, undoing the reversed() and the slicing
+                        yield (i - j - 1, i, simpClass)
 
                 if match:
                     return
