@@ -1,0 +1,3 @@
+The os.getcwd function can raise an exception if the working directory has been deleted;
+the internal _freezeFromChangesets call was changed to no longer call
+os.getcwd if only absolute paths are used.
