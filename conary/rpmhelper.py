@@ -159,6 +159,19 @@ class _RpmHeader(object):
         FILESIZES, FILEMODES, FILERDEVS, FILELINKTOS, FILEFLAGS,
         FILEVERIFYFLAGS, FILEDIGESTS, FILEMTIMES])
 
+    class _Stat(object):
+        """
+        An object that groups useful information about a file.
+        """
+        __slots__ = [ 'path', 'size', 'user', 'group', 'flags', ]
+        # Add more stuff to __slots__ as needed
+        def __init__(self, **kwargs):
+            for slot in self.__slots__:
+                setattr(self, slot, kwargs.get(slot))
+
+        def isEmpty(self):
+            return self.size == 0 or (self.flags & RPMFILE_GHOST)
+
     def has_key(self, tag):
         # __getitem__ assumes OLDFILENAMES is always present
         return self.entries.has_key(tag) or tag == OLDFILENAMES or \
@@ -188,6 +201,19 @@ class _RpmHeader(object):
             return self[item]
 
         return default
+
+    def getFiles(self):
+        for path, size, username, groupname, flags in itertools.izip(
+                self.paths(), self[FILESIZES], self[FILEUSERNAME],
+                self[FILEGROUPNAME], self[FILEFLAGS]):
+            yield self._Stat(path=path, size=size, user=username,
+                group=groupname, flags=flags)
+
+    def getFilesByPath(self, paths):
+        paths = set(paths)
+        for f in self.getFiles():
+            if f.path in paths:
+                yield f
 
     # regexs used in _getDepsetFromHeader below
     flagre = re.compile('\((.*?)\)')
