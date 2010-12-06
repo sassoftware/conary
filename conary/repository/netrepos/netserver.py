@@ -289,6 +289,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  kwArgs, exception = e,
                                  latency = time.time() - start)
+        elif isinstance(e, HiddenException):
+            exceptionOverride = e.forReturn
 
         if isinstance(e, sqlerrors.DatabaseLocked):
             exceptionOverride = errors.RepositoryLocked()

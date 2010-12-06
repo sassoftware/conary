@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -92,16 +92,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
-        def _writeNestedFile(outF, name, tag, size, f, sizeCb):
-            if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
-                path = f.read()
-                size = os.stat(path).st_size
-                f = open(path)
-                tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-
-            sizeCb(size, tag)
-            bytes = util.copyfileobj(f, outF)
-
         if (self.restHandler and self.path.startswith(self.restUri)):
             self.restHandler.handle(self, self.path)
             return
@@ -163,10 +153,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 if isChangeset:
                     cs = FileContainer(util.ExtendedFile(path,
                                                          buffering = False))
-                    cs.dump(self.wfile.write,
-                            lambda name, tag, size, f, sizeCb:
-                                _writeNestedFile(self.wfile, name, tag, size, f,
-                                                 sizeCb))
+                    for data in cs.dumpIter(_readNestedFile):
+                        self.wfile.write(data)
 
                     del cs
                 else:
@@ -436,6 +424,30 @@ if SSL:
         sslCert, sslKey = cfg.sslCert, cfg.sslKey
         ctx.load_cert_chain(sslCert, sslKey)
         return ctx
+
+
+def _iterFileChunks(fobj):
+    """Yield chunks of data from the given file object."""
+    while True:
+        data = fobj.read(16384)
+        if not data:
+            break
+        yield data
+
+
+def _readNestedFile(name, tag, rawSize, subfile):
+    """Use with ChangeSet.dumpIter to handle external file references."""
+    if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
+        # this is a reference to a compressed file in the contents store
+        path = subfile.read()
+        expandedSize = os.stat(path).st_size
+        tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+        fobj = open(path, 'rb')
+        return tag, expandedSize, _iterFileChunks(fobj)
+    else:
+        # this is data from the changeset itself
+        return tag, rawSize, _iterFileChunks(subfile)
+
 
 class ServerConfig(netserver.ServerConfig):
 
