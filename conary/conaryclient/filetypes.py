@@ -168,7 +168,7 @@ class Symlink(_File):
     =============
     The following user commands are applicable to C{Symlink}:
 
-        - L{get(I{pathId})} : Returns a filestream with the settings
+        - C{get(I{pathId})} : Returns a filestream with the settings
           represented by this class.
 
     EXAMPLES
@@ -254,10 +254,10 @@ class RegularFile(_File):
     =============
     The following user commands are applicable to C{RegularFile}:
 
-        - L{get(I{pathId})} : Returns a filestream with the settings
+        - C{get(I{pathId})} : Returns a filestream with the settings
           represented by this class.
 
-        - L{getContents() : Returns a seekable file object reflecting the
+        - C{getContents()} : Returns a seekable file object reflecting the
           contents associated with this filestream.
 
     EXAMPLES
@@ -362,7 +362,7 @@ class _Device(_File):
     =============
     The following user commands are applicable to C{_Device}:
 
-        - L{get(I{pathId})} : Returns a filestream with the settings
+        - C{get(I{pathId})} : Returns a filestream with the settings
           represented by this class.
 
     EXAMPLES
@@ -443,7 +443,7 @@ class Directory(_File):
     =============
     The following user commands are applicable to C{Directory}:
 
-        - L{get(I{pathId})} : Returns a filestream with the settings
+        - C{get(I{pathId})} : Returns a filestream with the settings
           represented by this class.
 
     EXAMPLES
@@ -511,7 +511,7 @@ class Socket(_File):
     =============
     The following user commands are applicable to C{Socket}:
 
-        - L{get(I{pathId})} : Returns a filestream with the settings
+        - C{get(I{pathId})} : Returns a filestream with the settings
           represented by this class.
 
     EXAMPLES
@@ -580,7 +580,7 @@ class NamedPipe(_File):
     =============
     The following user commands are applicable to C{NamedPipe}:
 
-        - L{get(I{pathId})} : Returns a filestream with the settings
+        - C{get(I{pathId})} : Returns a filestream with the settings
           represented by this class.
 
     EXAMPLES

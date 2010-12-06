@@ -17,7 +17,7 @@ import sys
 
 from conary.lib import log
 from conary.local import database
-from conaryclient import cmdline
+from conary.conaryclient import cmdline
 
 def listRollbacks(db, cfg):
     return formatRollbacks(cfg, db.getRollbackStack().iter(), stream=sys.stdout)

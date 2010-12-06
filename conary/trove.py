@@ -1892,11 +1892,7 @@ class Trove(streams.StreamSet):
             yield item, byDefault, False
 
     def isStrongReference(self, name, version, flavor):
-        key = (name, version, flavor)
-        rc = self.strongTroves.get(key, None)
-        if rc is None:
-            return False
-        return True
+        return (name, version, flavor) in self.strongTroves
 
     def includeTroveByDefault(self, name, version, flavor):
         key = (name, version, flavor)
