@@ -1022,6 +1022,7 @@ _TROVECAPSULE_MSI_PLATFORM    = 2
 _TROVECAPSULE_MSI_PCODE       = 3
 _TROVECAPSULE_MSI_UCODE       = 4
 _TROVECAPSULE_MSI_COMPONENTS  = 5
+_TROVECAPSULE_MSI_ARGUMENTS   = 6
 
 _TROVECAPSULE_WIM_NAME        = 0
 _TROVECAPSULE_WIM_VERSION     = 1
@@ -1125,7 +1126,9 @@ class TroveMsiCapsule(streams.StreamSet):
         _TROVECAPSULE_MSI_UCODE     :
             (DYNAMIC, streams.StringStream, 'upgradeCode' ),
         _TROVECAPSULE_MSI_COMPONENTS:
-            (DYNAMIC, MsiComponents, 'components')
+            (DYNAMIC, MsiComponents, 'components' ),
+        _TROVECAPSULE_MSI_ARGUMENTS :
+            (DYNAMIC, streams.StringStream, 'msiArgs' ),
     }
 
     def reset(self):
@@ -1134,6 +1137,8 @@ class TroveMsiCapsule(streams.StreamSet):
         self.platform.set(None)
         self.productCode.set(None)
         self.upgradeCode.set(None)
+        self.components = MsiComponents()
+        self.msiArgs.set(None)
 
 class TroveWimCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -1836,6 +1841,7 @@ class Trove(streams.StreamSet):
         self.troveInfo.capsule.msi.platform.set(winHelper.platform)
         self.troveInfo.capsule.msi.productCode.set(winHelper.productCode)
         self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode)
+        self.troveInfo.capsule.msi.msiArgs.set(winHelper.msiArgs)
         for uuid, path in winHelper.components:
             self.troveInfo.capsule.msi.components.add(uuid, path)
 

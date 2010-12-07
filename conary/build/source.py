@@ -47,6 +47,7 @@ class WindowsHelper:
         self.productCode = None
         self.upgradeCode = None
         self.components = []
+        self.msiArgs = None
 
     def extractMSIInfo(self, path, wbs):
         import robj
@@ -1497,6 +1498,10 @@ class addCapsule(_Source):
     B{wimVolumeIndex} : The image index of a Windows Imaging Formatted file that
     will be reprented in this package.
 
+    B{msiArgs} : (Optional) Arguments passed to msiexec at install time. The
+    default set of arguments at the time of this writing in the rPath Tools
+    Install Service are "/q /l*v".
+
     EXAMPLES
     ========
     The following examples demonstrate invocations of C{r.addCapsule}
@@ -1524,6 +1529,7 @@ class addCapsule(_Source):
     keywords = {'ignoreConflictingPaths': set(),
                 'ignoreAllConflictingTimes': False,
                 'wimVolumeIndex' : 1,
+                'msiArgs': None,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -1602,6 +1608,7 @@ class addCapsule(_Source):
             else:
                 self.recipe.winHelper.extractMSIInfo(f,
                     self.recipe.cfg.windowsBuildService)
+            self.recipe.winHelper.msiArgs = self.msiArgs
             pname = self.recipe.winHelper.name
         elif self.capsuleType == 'wim':
             self.recipe.winHelper = WindowsHelper()
