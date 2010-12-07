@@ -153,7 +153,13 @@ def generate(repo):
     print >> sys.stderr, "Updated NEWS"
     print >> sys.stderr, "Wrote NEWS.html"
 
-    repo.remove(files, unlink=True)
+    wlock = repo.wlock()
+    try:
+        for name in files:
+            os.unlink(name)
+            repo.dirstate.remove(name)
+    finally:
+        wlock.release()
     print >> sys.stderr, "Deleted %s news fragments" % len(files)
 
 
