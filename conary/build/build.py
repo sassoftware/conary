@@ -3941,13 +3941,35 @@ class BuildMSI(BuildAction):
 
     KEYWORDS
     ========
-    B{dest} : Destination directory for the "content" directory contents.
+    B{dest} : (None) (app only) Destination directory for the "contents"
+    directory contents.
 
     B{manufacturer} : (None) The "Manufacturer" that will be displayed in the
     installed software view on a Windows system.
 
     B{description} : (None) The "Description" that will be displayed in the
     installed software view on a Windows system.
+
+    B{applicationType} : (app) The type of application being packaged. This can
+    be either an "app" or a "webApp". An app is any collection of files that
+    needs to be packaged. A webApp is for files that are meant to be deployed as
+    an IIS web application.
+
+    B{defaultDocument} : (None) (webApp only) Informs IIS of the default
+    document to use for the site.
+
+    B{webSite} : (None) (webApp only) Informs IIS of the web site name.
+
+    B{alias} : (None) (webApp only) Alias used by IIS.
+
+    B{webSiteDir} : (None) (webApp only) Realitive path to the IIS root
+    directory where to deploy the content of the contents directory.
+
+    B{applicationName} : (None) (webApp only) Application name used by IIS.
+
+    B{msiArgs} : (None) Arguments passed to the generated MSI at install time.
+    The default set of arguments at the time of this writing in the rPath Tools
+    Install Service are "/q /l*v".
 
     EXAMPLES
     ========
@@ -3980,11 +4002,12 @@ class BuildMSI(BuildAction):
         'alias': None,
         'webSiteDir': None,
         'applicationName': None,
+        'msiArgs': None,
     }
 
     keywordOrder = ('dest', 'manufacturer', 'description', 'applictionType',
         'defaultDocument', 'webSite', 'alias', 'webSiteDir',
-        'applicationName', )
+        'applicationName', 'msiArgs', )
 
     supported_targets = (TARGET_WINDOWS, )
 
@@ -4066,7 +4089,7 @@ class BuildMSI(BuildAction):
         jobCfg.product.type = self.applicationType
 
         # FIXME: None of these values should need to be hard coded. They
-        #        should be defaults in the Windows Build Service.
+        #        should be defaults in the Windows Build Service. (CNY-3562)
         jobCfg.product.icon = 'icon.ico'
         jobCfg.product.packageName = 'Setup'
         jobCfg.product.allUsers = 'true'
@@ -4160,6 +4183,9 @@ class BuildMSI(BuildAction):
         for comp in componentInfo:
             if comp not in self.recipe.winHelper.components:
                 self.recipe.winHelper.components.append(comp)
+
+        # Set the arguments.
+        self.recipe.winHelper.msiArgs = self.msiArgs
 
     def _getWBSClient(self):
         """

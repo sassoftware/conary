@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
+import errno
 import logging
 import os
 import xmlrpclib
@@ -19,18 +20,15 @@ from email.Message import Message
 from conary.lib import log as cny_log
 from conary.lib import util
 from conary.repository import errors
+from conary.repository import filecontainer
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
+from conary.server.server import _readNestedFile, _iterFileChunks
 from conary.web import webauth
-
-try:
-    from crest import webhooks as cresthooks
-except ImportError:
-    cresthooks = None  # pyflakes=ignore
 
 log = logging.getLogger('wsgi_hooks')
 
-_repository_cache = {}
+_config_cache = {}
 
 
 class application(object):
@@ -40,7 +38,8 @@ class application(object):
         self.start_response = start_response
 
         self.auth = None
-        self.secure = None
+        self.isSecure = None
+        self.urlBase = None
 
         self.cfg = None
         self.repositoryServer = None
@@ -54,7 +53,7 @@ class application(object):
                 consoleFormat='apache_short')
 
         log.info("pid=%s cache=0x%x threaded=%s", os.getpid(),
-                id(_repository_cache), environ['wsgi.multithread'])
+                id(_config_cache), environ['wsgi.multithread'])
 
         self._loadCfg()
         self._loadAuth()
@@ -66,19 +65,20 @@ class application(object):
             raise ConfigurationError("The conary.netrepos.config_file "
                     "environment variable must be set.")
 
+        # Check for a cached configuration object. If the mtime has changed,
+        # reload.
         ino = util.statFile(cfgPath)
-        cached = _repository_cache.get(cfgPath)
+        cached = _config_cache.get(cfgPath)
+        cfg = None
         if cached:
-            cachedIno, repServer, proxyServer, restHandler = cached
+            cachedIno, cachedCfg = cached
             if ino == cachedIno:
-                self.cfg = proxyServer.cfg
-                self.repositoryServer = repServer
-                self.proxyServer = proxyServer
-                self.restHandler = restHandler
-                return
+                cfg = cachedCfg
 
-        cfg = netserver.ServerConfig()
-        cfg.read(cfgPath)
+        if cfg is None:
+            cfg = netserver.ServerConfig()
+            cfg.read(cfgPath)
+            _config_cache[cfgPath] = (ino, cfg)
 
         if cfg.repositoryDB:
             if cfg.proxyContentsDir:
@@ -101,43 +101,77 @@ class application(object):
             scheme = 'https'
         else:
             scheme = self.environ['wsgi.url_scheme']
-        self.secure = scheme == 'https'
-        urlBase = '%s://%s%s' % (scheme,
-                self.environ['HTTP_HOST'], self.environ['SCRIPT_NAME'])
+        self.isSecure = scheme == 'https'
+
+        # Build a base URL for returned Location headers, etc. Note that this
+        # uses neither the configured baseUri nor the placeholder variables
+        # used by apachehooks -- we can get all the information we need to
+        # construct an absolute URL from the request alone.
+        #   Why not use PATH_INFO here? Because that works for mod_wsgi, which
+        # sets SCRIPT_NAME as the root and PATH_INFO as the subpath, but not
+        # nginx where we have to set SCRIPT_NAME ourselves and PATH_INFO
+        # contains the full path.
+        hostUrl = '%s://%s' % (scheme, self.environ['HTTP_HOST'])
+        relPath = self.environ['REQUEST_URI']
+        scriptName = self.environ.get('SCRIPT_NAME')
+        if scriptName is None:
+            raise ConfigurationError("SCRIPT_NAME must be set to the relative "
+                    "URL path where Conary is mounted.")
+        if scriptName[-1] != '/':
+            scriptName += '/'
+        if len(relPath) < len(scriptName) and relPath[-1] != '/':
+            # /conary is OK where SCRIPT_NAME=/conary/
+            relPath += '/'
+        if not relPath.startswith(scriptName):
+            raise ConfigurationError("Request URI is %r but it is outside "
+                    "the SCRIPT_NAME %r" % (relPath, scriptName))
+        # http://somehost:8080/conary/
+        self.urlBase = hostUrl + scriptName
+        # http://somehost:8080/conary/changeset/?wxyz
+        self.rawUrl = hostUrl + relPath
+        # changeset/
+        self.pathInfo = relPath[len(scriptName):].split('?')[0]
 
         if cfg.closed:
-            # Closed repository
+            # Closed repository -- returns an exception for all requests
             self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
             self.restHandler = None
         elif cfg.proxyContentsDir:
-            # Caching proxy
+            # Caching proxy (no repository)
             self.repositoryServer = None
-            self.proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
+            self.proxyServer = proxy.ProxyRepositoryServer(cfg, self.urlBase)
             self.restHandler = None
         else:
-            # Full repository with changeset cache
+            # Full repository with optional changeset cache
             self.repositoryServer = netserver.NetworkRepositoryServer(cfg,
-                    urlBase)
-            if cresthooks and cfg.baseUri:
-                restUri = cfg.baseUri + '/api'
-                self.restHandler = cresthooks.ApacheHandler(restUri,
-                        self.repositoryServer)
+                    self.urlBase)
+            # TODO: need restlib and crest work to support WSGI
+            #if cresthooks and cfg.baseUri:
+            #    restUri = cfg.baseUri + '/api'
+            #    self.restHandler = cresthooks.ApacheHandler(restUri,
+            #            self.repositoryServer)
 
         if self.repositoryServer:
-            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase,
+            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, self.urlBase,
                     self.repositoryServer)
 
         self.cfg = cfg
         # TODO: figure out how or what to cache, caching the whole thing is not
-        # threadsafe since DB connections are stashed in repositoryServer.
+        # threadsafe since DB connections are stashed in repositoryServer. When
+        # a connection pool is in use, the cost of instantiating a new
+        # repository server is negligible. Maybe instead there can be an
+        # internal connection pool, or stashing db connections in threadlocal
+        # storage, etc.
         #_repository_cache[cfgPath] = (ino, self.repositoryServer,
         #        self.proxyServer, self.restHandler)
 
     def _loadAuth(self):
+        """Extract authentication info from the request."""
         self.auth = netserver.AuthToken()
         self._loadAuthPassword()
         self._loadAuthEntitlement()
-        # FIXME: it's sort of insecure to just take the client's word for it
+        # XXX: it's sort of insecure to just take the client's word for it.
+        # Maybe have a configuration directive when behind a reverse proxy?
         forward = self.environ.get('HTTP_X_FORWARDED_FOR')
         if forward:
             self.auth.remote_ip = forward.split(',')[-1].strip()
@@ -145,6 +179,7 @@ class application(object):
             self.auth.remote_ip = self.environ.get('REMOTE_ADDR')
 
     def _loadAuthPassword(self):
+        """Extract HTTP Basic Authorization from the request."""
         info = self.environ.get('HTTP_AUTHORIZATION')
         if not info:
             return
@@ -159,15 +194,16 @@ class application(object):
             self.auth.user, self.auth.password = info.split(':', 1)
 
     def _loadAuthEntitlement(self):
+        """Extract conary entitlements from the request headers."""
         info = self.environ.get('HTTP_X_CONARY_ENTITLEMENT')
         if not info:
             return
         self.auth.entitlements = webauth.parseEntitlement(info)
 
     def _getHeaders(self):
-        """HTTP headers aren't actually RFC 2822, but it provides a convenient
-        case-insensitive dictionary implementation.
-        """
+        """Build a case-insensitive dictionary of HTTP headers."""
+        # HTTP headers aren't actually RFC 2822, but it provides a convenient
+        # case-insensitive dictionary implementation.
         out = Message()
         for key, value in self.environ.iteritems():
             if key[:5] != 'HTTP_':
@@ -182,6 +218,11 @@ class application(object):
         return out
 
     def _response(self, status, body, headers=(), content_type='text/plain'):
+        """Helper for sending response headers and body. Returns the body for
+        convenient yielding.
+
+        Ex.: yield self._response('200 Ok', 'document here')
+        """
         headers = list(headers)
         if content_type is not None:
             headers.append(('Content-type', content_type))
@@ -189,6 +230,11 @@ class application(object):
         return body
 
     def _resp_iter(self, *args, **kwargs):
+        """Helper for sending response headers and body. Yields the response
+        body so it can be returned from a non-generator WSGI handler.
+
+        Ex.: return self._response('400 Bad Request', 'document here')
+        """
         return iter([self._response(*args, **kwargs)])
 
     def __iter__(self):
@@ -196,11 +242,12 @@ class application(object):
 
         self.proxyServer.log.reset()
 
-        if (self.auth.user != 'anonymous' and not self.secure
+        if (self.auth.user != 'anonymous'
+                and not self.isSecure
                 and self.cfg.forceSSL):
-            return self._resp_iter('403 Forbidden', "ERROR: Password "
-                    "authentication is not allowed over unsecured "
-                    "connections.\r\n")
+            return self._resp_iter('403 Secure Connection Required',
+                    "ERROR: Password authentication is not allowed over "
+                    "unsecured connections.\r\n")
 
         if self.repositoryServer:
             self.repositoryServer.reopen()
@@ -234,6 +281,7 @@ class application(object):
         encoding = self.environ.get('HTTP_CONTENT_ENCODING')
         if encoding == 'deflate':
             stream = util.decompressStream(stream)
+            stream.seek(0)
         elif encoding != 'identity':
             log.error("Unrecognized content-encoding %r from %s", encoding,
                     self.auth.remote_ip)
@@ -241,7 +289,6 @@ class application(object):
                     "ERROR: Unrecognized Content-Encoding\r\n")
             return
 
-        stream.seek(0)
         try:
             params, method = util.xmlrpcLoad(stream)
         except (xmlrpclib.ResponseError, UnicodeDecodeError):
@@ -262,11 +309,11 @@ class application(object):
                     authToken=self.auth,
                     args=params,
                     remoteIp=self.auth.remote_ip,
-                    rawUrl=self.environ['REQUEST_URI'],
+                    rawUrl=self.rawUrl,
                     localAddr=localAddr,
                     protocolString=self.environ['SERVER_PROTOCOL'],
                     headers=self._getHeaders(),
-                    isSecure=self.secure)
+                    isSecure=self.isSecure)
         except errors.InsufficientPermission:
             yield self._response('403 Forbidden',
                     "ERROR: Insufficient permissions.\r\n")
@@ -300,19 +347,136 @@ class application(object):
         self.start_response('200 OK', headers)
 
         sio.seek(0)
-        while True:
-            buf = sio.read(16384)
-            if not buf:
-                break
-            yield buf
+        for data in _iterFileChunks(sio):
+            yield data
 
     def _iter_get(self):
         """GET method -- handle changeset and file contents downloads."""
-        yield self._response('200 OK', 'wargh.\r\n')
+        # Request URI looks like /changeset/?wxyz.ccs
+        path = self.pathInfo
+        if path.endswith('/'):
+            path = path[:-1]
+        command = os.path.basename(path)
+
+        if command == 'changeset':
+            return self._iter_get_changeset()
+        else:
+            return self._resp_iter('404 Not Found',
+                    "ERROR: Resource not found.\r\n")
+
+    def _iter_get_changeset(self):
+        """GET a prepared changeset file."""
+        # IMPORTANT: As used here, "expandedSize" means the size of the
+        # changeset as it is sent over the wire. The size of the file we are
+        # reading from may be different if it includes references to other
+        # files in lieu of their actual contents.
+        path = self._changesetPath('-out')
+        if not path:
+            yield self._response('403 Forbidden',
+                    "ERROR: Illegal changeset request.\r\n")
+            return
+
+        items = []
+        totalSize = 0
+
+        if path.endswith('.cf-out'):
+            # Manifest of files to send sequentially (file contents or cached
+            # changesets). Some of these may live outside of the tmpDir and
+            # thus should not be unlinked afterwards.
+            try:
+                manifest = open(path, 'rt')
+            except IOError, err:
+                if err.errno == errno.ENOENT:
+                    yield self._response('404 Not Found',
+                            "ERROR: Resource not found.\r\n")
+                    return
+                raise
+            os.unlink(path)
+
+            for line in manifest:
+                path, expandedSize, isChangeset, preserveFile = line.split()
+                expandedSize = int(expandedSize)
+                isChangeset = bool(int(isChangeset))
+                preserveFile = bool(int(preserveFile))
+
+                items.append((path, isChangeset, preserveFile))
+                totalSize += expandedSize
+
+            manifest.close()
+
+        else:
+            # Single prepared file. Always in tmpDir, so always unlink
+            # afterwards.
+            try:
+                fobj = open(path, 'rb')
+            except IOError, err:
+                if err.errno == errno.ENOENT:
+                    yield self._response('404 Not Found',
+                            "ERROR: Resource not found.\r\n")
+                    return
+                raise
+            expandedSize = os.fstat(fobj.fileno()).st_size
+            items.append((path, False, False))
+            totalSize += expandedSize
+
+        self.start_response('200 Ok', [
+            ('Content-type', 'application/x-conary-change-set'),
+            ('Content-length', str(totalSize)),
+            ])
+        for path, isChangeset, preserveFile in items:
+            if isChangeset:
+                csFile = util.ExtendedFile(path, 'rb', buffering=False)
+                changeSet = filecontainer.FileContainer(csFile)
+                for data in changeSet.dumpIter(_readNestedFile):
+                    yield data
+                del changeSet
+            else:
+                fobj = open(path, 'rb')
+                for data in _iterFileChunks(fobj):
+                    yield data
+                fobj.close()
+
+            if not preserveFile:
+                os.unlink(path)
 
     def _iter_put(self):
         """PUT method -- handle changeset uploads."""
-        raise NotImplementedError
+        if not self.repositoryServer:
+            # FIXME
+            raise NotImplementedError("Changeset uploading through a proxy "
+                    "is not implemented yet")
+
+        # Copy request body to the designated temporary file.
+        out = self._openForPut()
+        if out is None:
+            # File already exists or is in an illegal location.
+            yield self._response('403 Forbidden',
+                    "ERROR: Illegal changeset upload.\r\n")
+            return
+
+        util.copyfileobj(self.environ['wsgi.input'], out)
+        out.close()
+
+        yield self._response('200 Ok', '')
+
+    def _changesetPath(self, suffix):
+        filename = self.environ['QUERY_STRING']
+        if not filename or os.path.sep in filename:
+            return None
+        return os.path.join(self.repositoryServer.tmpPath, filename + suffix)
+
+    def _openForPut(self):
+        path = self._changesetPath('-in')
+        if path:
+            try:
+                st = os.stat(path)
+            except OSError, err:
+                if err.errno != errno.ENOENT:
+                    return None
+                raise
+            if st.st_size == 0:
+                return open(path, 'wb+')
+        return None
 
     def close(self):
         log.info("... closing")

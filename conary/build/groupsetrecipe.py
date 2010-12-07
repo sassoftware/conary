@@ -1563,7 +1563,6 @@ class SG(_SingleGroup):
 class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = GroupSearchPathTroveSet
-    RemoveAction = GroupDifferenceAction
     FlattenAction = FlattenAction
 
 class GroupScript(object):
@@ -1776,7 +1775,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         NAME
         ====
-        B{C{GroupSetRecipe.writeDotGraph}}
+        B{C{GroupSetRecipe.writeDotGraph}} - write "dot" graph for recipe
 
         SYNOPSIS
         ========
@@ -1880,12 +1879,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         Returns a standard troveset with an extra attribute called
         C{searchPath}, which is a TroveSet representing the final
-        SearchPath from the model.  This search path is often used
-        for dependency resolution, though unioning it with the
-        optional portions of the resulting trove set is the normal
-        usage pattern. (Unioning with only the optional portion
-        is not functionally distinct from unioning with the entire
-        result, but is faster).
+        SearchPath from the model.  This search path is normally used
+        for dependency resolution.
 
         PARAMETERS
         ==========
@@ -1906,7 +1901,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
              install httpd
              install mod_ssl
          ''')
-         needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+         needed = ts.depsNeeded(ts.searchPath)
          finalSet = ts + needed
 
         If you are using a product definition and want to use the
@@ -1927,7 +1922,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
              install httpd
              install mod_ssl
          ''', searchPath=searchPath)
-         needed = ts.depsNeeded(ts.searchPath + ts.getOptional())
+         needed = ts.depsNeeded(ts.searchPath)
          finalSet = ts + needed
         """
         if searchPath is None:
@@ -1938,6 +1933,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
         model = cml.CML(None)
         lineNum = findRecipeLineNumber()
+        if isinstance(modelText, str):
+            modelText = modelText.split('\n')
         model.parse(modelText, context = '(recipe):%d' % lineNum)
 
         comp = ModelCompiler(self.flavor, self.repos, self.g)

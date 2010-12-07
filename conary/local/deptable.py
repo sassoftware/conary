@@ -452,8 +452,10 @@ class DependencyChecker:
                     troveListIter = trv.iterTroveList(strongRefs=True,
                                                       weakRefs=True)
                 else:
-                    troveListIter = self.troveSource.getPackageComponents(
-                                            ( job[0], job[2][0], job[2][1] ))
+                    troveListIter = [ (name, job[2][0], job[2][1])
+                                      for name in
+                                      self.troveSource.getPackageComponents(
+                                            ( job[0], job[2][0], job[2][1] )) ]
 
                 for info in troveListIter:
                     targetTrove = getNew(info, -1)
