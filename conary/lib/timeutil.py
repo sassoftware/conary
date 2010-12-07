@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2010 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+import logging
+import time
+
+
+class ISOFormatter(logging.Formatter):
+    """
+    Logging formatter for ISO 8601 timestamps with milliseconds.
+    """
+
+    def formatTime(self, record, datefmt=None):
+        timetup = time.localtime(record.created)
+        if timetup.tm_isdst:
+            tz_seconds = time.altzone
+        else:
+            tz_seconds = time.timezone
+        tz_offset = abs(tz_seconds / 60)
+        tz_sign = (time.timezone < 0 and '+' or '-')
+
+        timestampPart = time.strftime('%F %T', timetup)
+        return '%s.%03d%s%02d%02d' % (timestampPart, record.msecs, tz_sign,
+                tz_offset / 60, tz_offset % 60)

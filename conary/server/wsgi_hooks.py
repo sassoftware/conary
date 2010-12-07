@@ -63,11 +63,8 @@ class WSGIServer(object):
         self.proxyServer = None
         self.restHandler = None
 
-        # TODO: figure out how to emit logs that aren't forcibly prefixed by
-        # mod_wsgi. Maybe just start logging to a different place instead of
-        # relying on httpd's error_log.
         cny_log.setupLogging(consoleLevel=logging.INFO,
-                consoleFormat='apache_short')
+                consoleFormat='apache')
 
         log.info("pid=%s cache=0x%x threaded=%s", os.getpid(),
                 id(_config_cache), environ['wsgi.multithread'])

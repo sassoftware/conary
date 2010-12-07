@@ -32,14 +32,16 @@ from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOWLEVEL=DEBUG - 5
 from conary import constants
 from conary.lib import xmllog
+from conary.lib import timeutil
 
 
 FORMATS = {
-        'apache': ('[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s',
-            '%a %b %d %T %Y'),
+        'apache': timeutil.ISOFormatter(
+            '[%(asctime)s] [%(levelname)s] (%(name)s) %(message)s'),
         'apache_short': ('(%(name)s) %(message)s', None),
         'console': ('%(levelname)s: %(message)s', None),
-        'file': ('%(asctime)s %(levelname)s %(name)s : %(message)s', None),
+        'file': timeutil.ISOFormatter(
+            '%(asctime)s %(levelname)s %(name)s : %(message)s'),
         }
 
 syslog = None
@@ -257,9 +259,7 @@ def setupLogging(logPath=None, consoleLevel=logging.WARNING,
 
     # Console handler
     if consoleLevel is not None:
-        if consoleFormat in FORMATS:
-            consoleFormat = FORMATS[consoleFormat]
-        consoleFormatter = logging.Formatter(*consoleFormat)
+        consoleFormatter = _getFormatter(consoleFormat)
         consoleHandler = logging.StreamHandler()
         consoleHandler.setFormatter(consoleFormatter)
         consoleHandler.setLevel(consoleLevel)
@@ -268,9 +268,7 @@ def setupLogging(logPath=None, consoleLevel=logging.WARNING,
 
     # File handler
     if logPath and fileLevel is not None:
-        if fileFormat in FORMATS:
-            fileFormat = FORMATS[fileFormat]
-        logfileFormatter = logging.Formatter(*fileFormat)
+        logfileFormatter = _getFormatter(fileFormat)
         logfileHandler = logging.FileHandler(logPath)
         logfileHandler.setFormatter(logfileFormatter)
         logfileHandler.setLevel(fileLevel)
@@ -279,3 +277,19 @@ def setupLogging(logPath=None, consoleLevel=logging.WARNING,
 
     logger.setLevel(level)
     return logger
+
+
+def _getFormatter(format):
+    """Logging formats can be:
+     * A string - the record format
+     * A tuple - the record format and timestamp format
+     * An instance of Formatter or a subclass
+     * A string selecting a tuple or instance from FORMATS
+    """
+    if format in FORMATS:
+        format = FORMATS[format]
+    if isinstance(format, basestring):
+        format = (format,)
+    if isinstance(format, logging.Formatter):
+        return format
+    return logging.Formatter(*format)
