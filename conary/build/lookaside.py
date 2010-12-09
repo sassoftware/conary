@@ -31,7 +31,7 @@ from conary.lib import util
 from conary import callbacks
 from conary.build.mirror import Mirror
 from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
-from conary.repository import transport
+
 
 NETWORK_SCHEMES = ('http', 'https', 'ftp', 'mirror')
 
