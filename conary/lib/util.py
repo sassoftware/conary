@@ -1179,8 +1179,12 @@ class BZ2File:
                 if self.leftover:
                     # we have some uncompressed stuff left, return
                     # it
-                    rc = self.leftover[:]
-                    self.leftover = None
+                    if len(self.leftover) > bytes:
+                        rc = self.leftover[:bytes]
+                        self.leftover = self.leftover[bytes:]
+                    else:
+                        rc = self.leftover[:]
+                        self.leftover = None
                     return rc
                 # done returning all data, return None as the EOF
                 return None
@@ -2035,7 +2039,18 @@ def convertPackageNameToClassName(pkgname):
 class LZMAFile:
 
     def read(self, limit = 4096):
-        return os.read(self.infd, limit)
+        # Read exactly the specified amount of bytes. Since the underlying
+        # file descriptor is a pipe, os.read may return with fewer than
+        # expected bytes, so we need to iterate
+        buffers = []
+        pos = 0
+        while pos < limit:
+            buf = os.read(self.infd, limit - pos)
+            if not buf:
+                break
+            buffers.append(buf)
+            pos += len(buf)
+        return ''.join(buffers)
 
     def close(self):
         if self.childpid:
@@ -2048,7 +2063,7 @@ class LZMAFile:
 
     def __init__(self, fileobj = None):
         self.executable = None
-        for executable, args in (('xz', ('-dc',)), ('unlzma', ())):
+        for executable, args in (('xz', ('-dc',)), ('unlzma', ('-dc',))):
             for pathElement in os.getenv('PATH', '').split(os.path.pathsep):
                 fullpath = os.sep.join((pathElement, executable))
                 if os.path.exists(fullpath):
@@ -2065,13 +2080,25 @@ class LZMAFile:
         if self.childpid == 0:
             try:
                 os.close(self.infd)
+                if isinstance(fileobj, gzip.GzipFile):
+                    # We can't rely on the underlying file descriptor to feed
+                    # correct data.
+                    # This should really be made to use the read() method of
+                    # fileobj
+                    f = tempfile.TemporaryFile()
+                    copyfileobj(fileobj, f)
+                    f.seek(0)
+                    fileobj.close()
+                    fileobj = f
                 os.close(0)
                 os.close(1)
+
                 fd = fileobj.fileno()
                 # this undoes any buffering
                 os.lseek(fd, fileobj.tell(), 0)
+
                 os.dup2(fd, 0)
-                os.close(fd)
+                fileobj.close() # This closes fd
                 os.dup2(outfd, 1)
                 os.close(outfd)
                 os.execv(self.executable, commandLine)
@@ -2447,6 +2474,7 @@ class AtomicFile(object):
             self.fObj.close()
     __del__ = close
 
+
 class TimestampedMap(object):
     """
     A map that timestamps entries, to cycle them out after delta seconds.
@@ -2475,3 +2503,35 @@ class TimestampedMap(object):
 
     def clear(self):
         self._map.clear()
+
+
+def statFile(pathOrFile, missingOk=False, inodeOnly=False):
+    """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
+
+    Accepts paths, file descriptors, and file-like objects with a C{fileno()}
+    method.
+
+    @param pathOrFile: A file path or file-like object
+    @type  pathOrFile: C{basestring} or file-like object or C{int}
+    @param missingOk: If C{True}, return C{None} if the file is missing.
+    @type  missingOk: C{bool}
+    @param inodeOnly: If C{True}, return just (dev, inode).
+    @type  inodeOnly: C{bool}
+    @rtype: C{tuple}
+    """
+    try:
+        if isinstance(pathOrFile, basestring):
+            st = os.stat(pathOrFile)
+        else:
+            if hasattr(pathOrFile, 'fileno'):
+                pathOrFile = pathOrFile.fileno()
+            st = os.fstat(pathOrFile)
+    except OSError, err:
+        if err.errno == errno.ENOENT and missingOk:
+            return None
+        raise
+
+    if inodeOnly:
+        return (st.st_dev, st.st_ino)
+    else:
+        return (st.st_dev, st.st_ino, st.st_size, st.st_mtime, st.st_ctime)

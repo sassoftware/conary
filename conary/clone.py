@@ -16,8 +16,9 @@ import itertools
 from conary import callbacks
 from conary import errors
 from conary import versions
-from conary import conaryclient
 from conary.conaryclient import ConaryClient, cmdline
+from conary.conaryclient import callbacks as client_callbacks
+
 
 def displayCloneJob(cs):
     indent = '   '
@@ -59,7 +60,7 @@ def CloneTrove(cfg, targetBranch, troveSpecList, updateBuildInfo = True,
     trovesToClone = list(set(itertools.chain(*trovesToClone.itervalues())))
 
     if not client.cfg.quiet:
-        callback = conaryclient.callbacks.CloneCallback(client.cfg, message)
+        callback = client_callbacks.CloneCallback(client.cfg, message)
     else:
         callback = callbacks.CloneCallback()
 
@@ -161,7 +162,7 @@ def promoteTroves(cfg, troveSpecs, targetList, skipBuildInfo=False,
     trovesToClone = list(set(trovesToClone))
 
     if not client.cfg.quiet:
-        callback = conaryclient.callbacks.CloneCallback(client.cfg, message)
+        callback = client_callbacks.CloneCallback(client.cfg, message)
     else:
         callback = callbacks.CloneCallback()
 

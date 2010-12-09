@@ -15,6 +15,7 @@
 
 import codecs
 import os
+import re
 import sys
 import textwrap
 import time
@@ -29,6 +30,9 @@ HEADINGS = [
         ]
 KINDS = set(x[0] for x in HEADINGS)
 NEWSDIR = 'NEWS.src'
+
+RE_ISSUE = re.compile('^[A-Z0-9]+-\d+')
+
 
 def main():
     rootdir = os.path.realpath(__file__ + '/../..')
@@ -115,7 +119,7 @@ def preview(repo, modifiedOK=True):
         htmlOut.append("<ul>")
         for _, issue, _, entry in sorted(entries):
             htmlEntry = '    <li>' + entry
-            if not issue.startswith('misc-'):
+            if RE_ISSUE.match(issue):
                 entry += ' (%s)' % issue
                 htmlEntry += ' (<a href="https://issues.rpath.com/browse/%s">%s</a>)' % (issue,issue)
             lines = textwrap.wrap(entry, 66)
@@ -149,7 +153,13 @@ def generate(repo):
     print >> sys.stderr, "Updated NEWS"
     print >> sys.stderr, "Wrote NEWS.html"
 
-    repo.remove(files, unlink=True)
+    wlock = repo.wlock()
+    try:
+        for name in files:
+            os.unlink(name)
+            repo.dirstate.remove(name)
+    finally:
+        wlock.release()
     print >> sys.stderr, "Deleted %s news fragments" % len(files)
 
 

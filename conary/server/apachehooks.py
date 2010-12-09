@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,6 +14,7 @@
 
 from mod_python import apache
 from email import MIMEText
+import logging
 import os
 import sys
 import time
@@ -138,6 +139,8 @@ def handler(req):
         coveragehook.save()
 
 def _handler(req):
+    log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
+
     repName = req.filename
     if repName in repositories:
         repServer, proxyServer, restHandler = repositories[repName]
@@ -204,6 +207,11 @@ def _handler(req):
 
     try:
         try:
+            # reopen database connections early to make sure crest gets a
+            # working database connection
+            if repServer:
+                repServer.reopen()
+
             if method == "POST":
                 return post(port, secure, proxyServer, req)
             elif method == "GET":

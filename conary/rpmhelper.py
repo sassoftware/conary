@@ -159,6 +159,19 @@ class _RpmHeader(object):
         FILESIZES, FILEMODES, FILERDEVS, FILELINKTOS, FILEFLAGS,
         FILEVERIFYFLAGS, FILEDIGESTS, FILEMTIMES])
 
+    class _Stat(object):
+        """
+        An object that groups useful information about a file.
+        """
+        __slots__ = [ 'path', 'size', 'user', 'group', 'flags', ]
+        # Add more stuff to __slots__ as needed
+        def __init__(self, **kwargs):
+            for slot in self.__slots__:
+                setattr(self, slot, kwargs.get(slot))
+
+        def isEmpty(self):
+            return self.size == 0 or (self.flags & RPMFILE_GHOST)
+
     def has_key(self, tag):
         # __getitem__ assumes OLDFILENAMES is always present
         return self.entries.has_key(tag) or tag == OLDFILENAMES or \
@@ -189,13 +202,26 @@ class _RpmHeader(object):
 
         return default
 
+    def getFiles(self):
+        for path, size, username, groupname, flags in itertools.izip(
+                self.paths(), self[FILESIZES], self[FILEUSERNAME],
+                self[FILEGROUPNAME], self[FILEFLAGS]):
+            yield self._Stat(path=path, size=size, user=username,
+                group=groupname, flags=flags)
+
+    def getFilesByPath(self, paths):
+        paths = set(paths)
+        for f in self.getFiles():
+            if f.path in paths:
+                yield f
+
     # regexs used in _getDepsetFromHeader below
     flagre = re.compile('\((.*?)\)')
     depnamere = re.compile('(.*?)\(.*')
     localere = re.compile('locale\((.*)\)')
     kmodre = re.compile('(kernel|ksym)\((.*)\)')
 
-    def _getDepsetFromHeader(self, tags):
+    def _getDepsetFromHeader(self, tags, mergeKmodSymbols=False):
         if isinstance(tags, tuple):
             assert len(tags) == 2
             rpmdeps = self.get(tags[0], [])
@@ -264,14 +290,20 @@ class _RpmHeader(object):
                         modname = "%s:%s" % (modname, ver)
                     else:
                         log.warning("dependency '%s' is expected to have "
-                                    "a hexidecimal hash >= 8 characters "
+                                    "a hexadecimal hash >= 8 characters "
                                     "for a version. Instead it has a "
                                     "version of '%s' which will be "
                                     "ignored." % (dep, ver))
 
-                    flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
-                    depset.addDep(deps.RpmDependencies,
-                                  deps.Dependency(m.group(1), flags))
+                    if mergeKmodSymbols:
+                        flags = [(modname, deps.FLAG_SENSE_REQUIRED), ]
+                        depset.addDep(deps.RpmDependencies,
+                                      deps.Dependency(m.group(1), flags))
+                    else:
+                        modname = '%s[%s]' % (m.group(1), modname)
+                        flags = []
+                        depset.addDep(deps.RpmDependencies,
+                                      deps.Dependency(modname, flags))
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
@@ -281,21 +313,26 @@ class _RpmHeader(object):
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 
-    def getDeps(self):
+    def getDeps(self, mergeKmodSymbols=False):
         """
         Create two dependency sets that represent the requires and
         provides described in this RPM header object.
 
+        @param mergeKmodSymbols: merge kernel module symbols into a
+        single dependency (False)
         @return: (requires, provides)
         @rtype: two-tuple of deps.DependencySet instances
         """
-        return self.getRequires(), self.getProvides()
+        return (self.getRequires(mergeKmodSymbols=mergeKmodSymbols),
+                self.getProvides(mergeKmodSymbols=mergeKmodSymbols))
 
-    def getProvides(self):
-        return self._getDepsetFromHeader((PROVIDENAME, PROVIDEVERSION, ))
+    def getProvides(self, mergeKmodSymbols=False):
+        return self._getDepsetFromHeader((PROVIDENAME, PROVIDEVERSION, ),
+                                         mergeKmodSymbols=mergeKmodSymbols)
 
-    def getRequires(self):
-        return self._getDepsetFromHeader((REQUIRENAME, REQUIREVERSION, ))
+    def getRequires(self, mergeKmodSymbols=False):
+        return self._getDepsetFromHeader((REQUIRENAME, REQUIREVERSION, ),
+                                         mergeKmodSymbols=mergeKmodSymbols)
 
     def __getitem__(self, tag):
         if tag == OLDFILENAMES and tag not in self.entries:
