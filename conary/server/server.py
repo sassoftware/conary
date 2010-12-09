@@ -49,7 +49,7 @@ from conary.lib import options
 from conary.lib import util
 from conary.lib.cfg import CfgBool, CfgInt, CfgPath
 from conary.lib.tracelog import initLog, logMe
-from conary.repository import changeset, errors, netclient
+from conary.repository import errors, netclient
 from conary.repository.netrepos import netserver, proxy
 from conary.repository.netrepos.proxy import ProxyRepositoryServer, ChangesetFileReader
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
