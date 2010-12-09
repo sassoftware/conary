@@ -1,2 +1,0 @@
-The read method of util.LZMAFile is now properly dealing with short reads from
-the underlying pipe.

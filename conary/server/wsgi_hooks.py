@@ -14,6 +14,7 @@
 import errno
 import logging
 import os
+import traceback
 import xmlrpclib
 from email.Message import Message
 
@@ -23,7 +24,6 @@ from conary.repository import errors
 from conary.repository import filecontainer
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
-from conary.server.server import _readNestedFile, _iterFileChunks
 from conary.web import webauth
 
 log = logging.getLogger('wsgi_hooks')
@@ -31,7 +31,23 @@ log = logging.getLogger('wsgi_hooks')
 _config_cache = {}
 
 
-class application(object):
+def application(environ, start_response):
+    """Wrapper application that catches high-level errors."""
+    server = WSGIServer(environ, start_response)
+    yielded = False
+    try:
+        for chunk in server:
+            yield chunk
+            yielded = True
+    except:
+        traceback.print_exc()
+        if not yielded:
+            headers = [('Content-type', 'text/plain')]
+            start_response('500 Internal Server Error', headers)
+            yield "ERROR: Internal server error.\r\n"
+
+
+class WSGIServer(object):
 
     def __init__(self, environ, start_response):
         self.environ = environ
@@ -46,11 +62,8 @@ class application(object):
         self.proxyServer = None
         self.restHandler = None
 
-        # TODO: figure out how to emit logs that aren't forcibly prefixed by
-        # mod_wsgi. Maybe just start logging to a different place instead of
-        # relying on httpd's error_log.
         cny_log.setupLogging(consoleLevel=logging.INFO,
-                consoleFormat='apache_short')
+                consoleFormat='apache')
 
         log.info("pid=%s cache=0x%x threaded=%s", os.getpid(),
                 id(_config_cache), environ['wsgi.multithread'])
@@ -277,7 +290,10 @@ class application(object):
             return
 
         # TODO: pipeline
-        stream = self.environ['wsgi.input']
+        try:
+            stream = self._getStream()
+        except WrappedResponse, wrapper:
+            yield wrapper.response
         encoding = self.environ.get('HTTP_CONTENT_ENCODING')
         if encoding == 'deflate':
             stream = util.decompressStream(stream)
@@ -347,7 +363,7 @@ class application(object):
         self.start_response('200 OK', headers)
 
         sio.seek(0)
-        for data in _iterFileChunks(sio):
+        for data in util.iterFileChunks(sio):
             yield data
 
     def _iter_get(self):
@@ -378,6 +394,9 @@ class application(object):
 
         items = []
         totalSize = 0
+
+        # TODO: incorporate the improved logic here into
+        # proxy.ChangesetFileReader and consume it here.
 
         if path.endswith('.cf-out'):
             # Manifest of files to send sequentially (file contents or cached
@@ -423,16 +442,17 @@ class application(object):
             ('Content-type', 'application/x-conary-change-set'),
             ('Content-length', str(totalSize)),
             ])
+        readNestedFile = proxy.ChangesetFileReader.readNestedFile
         for path, isChangeset, preserveFile in items:
             if isChangeset:
                 csFile = util.ExtendedFile(path, 'rb', buffering=False)
                 changeSet = filecontainer.FileContainer(csFile)
-                for data in changeSet.dumpIter(_readNestedFile):
+                for data in changeSet.dumpIter(readNestedFile):
                     yield data
                 del changeSet
             else:
                 fobj = open(path, 'rb')
-                for data in _iterFileChunks(fobj):
+                for data in util.iterFileChunks(fobj):
                     yield data
                 fobj.close()
 
@@ -478,6 +498,19 @@ class application(object):
                 return open(path, 'wb+')
         return None
 
+    def _getStream(self):
+        if self.environ.get('HTTP_TRANSFER_ENCODING', 'identity') != 'identity':
+            raise WrappedResponse(self._response('400 Bad Request',
+                    "ERROR: Unrecognized Transfer-Encoding\r\n"))
+        try:
+            size = int(self.environ['CONTENT_LENGTH'])
+        except ValueError:
+            raise WrappedResponse(self._response('411 Length Required',
+                    "ERROR: Invalid or missing Content-Length\r\n"))
+
+        stream = self.environ['wsgi.input']
+        return LengthConstrainingWrapper(stream, size)
+
     def close(self):
         log.info("... closing")
         # Make sure any pooler database connections are released.
@@ -485,5 +518,30 @@ class application(object):
             self.repositoryServer.reset()
 
 
+class LengthConstrainingWrapper(object):
+    """
+    A file-like object that returns at most C{size} bytes before pretending to
+    hit end-of-file.
+    """
+
+    def __init__(self, fobj, size):
+        self.fobj = fobj
+        self.remaining = size
+
+    def read(self, size=None):
+        if size is None:
+            size = self.remaining
+        else:
+            size = min(size, self.remaining)
+        self.remaining -= size
+        return self.fobj.read(size)
+
+
 class ConfigurationError(RuntimeError):
     pass
+
+
+class WrappedResponse(Exception):
+
+    def __init__(self, response):
+        self.response = response

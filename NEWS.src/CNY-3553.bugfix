@@ -1,1 +1,0 @@
-The LZMAFile class can now handle gzip-compressed file streams.

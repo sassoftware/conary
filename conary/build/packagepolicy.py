@@ -2332,17 +2332,14 @@ class _dependency(policy.Policy):
             pythonPath = [m.contents['interpreter']]
         else:
             pythonVersion = self._getPythonVersionFromPath(path, None)
+            # After PATH, fall back to %(bindir)s.  If %(bindir)s should be
+            # preferred, it needs to be earlier in the PATH.  Include 
+            # unversioned python as a last resort for confusing cases.
+            shellPath = os.environ.get('PATH', '').split(':') + [ '%(bindir)s' ]
+            pythonPath = []
             if pythonVersion:
-                # After %(bindir)s, fall back to /usr/bin so that package
-                # modifications do not break the search for system python
-                # Include unversioned as a last resort for confusing
-                # cases.
-                pythonPath = [ '%(bindir)s/' + pythonVersion,
-                               '/usr/bin/' + pythonVersion,
-                               '%(bindir)s/python',
-                               '/usr/bin/python', ]
-            else:
-                pythonPath = [ '/usr/bin/python' ]
+                pythonPath = [ os.path.join(x, pythonVersion) for x in shellPath ]
+            pythonPath.extend([ os.path.join(x, 'python') for x in shellPath ])
 
         for pathElement in pythonPath:
             pythonDestPath = ('%(destdir)s'+pathElement) %macros
@@ -3599,7 +3596,7 @@ class Requires(_addInfo, _dependency):
 
             # generate site-packages list for destdir
             # (look in python base directory first)
-            pythonDir = os.popen("""python -c 'import os,sys; print sys.modules["os"].__file__'""").read().strip()
+            pythonDir = os.popen("""%s -c 'import os,sys; print sys.modules["os"].__file__'""" % pythonPath).read().strip()
 
             sys.path = [destdir + pythonDir]
             sys.prefix = destdir + sys.prefix
