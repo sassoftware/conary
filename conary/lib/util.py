@@ -2537,3 +2537,12 @@ def statFile(pathOrFile, missingOk=False, inodeOnly=False):
         return (st.st_dev, st.st_ino)
     else:
         return (st.st_dev, st.st_ino, st.st_size, st.st_mtime, st.st_ctime)
+
+
+def iterFileChunks(fobj):
+    """Yield chunks of data from the given file object."""
+    while True:
+        data = fobj.read(16384)
+        if not data:
+            break
+        yield data

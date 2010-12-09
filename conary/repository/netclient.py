@@ -214,33 +214,37 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             exceptionName = result[0]
             exceptionArgs = result[1]
             exceptionKwArgs = result[2]
-
-        if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
-            # old repositories give TIE w/ no trove information or with a
-            # string error message. exceptionArgs[0] is that message if
-            # exceptionArgs[1] is not set or is empty.
-            raise errors.TroveIntegrityError(error=exceptionArgs[0],
-                                        *self.toTroveTup(exceptionArgs[1]))
-        elif not hasattr(errors, exceptionName):
-            raise errors.UnknownException(exceptionName, exceptionArgs)
-        else:
-            exceptionClass = getattr(errors, exceptionName)
-
-            if hasattr(exceptionClass, 'demarshall'):
-                args, kwArgs = exceptionClass.demarshall(self, exceptionArgs,
-                                                         exceptionKwArgs)
-                raise exceptionClass(*args, **kwArgs)
-
-            for klass, marshall in errors.simpleExceptions:
-                if exceptionName == marshall:
-                    raise klass(exceptionArgs[0])
-            raise errors.UnknownException(exceptionName, exceptionArgs)
+        raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
 
     def __getattr__(self, name):
         # Don't invoke methods that start with __
         if name.startswith('__'):
             raise AttributeError(name)
         return xmlrpclib._Method.__getattr__(self, name)
+
+
+def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
+    conv = xmlshims.NetworkConvertors()
+    if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
+        # old repositories give TIE w/ no trove information or with a
+        # string error message. exceptionArgs[0] is that message if
+        # exceptionArgs[1] is not set or is empty.
+        return errors.TroveIntegrityError(error=exceptionArgs[0],
+                                    *conv.toTroveTup(exceptionArgs[1]))
+    elif not hasattr(errors, exceptionName):
+        return errors.UnknownException(exceptionName, exceptionArgs)
+    else:
+        exceptionClass = getattr(errors, exceptionName)
+
+        if hasattr(exceptionClass, 'demarshall'):
+            args, kwArgs = exceptionClass.demarshall(conv, exceptionArgs,
+                                                     exceptionKwArgs)
+            raise exceptionClass(*args, **kwArgs)
+
+        for klass, marshall in errors.simpleExceptions:
+            if exceptionName == marshall:
+                return klass(exceptionArgs[0])
+        return errors.UnknownException(exceptionName, exceptionArgs)
 
 class ServerProxy(util.ServerProxy):
 

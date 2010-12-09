@@ -231,13 +231,15 @@ def get(port, isSecure, repos, req, restHandler=None):
             items = [ (localName, size, 0, 0) ]
             totalSize = size
 
+        # TODO: refactor to use proxy.ChangesetFileReader
+        readNestedFile = proxy.ChangesetFileReader.readNestedFile
         req.content_type = "application/x-conary-change-set"
         req.set_content_length(totalSize)
         for (path, size, isChangeset, preserveFile) in items:
             if isChangeset:
                 cs = FileContainer(util.ExtendedFile(path, buffering=False))
                 try:
-                    for data in cs.dumpIter(_readNestedFile):
+                    for data in cs.dumpIter(readNestedFile):
                         req.write(data)
                 except IOError, err:
                     log.error("IOError dumping changeset: %s" % err)

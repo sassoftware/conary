@@ -24,7 +24,6 @@ from conary.repository import errors
 from conary.repository import filecontainer
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
-from conary.server.server import _readNestedFile, _iterFileChunks
 from conary.web import webauth
 
 log = logging.getLogger('wsgi_hooks')
@@ -364,7 +363,7 @@ class WSGIServer(object):
         self.start_response('200 OK', headers)
 
         sio.seek(0)
-        for data in _iterFileChunks(sio):
+        for data in util.iterFileChunks(sio):
             yield data
 
     def _iter_get(self):
@@ -395,6 +394,9 @@ class WSGIServer(object):
 
         items = []
         totalSize = 0
+
+        # TODO: incorporate the improved logic here into
+        # proxy.ChangesetFileReader and consume it here.
 
         if path.endswith('.cf-out'):
             # Manifest of files to send sequentially (file contents or cached
@@ -440,16 +442,17 @@ class WSGIServer(object):
             ('Content-type', 'application/x-conary-change-set'),
             ('Content-length', str(totalSize)),
             ])
+        readNestedFile = proxy.ChangesetFileReader.readNestedFile
         for path, isChangeset, preserveFile in items:
             if isChangeset:
                 csFile = util.ExtendedFile(path, 'rb', buffering=False)
                 changeSet = filecontainer.FileContainer(csFile)
-                for data in changeSet.dumpIter(_readNestedFile):
+                for data in changeSet.dumpIter(readNestedFile):
                     yield data
                 del changeSet
             else:
                 fobj = open(path, 'rb')
-                for data in _iterFileChunks(fobj):
+                for data in util.iterFileChunks(fobj):
                     yield data
                 fobj.close()
 
