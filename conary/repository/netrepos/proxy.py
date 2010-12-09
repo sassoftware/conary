@@ -1390,15 +1390,21 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
         # 44 returns a string to avoid XML-RPC marshal limits
         sizes = [ int(x) for x in sizes ]
 
-        (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                         suffix = '.tmp')
-        dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
-        os.close(fd)
-        os.unlink(tmpPath)
-        inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
-        size = util.copyfileobj(inUrl, dest)
-        inUrl.close()
-        dest.seek(0)
+        if hasattr(url, "read"):
+            dest = url
+            dest.seek(0, 2)
+            size = dest.tell()
+            dest.seek(0)
+        else:
+            (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                             suffix = '.tmp')
+            dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
+            os.close(fd)
+            os.unlink(tmpPath)
+            inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            size = util.copyfileobj(inUrl, dest)
+            inUrl.close()
+            dest.seek(0)
 
         totalSize = sum(sizes)
         start = 0
@@ -1481,6 +1487,7 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
         fobj.seek(0)
         return fobj
 
+
 class ProxyRepositoryServer(FileCachingChangesetFilter):
 
     SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
@@ -1510,6 +1517,7 @@ class ProxyRepositoryServer(FileCachingChangesetFilter):
             items[0] = proto
             items[1] = proxyHost
             self._baseUrlOverride = urlparse.urlunparse(items)
+
 
     def getFileContentsFromTrove(self, caller, authToken, clientVersion,
                                  troveName, version, flavor, pathList):
@@ -1614,15 +1622,34 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
                 authCheckOnly=authCheckOnly)
             if not otherFileList:
                 return url, sizes
+            url = self._localUrl(url)
             self._saveFileContents(capsuleBasedFileList, url, sizes)
         if otherFileList:
             url, sizes = caller.getFileContents(clientVersion, otherFileList,
                 authCheckOnly)
             if not capsuleBasedFileList:
                 return url, sizes
+            url = self._localUrl(url)
             self._saveFileContents(otherFileList, url, sizes)
         # Now reassemble the results
         return self._saveFileContentsChangeset(clientVersion, fileList)
+
+    def _localUrl(self, url):
+        # If the changeset can be downloaded locally, return it
+        parts = util.urlSplit(url)
+        fname = parts[6]
+        csfr = ChangesetFileReader(self.cfg.tmpDir)
+        items = csfr.getItems(fname)
+        if items is None:
+            return url
+        (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                         suffix = '.tmp')
+        dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
+        os.close(fd)
+        os.unlink(tmpPath)
+        csfr.writeItems(items, dest)
+        dest.seek(0)
+        return dest
 
 class ChangesetCache(object):
     __slots__ = ['dataStore', 'locksMap']
@@ -1736,6 +1763,69 @@ class ProxyRepositoryError(Exception):
         self.name = name
         self.args = tuple(args)
         self.kwArgs = kwArgs
+
+class ChangesetFileReader(object):
+    def __init__(self, tmpDir):
+        self.tmpDir = tmpDir
+
+    @classmethod
+    def _writeNestedFile(cls, outF, name, tag, size, f, sizeCb):
+        if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
+            path = f.read()
+            size = os.stat(path).st_size
+            f = open(path)
+            tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+
+        sizeCb(size, tag)
+        util.copyfileobj(f, outF)
+
+    def getItems(self, fileName):
+        localName = self.tmpDir + "/" + fileName + "-out"
+        if os.path.realpath(localName) != localName:
+            return None
+
+        if localName.endswith(".cf-out"):
+            try:
+                f = open(localName, "r")
+            except IOError:
+                return None
+
+            os.unlink(localName)
+
+            items = []
+            for l in f.readlines():
+                (path, size, isChangeset, preserveFile) = l.split()
+                size = int(size)
+                isChangeset = int(isChangeset)
+                preserveFile = int(preserveFile)
+                items.append((path, size, isChangeset, preserveFile))
+            f.close()
+            del f
+        else:
+            try:
+                size = os.stat(localName).st_size;
+            except OSError:
+                return None
+            items = [ (localName, size, 0, 0) ]
+        return items
+
+    def writeItems(self, items, wfile):
+        for path, size, isChangeset, preserveFile in items:
+            if isChangeset:
+                cs = filecontainer.FileContainer(util.ExtendedFile(path,
+                                                     buffering = False))
+                cs.dump(wfile.write,
+                        lambda name, tag, size, f, sizeCb:
+                            self._writeNestedFile(wfile, name, tag, size, f,
+                                             sizeCb))
+
+                del cs
+            else:
+                f = open(path)
+                util.copyfileobj(f, wfile)
+
+            if not preserveFile:
+                os.unlink(path)
 
 # ewtroan: for the internal proxy, we support client version 38 but need to talk to a server which is at least version 41
 # ewtroan: for external proxy, we support client version 41 and need a server which is at least 41
