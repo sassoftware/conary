@@ -82,10 +82,8 @@ class WindowsHelper:
         self.productCode = self.resource.productCode.encode('utf-8')
         self.upgradeCode = self.resource.upgradeCode.encode('utf-8')
 
-        # FIXME: Disabled until the Windows Build Service supports exposing MSI
-        #        components for MSIs that it did not generate (RBL-7484)
-        #self.components = [ (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
-        #    for x in self.resource.components ]
+        self.components = [ (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
+            for x in self.resource.components ]
 
         # clean up
         try:
