@@ -447,6 +447,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @requireClientProtocol(60)
     def addAcl(self, authToken, clientVersion, role, trovePattern,
                label, write = False, remove = False):
+        if not self.auth.authCheck(authToken, admin=True):
+            raise errors.InsufficientPermission
         self.log(2, authToken[0], role, trovePattern, label,
                  "write=%s remove=%s" % (write, remove))
         if trovePattern == "":
@@ -1902,7 +1904,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
-        if not self.auth.authCheck(authToken, mirror = True):
+        # Need both mirror and write permissions.
+        if not (self.auth.authCheck(authToken, mirror=True)
+                and self.auth.check(authToken, write=True)):
             raise errors.InsufficientPermission
 
         self.repos.troveStore.presentHiddenTroves()
@@ -2780,10 +2784,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def listSubkeys(self, authToken, label, fingerprint):
         self.log(2, authToken[0], label, fingerprint)
+        # Public function. Don't check auth.
         return self.repos.troveStore.keyTable.getSubkeys(fingerprint)
 
     @accessReadOnly
     def getOpenPGPKeyUserIds(self, authToken, label, keyId):
+        # Public function. Don't check auth.
         return self.repos.troveStore.keyTable.getUserIds(keyId)
 
     @accessReadOnly
@@ -2841,7 +2847,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-        if not self.auth.authCheck(authToken, mirror = True):
+        # Need both mirror and write permissions.
+        if not (self.auth.authCheck(authToken, mirror=True)
+                and self.auth.check(authToken, write=True)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], host, mark)
         cu = self.db.cursor()
@@ -3148,7 +3156,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addPGPKeyList(self, authToken, clientVersion, keyList):
-        if not self.auth.authCheck(authToken, mirror = True):
+        # Need both mirror and write permissions.
+        if not (self.auth.authCheck(authToken, mirror=True)
+                and self.auth.check(authToken, write=True)):
             raise errors.InsufficientPermission
 
         for encKey in keyList:

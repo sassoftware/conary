@@ -172,3 +172,8 @@ class Conary(CPackageRecipe, Python.VersionMixIn):
             r.Requires('python:lib', '%(sitepkgs)s/.*')
             r.Requires('pycrypto:python', '%(sitepkgs)s/lib/sha1helper.py')
             r.Requires('elementtree:python', '%(sitepkgs)s/build/packagepolicy.py')
+
+        r.macros.pybin = "/usr/bin/python%(pyver)s"
+        versionMap = [ ('/usr/bin/python%s' % x, '%(pybin)s')
+            for x in [ '', '2.4', '2.5', '2.6' ] ]
+        r.NormalizePythonInterpreterVersion(versionMap=versionMap)
