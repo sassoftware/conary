@@ -1611,22 +1611,31 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
         # changeset. So if exactly one type of file contents are requested, we
         # return immediately.
         if capsuleBasedFileList:
-            url, sizes = FileCachingChangesetFilter.getFileContents(self,
+            result = FileCachingChangesetFilter.getFileContents(self,
                 caller, authToken, clientVersion, capsuleBasedFileList,
                 authCheckOnly=authCheckOnly)
             if not otherFileList:
-                return url, sizes
-            url = self._localUrl(url)
-            self._saveFileContents(capsuleBasedFileList, url, sizes)
+                return result
+            elif not authCheckOnly:
+                url, sizes = result
+                url = self._localUrl(url)
+                self._saveFileContents(capsuleBasedFileList, url, sizes)
         if otherFileList:
-            url, sizes = caller.getFileContents(clientVersion, otherFileList,
+            result = caller.getFileContents(clientVersion, otherFileList,
                 authCheckOnly)
             if not capsuleBasedFileList:
-                return url, sizes
-            url = self._localUrl(url)
-            self._saveFileContents(otherFileList, url, sizes)
+                return result
+            elif not authCheckOnly:
+                url, sizes = result
+                url = self._localUrl(url)
+                self._saveFileContents(otherFileList, url, sizes)
         # Now reassemble the results
-        return self._saveFileContentsChangeset(clientVersion, fileList)
+        if authCheckOnly:
+            # The getFileContents calls above will raise an exception if
+            # something failed the auth check.
+            return True
+        else:
+            return self._saveFileContentsChangeset(clientVersion, fileList)
 
     def _localUrl(self, url):
         # If the changeset can be downloaded locally, return it
