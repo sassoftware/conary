@@ -18,7 +18,6 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import itertools
-import gzip
 import os
 import re
 import shutil, subprocess
@@ -26,15 +25,143 @@ import shlex
 import sys
 import tempfile
 import stat
+import httplib
 
 from conary.lib import debugger, digestlib, log, magic, sha1helper
-from conary.build import lookaside
 from conary import rpmhelper
 from conary.lib import openpgpfile, util
 from conary.build import action, errors, filter
 from conary.build.errors import RecipeFileError
 from conary.build.manifest import Manifest, ExplicitManifest
 from conary.repository import transport
+
+from conary.build.action import TARGET_LINUX
+from conary.build.action import TARGET_WINDOWS
+
+class WindowsHelper:
+    def __init__(self):
+        self.path = None
+        self.version = None
+        self.platform = None
+        self.productName = None
+        self.productCode = None
+        self.upgradeCode = None
+        self.components = []
+
+    def extractMSIInfo(self, path, wbs):
+        import robj
+
+        self.fileType = 'msi'
+        self.path = path
+
+        # This is here for backwards compatibility.
+        if not wbs.startswith('http'):
+            wbs = 'http://%s/api' % wbs
+
+        api = robj.connect(wbs)
+        api.msis.append(dict(
+            path=os.path.split(path)[1],
+            size=os.stat(path).st_size,
+        ))
+        self.resource = api.msis[-1]
+
+        # put the actual file contents
+        self.resource.path = open(path)
+        self.resource.refresh()
+
+        self.productName = self.resource.name.encode('utf-8')
+        name = self.productName.split()
+        if len(name) > 1 and '.' in name[-1]:
+            name = '-'.join(name[:-1])
+        else:
+            name = '-'.join(name)
+        self.name = name
+        self.version = self.resource.version.encode('utf-8')
+        self.platform = self.resource.platform.encode('utf-8')
+        self.productCode = self.resource.productCode.encode('utf-8')
+        self.upgradeCode = self.resource.upgradeCode.encode('utf-8')
+
+        # FIXME: Disabled until the Windows Build Service supports exposing MSI
+        #        components for MSIs that it did not generate (RBL-7484)
+        #self.components = [ (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
+        #    for x in self.resource.components ]
+
+        # clean up
+        try:
+            self.resource.delete()
+        except httplib.ResponseNotReady:
+            pass
+
+
+    def extractWIMInfo(self, path, wbs, volumeIndex=1):
+        self.volumeIndex = volumeIndex
+
+        import robj
+        from xobj import xobj
+
+        self.fileType = 'wim'
+        self.path = path
+
+        # This is here for backwards compatibility.
+        if not wbs.startswith('http'):
+            wbs = 'http://%s/api' % wbs
+
+        # create the resource
+        api = robj.connect(wbs)
+        api.images.append({'createdBy': 'conary-build'})
+
+        try:
+            image = api.images[-1]
+
+            # upload the image
+            name = os.path.basename(path)
+            fobj = open(path, 'rb')
+            size = os.fstat(fobj.fileno()).st_size
+            image.files.append({'path': name + '.wim',
+                                   'type': self.fileType,
+                                   'size': size,})
+            file_res = image.files[-1]
+            data = robj.HTTPData(data=fobj, size=size, chunked=True)
+            file_res.path = data
+
+            file_res.refresh()
+            self.wimInfoXml = file_res.wimInfo.read()
+            self.wimInfo = xobj.parse(self.wimInfoXml)
+            self.volumes = {}
+
+            if type(self.wimInfo.WIM.IMAGE) is list:
+                for i in self.wimInfo.WIM.IMAGE:
+                    if not hasattr(i, 'WINDOWS'):
+                        continue
+                    info = {}
+                    info['name'] = i.NAME.encode('utf-8')
+                    info['version'] = "%s.%s.%s" % \
+                        (i.WINDOWS.VERSION.MAJOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.MINOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.BUILD.encode('utf-8'))
+                    self.volumes[int(i.INDEX)] = info
+            else:
+                i = self.wimInfo.WIM.IMAGE
+                info = {}
+                info['name'] = i.NAME.encode('utf-8')
+                info['version'] = "%s.%s.%s" % \
+                    (i.WINDOWS.VERSION.MAJOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.MINOR.encode('utf-8'), \
+                         i.WINDOWS.VERSION.BUILD.encode('utf-8'))
+                self.volumes[int(i.INDEX)] = info
+
+            if self.volumeIndex not in self.volumes:
+                self.volumeIndex = self.volumes.keys()[0]
+
+            self.volume = self.volumes[self.volumeIndex]
+            self.name = '-'.join(self.volume['name'].split())
+
+        finally:
+            # clean up
+            try:
+                image.delete()
+            except httplib.ResponseNotReady:
+                pass
 
 class _AnySource(action.RecipeAction):
     def checkSignature(self, f):
@@ -54,6 +181,8 @@ class _Source(_AnySource):
                 'httpHeaders': {},
                 'package': None,
                 'sourceDir': None}
+
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS, )
 
     def __init__(self, recipe, *args, **keywords):
         self.archivePath = None
@@ -334,17 +463,14 @@ class addArchive(_Source):
     """
     NAME
     ====
-
     B{C{r.addArchive()}} - Add a source code archive
 
     SYNOPSIS
     ========
-
     C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{sourceDir}=,] [I{debArchive}=])}
 
     DESCRIPTION
     ===========
-
     The C{r.addArchive()} class adds a source code archive consisting
     of an optionally compressed tar, cpio, xpi or zip archive,
     binary/source RPM, or binary dpkg .deb, and unpacks it to the
@@ -370,7 +496,6 @@ class addArchive(_Source):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addArchive}:
 
     B{dir} : Instructs C{r.addArchive} to change to the directory
@@ -429,7 +554,6 @@ class addArchive(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addArchive}
     from within a recipe:
 
@@ -618,6 +742,9 @@ class addArchive(_Source):
                 elif debData.endswith('.xz'):
                     _uncompress = "xz -d -c"
                     actionPathBuildRequires.append('xz')
+                elif debData.endswith('.lzma'):
+                    _uncompress = "xz -d -c"
+                    actionPathBuildRequires.append('xz')
                 else:
                     # data.tar?  Alternatively, yet another
                     # compressed format that we need to add
@@ -746,23 +873,19 @@ class addPatch(_Source):
     """
     NAME
     ====
-
     B{C{r.addPatch()}} - Add a patch to source code
 
     SYNOPSIS
     ========
-
     C{r.addPatch(I{patchfilename}, [I{backup}=,] [I{dir}=,] [I{extraArgs}=,] [I{keyid}=,] [I{httpHeaders}=,] [I{package})=,] [I{level}=,] [I{macros}=,] [I{rpm}=,] [I{use}=,] [I{sourceDir}=,] [I{patchName}=])}
 
     DESCRIPTION
     ===========
-
     The C{r.addPatch()} class adds a patch to be applied to the source code
     during the build phase.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addPatch}:
 
     B{backup} : The suffix to use when storing file versions before applying
@@ -839,7 +962,6 @@ class addPatch(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addPatch}
     from within a recipe:
 
@@ -956,7 +1078,7 @@ class addPatch(_Source):
         logFiles = []
         log.info('attempting to apply %s to %s with patch level(s) %s'
                  %(patchPath, destDir, ', '.join(str(x) for x in patchlevels)))
-        partiallyApplied = []
+
         for patchlevel in patchlevels:
             failed, logFile = self._applyPatch(patchlevel, patch, destDir,
                                               dryRun=True)
@@ -1083,7 +1205,6 @@ class addSource(_Source):
     """
     NAME
     ====
-
     B{C{r.addSource()}} - Copy a file into build or destination directory
 
     SYNOPSIS
@@ -1092,13 +1213,11 @@ class addSource(_Source):
 
     DESCRIPTION
     ===========
-
     The C{r.addSource()} class copies a file into the build directory or
     destination directory.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addSource}:
 
     B{apply} : A command line to run after storing the file. Macros will be
@@ -1165,7 +1284,6 @@ class addSource(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addSource}
     from within a recipe:
 
@@ -1318,6 +1436,8 @@ class addCapsule(_Source):
     NAME
     ====
 
+    **************** UPDATE ME FOR MSI SUPPORT AT SOME POINT ************
+
     B{C{r.addCapsule()}} - Add an encapsulated file
 
     SYNOPSIS
@@ -1326,12 +1446,10 @@ class addCapsule(_Source):
 
     DESCRIPTION
     ===========
-
     The C{r.addCapsule()} class adds an encapsulated file to the package.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addCapsule}:
 
     B{dir} : The directory in which to store the file, relative to the build
@@ -1380,7 +1498,6 @@ class addCapsule(_Source):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addCapsule}
     from within a recipe:
 
@@ -1393,6 +1510,7 @@ class addCapsule(_Source):
 
     keywords = {'ignoreConflictingPaths': set(),
                 'ignoreAllConflictingTimes': False,
+                'wimVolumeIndex' : 1,
                }
 
     def __init__(self, recipe, *args, **keywords):
@@ -1425,29 +1543,67 @@ class addCapsule(_Source):
         @keyword ignoreAllConflictingTimes: When checking for conflicts between
         files contained in multiple capsules, ignore the mtime on the files.
         """
-        _Source.__init__(self, recipe, *args, **keywords)
+        self.capsuleMagic = None
         self.capsuleType = None
+
+        _Source.__init__(self, recipe, *args, **keywords)
 
     def _initManifest(self):
         assert self.package
         assert not self.manifest
 
         self.package = self.package % self.recipe.macros
-        self.manifest = ExplicitManifest(package=self.package, recipe=self.recipe)
+        self.manifest = ExplicitManifest(package=self.package,
+                                         recipe=self.recipe)
+
+    def _getCapsuleMagic(self, path):
+        if not self.capsuleMagic:
+            self.capsuleMagic = magic.magic(path)
+            if self.capsuleMagic is None:
+                raise SourceError('unknown capsule type for file %s', path)
+            self.capsuleType = self.capsuleMagic.name.lower()
+        assert(path==self.capsuleMagic.path)
+        return self.capsuleMagic
 
     def doDownload(self):
         f = self._findSource()
 
         # identify the capsule type
-        m = magic.magic(f)
-        if m is None:
-            raise SourceError('unknown capsule type for file %s', f)
-        if self.capsuleType is None:
-            self.capsuleType = m.name.lower()
+        m = self._getCapsuleMagic(f)
 
         # here we guarantee that package contains a package:component
         # designation.  This is required for _addComponent().
-        pname = m.contents['name']
+        if self.capsuleType == 'rpm':
+            pname = m.contents['name']
+        elif self.capsuleType == 'msi':
+            self.recipe.winHelper = WindowsHelper()
+            if not self.recipe.cfg.windowsBuildService:
+                self.recipe.winHelper.name = self.recipe.name
+                self.recipe.winHelper.version = \
+                    self.recipe.winHelper.platform = \
+                    self.recipe.winHelper.productCode = \
+                    self.recipe.winHelper.upgradeCode = m.contents['version']
+                #raise SourceError('MSI capsules cannot be added without a '
+                #                  'windowsBuildService defined in the conary '
+                #                  'configuration')
+            else:
+                self.recipe.winHelper.extractMSIInfo(f,
+                    self.recipe.cfg.windowsBuildService)
+            pname = self.recipe.winHelper.name
+        elif self.capsuleType == 'wim':
+            self.recipe.winHelper = WindowsHelper()
+            if not self.recipe.cfg.windowsBuildService:
+                raise SourceError('WIM capsules cannot be added without a '
+                                  'windowsBuildService defined in the conary '
+                                  'configuration')
+            else:
+                self.recipe.winHelper.extractWIMInfo(f,
+                    self.recipe.cfg.windowsBuildService,
+                    volumeIndex=self.wimVolumeIndex)
+            pname = self.recipe.winHelper.name
+        else:
+            raise SourceError('unknown capsule type %s', self.capsuleType)
+
         if self.package is None:
             self.package = pname + ':' + self.capsuleType
         else:
@@ -1480,6 +1636,14 @@ class addCapsule(_Source):
         # initialize the manifest
         self._initManifest()
 
+        if self.capsuleType == 'rpm':
+            self.doRPM(f, destDir)
+        elif self.capsuleType == 'msi':
+            self.doMSI(f, destDir)
+        elif self.capsuleType == 'wim':
+            self.doWIM(f, destDir)
+
+    def doRPM(self,f,destDir):
         # read ownership, permissions, file type, etc.
         ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
 
@@ -1493,6 +1657,7 @@ class addCapsule(_Source):
 
         for (path, user, group, mode, size,
              rdev, flags, vflags, digest, filelinktos, mtime) in ownerList:
+
             fullpath = util.joinPaths(destDir,path)
 
             totalPathList.append(path)
@@ -1532,20 +1697,22 @@ class addCapsule(_Source):
                         file(fullpath, 'w')
                     elif stat.S_ISLNK(mode):
                         if not filelinktos:
-                            raise SourceError, 'Ghost Symlink in RPM has no target'
+                            raise SourceError, \
+                                'Ghost Symlink in RPM has no target'
                         if util.exists(fullpath):
                             contents = os.readlink(fullpath)
                             if contents != filelinktos:
                                 raise SourceError(
                                     "Inconsistent symlink contents for %s:"
                                     "'%s' != '%s'" % (
-                                    path, contents, filelinktos))
+                                        path, contents, filelinktos))
                         else:
                             os.symlink(filelinktos, fullpath)
                     elif stat.S_ISFIFO(mode):
                         os.mkfifo(fullpath)
                     else:
-                        raise SourceError, 'Unknown Ghost Filetype defined in RPM'
+                        raise SourceError, \
+                            'Unknown Ghost Filetype defined in RPM'
                 elif flags & (rpmhelper.RPMFILE_CONFIG |
                               rpmhelper.RPMFILE_MISSINGOK |
                               rpmhelper.RPMFILE_NOREPLACE):
@@ -1556,9 +1723,10 @@ class addCapsule(_Source):
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
                     if (stat.S_ISREG(mode) and \
-                            not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) or \
-                            (stat.S_ISLNK(mode) and \
-                             not (vflags & rpmhelper.RPMVERIFY_LINKTO)):
+                        not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) \
+                        or (stat.S_ISLNK(mode) and \
+                        not (vflags & rpmhelper.RPMVERIFY_LINKTO)): \
+
                         InitialContents.append( path )
 
             if flags & rpmhelper.RPMFILE_MISSINGOK:
@@ -1598,20 +1766,37 @@ class addCapsule(_Source):
             '_CAPSULE_SCRIPTS_'))
         _extractScriptsFromRPM(f, scriptDir)
 
+    def doMSI(self, f, destDir):
+        totalPathList = []
+        self.manifest.recordRelativePaths(totalPathList)
+        self.manifest.create()
+        self.recipe._addCapsule(f, self.capsuleType, self.package)
+
+    def doWIM(self, f, destDir):
+        totalPathList = []
+        self.manifest.recordRelativePaths(totalPathList)
+        self.manifest.create()
+        self.recipe._addCapsule(f, self.capsuleType, self.package)
+
     def checkSignature(self, filepath):
+        # generate the magic object in order to populate the capsuleType
+        self._getCapsuleMagic(filepath)
+
         if self.keyid:
             key = self._getPublicKey()
             validKeys = [ key ]
         else:
             validKeys = None
 
-        rpmFileObj = util.ExtendedFile(filepath, buffering = False)
-
-        try:
-            rpmhelper.verifySignatures(rpmFileObj, validKeys)
-        except rpmhelper.SignatureVerificationError, e:
-            raise SourceError, str(e)
-
+        capsuleFileObj = util.ExtendedFile(filepath, buffering = False)
+        if self.capsuleType == 'rpm':
+            try:
+                rpmhelper.verifySignatures(capsuleFileObj, validKeys)
+            except rpmhelper.SignatureVerificationError, e:
+                raise SourceError, str(e)
+        elif self.capsuleType == 'msi':
+            ### WRITE ME ###
+            pass
         log.info('GPG signature for %s is OK', os.path.basename(filepath))
 
 
@@ -1619,24 +1804,20 @@ class addAction(action.RecipeAction):
     """
     NAME
     ====
-
     B{C{r.addAction()}} - Executes a shell command
 
     SYNOPSIS
     ========
-
     C{r.addAction([I{action},] [I{dir}=,] [I{package})=,] [I{use}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addAction()} class executes a shell command during the source
     preparation stage, in a manner similar to C{r.Run}, except that
     C{r.Run} executes shell commands later, during the build stage.
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -1657,7 +1838,6 @@ class addAction(action.RecipeAction):
 
     EXAMPLES
     ========
-
     The following examples demonstrate invocations of C{r.addAction}
     from within a recipe:
 
@@ -1768,18 +1948,15 @@ class addGitSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addGitSnapshot()}} - Adds a snapshot from a git
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addGitSnapshot([I{url},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addGitSnapshot()} class extracts sources from a
     git repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -1787,7 +1964,6 @@ class addGitSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -1856,18 +2032,15 @@ class addMercurialSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addMercurialSnapshot()}} - Adds a snapshot from a mercurial
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addMercurialSnapshot([I{url},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addMercurialSnapshot()} class extracts sources from a
     mercurial repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -1875,7 +2048,6 @@ class addMercurialSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -1935,18 +2107,15 @@ class addCvsSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addCvsSnapshot()}} - Adds a snapshot from a CVS
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addCvsSnapshot([I{root},] [I{project},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addCvsSnapshot()} class extracts sources from a
     CVS repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -1954,7 +2123,6 @@ class addCvsSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -2015,18 +2183,15 @@ class addSvnSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addSvnSnapshot()}} - Adds a snapshot from a subversion
     repository.
 
     SYNOPSIS
     ========
-
     C{r.addSvnSnapshot([I{url},] [I{project}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addSvnSnapshot()} class extracts sources from a
     subversion repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -2034,7 +2199,6 @@ class addSvnSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addAction}:
 
     B{dir} : Specify a directory to change into prior to executing the
@@ -2112,17 +2276,14 @@ class addBzrSnapshot(_RevisionControl):
     """
     NAME
     ====
-
     B{C{r.addBzrSnapshot()}} - Adds a snapshot from a bzr repository.
 
     SYNOPSIS
     ========
-
     C{r.addBzrSnapshot([I{url},] [I{tag}=,])}
 
     DESCRIPTION
     ===========
-
     The C{r.addBzrSnapshot()} class extracts sources from a
     bzr repository, places a tarred, bzipped archive into
     the source component, and extracts that into the build directory
@@ -2130,7 +2291,6 @@ class addBzrSnapshot(_RevisionControl):
 
     KEYWORDS
     ========
-
     The following keywords are recognized by C{r.addBzrSnapshot}:
 
     B{tag} : Specify a specific tagged revision to checkout.
@@ -2236,17 +2396,14 @@ class addPostInstallScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPostInstallScript()}} - Specify the post install script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPostInstallScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPostInstallScript} command specifies the post install script
     for a group. This script is run after the group has been installed
     for the first time (not when the group is being upgraded from a
@@ -2254,7 +2411,6 @@ class addPostInstallScript(TroveScript):
 
     PARAMETERS
     ==========
-
     The C{r.addPostInstallScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2269,24 +2425,20 @@ class addPreRollbackScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPreRollbackScript()}} - Specify the pre rollback script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPreRollbackScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPreRollbackScript} command specifies the pre rollback script
     for a group. This script is run before the group defining the script
     has been rolled back to a previously-installed version of the group.
 
     PARAMETERS
     ==========
-
     The C{r.addPreRollbackScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2302,24 +2454,20 @@ class addPostRollbackScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPostRollbackScript()}} - Specify the post rollback script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPostRollbackScript(I{sourcename}, I[{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPostRollbackScript} command specifies the post rollback
     script for a group. This script is run after the group defining the
     script has been rolled back to a previous version of the group.
 
     PARAMETERS
     ==========
-
     The C{r.addPostRollbackScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2344,24 +2492,20 @@ class addPostUpdateScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPostUpdateScript()}} - Specify the post update script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPostUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPostUpdateScript} command specifies the post update script
     for a group. This script is run after the group has been updated from
     a previously-installed version to the version defining the script.
 
     PARAMETERS
     ==========
-
     The C{r.addPostUpdateScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2376,24 +2520,20 @@ class addPreUpdateScript(TroveScript):
     """
     NAME
     ====
-
     B{C{r.addPreUpdateScript()}} - Specify the pre update script for a trove.
 
     SYNOPSIS
     ========
-
     C{r.addPreUpdateScript(I{sourcename}, [I{contents},] [I{groupName}]}
 
     DESCRIPTION
     ===========
-
     The C{r.addPreUpdateScript} command specifies the pre update script
     for a group. This script is run before the group is updated from
     a previously-installed version to the version defining the script.
 
     PARAMETERS
     ==========
-
     The C{r.addPreUpdateScript()} command accepts the following parameters,
     with default values shown in parentheses:
 
@@ -2576,7 +2716,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None, action=None):
             break
         try:
             os.write(wpipe, buf)
-        except OSError, msg:
+        except OSError:
             break
     os.close(wpipe)
     (pid, status) = os.waitpid(pid, 0)
@@ -2604,7 +2744,6 @@ def _extractFilesFromISO(iso, directory):
         raise IOError('ISO %s contains neither Joliet nor Rock Ridge info'
                       %iso)
 
-    errorMessage = 'extracting ISO %s' %os.path.basename(iso)
     filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 

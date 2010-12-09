@@ -1179,8 +1179,12 @@ class BZ2File:
                 if self.leftover:
                     # we have some uncompressed stuff left, return
                     # it
-                    rc = self.leftover[:]
-                    self.leftover = None
+                    if len(self.leftover) > bytes:
+                        rc = self.leftover[:bytes]
+                        self.leftover = self.leftover[bytes:]
+                    else:
+                        rc = self.leftover[:]
+                        self.leftover = None
                     return rc
                 # done returning all data, return None as the EOF
                 return None
@@ -2065,13 +2069,25 @@ class LZMAFile:
         if self.childpid == 0:
             try:
                 os.close(self.infd)
+                if isinstance(fileobj, gzip.GzipFile):
+                    # We can't rely on the underlying file descriptor to feed
+                    # correct data.
+                    # This should really be made to use the read() method of
+                    # fileobj
+                    f = tempfile.TemporaryFile()
+                    copyfileobj(fileobj, f)
+                    f.seek(0)
+                    fileobj.close()
+                    fileobj = f
                 os.close(0)
                 os.close(1)
+
                 fd = fileobj.fileno()
                 # this undoes any buffering
                 os.lseek(fd, fileobj.tell(), 0)
+
                 os.dup2(fd, 0)
-                os.close(fd)
+                fileobj.close() # This closes fd
                 os.dup2(outfd, 1)
                 os.close(outfd)
                 os.execv(self.executable, commandLine)
@@ -2099,7 +2115,7 @@ def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
 
     @param newClassOrInstance: Class of the new exception to be thrown,
         or the exact exception instance to be thrown.
-    @type  newClass: subclass or instance of Exception
+    @type  newClassOrInstance: subclass or instance of Exception
     @param prependClassName: If C{True}, prepend the original class
         name to the new exception
     @type  prependClassName: bool
@@ -2294,18 +2310,18 @@ def fnmatchTranslate(pattern):
 class LockedFile(object):
     """
     A file protected by a lock.
-    To use it:
+    To use it::
 
-    l = LockedFile("filename")
-    fileobj = l.open()
-    if fileobj is None:
-        # The target file does not exist. Create it.
-        l.write("Some content")
-        fileobj = l.commit()
-    else:
-        # The target file exists
-        pass
-    print fileobj.read()
+        l = LockedFile("filename")
+        fileobj = l.open()
+        if fileobj is None:
+            # The target file does not exist. Create it.
+            l.write("Some content")
+            fileobj = l.commit()
+        else:
+            # The target file exists
+            pass
+        print fileobj.read()
     """
     __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj')
 
@@ -2322,10 +2338,12 @@ class LockedFile(object):
     def open(self, shouldLock = True):
         """
         Attempt to open the file.
+
         Returns a file object if the file exists.
-        Returns None if the file does not exist, and needs to be created. At
-            this point the lock is acquired. Use write() and commit() to have
-            the file created and the lock released.
+
+        Returns None if the file does not exist, and needs to be created.
+        At this point the lock is acquired.  Use write() and commit() to
+        have the file created and the lock released.
         """
 
         if self._lockfobj is not None:
@@ -2447,6 +2465,7 @@ class AtomicFile(object):
             self.fObj.close()
     __del__ = close
 
+
 class TimestampedMap(object):
     """
     A map that timestamps entries, to cycle them out after delta seconds.
@@ -2475,3 +2494,35 @@ class TimestampedMap(object):
 
     def clear(self):
         self._map.clear()
+
+
+def statFile(pathOrFile, missingOk=False, inodeOnly=False):
+    """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
+
+    Accepts paths, file descriptors, and file-like objects with a C{fileno()}
+    method.
+
+    @param pathOrFile: A file path or file-like object
+    @type  pathOrFile: C{basestring} or file-like object or C{int}
+    @param missingOk: If C{True}, return C{None} if the file is missing.
+    @type  missingOk: C{bool}
+    @param inodeOnly: If C{True}, return just (dev, inode).
+    @type  inodeOnly: C{bool}
+    @rtype: C{tuple}
+    """
+    try:
+        if isinstance(pathOrFile, basestring):
+            st = os.stat(pathOrFile)
+        else:
+            if hasattr(pathOrFile, 'fileno'):
+                pathOrFile = pathOrFile.fileno()
+            st = os.fstat(pathOrFile)
+    except OSError, err:
+        if err.errno == errno.ENOENT and missingOk:
+            return None
+        raise
+
+    if inodeOnly:
+        return (st.st_dev, st.st_ino)
+    else:
+        return (st.st_dev, st.st_ino, st.st_size, st.st_mtime, st.st_ctime)

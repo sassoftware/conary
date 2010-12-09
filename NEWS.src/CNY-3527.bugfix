@@ -1,0 +1,1 @@
+Both mirror and write permissions are now required for the repository operations setMirrorMark, presentHiddenTroves, and addPGPKeyList. Previously only mirror permission was required.

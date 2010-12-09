@@ -60,7 +60,7 @@ class Rollback:
             # XXX We need to import rollbacks here to avoid a circular
             # import. We should refactor rollbacks.py to not import
             # local/database.py
-            from conary import rollbacks
+            from conary.cmds import rollbacks
             rbs = rollbacks._RollbackScripts()
             for job, sData, oldCompat, newCompat in rollbackScripts:
                 rbs.add(job, sData, oldCompat, newCompat)
@@ -111,7 +111,7 @@ class Rollback:
         if not self.count:
             return []
 
-        from conary import rollbacks
+        from conary.cmds import rollbacks
         try:
             rbs = rollbacks._RollbackScripts.load(self.dir)
         except rollbacks.RollbackScriptsError:
@@ -228,7 +228,41 @@ class RollbackStack:
         os.mkdir(rbDir, 0700)
         self.last += 1
         self.writeStatus(opJournal = opJournal)
+
+        if self.modelFile is not None:
+            saveSysModel = rbDir + '/system-model'
+            opJournal.create(saveSysModel)
+            ofd = os.open(saveSysModel, os.O_RDWR|os.O_CREAT)
+            os.write(ofd, ''.join(self.modelFile.read()[0]))
+            os.close(ofd)
+            if self.modelFile.model.modified():
+                opJournal.create(self.modelFile.snapFullName)
+                self.modelFile.writeSnapshot()
+
         return Rollback(rbDir)
+
+    def restoreSystemModel(self):
+        saveSysModel = self.dir + "/%d/system-model" % self.last
+        # need to restore it even if it didn't previously exist
+        if util.exists(saveSysModel):
+            if self.modelFile is None:
+                # We are rolling back from a rollback that contains
+                # a system model on a system without a system model
+                # This fake cfg object is enough.
+                class fakeCfg:
+                    root = self.root
+                    modelPath = self.modelPath
+                # have to import here to avoid import loop
+                from conary.conaryclient import cml, systemmodel
+                self.modelFile = systemmodel.SystemModelFile(
+                    model=cml.CML(fakeCfg()))
+            self.modelFile.parse(fileName=saveSysModel)
+            self.modelFile.write()
+            os.unlink(saveSysModel)
+        # if this is a rollback from a failed update/sync operation,
+        # remove the target snapshot
+        if self.modelFile is not None:
+            self.modelFile.deleteSnapshot()
 
     def hasRollback(self, name):
         try:
@@ -303,8 +337,11 @@ class RollbackStack:
             rb = self.getRollback(rollbackName)
             yield (rollbackName, rb)
 
-    def __init__(self, rbDir):
+    def __init__(self, rbDir, root, modelPath, modelFile):
         self.dir = rbDir
+        self.modelFile = modelFile
+        self.modelPath = modelPath
+        self.root = root
         self.statusPath = self.dir + '/status'
 
         if not os.path.exists(self.dir):
@@ -1215,16 +1252,25 @@ class DepCheckState:
     def setJobs(self, newJobSet):
         newJobSet = set(newJobSet)
         removedJobs = self.jobSet - newJobSet
+
         if removedJobs:
-            self.done()
-            addedJobs = newJobSet
+            # if every removed job was a simple removal, we can incrementally
+            # fix that up. if they are anything else, we need to start over
+            if [ x for x in removedJobs if x[2][0] is not None ]:
+                self.done()
+                addedJobs = newJobSet
+            else:
+                for (name, (oldV, oldF), (newV, newF), isAbs) in removedJobs:
+                    self.checker.restoreTrove((name, oldV, oldF))
+                self.jobSet.difference_update(removedJobs)
+                addedJobs = newJobSet - self.jobSet
         else:
             addedJobs = newJobSet - self.jobSet
 
         self.setup()
 
         self.checker.addJobs(addedJobs)
-        self.jobSet = newJobSet
+        self.jobSet.update(addedJobs)
 
     def depCheck(self, jobSet,
                  linkedJobs = None, criticalJobs = None,
@@ -1279,8 +1325,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def iterAllTroveNames(self):
         return self.db.iterAllTroveNames()
 
-    def iterAllTroves(self):
-        return self.db.iterAllTroves()
+    def iterAllTroves(self, withPins = False):
+        return self.db.iterAllTroves(withPins = withPins)
 
     def findRemovedByName(self, name):
         return self.db.findRemovedByName(name)
@@ -1317,7 +1363,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
         @raises TroveMissing:
         @note:
             As this calls database functions, it could also raise any type of
-        DatabaseError defined in L{dbstore.sqlerrors}
+            DatabaseError defined in L{dbstore.sqlerrors}
         """
         l = self.getTroves([ (name, version, flavor) ], pristine = pristine,
                            withDeps = withDeps, withFiles = withFiles,
@@ -1883,7 +1929,7 @@ class Database(SqlDbRepository):
         database, but where there is no filesystem information to restore. If
         this is used it is assumed that the content/fileObj elements of the
         file lists are both None.
-        @type noteMissing: bool
+        @type asMissing: bool
         @rtype changeset.ChangeSet
         """
         cs = changeset.ChangeSet()
@@ -2612,6 +2658,7 @@ class Database(SqlDbRepository):
                         lastFsJob.addPostRollbackScript(*scriptData)
                     lastFsJob.runPostScripts(tagScript)
 
+            self.rollbackStack.restoreSystemModel()
             self.rollbackStack.removeLast()
 
     def _getChangesetPreScripts(self, cs, updJob):
@@ -2788,13 +2835,17 @@ class Database(SqlDbRepository):
                     'journal file exists. use revert command to '
                     'undo the previous (failed) operation')
 
-    def __init__(self, root, path, timeout = None):
+    def __init__(self, root, path, modelPath=None, timeout=None, modelFile=None):
         """
         Instantiate a database object
         @param root: the path to '/' for this operation
         @type root: string
         @param path: the path to the database relative to 'root'
         @type path: string
+        @param modelPath: path to which model files should be written
+        @type modelPath: string
+        @param modelFile: optional model file (will journal snapshot)
+        @type modelFile: L{conary.conaryclient.systemmodel.SystemModelFile}
         @return: None
         @raises ExistingJournalError: Raised when a journal file exists,
         signifying a failed operation.
@@ -2806,24 +2857,29 @@ class Database(SqlDbRepository):
         """
 
         self.root = root
+        self.modelPath = modelPath
 
         if path == ":memory:": # memory-only db
             SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
             # use :memory: as a marker not to bother with locking
             self.lockFile = path
             self.opJournalPath = None
+            self.modelFile = None
         else:
             conarydbPath = util.joinPaths(root, path)
             SqlDbRepository.__init__(self, conarydbPath, timeout = timeout)
             self.opJournalPath = conarydbPath + '/journal'
             top = util.joinPaths(root, path)
+            self.modelFile = modelFile
 
             self.lockFile = top + "/syslock"
             self.lockFileObj = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
             try:
-                self.rollbackStack = RollbackStack(self.rollbackCache)
+                self.rollbackStack = RollbackStack(self.rollbackCache, root,
+                                                   self.modelPath,
+                                                   self.modelFile)
             except OpenError, e:
                 raise OpenError(top, e.msg)
 
@@ -2876,8 +2932,8 @@ class RollbackError(errors.ConaryError):
 
     def __init__(self, rollbackName, errorMessage=''):
         """
-        Create new new RollbackrError
-        @param rollbackName: string represeting the name of the rollback
+        Create new new RollbackError
+        @param rollbackName: string representing the name of the rollback
         """
         self.name = rollbackName
         self.error = errorMessage
@@ -2891,7 +2947,7 @@ class PreScriptError(errors.ConaryError):
 
     def __init__(self, script, errorCode, errorMessage=''):
         """
-        @param script: string represeting the path of the failed script
+        @param script: string representing the path of the failed script
         @param errorCode: the return code of the script
         """
         self.name = script
@@ -2913,7 +2969,7 @@ class RollbackOrderError(RollbackError):
 
     def __init__(self, rollbackName):
         """Create new new RollbackOrderError
-        @param rollbackName: string represeting the name of the rollback
+        @param rollbackName: string representing the name of the rollback
         which was trying to be applied out of order"""
         RollbackError.__init__(self, rollbackName)
 
@@ -2927,7 +2983,7 @@ class RollbackDoesNotExist(RollbackError):
 
     def __init__(self, rollbackName):
         """Create new new RollbackOrderError
-        @param rollbackName: string represeting the name of the rollback
+        @param rollbackName: string representing the name of the rollback
         which does not exist"""
         RollbackError.__init__(self, rollbackName)
 

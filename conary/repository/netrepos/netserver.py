@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -14,6 +14,7 @@
 
 import base64
 import cPickle
+import errno
 import fnmatch
 import itertools
 import os
@@ -27,12 +28,13 @@ from conary import files, trove, versions, streams
 from conary.conarycfg import CfgEntitlement, CfgProxy, CfgRepoMap, CfgUserInfo
 from conary.deps import deps
 from conary.lib import log, tracelog, sha1helper, util
-from conary.lib.cfg import *
+from conary.lib.cfg import ConfigFile
+from conary.lib.cfgtypes import (CfgInt, CfgString, CfgPath, CfgBool, CfgList,
+        CfgLineList)
 from conary.repository import changeset, errors, xmlshims
 from conary.repository.netrepos import fsrepos, instances, trovestore, accessmap, deptable
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
-from conary.trove import DigitalSignature
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -46,7 +48,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 69 + 1)
+SERVER_VERSIONS = range(36, 70 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -111,14 +113,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def __init__(self, cfg, basicUrl, db = None):
-        # FIXME: remove after deprecation period
-        if cfg.cacheDB:
-            import warnings
-            warnings.warn('cacheDB is deprecated.  changesetCacheDir '
-                          'should be used instead.  defaulting to %s/cscache '
-                          'for changesetCacheDir' %cfg.tmpDir,
-                          DeprecationWarning)
-            cfg.configLine('changesetCacheDir %s/cscache' %cfg.tmpDir)
         # this is a bit of a hack to determine if we're running
         # as a standalone server or not without having to touch
         # rMake code
@@ -451,6 +445,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @requireClientProtocol(60)
     def addAcl(self, authToken, clientVersion, role, trovePattern,
                label, write = False, remove = False):
+        if not self.auth.authCheck(authToken, admin=True):
+            raise errors.InsufficientPermission
         self.log(2, authToken[0], role, trovePattern, label,
                  "write=%s remove=%s" % (write, remove))
         if trovePattern == "":
@@ -1906,7 +1902,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def presentHiddenTroves(self, authToken, clientVersion):
-        if not self.auth.authCheck(authToken, mirror = True):
+        # Need both mirror and write permissions.
+        if not (self.auth.authCheck(authToken, mirror=True)
+                and self.auth.check(authToken, write=True)):
             raise errors.InsufficientPermission
 
         self.repos.troveStore.presentHiddenTroves()
@@ -2176,8 +2174,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         uniqIdList = fileIdMap.keys()
 
         # now i+1 is how many items we shall return
-        # None in streams means the stream wasn't found.
-        streams = [ None ] * (i+1)
+        # None in streamMap means the stream wasn't found.
+        streamMap = [ None ] * (i+1)
 
         # use the list of uniqified fileIds to look up streams in the repo
         def _iterIdList(uniqIdList):
@@ -2209,13 +2207,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if stream is None:
                 continue
             for streamIdx in fileIdMap[fileId]:
-                streams[streamIdx] = stream
+                streamMap[streamIdx] = stream
             # mark as processed
             uniqIdList[i] = None
         # FIXME: the fact that we're not extracting the list ordered
         # makes it very hard to return an iterator out of this
         # function - for now, returning a list will do...
-        return streams
+        return streamMap
 
     @accessReadOnly
     def getFileVersions(self, authToken, clientVersion, fileList):
@@ -2231,14 +2229,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             fileId = self.toFileId(fileList[rawStreams.index(None)][1])
             raise errors.FileStreamMissing(fileId)
 
-        streams = [ None ] * len(fileList)
+        streamMap = [ None ] * len(fileList)
         for i,  (stream, (pathId, fileId)) in enumerate(itertools.izip(rawStreams, fileList)):
             # XXX the only thing we use the pathId for is to set it in
             # the file object; we should just pass the stream back and
             # let the client set it to avoid sending it back and forth
             # for no particularly good reason
-            streams[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
-        return streams
+            streamMap[i] = self.fromFileAsStream(pathId, stream, rawPathId = True)
+        return streamMap
 
     @accessReadOnly
     def getFileVersion(self, authToken, clientVersion, pathId, fileId,
@@ -2784,10 +2782,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def listSubkeys(self, authToken, label, fingerprint):
         self.log(2, authToken[0], label, fingerprint)
+        # Public function. Don't check auth.
         return self.repos.troveStore.keyTable.getSubkeys(fingerprint)
 
     @accessReadOnly
     def getOpenPGPKeyUserIds(self, authToken, label, keyId):
+        # Public function. Don't check auth.
         return self.repos.troveStore.keyTable.getUserIds(keyId)
 
     @accessReadOnly
@@ -2845,7 +2845,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             mark = long(mark)
         except: # deny invalid marks
             raise errors.InsufficientPermission
-        if not self.auth.authCheck(authToken, mirror = True):
+        # Need both mirror and write permissions.
+        if not (self.auth.authCheck(authToken, mirror=True)
+                and self.auth.check(authToken, write=True)):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], host, mark)
         cu = self.db.cursor()
@@ -3152,7 +3154,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadWrite
     def addPGPKeyList(self, authToken, clientVersion, keyList):
-        if not self.auth.authCheck(authToken, mirror = True):
+        # Need both mirror and write permissions.
+        if not (self.auth.authCheck(authToken, mirror=True)
+                and self.auth.check(authToken, write=True)):
             raise errors.InsufficientPermission
 
         for encKey in keyList:
@@ -3268,6 +3272,148 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in ret ]
         return ret
+
+    @accessReadOnly
+    def getTimestamps(self, authToken, clientVersion, nameVersionList):
+        """
+        Returns : separated list of timestamps for the versions in
+        a list of (name, version) tuples. Note that the flavor is excluded
+        here, as the timestamps are necessarily the same for all flavors
+        of a (name, version) pair. Timestamps are not considered privledged
+        information, so no permission checking is performed. An int value of
+        zero is returned for (name, version) paris which are not found in the
+        repository.
+        """
+        self.log(2, nameVersionList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                     [ [i,] + tup for i, tup in enumerate(nameVersionList) ],
+                     ["idx","name","version" ],
+                     start_transaction=False)
+
+        cu.execute("""
+            SELECT tmpNVF.idx, Nodes.timeStamps FROM tmpNVF
+            JOIN Items ON
+                tmpNVF.name = Items.item
+            JOIN Versions ON
+                tmpNVF.version = Versions.version
+            JOIN Nodes ON
+                Items.itemId = Nodes.itemId AND
+                Versions.versionId = Nodes.versionId
+        """)
+
+        results = [ 0 ] * len(nameVersionList)
+        for (idx, timeStamps) in cu:
+            results[idx] = timeStamps
+
+        return results
+
+    @accessReadOnly
+    def getDepsForTroveList(self, authToken, clientVersion, troveList,
+                            provides = True, requires = True):
+        """
+        Returns list of (provides, requires) for troves. For troves which
+        are missing or we do not have access to, {} is returned. Empty
+        strings are returned for for provides if provides parameter is
+        False; same for requires.
+        """
+        self.log(2, troveList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                         [ [i,] + tup for i, tup in enumerate(troveList) ],
+                         ["idx","name","version", "flavor"],
+                         start_transaction=False)
+
+        req = []
+        prov = []
+        for tup in troveList:
+            req.append({})
+            prov.append({})
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+
+        tblList = []
+
+        if requires:
+            tblList.append( ('Requires', req) )
+        else:
+            req = [ '' ] * len(troveList)
+
+        if provides:
+            tblList.append( ('Provides', prov) )
+        else:
+            prov = [ '' ] * len(troveList)
+
+        for tableName, dsList in tblList:
+            start = time.time()
+            cu.execute("""
+                SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
+                    JOIN Items ON
+                        Items.item = tmpNVF.name
+                    JOIN Versions ON
+                        Versions.version = tmpNVF.version
+                    JOIN Flavors ON
+                        Flavors.flavor = tmpNVF.flavor
+                    JOIN Instances ON
+                        Items.itemId = Instances.itemId AND
+                        Versions.versionId = Instances.versionId AND
+                        Flavors.flavorId = Instances.flavorId
+                    JOIN UserGroupInstancesCache AS ugi
+                        USING (instanceId)
+                    JOIN %s USING (InstanceId)
+                    JOIN Dependencies AS D USING (depId)
+                WHERE
+                    ugi.userGroupId in (%s)
+            """ %  (tableName, ",".join("%d" % x for x in roleIds) ))
+
+            l = [ x for x in cu ]
+            last = None
+            flags = []
+            for idx, depClassId, depName, depFlag in l:
+                this = (idx, depClassId, depName)
+
+                if this != last:
+                    if last:
+                        dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+
+                    last = this
+                    flags = []
+
+                if depFlag != deptable.NO_FLAG_MAGIC:
+                    flags.append((depFlag, deps.FLAG_SENSE_REQUIRED))
+
+            if last:
+                dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+            flagMap = [ None, '', '~', '~!', '!' ]
+            for i, itemList in enumerate(dsList):
+                depList = itemList.items()
+                depList.sort()
+
+                if not depList:
+                    frz = ''
+                else:
+                    l = []
+                    for (depClassId, depName), depFlags in depList:
+                        l += [ '|', str(depClassId), '#', depName.replace(':', '::') ]
+                        lastFlag = None
+                        for flag in sorted(depFlags):
+                            if flag == lastFlag:
+                                continue
+
+                            l.append(':')
+                            l.append(flagMap[flag[1]])
+                            l.append(flag[0].replace(':', '::'))
+
+                    frz = ''.join(l[1:])
+
+                dsList[i] = frz
+
+        result = zip(prov, req)
+        return result
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
@@ -3529,6 +3675,10 @@ class ClosedRepositoryServer(xmlshims.NetworkConvertors):
     def reset(self):
         pass
 
+    def reopen(self):
+        pass
+
+
 class HiddenException(Exception):
 
     def __init__(self, forLog, forReturn):
@@ -3561,6 +3711,58 @@ class GlobListType(list):
 
         return False
 
+
+class AuthToken(list):
+    __slots__ = ()
+
+    _user, _password, _entitlements, _remote_ip = range(4)
+
+    def __init__(self, user='anonymous', password='anonymous', entitlements=(),
+            remote_ip=None):
+        if not (user == password == 'anonymous'):
+            password = util.ProtectedString(password)
+        list.__init__(self, (user, password, list(entitlements), remote_ip))
+
+    def _get_user(self):
+        return self[self._user]
+    def _set_user(self, user):
+        self[self._user] = user
+    user = property(_get_user, _set_user)
+
+    def _get_password(self):
+        return self[self._password]
+    def _set_password(self, password):
+        if not (self[self._user] == password == 'anonymous'):
+            password = util.ProtectedString(password)
+        self[self._password] = password
+    password = property(_get_password, _set_password)
+
+    def _get_entitlements(self):
+        return self[self._entitlements]
+    def _set_entitlements(self, entitlements):
+        self[self._entitlements] = entitlements
+    entitlements = property(_get_entitlements, _set_entitlements)
+
+    def _get_remote_ip(self):
+        return self[self._remote_ip]
+    def _set_remote_ip(self, remote_ip):
+        self[self._remote_ip] = remote_ip
+    remote_ip = property(_get_remote_ip, _set_remote_ip)
+
+    def __repr__(self):
+        out = '<AuthToken'
+        if self.user != 'anonymous' or not self.entitlements:
+            out += ' user=%s' % (self.user,)
+        if self.entitlements:
+            ents = []
+            for ent in self.entitlements:
+                ents.append('%s...' % ent[:6])
+            out += ' entitlements=[%s]' % (', '.join(ents))
+        if self.remote_ip:
+            out += ' remote_ip=%s' % self.remote_ip
+        return out + '>'
+
+
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
     baseUri                 = (CfgString, None)
@@ -3568,8 +3770,8 @@ class ServerConfig(ConfigFile):
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository')
     bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
-    cacheDB                 = dbstore.CfgDriver
     changesetCacheDir       = CfgPath
+    changesetCacheLogFile   = CfgPath
     closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath

@@ -14,7 +14,6 @@
 
 import base64
 import binascii
-import errno
 import fcntl
 import itertools
 import os
@@ -308,8 +307,8 @@ def exportKey(keyId, keyRing, armored=False):
     @type keyId: str
     @param keyRing: the keyring from where the key is to be extracted
     @type keyRing: file or path
-    @param armor: If True, exports the key in a Radix-64 encoding (armor)
-    @type armor: bool
+    @param armored: If True, exports the key in a Radix-64 encoding (armor)
+    @type armored: bool
     @rtype: stream
     @return: the key in a stream
     """
@@ -340,8 +339,8 @@ def armorKeyData(keyData, stream):
     Write the Radix-64 encoded version of the key data.
 
     @param keyData: key data
-    @type key: str
-    @type stream: A stream open in write mode
+    @type keyData: str
+    @param stream: A stream open in write mode
     @type stream: file
     """
     assert(isinstance(keyData, str))
@@ -613,10 +612,8 @@ def parseAsciiArmor(asciiData, dest):
     @type asciiData: string or stream
     @param dest: a stream to deposit the message into
     @type dest: stream
-    @return: the unencoded PGP messsage, or None if the encoded message was
-        incorrect
-    @rtype: bool
     @return: True if data was decoded, False otherwise
+    @rtype: bool
     @raise PGPError: if the CRC does not match the message
     """
 
@@ -2954,20 +2951,22 @@ class PGP_SecretAnyKey(PGP_Key):
         # Fetch the crypto key
         cryptoKey = self.makePgpKey(passPhrase = passwordCallback())
 
-        if isinstance(cryptoKey,(DSA.DSAobj_c, DSA.DSAobj)):
+        # See comment in OpenPGPKey.getType
+        keyType = key_type(cryptoKey)
+        if keyType == 'DSA':
             pkAlg = PK_ALGO_DSA
             # Pick a random number that is relatively prime with the crypto
             # key's q
             relprime = cryptoKey.q + 1
             while relprime > cryptoKey.q:
                 relprime = num_getRelPrime(cryptoKey.q)
-        elif isinstance(cryptoKey, (RSA.RSAobj_c, RSA.RSAobj)):
+        elif keyType == 'RSA':
             pkAlg = PK_ALGO_RSA
             # RSA doesn't need a prime for signing
             relprime = 0
         else:
             # Maybe we need a different exception?
-            raise UnsupportedEncryptionAlgorithm(cryptoKey.__class__.__name__)
+            raise UnsupportedEncryptionAlgorithm(keyType)
 
         hashAlg = 2 # sha
 
@@ -3547,3 +3546,15 @@ class PublicKeyring(object):
             fp = pk.getKeyId()
             ret[fp] = set(x.getKeyId() for x in pk.iterSubKeys())
         return ret
+
+
+def key_type(cryptoKey):
+    # pycrypto's API has no consistent way to tell what kind of key we
+    # have. This is apparently the least awful way to do it.
+    keyName = cryptoKey.__class__.__name__
+    if 'RSA' in keyName:
+        return 'RSA'
+    elif 'DSA' in keyName:
+        return 'DSA'
+    else:
+        raise TypeError("Unrecognized key type: " + keyName)

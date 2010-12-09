@@ -1,0 +1,2 @@
+A missing permission check on the addAcl repository call has been corrected.
+This vunlerability would allow an attacker with anonymous, read-only access to grant themselves full, read-write access to the repository but could not be used to gain administrator privileges.

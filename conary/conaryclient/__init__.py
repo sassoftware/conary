@@ -11,27 +11,27 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 
-import itertools
 import os
 import pickle
 
-#conary imports
-from conary import conarycfg, errors, metadata, rollbacks, trove
-from conary.conaryclient import clone, resolve, update, filetypes, callbacks, mirror
+#conary imports. the unused imports of filetypes, mirror, and callbacks
+#are part of the conaryclient api
+from conary import conarycfg, errors, trove
+from conary.cmds import metadata, rollbacks
+from conary.conaryclient import clone, cmdline, password, resolve, update
+from conary.conaryclient import filetypes, mirror, callbacks  # pyflakes=ignore
 from conary.lib import log, util, openpgpkey, api
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
-from conary.repository import trovesource
 from conary.repository import searchsource
 from conary.repository import resolvemethod
 
 # mixins for ConaryClient
 from conary.conaryclient.branch import ClientBranch
-from conary.conaryclient import cmdline
 from conary.conaryclient.clone import ClientClone
-from conary.conaryclient import password
 from conary.conaryclient.update import ClientUpdate
 from conary.conaryclient.newtrove import ClientNewTrove
+from conary.conaryclient.modelupdate import CMLClient
 
 CloneError = clone.CloneError
 CloneIncomplete = clone.CloneIncomplete
@@ -59,7 +59,8 @@ class VersionSuppliedError(UpdateError):
         return "version should not be specified when a Conary change set " \
                "is being installed"
 
-class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
+class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
+                   CMLClient):
     """
     ConaryClient is a high-level class to some useful Conary operations,
     including trove updates and erases.
@@ -67,7 +68,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
     @api.publicApi
     def __init__(self, cfg = None, passwordPrompter = None,
                  resolverClass=resolve.DependencySolver, updateCallback=None,
-                 repos=None):
+                 repos=None, modelFile=None):
         """
         @param cfg: a custom L{conarycfg.ConaryConfiguration} object.
                     If None, the standard Conary configuration is loaded
@@ -83,7 +84,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         self.repos = None
 
         self.cfg = cfg
-        self.db = database.Database(cfg.root, cfg.dbPath)
+        self.db = database.Database(cfg.root, cfg.dbPath, cfg.modelPath,
+                                    modelFile=modelFile)
         if repos:
             self.repos = repos
         else:
@@ -95,7 +97,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
         if not resolverClass:
             resolverClass = resolve.DependencySolver
 
-        self.resolver = resolverClass(self, cfg, self.repos, self.db)
+        self.resolver = resolverClass(self, cfg, self.db)
 
         # Set up the callbacks for the PGP key cache
         keyCache = openpgpkey.getKeyCache()
@@ -166,7 +168,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove):
                 cacheFp = open(cacheFile, "r")
                 cache = pickle.load(cacheFp)
                 cacheFp.close()
-            except IOError, EOFError:
+            except (IOError, EOFError):
                 if cacheOnly:
                     return {}
             else:

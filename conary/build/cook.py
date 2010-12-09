@@ -31,15 +31,16 @@ import traceback
 
 from conary import (callbacks, conaryclient, constants, files, trove, versions,
                     updatecmd)
-from conary.build import buildinfo, buildpackage, lookaside, policy, use
-from conary.build import recipe, grouprecipe, loadrecipe, packagerecipe, factory, capsulerecipe
+from conary.build import buildinfo, buildpackage, lookaside, use
+from conary.build import recipe, grouprecipe, loadrecipe, factory
 from conary.build import errors as builderrors
 from conary.build.nextversion import nextVersion
 from conary.conarycfg import selectSignatureKey
 from conary.deps import deps
 from conary.lib import debugger, log, logger, sha1helper, util, magic
 from conary.local import database
-from conary.repository import changeset, errors, filecontents
+from conary.repository import changeset, errors
+from conary.conaryclient import callbacks as client_callbacks
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.state import ConaryState, ConaryStateFromFile
 
@@ -47,7 +48,8 @@ CookError = builderrors.CookError
 RecipeFileError = builderrors.RecipeFileError
 
 # -------------------- private below this line -------------------------
-def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
+def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo,
+                     winHelper=None):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
@@ -66,8 +68,18 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         m = magic.magic(capsulePath)
         fileObj = files.FileFromFilesystem(capsulePath,
                                            trove.CAPSULE_PATHID)
-        p.addRpmCapsule(os.path.basename(capsulePath),
-                          newVersion, fileObj.fileId(), m.hdr)
+        if capsuleInfo[0] == 'rpm':
+            p.addRpmCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), m.hdr)
+        elif capsuleInfo[0] == 'msi':
+            p.addMsiCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
+        elif capsuleInfo[0] == 'wim':
+            p.addWimCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
+        else:
+            # This shouldn't be able to happen
+            raise
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
 
@@ -156,7 +168,7 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-class CookCallback(conaryclient.callbacks.ChangesetCallback, callbacks.CookCallback):
+class CookCallback(client_callbacks.ChangesetCallback, callbacks.CookCallback):
 
     def buildingChangeset(self):
         self._message('Building changeset...')
@@ -425,7 +437,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     """
 
     if not groupOptions:
-        groupCookOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
+        groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
     assert(len(set((x.getRecipe().name, x.getRecipe().version)
                 for x in loaderList)) == 1)
@@ -488,7 +500,6 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     macros['buildlabel'] = buildBranch.label().asString()
 
     if targetLabel:
-        signatureLabel = targetLabel
         signatureKey = selectSignatureKey(cfg, targetLabel)
     else:
         signatureKey = selectSignatureKey(cfg, sourceVersion.trailingLabel())
@@ -742,7 +753,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
         use.track(True)
-        policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
+        _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
         _callSetup(cfg, recipeObj)
 
@@ -1012,8 +1023,6 @@ def cookPackageObject(repos, db, cfg, loader, sourceVersion, prep=True,
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean
@@ -1101,7 +1110,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
        described there.
     """
     recipeClass = loader.getRecipe()
-    fullName = recipeClass.name
 
     lcache = lookaside.RepositoryCache(repos, cfg=cfg)
 
@@ -1208,13 +1216,14 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
                 # is finished
             else:
                 raise
-        try:
-            logFile.pushDescriptor('cook')
-            logBuildEnvironment(logFile, sourceVersion, policyTroves,
-                                    recipeObj.macros, cfg)
-        except:
-            logFile.close()
-            raise
+        else:
+            try:
+                logFile.pushDescriptor('cook')
+                logBuildEnvironment(logFile, sourceVersion, policyTroves,
+                                        recipeObj.macros, cfg)
+            except:
+                logFile.close()
+                raise
     try:
         logBuild and logFile.pushDescriptor('build')
         bldInfo.begin()
@@ -1274,8 +1283,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
             logBuild and logFile.popDescriptor('policy')
         finally:
             os.chdir(cwd)
-
-        grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
         if (recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE and
@@ -1464,7 +1471,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     built = []
     packageList = []
-    perviousQuery = {}
 
     for buildPkg in bldList:
         # bldList only contains components
@@ -1473,8 +1479,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         assert(comp)
         grp = grpMap[main]
 
-        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen,
-                                recipeObj._getCapsule(buildPkg.getName()))
+        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion,
+                idgen, recipeObj._getCapsule(buildPkg.getName()),
+                getattr(recipeObj, 'winHelper', None))
 
         built.append((compName, p.getVersion().asString(), p.getFlavor()))
 
@@ -1500,7 +1507,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     if not targetVersion.isOnLocalHost():
         # this keeps cook and emerge branchs from showing up
-        searchBranch = targetVersion.branch()
         previousVersions = repos.getTroveLeavesByBranch(
                 dict(
                     ( x[1].getName(), { targetVersion.branch() : [ flavor ] } )
@@ -1820,7 +1826,6 @@ def guessSourceVersion(repos, name, versionStr, buildLabel, conaryState = None,
         trove if it was previously built on the same branch.
     """
     srcName = name + ':source'
-    sourceVerison = None
 
     if not conaryState and os.path.exists('CONARY'):
         conaryState = ConaryStateFromFile('CONARY', repos)
@@ -1921,7 +1926,6 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
             loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
                                              branch=branch,
                                              buildFlavor=buildFlavor)
-        version = None
     except builderrors.RecipeFileError, msg:
         raise CookError(str(msg))
 
@@ -1993,7 +1997,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
              emerge = False, resume = None, allowUnknownFlags = False,
              showBuildReqs = False, ignoreDeps = False, logBuild = False,
              crossCompile = None, callback = None, requireCleanSources = None,
-             downloadOnly = False, groupOptions = None):
+             downloadOnly = False, groupOptions = None, changeSetFile=None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -2015,8 +2019,10 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @type downloadOnly: boolean
     @param macros: set of macros for the build
     @type macros: dict
+    @param changeSetFile: file to write changeset out to.
+    @type changeSetFile: str
     """
-    changeSetFile = None
+
     targetLabel = None
 
     use.track(True)
@@ -2217,11 +2223,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 import cProfile
                 prof = cProfile.Profile()
                 prof.enable()
-                lsprof = True
-            elif profile:
-                import hotshot
-                prof = hotshot.Profile('conary-cook.prof')
-                prof.start()
             # child, set ourself to be the foreground process
             os.setpgrp()
 
@@ -2281,8 +2282,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof.disable()
                 prof.dump_stats('conary-cook.lsprof')
                 prof.print_stats()
-            elif profile:
-                prof.stop()
             os._exit(0)
         else:
             # parent process, no need for the write side of the pipe
@@ -2340,7 +2339,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     callback.done()
 
                 try:
-                    restartDir = client.applyUpdateJob(updJob)
+                    client.applyUpdateJob(updJob)
                 finally:
                     updJob.close()
                     client.close()
@@ -2418,6 +2417,8 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
         linenum = lastRecipeFrame.tb_frame.f_lineno
         del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))
+
+    return rv
 
 def _copyForwardTroveMetadata(repos, troveList, recipeObj):
     """
@@ -2626,7 +2627,6 @@ def _setCookTroveMetadata(trv, itemDictList):
     # Copy the metadata back in the trove
     # We don't bother with flattening it at this point, we'll take care of
     # that later
-    langMap = []
     metadata = trv.troveInfo.metadata
     for itemDict in itemDictList:
         item = trove.MetadataItem()

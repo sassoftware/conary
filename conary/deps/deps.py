@@ -870,6 +870,19 @@ class DependencySet(object):
             for dep in c.members.itervalues():
                 yield dep
 
+    def iterRawDeps(self):
+        # returns deps as (classId, name, flags) tuples
+        if type(self._members) == str:
+            next = 0
+            end = len(self._members)
+            while next < end:
+                (next, classId, depStr) = misc.depSetSplit(next, self._members)
+                (name, flags) = misc.depSplit(depStr)
+                yield (classId, name, flags)
+        else:
+            for depClass, oneDep in self.iterDeps():
+                yield (depClass.tag, oneDep.getName()[0], oneDep.getFlags()[0])
+
     def hasDepClass(self, depClass):
         return depClass.tag in self.members
 
@@ -1376,8 +1389,7 @@ def _filterFlavorFlags(depClass, dep, filterDeps):
     @type dep: Dependency
     @param filterDeps: Objects whose flags will be used to filter the dep parameter
     @type filterDeps: [ Dependency ]
-    @rtype dep: Dependency
-
+    @rtype: Dependency
     """
     filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
     finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]
