@@ -2039,7 +2039,18 @@ def convertPackageNameToClassName(pkgname):
 class LZMAFile:
 
     def read(self, limit = 4096):
-        return os.read(self.infd, limit)
+        # Read exactly the specified amount of bytes. Since the underlying
+        # file descriptor is a pipe, os.read may return with fewer than
+        # expected bytes, so we need to iterate
+        buffers = []
+        pos = 0
+        while pos < limit:
+            buf = os.read(self.infd, limit - pos)
+            if not buf:
+                break
+            buffers.append(buf)
+            pos += len(buf)
+        return ''.join(buffers)
 
     def close(self):
         if self.childpid:
@@ -2052,7 +2063,7 @@ class LZMAFile:
 
     def __init__(self, fileobj = None):
         self.executable = None
-        for executable, args in (('xz', ('-dc',)), ('unlzma', ())):
+        for executable, args in (('xz', ('-dc',)), ('unlzma', ('-dc',))):
             for pathElement in os.getenv('PATH', '').split(os.path.pathsep):
                 fullpath = os.sep.join((pathElement, executable))
                 if os.path.exists(fullpath):

@@ -816,12 +816,14 @@ class UpdateJob:
 
     def _freezeFromChangesets(self):
         ret = []
-        cwd = os.getcwd()
+        cwd = ''
         for f in self._fromChangesets:
             if not f.fileName:
                 continue
             fn = f.fileName
             if not fn.startswith('/'):
+                if not cwd:
+                    cwd = os.getcwd()
                 fn = util.joinPaths(cwd, fn)
             ret.append(fn)
         return ret

@@ -549,12 +549,6 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                     '%s/%s' %(foundTrove[1].trailingLabel(),
                               foundTrove[1].trailingRevision()))
 
-        if addArgs:
-            sysmodel.appendTroveOpByName(updateName, text=addArgs)
-
-        if patchArgs:
-            sysmodel.appendTroveOpByName('patch', text=patchArgs)
-
         disallowedChangesets = []
         for cs, argName in fromChangesets:
             for troveTuple in cs.getPrimaryTroveList():
@@ -571,8 +565,9 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                         disallowedChangesets.append((argName, 'redirect',
                             trovetup.TroveTuple(*troveTuple).asString()))
                         continue
-                sysmodel.appendTroveOpByName(updateName,
-                    text=trovetup.TroveTuple(*troveTuple).asString())
+
+                addArgs.append(
+                    trovetup.TroveTuple(*troveTuple).asString())
 
         if disallowedChangesets:
             raise errors.ConaryError(
@@ -580,6 +575,13 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                 ' cannot be installed:\n    ' + '\n    '.join(
                     '%s contains local %s: %s' % x
                     for x in disallowedChangesets))
+
+        if addArgs:
+            sysmodel.appendTroveOpByName(updateName, text=addArgs)
+
+        if patchArgs:
+            sysmodel.appendTroveOpByName('patch', text=patchArgs)
+
 
         kwargs['fromChangesets'] = [x[0] for x in fromChangesets]
 
@@ -743,6 +745,17 @@ def _updateTroves(cfg, applyList, **kwargs):
         updJob.close()
         client.close()
         return
+
+    if model:
+        missingLocalTroves = model.getMissingLocalTroves(tc, ts)
+        if missingLocalTroves:
+            print 'Update would leave references to missing local troves:'
+            for troveTup in missingLocalTroves:
+                if not isinstance(troveTup, trovetup.TroveTuple):
+                    troveTup = trovetup.TroveTuple(troveTup)
+                print "\t" + str(troveTup)
+            client.close()
+            return
 
     if suggMap:
         callback.done()

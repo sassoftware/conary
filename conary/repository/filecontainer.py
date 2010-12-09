@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -193,41 +193,50 @@ class FileContainer:
 
         return (name, tag, size, offset, nextOffset)
 
-    def dump(self, dumpString, dumpFile):
-        def sizeCallback(dumpString, name, tag, size, realSize):
-            # realSize is an in/out parameter to get the actual
-            # file size back to the dump() method
-            realSize[0] = size
-            if size < 0x100000000:
-                hdr = struct.pack("!HHIH%ds%ds" % (len(name), len(tag)),
-                                  SUBFILE_MAGIC, len(name), size, len(tag), name, tag)
-            else:
-                total = size + len(name) + len(tag)
-                hdr = struct.pack("!HII%ds%ds" % (len(name), len(tag)),
-                                  LARGE_SUBFILE_MAGIC,
-                                  total >> 32, total & 0xFFFFFFFF,
-                                  name, tag)
-            dumpString(hdr)
+    @staticmethod
+    def _packFileHeader(name, tag, size):
+        """Return the header and footer for the given contents."""
+        if size < 0x100000000:
+            header = struct.pack('!HHIH', SUBFILE_MAGIC,
+                    len(name), size, len(tag))
+            footer = ''
+        else:
+            total = size + len(name) + len(tag)
+            header = struct.pack('!HQ', LARGE_SUBFILE_MAGIC, total)
+            footer = struct.pack('!HH', len(name), len(tag))
+        return ''.join((header, name, tag)), footer
 
-        assert(not self.mutable)
+    def dumpIter(self, readFileFunc):
+        """Dump the changeset as a byte stream, yielding chunks of bytes.
+
+        C{readFileFunc} allows the caller to replace placeholders with actual
+        file contents. It should take as arguments C{name, tag, rawSize,
+        subfile}, C{subfile} being a file-like object of size C{rawSize}, and
+        return a tuple C{(tag, expandedSize, dataIter)}. C{tag} replaces the
+        old tag. C{dataIter} is an iterable that yields bytestrings totalling
+        C{expandedSize} bytes.
+        """
+        assert not self.mutable
 
         fileHeader = self.file.pread(8, 0)
-        dumpString(fileHeader)
+        yield fileHeader
 
         next = self.getNextFile()
         while next is not None:
-            (name, tag, fcf) = next
-            size = fcf.size
-            # realSize is an out parameter
-            realSize = [0]
-            dumpFile(name, tag, size, fcf,
-                     lambda size, newTag:
-                        sizeCallback(dumpString, name, newTag, size, realSize))
+            name, tag, subfile = next
+            rawSize = subfile.size
+            tag, expandedSize, dataIter = readFileFunc(name, tag, rawSize,
+                    subfile)
+            header, footer = self._packFileHeader(name, tag, expandedSize)
+
+            yield header
+            for chunk in dataIter:
+                yield chunk
+
             # > 4 GiB files have length of file name and tag after contents
             # (see format at the top of this file)
-            if realSize[0] >= 0x100000000:
-                ftr = struct.pack("!HH", len(name), len(tag))
-                dumpString(ftr)
+            yield footer
+
             next = self.getNextFile()
 
     def reset(self):

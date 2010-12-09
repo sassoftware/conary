@@ -1798,6 +1798,7 @@ class _dependency(policy.Policy):
         self.bootstrapPythonFlags = None
         self.bootstrapSysPath = []
         self.bootstrapPerlIncPath = []
+        self.pythonFlagNamespace = None
         self.removeFlagsByDependencyClass = None # pre-transform
         self.removeFlagsByDependencyClassMap = {}
 
@@ -1980,13 +1981,19 @@ class _dependency(policy.Policy):
                 flags.add(dirName[6:])
             if foundLib and foundVer:
                 break
+        if self.pythonFlagNamespace:
+            flags = set('%s:%s' %(self.pythonFlagNamespace, x) for x in flags)
+
         return flags
 
     def _stringIsPythonVersion(self, s):
         return not set(s).difference(set('.0123456789'))
 
     def _getPythonVersionFromFlags(self, flags):
+        nameSpace = self.pythonFlagNamespace
         for flag in flags:
+            if nameSpace and flag.startswith(nameSpace):
+                flag = flag[len(nameSpace):]
             if self._stringIsPythonVersion(flag):
                 return 'python'+flag
 
@@ -2484,6 +2491,9 @@ class Provides(_dependency):
                 self.exceptDeps.append(exceptDeps)
         # The next three are called only from Requires and should override
         # completely to make sure the policies are in sync
+        pythonFlagNamespace = keywords.pop('_pythonFlagNamespace', None)
+        if pythonFlagNamespace is not None:
+            self.pythonFlagNamespace = pythonFlagNamespace
         bootstrapPythonFlags = keywords.pop('_bootstrapPythonFlags', None)
         if bootstrapPythonFlags is not None:
             self.bootstrapPythonFlags = bootstrapPythonFlags
@@ -2505,6 +2515,8 @@ class Provides(_dependency):
                                             for x in self.bootstrapPythonFlags)
         if self.bootstrapSysPath:
             self.bootstrapSysPath = [x % macros for x in self.bootstrapSysPath]
+        if self.pythonFlagNamespace is not None:
+            self.pythonFlagNamespace = self.pythonFlagNamespace % macros
         if self.bootstrapPerlIncPath:
             self.bootstrapPerlIncPath = [x % macros for x in self.bootstrapPerlIncPath]
         self.rootdir = self.rootdir % macros
@@ -3177,6 +3189,7 @@ class Requires(_addInfo, _dependency):
         self.bootstrapPythonFlags = set()
         self.bootstrapSysPath = []
         self.bootstrapPerlIncPath = []
+        self.pythonFlagNamespace = None
         self.sonameSubtrees = set()
         self._privateDepMap = {}
         self.rpathFixup = []
@@ -3232,6 +3245,10 @@ class Requires(_addInfo, _dependency):
             # pass full set to Provides to share the exact same data
             self.recipe.Provides(
                 _bootstrapSysPath=self.bootstrapSysPath)
+        pythonFlagNamespace = keywords.pop('pythonFlagNamespace', None)
+        if pythonFlagNamespace is not None:
+            self.pythonFlagNamespace = pythonFlagNamespace
+            self.recipe.Provides(_pythonFlagNamespace=pythonFlagNamespace)
         bootstrapPerlIncPath = keywords.pop('bootstrapPerlIncPath', None)
         if bootstrapPerlIncPath:
             if type(bootstrapPerlIncPath) in (list, tuple):
@@ -3287,6 +3304,8 @@ class Requires(_addInfo, _dependency):
         self.bootstrapPythonFlags = set(x % macros
                                         for x in self.bootstrapPythonFlags)
         self.bootstrapSysPath = [x % macros for x in self.bootstrapSysPath]
+        if self.pythonFlagNamespace is not None:
+            self.pythonFlagNamespace = self.pythonFlagNamespace % macros
         self.bootstrapPerlIncPath = [x % macros for x in self.bootstrapPerlIncPath]
 
         # anything that any buildreqs have caused to go into ld.so.conf

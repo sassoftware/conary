@@ -58,7 +58,7 @@ similar to \fBmigrate\fP mode.  The most obvious difference is that
 \fBmigrate\fP mode honors variations in \fBbyDefault\fP settings in
 the system database (that is, an optional component of the trove(s)
 migrated to that has been installed on the system will still be
-installed after the migrate operation finishes), wherease a
+installed after the migrate operation finishes), whereas a
 \fBsystem model\fP update honors those changes only if they are
 represented in the model itself.
 
@@ -218,9 +218,23 @@ of the operation.  If a -- is used in a troveSpec, the version and flavor
 before the -- (if any) specify the trove to erase from the local system,
 and the version and flavor after the -- (if any) specify the update version.
 
-In \fBsystem model\fP mode, the \fBconary install\fP command is the best
-way to add new troves to a system; \fBconary update\fP is normally
-used only to change the version or flavor of the trove previously installed.
+In \fBsystem model\fP mode, the \fBconary install\fP command is the
+recommended way to add new troves to a system when they are expected
+to be found in group troves in the search path, reference as available
+but not installed in groups installed earlier in the model, or troves
+not included in the groups at all.  The \fBconary update\fP command is
+normally used only to change the version or flavor of troves
+installed earlier in the model.  The \fBconary update\fP command looks
+at the currently-installed set of packages at that point in the model
+and uses that to determine what parts of the new version of the package
+to install: If a package of that name has components in the installed
+set at that point in the model, then the matching components from the
+new version and/or flavor will be installed; the rest will be available
+for later operations.
+
+If an update removes a dependency on another trove which is neither
+required nor depended on otherwise, the update will remove that
+other trove.
 .RS 4
 .TP
 .B \-\-exclude-troves \fIregexp-list\fR
@@ -336,10 +350,20 @@ the command line and only uses the flavors you explicitly specify.
 .B install
 The \fBconary install\fP command is an alias for \fBconary
 update \-\-keep\-existing\fR.  In \fBsystem model\fP mode, it is
-the recommended way to add new troves to a system.
+the recommended way to add new (previously unreferenced) troves to a
+system.
 .TP
 .B updateall
-Iterates through all the top-level troves installed on the system
+In system model model, \fBconary updateall\fP looks for all troves
+references in \fI/etc/conary/system-model\fP that include a specific
+version (except for locally-cooked troves, and troves that have
+\fB==\fP instead of \fB=\fP in between the name and the version),
+updates the model to refer to the latest version of each of those
+troves that is present in the repository, and applies that new model
+to the system.
+
+Otherwise, \fBconary updateall\fP iterates through all the
+top-level troves installed on the system
 and updates to the most recent version in the repository.
 Thus, if foo:lib has been updated upstream but is only installed on
 your system because its a member of group-dist, it will be updated to the
@@ -858,6 +882,22 @@ The \fI/etc/conary/system-model.next\fP file is temporarily used
 during update operations that modify the system model, so that a
 failed update operation can be either reverted or resumed after
 a transient failure.
+
+The system-model file is interpreted line by line.  Each line may
+modify the search path, the set of installed troves, and the set
+of available troves.  Each line is interpreted relative to the
+operations of the previous lines.  After all the lines are processed,
+conary resolves dependencies for packages in the installed set.
+Then conary makes appropriate changes to the system so that (except
+for pinned troves) the system is moved to the state described by
+the installed set.
+
+All trove references that include a specific version will be updated
+to the latest version by the \fBconary updateall\fP command, except
+for local troves (for which there is no repository) and troves where
+the name is separated from the version by \fB==\fP instead of \fB=\fP.
+To make Conary not update a version when you use the \fBconary updateall\fP
+command, double the appropriate \fB=\fP in the system-model file.
 .PD
 .RS 4
 .TP 4
@@ -866,10 +906,7 @@ A \fBsearch\fP line, like an element of a \fBsearchPath\fP in a Conary
 group, lists either a label or a trove to add to the search path used for
 finding other troves in the model.  Unlike \fB$PATH\fP on the command
 line, it is searched starting from the most recently-added item; so the
-last item listed is searched first.  The \fBconary updateall\fP
-command line causes all \fItroveSpec\fPs on \fBsearch\fP lines to be
-updated to reference the most recent versions of those troves found in
-the repositories at the time the command is run.
+last item listed is searched first.
 .TP 4
 .B install \fItroveSpec+\fP
 One or more troves to install.  The trove is first looked up in the
@@ -886,8 +923,10 @@ One or more troves to update, relative to the previous trove operations
 honor the existing isInstall (byDefault) settings of the troves being
 replaced; it is commonly used to choose a different version of a
 package (for example, an older version, newer version, or version on a
-different label).  This line corresponds to a \fBconary update\fP
-command.
+different label).  If no part of the referenced trove has been previously
+added to the model directly or indirectly, then \fBupdate\fP functions
+like \fBinstall\fP.
+This line corresponds to a \fBconary update\fP command.
 .TP 4
 .B erase \fItroveSpec+\fP
 Make previously-referenced troves optional.  Note that a trove erased
