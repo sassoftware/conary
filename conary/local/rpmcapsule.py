@@ -160,6 +160,9 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         # force the nss modules to be loaded from outside of any chroot
         pwd.getpwall()
 
+        # Create lockdir early since RPM 4.3.3-32 won't do it.
+        util.mkdirChain(os.path.join(self.root, 'var/lock/rpm'))
+
         ts = rpm.TransactionSet(self.root, rpm._RPMVSF_NOSIGNATURES)
 
         installNvras = set()
