@@ -1793,7 +1793,7 @@ class ChangesetFileReader(object):
         self.tmpDir = tmpDir
 
     @staticmethod
-    def readNestedFile(cls, name, tag, rawSize, subfile):
+    def readNestedFile(name, tag, rawSize, subfile):
         """Use with ChangeSet.dumpIter to handle external file references."""
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
             # this is a reference to a compressed file in the contents store

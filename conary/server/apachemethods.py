@@ -13,7 +13,6 @@
 #
 
 from mod_python import apache
-from mod_python.util import FieldStorage
 import os
 import sys
 import time
@@ -21,10 +20,9 @@ import xmlrpclib
 import zlib
 
 from conary.lib import log, util
-from conary.repository import changeset, errors, netclient
+from conary.repository import errors, netclient
 from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
-from conary.server.server import _readNestedFile
 from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
