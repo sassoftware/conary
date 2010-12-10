@@ -1,0 +1,1 @@
+isEncapsulatedContent is reset when derived capsules overwrite capsule content.
