@@ -1065,7 +1065,6 @@ class ChangesetFilter(BaseProxy):
         # We need to restore primaryTroveList in the end
         primaryTroveList = newCs.primaryTroveList.copy()
         csfiles = changeset.files
-        getFrozenFileFlags = csfiles.frozenFileFlags
 
         # Derived capsules may have content that has to be fetched
         # separately
