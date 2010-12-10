@@ -27,6 +27,7 @@ import sys
 
 from conary import files, trove
 from conary.build import buildpackage, filter, policy, recipe, tags, use
+from conary.build import smartform
 from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
@@ -973,6 +974,47 @@ class TagSpec(_addInfo):
             self.info('possibly add to buildRequires: %s',
                       str(sorted(list(self.suggestBuildRequires))))
             self.recipe.reportMissingBuildRequires(self.suggestBuildRequires)
+
+
+class Properties(policy.Policy):
+    """
+    NAME
+    ====
+    B{C{r.Properties()}} - Read property definition files
+
+    SYNOPSIS
+    ========
+    C{r.Properties(I{exceptions=filterexp})}
+
+    DESCRIPTION
+    ===========
+    The C{r.Properties()} policy automatically parses iconfig property
+    definition files, making the properties available for configuration
+    management with iconfig.
+    """
+    bucket = policy.PACKAGE_CREATION
+    processUnmodified = True
+    invariantinclusions = [ r'%(prefix)s/lib/iconfig/properties/.*\.iprop' ]
+    requires = (
+        # We need to know what component files have been assigned to
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+
+    def doFile(self, path):
+        fullpath = self.recipe.macros.destdir + path
+        if not os.path.isfile(fullpath) or not util.isregular(fullpath):
+            return
+
+        componentMap = self.recipe.autopkg.componentMap
+        if path not in componentMap:
+            return
+        main, comp = componentMap[path].getName().split(':')
+
+        xml = open(fullpath).read()
+        xmldata = smartform.SmartFormFieldParser(xml)
+
+        self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM,
+            main, comp, xmldata.name, xml, xmldata.default)
 
 
 class MakeDevices(policy.Policy):

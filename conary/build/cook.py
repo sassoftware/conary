@@ -1479,6 +1479,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
         p.setIsDerived(recipeObj._isDerived)
+        recipeObj._setProperties(p, main, comp)
 
         # Add build flavor
         p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))

@@ -996,7 +996,8 @@ _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
 _TROVEINFO_TAG_CAPSULE        = 28
 _TROVEINFO_TAG_MTIMES         = 29
-_TROVEINFO_TAG_LAST           = 29
+_TROVEINFO_TAG_PROPERTIES     = 30
+_TROVEINFO_TAG_LAST           = 30
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1150,6 +1151,44 @@ class TroveScripts(streams.StreamSet):
         _TROVESCRIPTS_POSTERASE     : (DYNAMIC, TroveScript, 'postErase' ),
     }
 
+_PROPERTY_NAME        = 1
+_PROPERTY_DESCRIPTION = 2
+_PROPERTY_DEFAULT     = 3
+_PROPERTY_DEFINITION  = 4
+_PROPERTY_TYPE        = 5
+
+_PROPERTY_TYPE_SMARTFORM = 'sf'
+
+class Property(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _PROPERTY_TYPE        : (SMALL,   streams.StringStream, 'type' ),
+        _PROPERTY_NAME        : (DYNAMIC, streams.StringStream, 'name' ),
+        _PROPERTY_DEFAULT     : (DYNAMIC, streams.StringStream, 'default' ),
+        _PROPERTY_DEFINITION  : (DYNAMIC, streams.StringStream, 'definition' ),
+    }
+
+    def __cmp__(self, other):
+        return cmp(self.name(), other.name()) or \
+               cmp(self.freeze(), other.freeze())
+
+class PropertySet(streams.StreamCollection):
+    streamDict = { 1 : Property }
+    ignoreSkipSet = True
+
+    def add(self, propertyType, name, dataDefinition, defaultValue = None):
+        assert(propertyType == _PROPERTY_TYPE_SMARTFORM)
+        prop = Property()
+        prop.name.set(name)
+        prop.type.set(propertyType)
+        if defaultValue is not None:
+            prop.default.set(defaultValue)
+        prop.definition.set(dataDefinition)
+        self.addStream(1, prop)
+
+    def iter(self):
+        return ( x[1] for x in self.iterAll() )
+
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
@@ -1182,6 +1221,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,   'clonedFromList' ),
         _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
         _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
+        _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
