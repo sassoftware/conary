@@ -1,0 +1,1 @@
+Conary proxies will no longer crash if a changeset is requested which has more troves than the current process file descriptor limit.

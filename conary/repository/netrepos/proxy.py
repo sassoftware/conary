@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,6 +15,7 @@
 import cPickle
 import itertools
 import os
+import resource
 import tempfile
 import time
 import urllib
@@ -1693,6 +1694,9 @@ class ChangesetCache(object):
         self.dataStore = dataStore
         self.logPath = logPath
         self.locksMap = {}
+        # Use only 1/4 our file descriptor limit for locks
+        limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+        self.maxLocks = limit / 4
 
     def hashKey(self, key):
         (fingerPrint, csVersion) = key
@@ -1733,6 +1737,8 @@ class ChangesetCache(object):
         csPath = self.hashKey(key)
         csVersion = key[1]
         dataPath = csPath + '.data'
+        if len(self.locksMap) >= self.maxLocks:
+            shouldLock = False
 
         lockfile = util.LockedFile(csPath)
         util.mkdirChain(os.path.dirname(csPath))
