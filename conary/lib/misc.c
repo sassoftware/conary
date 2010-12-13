@@ -19,7 +19,6 @@
 #include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <malloc.h>
 #include <netinet/in.h>
 #include <openssl/sha.h>
@@ -57,7 +56,6 @@ static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyObject * pyfchmod(PyObject *self, PyObject *args);
 static PyObject * py_fopen(PyObject *self, PyObject *args);
-static PyObject * py_struct_flock(PyObject *self, PyObject *args);
 static PyObject * rpmExpandMacro(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
@@ -90,7 +88,6 @@ static PyMethodDef MiscMethods[] = {
     { "res_init", py_res_init, METH_VARARGS },
     { "fchmod", pyfchmod, METH_VARARGS },
     { "fopenIfExists", py_fopen, METH_VARARGS },
-    { "structFlock", py_struct_flock, METH_VARARGS },
     { "rpmExpandMacro", rpmExpandMacro, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
@@ -1588,38 +1585,6 @@ static PyObject * py_fopen(PyObject *self, PyObject *args) {
     return PyFile_FromFile(f, fn, mode, fclose);
 }
 
-static PyObject * py_struct_flock(PyObject *self, PyObject *args) {
-    struct flock fl;
-    PyObject *pystart, *pylen, *pypid;
-    int l_type, l_whence;
-    memset((void *)&fl, '\0', sizeof(struct flock));
-
-    if (PyTuple_GET_SIZE(args) != 5) {
-        PyErr_SetString(PyExc_TypeError, "exactly five arguments expected");
-        return NULL;
-    }
-
-    if (!PyArg_ParseTuple(args, "iiOOO", &l_type, &l_whence,
-            &pystart, &pylen, &pypid))
-        return NULL;
-    if (pystart != Py_None && !PYINT_CHECK_EITHER(pystart)) {
-        PyErr_SetString(PyExc_TypeError, "third argument must be an int or long");
-        return NULL;
-    } else if (pylen != Py_None && !PYINT_CHECK_EITHER(pylen)) {
-        PyErr_SetString(PyExc_TypeError, "fourth argument must be an int or long");
-        return NULL;
-    } else if (pypid != Py_None && !PYINT_CheckExact(pypid)) {
-        PyErr_SetString(PyExc_TypeError, "fifth argument must be an int");
-        return NULL;
-    }
-
-    fl.l_type = l_type;
-    fl.l_whence = l_whence;
-    fl.l_start = (pystart == Py_None) ? 0 : PYLONG_AS_ULL(pystart);
-    fl.l_len = (pylen == Py_None) ? 0 : PYLONG_AS_ULL(pylen);
-    fl.l_pid = (pypid == Py_None) ? 0 : PYINT_AS_LONG(pypid);
-    return PyString_FromStringAndSize((char *)&fl, sizeof(struct flock));
-}
 
 static PyObject * rpmExpandMacro(PyObject *self, PyObject *args) {
     void * rpmso = NULL;

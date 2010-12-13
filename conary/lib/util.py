@@ -1309,7 +1309,6 @@ res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
 fchmod = misc.fchmod
 fopenIfExists = misc.fopenIfExists
-structFlock = misc.structFlock
 
 def _LazyFile_reopen(method):
     """Decorator to perform the housekeeping of opening/closing of fds"""
@@ -2336,10 +2335,6 @@ class LockedFile(object):
     """
     __slots__ = ('fileName', 'lockFileName', '_lockfobj', '_tmpfobj')
 
-    # python 2.4 defines SEEK_SET in posixfile, which is deprecated
-    SEEK_SET = 0
-    WRLOCK = structFlock(fcntl.F_WRLCK, SEEK_SET, 0, 0, None)
-
     def __init__(self, fileName):
         self.fileName = fileName
         self.lockFileName = self.fileName + '.lck'
@@ -2365,7 +2360,7 @@ class LockedFile(object):
         self._lockfobj = open(self.lockFileName, "w")
 
         # Attempt to lock file in write mode
-        fcntl.fcntl(self._lockfobj, fcntl.F_SETLKW, self.WRLOCK)
+        fcntl.lockf(self._lockfobj, fcntl.LOCK_EX)
         # If we got this far, we now have the lock. Check if the data file was
         # created
         fobj = fopenIfExists(self.fileName, "r")
@@ -2381,7 +2376,7 @@ class LockedFile(object):
             # orphaned fd
             # This should normally not happen, since a close() will not remove
             # the lock file after releasing the lock
-            return self.open()
+            return self.open(shouldLock=False)
         # We now hold the lock
         return None
 
