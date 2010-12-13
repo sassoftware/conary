@@ -2087,6 +2087,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.db.analyze("tmpFileId")
         q = """
         SELECT DISTINCT tmpFileId.itemId, TroveFiles.instanceId,
+            TroveInfo.changed,
             TroveInfo.data,
             Dirnames.dirname,
             Basenames.basename,
@@ -2104,11 +2105,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         WHERE FileStreams.stream IS NOT NULL
           AND UserGroupInstancesCache.userGroupId IN (%(roleids)s)
         AND TroveInfo.infoType = ?
+        ORDER BY TroveInfo.changed
         """ % { 'roleids' : ", ".join("%d" % x for x in roleIds) }
         cu.execute(q, trove._TROVEINFO_TAG_CAPSULE)
         fileIdCapsuleList = []
         instanceIds = set()
-        for (i, instanceId, data, dirname, basename, fileSha1) in cu:
+        for (i, instanceId, changed, data, dirname, basename, fileSha1) in cu:
             fileId = uniqIdList[i]
             trvCapsule = trove.TroveCapsule()
             trvCapsule.thaw(data)
