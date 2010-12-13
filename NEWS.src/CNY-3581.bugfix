@@ -1,0 +1,2 @@
+The getFileContentsCapsuleInfo call no longer returns results in database
+order (which is non-deterministic).
