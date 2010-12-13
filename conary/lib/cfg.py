@@ -602,10 +602,12 @@ class SectionedConfigFile(ConfigFile):
             raise ParseError, 'Unknown section "%s"' % sectionName
         return self._sections[sectionName]
 
-    def setSection(self, sectionName):
+    def setSection(self, sectionName, sectionType = None):
         if not self.hasSection(sectionName):
             if self._allowNewSections:
-                self._addSection(sectionName, self._defaultSectionType(self))
+                if sectionType is None:
+                    sectionType = self._defaultSectionType
+                self._addSection(sectionName, sectionType(self))
             else:
                 raise ParseError, 'Unknown section "%s"' % sectionName
         self._sectionName = sectionName
