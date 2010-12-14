@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,6 +15,7 @@
 import cPickle
 import itertools
 import os
+import resource
 import tempfile
 import time
 import urllib
@@ -860,8 +861,10 @@ class ChangesetFilter(BaseProxy):
                     # Reassemble changesets
                     for idx, csInfo, fprint in zip(
                             indexesNeeded, partChangeSetList, fpNeeded):
-                        cs = self._reassembleChangeSet(csInfo, ncCsInfoMap,
-                            absOldChangeSetMap)
+                        cs, extraFiles = self._reassembleChangeSet(
+                            csInfo, ncCsInfoMap, absOldChangeSetMap)
+                        self._fetchDerivedCapsuleFiles(caller, serverVersion,
+                            extraFiles, cs)
                         (fd, tmppath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                                          suffix = ".ccs-temp")
                         os.unlink(tmppath)
@@ -968,6 +971,26 @@ class ChangesetFilter(BaseProxy):
 
         return changeSetList
 
+    def _fetchDerivedCapsuleFiles(self, caller, clientVersion,
+            extraFiles, ccs):
+        if not extraFiles:
+            return
+        fileList = [ (self.fromFileId(x[2]), self.fromVersion(x[3]))
+            for x in extraFiles ]
+        url, sizes = caller.getFileContents(clientVersion, fileList)
+        url = self._localUrl(url)
+        self._saveFileContents(fileList, url, sizes)
+        newCs = changeset.ChangeSet()
+        for pathId, path, fileId, fileVersion, fileObj in extraFiles:
+            cachedPath = self.contents.hashToPath(
+                sha1helper.sha1ToString(fileId) + '-c')
+            contents = filecontents.FromFilesystem(cachedPath)
+            newCs.addFileContents(pathId, fileId,
+                    changeset.ChangedFileTypes.file, contents,
+                    cfgFile=fileObj.flags.isConfig(),
+                    compressed=True)
+        ccs.merge(newCs)
+
     def _splitChangeSetInjection(self, changeSetsNeeded):
         # As of Conary 2.2, the client will separate changesets based
         # on the hostname portion of the label, and will not collapse
@@ -1043,7 +1066,11 @@ class ChangesetFilter(BaseProxy):
         # We need to restore primaryTroveList in the end
         primaryTroveList = newCs.primaryTroveList.copy()
         csfiles = changeset.files
-        getFrozenFileFlags = csfiles.frozenFileFlags
+
+        # Derived capsules may have content that has to be fetched
+        # separately
+        nonCapsuleFiles = []
+
         for trvCs in newCs.iterNewTroveList():
             job = trvCs.getJob()
             sjob = self.toJob(job)
@@ -1127,6 +1154,12 @@ class ChangesetFilter(BaseProxy):
                             cfgFile=False)
                     continue
 
+                # derivedcapsulepolicy will set
+                # isCapsuleOverride when isCapsuleAddition
+                # is set, so only check for the more general one
+                if fileObj.flags.isCapsuleOverride():
+                    nonCapsuleFiles.append((pathId, path, fileId, fileVersion, fileObj))
+                    continue
                 if not fileObj.flags.isConfig() or isinstance(fileObj,
                         (csfiles.SymbolicLink, csfiles.Directory)):
                     continue
@@ -1150,7 +1183,7 @@ class ChangesetFilter(BaseProxy):
         # All this merging messed up the primary trove list
         newCs.primaryTroveList.thaw("")
         newCs.primaryTroveList.extend(primaryTroveList)
-        return newCs
+        return newCs, nonCapsuleFiles
 
     @classmethod
     def _getFileObject(cls, pathId, fileId, oldTrove, oldChangeset, newChangeset):
@@ -1273,6 +1306,23 @@ class ChangesetFilter(BaseProxy):
                 fileKey, fileSha1))
         return ret
 
+    def _localUrl(self, url):
+        # If the changeset can be downloaded locally, return it
+        parts = util.urlSplit(url)
+        fname = parts[6]
+        csfr = ChangesetFileReader(self.cfg.tmpDir)
+        items = csfr.getItems(fname)
+        if items is None:
+            return url
+        (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
+                                         suffix = '.tmp')
+        dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
+        os.close(fd)
+        os.unlink(tmpPath)
+        csfr.writeItems(items, dest)
+        dest.seek(0)
+        return dest
+
 class BaseCachingChangesetFilter(ChangesetFilter):
     def __init__(self, cfg, basicUrl):
         if cfg.changesetCacheDir:
@@ -1374,6 +1424,7 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
             # now get the contents we don't have cached
             (url, sizes) = caller.getFileContents(
                     clientVersion, neededFiles, False)
+            url = self._localUrl(url)
             self._saveFileContents(neededFiles, url, sizes)
 
         url, sizes = self._saveFileContentsChangeset(clientVersion, fileList)
@@ -1637,29 +1688,15 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
         else:
             return self._saveFileContentsChangeset(clientVersion, fileList)
 
-    def _localUrl(self, url):
-        # If the changeset can be downloaded locally, return it
-        parts = util.urlSplit(url)
-        fname = parts[6]
-        csfr = ChangesetFileReader(self.cfg.tmpDir)
-        items = csfr.getItems(fname)
-        if items is None:
-            return url
-        (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                         suffix = '.tmp')
-        dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
-        os.close(fd)
-        os.unlink(tmpPath)
-        csfr.writeItems(items, dest)
-        dest.seek(0)
-        return dest
-
 class ChangesetCache(object):
 
     def __init__(self, dataStore, logPath=None):
         self.dataStore = dataStore
         self.logPath = logPath
         self.locksMap = {}
+        # Use only 1/4 our file descriptor limit for locks
+        limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+        self.maxLocks = limit / 4
 
     def hashKey(self, key):
         (fingerPrint, csVersion) = key
@@ -1700,6 +1737,8 @@ class ChangesetCache(object):
         csPath = self.hashKey(key)
         csVersion = key[1]
         dataPath = csPath + '.data'
+        if len(self.locksMap) >= self.maxLocks:
+            shouldLock = False
 
         lockfile = util.LockedFile(csPath)
         util.mkdirChain(os.path.dirname(csPath))
