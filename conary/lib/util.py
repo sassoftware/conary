@@ -2376,7 +2376,7 @@ class LockedFile(object):
             # orphaned fd
             # This should normally not happen, since a close() will not remove
             # the lock file after releasing the lock
-            return self.open(shouldLock=False)
+            return self.open()
         # We now hold the lock
         return None
 
