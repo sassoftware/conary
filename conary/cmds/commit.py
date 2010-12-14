@@ -16,8 +16,8 @@ import tempfile
 
 from conary import callbacks
 from conary import conaryclient
-from conary import updatecmd
 from conary import versions
+from conary.cmds import updatecmd
 from conary.lib import log
 from conary.repository import changeset
 from conary.repository import errors

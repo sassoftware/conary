@@ -1826,20 +1826,24 @@ class ProxyRepositoryError(Exception):
         self.args = tuple(args)
         self.kwArgs = kwArgs
 
+
 class ChangesetFileReader(object):
     def __init__(self, tmpDir):
         self.tmpDir = tmpDir
 
-    @classmethod
-    def _writeNestedFile(cls, outF, name, tag, size, f, sizeCb):
+    @staticmethod
+    def readNestedFile(name, tag, rawSize, subfile):
+        """Use with ChangeSet.dumpIter to handle external file references."""
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
-            path = f.read()
-            size = os.stat(path).st_size
-            f = open(path)
+            # this is a reference to a compressed file in the contents store
+            path = subfile.read()
+            expandedSize = os.stat(path).st_size
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-
-        sizeCb(size, tag)
-        util.copyfileobj(f, outF)
+            fobj = open(path, 'rb')
+            return tag, expandedSize, util.iterFileChunks(fobj)
+        else:
+            # this is data from the changeset itself
+            return tag, rawSize, util.iterFileChunks(subfile)
 
     def getItems(self, fileName):
         localName = self.tmpDir + "/" + fileName + "-out"
@@ -1876,10 +1880,8 @@ class ChangesetFileReader(object):
             if isChangeset:
                 cs = filecontainer.FileContainer(util.ExtendedFile(path,
                                                      buffering = False))
-                cs.dump(wfile.write,
-                        lambda name, tag, size, f, sizeCb:
-                            self._writeNestedFile(wfile, name, tag, size, f,
-                                             sizeCb))
+                for data in cs.dumpIter(self.readNestedFile):
+                    wfile.write(data)
 
                 del cs
             else:

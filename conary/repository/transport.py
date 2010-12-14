@@ -58,6 +58,13 @@ class InfoURL(urllib.addinfourl):
         urllib.addinfourl.__init__(self, fp, headers, url)
         self.protocolVersion = protocolVersion
 
+    def getheader(self, headerName, default=None):
+        """
+        Compatibility method for python 2.7, which expects the response to
+        be an httplib.Response object
+        """
+        return self.headers.getheader(headerName, default)
+
 
 class DecompressFileObj:
     "implements a wrapper file object that decompress()s data on the fly"
@@ -139,8 +146,8 @@ class HTTPSConnection(httplib.HTTPConnection):
     inheriting.
 
     Currently supported "extra" features:
-     * Can pass in a list of peer certificate authorities.
-     * Can set the hostname used to check the peer's certificate.
+     - Can pass in a list of peer certificate authorities.
+     - Can set the hostname used to check the peer's certificate.
     """
     default_port = httplib.HTTPS_PORT
 

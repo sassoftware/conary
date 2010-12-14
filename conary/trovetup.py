@@ -21,13 +21,101 @@ from conary.lib.compat import namedtuple as _namedtuple
 
 class TroveSpec(_namedtuple('TroveSpec', 'name version flavor')):
     """
-    A trove spec is a partial trove specification. It contains a name, an
-    optional version specification, and an optional flavor. The version
-    specification may be a full version, a branch, a label, a revision or
-    partial revision, or a label plus a revision or partial revision.
+    A trove spec is a partial trove specification. It contains an optionally
+    optional name, an optional version specification, and an optional flavor.
+    The version specification may be a full version, a branch, a label,
+    a revision or partial revision, or a label plus a revision or partial
+    revision.
     """
     __slots__ = ()
-    # TODO: Parsers, stringifiers, etc.
+
+    def __new__(cls, name, version=None, flavor=None,
+                allowEmptyName=True, withFrozenFlavor=False):
+        """
+        @param name: the input string or tuple
+        @type name: string or tuple
+
+        @param version: optional version, if version not included in name
+        @type version: string
+
+        @param flavor: optional version, if version not included in name
+        @type flavor: string, or frozen flavor if C{withFrozenFlavor} is True.
+
+        @param allowEmptyName: if set, will accept an empty string and some
+        other variations.
+        @type allowEmptyName: bool
+
+        @param withFrozenFlavor: if set, will accept a frozen flavor
+        @type withFrozenFlavor: bool
+
+        @raise errors.TroveSpecError: Raised if the input string is not
+        a valid TroveSpec
+        """
+        if isinstance(name, (tuple, list)):
+            # TroveSpec(sometuple)
+            name, version, flavor = name
+        elif version is None and flavor is None:
+            # TroveSpec('a=b[c]')
+            return cls.fromString(name, allowEmptyName=allowEmptyName,
+                withFrozenFlavor=withFrozenFlavor)
+
+        # TroveSpec(name, version, flavor)
+        if isinstance(flavor, basestring):
+            flavor = cls._thawFlavor(flavor, withFrozenFlavor)
+        return tuple.__new__(cls, (name, version, flavor))
+
+    def __repr__(self):
+        return 'TroveSpec(%r)' % (self.asString(True),)
+
+    def asString(self, withTimestamp=False):
+        if self.version is not None:
+            version = '=' + self.version
+        else:
+            version = ''
+        if self.flavor is not None:
+            flavor = '[' + str(self.flavor) + ']'
+        else:
+            flavor = ''
+        return ''.join((self.name, version, flavor))
+    __str__ = asString
+
+    @staticmethod
+    def _thawFlavor(flavor, withFrozenFlavor):
+        if withFrozenFlavor:
+            return deps.ThawFlavor(flavor)
+        return deps.parseFlavor(flavor)
+
+    @classmethod
+    def fromString(cls, specStr, allowEmptyName=True, withFrozenFlavor=False):
+        origSpecStr = specStr
+        # CNY-3219: strip leading and trailing whitespaces around job
+        # specification
+        specStr = specStr.strip()
+        if specStr.find('[') > 0 and specStr[-1] == ']':
+            specStr = specStr[:-1]
+            l = specStr.split('[')
+            if len(l) != 2:
+                raise errors.TroveSpecError(origSpecStr, "bad flavor spec")
+            specStr, flavorSpec = l
+            flavor = cls._thawFlavor(flavorSpec, withFrozenFlavor)
+            if flavor is None:
+                raise errors.TroveSpecError(origSpecStr, "bad flavor spec")
+        else:
+            flavor = None
+
+        if specStr.find("=") >= 0:
+            l = specStr.split("=")
+            if len(l) != 2:
+                raise errors.TroveSpecError(origSpecStr, "Too many ='s")
+            name, versionSpec = l
+        else:
+            name = specStr
+            versionSpec = None
+        if not name and not allowEmptyName:
+            raise errors.TroveSpecError(origSpecStr, 'Trove name is required')
+
+        return tuple.__new__(cls, (name, versionSpec, flavor))
+
 
 
 class TroveTuple(_namedtuple('TroveTuple', 'name version flavor')):
