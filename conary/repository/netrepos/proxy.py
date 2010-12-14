@@ -1157,7 +1157,9 @@ class ChangesetFilter(BaseProxy):
                 # derivedcapsulepolicy will set
                 # isCapsuleOverride when isCapsuleAddition
                 # is set, so only check for the more general one
-                if fileObj.flags.isCapsuleOverride():
+                # See also CNY-3463 - we need to skip device files
+                if fileObj.flags.isCapsuleOverride() and isinstance(fileObj,
+                        csfiles.RegularFile):
                     nonCapsuleFiles.append((pathId, path, fileId, fileVersion, fileObj))
                     continue
                 if not fileObj.flags.isConfig() or isinstance(fileObj,
