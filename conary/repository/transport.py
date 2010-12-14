@@ -58,6 +58,13 @@ class InfoURL(urllib.addinfourl):
         urllib.addinfourl.__init__(self, fp, headers, url)
         self.protocolVersion = protocolVersion
 
+    def getheader(self, headerName, default=None):
+        """
+        Compatibility method for python 2.7, which expects the response to
+        be an httplib.Response object
+        """
+        return self.headers.getheader(headerName, default)
+
 
 class DecompressFileObj:
     "implements a wrapper file object that decompress()s data on the fly"
