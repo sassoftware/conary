@@ -1832,13 +1832,15 @@ class ChangesetFileReader(object):
         self.tmpDir = tmpDir
 
     @staticmethod
-    def readNestedFile(name, tag, rawSize, subfile):
+    def readNestedFile(name, tag, rawSize, subfile, contentsStore):
         """Use with ChangeSet.dumpIter to handle external file references."""
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
             # this is a reference to a compressed file in the contents store
-            path = subfile.read()
-            expandedSize = os.stat(path).st_size
+            entry = subfile.read()
+            sha1, expandedSize = entry.split(' ')
+            expandedSize = int(expandedSize)
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+            path = contentsStore.hashToPath(sha1)
             fobj = open(path, 'rb')
             return tag, expandedSize, util.iterFileChunks(fobj)
         else:
@@ -1875,12 +1877,13 @@ class ChangesetFileReader(object):
             items = [ (localName, size, 0, 0) ]
         return items
 
-    def writeItems(self, items, wfile):
+    def writeItems(self, items, wfile, contentsStore=None):
         for path, size, isChangeset, preserveFile in items:
             if isChangeset:
                 cs = filecontainer.FileContainer(util.ExtendedFile(path,
                                                      buffering = False))
-                for data in cs.dumpIter(self.readNestedFile):
+                for data in cs.dumpIter(self.readNestedFile,
+                        args=(contentsStore,)):
                     wfile.write(data)
 
                 del cs
