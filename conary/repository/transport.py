@@ -18,13 +18,6 @@
 
 import base64
 import xmlrpclib
-    def getheader(self, headerName, default=None):
-        """
-        Compatibility method for python 2.7, which expects the response to
-        be an httplib.Response object
-        """
-        return self.headers.getheader(headerName, default)
-
 
 from conary.lib import util, httputils
 

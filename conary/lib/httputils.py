@@ -863,6 +863,13 @@ class InfoURL(urllib.addinfourl):
         self.code = code
         self.msg = msg
 
+    def getheader(self, headerName, default=None):
+        """
+        Compatibility method for python 2.7, which expects the response to
+        be an httplib.Response object
+        """
+        return self.headers.getheader(headerName, default)
+
 
 class AbortError(Exception):
     pass
