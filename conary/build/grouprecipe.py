@@ -1837,6 +1837,8 @@ class TroveCache(trovecache.TroveCache):
         if not callback:
             callback = callbacks.CookCallback()
         self.callback = callback
+        self.depCache = {}
+        self.troveInfoCache = {}
 
     def __getattr__(self, key):
         return getattr(self.troveSource, key)

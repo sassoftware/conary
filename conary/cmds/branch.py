@@ -54,7 +54,7 @@ def displayBranchJob(cs, shadow=False):
 
 
 def branch(repos, cfg, newLabel, troveSpecs, makeShadow=False,
-           sourceOnly=False, binaryOnly=False, allowEmptyShadow=True,
+           sourceOnly=False, binaryOnly=False, allowEmptyShadow=False,
            info=False, forceBinary=False, ignoreConflicts=False,
            targetFile=None):
     branchType = _getBranchType(binaryOnly, sourceOnly)
@@ -75,7 +75,8 @@ def branch(repos, cfg, newLabel, troveSpecs, makeShadow=False,
 
     if makeShadow:
         dups, cs = client.createShadowChangeSet(newLabel, troveList,
-                                                allowEmptyShadow=True,
+                                                allowEmptyShadow=\
+                                                    allowEmptyShadow,
                                                 branchType=branchType,
                                                 sigKeyId=sigKey)
     else:
