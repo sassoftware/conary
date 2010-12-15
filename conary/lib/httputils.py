@@ -169,7 +169,7 @@ class _ConnectionIterator(object):
                 errMsg = ""
             errMsg = "Proxy error:%s %s" % (errMsg,
                 self._formatProxyError(proxyError))
-            raise (TransportError, errMsg, ei[2])
+            raise TransportError, errMsg, ei[2]
         return (self.connSpec, proxy)
 
     def markFailedProxy(self, proxy, error=None):
@@ -382,8 +382,6 @@ class ConnectionManager(object):
                 raise
             # Reformat to indicate which thing actually failed, otherwise
             # there's no indication that a proxy was involved.
-            if len(err.args) != 2:
-                raise
             util.rethrow(socket.gaierror(err.args[0],
                 "Error resolving name %s: %s" % (connSpec.host, err[1])))
         if connSpec.port is not None:

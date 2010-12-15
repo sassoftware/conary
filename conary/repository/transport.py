@@ -34,6 +34,7 @@ class _ConnectionIterator(httputils._ConnectionIterator):
 
 class ConnectionManager(httputils.ConnectionManager):
     ConaryProxyProtocols = set([ 'conary' ])
+    _ConnectionIterator = _ConnectionIterator
     # Conary connections to http:// try to use conary proxies first, then
     # fall back to regular HTTP proxies.
     ProtocolMaps = dict(
