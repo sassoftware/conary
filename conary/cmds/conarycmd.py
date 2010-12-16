@@ -32,19 +32,15 @@ if __name__ == "__main__":
         importer.install()
 
 #stdlib
-import itertools
 import optparse
 import os
 import pwd
-import xmlrpclib
 import errno
 
 #conary
 import conary
 from conary import callbacks, command, conarycfg, constants
-from conary import deps, flavorcfg, repository
-from conary import conaryclient, state
-from conary import trove, versions
+from conary import conaryclient
 from conary.cmds import commit
 from conary.cmds import cscmd
 from conary.cmds import query
@@ -53,7 +49,7 @@ from conary.cmds import rollbacks
 from conary.cmds import showchangeset
 from conary.cmds import updatecmd
 from conary.cmds import verify
-from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
+from conary.lib import cfgtypes,log, openpgpfile, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
 from conary.conaryclient import cml
