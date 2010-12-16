@@ -679,7 +679,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                                                    callback = callback,
                                                    changeSetList =
                                                         changeSetList)
-            tcPath = cfg.root + '/var/lib/conarydb/modelcache'
+            tcPath = cfg.root + cfg.dbPath + '/modelcache'
             if loadTroveCache:
                 if os.path.exists(tcPath):
                     log.info("loading %s", tcPath)
