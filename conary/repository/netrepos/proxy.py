@@ -401,6 +401,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         return commonVersions
 
+    def getContentsStore(self):
+        return None
+
+
 class ChangeSetInfo(object):
 
     __slots__ = [ 'size', 'trovesNeeded', 'removedTroves', 'filesNeeded',
@@ -1348,6 +1352,10 @@ class SimpleRepositoryFilter(BaseCachingChangesetFilter, RepositoryFilterMixin):
     def __init__(self, cfg, basicUrl, repos):
         BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         RepositoryFilterMixin.__init__(self, repos)
+
+    def getContentsStore(self):
+        return self.repos.getContentsStore()
+
 
 class FileCachingChangesetFilter(BaseCachingChangesetFilter):
     def __init__(self, cfg, basicUrl):

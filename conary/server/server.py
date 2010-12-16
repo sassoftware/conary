@@ -120,8 +120,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(totalSize))
             self.end_headers()
 
-            csfr.writeItems(items, self.wfile,
-                    self.netRepos.repos.repos.contentsStore)
+            if self.netProxy:
+                repos = self.netProxy
+            else:
+                repos = self.netRepos
+            csfr.writeItems(items, self.wfile, repos.getContentsStore())
         else:
             self.send_error(501)
 

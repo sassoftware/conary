@@ -308,6 +308,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self.basicUrl % { 'port' : self._port,
                                  'protocol' : self._protocol }
 
+    def getContentsStore(self):
+        return self.repos.contentsStore
+
     @accessReadWrite
     def addUser(self, authToken, clientVersion, user, newPassword):
         # adds a new user, with no acls. for now it requires full admin

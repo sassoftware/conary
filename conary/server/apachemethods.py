@@ -238,7 +238,7 @@ def get(port, isSecure, repos, req, restHandler=None):
                 cs = FileContainer(util.ExtendedFile(path, buffering=False))
                 try:
                     for data in cs.dumpIter(readNestedFile,
-                            args=(repos.repos.repos.contentsStore,)):
+                            args=(repos.getContentsStore(),)):
                         req.write(data)
                 except IOError, err:
                     log.error("IOError dumping changeset: %s" % err)
