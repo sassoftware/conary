@@ -2122,7 +2122,12 @@ class _dependency(policy.Policy):
                                   pathString)
 
                 curClass = deps.SonameDependencies
-                flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
+                for flag in abi[1]:
+                    if flag == 'Linux':
+                        flags.append(('SysV', deps.FLAG_SENSE_REQUIRED))
+                    else:
+                        flags.append((flag, deps.FLAG_SENSE_REQUIRED))
+
                 dep = deps.Dependency(main, flags)
 
             elif depClass == 'abi':

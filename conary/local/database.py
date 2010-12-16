@@ -1237,6 +1237,7 @@ class DepCheckState:
         self.troveSource = troveSource
 
     def done(self):
+        import epdb;epdb.st()
         if self.checker is not None:
             self.checker.done()
             self.checker = None
