@@ -32,19 +32,15 @@ if __name__ == "__main__":
         importer.install()
 
 #stdlib
-import itertools
 import optparse
 import os
 import pwd
-import xmlrpclib
 import errno
 
 #conary
 import conary
 from conary import callbacks, command, conarycfg, constants
-from conary import deps, flavorcfg, repository
-from conary import conaryclient, state
-from conary import trove, versions
+from conary import conaryclient
 from conary.cmds import commit
 from conary.cmds import cscmd
 from conary.cmds import query
@@ -53,7 +49,7 @@ from conary.cmds import rollbacks
 from conary.cmds import showchangeset
 from conary.cmds import updatecmd
 from conary.cmds import verify
-from conary.lib import cfg,cfgtypes,log, openpgpfile, openpgpkey, options, util
+from conary.lib import cfgtypes,log, openpgpfile, options, util
 from conary.local import database
 from conary.conaryclient import cmdline
 from conary.conaryclient import cml
@@ -997,10 +993,9 @@ class _UpdateCommand(ConaryCommand):
             cfg.autoResolve = True
             del argSet['resolve']
 
-        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
-        if noRestart and cfg.root == '/':
-            raise conary.errors.ConaryError(
-                "--no-restart has to be used with --root")
+        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if os.path.normpath(cfg.root) != '/':
+            kwargs['noRestart'] = True
 
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
@@ -1222,10 +1217,9 @@ class UpdateAllCommand(_UpdateCommand):
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['modelTrace'] = argSet.pop('model-trace', None)
 
-        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
-        if noRestart and cfg.root == '/':
-            raise conary.errors.ConaryError(
-                "--no-restart has to be used with --root")
+        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if os.path.normpath(cfg.root) != '/':
+            kwargs['noRestart'] = True
 
         if argSet.has_key('info'):
             kwargs['info'] = True

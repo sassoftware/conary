@@ -502,9 +502,10 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
         defArgs = [x for x in otherArgs
                     if not (x.startswith('+') or x.startswith('-'))]
 
-        # find any default arguments that represent changesets
+        # find any default arguments that represent changesets to
+        # install/update
         for defArg in list(defArgs):
-            if util.exists(defArg):
+            if kwargs['updateByDefault'] and os.path.isfile(defArg):
                 try:
                     cs = changeset.ChangeSetFromFile(defArg)
                     fromChangesets.append((cs, defArg))
