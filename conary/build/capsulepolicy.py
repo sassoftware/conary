@@ -570,3 +570,5 @@ class CapsuleModifications(policy.Policy):
                     f.flags.isCapsuleOverride(True)
                     if not capPath:
                         f.flags.isCapsuleAddition(True)
+                    # CNY-3577
+                    f.flags.isEncapsulatedContent(False)
