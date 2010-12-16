@@ -545,7 +545,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     continue
                 if (not withFileContents
                     or (excludeAutoSource and newFile.flags.isAutoSource())
-                    or newFile.flags.isEncapsulatedContent()):
+                    or (newFile.flags.isEncapsulatedContent()
+                        and not newFile.flags.isCapsuleOverride())):
                     continue
 
                 # this test catches files which have changed from not
