@@ -331,7 +331,7 @@ class OfferTroveOperation(TroveOperation):
 class PatchTroveOperation(TroveOperation):
     key = 'patch'
 
-troveOpMap = {
+opMap = {
     UpdateTroveOperation.key  : UpdateTroveOperation,
     EraseTroveOperation.key   : EraseTroveOperation,
     InstallTroveOperation.key : InstallTroveOperation,
@@ -414,7 +414,7 @@ class CM:
     def appendNoOpByText(self, text, **kwargs):
         self.appendNoOperation(NoOperation(text, **kwargs))
 
-    def appendOp(self, op, deDup=True):
+    def appendOp(self, op):
         self.modelOps.append(op)
         self._addIndex(op)
 
@@ -436,10 +436,9 @@ class CM:
         self.modelOps[i] = newOp
         self._addIndex(newOp)
 
-    def appendTroveOpByName(self, key, *args, **kwargs):
-        deDup = kwargs.pop('deDup', True)
-        op = troveOpMap[key](*args, **kwargs)
-        self.appendOp(op, deDup=deDup)
+    def appendOpByName(self, key, *args, **kwargs):
+        op = opMap[key](*args, **kwargs)
+        self.appendOp(op)
         return op
 
     def _iterOpTroveItems(self):
@@ -735,12 +734,12 @@ class CML(CM):
                 raise CMError('%s: Invalid statement "%s"'
                               %(CMLocation(index, self.context), line))
 
-            if verb == 'version':
+            if verb == VersionOperation.key:
                 nouns = nouns.split('#')[0].strip()
                 self.setVersion(VersionOperation(text=nouns,
                     modified=False, index=index, context=self.context))
 
-            elif verb == 'search':
+            elif verb == SearchOperation.key:
                 # Handle it if quoted, but it doesn't need to be
                 try:
                     nouns = ' '.join(shlex.split(nouns, comments=True))
@@ -759,12 +758,11 @@ class CML(CM):
                             CMLocation(index, self.context), str(e)))
                 self.appendOp(searchOp)
 
-            elif verb in troveOpMap:
+            elif verb in opMap:
                 try:
-                    self.appendTroveOpByName(verb,
+                    self.appendOpByName(verb,
                         text=shlex.split(nouns, comments=True),
-                        modified=False, index=index, context=self.context,
-                        deDup=False)
+                        modified=False, index=index, context=self.context)
                 except ValueError, e:
                     raise CMError('%s: %s' %(
                         CMLocation(index, self.context), str(e)))

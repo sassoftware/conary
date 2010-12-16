@@ -520,7 +520,7 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
             rmArgs += defArgs
 
         if rmArgs:
-            sysmodel.appendTroveOpByName('erase', text=rmArgs)
+            sysmodel.appendOpByName('erase', text=rmArgs)
 
         updateName = { False: 'update',
                        True: 'install' }[kwargs['keepExisting']]
@@ -578,10 +578,10 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                     for x in disallowedChangesets))
 
         if addArgs:
-            sysmodel.appendTroveOpByName(updateName, text=addArgs)
+            sysmodel.appendOpByName(updateName, text=addArgs)
 
         if patchArgs:
-            sysmodel.appendTroveOpByName('patch', text=patchArgs)
+            sysmodel.appendOpByName('patch', text=patchArgs)
 
 
         kwargs['fromChangesets'] = [x[0] for x in fromChangesets]
