@@ -335,6 +335,16 @@ class TroveCache(trovesource.AbstractTroveSource):
         self._startingSizes = self._getSizeTuple()
 
     def save(self, path):
+        # return early if we aren't going to have permission to save
+        try:
+            fd, cacheName = tempfile.mkstemp(
+                    prefix=os.path.basename(path) + '.',
+                    dir=os.path.dirname(path))
+            os.close(fd)
+        except (IOError, OSError):
+            # may not have permissions; say, not running as root
+            return
+
         cs = changeset.ChangeSet()
         for trv in self.cache.values():
             cs.newTrove(trv.diff(None, absolute = True)[0])
@@ -384,11 +394,6 @@ class TroveCache(trovesource.AbstractTroveSource):
         cs.addFileContents(self.timeStampsPathId, self.timeStampsFileId,
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(timeStampsStr), False)
-
-        fd, cacheName = tempfile.mkstemp(
-                prefix=os.path.basename(path) + '.',
-                dir=os.path.dirname(path))
-        os.close(fd)
 
         try:
             try:
