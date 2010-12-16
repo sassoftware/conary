@@ -994,9 +994,8 @@ class _UpdateCommand(ConaryCommand):
             del argSet['resolve']
 
         noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
-        if noRestart and cfg.root == '/':
-            raise conary.errors.ConaryError(
-                "--no-restart has to be used with --root")
+        if os.path.normpath(cfg.root) != '/':
+            noRestart = True
 
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False

@@ -290,10 +290,9 @@ autoResolve flag in conaryrc, \-\-no-resolve
 is the default behavior.
 .TP
 .B \-\-no-restart
-Do not restart Conary after applying a critical update.
-This option is only useful in the context of installing troves in
-a chroot, therefore it requires the \fB\-\-root \fI<root>\fR option
-to be used.
+Do not restart Conary after applying a critical update. It is implied whenever
+an alternate root is provided using the \fB\-\-root \fI<root>\fR option
+or through a configuration file.
 .TP
 .B \-\-replace-files
 Equivalent to specifying \fB\-\-replace\-managed\-files\fR,
