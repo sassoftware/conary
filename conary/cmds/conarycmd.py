@@ -993,9 +993,9 @@ class _UpdateCommand(ConaryCommand):
             cfg.autoResolve = True
             del argSet['resolve']
 
-        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
+        kwargs['noRestart'] = argSet.pop('no-restart', False)
         if os.path.normpath(cfg.root) != '/':
-            noRestart = True
+            kwargs['noRestart'] = True
 
         if argSet.has_key('no-resolve'):
             cfg.autoResolve = False
@@ -1217,10 +1217,9 @@ class UpdateAllCommand(_UpdateCommand):
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['modelTrace'] = argSet.pop('model-trace', None)
 
-        noRestart = kwargs['noRestart'] = argSet.pop('no-restart', False)
-        if noRestart and cfg.root == '/':
-            raise conary.errors.ConaryError(
-                "--no-restart has to be used with --root")
+        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        if os.path.normpath(cfg.root) != '/':
+            kwargs['noRestart'] = True
 
         if argSet.has_key('info'):
             kwargs['info'] = True
