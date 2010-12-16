@@ -1521,7 +1521,9 @@ class DependencyTables:
         depSetList = list(set(depSetList))
 
         selectTemplate = "SELECT depNum, provInstanceId FROM (%s)"
-        depList, cu = self._resolve(depSetList, selectTemplate)
+        depList, cu = self._resolve(depSetList, selectTemplate,
+                                    restrictor = restrictor,
+                                    restrictBy = restrictBy)
 
         result = {}
         depSolutions = [ [] for x in xrange(len(depList)) ]
