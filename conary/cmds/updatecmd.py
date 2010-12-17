@@ -971,7 +971,9 @@ def updateAll(cfg, **kwargs):
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
 
-def changePins(cfg, troveStrList, pin = True):
+def changePins(cfg, troveStrList, pin = True,
+               systemModel = None, systemModelFile = None,
+               callback = None):
     client = conaryclient.ConaryClient(cfg)
     client.checkWriteableRoot()
     troveList = []
@@ -981,6 +983,10 @@ def changePins(cfg, troveStrList, pin = True):
         troveList += troves
 
     client.pinTroves(troveList, pin = pin)
+
+    if systemModel and systemModelFile and not pin:
+        doModelUpdate(cfg, systemModel, systemModelFile, [], callback=callback)
+
 
 def revert(cfg):
     conaryclient.ConaryClient.revertJournal(cfg)

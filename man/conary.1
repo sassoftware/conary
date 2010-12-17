@@ -130,6 +130,12 @@ Creates a local changeset, which represents the changes made on the
 local system to \fItrovename\fP, relative to the package as it is
 represented in the repository.
 .TP
+.B pin/unpin [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+Pin / unpin all instances of \fItrovename\fP (or only a specified
+\fIversion\fP) on the local system.  In system model mode, after
+unpinning, a "conary sync" operation is then run, in order to keep
+the system in sync with the system model.
+.TP
 .B rblist
 Lists available rollbacks.
 .TP

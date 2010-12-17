@@ -251,9 +251,44 @@ class PinUnpinCommand(ConaryCommand):
     paramHelp = "<pkgname>[=<version>][[flavor]]+"
     hidden = True
     commandGroup = 'System Modification'
+
+    docs = {
+        'ignore-model'  : (VERBOSE_HELP,
+                           'Do not use the system-model file, even if present'),
+    }
+
+    def addParameters(self, argDef):
+        ConaryCommand.addParameters(self, argDef)
+        d = {}
+        d["ignore-model"] = NO_PARAM
+        argDef['Update Options'] = d
+
     def runCommand(self, cfg, argSet, otherArgs):
+        ignoreModel = argSet.pop('ignore-model', False)
         if argSet: return self.usage()
-        updatecmd.changePins(cfg, otherArgs[2:], pin = otherArgs[1] == "pin")
+
+        pin = otherArgs[1] == 'pin'
+        kwargs = {
+            'pin': pin,
+            'systemModel': False,
+            'systemModelFile': None,
+        }
+
+        if not pin and not ignoreModel:
+            # if system model is present, unpin implies sync
+            systemModel = cml.CML(cfg)
+            modelFile = systemmodel.SystemModelFile(systemModel)
+
+            if cfg.quiet:
+                callback = callbacks.UpdateCallback()
+            else:
+                callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
+            kwargs['callback'] = callback
+            if modelFile.exists():
+                kwargs['systemModel'] = systemModel
+                kwargs['systemModelFile'] = modelFile
+
+        updatecmd.changePins(cfg, otherArgs[2:], **kwargs)
 
 class PinCommand(PinUnpinCommand):
     commands = ['pin']
