@@ -30,6 +30,12 @@ class NetworkConvertors(object):
     def toVersion(self, v):
         return versions.VersionFromString(v)
 
+    def versionStringToFrozen(self, verStr, timeStamps):
+        if isinstance(timeStamps, basestring):
+            timeStamps = [float(x) for x in timeStamps.split(':')]
+        timeStamps = ['%.3f' % x for x in timeStamps]
+        return versions.strToFrozen(verStr, timeStamps)
+
     def fromPathId(self, f):
         assert(len(f) == 16)
         return base64.encodestring(f)
