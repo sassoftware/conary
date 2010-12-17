@@ -107,7 +107,11 @@ class CMLocation(_namedtuple('CMLocation', 'line context op spec')):
             spec = self.spec.asString()
         else:
             spec = ''
-        return ':'.join((x for x in (context, str(self.line), spec) if x))
+        if self.line is None:
+            line = 'new-line'
+        else:
+            line = str(self.line)
+        return ':'.join((x for x in (context, line, spec) if x))
     asString = __str__
 
 
@@ -600,6 +604,11 @@ class CM:
                                         self._simplificationCandidate(opList):
                 oldOp, oldSpec = opList[oldIdx]
                 newOp, newSpec = opList[newIdx]
+                if newOp.index != None:
+                    # We may later add aggressive simplification:
+                    # if not simplifyAllLocalOps and newOp.index != None:
+                    continue
+
                 result = simplifyClass.check(troveCache, g, oldOp, oldSpec,
                                              newOp, newSpec)
                 if result is False:
