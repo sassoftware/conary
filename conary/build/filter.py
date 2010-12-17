@@ -151,8 +151,14 @@ class PathSet(set):
     raise OverflowError for regular expressions of complexity seen
     in real packages.
     '''
-    def match(self, string):
+    def __init__(self, *args, **kwargs):
+        name = kwargs.pop('name', None)
+        self.name = name
+        set.__init__(self, *args, **kwargs)
+    def match(self, string, mode=None):
         return string in self
     search = match
     def __call__(self):
         return self
+    def __hash__(self):
+        return id(self)

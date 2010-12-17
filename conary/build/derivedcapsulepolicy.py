@@ -27,11 +27,9 @@ class ComponentSpec(capsulepolicy.ComponentSpec):
             trv = trove.Trove(trvCs)
 
             if not trv.isCollection():
-                regexs = [ re.escape(x[1]) for x in trv.iterFileList() ]
-                f = filter.Filter(regexs, self.recipe.macros,
+                f = filter.PathSet((x[1] for x in trv.iterFileList()),
                                   name = trv.getName().split(':')[1])
                 self.derivedFilters.append(f)
-
         capsulepolicy.ComponentSpec.doProcess(self, recipe)
 
 PackageSpec = derivedpolicy.PackageSpec
