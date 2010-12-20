@@ -154,7 +154,7 @@ class PathSet(set):
     def __init__(self, *args, **kwargs):
         name = kwargs.pop('name', None)
         self.name = name
-        set.__init__(self, *args, **kwargs)
+        set.__init__(self, *args)
     def match(self, string, mode=None):
         return string in self
     search = match
