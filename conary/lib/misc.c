@@ -382,8 +382,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
     char tag[12];
 
     if (!PYINT_CheckExact(tagObj)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
-        free(depList);
+        PyErr_SetString(PyExc_TypeError, "'tag' attribute of dep class object must be an int");
         return -1;
     }
 
