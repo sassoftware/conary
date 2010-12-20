@@ -15,7 +15,7 @@
 SUBDIRS = epdb_embedded
 
 python_files=$(wildcard *.py)
-python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so
+python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so _versions.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
