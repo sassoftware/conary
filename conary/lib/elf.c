@@ -816,18 +816,13 @@ static PyMethodDef ElfMethods[] = {
 };
 
 
-#define MODULE_DOCSTR "provides access to elf shared library dependencies"
-
-#if PY_MAJOR_VERSION >= 3
 static PyModuleDef ElfModule = {
     PyModuleDef_HEAD_INIT,
     "elf",
-    MODULE_DOCSTR,
+    "provides access to elf shared library dependencies",
     -1,
     ElfMethods
 };
-#endif
-
 
 #define ADD_CONST(name) \
 PyModule_AddObject(m, #name, PyLong_FromLong(name));
@@ -836,7 +831,7 @@ PYMODULE_INIT(elf)
 {
     PyObject* m;
 
-    m = PYMODULE_CREATE("elf", ElfMethods, MODULE_DOCSTR, &ElfModule);
+    m = PYMODULE_CREATE(&ElfModule);
     if (m == NULL)
         PYMODULE_RETURN(NULL);
 

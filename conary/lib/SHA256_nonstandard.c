@@ -472,16 +472,13 @@ static struct PyMethodDef ALG_functions[] = {
              {PyDict_SetItemString(PyModule_GetDict(m),n,o); Py_DECREF(o);}}
 #endif
 
-#define _MODULE_DOCSTR "nonstandard implementation of SHA256 algorithm"
-#if PY_MAJOR_VERSION >= 3
 static PyModuleDef ALGmodule = {
     PyModuleDef_HEAD_INIT,
     _MODULE_STRING,
-    _MODULE_DOCSTR,
+    "nonstandard implementation of SHA256 algorithm",
     -1,
     ALG_functions
 };
-#endif
 
 
 PYMODULE_INIT(MODULE_NAME)
@@ -492,8 +489,7 @@ PYMODULE_INIT(MODULE_NAME)
         if (PyType_Ready(&ALGtype) < 0)
             PYMODULE_RETURN(NULL);
 
-        m = PYMODULE_CREATE(_MODULE_STRING, ALG_functions, _MODULE_DOCSTR,
-                &ALGmodule);
+        m = PYMODULE_CREATE(&ALGmodule);
         if (m == NULL)
             PYMODULE_RETURN(NULL);
 

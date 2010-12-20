@@ -1631,24 +1631,6 @@ static PyObject * rpmExpandMacro(PyObject *self, PyObject *args) {
 }
 
 
-#define MODULE_DOCSTR "miscellaneous low-level C functions for conary"
-
-#if PY_MAJOR_VERSION >= 3
-static PyModuleDef MiscModule = {
-    PyModuleDef_HEAD_INIT,
-    "misc",
-    MODULE_DOCSTR,
-    -1,
-    MiscMethods
-};
-#endif
-
-PYMODULE_INIT(misc)
-{
-    PyObject *m = PYMODULE_CREATE("misc", MiscMethods, MODULE_DOCSTR,
-            &MiscModule);
-    PYMODULE_RETURN(m);
-}
-
+PYMODULE_DECLARE(misc, MiscMethods, "miscellaneous low-level C functions for conary");
 
 /* vim: set sts=4 sw=4 expandtab : */

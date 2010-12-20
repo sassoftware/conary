@@ -13,6 +13,28 @@
  *
  */
 
+/*
+ * How to declare a module:
+ *
+ *  PYMODULE_DECLARE(mymodule, MyMethods, "my docstring");
+ *
+ * - or -
+ *
+ *  static PyModuleDef MyModule = {
+ *      PyModuleDef_HEAD_INIT,
+ *      "mymodule",
+ *      "my docstring",
+ *      -1,
+ *      MyMethods
+ *      };
+ *
+ *  PYMODULE_INIT(mymodule) {
+ *      PyObject *m = PYMODULE_CREATE(&MyModule);
+ *      do_stuff();
+ *      PYMODULE_RETURN(m);
+ *  }
+ */
+
 #ifndef __PYCOMPAT_H
 #define __PYCOMPAT_H
 
@@ -20,6 +42,10 @@
 #define _PASTE(x,y) x##y
 #define _PASTE2(x,y) _PASTE(x,y)
 
+# define PYMODULE_DECLARE(name, methods, doc) \
+    static PyModuleDef _module_def = { PyModuleDef_HEAD_INIT, \
+        #name, doc, -1, methods }; \
+    PYMODULE_INIT(name) { PYMODULE_RETURN(PYMODULE_CREATE(&_module_def)); }
 
 #if PY_MAJOR_VERSION < 3
 /* Macros for python 2.x */
@@ -38,8 +64,8 @@
         PyLong_AsUnsignedLongLong((x)) )
 
 # define PYMODULE_INIT(name)        PyMODINIT_FUNC _PASTE2(init, name)(void)
-# define PYMODULE_CREATE(name, functions, docstr, moddef) \
-    Py_InitModule3(name, functions, docstr)
+# define PYMODULE_CREATE(moddef) \
+    Py_InitModule3((moddef)->m_name, (moddef)->m_methods, (moddef)->m_doc)
 # define PYMODULE_RETURN(value)     { if(value) ; return; }
 
 #else
@@ -55,8 +81,7 @@
 # define PYLONG_AS_ULL(x)           PyLong_AsUnsignedLongLong((x))
 
 # define PYMODULE_INIT(name)        PyMODINIT_FUNC _PASTE2(PyInit_, name)(void)
-# define PYMODULE_CREATE(name, functions, docstr, moddef) \
-    PyModule_Create(moddef)
+# define PYMODULE_CREATE(moddef)    PyModule_Create((moddef))
 # define PYMODULE_RETURN(value)     return value
 
 #endif
@@ -99,6 +124,19 @@
 # define Py_TYPE(ob)                (ob)->ob_type
 # define Py_SIZE(ob)                (ob)->ob_size
 # define PyVarObject_HEAD_INIT(type, size) PyObject_HEAD_INIT(type) size,
+#endif
+
+
+/* Partial backport from 3.1 to make PYMODULE simpler */
+#if PY_MAJOR_VERSION < 3
+#define PyModuleDef_HEAD_INIT       NULL
+typedef struct PyModuleDef {
+    void *dummy;
+    const char *m_name;
+    const char *m_doc;
+    Py_ssize_t m_size;
+    PyMethodDef *m_methods;
+} PyModuleDef;
 #endif
 
 
