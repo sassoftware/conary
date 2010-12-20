@@ -18,13 +18,8 @@ python_files=$(wildcard *.py)
 python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
-elfmodule_objs=elf.o
-sha256module_objs=SHA256_nonstandard.o
-miscmodule_objs=misc.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
-generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules) $(wrapper_libs) $(wrapper_objs) $(sha256module_objs)
-dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
-             stringstream.c cstreams.h filename_wrapper.c SHA256_nonstandard.c Makefile
+
 libelf = $(shell \
 if [ -x /usr/bin/pkg-config ] && /usr/bin/pkg-config --exists libelf; then \
     pkg-config --cflags --libs libelf; \
@@ -47,27 +42,23 @@ fi)
 
 all: default-subdirs $(python_modules) $(wrapper_libs)
 
+$(python_modules): %.so: %.o
+	$(CC) $(LDFLAGS) -shared -rdynamic -o $@ $^ $(LIBS)
+
 elf.o: elf.c
 	@if [ -z "$(libelf)" ] ; then \
 	    echo 'Stopping build due to missing libelf' ; exit 1 ; fi
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
-elf.so: $(elfmodule_objs)
-	$(CC) $(LDFLAGS) -shared -o $@ $< $(libelf)
-
 SHA256.o: SHA256_nonstandard.c
 	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
 
-SHA256_nonstandard.so: $(sha256module_objs)
-	$(CC) $(LDFLAGS) -pthread -shared -o $@ $< 
-
-misc.so: $(miscmodule_objs)
-	$(CC) $(LDFLAGS) -shared -lcrypto -lz -lresolv -o $@ $<
-
+elf.so: LIBS = $(libelf)
+SHA256_nonstandard.so: LIBS = -pthread
+misc.so: LIBS = -lcrypto -lz -lresolv
 $(cstreamsmodule_objs): cstreams.h
-
 cstreams.so: $(cstreamsmodule_objs)
-	$(CC) $(LDFLAGS) -shared -o $@ $^
+
 
 filename_wrapper.so: filename_wrapper.c
 	$(CC) -Wall -fPIC -rdynamic -c filename_wrapper.c
