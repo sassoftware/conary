@@ -37,7 +37,19 @@ static PyMethodDef VersionsMethods[] = {
 
 
 static PyObject * raise_parse_error(const char *msg, int offset) {
+    char buffer[256];
+    const char *newmsg;
     PyObject *exception, *module;
+
+    if (offset >= 0) {
+        if (snprintf(buffer, 255, "%s at offset %d", msg, offset) < 0) {
+            PyErr_SetString(PyExc_RuntimeError, "snprintf failed");
+            return NULL;
+        }
+        newmsg = buffer;
+    } else {
+        newmsg = msg;
+    }
 
     module = PyImport_ImportModule("conary.errors");
     if (module == NULL) {
@@ -49,11 +61,7 @@ static PyObject * raise_parse_error(const char *msg, int offset) {
         return NULL;
     }
 
-    if (offset >= 0) {
-        PyErr_SetString(exception, msg);
-    } else {
-        PyErr_Format(exception, "%s at offset %d", msg, offset);
-    }
+    PyErr_SetString(exception, newmsg);
     Py_DECREF(exception);
     return NULL;
 }
