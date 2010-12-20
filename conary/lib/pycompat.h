@@ -132,9 +132,9 @@
 #define PyModuleDef_HEAD_INIT       NULL
 typedef struct PyModuleDef {
     void *dummy;
-    const char *m_name;
-    const char *m_doc;
-    Py_ssize_t m_size;
+    char *m_name;
+    char *m_doc;
+    int m_size;
     PyMethodDef *m_methods;
 } PyModuleDef;
 #endif
