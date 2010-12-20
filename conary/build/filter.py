@@ -138,7 +138,7 @@ class Filter:
         return 0
 
 
-class PathSet(set):
+class PathSet(object):
     '''
     This class implements an interface sufficiently similar to
     a regular expression object to use for filters, but looks up
@@ -151,14 +151,13 @@ class PathSet(set):
     raise OverflowError for regular expressions of complexity seen
     in real packages.
     '''
+    slots = [ 'name', '_set' ]
     def __init__(self, *args, **kwargs):
         name = kwargs.pop('name', None)
         self.name = name
-        set.__init__(self, *args)
+        self._set = set(*args)
     def match(self, string, mode=None):
-        return string in self
+        return string in self._set
     search = match
     def __call__(self):
         return self
-    def __hash__(self):
-        return id(self)
