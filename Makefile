@@ -34,7 +34,7 @@ minimal:
 	NO_KID=1 $(MAKE) all
 
 
-SUBDIRS = commands conary config man scripts extra
+SUBDIRS = commands conary config man scripts
 
 extra_files = \
 	LICENSE			\
@@ -66,7 +66,6 @@ archive:
 version:
 	sed -i 's/@NEW@/$(VERSION)/g' NEWS
 	sed -i 's/@NEW@/$(VERSION)/g' ./doc/PROTOCOL.versions
-	$(MAKE) -C extra VERSION=$(VERSION)
 
 show-version:
 	@echo $(VERSION)
