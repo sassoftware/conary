@@ -1,0 +1,2 @@
+Capsule-based packages no longer allow their contents to be changed - that
+can be achieved in a derived package.

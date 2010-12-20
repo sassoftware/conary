@@ -580,9 +580,13 @@ class CapsuleModifications(policy.Policy):
                 capPath = self.recipe._getCapsulePathsForFile(filename)
                 hasCapsule = bool(self.recipe._hasCapsulePackage(pkg.name))
                 if hasCapsule:
+                    if capPath:
+                        # CNY-3590: we won't allow users to change contents or
+                        # permissions of encapsulated files
+                        continue
                     f = pkg.getFile(filename)
+                    f.flags.isCapsuleAddition(True)
+                    # Setting the override flag is unnecessary, but
+                    # historically that's what the code did, prior to CNY-3577
                     f.flags.isCapsuleOverride(True)
-                    if not capPath:
-                        f.flags.isCapsuleAddition(True)
-                    # CNY-3577
                     f.flags.isEncapsulatedContent(False)
