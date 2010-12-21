@@ -737,6 +737,7 @@ class CMLClient(object):
                                         finalJobs = finalJobs,
                                         criticalOnly = criticalOnly)
 
+            check.done()
             log.info("job dependency closed; %s jobs resulted", len(job))
 
             # if any of the things we're about to install or remove use
