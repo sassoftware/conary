@@ -1098,7 +1098,7 @@ class IncludeAction(DelayedTupleSetAction):
 
         if not trove.troveIsComponent(nvf[0]):
             assert(trove.troveIsPackage(nvf[0]))
-            trv = data.troveCache.getTrove(*nvf, withFiles = False)
+            trv = data.troveCache.getTrove(withFiles=False, *nvf)
             found = None
             for subNVF in trv.iterTroveList(strongRefs = True):
                 if subNVF[0].endswith(':cml'):
