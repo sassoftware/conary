@@ -23,8 +23,6 @@ class AbstractModelCompiler(object):
 
     SearchPathTroveSet = None
 
-    FlattenAction = None
-
     FetchAction = troveset.FetchAction
     EraseFindAction = troveset.FindAction
     FindAction = troveset.FindAction

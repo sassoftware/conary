@@ -271,28 +271,6 @@ class FlattenedTroveTupleSet(troveset.DelayedTupleSet):
 
         return troveset.DelayedTupleSet._walk(self, *args, **kwargs)
 
-class CMLFlattenAction(troveset.DelayedTupleSetAction):
-
-    prefilter = troveset.FetchAction
-    resultClass = FlattenedTroveTupleSet
-
-    def cmlFlattenAction(self, data):
-        installs = []
-        available = []
-
-        for refTrove, inInstall, explicit in self.primaryTroveSet._walk(
-                                            data.troveCache, recurse = True):
-            if inInstall:
-                installs.append(refTrove)
-            else:
-                available.append(refTrove)
-
-        self.outSet._setInstall(installs)
-        self.outSet._setOptional(available)
-        self.outSet._flat = True
-
-    __call__ = cmlFlattenAction
-
 class CMLSearchPath(troveset.SearchPathTroveSet):
 
     def find(self, *troveSpecs):
@@ -369,7 +347,6 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = CMLSearchPath
     FindAction = CMLFindAction
-    FlattenAction = CMLFlattenAction
 
     def __init__(self, cfg, repos, db, changeSetList = []):
         self.db =  db
