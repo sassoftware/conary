@@ -176,23 +176,19 @@ class Run(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.Run()}} - Run a shell command
 
     SYNOPSIS
     ========
-
     C{r.Run(I{cmd}, [I{dir},] [I{filewrap},] [I{wrapdir}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Run()} class is called from within a Conary recipe to run a shell
     command with simple macro substitution.
 
     KEYWORDS
     ========
-
     The C{r.Run()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -219,7 +215,6 @@ class Run(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.Run('find %(destdir)s -name "floppyd*" -print | xargs rm')}
 
     Locate instances of the filespec C{floppyd*} in the C{%(destdir)s}, and
@@ -280,23 +275,19 @@ class Automake(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.Automake()}} - Re-runs aclocal, autoconf, and automake
 
     SYNOPSIS
     ========
-
     C{r.Automake()}
 
     DESCRIPTION
     ===========
-
     The C{r.Automake()} class is called from within a Conary recipe to re-run
     the C{aclocal}, C{autoconf}, and C{automake} commands.
 
     KEYWORDS
     ========
-
     The C{r.Automake()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -332,7 +323,6 @@ class Automake(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.Automake(autoMakeArgs='--add-missing --foreign')}
 
     Demonstrates calling C{r.Automake()} and passing in the C{--add-missing}
@@ -375,17 +365,14 @@ class Configure(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.Configure()}} - Runs autoconf configure script
 
     SYNOPSIS
     ========
-
     C{r.Configure(I{extra args}, [I{configureName},] [I{objDir},] [I{preConfigure},] [I{skipMissingDir},] [I{dir}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Configure()} class is called from within a Conary recipe to run an
     autoconf configure script, giving it the default paths as defined by the
     macro set: C{r.Configure(extra args)}.
@@ -397,7 +384,6 @@ class Configure(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.Configure()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -428,7 +414,6 @@ class Configure(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.Configure('--sbindir=%(essentialsbindir)s')}
 
     Demonstrates calling C{r.Configure()} and specifying the
@@ -573,24 +558,20 @@ class CMake(Configure):
     """
     NAME
     ====
-
     B{C{r.CMake()}} - Runs cmake configure script
 
     SYNOPSIS
     ========
-
     C{r.CMake(I{extra args}, [I{objDir},] [I{preCMake},] [I{skipMissingDir},] [I{dir}])}
 
     DESCRIPTION
     ===========
-
     The C{r.CMake()} class is called from within a Conary recipe to run an
     cmake configure script, giving it the default paths as defined by the
     macro set: C{r.CMake(extra args)}.
 
     KEYWORDS
     ========
-
     The C{r.CMake()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -617,7 +598,6 @@ class CMake(Configure):
 
     EXAMPLES
     ========
-
     C{r.CMake('-DUSE_KDE3=NO')}
 
     Demonstrates calling C{r.CMake()} and specifying C{NO} value for
@@ -703,17 +683,14 @@ class ManualConfigure(Configure):
     """
     NAME
     ====
-
     B{C{r.ManualConfigure()}} - Runs make without functional DESTDIR
 
     SYNOPSIS
     ========
-
     C{r.ManualConfigure(I{--limited-args})}
 
     DESCRIPTION
     ===========
-
     The C{r.ManualConfigure()} class is called from within a Conary recipe in
     a manner similar to C{r.Configure} except all arguments to the configure
     script must be provided explicitly.
@@ -722,7 +699,6 @@ class ManualConfigure(Configure):
 
     EXAMPLES
     ========
-
     C{r.ManualConfigure('--prefix=/usr --shared')}
 
     Calls C{r.ManualConfigure()} and specifies the C{--prefix} and C{--shared}
@@ -740,17 +716,14 @@ class Make(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.Make()}} - Runs make with system defaults
 
     SYNOPSIS
     ========
-
     C{r.Make(I{makeargs}, [I{forceFlags},] [I{makeName},] [I{preMake},] [I{skipMissingDir},] [I{dir}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Make()} class is called from within a Conary recipe to execute the
     C{make} utility with system defaults.  The environment variables
     C{CFLAGS}, C{LDFLAGS}, C{CXXFLAGS}, and so on are set to the system
@@ -771,7 +744,6 @@ class Make(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.Make()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -802,7 +774,6 @@ class Make(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.Make("PARALLELMFLAGS='%(parallelmflags)s'", dir=objDir)}
 
     Demonstrates calling C{r.Make()}, and setting the environment variable
@@ -893,18 +864,15 @@ class MakeParallelSubdir(Make):
     """
     NAME
     ====
-
     B{C{r.MakeParallelSubdir()}} - Runs make with parallelmflags applied only to
     sub-make processes
 
     SYNOPSIS
     ========
-
     C{r.MakeParallelSubdir(I{makeargs})}
 
     DESCRIPTION
     ===========
-
     The C{r.MakeParallelSubdir()} class is called from within a Conary recipe
     to execute the C{make} utility with system defaults for parallelmflags
     only applied to sub-make processes.
@@ -930,17 +898,14 @@ class MakeInstall(Make):
     """
     NAME
     ====
-
     B{C{r.MakeInstall()}} - Runs make utility with install target
 
     SYNOPSIS
     ========
-
     C{r.MakeInstall(I{makeargs}, [I{rootVar},] [I{installtarget}])}
 
     DESCRIPTION
     ===========
-
     The C{r.MakeInstall()} class is called from within a Conary recipe to run
     the C{make} utility, automatically set C{DESTDIR}, and provide the install
     target.
@@ -950,7 +915,6 @@ class MakeInstall(Make):
 
     KEYWORDS
     ========
-
     The C{r.MakeInstall()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -968,7 +932,6 @@ class MakeInstall(Make):
 
     EXAMPLES
     ========
-
     C{r.MakeInstall(rootVar='BUILDROOT')}
 
     Demonstrates C{r.MakeInstall()}, specifying C{BUILDROOT} as the rootVar
@@ -1007,17 +970,14 @@ class MakePathsInstall(Make):
     """
     NAME
     ====
-
     B{C{r.MakePathsInstall()}} - Runs make without functional DESTDIR
 
     SYNOPSIS
     ========
-
     C{r.MakePathsInstall(I{makeargs})}
 
     DESCRIPTION
     ===========
-
     The C{r.MakePathsInstall()} class is called from within a Conary recipe
     when there is no single functional C{DESTDIR} or similar definition, but
     enough of the de-facto standard variables such as C{prefix}, C{bindir},
@@ -1064,23 +1024,19 @@ class Ant(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.Ant()}} - Runs c{ant}
 
     SYNOPSIS
     ========
-
     C{r.Ant(I{antargs}, [I{verbose}], [I{options}], [I{dir}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Ant()} class is called from within a Conary recipe to execute the
     C{ant} utility.
 
     KEYWORDS
     ========
-
     The C{r.Ant()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1094,7 +1050,6 @@ class Ant(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.Ant('jar javadoc')}
 
     Demonstrates calling C{r.Ant()}, with the C{jar} and C{javadoc} arguments
@@ -1123,23 +1078,19 @@ class JavaCompile(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.JavaCompile()}} - Runs C{javac}
 
     SYNOPSIS
     ========
-
     C{r.JavaCompile(I{directory}, [I{javacmd}], [I{javaArgs}])}
 
     DESCRIPTION
     ===========
-
     The C{r.JavaCompile()} class is called from within a Conary recipe to
     execute the command defined by C{javacmd}, normally C{javac}.
 
     KEYWORDS
     ========
-
     The C{r.JavaCompile()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1153,7 +1104,6 @@ class JavaCompile(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.JavaCompile('/path/to/java/files', javacmd='ecj')}
 
     Demonstrates calling C{r.JavaCompile()}, to compile all java files in a
@@ -1180,17 +1130,14 @@ class CompilePython(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.CompilePython()}} - Builds compiled and optimized Python bytecode files
 
     SYNOPSIS
     ========
-
     C{r.CompilePython([I{/dir0},] [I{/dir1}])}
 
     DESCRIPTION
     ===========
-
     The C{r.CompilePython()} is called from within a Conary recipe to compile
     optimized and compiled Python bytecode files. The paths specified must be
     absolute paths which are interpreted relative to C{%(destdir)s} in order
@@ -1198,7 +1145,6 @@ class CompilePython(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.CompilePython()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1215,7 +1161,6 @@ class CompilePython(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.CompilePython('%(varmmdir)s')}
 
     The above example demonstrates calling C{r.CompilePython()}, and specifying
@@ -1252,17 +1197,14 @@ class PythonSetup(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.PythonSetup()}} - Invokes setup.py to package Python code
 
     SYNOPSIS
     ========
-
     C{r.PythonSetup(I{extra args}, [I{setupName}],[I{action},] [I{purePython},] [I{allowNonPure},] [I{bootstrap},] [I{dir},] [I{rootDir},] [I{purelib},] [I{platlib},] [I{data},] )}
 
     DESCRIPTION
     ===========
-
     The C{r.PythonSetup()} class is called from within a Conary recipe to
     invoke setup.py in the correct way to use python-setuptools to install
     without building a C{.egg} file regardless of whether this version of
@@ -1273,7 +1215,6 @@ class PythonSetup(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.PythonSetup()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -1307,7 +1248,6 @@ class PythonSetup(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.PythonSetup(bootstrap=True)}
 
     Calls C{r.PythonSetup()} and specifies C{bootstrap} to be C{True}.
@@ -1427,17 +1367,14 @@ class Ldconfig(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.Ldconfig()}} - Runs ldconfig in a directory
 
     SYNOPSIS
     ========
-
     C{r.Ldconfig(I{/dir0})}
 
     DESCRIPTION
     ===========
-
     The C{r.Ldconfig()} class is called from within a Conary recipe to execute
     the C{ldconfig} program in a subdirectory.
 
@@ -1454,7 +1391,6 @@ class Ldconfig(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.Ldconfig()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1468,7 +1404,6 @@ class Ldconfig(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.Ldconfig('%(libdir)s/')}
 
     Demonstrates calling C{r.Ldconfig()} to execute C{ldconfig} in the
@@ -1582,17 +1517,14 @@ class Desktopfile(BuildCommand, _FileAction):
     """
     NAME
     ====
-
     B{C{r.Desktopfile()}} - Properly installs desktop files
 
     SYNOPSIS
     ========
-
     C{r.Desktopfile(I{filename}, [I{category},] [I{vendor}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Desktopfile()} class is called from within a Conary recipe to
     install a desktop file in C{/usr/share/applications} while also setting a
     category and vendor.
@@ -1603,7 +1535,6 @@ class Desktopfile(BuildCommand, _FileAction):
 
     KEYWORDS
     ========
-
     The C{r.Desktopfile()} class accepts the following keywords:
 
     B{category} : (None) A category name for the desktop file
@@ -1620,7 +1551,6 @@ class Desktopfile(BuildCommand, _FileAction):
 
     EXAMPLES
     ========
-
     C{r.Desktopfile('thunderbird.desktop')}
 
     Demonstrates creation of the desktop file C{thunderbird.desktop} with
@@ -1657,24 +1587,20 @@ class Environment(BuildAction):
     """
     NAME
     ====
-
     B{C{r.Environment()}} - Set an environment variable
 
     SYNOPSIS
     ========
-
     C{r.Environment(I{'VARIABLE'}, I{'value'})}
 
     DESCRIPTION
     ===========
-
     The C{r.Environment()} class is called from within a Conary recipe to set
     an environment variable after all macros have been set.
 
 
     KEYWORDS
     ========
-
     The C{r.Environment()} class accepts the following keywords:
 
     B{use} : Optional argument of Use flag(s) telling whether to actually
@@ -1682,7 +1608,6 @@ class Environment(BuildAction):
 
     EXAMPLES
     ========
-
     C{r.Environment('MOZ_THUNDERBIRD', '1')}
 
     Demonstrates calling C{r.Environment()} to set the environment variable
@@ -1701,23 +1626,19 @@ class ClassPath(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.ClassPath()}} - Set the CLASSPATH environment variable
 
     SYNOPSIS
     ========
-
     C{r.ClassPath(I{'jars'})}
 
     DESCRIPTION
     ===========
-
     The C{r.ClassPath()} class is called from within a Conary recipe to set
     the CLASSPATH environment variable using C{r.classpath}.
 
     KEYWORDS
     ========
-
     The C{r.ClassPath()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1730,7 +1651,6 @@ class ClassPath(BuildCommand):
     specifications are considered in strict order as provided by the recipe.
     EXAMPLES
     ========
-
     C{r.Environment('junit', 'servlet-api')}
     """
     template = ''
@@ -1752,17 +1672,14 @@ class SetModes(_FileAction):
     """
     NAME
     ====
-
     B{C{r.SetModes()}} - Sets modes on files
 
     SYNOPSIS
     ========
-
     C{r.SetModes(I{file}, [I{file}, I{...},] I{mode})}
 
     DESCRIPTION
     ===========
-
     The C{r.SetModes()} class is called from within a Conary recipe to set
     modes on files in the C{%(destdir)s} or C{%(builddir)s} directories.
 
@@ -1777,7 +1694,6 @@ class SetModes(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.SetModes('%(sbindir)s/sendmail', 02755)}
 
     Calls C{r.SetModes()} on the file C{%(sbindir)s/sendmail}, setting it to
@@ -1885,17 +1801,14 @@ class Install(_PutFiles):
     """
     NAME
     ====
-
     B{C{r.Install()}} - Copies file while setting permissions
 
     SYNOPSIS
     ========
-
     C{r.Install(I{srcfile}, I{destfile})}
 
     DESCRIPTION
     ===========
-
     The C{r.Install()} class is called from within a Conary recipe to copy
     files from a source to destination as with C{r.Copy} with the exception
     that C{r.Install} also fixes the file's modes.
@@ -1912,7 +1825,6 @@ class Install(_PutFiles):
 
     KEYWORDS
     ========
-
     The C{r.Install()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1933,7 +1845,6 @@ class Install(_PutFiles):
 
     EXAMPLES
     ========
-
     C{r.Install('am-utils.conf', '%(sysconfdir)s/amd.conf')}
 
     Demonstrates calling C{r.Install()} to install the file
@@ -1950,17 +1861,14 @@ class Copy(_PutFiles):
     """
     NAME
     ====
-
     B{C{r.Copy()}} - Copies files without changing the mode
 
     SYNOPSIS
     ========
-
     C{r.Copy(I{srcfile}, I{destfile})}
 
     DESCRIPTION
     ===========
-
     The C{r.Copy()} class is called from within a Conary recipe to copy files
     from a source directory to a destination directory without changing the
     mode of the file(s).
@@ -1972,7 +1880,6 @@ class Copy(_PutFiles):
 
     KEYWORDS
     ========
-
     The C{r.Copy()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -1986,7 +1893,6 @@ class Copy(_PutFiles):
 
     EXAMPLES
     ========
-
     C{r.Copy('mm_cfg.py', 'Mailman/mm_cfg.py.dist')}
 
     Demonstrates calling C{r.Copy()} and specifying the file C{mm_cfg.py} be
@@ -2001,17 +1907,14 @@ class Move(_PutFiles):
     """
     NAME
     ====
-
     B{C{r.Move()}} - Moves files
 
     SYNOPSIS
     ========
-
     C{r.Move(I{srcname}, I{destname})}
 
     DESCRIPTION
     ===========
-
     The C{r.Move()} class is called from within a Conary recipe to move files.
 
     Note that a trailing slash on the C{destfile} means to create the directory
@@ -2021,7 +1924,6 @@ class Move(_PutFiles):
 
     KEYWORDS
     ========
-
     The C{r.Move()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -2035,7 +1937,6 @@ class Move(_PutFiles):
 
     EXAMPLES
     ========
-
     C{r.Move('%(sbindir)s/lpc', '%(sbindir)s/lpc.cups')')}
 
     Calls C{r.Move()} to move the file C{%(sbindir)s/lpc} to
@@ -2050,17 +1951,14 @@ class Symlink(_FileAction):
     """
     NAME
     ====
-
     B{C{r.Symlink()}} - Creates a symbolic link
 
     SYNOPSIS
     ========
-
     C{r.Symlink(I{realfile}, I{symlink})}
 
     DESCRIPTION
     ===========
-
     The C{r.Symlink()} class is called from within a Conary recipe to create     a symbolic link to a file.
 
     Multiple symlinks can be created if the destination path C{realfile} is a
@@ -2069,7 +1967,6 @@ class Symlink(_FileAction):
 
     KEYWORDS
     ========
-
     The C{r.Symlink()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -2083,7 +1980,6 @@ class Symlink(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.Symlink('%(bindir)s/enable', '%(bindir)s/cups-enable')}
 
     Calls C{r.Symlink()} to create a symbolic link named C{cups-enable} from
@@ -2181,17 +2077,14 @@ class Link(_FileAction):
     """
     NAME
     ====
-
     B{C{r.Link()}} - Creates a hard link
 
     SYNOPSIS
     ========
-
     C{r.Link(I{newname(s)}, I{existingname})}
 
     DESCRIPTION
     ===========
-
     The C{r.Link()} class is called from within a Conary recipe to install a
     hard link.
 
@@ -2202,7 +2095,6 @@ class Link(_FileAction):
 
     KEYWORDS
     ========
-
     The C{r.Link()} class accepts the following keywords, with default values
     shown in parentheses when applicable:
 
@@ -2216,7 +2108,6 @@ class Link(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.Link('mumble', '%(bindir)s/passwd')}
 
     Demonstrates calling C{r.Link()} to create a hard link from the file
@@ -2270,23 +2161,19 @@ class Remove(BuildAction):
     """
     NAME
     ====
-
     B{C{r.Remove()}} - Removes files and directories
 
     SYNOPSIS
     ========
-
     C{r.Remove(I{filename}, I{...} || I{dirname}, I{...} [I{recursive}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Remove()} class is called from within a Conary recipe to remove
     one or more files or directories.
 
     KEYWORDS
     ========
-
     The C{r.Remove()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -2300,7 +2187,6 @@ class Remove(BuildAction):
 
     EXAMPLES
     ========
-
     C{r.Remove('/lib/modules/%(kver)s/modules.*')}
 
     Calls C{r.Remove()} to remove the C{modules.*} files from the
@@ -2349,17 +2235,14 @@ class Replace(BuildAction):
     """
     NAME
     ====
-
     B{C{r.Replace()}} - Substitute text in a file
 
     SYNOPSIS
     ========
-
     C{r.Replace(I{old}, I{new}, I{path+} || (I{old}, I{new})+, I{path}+)}
 
     DESCRIPTION
     ===========
-
     The C{r.Replace()} class is called from within a Conary recipe to
     substitute text *old* with *new* in a file using Python regular
     expression rules
@@ -2382,7 +2265,6 @@ class Replace(BuildAction):
 
     KEYWORDS
     ========
-
     The C{r.Replace()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -2393,7 +2275,6 @@ class Replace(BuildAction):
 
     EXAMPLES
     ========
-
     C{r.Replace('-lgphoto2', '-lgphoto2 -lgphoto2_port', 'gphoto2-config')}
 
     Calls C{r.Replace()} to change C{-lgphoto2} to
@@ -2539,17 +2420,14 @@ class Doc(_FileAction):
     """
     NAME
     ====
-
     B{C{r.Doc()}} - Installs documentation files
 
     SYNOPSIS
     ========
-
     C{r.Doc(I{filename}, [I{dir=/path}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Doc()} class is called from within a Conary recipe to Install
     documentation files from the C{%(builddir)s} into
     C{%(destdir)s/%(thisdocdir)s}.
@@ -2560,7 +2438,6 @@ class Doc(_FileAction):
 
     KEYWORDS
     ========
-
     The C{r.Doc()} class accepts the following keywords:
 
     B{dir} : Specify a subdirectory to create before placing documentation
@@ -2576,7 +2453,6 @@ class Doc(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.Doc('doc/kbd.FAQ*.html', dir='html')}
 
     Demonstrates installing C{doc/kbd.FAQ*.html} files into the C{html}
@@ -2627,17 +2503,14 @@ class JavaDoc(Doc):
     """
     NAME
     ====
-
     B{C{r.JavaDoc()}} - Installs documentation files
 
     SYNOPSIS
     ========
-
     C{r.JavaDoc(I{filename}, [I{dir=/path}])}
 
     DESCRIPTION
     ===========
-
     The C{r.JavaDoc()} class is called from within a Conary recipe to Install
     documentation files from the C{%(builddir)s} into
     C{%(destdir)s/%(thisjavadocdir)s}.
@@ -2648,7 +2521,6 @@ class JavaDoc(Doc):
 
     KEYWORDS
     ========
-
     The C{r.JavaDoc()} class accepts the following keywords:
 
     B{dir} : Specify a subdirectory to create before placing documentation
@@ -2664,7 +2536,6 @@ class JavaDoc(Doc):
 
     EXAMPLES
     ========
-
     C{r.JavaDoc('doc/kbd.FAQ*.html', dir='html')}
 
     Demonstrates installing C{doc/kbd.FAQ*.html} files into the C{html}
@@ -2691,17 +2562,14 @@ class Create(_FileAction):
     """
     NAME
     ====
-
     B{C{r.Create()}} - Creates a file
 
     SYNOPSIS
     ========
-
     C{r.Create(I{emptyfile}, [I{contents},] [I{macros},] [I{mode}])}
 
     DESCRIPTION
     ===========
-
     The C{r.Create()} class is called from within a Conary recipe to create a
     file. The file may be created empty, or with with contents specified
     optionally.
@@ -2713,7 +2581,6 @@ class Create(_FileAction):
 
     KEYWORDS
     ========
-
     The C{r.Create()} class accepts the following keywords:
 
     B{contents} : The (optional) contents of the file
@@ -2732,7 +2599,6 @@ class Create(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.Create('%(localstatedir)s/log/acpid', mode=0640)}
 
     Demonstrates calling C{r.Create()} specifying the creation of
@@ -2776,23 +2642,19 @@ class MakeDirs(_FileAction):
     """
     NAME
     ====
-
     B{C{r.MakeDirs()}} - Creates directories
 
     SYNOPSIS
     ========
-
     C{r.MakeDirs(I{dir(s)}, [I{component}], [I{mode}])}
 
     DESCRIPTION
     ===========
-
     The C{r.MakeDirs()} class is called from within a Conary recipe to create
     directories.
 
     KEYWORDS
     ========
-
     The C{r.MakeDirs()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -2811,7 +2673,6 @@ class MakeDirs(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.MakeDirs('/misc', component='runtime')}
 
     Demonstrates C{r.MakeDirs()} creating the C{/misc} directory while
@@ -2848,17 +2709,14 @@ class TestSuite(_FileAction):
     """
     NAME
     ====
-
     B{C{r.TestSuite()}} - Creates a script to run package test suite
 
     SYNOPSIS
     ========
-
     C{r.TestSuite(I{dir}, I{command})}
 
     DESCRIPTION
     ===========
-
     The C{r.TestSuite()} class is called from within a Conary recipe to create
     a script to run the package's test suite.
 
@@ -2875,7 +2733,6 @@ class TestSuite(_FileAction):
 
     KEYWORDS
     ========
-
     The C{r.TestSuite()} class accepts the following keywords, with default
     values shown in parentheses when applicable:
 
@@ -2889,7 +2746,6 @@ class TestSuite(_FileAction):
 
     EXAMPLES
     ========
-
     C{r.TestSuite('testsuite/', 'runtest')}
 
     Calls C{r.TestSuite()} to execute the test suite C{runtest} in the
@@ -3041,17 +2897,14 @@ class ConsoleHelper(BuildAction):
     """
     NAME
     ====
-
     B{C{r.ConsoleHelper()}} - Set up consolehelper symlinks, control files, and dependency
 
     SYNOPSIS
     ========
-
     C{r.ConsoleHelper(I{linkname}, I{realprogram}, [I{consoleuser=bool(False)},] [I{timestamp=bool(False)},] [I{pamfile=path},] [I{targetuser=user(root)},] [I{session=bool},] [I{fallback=bool},] [I{noxoption=optstring},] [I{otherlines=linelist}])}
 
     DESCRIPTION
     ===========
-
     The C{r.ConsoleHelper()} class is called from within a Conary recipe to
     set up C{consolehelper} symlinks, control files, and dependency for an
     application.
@@ -3082,7 +2935,6 @@ class ConsoleHelper(BuildAction):
 
     KEYWORDS
     ========
-
     The C{r.ConsoleHelper()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
 
@@ -3110,7 +2962,6 @@ class ConsoleHelper(BuildAction):
 
     EXAMPLES
     ========
-
     C{r.ConsoleHelper('%(bindir)s/xmtr', '%(prefix)s/X11R6/bin/xmtr', session=True)}
 
     Demonstrates calling C{r.ConsoleHelper()} and specifying the link name
@@ -3207,12 +3058,10 @@ class XInetdService(_FileAction):
     """
     NAME
     ====
-
     B{C{r.XInetdService()}} - Creates a file in /etc/xinetd.d
 
     SYNOPSIS
     ========
-
     C{r.XInetdService(I{name}, I{description},
     [server=I{'/path/to/server',}] [server_args=I{'--args'}]
     [protocol=I{'protocol'},] [port=I{'portnumber'},]
@@ -3225,7 +3074,6 @@ class XInetdService(_FileAction):
 
     DESCRIPTION
     ===========
-
     The C{r.XInetdService()} class is called from within a Conary recipe to
     create a file in /etc/xinetd.d for running an application from the
     C{xinetd} daemon.
@@ -3243,7 +3091,6 @@ class XInetdService(_FileAction):
 
     KEYWORDS
     ========
-
     The C{r.XInetdService()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
 
@@ -3457,18 +3304,15 @@ class XMLCatalogEntry(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.XMLCatalogEntry()}} - Adds an entry to the XML catalog file catalog
     file
 
     SYNOPSIS
     ========
-
     C{r.XMLCatalogEntry([I{catalogFile},] [I{type},] [I{orig},] [I{replace}])}
 
     DESCRIPTION
     ===========
-
     The C{r.XMLCatalogEntry()} class is called from within a Conary recipe to
     add an entry to the XML catalog file C{catalogFile}.
 
@@ -3478,7 +3322,6 @@ class XMLCatalogEntry(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.XMLCatalogEntry()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
 
@@ -3495,7 +3338,6 @@ class XMLCatalogEntry(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.XMLCatalogEntry('docbook-xsl.xml', 'rewriteSystem',
     'http://docbook.sourceforge.net/release/xsl/1.65.1',
     'file://%(datadir)s/sgml/docbook/xsl-stylesheets-1.65.1')}
@@ -3555,17 +3397,14 @@ class SGMLCatalogEntry(BuildCommand):
     """
     NAME
     ====
-
     B{C{r.SGMLCatalogEntry()}} - Adds an entry to the SGML catalog file
 
     SYNOPSIS
     ========
-
     C{r.SGMLCatalogEntry(I{catalogFile} || I{catalogFile}, I{catalogReference})}
 
     DESCRIPTION
     ===========
-
     The C{r.SGMLCatalogEntry()} class is called from within a Conary recipe to
     add an entry to the SGML catalog file.
 
@@ -3574,7 +3413,6 @@ class SGMLCatalogEntry(BuildCommand):
 
     KEYWORDS
     ========
-
     The C{r.SGMLCatalogEntry()} class accepts the following keywords, with
     default values shown in parentheses when applicable:
 
@@ -3594,7 +3432,6 @@ class SGMLCatalogEntry(BuildCommand):
 
     EXAMPLES
     ========
-
     C{r.SGMLCatalogEntry('sgml-common.cat', '%(datadir)s/xml/qaml/catalog')}
 
     Calls C{r.SGMLCatalogEntry()} adding the entry C{sgml-common.cat} to the
@@ -3661,23 +3498,19 @@ class IncludeLicense(BuildAction):
     """
     NAME
     ====
-
     B{C{r.IncludeLicense()}} - Adds entries to the licenses conary understands
 
     SYNOPSIS
     ========
-
     C{r.IncludeLicense(I{directory} || I{(file, license)})}
 
     DESCRIPTION
     ===========
-
     The C{r.IncludeLicense()} class is called from within a Conary recipe to add a
     new license to the list of known licenses.
 
     EXAMPLES
     ========
-
     C{r.IncludeLicense(('gpl.txt', 'GPL-2'), ('cpl', 'CPL-1.0'))}
 
     Calls C{r.IncludeLicense()} to add the GPL and CPL licenses to the known
@@ -3757,30 +3590,25 @@ class MakeFIFO(_FileAction):
     """
     NAME
     ====
-
     B{C{r.MakeFIFO()}} - Creates a FIFO (named pipe)
 
     SYNOPSIS
     ========
-
     C{r.MakeFIFO(I{path}, [I{mode}])}
 
     DESCRIPTION
     ===========
-
     The C{r.MakeFIFO()} class is called from within a Conary recipe to create a
     named pipe.
 
     KEYWORDS
     ========
-
     The C{r.MakeFIFO()} class accepts the following keywords:
 
     B{mode} : The mode of the file in octal (Default: 0644)
 
     EXAMPLES
     ========
-
     C{r.MakeFIFO('/path/to/fifo', mode=0640)}
 
     Demonstrates calling C{r.MakeFIFO()} specifying the creation of
@@ -3822,7 +3650,6 @@ class User(_UserGroupBuildAction):
     """
     NAME
     ====
-
     B{C{r.User()}} - Provides user account creation information
 
     SYNOPSIS
@@ -3847,7 +3674,6 @@ class User(_UserGroupBuildAction):
 
     KEYWORDS
     ========
-
     The C{r.User} class accepts the following keyword arguments, with
     default values shown in parentheses where applicable.
 
@@ -3878,7 +3704,6 @@ class User(_UserGroupBuildAction):
 
     EXAMPLES
     ========
-
     C{r.User('mysql', 27, comment='mysql', homedir='%(localstatedir)s/lib/mysql', shell='%(essentialbindir)s/bash')}
 
     Uses C{r.User} to define a C{mysql} user with a specific UID value of
@@ -3968,24 +3793,20 @@ class Group(_UserGroupBuildAction):
     """
     NAME
     ====
-
     B{C{r.Group()}} - Provides group creation information
 
     SYNOPSIS
     ========
-
     C{r.Group('I{group}', I{preferred_gid})}
 
     DESCRIPTION
     ===========
-
     The C{r.Group} class provides group information to Conary for
     the purpose of group creation, and should be used only for groups
     that exist independently, never for a main group created by C{r.User()}.
 
     KEYWORDS
     ========
-
     The C{r.Group} class accepts the following keyword arguments, with
     default values shown in parentheses where applicable.
 
@@ -3995,7 +3816,6 @@ class Group(_UserGroupBuildAction):
 
     EXAMPLES
     ========
-
     C{r.Group('mem', 8)}
 
     Uses C{r.Group} to created a group named C{mem} with a group
@@ -4046,24 +3866,20 @@ class SupplementalGroup(Group):
     """
     NAME
     ====
-
     B{C{r.SupplementalGroup()}} - Ensures a user is associated with
     a supplemental group
 
     SYNOPSIS
     ========
-
     C{r.SupplementalGroup('I{user}', 'I{group}', I{preferred_gid})}
 
     DESCRIPTION
     ===========
-
     The C{r.SupplementalGroup} class ensures that a user is associated with a
     supplemental group that is not associated with any user.
 
     KEYWORDS
     ========
-
     The C{r.SupplementalGroup} class accepts the following keyword arguments,
     with default values shown in parentheses where applicable.
 
@@ -4077,7 +3893,6 @@ class SupplementalGroup(Group):
 
     EXAMPLES
     ========
-
     C{r.SupplementalGroup('breandon', 'ateam', 560)}
 
     Uses C{r.SupplementalGroup} to add the user C{breandon} to the

@@ -284,7 +284,7 @@ static inline int addTag(char** buf, int tag, int valSize, int valLen) {
     }
 
     /* figure out how much space we used */
-    len = (int) chptr - (int) *buf;
+    len = (char *)chptr - *buf;
 
     /* move the buffer pointer to the current posititon */
     *buf = (char *) chptr;

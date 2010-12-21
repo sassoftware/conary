@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+import copy
 import os
 import itertools
 import sys
@@ -21,13 +23,17 @@ from conary import callbacks
 from conary import conaryclient
 from conary import display
 from conary import errors
+from conary import trove
+from conary import trovetup
+from conary import versions
 from conary.deps import deps
 from conary.lib import api
+from conary.lib import log
 from conary.lib import util
 from conary.local import database
-from conary.repository import changeset
-from conaryclient import cmdline
-from conaryclient.cmdline import parseTroveSpec
+from conary.repository import changeset, filecontainer
+from conary.conaryclient import cmdline, modelupdate
+from conary.conaryclient.cmdline import parseTroveSpec
 
 # FIXME client should instantiated once per execution of the command line
 # conary client
@@ -51,6 +57,8 @@ def locked(method):
         finally:
             self.lock.release()
 
+    wrapper.__doc__ = method.__doc__
+    wrapper.func_name = method.func_name
     return wrapper
 
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
@@ -324,7 +332,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
         self.out.write("[%s] %s" % (typ, errcode))
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, modelFile=None):
         """
         Initialize this callback object.
         @param cfg: Conary configuration
@@ -348,7 +356,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             showLabels = cfg.showLabels
             baseFlavors = cfg.flavor
             showComponents = cfg.showComponents
-            db = conaryclient.ConaryClient(cfg).db
+            db = conaryclient.ConaryClient(cfg, modelFile=modelFile).db
         else:
             fullVersions = showFlavors = showLabels = db = baseFlavors = None
             showComponents = None
@@ -451,9 +459,8 @@ def doUpdate(cfg, changeSpecs, **kwargs):
 
             fromChangesets.append(cs)
             changeSpecs.remove(item)
-            for trvInfo in cs.getPrimaryTroveList():
-                changeSpecs.append("%s=%s[%s]" % (trvInfo[0],
-                      trvInfo[1].asString(), deps.formatFlavor(trvInfo[2])))
+            for troveTuple in cs.getPrimaryTroveList():
+                changeSpecs.append(trovetup.TroveTuple(*troveTuple).asString())
 
     if kwargs.get('restartInfo', None):
         # We don't care about applyList, we will set it later
@@ -466,7 +473,135 @@ def doUpdate(cfg, changeSpecs, **kwargs):
                                             allowChangeSets=True)
 
     _updateTroves(cfg, applyList, **kwargs)
-    # XXX fixme
+    # Clean up after ourselves
+    if restartInfo:
+        util.rmtree(restartInfo, ignore_errors=True)
+
+def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
+    kwargs['systemModel'] = sysmodel
+    kwargs['systemModelFile'] = modelFile
+    kwargs['loadTroveCache'] = True
+    kwargs.setdefault('updateByDefault', True) # erase is not default case
+    kwargs.setdefault('model', False)
+    kwargs.setdefault('keepExisting', True) # prefer "install" to "update"
+    restartInfo = kwargs.get('restartInfo', None)
+    patchArgs = kwargs.pop('patchSpec', None)
+    fromChangesets = []
+    applyList = []
+
+    callback = kwargs.get('callback', None)
+    if not callback:
+        callback = callbacks.UpdateCallback(trustThreshold=cfg.trustThreshold)
+        kwargs['callback'] = callback
+    else:
+        callback.setTrustThreshold(cfg.trustThreshold)
+
+    if restartInfo is None:
+        addArgs = [x[1:] for x in otherArgs if x.startswith('+')]
+        rmArgs = [x[1:] for x in otherArgs if x.startswith('-')]
+        defArgs = [x for x in otherArgs
+                    if not (x.startswith('+') or x.startswith('-'))]
+
+        # find any default arguments that represent changesets to
+        # install/update
+        for defArg in list(defArgs):
+            if kwargs['updateByDefault'] and os.path.isfile(defArg):
+                try:
+                    cs = changeset.ChangeSetFromFile(defArg)
+                    fromChangesets.append((cs, defArg))
+                    defArgs.remove(defArg)
+                except filecontainer.BadContainer:
+                    # not a changeset, must be a trove name
+                    pass
+
+        if kwargs['updateByDefault']:
+            addArgs += defArgs
+        else:
+            rmArgs += defArgs
+
+        if rmArgs:
+            sysmodel.appendOpByName('erase', text=rmArgs)
+
+        updateName = { False: 'update',
+                       True: 'install' }[kwargs['keepExisting']]
+
+        branchArgs = {}
+        for index, spec in enumerate(addArgs):
+            try:
+                troveSpec = trovetup.TroveSpec(spec)
+                version = versions.Label(troveSpec.version)
+                branchArgs[troveSpec] = index
+            except:
+                # Any exception is a parse failure in one of the
+                # two steps, and so we do not convert that argument
+                pass
+       
+        if branchArgs:
+            client = conaryclient.ConaryClient(cfg)
+            repos = client.getRepos()
+            foundTroves = repos.findTroves(cfg.installLabelPath,
+                                           branchArgs.keys(),
+                                           defaultFlavor = cfg.flavor)
+            for troveSpec in foundTroves:
+                index = branchArgs[troveSpec]
+                foundTrove = foundTroves[troveSpec][0]
+                addArgs[index] = addArgs[index].replace(
+                    troveSpec.version,
+                    '%s/%s' %(foundTrove[1].trailingLabel(),
+                              foundTrove[1].trailingRevision()))
+
+        disallowedChangesets = []
+        for cs, argName in fromChangesets:
+            for troveTuple in cs.getPrimaryTroveList():
+                # group and redirect changesets will break the model the
+                # next time it is run, so prevent them from getting in
+                # the model in the first place
+                if troveTuple[1].isOnLocalHost():
+                    if troveTuple[0].startswith('group-'):
+                        disallowedChangesets.append((argName, 'group',
+                            trovetup.TroveTuple(*troveTuple).asString()))
+                        continue
+                    trvCs = cs.getNewTroveVersion(*troveTuple)
+                    if trvCs.getType() == trove.TROVE_TYPE_REDIRECT:
+                        disallowedChangesets.append((argName, 'redirect',
+                            trovetup.TroveTuple(*troveTuple).asString()))
+                        continue
+
+                addArgs.append(
+                    trovetup.TroveTuple(*troveTuple).asString())
+
+        if disallowedChangesets:
+            raise errors.ConaryError(
+                'group and redirect changesets on a local label'
+                ' cannot be installed:\n    ' + '\n    '.join(
+                    '%s contains local %s: %s' % x
+                    for x in disallowedChangesets))
+
+        if addArgs:
+            sysmodel.appendOpByName(updateName, text=addArgs)
+
+        if patchArgs:
+            sysmodel.appendOpByName('patch', text=patchArgs)
+
+
+        kwargs['fromChangesets'] = [x[0] for x in fromChangesets]
+
+        if kwargs.pop('model'):
+            sysmodel.write(sys.stdout)
+            sys.stdout.flush()
+            return None
+
+        keepExisting = kwargs.get('keepExisting')
+        updateByDefault = kwargs.get('updateByDefault', True)
+        applyList = cmdline.parseChangeList([], keepExisting,
+                                            updateByDefault,
+                                            allowChangeSets=True)
+
+    else:
+        # In the restart case, applyList == [] which says "sync to model"
+        pass
+        
+    _updateTroves(cfg, applyList, **kwargs)
     # Clean up after ourselves
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
@@ -494,13 +629,19 @@ def _updateTroves(cfg, applyList, **kwargs):
             applyKwargs[k] = kwargs.pop(k)
 
     callback = kwargs.pop('callback')
+    loadTroveCache = kwargs.pop('loadTroveCache', False)
     applyKwargs['test'] = kwargs.get('test', False)
     applyKwargs['localRollbacks'] = cfg.localRollbacks
     applyKwargs['autoPinList'] = cfg.pinTroves
 
+    model = kwargs.pop('systemModel', None)
+    modelFile = kwargs.pop('systemModelFile', None)
+    modelGraph = kwargs.pop('modelGraph', None)
+    modelTrace = kwargs.pop('modelTrace', None)
+
     noRestart = applyKwargs.get('noRestart', False)
 
-    client = conaryclient.ConaryClient(cfg)
+    client = conaryclient.ConaryClient(cfg, modelFile=modelFile)
     client.setUpdateCallback(callback)
     if kwargs.pop('disconnected', False):
         client.disconnectRepos()
@@ -529,7 +670,60 @@ def _updateTroves(cfg, applyList, **kwargs):
     updJob = client.newUpdateJob()
 
     try:
-        suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
+        if model:
+            changeSetList = kwargs.get('fromChangesets', [])
+            criticalUpdates = kwargs.get('criticalUpdateInfo', None)
+
+            tc = modelupdate.CMLTroveCache(client.getDatabase(),
+                                                   client.getRepos(),
+                                                   callback = callback,
+                                                   changeSetList =
+                                                        changeSetList)
+            tcPath = cfg.root + cfg.dbPath + '/modelcache'
+            if loadTroveCache:
+                if os.path.exists(tcPath):
+                    log.info("loading %s", tcPath)
+                    tc.load(tcPath)
+            ts = client.cmlGraph(model, changeSetList = changeSetList)
+            if modelGraph is not None:
+                ts.g.generateDotFile(modelGraph)
+            suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
+                                        fromChangesets = changeSetList,
+                                        criticalUpdateInfo = criticalUpdates)
+            if modelTrace is not None:
+                ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
+
+            finalModel = copy.deepcopy(model)
+            if model.suggestSimplifications(tc, ts.g):
+                log.info("possible system model simplifications found")
+                ts2 = client.cmlGraph(model, changeSetList = changeSetList)
+                updJob2 = client.newUpdateJob()
+                try:
+                    suggMap2 = client._updateFromTroveSetGraph(updJob2, ts2,
+                                        tc,
+                                        fromChangesets = changeSetList,
+                                        criticalUpdateInfo = criticalUpdates)
+                except errors.TroveNotFound:
+                    log.info("bad model generated; bailing")
+                else:
+                    if (suggMap == suggMap2 and
+                        updJob.getJobs() == updJob2.getJobs()):
+                        log.info("simplified model verfied; using it instead")
+                        ts = ts2
+                        finalModel = model
+                        updJob = updJob2
+                        suggMap = suggMap2
+                    else:
+                        log.info("simplified model changed result; ignoring")
+
+            model = finalModel
+            modelFile.model = finalModel
+
+            if tc.cacheModified():
+                log.info("saving %s", tcPath)
+                tc.save(tcPath)
+        else:
+            suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
         callback.done()
         client.close()
@@ -538,7 +732,7 @@ def _updateTroves(cfg, applyList, **kwargs):
     if info:
         callback.done()
         displayUpdateInfo(updJob, cfg)
-        if restartInfo:
+        if restartInfo and not model:
             callback.done()
             newJobs = set(itertools.chain(*updJob.getJobs()))
             oldJobs = set(updJob.getItemList())
@@ -552,6 +746,17 @@ def _updateTroves(cfg, applyList, **kwargs):
         updJob.close()
         client.close()
         return
+
+    if model:
+        missingLocalTroves = model.getMissingLocalTroves(tc, ts)
+        if missingLocalTroves:
+            print 'Update would leave references to missing local troves:'
+            for troveTup in missingLocalTroves:
+                if not isinstance(troveTup, trovetup.TroveTuple):
+                    troveTup = trovetup.TroveTuple(troveTup)
+                print "\t" + str(troveTup)
+            client.close()
+            return
 
     if suggMap:
         callback.done()
@@ -576,14 +781,23 @@ def _updateTroves(cfg, applyList, **kwargs):
         addedJobs = newJobs - oldJobs
         removedJobs = oldJobs - newJobs
 
-        if addedJobs or removedJobs:
+        if not model and addedJobs or removedJobs:
             print 'NOTE: after critical updates were applied, the contents of the update were recalculated:'
             displayChangedJobs(addedJobs, removedJobs, cfg)
         else:
             askInteractive = False
+
+    if not updJob.jobs:
+        # Nothing to do
+        print 'Update would not modify system'
+        updJob.close()
+        client.close()
+        return
+
     elif askInteractive:
         print 'The following updates will be performed:'
         displayUpdateInfo(updJob, cfg)
+
     if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'
                ' specified.')
@@ -627,6 +841,9 @@ def _updateTroves(cfg, applyList, **kwargs):
         raise errors.ReexecRequired(
                 'Critical update completed, rerunning command...', params,
                 restartDir)
+    else:
+        if (not kwargs.get('test', False)) and model:
+            modelFile.closeSnapshot()
 
 # we grab a url from the repo based on our version and flavor,
 # download the changeset it points to and update it
@@ -707,15 +924,29 @@ def updateAll(cfg, **kwargs):
     showItems = kwargs.pop('showItems', False)
     restartInfo = kwargs.get('restartInfo', None)
     migrate = kwargs.pop('migrate', False)
+    modelArg = kwargs.pop('model', False)
+    modelFile = kwargs.get('systemModelFile', None)
+    model = kwargs.get('systemModel', None)
+    infoArg = kwargs.get('info', False)
+
+    if model and modelFile and modelFile.exists() and restartInfo is None:
+        model.refreshVersionSnapshots()
+        if modelArg:
+            model.write(sys.stdout)
+            sys.stdout.flush()
+            return None
+
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
     kwargs['callback'] = UpdateCallback(cfg)
+    # load trove cache only if --info provided
+    kwargs['loadTroveCache'] = infoArg
 
     client = conaryclient.ConaryClient(cfg)
     # We want to be careful not to break the old style display, for whoever
     # might have a parser for that output.
     withLongDisplay = (cfg.fullFlavors or cfg.fullVersions or cfg.showLabels)
     formatter = UpdateAllFormatter()
-    if restartInfo:
+    if restartInfo or (model and modelFile and modelFile.exists()):
         updateItems = []
         applyList = None
     else:
@@ -740,7 +971,9 @@ def updateAll(cfg, **kwargs):
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
 
-def changePins(cfg, troveStrList, pin = True):
+def changePins(cfg, troveStrList, pin = True,
+               systemModel = None, systemModelFile = None,
+               callback = None):
     client = conaryclient.ConaryClient(cfg)
     client.checkWriteableRoot()
     troveList = []
@@ -750,6 +983,10 @@ def changePins(cfg, troveStrList, pin = True):
         troveList += troves
 
     client.pinTroves(troveList, pin = pin)
+
+    if systemModel and systemModelFile and not pin:
+        doModelUpdate(cfg, systemModel, systemModelFile, [], callback=callback)
+
 
 def revert(cfg):
     conaryclient.ConaryClient.revertJournal(cfg)

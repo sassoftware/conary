@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,7 +13,6 @@
 #
 
 from mod_python import apache
-from mod_python.util import FieldStorage
 import os
 import sys
 import time
@@ -21,7 +20,7 @@ import xmlrpclib
 import zlib
 
 from conary.lib import log, util
-from conary.repository import changeset, errors, netclient
+from conary.repository import errors, netclient
 from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
 from conary.web.webauth import getAuth
@@ -176,18 +175,6 @@ def sendfile(req, size, path):
         # otherwise we can use the handy sendfile method
         req.sendfile(path)
 
-def _writeNestedFile(req, name, tag, size, f, sizeCb):
-    if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
-        # this is a reference to a compressed file in the contents store
-        path = f.read()
-        size = os.stat(path).st_size
-        tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-        sizeCb(size, tag)
-        sendfile(req, size, path)
-    else:
-        # this is data from the changeset itself
-        sizeCb(size, tag)
-        req.write(f.read())
 
 def get(port, isSecure, repos, req, restHandler=None):
     uri = req.uri
@@ -242,19 +229,19 @@ def get(port, isSecure, repos, req, restHandler=None):
             items = [ (localName, size, 0, 0) ]
             totalSize = size
 
+        # TODO: refactor to use proxy.ChangesetFileReader
+        readNestedFile = proxy.ChangesetFileReader.readNestedFile
         req.content_type = "application/x-conary-change-set"
         req.set_content_length(totalSize)
         for (path, size, isChangeset, preserveFile) in items:
             if isChangeset:
                 cs = FileContainer(util.ExtendedFile(path, buffering=False))
                 try:
-                    cs.dump(req.write,
-                            lambda name, tag, size, f, sizeCb:
-                                _writeNestedFile(req, name, tag, size, f,
-                                                 sizeCb))
-                except IOError, e:
-                    log.error('IOError dumping changeset: %s' % e)
-
+                    for data in cs.dumpIter(readNestedFile):
+                        req.write(data)
+                except IOError, err:
+                    log.error("IOError dumping changeset: %s" % err)
+                    return apache.HTTP_BAD_REQUEST
                 del cs
             else:
                 sendfile(req, size, path)

@@ -32,7 +32,6 @@ from conary import callbacks
 from conary.build.mirror import Mirror
 from conary.conaryclient.callbacks import FetchCallback, ChangesetCallback
 
-
 NETWORK_SCHEMES = ('http', 'https', 'ftp', 'mirror')
 
 NEGATIVE_CACHE_TTL = 60 * 60  # The TTL for negative cache entries (seconds)

@@ -1,0 +1,17 @@
+The conary command line handling has been made available as
+conary.cmds.conarycmd, and the cvc command line handling has
+been moved from conary.cvc to conary.cmds.cvccmd.  Similarly,
+conary.branch has been renamed to conary.cmds.branch,
+conary.clone has been renamed to conary.cmds.clone,
+conary.commit has been renamed to conary.cmds.commit,
+conary.cscmd has been renamed to conary.cmds.cscmd,
+conary.fmtroves has been renamed to conary.cmds.fmtroves,
+conary.metadata has been renamed to conary.cmds.metadata,
+conary.query has been renamed to conary.cmds.query,
+conary.queryrep has been renamed to conary.cmds.queryrep,
+conary.rollbacks has been renamed to conary.cmds.rollbacks,
+conary.showchangeset has been renamed to conary.cmds.showchangeset,
+conary.updatecmd has been renamed to conary.cmds.updatecmd, and
+conary.verify has been renamed to conary.cmds.verify.
+The old locations will be available for
+backward compatibility for the foreseeable future.

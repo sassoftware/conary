@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -49,7 +49,7 @@ from conary.lib import options
 from conary.lib import util
 from conary.lib.cfg import CfgBool, CfgInt, CfgPath
 from conary.lib.tracelog import initLog, logMe
-from conary.repository import changeset, errors, netclient
+from conary.repository import errors, netclient
 from conary.repository.netrepos import netserver, proxy
 from conary.repository.netrepos.proxy import ProxyRepositoryServer, ChangesetFileReader
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
@@ -91,16 +91,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
-        def _writeNestedFile(outF, name, tag, size, f, sizeCb):
-            if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
-                path = f.read()
-                size = os.stat(path).st_size
-                f = open(path)
-                tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-
-            sizeCb(size, tag)
-            bytes = util.copyfileobj(f, outF)
-
         if (self.restHandler and self.path.startswith(self.restUri)):
             self.restHandler.handle(self, self.path)
             return
@@ -392,6 +382,7 @@ if SSL:
         sslCert, sslKey = cfg.sslCert, cfg.sslKey
         ctx.load_cert_chain(sslCert, sslKey)
         return ctx
+
 
 class ServerConfig(netserver.ServerConfig):
 

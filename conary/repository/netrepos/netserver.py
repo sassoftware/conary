@@ -48,7 +48,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 69 + 1)
+SERVER_VERSIONS = range(36, 70 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -289,6 +289,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  kwArgs, exception = e,
                                  latency = time.time() - start)
+        elif isinstance(e, HiddenException):
+            exceptionOverride = e.forReturn
 
         if isinstance(e, sqlerrors.DatabaseLocked):
             exceptionOverride = errors.RepositoryLocked()
@@ -1062,15 +1064,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
                 assert(withFlavors)
 
-                ts = [float(x) for x in timeStamps.split(":")]
-                version = versions.VersionFromString(versionStr, timeStamps=ts)
-
                 d = troveVersions.get(troveName, None)
                 if d is None:
                     d = {}
                     troveVersions[troveName] = d
 
-                version = version.freeze()
+                version = self.versionStringToFrozen(versionStr, timeStamps)
                 l = d.get(version, None)
                 if l is None:
                     l = []
@@ -1089,10 +1088,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 for (finalTimestamp, flavorScore, versionStr, timeStamps,
                      flavor) in versionDict.itervalues():
-                    ts = [float(x) for x in timeStamps.split(":")]
-                    version = versions.VersionFromString(versionStr, timeStamps=ts)
-                    version = self.freezeVersion(version)
-
+                    version = self.versionStringToFrozen(versionStr, timeStamps)
                     if withFlavors:
                         flist = l.setdefault(version, [])
                         flist.append(flavor or '')
@@ -1228,9 +1224,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute(query)
         ret = {}
         for (trove, version, flavor, timeStamps) in cu:
-            # FIXME: we hardcode the timestamp format here for speed reasons
-            version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
-                                                      for x in timeStamps.split(":") ])
+            version = self.versionStringToFrozen(version, timeStamps)
             retname = ret.setdefault(trove, {})
             flist = retname.setdefault(version, [])
             flist.append(flavor or '')
@@ -3253,8 +3247,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(4, "executing query", query, mark)
         ret = []
         for name, version, flavor, timeStamps, mark, troveType in cu:
-            version = versions.strToFrozen(version, [
-                "%.3f" % (float(x),) for x in timeStamps.split(":") ])
+            version = self.versionStringToFrozen(version, timeStamps)
             ret.append( (mark, (name, version, flavor), troveType) )
             if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
@@ -3264,6 +3257,148 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 40:
             return [ (x[0], x[1]) for x in ret ]
         return ret
+
+    @accessReadOnly
+    def getTimestamps(self, authToken, clientVersion, nameVersionList):
+        """
+        Returns : separated list of timestamps for the versions in
+        a list of (name, version) tuples. Note that the flavor is excluded
+        here, as the timestamps are necessarily the same for all flavors
+        of a (name, version) pair. Timestamps are not considered privledged
+        information, so no permission checking is performed. An int value of
+        zero is returned for (name, version) paris which are not found in the
+        repository.
+        """
+        self.log(2, nameVersionList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                     [ [i,] + tup for i, tup in enumerate(nameVersionList) ],
+                     ["idx","name","version" ],
+                     start_transaction=False)
+
+        cu.execute("""
+            SELECT tmpNVF.idx, Nodes.timeStamps FROM tmpNVF
+            JOIN Items ON
+                tmpNVF.name = Items.item
+            JOIN Versions ON
+                tmpNVF.version = Versions.version
+            JOIN Nodes ON
+                Items.itemId = Nodes.itemId AND
+                Versions.versionId = Nodes.versionId
+        """)
+
+        results = [ 0 ] * len(nameVersionList)
+        for (idx, timeStamps) in cu:
+            results[idx] = timeStamps
+
+        return results
+
+    @accessReadOnly
+    def getDepsForTroveList(self, authToken, clientVersion, troveList,
+                            provides = True, requires = True):
+        """
+        Returns list of (provides, requires) for troves. For troves which
+        are missing or we do not have access to, {} is returned. Empty
+        strings are returned for for provides if provides parameter is
+        False; same for requires.
+        """
+        self.log(2, troveList)
+        cu = self.db.cursor()
+
+        schema.resetTable(cu, "tmpNVF")
+        self.db.bulkload("tmpNVF",
+                         [ [i,] + tup for i, tup in enumerate(troveList) ],
+                         ["idx","name","version", "flavor"],
+                         start_transaction=False)
+
+        req = []
+        prov = []
+        for tup in troveList:
+            req.append({})
+            prov.append({})
+
+        roleIds = self.auth.getAuthRoles(cu, authToken)
+
+        tblList = []
+
+        if requires:
+            tblList.append( ('Requires', req) )
+        else:
+            req = [ '' ] * len(troveList)
+
+        if provides:
+            tblList.append( ('Provides', prov) )
+        else:
+            prov = [ '' ] * len(troveList)
+
+        for tableName, dsList in tblList:
+            start = time.time()
+            cu.execute("""
+                SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
+                    JOIN Items ON
+                        Items.item = tmpNVF.name
+                    JOIN Versions ON
+                        Versions.version = tmpNVF.version
+                    JOIN Flavors ON
+                        Flavors.flavor = tmpNVF.flavor
+                    JOIN Instances ON
+                        Items.itemId = Instances.itemId AND
+                        Versions.versionId = Instances.versionId AND
+                        Flavors.flavorId = Instances.flavorId
+                    JOIN UserGroupInstancesCache AS ugi
+                        USING (instanceId)
+                    JOIN %s USING (InstanceId)
+                    JOIN Dependencies AS D USING (depId)
+                WHERE
+                    ugi.userGroupId in (%s)
+            """ %  (tableName, ",".join("%d" % x for x in roleIds) ))
+
+            l = [ x for x in cu ]
+            last = None
+            flags = []
+            for idx, depClassId, depName, depFlag in l:
+                this = (idx, depClassId, depName)
+
+                if this != last:
+                    if last:
+                        dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+
+                    last = this
+                    flags = []
+
+                if depFlag != deptable.NO_FLAG_MAGIC:
+                    flags.append((depFlag, deps.FLAG_SENSE_REQUIRED))
+
+            if last:
+                dsList[last[0]].setdefault((last[1], last[2]), []).extend(flags)
+            flagMap = [ None, '', '~', '~!', '!' ]
+            for i, itemList in enumerate(dsList):
+                depList = itemList.items()
+                depList.sort()
+
+                if not depList:
+                    frz = ''
+                else:
+                    l = []
+                    for (depClassId, depName), depFlags in depList:
+                        l += [ '|', str(depClassId), '#', depName.replace(':', '::') ]
+                        lastFlag = None
+                        for flag in sorted(depFlags):
+                            if flag == lastFlag:
+                                continue
+
+                            l.append(':')
+                            l.append(flagMap[flag[1]])
+                            l.append(flag[0].replace(':', '::'))
+
+                    frz = ''.join(l[1:])
+
+                dsList[i] = frz
+
+        result = zip(prov, req)
+        return result
 
     @accessReadOnly
     def getTroveInfo(self, authToken, clientVersion, infoType, troveList):
