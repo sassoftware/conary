@@ -48,7 +48,8 @@ CookError = builderrors.CookError
 RecipeFileError = builderrors.RecipeFileError
 
 # -------------------- private below this line -------------------------
-def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
+def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo,
+                     winHelper=None):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
@@ -67,8 +68,18 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         m = magic.magic(capsulePath)
         fileObj = files.FileFromFilesystem(capsulePath,
                                            trove.CAPSULE_PATHID)
-        p.addRpmCapsule(os.path.basename(capsulePath),
-                          newVersion, fileObj.fileId(), m.hdr)
+        if capsuleInfo[0] == 'rpm':
+            p.addRpmCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), m.hdr)
+        elif capsuleInfo[0] == 'msi':
+            p.addMsiCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
+        elif capsuleInfo[0] == 'wim':
+            p.addWimCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
+        else:
+            # This shouldn't be able to happen
+            raise
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
 
@@ -1468,8 +1479,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         assert(comp)
         grp = grpMap[main]
 
-        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen,
-                                recipeObj._getCapsule(buildPkg.getName()))
+        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion,
+                idgen, recipeObj._getCapsule(buildPkg.getName()),
+                getattr(recipeObj, 'winHelper', None))
 
         built.append((compName, p.getVersion().asString(), p.getFlavor()))
 
@@ -2011,6 +2023,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @param changeSetFile: file to write changeset out to.
     @type changeSetFile: str
     """
+
     targetLabel = None
 
     use.track(True)

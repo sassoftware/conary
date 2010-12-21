@@ -32,6 +32,9 @@ from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
 from conary.local import database
 
+from conary.build.action import TARGET_LINUX
+from conary.build.action import TARGET_WINDOWS
+
 try:
     from xml.etree import ElementTree
 except ImportError:
@@ -69,6 +72,7 @@ class _filterSpec(policy.Policy):
     """
     bucket = policy.PACKAGE_CREATION
     processUnmodified = False
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
     def __init__(self, *args, **keywords):
         self.extraFilters = []
         policy.Policy.__init__(self, *args, **keywords)
@@ -101,6 +105,7 @@ class _addInfo(policy.Policy):
         'included': {},
         'excluded': {}
     }
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def updateArgs(self, *args, **keywords):
         """
@@ -1323,6 +1328,7 @@ class ExcludeDirectories(policy.Policy):
         ('MakeDevices', policy.CONDITIONAL_PRIOR),
     )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def doFile(self, path):
         # temporarily do nothing for capsules, we might do something later
@@ -1395,6 +1401,7 @@ class ByDefault(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
     filetree = policy.NO_FILES
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     invariantexceptions = [':test', ':debuginfo']
 
@@ -1679,6 +1686,7 @@ class ComponentRequires(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.depMap = {
@@ -1772,6 +1780,7 @@ class ComponentProvides(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.flags = set()
@@ -4131,6 +4140,7 @@ class RemoveSelfProvidedRequires(policy.Policy):
     requires = (
         ('Requires', policy.REQUIRED_PRIOR),
     )
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def do(self):
         if use.Use.bootstrap._get():
@@ -4172,6 +4182,7 @@ class Flavor(policy.Policy):
         ('ExcludeDirectories', policy.REQUIRED_PRIOR),
     )
     filetree = policy.PACKAGE
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def preProcess(self):
         self.libRe = re.compile(
@@ -4501,6 +4512,7 @@ class reportExcessBuildRequires(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.found = set()
@@ -4592,6 +4604,7 @@ class reportMissingBuildRequires(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.errors = set()
@@ -4619,6 +4632,7 @@ class reportErrors(policy.Policy, policy.GroupPolicy):
     processUnmodified = True
     filetree = policy.NO_FILES
     groupError = False
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.errors = []
