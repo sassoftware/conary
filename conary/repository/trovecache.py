@@ -23,6 +23,11 @@ from conary.repository import netclient, trovesource
 
 class TroveCache(trovesource.AbstractTroveSource):
 
+    VERSION = (1, 0)                    # (major, minor)
+
+    troveCacheVersionFileId = 'TROVE-CACHE-FILE-VERSION--------'
+    troveCacheVersionPathId = '\0' * 40
+
     depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
     depCacheFileId = '\0' * 40
 
@@ -35,6 +40,9 @@ class TroveCache(trovesource.AbstractTroveSource):
     timeStampsPathId = 'SYSTEM-MODEL-TIMESTAMP-CACHE----'
     timeStampsFileId = '\0' * 40
 
+    includeFilePathId = 'SYSTEM-MODEL-INCLUDE-FILE-CACHE-'
+    includeFileFileId = '\0' * 40
+
     def __init__(self, troveSource):
         self.troveInfoCache = {}
         self.depCache = {}
@@ -43,6 +51,7 @@ class TroveCache(trovesource.AbstractTroveSource):
         self.cache = {}
         self.troveSource = troveSource
         self.findCache = {}
+        self.fileCache = {}
         self._startingSizes = self._getSizeTuple()
 
     def _addToCache(self, troveTupList, troves, _cached = None):
@@ -67,7 +76,7 @@ class TroveCache(trovesource.AbstractTroveSource):
                        len([ x[1] for x in self.depCache.itervalues()
                                  if x[1] is not None ]) ] ),
                  len(self.depSolutionCache), len(self.timeStampCache),
-                 len(self.findCache) )
+                 len(self.findCache), len(self.fileCache) )
 
     def cacheTroves(self, troveTupList, _cached = None):
         troveTupList = [x for x in troveTupList if x not in self.cache]
@@ -292,6 +301,21 @@ class TroveCache(trovesource.AbstractTroveSource):
 
         self._cached(self.cache.keys(), self.cache.values())
 
+        try:
+            contType, depContents = cs.getFileContents(
+                               self.troveCacheVersionPathId,
+                               self.troveCacheVersionFileId)
+        except KeyError:
+            self.version = (0, 0)
+            cs.reset()
+        else:
+            versionList = depContents.get().read().split(' ')
+            self.version = (int(versionList[0]), int(versionList[1]))
+
+        if self.version[0] > self.VERSION[0]:
+            # major number is too big for us; we can't load this
+            return
+
         contType, depContents = cs.getFileContents(
                            self.depCachePathId, self.depCacheFileId)
         pickled = depContents.get().read()
@@ -319,18 +343,21 @@ class TroveCache(trovesource.AbstractTroveSource):
                            self.findCachePathId, self.findCacheFileId)
         self.findCache = cPickle.loads(fileCache.get().read())
 
-        try:
-            contType, versionTimeStamps = cs.getFileContents(
-                               self.timeStampsPathId, self.timeStampsFileId)
-        except KeyError:
-            pass
-        else:
-            pickled = versionTimeStamps.get().read()
-            timeStampList = cPickle.loads(pickled)
+        if self.version[0] >= 1:
+            contType, includeFileContents = cs.getFileContents(
+                               self.includeFilePathId, self.includeFileFileId)
+            pickled = includeFileContents.get().read()
+            self.fileCache = cPickle.loads(pickled)
 
-            for (name, frozenVersion) in timeStampList:
-                thawed = versions.ThawVersion(frozenVersion)
-                self.timeStampCache[(name, thawed)] = thawed
+        contType, versionTimeStamps = cs.getFileContents(
+                           self.timeStampsPathId, self.timeStampsFileId)
+
+        pickled = versionTimeStamps.get().read()
+        timeStampList = cPickle.loads(pickled)
+
+        for (name, frozenVersion) in timeStampList:
+            thawed = versions.ThawVersion(frozenVersion)
+            self.timeStampCache[(name, thawed)] = thawed
 
         self._startingSizes = self._getSizeTuple()
 
@@ -348,6 +375,12 @@ class TroveCache(trovesource.AbstractTroveSource):
         cs = changeset.ChangeSet()
         for trv in self.cache.values():
             cs.newTrove(trv.diff(None, absolute = True)[0])
+
+        cs.addFileContents(self.troveCacheVersionPathId,
+                           self.troveCacheVersionFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString("%d %d" % self.VERSION),
+                           False)
 
         depList = []
         for troveTup, (prov, req) in self.depCache.iteritems():
@@ -395,6 +428,12 @@ class TroveCache(trovesource.AbstractTroveSource):
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(timeStampsStr), False)
 
+        cs.addFileContents(self.includeFilePathId, self.includeFileFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString(
+                                cPickle.dumps(self.fileCache)),
+                           False)
+
         try:
             try:
                 cs.writeToFile(cacheName)
@@ -419,3 +458,8 @@ class TroveCache(trovesource.AbstractTroveSource):
     def troveReferencesTrove(self, troveTup, troveRef):
         return self.cache[troveTup].hasTrove(*troveRef)
 
+    def cacheFile(self, key, contents):
+        self.fileCache[key] = contents
+
+    def getCachedFile(self, key):
+        return self.fileCache.get(key)
