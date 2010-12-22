@@ -1595,14 +1595,9 @@ class addCapsule(_Source):
         elif self.capsuleType == 'msi':
             self.recipe.winHelper = WindowsHelper()
             if not self.recipe.cfg.windowsBuildService:
-                self.recipe.winHelper.name = self.recipe.name
-                self.recipe.winHelper.version = \
-                    self.recipe.winHelper.platform = \
-                    self.recipe.winHelper.productCode = \
-                    self.recipe.winHelper.upgradeCode = m.contents['version']
-                #raise SourceError('MSI capsules cannot be added without a '
-                #                  'windowsBuildService defined in the conary '
-                #                  'configuration')
+                raise SourceError('MSI capsules cannot be added without a '
+                                  'windowsBuildService defined in the conary '
+                                  'configuration')
             else:
                 self.recipe.winHelper.extractMSIInfo(f,
                     self.recipe.cfg.windowsBuildService)
