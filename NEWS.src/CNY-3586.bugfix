@@ -1,2 +1,0 @@
-Another case where content overriden outside of a capsule is not included in
-the changeset is now fixed.

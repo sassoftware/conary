@@ -1,1 +1,0 @@
-The proxy layer will now properly include in changesets any files with isCapsuleOverride() set.

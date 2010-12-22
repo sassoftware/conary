@@ -1,3 +1,25 @@
+Changes in 2.1.28:
+  o Bug Fixes:
+    * Content injection for capsules is no longer retrieving the
+      changeset over HTTP when it is available locally. (CNY-3573)
+    * isEncapsulatedContent is reset when derived capsules overwrite
+      capsule content. (CNY-3577)
+    * The proxy layer will now properly include in changesets any files
+      with isCapsuleOverride() set. (CNY-3578)
+    * Conary proxies will no longer crash if a changeset is requested
+      which has more troves than the current process file descriptor
+      limit. (CNY-3497)
+    * The getFileContentsCapsuleInfo call no longer returns results in
+      database order (which is non-deterministic). (CNY-3581)
+    * The proxy now works around device files inadvertently marked as
+      overrides of the capsule. (CNY-3583)
+    * Another case where content overriden outside of a capsule is not
+      included in the changeset is now fixed. (CNY-3586)
+    * Deriving large packages no longer runs into regular expression
+      size limitations. (CNY-3594)
+    * Capsule-based packages no longer allow their contents to be
+      changed - that can be achieved in a derived package. (CNY-3590)
+
 Changes in 2.1.27:
   o New Features:
     * Support for PostgreSQL 9.0 has been added.
