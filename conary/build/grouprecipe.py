@@ -1424,12 +1424,19 @@ class _SingleGroup(object):
         self.troves = {}
         self.reasons = {}
         self.newGroupList = {}
+        self.buildRefs = []
 
     def setSize(self, size):
         self.size = size
 
     def getSize(self):
         return self.size
+
+    def getBuildRefs(self):
+        return self.buildRefs
+
+    def setBuildRefs(self, buildRefs):
+        self.buildRefs = buildRefs
 
     def addScript(self, scriptName, contents, fromClass):
         assert(hasattr(self, scriptName))

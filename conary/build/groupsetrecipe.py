@@ -1767,6 +1767,29 @@ class _GroupSetRecipe(_BaseGroupRecipe):
                                groupRecipe = self)
         self.g.realize(data)
 
+        ordering = self.g.getTotalOrdering()
+
+        nv = versions.NewVersion()
+
+        allTroveTups = set()
+        for node in ordering:
+            if not isinstance(node, troveset.TroveTupleSet):
+                continue
+
+            allTroveTups.update(node._getInstallSet())
+            allTroveTups.update(node._getOptionalSet())
+
+        for outerName in self.getGroupNames():
+            allTroveTups.remove( (outerName, nv, self.flavor) )
+
+        for outerName in self.getPrimaryGroupNames():
+            grp = self._getGroup(outerName)
+            grp.setBuildRefs(allTroveTups
+                                - set(grp.iterTroveList(strongRefs = True,
+                                                        weakRefs = True))
+                                - set((x, nv, self.flavor)
+                                        for x in grp.iterNewGroupList()))
+
     def dumpAll(self):
         '''
         NAME
