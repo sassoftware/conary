@@ -195,7 +195,7 @@ class TroveSet(object):
         self.index = index
 
     def __str__(self):
-        return self.__class__.__name__
+        return self.__class__.__name__ #+ '%' + str(id(self))
 
     def _action(self, *args, **kwargs):
         ActionClass = kwargs.pop('ActionClass')
@@ -509,20 +509,28 @@ class SearchPathTroveSet(SearchSourceTroveSet):
         self.troveSetList = None
 
         if troveSetList is not None:
-            self.setTroveSetList(troveSetList)
+            self.setTroveSetList(self.fetch(troveSetList))
 
-    def setTroveSetList(self, troveSetList):
-        assert(self.troveSetList is None)
-
-        self.troveSetList = []
+    def fetch(self, troveSetList):
+        # fetch all of the trovesets in troveSetList. it is acceptable
+        # for the caller to do this manually, in which case setTroveList()
+        # can be used directly to avoid this step
+        resultList = []
         for i, troveSet in enumerate(troveSetList):
             if isinstance(troveSet, TroveTupleSet):
                 fetched = troveSet._action(ActionClass = FetchAction)
-                self.troveSetList.append(fetched)
+                resultList.append(fetched)
                 self.g.addEdge(fetched, self, value = str(i + 1))
             else:
-                self.troveSetList.append(troveSet)
+                resultList.append(troveSet)
                 self.g.addEdge(troveSet, self, value = str(i + 1))
+
+        return resultList
+
+    def setTroveSetList(self, troveSetList, fetch = True):
+        # troveSetList must be fetched before calling this
+        assert(self.troveSetList is None)
+        self.troveSetList = troveSetList
 
     def _getResolveSource(self, depDb = None, filterFn = None):
         # we search differently then we resolve; resolving is recursive
@@ -623,7 +631,8 @@ class FetchAction(ParallelAction):
 
     __call__ = fetchAction
 
-    def _fetch(self, actionList, data):
+    @staticmethod
+    def _fetch(actionList, data):
         troveTuples = set()
 
         for action in actionList:
@@ -1098,7 +1107,9 @@ class IncludeAction(DelayedTupleSetAction):
 
         if not trove.troveIsComponent(nvf[0]):
             assert(trove.troveIsPackage(nvf[0]))
-            trv = data.troveCache.getTrove(withFiles=False, *nvf)
+            # getTrove is sometimes disabled to prevent one at a time calls
+            # can't be helped here
+            trv = data.troveCache.getTroves([ nvf], withFiles=False)[0]
             found = None
             for subNVF in trv.iterTroveList(strongRefs = True):
                 if subNVF[0].endswith(':cml'):
@@ -1122,7 +1133,8 @@ class IncludeAction(DelayedTupleSetAction):
         self.outSet.g.addEdge(self.resultSet, self.outSet)
 
         self.outSet.finalSearchSet.setTroveSetList(
-                                            [ self.resultSet.searchPath ])
+                            self.outSet.finalSearchSet.fetch(
+                                            [ self.resultSet.searchPath ]) )
 
         return False
 

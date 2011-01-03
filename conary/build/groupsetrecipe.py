@@ -213,20 +213,14 @@ class GroupTupleSetMethods(object):
         outside of the current group cook.
 
         """
-        if isinstance(resolveSource, troveset.SearchPathTroveSet):
-            newList = []
-            for ts in resolveSource.troveSetList:
-                if isinstance(ts, troveset.TroveTupleSet):
-                    ts = ts._action(ActionClass = troveset.FetchAction)
-                newList.append(ts)
-
-            resolveSource = troveset.SearchPathTroveSet(newList,
-                                                        graph = self.g)
-        elif isinstance(resolveSource, troveset.TroveTupleSet):
-            resolveSource = resolveSource._action(
-                                    ActionClass = troveset.FetchAction)
-
         fetched = self._action(ActionClass = troveset.FetchAction)
+        if resolveSource:
+            if isinstance(resolveSource, troveset.SearchPathTroveSet):
+                resolveSource = resolveSource._action(
+                                        ActionClass = GroupSearchPathFetch)
+            elif isinstance(resolveSource, troveset.DelayedTupleSet):
+                resolveSource = resolveSource._action(
+                                        ActionClass = troveset.FetchAction)
 
         return fetched._action(resolveSource,
                                      failOnUnresolved = failOnUnresolved,
@@ -1137,6 +1131,47 @@ class CreateNewGroupAction(CreateGroupAction):
         return True
 
     __call__ = createNewGroupAction
+
+class DelayedSearchPathTroveSet(GroupSearchPathTroveSet):
+
+    def __init__(self, troveSetList = None, graph = None, index = None,
+                 action = None):
+        troveset.SearchPathTroveSet.__init__(self, troveSetList = troveSetList,
+                                             graph = graph, index = index)
+        self.action = action
+        assert(not self.troveSetList)
+
+    def realize(self, data):
+        result = self.action(data)
+        self.realized = True
+        return True
+
+class GroupSearchPathFetch(troveset.DelayedTupleSetAction):
+
+    resultClass = DelayedSearchPathTroveSet
+
+    def __init__(self, *args, **kwargs):
+        troveset.DelayedTupleSetAction.__init__(self, *args, **kwargs)
+
+    def groupSearchPathFetch(self, data):
+        actionList = []
+        needed = self.primaryTroveSet.troveSetList[:]
+        while needed:
+            ts = needed.pop(0)
+
+            if isinstance(ts, troveset.TroveTupleSet):
+                f = troveset.FetchAction(ts)
+                actionList.append(f)
+            elif isinstance(ts, troveset.SearchPathTroveSet):
+                needed += ts.troveSetList
+
+        troveset.FetchAction._fetch(actionList, data)
+
+        self.outSet.setTroveSetList(self.primaryTroveSet.troveSetList)
+
+        return True
+
+    __call__ = groupSearchPathFetch
 
 class DepsNeededAction(GroupDelayedTupleSetAction):
 
