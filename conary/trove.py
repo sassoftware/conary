@@ -1227,7 +1227,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
         _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
         _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
-        _TROVEINFO_TAG_BUILD_REFS    : (LARGE, LoadedTroves,         'buildRefs' ),
+        _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
