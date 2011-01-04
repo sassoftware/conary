@@ -756,7 +756,8 @@ class GroupTupleSetMethods(object):
         return self._action(updateSet, ActionClass = GroupUpdateAction)
 
 
-    def createGroup(self, name, checkPathConflicts = True, scripts = None):
+    def createGroup(self, name, checkPathConflicts = True, scripts = None,
+                    imageGroup = False):
         """
         NAME
         ====
@@ -780,16 +781,21 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
          - C{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{imageGroup} : (False) Designate that this group is a image group.
+           Image Group policies will be executed separately on this group.
          - C{scripts} : Attach one or more scripts specified by a C{Scripts}
            object (C{None})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
                             ActionClass = CreateNewGroupAction,
+                            imageGroup = imageGroup,
                             scripts = scripts)
 
-    def _createGroup(self, name, checkPathConflicts = True, scripts = None):
+    def _createGroup(self, name, checkPathConflicts = True, scripts = None,
+                     imageGroup = False):
         return self._action(name, ActionClass = CreateGroupAction,
                             checkPathConflicts = checkPathConflicts,
+                            imageGroup = imageGroup,
                             scripts = scripts)
 
     __add__ = union
@@ -1074,7 +1080,7 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
     prefilter = troveset.FetchAction
 
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
-                 scripts = None):
+                 imageGroup = False, scripts = None):
         if hasattr(scripts, "ts"):
             GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
                                                 scripts.ts)
@@ -1083,11 +1089,13 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
         self.name = name
         self.checkPathConflicts = checkPathConflicts
+        self.imageGroup = imageGroup
         self.scripts = scripts
 
     def createGroupAction(self, data):
         grp = SG(data.groupRecipe.name,
-                 checkPathConflicts = self.checkPathConflicts)
+                 checkPathConflicts = self.checkPathConflicts,
+                 imageGroup = self.imageGroup)
 
         data.groupRecipe._addGroup(self.name, grp)
         data.groupRecipe._setDefaultGroup(grp)
@@ -1118,13 +1126,15 @@ class CreateNewGroupAction(CreateGroupAction):
     resultClass = GroupLoggingDelayedTroveTupleSet
 
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
-                 scripts = None):
+                 scripts = None, imageGroup = False):
         CreateGroupAction.__init__(self, primaryTroveSet, name,
                                    checkPathConflicts = checkPathConflicts,
+                                   imageGroup = imageGroup,
                                    scripts = scripts)
 
     def createNewGroupAction(self, data):
-        newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
+        newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts,
+                      imageGroup = self.imageGroup)
         data.groupRecipe._addGroup(self.name, newGroup)
         self._create(newGroup, self.primaryTroveSet, self.outSet, data)
 
@@ -1578,7 +1588,6 @@ class SG(_SingleGroup):
         _SingleGroup.__init__(self, *args, **kwargs)
         self.autoResolve = False
         self.depCheck = False
-        self.imageGroup = False
 
     def populate(self, troveSet, troveCache):
         seen = set()
@@ -1893,7 +1902,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
 
-    def Group(self, ts, checkPathConflicts = True, scripts = None):
+    def Group(self, ts, checkPathConflicts = True, scripts = None,
+              imageGroup = False):
         '''
         NAME
         ====
@@ -1916,12 +1926,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         ==========
          - C{checkPathConflicts} : Raise an error if any paths
            overlap (C{True})
+         - C{imageGroup} : (False) Designate that this group is a image group.
+           Image Group policies will be executed separately on this group.
          - C{scripts} : Attach one or more scripts specified by a C{Scripts}
            object (C{None})
         '''
         return ts._createGroup(self.name,
                                checkPathConflicts = checkPathConflicts,
-                               scripts = scripts)
+                               scripts = scripts, imageGroup = imageGroup)
 
     def Repository(self, labelList, flavor):
         # Documented in GroupSearchSourceTroveSet as "Repository" so that

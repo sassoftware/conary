@@ -1404,11 +1404,13 @@ class _GroupRecipe(_BaseGroupRecipe):
 
 class _SingleGroup(object):
 
-    def __init__(self, groupName, checkPathConflicts = False):
+    def __init__(self, groupName, checkPathConflicts = False,
+                 imageGroup = False):
         if not groupName.startswith('group-'):
             raise RecipeFileError, 'group names must start with "group-"'
 
         self.name = groupName
+        self.imageGroup = imageGroup
 
         self.preInstallScripts = None
         self.postInstallScripts = None
@@ -1610,14 +1612,14 @@ class SingleGroup(_SingleGroup):
                  checkPathConflicts, byDefault = True, imageGroup = False,
                  cache = None):
         _SingleGroup.__init__(self, name,
-                              checkPathConflicts = checkPathConflicts)
+                              checkPathConflicts = checkPathConflicts,
+                              imageGroup = imageGroup)
         assert(isinstance(byDefault, bool))
         self.depCheck = depCheck
         self.autoResolve = autoResolve
         self.checkOnlyByDefaultDeps = checkOnlyByDefaultDeps
         self.byDefault = byDefault
         self.cache = cache
-        self.imageGroup = imageGroup
 
         self.addTroveList = []
         self.removeTroveList = []
