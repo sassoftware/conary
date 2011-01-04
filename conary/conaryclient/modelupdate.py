@@ -680,6 +680,14 @@ class CMLClient(object):
                                     criticalJobs = criticalJobs,
                                     finalJobs = finalJobs,
                                     criticalOnly = criticalOnly)
+            # this is horrible. it forces the dependency graph which is used
+            # for ordering to be updated with the results of each dep pass
+            # (note that we do this after the depCheck() call in the loop
+            # below. it's really a bug that it happens here and it not internal
+            # to the dep checker, but changing that would affect the non
+            # system model update path which I don't want to do (even if doing
+            # so would be a bug fix)
+            result._order()
 
             suggMap = {}
             while True:
@@ -736,6 +744,7 @@ class CMLClient(object):
                                         criticalJobs = criticalJobs,
                                         finalJobs = finalJobs,
                                         criticalOnly = criticalOnly)
+                result._order()
 
             check.done()
             log.info("job dependency closed; %s jobs resulted", len(job))
