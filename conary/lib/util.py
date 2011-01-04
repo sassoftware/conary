@@ -1880,7 +1880,35 @@ def xmlrpcLoad(stream):
     return u.close(), u.getmethodname()
 
 
-class ServerProxy(xmlrpclib.ServerProxy):
+class ServerProxy(object):
+    # This used to inherit from xmlrpclib but it replaced everything anyway...
+
+    def __init__(self, uri, transport=None, encoding=None, allow_none=False):
+        scheme, uri = urllib.splittype(uri)
+        if scheme not in ('http', 'https'):
+            raise IOError("unsupported XML-RPC protocol")
+        host, handler = urllib.splithost(uri)
+        userpass, hostport = urllib.splituser(host)
+        if userpass:
+            # Hide password
+            user, passwd = urllib.splitpasswd(userpass)
+            passwd = ProtectedString(urllib.quote(passwd))
+            userpass = '%s:${passwd}' % user
+            host = ProtectedTemplate('%s@%s' % (userpass, hostport),
+                    passwd=passwd)
+        if not handler:
+            handler = '/RPC2'
+        if transport is None:
+            if scheme == 'https':
+                transport = xmlrpclib.SafeTransport()
+            else:
+                transport = xmlrpclib.Transport()
+
+        self.__host = host
+        self.__handler = handler
+        self.__transport = transport
+        self.__encoding = encoding
+        self.__allow_none = allow_none
 
     def _request(self, methodname, params):
         # Call a method on the remote server
@@ -1890,8 +1918,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
         response = self.__transport.request(
             self.__host,
             self.__handler,
-            request,
-            verbose=self.__verbose)
+            request)
 
         if len(response) == 1:
             response = response[0]
@@ -1902,8 +1929,6 @@ class ServerProxy(xmlrpclib.ServerProxy):
         # magic method dispatcher
         if name.startswith('__'):
             raise AttributeError(name)
-        #from conary.lib import log
-        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name)
         return self._createMethod(name)
 
     def _createMethod(self, name):
@@ -1914,16 +1939,6 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
     __str__ = __repr__
 
-    def __init__(self, *args, **kwargs):
-        xmlrpclib.ServerProxy.__init__(self, *args, **kwargs)
-        # Hide password
-        userpass, hostport = urllib.splituser(self.__host)
-        if userpass:
-            user, passwd = urllib.splitpasswd(userpass)
-            passwd = ProtectedString(urllib.quote(passwd))
-            userpass = '%s:${passwd}' % user
-            self.__host = ProtectedTemplate('%s@%s' % (userpass, hostport),
-                passwd = passwd)
 
 def copyStream(src, dest, length = None, bufferSize = 16384):
     """Copy from one stream to another, up to a specified length"""
