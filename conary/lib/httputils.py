@@ -14,11 +14,9 @@
 
 import base64
 import errno
-import glob
 import httplib
 import itertools
 import logging
-import os
 import random
 import select
 import socket
@@ -30,6 +28,7 @@ import zlib
 
 from conary import errors
 from conary.lib import util
+from conary.lib.http import connection as conn_mod
 
 log = logging.getLogger(__name__)
 
@@ -47,71 +46,6 @@ except ImportError:
 
 LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
                   socket.gethostname()])
-
-
-class HTTPSConnection(httplib.HTTPConnection):
-    """
-    HTTPS connection that supports m2crypto contexts plus some other features.
-
-    m2crypto's httpslib isn't used here because it is too simple to bother
-    inheriting.
-
-    Currently supported "extra" features:
-     * Can pass in a list of peer certificate authorities.
-     * Can set the hostname used to check the peer's certificate.
-    """
-    default_port = httplib.HTTPS_PORT
-
-    def __init__(self, host, port=None, strict=None, caCerts=None,
-            commonName=None):
-        httplib.HTTPConnection.__init__(self, host, port, strict)
-        self.caCerts = caCerts
-        self.commonName = commonName
-
-        self.ssl_ctx = SSL.Context('sslv23')
-        if caCerts:
-            self.ssl_ctx.set_verify(SSL.verify_peer, depth=9)
-            paths = []
-            for path in caCerts:
-                paths.extend(sorted(list(glob.glob(path))))
-            for path in paths:
-                if os.path.isdir(path):
-                    self.ssl_ctx.load_verify_locations(capath=path)
-                elif os.path.exists(path):
-                    self.ssl_ctx.load_verify_locations(cafile=path)
-
-    def connect(self):
-        self.sock = SSL.Connection(self.ssl_ctx)
-        self.sock.clientPostConnectionCheck = self.checkSSL
-        self.sock.connect((self.host, self.port))
-
-    def adopt(self, sock):
-        """
-        Set this connection's underlying socket to C{sock} and wrap it with the
-        SSL connection object. Assume the socket is already open but has not
-        exchanged any SSL traffic.
-        """
-        self.sock = SSL.Connection(self.ssl_ctx, sock)
-        self.sock.setup_ssl()
-        self.sock.set_connect_state()
-        self.sock.connect_ssl()
-        if not self.checkSSL(self.sock.get_peer_cert(), self.host):
-            raise SSLVerificationError('post connection check failed')
-
-    def close(self):
-        # See M2Crypto/httpslib.py:67
-        pass
-
-    def checkSSL(self, cert, host):
-        """
-        Peer cert checker that will use an alternate hostname for the
-        comparison, e.g. if the actual connect host is an IP this can be used
-        to specify the original hostname.
-        """
-        if self.commonName:
-            host = self.commonName
-        checker = SSL.Checker.Checker()
-        return checker(cert, host)
 
 
 class _ConnectionIterator(object):
@@ -311,7 +245,7 @@ class ConnectionManager(object):
         # Wrap the socket in an SSL socket
         if SSL and self.caCerts:
             # Doing server cert checking; use m2crypto
-            h = HTTPSConnection(endpointHost, endpointPort,
+            h = conn_mod.HTTPSConnection(endpointHost, endpointPort,
                     caCerts=self.caCerts, commonName=endpointHost)
             try:
                 h.adopt(sock)
@@ -419,8 +353,8 @@ class ConnectionManager(object):
                     # If cert checking is requested use our HTTPSConnection
                     # (which uses m2crypto)
                     commonName = nexthop.host
-                    hndl = HTTPSConnection(nexthopHP, caCerts=self.caCerts,
-                                           commonName=commonName)
+                    hndl = conn_mod.HTTPSConnection(nexthopHP,
+                            caCerts=self.caCerts, commonName=commonName)
                 else:
                     # Either no cert checking was requested, or we don't have
                     # the module to support it, so use vanilla httplib.
