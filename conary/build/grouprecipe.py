@@ -2977,16 +2977,19 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
 
         callback.groupDeterminingPathConflicts(len(conflictLists))
 
+        # get the troves into a simple dict; it's easier than calling
+        # troveCache.getTroves([something], withFiles=True)[0]
+        # over and over
+        allTrovesNeeded = list(set(chain(*conflictLists.values())))
+        trovesWithFiles = dict( (troveTup, trv) for troveTup, trv in
+                            izip(allTrovesNeeded,
+                                 troveCache.getTroves(allTrovesNeeded,
+                                                      withFiles = True) ) )
+
         # We've got the sets of conflicting troves, now
         # determine the set of conflicting files.
-        trovesWithFiles = {}
         conflictsWithFiles = []
         for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
-            # Find troves to cache
-            needed = [ x for x in conflictSet if x not in trovesWithFiles ]
-            troves = troveCache.troveSource.getTroves(needed, withFiles=True)
-            trovesWithFiles.update(dict(izip(needed, troves)))
-
             # Build set of paths which conflicts across these troves
             conflictingPaths = None
             for tup in conflictSet:
