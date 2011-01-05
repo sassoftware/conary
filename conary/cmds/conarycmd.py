@@ -944,9 +944,7 @@ class _UpdateCommand(ConaryCommand):
                            'Do not attempt to solve dependency problems'),
         'no-conflict-check' : (VERBOSE_HELP,
                                'Ignore potential path conflicts'),
-        'no-restart'    : (VERBOSE_HELP,
-                           'Do not restart after applying a critical update. '
-                           'Requires --root'),
+        'no-restart'    : optparse.SUPPRESS_HELP,
         'no-scripts'    : (VERBOSE_HELP,
                            'Do not run trove scripts'),
         'recurse'       : optparse.SUPPRESS_HELP,
@@ -957,7 +955,7 @@ class _UpdateCommand(ConaryCommand):
                           'Replace config files on the system which have '
                           'been changed by something other than conary',
         'replace-managed-files':
-                          'Replaces files owned by other troves (including'
+                          'Replaces files owned by other troves (including '
                           'other troves which are part of this update)',
         'replace-modified-files':
                           'Replace non-config files on the system which have '
@@ -966,6 +964,8 @@ class _UpdateCommand(ConaryCommand):
                           'Replace files on the system which are not owned '
                           'by any trove',
         'resolve'       : 'Add troves to update to solve dependency problems',
+        'restart'       : (VERBOSE_HELP,
+                           'Restart after applying a critical update'),
         'restart-info'  : optparse.SUPPRESS_HELP,
         'sync-to-parents' : (VERBOSE_HELP,
                             'Install already referenced versions of troves'),
@@ -1002,6 +1002,7 @@ class _UpdateCommand(ConaryCommand):
         d["replace-modified-files"] = NO_PARAM
         d["replace-unmanaged-files"] = NO_PARAM
         d["resolve"] = NO_PARAM
+        d["restart"] = NO_PARAM
         d["sync-to-parents"] = NO_PARAM
         d["tag-script"] = ONE_PARAM
         d["test"] = NO_PARAM
@@ -1028,7 +1029,8 @@ class _UpdateCommand(ConaryCommand):
             cfg.autoResolve = True
             del argSet['resolve']
 
-        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        kwargs['noRestart'] = argSet.pop('no-restart',
+                                         not argSet.pop('restart', False))
         if os.path.normpath(cfg.root) != '/':
             kwargs['noRestart'] = True
 
@@ -1161,8 +1163,9 @@ class EraseCommand(_UpdateCommand):
         # rename Update Options to Erase Options (CNY-1090)
         _UpdateCommand.addParameters(self, argDef)
         d = argDef['Erase Options'] = argDef.pop('Update Options')
-        # --no-restart doesn't make sense in the erase context
+        # --restart and --no-restart doesn't make sense in the erase context
         del d['no-restart']
+        del d['restart']
 
 _register(EraseCommand)
 
@@ -1232,6 +1235,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["replace-unmanaged-files"] = NO_PARAM
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
+        argDef["restart"] = NO_PARAM
         argDef["restart-info"] = ONE_PARAM
         argDef["apply-critical"] = NO_PARAM
 
@@ -1252,7 +1256,8 @@ class UpdateAllCommand(_UpdateCommand):
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['modelTrace'] = argSet.pop('model-trace', None)
 
-        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        kwargs['noRestart'] = argSet.pop('no-restart',
+                                         not argSet.pop('restart', False))
         if os.path.normpath(cfg.root) != '/':
             kwargs['noRestart'] = True
 
