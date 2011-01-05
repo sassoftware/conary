@@ -2452,6 +2452,7 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
     troveDict.update(dict(zip(oldTroveTups, oldTroves)))
 
     unmatchedComponents = []
+    componentsToFetch = []
     for newTup in toMatch:
         newTrove = troveDict[newTup]
         if newTup not in metadataMatches:
@@ -2477,17 +2478,18 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
         # match up those components that existed both in the old collection
         # and the new one.
         componentMatches = set(newTroveComponents) & set(oldTroveComponents)
-        componentMatches = [ (x, oldTup[1], oldTup[2])
+        componentsToFetch += [ (x, oldTup[1], oldTup[2])
                                 for x in componentMatches ]
-        hasTroves = repos.hasTroves(componentMatches)
-        componentMatches = [x for x in componentMatches if hasTroves[x]]
-        componentMatches = repos.getTroves(componentMatches, withFiles=False)
-        componentMatches = dict((x.getName(), x) for x in componentMatches)
-        for childTrv in childrenByTrove.get(
-                                    newTrove.getNameVersionFlavor(), []):
-            match = componentMatches.get(childTrv.getName(), None)
-            if match:
-                allMatches.append((childTrv, match, False))
+
+    hasTroves = repos.hasTroves(componentsToFetch)
+    componentsToFetch = [x for x in componentsToFetch if hasTroves[x]]
+    componentsToFetch = repos.getTroves(componentsToFetch, withFiles=False)
+    componentsToFetch = dict((x.getName(), x) for x in componentsToFetch)
+    for childTrv in childrenByTrove.get(
+                                newTrove.getNameVersionFlavor(), []):
+        match = componentsToFetch.get(childTrv.getName(), None)
+        if match:
+            allMatches.append((childTrv, match, False))
 
     if unmatchedComponents:
         # some components must have been added in this build from the
