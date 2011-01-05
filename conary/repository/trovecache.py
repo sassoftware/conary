@@ -21,6 +21,24 @@ from conary.lib import log, util
 from conary.repository import changeset, filecontainer, filecontents
 from conary.repository import netclient, trovesource
 
+
+class CacheDict(dict):
+
+    def has(self, troveTup, withFiles = False):
+        if not withFiles or trove.troveIsCollection(troveTup[0]):
+            return troveTup in self
+
+        return self.get(troveTup, (None, False))[1] is True
+
+    def __setitem__(self, troveTup, trv):
+        dict.__setitem__(self, troveTup, (False, trv))
+
+    def __getitem__(self, troveTup):
+        return dict.__getitem__(self, troveTup)[1]
+
+    def add(self, troveTup, trv, withFiles=False):
+        dict.__setitem__(self, troveTup, (withFiles, trv))
+
 class TroveCache(trovesource.AbstractTroveSource):
 
     VERSION = (1, 0)                    # (major, minor)
@@ -48,15 +66,16 @@ class TroveCache(trovesource.AbstractTroveSource):
         self.depCache = {}
         self.depSolutionCache = {}
         self.timeStampCache = {}
-        self.cache = {}
+        self.cache = CacheDict()
         self.troveSource = troveSource
         self.findCache = {}
         self.fileCache = {}
         self._startingSizes = self._getSizeTuple()
 
-    def _addToCache(self, troveTupList, troves, _cached = None):
+    def _addToCache(self, troveTupList, troves, _cached = None,
+                    withFiles = False):
         for troveTup, trv in izip(troveTupList, troves):
-            self.cache[troveTup] = trv
+            self.cache.add(troveTup, trv, withFiles = withFiles)
 
         if _cached:
             _cached(troveTupList, troves)
@@ -78,17 +97,19 @@ class TroveCache(trovesource.AbstractTroveSource):
                  len(self.depSolutionCache), len(self.timeStampCache),
                  len(self.findCache), len(self.fileCache) )
 
-    def cacheTroves(self, troveTupList, _cached = None):
-        troveTupList = [x for x in troveTupList if x not in self.cache]
+    def cacheTroves(self, troveTupList, _cached = None, withFiles = False):
+        troveTupList = [x for x in troveTupList
+                            if not self.cache.has(x, withFiles = withFiles) ]
         if not troveTupList:
             return
 
         self._caching(troveTupList)
 
-        troves = self.troveSource.getTroves(troveTupList, withFiles=False,
+        troves = self.troveSource.getTroves(troveTupList, withFiles=withFiles,
                                             callback = self.callback)
 
-        self._addToCache(troveTupList, troves, _cached = _cached)
+        self._addToCache(troveTupList, troves, _cached = _cached,
+                         withFiles=withFiles)
 
     def addFindResult(self, spec, result):
         self.findCache[(None, spec)] = result
@@ -277,8 +298,7 @@ class TroveCache(trovesource.AbstractTroveSource):
                         [ (name, version, flavor) ], withFiles = False)[0]
 
     def getTroves(self, tupList, withFiles = False, _cached = None):
-        assert(not withFiles)
-        self.cacheTroves(tupList, _cached = _cached)
+        self.cacheTroves(tupList, _cached = _cached, withFiles = withFiles)
         return [ self.cache[x] for x in tupList ]
 
     def iterTroveListInfo(self, troveTup):
@@ -299,7 +319,7 @@ class TroveCache(trovesource.AbstractTroveSource):
             trv = trove.Trove(trvCs, skipIntegrityChecks = True)
             self.cache[trv.getNameVersionFlavor()] = trv
 
-        self._cached(self.cache.keys(), self.cache.values())
+        self._cached(self.cache.keys(), [ x[1] for x in self.cache.values() ])
 
         try:
             contType, depContents = cs.getFileContents(
@@ -373,7 +393,10 @@ class TroveCache(trovesource.AbstractTroveSource):
             return
 
         cs = changeset.ChangeSet()
-        for trv in self.cache.values():
+        for withFiles, trv in self.cache.values():
+            # we just assume everything in the cache is w/o files. it's
+            # fine for system model, safe, and we don't need the cache
+            # anywhere else
             cs.newTrove(trv.diff(None, absolute = True)[0])
 
         cs.addFileContents(self.troveCacheVersionPathId,
