@@ -1124,6 +1124,12 @@ class IncludeAction(DelayedTupleSetAction):
             raise IncludeException('Include only supports source and cml '
                                    'components')
 
+        if nvf in self.outSet.g.included:
+            raise IncludeException('Include loop detected involving %s=%s[%s]'
+                                   % nvf)
+
+        self.outSet.g.included.add(nvf)
+
         cmlFileLines = self.getCML(data.troveCache, nvf)
 
         model = cml.CML(None, context = nvf[0])
@@ -1145,6 +1151,10 @@ class IncludeAction(DelayedTupleSetAction):
     __call__ = includeAction
 
 class OperationGraph(graph.DirectedGraph):
+
+    def __init__(self, *args, **kwargs):
+        graph.DirectedGraph.__init__(self, *args, **kwargs)
+        self.included = set()
 
     def realize(self, data):
         # this is a hack
