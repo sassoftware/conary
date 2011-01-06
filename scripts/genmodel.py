@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/conary/bin/python
 #
 # Copyright (C) 2010 rPath, Inc.
 #
@@ -324,7 +324,8 @@ if __name__ == '__main__':
 
                 if pkgTuple in newInstalls:
                     print "   updating model for job", jobList
-                    if len(jobList) == 2:
+                    if (len(jobList) == 2 and
+                        not sum(x[0].endswith('rpm') for x in jobList)):
                         # pick out the one component we use
                         installJob = [ x for x in jobList if
                                        (x[0], x[1][0], x[1][1]) != pkgTuple ]
