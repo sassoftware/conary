@@ -4022,7 +4022,8 @@ class Requires(_addInfo, _dependency):
                 depClass = deps.SonameDependencies
                 for depType, dep, f in m.contents['requires']:
                     if depType == 'abi':
-                        flags = f
+                        flags = tuple(x == 'Linux' and 'SysV' or x
+                                      for x in f) # CNY-3604
                         info = '%s/%s' %(dep, info.split(None, 1)[1])
                         info = os.path.normpath(info)
             else: # by process of elimination, must be a trove
