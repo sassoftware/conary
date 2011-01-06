@@ -93,6 +93,7 @@ Creates a changeset with the specified troves and stores it in <outfile>"""
     commandGroup = 'Repository Access'
     docs = {'no-recurse' : (VERBOSE_HELP, 
                             "Don't include child troves in changeset")}
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -128,6 +129,7 @@ class CommitCommand(ConaryCommand):
     help = 'Commit a changeset to a Conary repository'
     docs = {'target-branch' : ('commit to branch BRANCH', 'BRANCH')}
     commandGroup = 'Repository Access'
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -148,6 +150,7 @@ class EmergeCommand(ConaryCommand):
     paramHelp = "<troveName>+"
     help = 'Build software from source and install it on the system'
     commandGroup = 'System Modification'
+    hidden = True
 
     docs = {'no-deps' : 'Do not check to see if buildreqs are installed' }
 
@@ -501,6 +504,7 @@ class RemoveRollbackCommand(ConaryCommand):
     help = 'Remove old rollbacks'
     commandGroup = 'System Modification'
     ignoreConfigErrors = True
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -1152,6 +1156,7 @@ _register(InstallCommand)
 class PatchCommand(_UpdateCommand):
     commands = [ "patch" ]
     help = 'Patch software on the system'
+    hidden = True
 _register(PatchCommand)
 
 
