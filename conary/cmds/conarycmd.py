@@ -1192,7 +1192,7 @@ class MigrateCommand(_UpdateCommand):
     commands = ["migrate"]
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
     help = 'Migrate the system to a different group'
-    hidden = True
+    hidden = False
 
     def addParameters(self, argDef):
         _UpdateCommand.addParameters(self, argDef)
