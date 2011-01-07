@@ -128,6 +128,15 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.csText = text
         self.update()
 
+    def executingSystemModel(self):
+        self.updateMsg("Processing system model")
+
+    def loadingModelCache(self):
+        self.updateMsg("Loading system model cache")
+
+    def savingModelCache(self):
+        self.updateMsg("Saving system model cache")
+
     def preparingChangeSet(self):
         """
         @see: callbacks.ChangesetCallback.preparingChangeSet
@@ -683,13 +692,15 @@ def _updateTroves(cfg, applyList, **kwargs):
             if loadTroveCache:
                 if os.path.exists(tcPath):
                     log.info("loading %s", tcPath)
+                    callback.loadingModelCache()
                     tc.load(tcPath)
             ts = client.cmlGraph(model, changeSetList = changeSetList)
             if modelGraph is not None:
                 ts.g.generateDotFile(modelGraph)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
-                                        criticalUpdateInfo = criticalUpdates)
+                                        criticalUpdateInfo = criticalUpdates,
+                                        callback = callback)
             if modelTrace is not None:
                 ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
 
@@ -721,6 +732,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
+                callback.savingModelCache()
                 tc.save(tcPath)
         else:
             suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)

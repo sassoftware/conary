@@ -70,6 +70,7 @@ class TroveCache(trovesource.AbstractTroveSource):
         self.troveSource = troveSource
         self.findCache = {}
         self.fileCache = {}
+        self.callback = None
         self._startingSizes = self._getSizeTuple()
 
     def _addToCache(self, troveTupList, troves, _cached = None,

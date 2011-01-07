@@ -532,7 +532,7 @@ class CMLClient(object):
     def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
                             split = True, fromChangesets = [],
                             criticalUpdateInfo=None, applyCriticalOnly = False,
-                            restartInfo = None,
+                            restartInfo = None, callback = None,
                             ignoreMissingDeps = False):
         """
         Populates an update job based on a set of trove update and erase
@@ -613,6 +613,9 @@ class CMLClient(object):
 
         searchPath = troveSet.searchPath
 
+        if callback:
+            callback.executingSystemModel()
+
         #depSearch = CMLSearchPath([ preFetch, searchPath ],
                                                #graph = preFetch.g)
         depSearch = searchPath
@@ -639,6 +642,9 @@ class CMLClient(object):
 
         self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv, absolute = False)[2]
+
+        if callback:
+            callback.resolvingDependencies()
 
         # don't resolve against local troves (we can do this because either
         # they're installed and show up in the unresolveable list or they
@@ -791,5 +797,8 @@ class CMLClient(object):
         for needingTroveTup, neededSet in suggMap.items():
             if not neededSet:
                 del suggMap[needingTroveTup]
+
+        if callback:
+            callback.done()
 
         return suggMap

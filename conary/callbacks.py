@@ -227,6 +227,16 @@ class CookCallback(ChangesetCallback):
 
 class UpdateCallback(ChangesetCallback):
 
+    def executingSystemModel(self):
+        """
+        Called when the system model is being executed, before dependencies
+        are resolved.
+
+        @return: None
+        """
+        None
+
+
     def resolvingDependencies(self):
         """
         Called after requested troves have been found and before it resolves
@@ -415,6 +425,20 @@ class UpdateCallback(ChangesetCallback):
          - after restarting an update that contains critical troves
         """
         pass
+
+    # called by updatecmd.py only, at least for now
+    def loadingModelCache(self):
+        """
+        Called when a modelcache is being loaded.
+        """
+        pass
+
+    def savingModelCache(self):
+        """
+        Called when a modelcache is being written to disk.
+        """
+        pass
+
 
     def checkAbort(self):
         return (self.abortEvent and self.abortEvent.isSet()) or self.cancelOperation()
