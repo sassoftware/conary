@@ -183,11 +183,18 @@ def collectNewTrovesFromRPMDb(cfg):
                    capsuleInfo.rpm.version(), capsuleInfo.rpm.release(),
                    capsuleInfo.rpm.arch())
 
-            if (key not in allNevras or
-                   (cfg.flavor[0].score(trvTuple[2]) >
-                    cfg.flavor[0].score(allNevras[key][2]))):
+            if key not in allNevras:
                 allNevras[key] = trvTuple
-
+            else:
+                for flavor in cfg.flavorPreferences:
+                    existingScore = flavor.score(allNevras[key][2])
+                    newScore = flavor.score(trvTuple[2])
+                    if (existingScore is False or
+                        newScore > existingScore):
+                        # this test works because False == 0
+                        allNevras[key] = trvTuple
+                        break
+                
         for nevra in sorted(nevras):
             if nevra in allNevras:
                 matches.append(allNevras[nevra])
