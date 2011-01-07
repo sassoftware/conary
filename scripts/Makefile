@@ -19,7 +19,7 @@ extra_dist = Makefile \
 	     perlreqs.pl findmissingbuildreqs
 
 bin_scripts = rpm2cpio dbsh conary-debug ccs2tar
-util_scripts = dumpcontainer localupdateinfo mirror md5pw showchangeset logcat listcachedir recreatedb
+util_scripts = dumpcontainer localupdateinfo mirror md5pw showchangeset logcat listcachedir recreatedb genmodel
 
 dist_files = $(python_files) $(extra_dist) $(bin_scripts) $(util_scripts)
 
@@ -35,7 +35,6 @@ install: install-subdirs
 	install -m 755 $(util_scripts) $(DESTDIR)$(datadir)/conary
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
-	install -m 755 genmodel $(DESTDIR)$(conarydir)
 	install -m 755 changemail.py $(DESTDIR)$(conarydir)
 	install -m 755 logaction.py $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
