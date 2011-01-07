@@ -734,6 +734,7 @@ def _updateTroves(cfg, applyList, **kwargs):
                 log.info("saving %s", tcPath)
                 callback.savingModelCache()
                 tc.save(tcPath)
+                callback.done()
         else:
             suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
