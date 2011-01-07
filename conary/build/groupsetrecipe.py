@@ -864,11 +864,19 @@ class GroupLoggingDelayedTroveTupleSet(GroupDelayedTroveTupleSet):
     def realize(self, *args):
         mark = time.time()
 
-        log.info("Running action %s" % str(self.action) + self._lineNumStr)
+        if isinstance(self.action, GroupIncludeAction):
+            log.info("Including %s" % " ".join(
+                        "%s=%s[%s]" % nvf for nvf in
+                               self.action.includeSet._getInstallSet()))
+        else:
+            log.info("Running action %s" % str(self.action) + self._lineNumStr)
         GroupDelayedTroveTupleSet.realize(self, *args)
         runtime = time.time() - mark
         if runtime > 0.1:
-            log.info("\ttook %.1fs" % runtime)
+            if isinstance(self.action, GroupIncludeAction):
+                log.info("\tinclude processing took %.1fs" % runtime)
+            else:
+                log.info("\ttook %.1fs" % runtime)
 
 class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     '''
@@ -1353,6 +1361,10 @@ class IsNotEmptyAction(GroupDelayedTupleSetAction):
 
     __call__ = isNotEmptyAction
 
+class GroupIncludeAction(troveset.IncludeAction):
+
+    resultClass = GroupLoggingDelayedTroveTupleSet
+
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
     resultClass = GroupLoggingDelayedTroveTupleSet
@@ -1647,6 +1659,7 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = GroupSearchPathTroveSet
     FlattenAction = FlattenAction
+    IncludeAction = GroupIncludeAction
 
 class GroupScript(object):
     '''
