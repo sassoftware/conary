@@ -18,6 +18,7 @@
 filters = ('devel', (r'.*/include/.*\.h',
                      '%(includedir)s/',
                      '%(datadir)s/aclocal/',
+                     '%(datadir)s/gir-.*/',
                      '%(bindir)s/..*-config',))
 follows = ('devellib',)
 precedes = ('lib', 'data',)

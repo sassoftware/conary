@@ -784,7 +784,7 @@ class RpmDependencies(DependencyClass):
     depClass = Dependency
     flags = DEP_CLASS_OPT_FLAGS
     WORD = '(?:[:.0-9A-Za-z_+-]+)'          # allow colons in flags
-    IDENT = '(?:[][.0-9A-Za-z_-]+)'          # allow [] in dep names
+    IDENT = r'(?:[][:.0-9A-Za-z_-]+)'       # allow [] and colons in dep names
     flagFormat = "WORD"
     depFormat = "IDENT"
 _registerDepClass(RpmDependencies)
@@ -869,6 +869,19 @@ class DependencySet(object):
             c = self.members[depClass.tag]
             for dep in c.members.itervalues():
                 yield dep
+
+    def iterRawDeps(self):
+        # returns deps as (classId, name, flags) tuples
+        if type(self._members) == str:
+            next = 0
+            end = len(self._members)
+            while next < end:
+                (next, classId, depStr) = misc.depSetSplit(next, self._members)
+                (name, flags) = misc.depSplit(depStr)
+                yield (classId, name, flags)
+        else:
+            for depClass, oneDep in self.iterDeps():
+                yield (depClass.tag, oneDep.getName()[0], oneDep.getFlags()[0])
 
     def hasDepClass(self, depClass):
         return depClass.tag in self.members
@@ -1376,8 +1389,7 @@ def _filterFlavorFlags(depClass, dep, filterDeps):
     @type dep: Dependency
     @param filterDeps: Objects whose flags will be used to filter the dep parameter
     @type filterDeps: [ Dependency ]
-    @rtype dep: Dependency
-
+    @rtype: Dependency
     """
     filterFlags = set(itertools.chain(*(x.flags for x in filterDeps)))
     finalFlags = [ x for x in dep.flags.iteritems() if x[0] in filterFlags ]

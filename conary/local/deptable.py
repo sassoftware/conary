@@ -218,6 +218,28 @@ class DependencyWorkTables:
                                 ("Dependencies", "TmpDependencies"),
                                 multiplier = -1)
 
+    def restoreTrove(self, n, v, f):
+        args = [ n, v.asString() ]
+        if f.isEmpty():
+            flavorCheck = "flavors.flavor is null"
+        else:
+            flavorCheck = "flavors.flavor = ?"
+            args.append(f.freeze())
+
+        self.cu.execute("""
+            select instanceId from Instances
+                join versions using (versionid)
+                join flavors on instances.flavorid = flavors.flavorid
+                where
+                    instances.trovename = ? and
+                    versions.version = ? and
+                    %s
+        """ % (flavorCheck), args)
+
+        instanceId = self.cu.next()[0]
+        self.cu.execute("delete from removedtroveids where troveId=?",
+                        instanceId)
+
     def mergeRemoves(self):
         # The COALESCE here handles RemovedTroveIds being empty. The max
         # tells us how many rows from RemovedTroveIds have already been
@@ -303,10 +325,12 @@ class DependencyChecker:
 
         return nodeId
 
-    @staticmethod
-    def _findNewDependencies(nodeId, depSet, idx):
+    def _findNewDependencies(self, nodeId, depSet, idx):
         new = deps.DependencySet()
         for depClass, oneDep in depSet.iterDeps():
+            if depClass in self.ignoreDepClasses:
+                continue
+
             # we index my depTuple, which seems awfully slow
             depTuple = (depClass.tag, oneDep)
             l = idx.get(depTuple, None)
@@ -398,7 +422,7 @@ class DependencyChecker:
 
         # skip node 0, which is None
         oldTroveIndexes = [ (i, job) for i, (job, _, _) in
-                              itertools.islice(enumerate(self.nodes), 1, None)
+                                    self.iterNodes(enum = True)
                               if trove.troveIsCollection(job[0]) and
                                  job[1][0] is not None ]
         referencesList = self.troveSource.db.getTroveReferences(
@@ -407,7 +431,7 @@ class DependencyChecker:
                           weakRefs = True)
 
         # skip node 0, which is None
-        for i, (job, _, _) in itertools.islice(enumerate(self.nodes), 1, None):
+        for i, (job, _, _) in self.iterNodes(enum = True):
             if not trove.troveIsCollection(job[0]): continue
 
             if job[1][0]:
@@ -419,11 +443,21 @@ class DependencyChecker:
                     if targetTrove >= 0:
                         addEdge((i, targetTrove, None))
 
-            if job[2][0]:
-                trv = self.troveSource.getTrove(job[0], job[2][0], job[2][1],
-                                                withFiles = False)
+            if job[2][0] and trove.troveIsCollection(job[0]):
+                if (not hasattr(self.troveSource, 'getPackageComponents') or
+                    trove.troveIsGroup(job[0])):
+                    trv = self.troveSource.getTrove(
+                                    job[0], job[2][0], job[2][1],
+                                    withFiles = False)
+                    troveListIter = trv.iterTroveList(strongRefs=True,
+                                                      weakRefs=True)
+                else:
+                    troveListIter = [ (name, job[2][0], job[2][1])
+                                      for name in
+                                      self.troveSource.getPackageComponents(
+                                            ( job[0], job[2][0], job[2][1] )) ]
 
-                for info in trv.iterTroveList(strongRefs=True, weakRefs=True):
+                for info in troveListIter:
                     targetTrove = getNew(info, -1)
                     if targetTrove >= 0:
                         addEdge((i, targetTrove, None))
@@ -504,13 +538,15 @@ class DependencyChecker:
         versionCache = sqldb.VersionCache()
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
-            failedSets = [ ((x[0], x[2][0], x[2][1]), None, None, None)
-                    for x in self.iterNodes() ]
+            failedSets = [ None ] * len(self.nodes)
+            for i, x in self.iterNodes(enum = True):
+                x = x[0]
+                failedSets[i] = ((x[0], x[2][0], x[2][1]), None, None, None)
 
             for idx in idxList:
                 (troveIndex, classId, dep) = depInfoList[-idx]
 
-                troveIndex = -(troveIndex + 1)
+                troveIndex = -troveIndex
 
                 if failedSets[troveIndex][2] is None:
                     failedSets[troveIndex] = (failedSets[troveIndex][0],
@@ -525,7 +561,9 @@ class DependencyChecker:
                     failedSets[troveIndex][3].extend(wasIn[idx])
 
             failedList = []
-            for (name, classId, depSet, neededByList) in failedSets:
+            for item in failedSets:
+                if item is None: continue
+                (name, classId, depSet, neededByList) = item
                 if depSet is not None:
                     if not wasIn:
                         failedList.append((name, depSet))
@@ -993,9 +1031,20 @@ class DependencyChecker:
             nodeList.append(nodeId)
         return nodeList
 
-    def iterNodes(self):
-        # skips the None node on the front
-        return [ x[0] for x in itertools.islice(self.nodes, 1, None) ]
+    def iterNodes(self, enum = False):
+        # skips None entries
+        if enum:
+            return ( tup for tup in enumerate(self.nodes)
+                     if tup[1] is not None )
+        else:
+            return ( x[0] for x in self.nodes if x is not None )
+
+    def restoreTrove(self, troveTup):
+        nodeId = self.oldInfoToNodeId[troveTup]
+        del self.oldInfoToNodeId[troveTup]
+        self.nodes[nodeId] = None
+        self.g.delete(nodeId)
+        self.workTables.restoreTrove(*troveTup)
 
     def addJobs(self, jobSet):
         # This sets up negative depNum entries for the requirements we're
@@ -1003,23 +1052,21 @@ class DependencyChecker:
         # indexing depList. depList is a list of (troveNum, depClass, dep)
         # tuples. Like for depNum, negative troveNum values mean the
         # dependency was part of a new trove.
+        allDeps = self.troveSource.getDepsForTroveList(
+                [ (job[0], job[2][0], job[2][1]) for job in jobSet
+                        if job[2][0] is not None ] )
+
         for job in jobSet:
             if job[2][0] is None:
                 nodeId = self._addJob(job)
                 self.workTables.removeTrove((job[0], job[1][0], job[1][1]),
                                             nodeId)
             else:
-                (provides, requires) = self.troveSource.getDepsForTroveList(
-                                        [ (job[0], job[2][0], job[2][1]) ])[0]
+                (provides, requires) = allDeps.pop(0)
 
                 newNodeId = self._addJob(job)
-
-                # this reduces the size of our tables by removing things
-                # which this trove both provides and requires conary 1.0.11
-                # and later remove these from troves at build time
-                requires = requires - provides
-                for depClass in self.ignoreDepClasses:
-                    requires.removeDepsByClass(depClass)
+                #requires = requires - provides
+                r1 = requires.copy()
 
                 newRequires = self._findNewDependencies(newNodeId, requires,
                                                         self.requiresToNodeId)
@@ -1122,7 +1169,7 @@ class DependencyChecker:
 
             def _order(self):
                 if self._changeSetList is None:
-                    a, b = orderer()
+                    a, b = self.orderer()
                     self._changeSetList = a
                     self._criticalUpdates = b
 
@@ -1134,6 +1181,7 @@ class DependencyChecker:
                 self._changeSetList = None
                 self._criticalUpdates = None
                 self._linkedJobs = set()
+                self.orderer = orderer
 
         if createGraph or self.findOrdering:
             orderer = lambda : self._findOrdering(sqlResult,
@@ -1219,10 +1267,17 @@ class BulkDependencyLoader:
 
     def __init__(self, db, cu):
         self.workTables = DependencyWorkTables(db, cu)
+        self.nextTroveId = 0
 
     def add(self, trove, troveId):
         self.workTables._populateTmpTable([], troveId, trove.getRequires(),
                                           trove.getProvides())
+
+    def addRaw(self, provides, requires):
+        troveId = self.nextTroveId
+        self.nextTroveId += 1
+        self.workTables._populateTmpTable([], troveId, requires, provides);
+        return troveId
 
     def done(self):
         self.workTables.merge(intoDatabase = True)
@@ -1327,7 +1382,7 @@ class DependencyTables:
 
         return restrictJoin, restrictWhere
 
-    def _restrictResolveByTrove(self, *args):
+    def _restrictResolveByTrove(self):
         """ Restricts deps to being solved by the given instanceIds or
             their children
         """
@@ -1467,7 +1522,9 @@ class DependencyTables:
         depSetList = list(set(depSetList))
 
         selectTemplate = "SELECT depNum, provInstanceId FROM (%s)"
-        depList, cu = self._resolve(depSetList, selectTemplate)
+        depList, cu = self._resolve(depSetList, selectTemplate,
+                                    restrictor = restrictor,
+                                    restrictBy = restrictBy)
 
         result = {}
         depSolutions = [ [] for x in xrange(len(depList)) ]
@@ -1483,8 +1540,20 @@ class DependencyTables:
         self.db.rollback()
         return result
 
-    def resolveToIds(self, depSetList):
-        return self._resolveToIds(depSetList)
+    def resolveToIds(self, depSetList, troveIdList = None):
+        if troveIdList:
+            cu = self.db.cursor()
+            schema.resetTable(cu, "tmpInstances")
+            self.db.bulkload('tmpInstances', [ (x,) for x in troveIdList ],
+                             [ 'instanceId' ], start_transaction = False)
+            restrictBy = ()
+            restrictor = self._restrictResolveByTrove
+        else:
+            restrictBy = None
+            restrictor = None
+
+        return self._resolveToIds(depSetList, restrictor = restrictor,
+                                  restrictBy = restrictBy)
 
 
     def getLocalProvides(self, depSetList):
@@ -1545,20 +1614,31 @@ class DependencyDatabase(DependencyTables):
     def __init__(self, path=":memory:", driver="sqlite"):
         db = dbstore.connect(path, driver=driver, timeout=30000)
         db.loadSchema()
+        cu = db.cursor()
         schema.setupTempDepTables(db)
+        cu.execute("CREATE TEMPORARY TABLE tmpInstances "
+                   "(instanceId INTEGER)", start_transaction = False)
         schema.createDependencies(db)
+        self._bulkLoader = None
         DependencyTables.__init__(self, db)
 
     def add(self, troveId, provides, requires):
         cu = self.db.cursor()
         self._add(cu, troveId, provides, requires)
 
+    def bulkLoader(self):
+        if self._bulkLoader is None:
+            cu = self.db.cursor()
+            self._bulkLoader = BulkDependencyLoader(self.db, cu)
+
+        return self._bulkLoader
+
     def delete(self):
-        cu = self.db.cursor()
-        DependencyDatabase.delete(self, cu, troveId)
+        raise NotImplementedError
 
     def commit(self):
         self.db.commit()
 
-    def resolve(self, label, depSetList, leavesOnly=False):
-        return self.resolveToIds(list(depSetList))
+    def resolve(self, label, depSetList, leavesOnly=False,
+                troveIdList = None):
+        return self.resolveToIds(list(depSetList), troveIdList = troveIdList)

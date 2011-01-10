@@ -1,4 +1,5 @@
-# Copyright (c) 2006 rPath, Inc.
+#
+# Copyright (c) 2010 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,23 +12,17 @@
 # full details.
 #
 
-TOPDIR = ..
+python_files = $(wildcard *.py)
+extra_dist = Makefile
 
-extra_files = Makefile conary.spec.in
-gen_files = conary.spec
-dist_files = $(gen_files) $(extra_files)
+dist_files = $(python_files) $(extra_dist)
 
-all : $(gen_files)
+all: default-all
 
-conary.spec : conary.spec.in $(TOPDIR)/Makefile
-	sed s,@version@,$(VERSION),g $< > $@
+install: pyfiles-install
 
-install :
+dist: default-dist
 
-dist : $(dist_files) default-dist
+clean: default-clean
 
-clean : default-clean
-
-include $(TOPDIR)/Make.rules
-
-.PHONY: clean dist install
+include ../../Make.rules

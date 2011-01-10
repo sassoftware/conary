@@ -426,7 +426,7 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     """
 
     if not groupOptions:
-        groupCookOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
+        groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
     assert(len(set((x.getRecipe().name, x.getRecipe().version)
                 for x in loaderList)) == 1)
@@ -489,7 +489,6 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     macros['buildlabel'] = buildBranch.label().asString()
 
     if targetLabel:
-        signatureLabel = targetLabel
         signatureKey = selectSignatureKey(cfg, targetLabel)
     else:
         signatureKey = selectSignatureKey(cfg, sourceVersion.trailingLabel())
@@ -743,7 +742,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         if recipeObj._trackedFlags is not None:
             use.setUsed(recipeObj._trackedFlags)
         use.track(True)
-        policyTroves = _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
+        _loadPolicy(recipeObj, cfg, enforceManagedPolicy)
 
         _callSetup(cfg, recipeObj)
 
@@ -820,6 +819,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
             grpTrv.setSearchPath(recipeObj.getSearchPath())
+            grpTrv.setBuildRefs(group.getBuildRefs())
             grpTrv.troveInfo.imageGroup.set(group.imageGroup)
             compatClass = group.compatibilityClass
             if compatClass is not None:
@@ -1013,8 +1013,6 @@ def cookPackageObject(repos, db, cfg, loader, sourceVersion, prep=True,
     @type repos: repository.Repository
     @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
-    @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class descended from recipe.Recipe
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean
@@ -1102,7 +1100,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
        described there.
     """
     recipeClass = loader.getRecipe()
-    fullName = recipeClass.name
 
     lcache = lookaside.RepositoryCache(repos, cfg=cfg)
 
@@ -1276,8 +1273,6 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
             logBuild and logFile.popDescriptor('policy')
         finally:
             os.chdir(cwd)
-
-        grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
         if (recipeObj.getType() is not recipe.RECIPE_TYPE_CAPSULE and
@@ -1466,7 +1461,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     built = []
     packageList = []
-    perviousQuery = {}
 
     for buildPkg in bldList:
         # bldList only contains components
@@ -1486,6 +1480,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         p.setConaryVersion(constants.version)
         p.setIsCollection(False)
         p.setIsDerived(recipeObj._isDerived)
+        recipeObj._setProperties(p, main, comp)
 
         # Add build flavor
         p.setBuildFlavor(use.allFlagsToFlavor(recipeObj.name))
@@ -1502,7 +1497,6 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
 
     if not targetVersion.isOnLocalHost():
         # this keeps cook and emerge branchs from showing up
-        searchBranch = targetVersion.branch()
         previousVersions = repos.getTroveLeavesByBranch(
                 dict(
                     ( x[1].getName(), { targetVersion.branch() : [ flavor ] } )
@@ -1822,7 +1816,6 @@ def guessSourceVersion(repos, name, versionStr, buildLabel, conaryState = None,
         trove if it was previously built on the same branch.
     """
     srcName = name + ':source'
-    sourceVerison = None
 
     if not conaryState and os.path.exists('CONARY'):
         conaryState = ConaryStateFromFile('CONARY', repos)
@@ -1923,7 +1916,6 @@ def getRecipeInfoFromPath(repos, cfg, recipeFile, buildFlavor=None):
             loader = loadrecipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos,
                                              branch=branch,
                                              buildFlavor=buildFlavor)
-        version = None
     except builderrors.RecipeFileError, msg:
         raise CookError(str(msg))
 
@@ -2220,7 +2212,6 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 import cProfile
                 prof = cProfile.Profile()
                 prof.enable()
-                lsprof = True
             # child, set ourself to be the foreground process
             os.setpgrp()
 
@@ -2337,7 +2328,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     callback.done()
 
                 try:
-                    restartDir = client.applyUpdateJob(updJob)
+                    client.applyUpdateJob(updJob)
                 finally:
                     updJob.close()
                     client.close()
@@ -2416,6 +2407,8 @@ def _callSetup(cfg, recipeObj, recordCalls=True):
         del tb, lastRecipeFrame
         raise CookError('%s:%s:\n %s: %s' % (filename, linenum, err.__class__.__name__, err))
 
+    return rv
+
 def _copyForwardTroveMetadata(repos, troveList, recipeObj):
     """
         Copies forward metadata from a previous build of this package
@@ -2459,6 +2452,7 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
     troveDict.update(dict(zip(oldTroveTups, oldTroves)))
 
     unmatchedComponents = []
+    componentsToFetch = []
     for newTup in toMatch:
         newTrove = troveDict[newTup]
         if newTup not in metadataMatches:
@@ -2484,17 +2478,18 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
         # match up those components that existed both in the old collection
         # and the new one.
         componentMatches = set(newTroveComponents) & set(oldTroveComponents)
-        componentMatches = [ (x, oldTup[1], oldTup[2])
+        componentsToFetch += [ (x, oldTup[1], oldTup[2])
                                 for x in componentMatches ]
-        hasTroves = repos.hasTroves(componentMatches)
-        componentMatches = [x for x in componentMatches if hasTroves[x]]
-        componentMatches = repos.getTroves(componentMatches, withFiles=False)
-        componentMatches = dict((x.getName(), x) for x in componentMatches)
-        for childTrv in childrenByTrove.get(
-                                    newTrove.getNameVersionFlavor(), []):
-            match = componentMatches.get(childTrv.getName(), None)
-            if match:
-                allMatches.append((childTrv, match, False))
+
+    hasTroves = repos.hasTroves(componentsToFetch)
+    componentsToFetch = [x for x in componentsToFetch if hasTroves[x]]
+    componentsToFetch = repos.getTroves(componentsToFetch, withFiles=False)
+    componentsToFetch = dict((x.getName(), x) for x in componentsToFetch)
+    for childTrv in childrenByTrove.get(
+                                newTrove.getNameVersionFlavor(), []):
+        match = componentsToFetch.get(childTrv.getName(), None)
+        if match:
+            allMatches.append((childTrv, match, False))
 
     if unmatchedComponents:
         # some components must have been added in this build from the
@@ -2623,7 +2618,6 @@ def _setCookTroveMetadata(trv, itemDictList):
     # Copy the metadata back in the trove
     # We don't bother with flattening it at this point, we'll take care of
     # that later
-    langMap = []
     metadata = trv.troveInfo.metadata
     for itemDict in itemDictList:
         item = trove.MetadataItem()

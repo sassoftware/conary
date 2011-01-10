@@ -963,13 +963,14 @@ _TROVEINFO_TAG_SOURCENAME     =  1
 _TROVEINFO_TAG_BUILDTIME      =  2
 _TROVEINFO_TAG_CONARYVER      =  3
 _TROVEINFO_TAG_BUILDDEPS      =  4
-_TROVEINFO_TAG_LOADEDTROVES   =  5
+_TROVEINFO_TAG_LOADEDTROVES   =  5  # recipe troves loaded during a build
 _TROVEINFO_TAG_INSTALLBUCKET  =  6          # unused as of 0.62.16
 _TROVEINFO_TAG_FLAGS          =  7
 _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10
-_TROVEINFO_TAG_LABEL_PATH     = 11
+_TROVEINFO_TAG_LABEL_PATH     = 11  # old style group recipes used this
+                                    # instead of search path. sometimes.
 _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
@@ -990,13 +991,18 @@ _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_COPIED_FROM    = 21
 _TROVEINFO_TAG_IMAGE_GROUP    = 22
 _TROVEINFO_TAG_FACTORY        = 23
-_TROVEINFO_TAG_SEARCH_PATH    = 24
+_TROVEINFO_TAG_SEARCH_PATH    = 24  # final search path for old-style group
+                                    # builds
 _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
 _TROVEINFO_TAG_CAPSULE        = 28
 _TROVEINFO_TAG_MTIMES         = 29
-_TROVEINFO_TAG_LAST           = 29
+_TROVEINFO_TAG_PROPERTIES     = 30
+_TROVEINFO_TAG_BUILD_REFS     = 31  # group set recipes track troves which
+                                    # were named during a build but did not
+                                    # make it into the final groups
+_TROVEINFO_TAG_LAST           = 31
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1150,6 +1156,44 @@ class TroveScripts(streams.StreamSet):
         _TROVESCRIPTS_POSTERASE     : (DYNAMIC, TroveScript, 'postErase' ),
     }
 
+_PROPERTY_NAME        = 1
+_PROPERTY_DESCRIPTION = 2
+_PROPERTY_DEFAULT     = 3
+_PROPERTY_DEFINITION  = 4
+_PROPERTY_TYPE        = 5
+
+_PROPERTY_TYPE_SMARTFORM = 'sf'
+
+class Property(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _PROPERTY_TYPE        : (SMALL,   streams.StringStream, 'type' ),
+        _PROPERTY_NAME        : (DYNAMIC, streams.StringStream, 'name' ),
+        _PROPERTY_DEFAULT     : (DYNAMIC, streams.StringStream, 'default' ),
+        _PROPERTY_DEFINITION  : (DYNAMIC, streams.StringStream, 'definition' ),
+    }
+
+    def __cmp__(self, other):
+        return cmp(self.name(), other.name()) or \
+               cmp(self.freeze(), other.freeze())
+
+class PropertySet(streams.StreamCollection):
+    streamDict = { 1 : Property }
+    ignoreSkipSet = True
+
+    def add(self, propertyType, name, dataDefinition, defaultValue = None):
+        assert(propertyType == _PROPERTY_TYPE_SMARTFORM)
+        prop = Property()
+        prop.name.set(name)
+        prop.type.set(propertyType)
+        if defaultValue is not None:
+            prop.default.set(defaultValue)
+        prop.definition.set(dataDefinition)
+        self.addStream(1, prop)
+
+    def iter(self):
+        return ( x[1] for x in self.iterAll() )
+
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
@@ -1182,6 +1226,8 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CLONEDFROMLIST: (DYNAMIC, VersionListStream,   'clonedFromList' ),
         _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
         _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
+        _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
+        _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1892,11 +1938,7 @@ class Trove(streams.StreamSet):
             yield item, byDefault, False
 
     def isStrongReference(self, name, version, flavor):
-        key = (name, version, flavor)
-        rc = self.strongTroves.get(key, None)
-        if rc is None:
-            return False
-        return True
+        return (name, version, flavor) in self.strongTroves
 
     def includeTroveByDefault(self, name, version, flavor):
         key = (name, version, flavor)
@@ -3033,6 +3075,14 @@ class Trove(streams.StreamSet):
     def getLoadedTroves(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor())
                  for x in self.troveInfo.loadedTroves.iterAll() ]
+
+    def setBuildRefs(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.buildRefs.add(name, ver, release)
+
+    def getBuildRefs(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor())
+                 for x in self.troveInfo.buildRefs.iterAll() ]
 
     def setDerivedFrom(self, itemList):
         for (name, ver, release) in itemList:

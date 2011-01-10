@@ -1,0 +1,2 @@
+Synthesized soname requirements map "Linux" to "SysV" because a Linux ABI
+ELF object is capable of using dlopen() to open a SysV ELF object.
