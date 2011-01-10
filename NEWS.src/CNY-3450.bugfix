@@ -1,0 +1,2 @@
+Make negative openpgp key cache entries to avoid repeated server queries for
+keys which don't exist (CNY-3450)
