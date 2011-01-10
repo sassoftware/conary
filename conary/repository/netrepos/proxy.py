@@ -79,6 +79,8 @@ class ExtraInfo(object):
 
 class ProxyCaller:
 
+    # shim object used by Proxy servers to relay calls to other servers
+
     def callByName(self, methodname, *args, **kwargs):
         # args[0] is protocolVersion
         if args[0] < 51:
@@ -179,6 +181,9 @@ class ProxyCallFactory:
         return ProxyCaller(url, proxy, transporter)
 
 class RepositoryCaller(xmlshims.NetworkConvertors):
+
+    # shim object used by internal filters (which share code with the
+    # proxies) to let the filters call internal classes
 
     def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
@@ -418,6 +423,11 @@ class ChangeSetInfo(object):
                     self.size) = cPickle.loads(pickled)
 
 class ChangesetFilter(BaseProxy):
+
+    # Implements changeset caching, content injection for capsules, and
+    # format conversion between changeset versions. The changeset cache
+    # is passed in as an object rather than created here to allow different
+    # types of changeset caches to be used in the future.
 
     forceGetCsVersion = None
     forceSingleCsJob = False
@@ -1325,6 +1335,8 @@ class ChangesetFilter(BaseProxy):
         return dest
 
 class BaseCachingChangesetFilter(ChangesetFilter):
+    # Changeset filter which uses a directory to create a ChangesetCache
+    # instance for the cache
     def __init__(self, cfg, basicUrl):
         if cfg.changesetCacheDir:
             util.mkdirChain(cfg.changesetCacheDir)
@@ -1336,6 +1348,12 @@ class BaseCachingChangesetFilter(ChangesetFilter):
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
 
 class RepositoryFilterMixin(object):
+
+    # Simple mixin which lets a BaseProxy derivative sit in front of a
+    # in-process repository class (defined in netrepos.py) rather than
+    # acting as a proxy for a network repository somewhere else. repos
+    # is a netrepos.NetworkRepositoryServer instance
+
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
     forceSingleCsJob = False
 
@@ -1346,11 +1364,18 @@ class RepositoryFilterMixin(object):
 class SimpleRepositoryFilter(BaseCachingChangesetFilter, RepositoryFilterMixin):
     withCapsuleInjection = False
 
+    # Basic class used for creating repositories with Conary. It places
+    # a changeset caching layer on top of an in-memory repository.
+
     def __init__(self, cfg, basicUrl, repos):
         BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         RepositoryFilterMixin.__init__(self, repos)
 
 class FileCachingChangesetFilter(BaseCachingChangesetFilter):
+
+    # Adds caching for getFileContents() call to allow proxies to keep
+    # those results around
+
     def __init__(self, cfg, basicUrl):
         BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         util.mkdirChain(cfg.proxyContentsDir)
@@ -1536,6 +1561,9 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
 
 class ProxyRepositoryServer(FileCachingChangesetFilter):
 
+    # class for proxy servers used by standalone and apache implementations
+    # adds a proxy specific version of getFileContentsFromTrove()
+
     SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
     forceSingleCsJob = False
     withCapsuleInjection = True
@@ -1641,6 +1669,11 @@ class ProxyRepositoryServer(FileCachingChangesetFilter):
 class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin):
     withCapsuleInjection = False
 
+    # Base class for creating a repository which has file content injection.
+    # This is not used by Conary itself, but is used by rBuilder for creating
+    # repositories which need injected capsule content. Adds a
+    # getFileContents() call which can handle content injections.
+
     def __init__(self, cfg, basicUrl, repos):
         FileCachingChangesetFilter.__init__(self, cfg, basicUrl)
         RepositoryFilterMixin.__init__(self, repos)
@@ -1690,6 +1723,9 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
             return self._saveFileContentsChangeset(clientVersion, fileList)
 
 class ChangesetCache(object):
+
+    # Provides a place to cache changeset; uses a directory for them
+    # all indexed by fingerprint
 
     def __init__(self, dataStore, logPath=None):
         self.dataStore = dataStore
