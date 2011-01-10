@@ -30,7 +30,6 @@ from conary.build import buildpackage, filter, policy, recipe, tags, use
 from conary.build import smartform
 from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
-from conary.local import database
 
 from conary.build.action import TARGET_LINUX
 from conary.build.action import TARGET_WINDOWS

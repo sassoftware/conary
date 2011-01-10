@@ -2244,7 +2244,6 @@ def followRedirect(recipeObj, trove, ref, reason):
 
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
-        groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
         for troveSpec, flags in group.iterAddAllSpecs():
             trvList = troveMap[(flags.ref, flags.requireLatest)][troveSpec]
             if not trvList:

@@ -47,7 +47,6 @@ from conary.build.use import Use
 from conary.build.source import WindowsHelper
 from conary.build.manifest import Manifest, ExplicitManifest
 
-from conary.build.action import TARGET_LINUX
 from conary.build.action import TARGET_WINDOWS
 
 # make sure that the decimal value really is unreasonable before
