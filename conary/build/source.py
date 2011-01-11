@@ -1735,12 +1735,11 @@ class addCapsule(_Source):
                         InitialContents.append(path)
                 elif vflags:
                     # CNY-3254: improve verification mapping; %doc are regular
-                    if (stat.S_ISREG(mode) and \
-                        not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)) \
-                        or (stat.S_ISLNK(mode) and \
-                        not (vflags & rpmhelper.RPMVERIFY_LINKTO)): \
-
-                        InitialContents.append( path )
+                    if ((stat.S_ISREG(mode) and
+                            not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST))
+                            or (stat.S_ISLNK(mode) and
+                            not (vflags & rpmhelper.RPMVERIFY_LINKTO))):
+                        InitialContents.append(path)
 
             if flags & rpmhelper.RPMFILE_MISSINGOK:
                 MissingOkay.append(path)
@@ -2757,6 +2756,7 @@ def _extractFilesFromISO(iso, directory):
         raise IOError('ISO %s contains neither Joliet nor Rock Ridge info'
                       %iso)
 
+    log.info("extracting ISO %s into %s" % (iso, directory))
     filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 
