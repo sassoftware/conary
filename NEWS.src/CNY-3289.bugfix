@@ -1,1 +1,0 @@
-Querying RPM deps is now possible if the deps has a colon in it.

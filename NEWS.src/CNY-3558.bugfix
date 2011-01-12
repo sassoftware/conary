@@ -1,1 +1,0 @@
-Ignore images without Windows content when evaluating results from the Windows Build Service. These images are normally used for system rescue.
