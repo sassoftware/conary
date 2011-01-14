@@ -1762,6 +1762,7 @@ class Trove(streams.StreamSet):
         new.weakTroves = self.weakTroves.copy()
         new.provides.thaw(self.provides.freeze())
         new.requires.thaw(self.requires.freeze())
+        new.redirects.thaw(self.redirects.freeze())
         new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
         new.troveInfo.thaw(self.troveInfo.freeze())
         return new

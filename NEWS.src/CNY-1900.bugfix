@@ -1,0 +1,4 @@
+Promoting redirect troves now rewrites versions in redirects when
+the target of the redirect has been promoted according to the
+promote map, and leaves other redirects untouched.   Previously,
+it converted the redirect into a redirect to nothing.

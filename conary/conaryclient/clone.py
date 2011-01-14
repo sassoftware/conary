@@ -1005,6 +1005,39 @@ class ClientClone(object):
                 ver = fileMap.get((pathId, fileId), newVersion)
                 trv.updateFile(pathId, path, ver, fileId)
 
+        # CNY-1900: for any redirects where the redirect target exists on
+        # both sides of the promote map, and the redirect target on the
+        # target of the promote map is cloned from the redirect target on
+        # the source side of the promote map, then re-write the redirect
+        # to follow the promote map
+        redirects = [x for x in trv.redirects.iter()]
+        for redirect in redirects:
+            sourceLabel = redirect.branch().label()
+            targetLabel = chooser.getTargetLabel(sourceLabel)
+            if targetLabel:
+                redirTargetTups = [
+                    (redirect.name(),
+                     redirect.branch().asString(),
+                     redirect.flavor()),
+                    (redirect.name(),
+                     targetLabel.asString(),
+                     redirect.flavor()) ]
+                result = troveCache.repos.findTroves(
+                    None, redirTargetTups, None, allowMissing=True)
+                sourceRedirTarget = result[redirTargetTups[0]]
+                targetRedirTarget = result[redirTargetTups[1]]
+                if sourceRedirTarget and targetRedirTarget:
+                    redirTargetTroves = troveCache.getTroves(
+                        sourceRedirTarget + targetRedirTarget,
+                        withFiles=False)
+                    if (redirTargetTroves[1].troveInfo.clonedFrom()
+                          == redirTargetTroves[0].getVersion()):
+                        trv.redirects.remove(redirect)
+                        trv.redirects.add(
+                            redirTargetTroves[1].getName(),
+                            redirTargetTroves[1].getVersion().branch(),
+                            redirTargetTroves[1].getFlavor())
+
         infoOnly = cloneJob.options.infoOnly
         if trv.getName().endswith(':source') and not infoOnly:
             try:
@@ -1205,6 +1238,9 @@ class CloneChooser(object):
 
     def getPrimaryTroveList(self):
         return self.primaryTroveList
+
+    def getTargetLabel(self, label):
+        return self.targetMap.get(label, None)
 
     def setByDefaultMap(self, map):
         self.byDefaultMap = map
