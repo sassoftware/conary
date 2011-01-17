@@ -2033,8 +2033,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
          repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
          if 'productDefinitionSearchPath' in r.macros:
              # proper build with product definition
-             searchPath = r.SearchPath(repo[x] for x in
-                 r.macros.productDefinitionSearchPath.split('\\\\n'))
+             searchPath = r.SearchPath(*[repo[x] for x in
+                 r.macros.productDefinitionSearchPath.split('\\\\n')])
          else:
              # local test build against specific version
              searchPath = r.SearchPath(
