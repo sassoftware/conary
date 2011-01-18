@@ -1425,11 +1425,13 @@ class _GroupRecipe(_BaseGroupRecipe):
 
 class _SingleGroup(object):
 
-    def __init__(self, groupName, checkPathConflicts = False):
+    def __init__(self, groupName, checkPathConflicts = False,
+                 imageGroup = False):
         if not groupName.startswith('group-'):
             raise RecipeFileError, 'group names must start with "group-"'
 
         self.name = groupName
+        self.imageGroup = imageGroup
 
         self.preInstallScripts = None
         self.postInstallScripts = None
@@ -1445,12 +1447,19 @@ class _SingleGroup(object):
         self.troves = {}
         self.reasons = {}
         self.newGroupList = {}
+        self.buildRefs = []
 
     def setSize(self, size):
         self.size = size
 
     def getSize(self):
         return self.size
+
+    def getBuildRefs(self):
+        return self.buildRefs
+
+    def setBuildRefs(self, buildRefs):
+        self.buildRefs = buildRefs
 
     def addScript(self, scriptName, contents, fromClass):
         assert(hasattr(self, scriptName))
@@ -1624,14 +1633,14 @@ class SingleGroup(_SingleGroup):
                  checkPathConflicts, byDefault = True, imageGroup = False,
                  cache = None):
         _SingleGroup.__init__(self, name,
-                              checkPathConflicts = checkPathConflicts)
+                              checkPathConflicts = checkPathConflicts,
+                              imageGroup = imageGroup)
         assert(isinstance(byDefault, bool))
         self.depCheck = depCheck
         self.autoResolve = autoResolve
         self.checkOnlyByDefaultDeps = checkOnlyByDefaultDeps
         self.byDefault = byDefault
         self.cache = cache
-        self.imageGroup = imageGroup
 
         self.addTroveList = []
         self.removeTroveList = []
@@ -2235,7 +2244,6 @@ def followRedirect(recipeObj, trove, ref, reason):
 
 def processAddAllDirectives(recipeObj, troveMap, cache, repos):
     for group in list(recipeObj.iterGroupList()):
-        groupsByName = dict((x.name, x) for x in recipeObj.iterGroupList())
         for troveSpec, flags in group.iterAddAllSpecs():
             trvList = troveMap[(flags.ref, flags.requireLatest)][troveSpec]
             if not trvList:
@@ -3013,16 +3021,19 @@ def calcSizeAndCheckHashes(group, troveCache, callback):
 
         callback.groupDeterminingPathConflicts(len(conflictLists))
 
+        # get the troves into a simple dict; it's easier than calling
+        # troveCache.getTroves([something], withFiles=True)[0]
+        # over and over
+        allTrovesNeeded = list(set(chain(*conflictLists.values())))
+        trovesWithFiles = dict( (troveTup, trv) for troveTup, trv in
+                            izip(allTrovesNeeded,
+                                 troveCache.getTroves(allTrovesNeeded,
+                                                      withFiles = True) ) )
+
         # We've got the sets of conflicting troves, now
         # determine the set of conflicting files.
-        trovesWithFiles = {}
         conflictsWithFiles = []
         for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
-            # Find troves to cache
-            needed = [ x for x in conflictSet if x not in trovesWithFiles ]
-            troves = troveCache.troveSource.getTroves(needed, withFiles=True)
-            trovesWithFiles.update(dict(izip(needed, troves)))
-
             # Build set of paths which conflicts across these troves
             conflictingPaths = None
             for tup in conflictSet:

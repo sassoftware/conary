@@ -128,6 +128,15 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.csText = text
         self.update()
 
+    def executingSystemModel(self):
+        self.updateMsg("Processing system model")
+
+    def loadingModelCache(self):
+        self.updateMsg("Loading system model cache")
+
+    def savingModelCache(self):
+        self.updateMsg("Saving system model cache")
+
     def preparingChangeSet(self):
         """
         @see: callbacks.ChangesetCallback.preparingChangeSet
@@ -389,7 +398,7 @@ def displayChangedJobs(addedJobs, removedJobs, cfg):
         for line in formatter.formatJobTups(addedJobs, indent='    '):
             print line
 
-def displayUpdateInfo(updJob, cfg):
+def displayUpdateInfo(updJob, cfg, noRestart=False):
     jobLists = updJob.getJobs()
     db = conaryclient.ConaryClient(cfg).db
 
@@ -410,7 +419,7 @@ def displayUpdateInfo(updJob, cfg):
             print 'Job %d of %d:' % (num + 1, totalJobs)
         for line in formatter.formatJobTups(job, indent='    '):
             print line
-    if updJob.getCriticalJobs():
+    if updJob.getCriticalJobs() and not noRestart:
         criticalJobs = updJob.getCriticalJobs()
         if len(criticalJobs) > 1:
             jobPlural = 's'
@@ -683,13 +692,15 @@ def _updateTroves(cfg, applyList, **kwargs):
             if loadTroveCache:
                 if os.path.exists(tcPath):
                     log.info("loading %s", tcPath)
+                    callback.loadingModelCache()
                     tc.load(tcPath)
             ts = client.cmlGraph(model, changeSetList = changeSetList)
             if modelGraph is not None:
                 ts.g.generateDotFile(modelGraph)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
-                                        criticalUpdateInfo = criticalUpdates)
+                                        criticalUpdateInfo = criticalUpdates,
+                                        callback = callback)
             if modelTrace is not None:
                 ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
 
@@ -721,7 +732,9 @@ def _updateTroves(cfg, applyList, **kwargs):
 
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
+                callback.savingModelCache()
                 tc.save(tcPath)
+                callback.done()
         else:
             suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
@@ -731,7 +744,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if info:
         callback.done()
-        displayUpdateInfo(updJob, cfg)
+        displayUpdateInfo(updJob, cfg, noRestart=noRestart)
         if restartInfo and not model:
             callback.done()
             newJobs = set(itertools.chain(*updJob.getJobs()))
@@ -796,7 +809,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     elif askInteractive:
         print 'The following updates will be performed:'
-        displayUpdateInfo(updJob, cfg)
+        displayUpdateInfo(updJob, cfg, noRestart=noRestart)
 
     if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'

@@ -93,6 +93,7 @@ Creates a changeset with the specified troves and stores it in <outfile>"""
     commandGroup = 'Repository Access'
     docs = {'no-recurse' : (VERBOSE_HELP, 
                             "Don't include child troves in changeset")}
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -128,6 +129,7 @@ class CommitCommand(ConaryCommand):
     help = 'Commit a changeset to a Conary repository'
     docs = {'target-branch' : ('commit to branch BRANCH', 'BRANCH')}
     commandGroup = 'Repository Access'
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -148,6 +150,7 @@ class EmergeCommand(ConaryCommand):
     paramHelp = "<troveName>+"
     help = 'Build software from source and install it on the system'
     commandGroup = 'System Modification'
+    hidden = True
 
     docs = {'no-deps' : 'Do not check to see if buildreqs are installed' }
 
@@ -501,6 +504,7 @@ class RemoveRollbackCommand(ConaryCommand):
     help = 'Remove old rollbacks'
     commandGroup = 'System Modification'
     ignoreConfigErrors = True
+    hidden = True
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
@@ -944,9 +948,7 @@ class _UpdateCommand(ConaryCommand):
                            'Do not attempt to solve dependency problems'),
         'no-conflict-check' : (VERBOSE_HELP,
                                'Ignore potential path conflicts'),
-        'no-restart'    : (VERBOSE_HELP,
-                           'Do not restart after applying a critical update. '
-                           'Requires --root'),
+        'no-restart'    : optparse.SUPPRESS_HELP,
         'no-scripts'    : (VERBOSE_HELP,
                            'Do not run trove scripts'),
         'recurse'       : optparse.SUPPRESS_HELP,
@@ -957,7 +959,7 @@ class _UpdateCommand(ConaryCommand):
                           'Replace config files on the system which have '
                           'been changed by something other than conary',
         'replace-managed-files':
-                          'Replaces files owned by other troves (including'
+                          'Replaces files owned by other troves (including '
                           'other troves which are part of this update)',
         'replace-modified-files':
                           'Replace non-config files on the system which have '
@@ -966,6 +968,8 @@ class _UpdateCommand(ConaryCommand):
                           'Replace files on the system which are not owned '
                           'by any trove',
         'resolve'       : 'Add troves to update to solve dependency problems',
+        'restart'       : (VERBOSE_HELP,
+                           'Restart after applying a critical update'),
         'restart-info'  : optparse.SUPPRESS_HELP,
         'sync-to-parents' : (VERBOSE_HELP,
                             'Install already referenced versions of troves'),
@@ -1002,6 +1006,7 @@ class _UpdateCommand(ConaryCommand):
         d["replace-modified-files"] = NO_PARAM
         d["replace-unmanaged-files"] = NO_PARAM
         d["resolve"] = NO_PARAM
+        d["restart"] = NO_PARAM
         d["sync-to-parents"] = NO_PARAM
         d["tag-script"] = ONE_PARAM
         d["test"] = NO_PARAM
@@ -1028,7 +1033,8 @@ class _UpdateCommand(ConaryCommand):
             cfg.autoResolve = True
             del argSet['resolve']
 
-        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        kwargs['noRestart'] = argSet.pop('no-restart',
+                                         not argSet.pop('restart', False))
         if os.path.normpath(cfg.root) != '/':
             kwargs['noRestart'] = True
 
@@ -1150,6 +1156,7 @@ _register(InstallCommand)
 class PatchCommand(_UpdateCommand):
     commands = [ "patch" ]
     help = 'Patch software on the system'
+    hidden = True
 _register(PatchCommand)
 
 
@@ -1161,8 +1168,9 @@ class EraseCommand(_UpdateCommand):
         # rename Update Options to Erase Options (CNY-1090)
         _UpdateCommand.addParameters(self, argDef)
         d = argDef['Erase Options'] = argDef.pop('Update Options')
-        # --no-restart doesn't make sense in the erase context
+        # --restart and --no-restart doesn't make sense in the erase context
         del d['no-restart']
+        del d['restart']
 
 _register(EraseCommand)
 
@@ -1192,7 +1200,7 @@ class MigrateCommand(_UpdateCommand):
     commands = ["migrate"]
     paramHelp = "<pkgname>[=<version>][[flavor]]*"
     help = 'Migrate the system to a different group'
-    hidden = True
+    hidden = False
 
     def addParameters(self, argDef):
         _UpdateCommand.addParameters(self, argDef)
@@ -1232,6 +1240,7 @@ class UpdateAllCommand(_UpdateCommand):
         argDef["replace-unmanaged-files"] = NO_PARAM
         argDef["resolve"] = NO_PARAM
         argDef["test"] = NO_PARAM
+        argDef["restart"] = NO_PARAM
         argDef["restart-info"] = ONE_PARAM
         argDef["apply-critical"] = NO_PARAM
 
@@ -1252,7 +1261,8 @@ class UpdateAllCommand(_UpdateCommand):
         kwargs['modelGraph'] = argSet.pop('model-graph', None)
         kwargs['modelTrace'] = argSet.pop('model-trace', None)
 
-        kwargs['noRestart'] = argSet.pop('no-restart', False)
+        kwargs['noRestart'] = argSet.pop('no-restart',
+                                         not argSet.pop('restart', False))
         if os.path.normpath(cfg.root) != '/':
             kwargs['noRestart'] = True
 

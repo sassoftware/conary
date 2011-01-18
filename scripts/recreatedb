@@ -173,15 +173,28 @@ def collectNewTrovesFromRPMDb(cfg):
                 troveList.extend((pkgName, version, x) for x in flvs)
 
         troveInfo = repos.getTroveInfo(trove._TROVEINFO_TAG_CAPSULE, troveList)
-        allNevras = dict(((x.rpm.name(),
-                           x.rpm.epoch(),
-                           x.rpm.version(),
-                           x.rpm.release(),
-                           x.rpm.arch()),
-                          y)
-                         for x, y in itertools.izip(troveInfo, troveList)
-                         if x and x.type() == trove._TROVECAPSULE_TYPE_RPM)
+        allNevras = dict()
+        for capsuleInfo, trvTuple in itertools.izip(troveInfo, troveList):
+            if not capsuleInfo or (capsuleInfo.type() !=
+                                   trove._TROVECAPSULE_TYPE_RPM):
+                continue
 
+            key = (capsuleInfo.rpm.name(), capsuleInfo.rpm.epoch(),
+                   capsuleInfo.rpm.version(), capsuleInfo.rpm.release(),
+                   capsuleInfo.rpm.arch())
+
+            if key not in allNevras:
+                allNevras[key] = trvTuple
+            else:
+                for flavor in cfg.flavorPreferences:
+                    existingScore = flavor.score(allNevras[key][2])
+                    newScore = flavor.score(trvTuple[2])
+                    if (existingScore is False or
+                        newScore > existingScore):
+                        # this test works because False == 0
+                        allNevras[key] = trvTuple
+                        break
+                
         for nevra in sorted(nevras):
             if nevra in allNevras:
                 matches.append(allNevras[nevra])
@@ -272,12 +285,21 @@ def addConfigFileContents(client, cs, targetCs):
         for (pathid, path, fileid, version) in trove.getNewFileList():
             filediff = cs.getFileChange(None, fileid)
             fileobj = files.ThawFile(filediff, pathid)
-            if fileobj.flags.isConfig():
+            if not fileobj.flags.isConfig() or not fileobj.hasContents:
+                continue
+          
+            diskSha1 = sha1helper.sha1FileBin(path)
+            if diskSha1 == fileobj.contents.sha1():
+		targetCs.addFileContents(pathid, fileid,
+					 changeset.ChangedFileTypes.file,
+                                         filecontents.FromFilesystem(path),
+                                         True)
+            else:
                 needed.append(((fileid, version), (path, pathid)))
 
     # build up the repository request
     neededContents = [x[0] for x in needed]
-    print >> sys.stderr, '\ndownloading config file contents...',
+    print >> sys.stderr, '\ndownloading %d config file contents...' % len(neededContents),
     sys.stderr.flush()
     contents = client.repos.getFileContents(neededContents)
     print >> sys.stderr, 'done.'
@@ -298,6 +320,7 @@ def main(argv):
         sys.exit(1)
 
     cfg = conarycfg.ConaryConfiguration(True)
+    cfg.initializeFlavors()
     cfg.root = sys.argv[2]
     cfg.threaded = False
     client = conaryclient.ConaryClient(cfg)
@@ -344,7 +367,8 @@ def main(argv):
                            replaceFiles = True,
                            noRestart = True,
                            checkPathConflicts = False,
-                           skipCapsuleOps = True)
+                           skipCapsuleOps = True,
+                           callback = updatecmd.UpdateCallback())
     finally:
         os.unlink(path)
 

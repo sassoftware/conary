@@ -295,8 +295,8 @@ Unless \-\-resolve has been made the default by setting the
 autoResolve flag in conaryrc, \-\-no-resolve
 is the default behavior.
 .TP
-.B \-\-no-restart
-Do not restart Conary after applying a critical update. It is implied whenever
+.B \-\-restart
+Restart Conary after applying a critical update. It is ignored if
 an alternate root is provided using the \fB\-\-root \fI<root>\fR option
 or through a configuration file.
 .TP
@@ -903,6 +903,9 @@ for local troves (for which there is no repository) and troves where
 the name is separated from the version by \fB==\fP instead of \fB=\fP.
 To make Conary not update a version when you use the \fBconary updateall\fP
 command, double the appropriate \fB=\fP in the system-model file.
+
+The language used in the \fIsystem-model\fP file is called Conary Modeling
+Language (CML):
 .PD
 .RS 4
 .TP 4
@@ -948,6 +951,14 @@ set to be included on the system.)  This operation is intended for
 operations like applying a group that contains exactly the set of
 packages that comprise a patch/errata set, to allow the base OS version
 to remain stable while applying a specific set of required patches.
+.TP 4
+.B include \fItroveSpec\fP
+Fetches a trove (which may be source or a binary :cml component)
+containing only a CML file (or, in a source component, in the
+only file with a name ending in \fB.cml\fP), and interprets the
+CML found in that file.  The result will be as if the contents of
+that CML file were literally included in place of the \fBinclude\fP
+line.
 .TP 4
 .B version \fIversionString\fP
 Currently ignored on system; may be used when importing a system

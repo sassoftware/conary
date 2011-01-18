@@ -2757,6 +2757,7 @@ def _extractFilesFromISO(iso, directory):
         raise IOError('ISO %s contains neither Joliet nor Rock Ridge info'
                       %iso)
 
+    log.info("extracting ISO %s into %s" % (iso, directory))
     filenames = util.popen("isoinfo -i '%s' '%s' -f" %(iso, isoType)).readlines()
     filenames = [ x.strip() for x in filenames ]
 

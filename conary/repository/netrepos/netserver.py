@@ -3765,6 +3765,9 @@ class ServerConfig(ConfigFile):
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository')
     bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
+    memCache                = CfgString
+    memCacheUserAuth        = (CfgBool, True)
+    memCacheTimeout         = (CfgInt, -1)
     changesetCacheDir       = CfgPath
     changesetCacheLogFile   = CfgPath
     closed                  = CfgString

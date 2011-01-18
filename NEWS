@@ -1,3 +1,135 @@
+Changes in 2.2.9:
+  o New Features:
+    * The "cvc explain" command now honors the PAGER environment
+      variable, and if PAGER is unset or is set to "less", has
+      additional formatting that shows more character styles.
+    * GroupSetRecipe, a new superclass for building groups, has been
+      added. Documentation is available via "cvc explain"; start with
+      the command "cvc explain GroupSetRecipe" and follow references to
+      Repository, TroveSet, and SearchPath documentation.
+    * The "conary install" command has been added.  It is equivalent to
+      the "conary update --keep-existing" command.  While the "--keep-
+      existing" argument option has been not commonly recommended in the
+      old update model because it can easily introduce packages with
+      versions that are unintentionally out of sync, it is commonly
+      useful with a system model because the search path used for a
+      system model can keep versions in sync.
+    * The new group policy PathConflicts has been added, allowing more
+      granular control over which paths are allowed to conflict.
+      (CNY-3505)
+    * Added support for specifying trove requirements on other troves.
+      (CNY-3517)
+    * Add support for defining the actions that run based on the target
+      platform. (CNY-3519)
+    * Added support for building specially formatted zip archives into
+      MSIs (CNY-3475)
+    * The BuildMSI build action has been updated to always store the
+      Windows Build Service log as part of the package build log.
+      (CNY-3521)
+    * Add support for specifying web applications to the Windows Build
+      Service. (CNY-3522)
+    * Added support for storing and persisting MSI component
+      information. (CNY-3523)
+    * Added support for WIM capsules (CNY-3473)
+    * In group recipes the add, replace, addAll, and addCopy methods now
+      take a allowMissing keyword argument that prevents the action from
+      failing if the trove can not be found. (CNY-3532)
+    * An experimental implementation of a WSGI conary repository is now
+      available.
+    * Added support for specifying and storing msiexec arguments.
+      (CNY-3550)
+    * A new Properties policy parses iconfig property description files
+      and adds the information from them to Conary packages. (CNY-3571)
+    * Conary now works with python 2.7. (CNY-3582)
+    * Handle Linux ABI type for sonames by mapping it to SysV (CNY-3584)
+    * --no-restart is now implied for operations in a chroot (since we
+      would just run the same conary version anyway), and is allowed
+      when conary is run on the system's root directory (CNY-3515)
+    * A new update mechanism called "system model" has been added.  In
+      this model, a file called /etc/conary/system-model describes what
+      should be installed on the system.  This file is modified by
+      certain conary update commands, and can also be edited with a text
+      editor.  The system model allows a system to be updated relative
+      to a search path that includes groups as well as labels, leading
+      to more coherent sets of updated packages.  It also allows re-
+      starting updates with transient failures; the filename /etc/conary
+      /system-model.next is reserved for storing the system target state
+      during an update operation. (CNY-3592)
+    * On systems with a system model, the "conary unpin" command
+      synchronizes the system to the model after unpinning. (CNY-3591)
+    * gobject-introspection's gir files are now included in :devel
+      components by default, because they are non-arch-specific
+      development artifacts. (CNY-3579)
+    * Sped up metadata lookups during builds by collapsing many
+      getTroves() into a single call.
+    * Sped up path conflict checking when path names conflict and file
+      signatures need to be compared
+    * Conary no longer restarts after updating Conary ("critical
+      restarts") by default.  When an alternative root has not been
+      provided, the --restart option is available to choose to restart.
+      (CNY-3601)
+
+  o API Changes:
+    * The conary command line handling has been made available as
+      conary.cmds.conarycmd, and the cvc command line handling has been
+      moved from conary.cvc to conary.cmds.cvccmd.  Similarly,
+      conary.branch has been renamed to conary.cmds.branch, conary.clone
+      has been renamed to conary.cmds.clone, conary.commit has been
+      renamed to conary.cmds.commit, conary.cscmd has been renamed to
+      conary.cmds.cscmd, conary.fmtroves has been renamed to
+      conary.cmds.fmtroves, conary.metadata has been renamed to
+      conary.cmds.metadata, conary.query has been renamed to
+      conary.cmds.query, conary.queryrep has been renamed to
+      conary.cmds.queryrep, conary.rollbacks has been renamed to
+      conary.cmds.rollbacks, conary.showchangeset has been renamed to
+      conary.cmds.showchangeset, conary.updatecmd has been renamed to
+      conary.cmds.updatecmd, and conary.verify has been renamed to
+      conary.cmds.verify. The old locations will be available for
+      backward compatibility for the foreseeable future. (CNY-3471)
+
+  o Bug Fixes:
+    * Make negative openpgp key cache entries to avoid repeated server
+      queries for keys which don't exist. (CNY-3450)
+    * Labels no longer allow equal signs in them.
+    * Ignore images without Windows content when evaluating results from
+      the Windows Build Service. These images are normally used for
+      system rescue. (CNY-3558)
+    * Add information about MSIs and WMIs to the documentation string of
+      the addCapsule source action. (CNY-3563)
+    * Querying RPM deps is now possible if the deps contains a colon.
+      (CNY-3289)
+    * The migrate command is now displayed in the basic help text
+      (CNY-3456)
+    * Synthesized soname requirements map "Linux" to "SysV" because a
+      Linux ABI ELF object is capable of using dlopen() to open a SysV
+      ELF object. (CNY-3604)
+    * Cleaned up standard conary help and moved least commonly used
+      sub-commands to verbose help. (CNY-3605)
+    * The lookaside cache now correctly supports ftp urls with
+      user/passwords. (CNY-3508)
+
+Changes in 2.1.28:
+  o Bug Fixes:
+    * Content injection for capsules is no longer retrieving the
+      changeset over HTTP when it is available locally. (CNY-3573)
+    * isEncapsulatedContent is reset when derived capsules overwrite
+      capsule content. (CNY-3577)
+    * The proxy layer will now properly include in changesets any files
+      with isCapsuleOverride() set. (CNY-3578)
+    * Conary proxies will no longer crash if a changeset is requested
+      which has more troves than the current process file descriptor
+      limit. (CNY-3497)
+    * The getFileContentsCapsuleInfo call no longer returns results in
+      database order (which is non-deterministic). (CNY-3581)
+    * The proxy now works around device files inadvertently marked as
+      overrides of the capsule. (CNY-3583)
+    * Another case where content overriden outside of a capsule is not
+      included in the changeset is now fixed. (CNY-3586)
+    * Deriving large packages no longer runs into regular expression
+      size limitations. (CNY-3594)
+    * Capsule-based packages no longer allow their contents to be
+      changed - that can be achieved in a derived package. (CNY-3590)
+
 Changes in 2.1.27:
   o New Features:
     * Support for PostgreSQL 9.0 has been added.

@@ -389,8 +389,12 @@ class FileFinder(object):
                     opener.add_handler(
                         urllib2.ProxyHandler(self.cfg.proxy))
 
-                urlStr = url.asStr(noAuth=True, quoted=True)
+                if url.scheme == 'ftp':
+                    urlStr = url.asStr(noAuth=False, quoted=True)
+                else:
+                    urlStr = url.asStr(noAuth=True, quoted=True)
                 req = urllib2.Request(urlStr, headers=headers)
+
                 inFile = opener.open(req)
                 if not urlStr.startswith('ftp://'):
                     content_type = inFile.info()['content-type']

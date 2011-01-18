@@ -255,8 +255,8 @@ class PromoteCommand(CvcCommand):
                                             ' package/group at the same time'
                                             ' (now the default)'),
              'exact-flavors' : (VERBOSE_HELP, 'Specified flavors must match'
-                                              'the package/group flavors'
-                                              'exactly to promote'),
+                                              ' the package/group flavors'
+                                              ' exactly to promote'),
              'exclude-groups'  : (VERBOSE_HELP,
                                     'Skip over any groups in the clone list,'
                                     ' but clone their contents')

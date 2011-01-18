@@ -52,6 +52,9 @@ class GroupSetTroveCache(object):
         # GroupSet.TroveCache needs
         pass
 
+    def getRepos(self):
+        return self.cache.troveSource
+
     def cacheTroves(self, troveList):
         return self.cache.cacheTroves(troveList, _cached = self._cached)
 
@@ -210,20 +213,14 @@ class GroupTupleSetMethods(object):
         outside of the current group cook.
 
         """
-        if isinstance(resolveSource, troveset.SearchPathTroveSet):
-            newList = []
-            for ts in resolveSource.troveSetList:
-                if isinstance(ts, troveset.TroveTupleSet):
-                    ts = ts._action(ActionClass = troveset.FetchAction)
-                newList.append(ts)
-
-            resolveSource = troveset.SearchPathTroveSet(newList,
-                                                        graph = self.g)
-        elif isinstance(resolveSource, troveset.TroveTupleSet):
-            resolveSource = resolveSource._action(
-                                    ActionClass = troveset.FetchAction)
-
         fetched = self._action(ActionClass = troveset.FetchAction)
+        if resolveSource:
+            if isinstance(resolveSource, troveset.SearchPathTroveSet):
+                resolveSource = resolveSource._action(
+                                        ActionClass = GroupSearchPathFetch)
+            elif isinstance(resolveSource, troveset.DelayedTupleSet):
+                resolveSource = resolveSource._action(
+                                        ActionClass = troveset.FetchAction)
 
         return fetched._action(resolveSource,
                                      failOnUnresolved = failOnUnresolved,
@@ -759,7 +756,8 @@ class GroupTupleSetMethods(object):
         return self._action(updateSet, ActionClass = GroupUpdateAction)
 
 
-    def createGroup(self, name, checkPathConflicts = True, scripts = None):
+    def createGroup(self, name, checkPathConflicts = True, scripts = None,
+                    imageGroup = False):
         """
         NAME
         ====
@@ -783,16 +781,21 @@ class GroupTupleSetMethods(object):
         PARAMETERS
         ==========
          - C{checkPathConflicts} : Raise an error if any paths overlap (C{True})
+         - C{imageGroup} : (False) Designate that this group is a image group.
+           Image Group policies will be executed separately on this group.
          - C{scripts} : Attach one or more scripts specified by a C{Scripts}
            object (C{None})
         """
         return self._action(name, checkPathConflicts = checkPathConflicts,
                             ActionClass = CreateNewGroupAction,
+                            imageGroup = imageGroup,
                             scripts = scripts)
 
-    def _createGroup(self, name, checkPathConflicts = True, scripts = None):
+    def _createGroup(self, name, checkPathConflicts = True, scripts = None,
+                     imageGroup = False):
         return self._action(name, ActionClass = CreateGroupAction,
                             checkPathConflicts = checkPathConflicts,
+                            imageGroup = imageGroup,
                             scripts = scripts)
 
     __add__ = union
@@ -861,11 +864,19 @@ class GroupLoggingDelayedTroveTupleSet(GroupDelayedTroveTupleSet):
     def realize(self, *args):
         mark = time.time()
 
-        log.info("Running action %s" % str(self.action) + self._lineNumStr)
+        if isinstance(self.action, GroupIncludeAction):
+            log.info("Including %s" % " ".join(
+                        "%s=%s[%s]" % nvf for nvf in
+                               self.action.includeSet._getInstallSet()))
+        else:
+            log.info("Running action %s" % str(self.action) + self._lineNumStr)
         GroupDelayedTroveTupleSet.realize(self, *args)
         runtime = time.time() - mark
         if runtime > 0.1:
-            log.info("\ttook %.1fs" % runtime)
+            if isinstance(self.action, GroupIncludeAction):
+                log.info("\tinclude processing took %.1fs" % runtime)
+            else:
+                log.info("\ttook %.1fs" % runtime)
 
 class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
     '''
@@ -1058,6 +1069,8 @@ class ComponentsAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+        return True
+
     __call__ = componentsAction
 
 class CopyAction(GroupDelayedTupleSetAction):
@@ -1066,6 +1079,8 @@ class CopyAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
 
+        return True
+
     __call__ = copyAction
 
 class CreateGroupAction(GroupDelayedTupleSetAction):
@@ -1073,7 +1088,7 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
     prefilter = troveset.FetchAction
 
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
-                 scripts = None):
+                 imageGroup = False, scripts = None):
         if hasattr(scripts, "ts"):
             GroupDelayedTupleSetAction.__init__(self, primaryTroveSet,
                                                 scripts.ts)
@@ -1082,17 +1097,21 @@ class CreateGroupAction(GroupDelayedTupleSetAction):
 
         self.name = name
         self.checkPathConflicts = checkPathConflicts
+        self.imageGroup = imageGroup
         self.scripts = scripts
 
     def createGroupAction(self, data):
         grp = SG(data.groupRecipe.name,
-                 checkPathConflicts = self.checkPathConflicts)
+                 checkPathConflicts = self.checkPathConflicts,
+                 imageGroup = self.imageGroup)
 
         data.groupRecipe._addGroup(self.name, grp)
         data.groupRecipe._setDefaultGroup(grp)
 
         self._create(data.groupRecipe.defaultGroup,
                      self.primaryTroveSet, self.outSet, data)
+
+        return True
 
     __call__ = createGroupAction
 
@@ -1115,17 +1134,62 @@ class CreateNewGroupAction(CreateGroupAction):
     resultClass = GroupLoggingDelayedTroveTupleSet
 
     def __init__(self, primaryTroveSet, name, checkPathConflicts = True,
-                 scripts = None):
+                 scripts = None, imageGroup = False):
         CreateGroupAction.__init__(self, primaryTroveSet, name,
                                    checkPathConflicts = checkPathConflicts,
+                                   imageGroup = imageGroup,
                                    scripts = scripts)
 
     def createNewGroupAction(self, data):
-        newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts)
+        newGroup = SG(self.name, checkPathConflicts = self.checkPathConflicts,
+                      imageGroup = self.imageGroup)
         data.groupRecipe._addGroup(self.name, newGroup)
         self._create(newGroup, self.primaryTroveSet, self.outSet, data)
 
+        return True
+
     __call__ = createNewGroupAction
+
+class DelayedSearchPathTroveSet(GroupSearchPathTroveSet):
+
+    def __init__(self, troveSetList = None, graph = None, index = None,
+                 action = None):
+        troveset.SearchPathTroveSet.__init__(self, troveSetList = troveSetList,
+                                             graph = graph, index = index)
+        self.action = action
+        assert(not self.troveSetList)
+
+    def realize(self, data):
+        result = self.action(data)
+        self.realized = True
+        return True
+
+class GroupSearchPathFetch(troveset.DelayedTupleSetAction):
+
+    resultClass = DelayedSearchPathTroveSet
+
+    def __init__(self, *args, **kwargs):
+        troveset.DelayedTupleSetAction.__init__(self, *args, **kwargs)
+
+    def groupSearchPathFetch(self, data):
+        actionList = []
+        needed = self.primaryTroveSet.troveSetList[:]
+        while needed:
+            ts = needed.pop(0)
+
+            if isinstance(ts, troveset.TroveTupleSet):
+                f = troveset.FetchAction(ts)
+                actionList.append(f)
+            elif isinstance(ts, troveset.SearchPathTroveSet):
+                needed += ts.troveSetList
+
+        troveset.FetchAction._fetch(actionList, data)
+
+        self.outSet.setTroveSetList(self.primaryTroveSet.troveSetList)
+
+        return True
+
+    __call__ = groupSearchPathFetch
 
 class DepsNeededAction(GroupDelayedTupleSetAction):
 
@@ -1177,6 +1241,8 @@ class DepsNeededAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
 
+        return True
+
     __call__ = depsNeededAction
 
 class GetInstalledAction(GroupDelayedTupleSetAction):
@@ -1184,12 +1250,16 @@ class GetInstalledAction(GroupDelayedTupleSetAction):
     def getInstalledAction(self, data):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
 
+        return True
+
     __call__= getInstalledAction
 
 class GetOptionalAction(GroupDelayedTupleSetAction):
 
     def getOptionalAction(self, data):
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
+
+        return True
 
     __call__= getOptionalAction
 
@@ -1218,6 +1288,8 @@ class FindByNameAction(GroupDelayedTupleSetAction):
 
         if (not self.emptyOkay and not install and not optional):
             raise CookError("findByName() matched no trove names")
+
+        return True
 
     __call__= findByNameAction
 
@@ -1256,6 +1328,8 @@ class FindBySourceNameAction(GroupDelayedTupleSetAction):
         if (not installs and not optional):
             raise CookError("findBySourceName() matched no trove names")
 
+        return True
+
     __call__ = findBySourceNameAction
 
 class IsEmptyAction(GroupDelayedTupleSetAction):
@@ -1267,6 +1341,8 @@ class IsEmptyAction(GroupDelayedTupleSetAction):
             raise CookError("Trove set is not empty")
 
         # self.outSet is already empty
+
+        return True
 
     __call__ = isEmptyAction
 
@@ -1281,7 +1357,13 @@ class IsNotEmptyAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet())
 
+        return True
+
     __call__ = isNotEmptyAction
+
+class GroupIncludeAction(troveset.IncludeAction):
+
+    resultClass = GroupLoggingDelayedTroveTupleSet
 
 class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
@@ -1327,6 +1409,8 @@ class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
 
         self.outSet._setInstall(resultTupList)
 
+        return True
+
     __call__ = latestPackageFromSearchSourceAction
 
 class MakeInstallAction(GroupDelayedTupleSetAction):
@@ -1346,6 +1430,8 @@ class MakeInstallAction(GroupDelayedTupleSetAction):
             self.outSet._setInstall(self.primaryTroveSet._getInstallSet() |
                                     self.primaryTroveSet._getOptionalSet())
 
+        return True
+
     __call__ = makeInstallAction
 
 class MakeOptionalAction(GroupDelayedTupleSetAction):
@@ -1364,6 +1450,8 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
         else:
             self.outSet._setOptional(self.primaryTroveSet._getInstallSet() |
                                      self.primaryTroveSet._getOptionalSet())
+
+        return True
 
     __call__ = makeOptionalAction
 
@@ -1400,6 +1488,8 @@ class MembersAction(GroupDelayedTupleSetAction):
 
             self.outSet._setInstall(installs)
             self.outSet._setOptional(available)
+
+        return True
 
     __call__ = membersAction
 
@@ -1459,6 +1549,10 @@ class PackagesAction(GroupDelayedTupleSetAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+        return True
+
+        return True
+
     __call__ = packagesAction
 
 class ScriptsAction(GroupDelayedTupleSetAction):
@@ -1496,6 +1590,8 @@ class ScriptsAction(GroupDelayedTupleSetAction):
             selfScript = getattr(groupScripts, scriptName[:-7])
             selfScript.set(trvScript.script())
 
+        return True
+
     __call__ = scriptsAction
 
 class SG(_SingleGroup):
@@ -1504,7 +1600,6 @@ class SG(_SingleGroup):
         _SingleGroup.__init__(self, *args, **kwargs)
         self.autoResolve = False
         self.depCheck = False
-        self.imageGroup = False
 
     def populate(self, troveSet, troveCache):
         seen = set()
@@ -1564,6 +1659,7 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = GroupSearchPathTroveSet
     FlattenAction = FlattenAction
+    IncludeAction = GroupIncludeAction
 
 class GroupScript(object):
     '''
@@ -1728,6 +1824,29 @@ class _GroupSetRecipe(_BaseGroupRecipe):
                                groupRecipe = self)
         self.g.realize(data)
 
+        ordering = self.g.getTotalOrdering()
+
+        nv = versions.NewVersion()
+
+        allTroveTups = set()
+        for node in ordering:
+            if not isinstance(node, troveset.TroveTupleSet):
+                continue
+
+            allTroveTups.update(node._getInstallSet())
+            allTroveTups.update(node._getOptionalSet())
+
+        for outerName in self.getGroupNames():
+            allTroveTups.remove( (outerName, nv, self.flavor) )
+
+        for outerName in self.getPrimaryGroupNames():
+            grp = self._getGroup(outerName)
+            grp.setBuildRefs(allTroveTups
+                                - set(grp.iterTroveList(strongRefs = True,
+                                                        weakRefs = True))
+                                - set((x, nv, self.flavor)
+                                        for x in grp.iterNewGroupList()))
+
     def dumpAll(self):
         '''
         NAME
@@ -1796,7 +1915,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         self.g.generateDotFile(path, edgeFormatFn = lambda a,b,c: c)
 
-    def Group(self, ts, checkPathConflicts = True, scripts = None):
+    def Group(self, ts, checkPathConflicts = True, scripts = None,
+              imageGroup = False):
         '''
         NAME
         ====
@@ -1819,12 +1939,14 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         ==========
          - C{checkPathConflicts} : Raise an error if any paths
            overlap (C{True})
+         - C{imageGroup} : (False) Designate that this group is a image group.
+           Image Group policies will be executed separately on this group.
          - C{scripts} : Attach one or more scripts specified by a C{Scripts}
            object (C{None})
         '''
         return ts._createGroup(self.name,
                                checkPathConflicts = checkPathConflicts,
-                               scripts = scripts)
+                               scripts = scripts, imageGroup = imageGroup)
 
     def Repository(self, labelList, flavor):
         # Documented in GroupSearchSourceTroveSet as "Repository" so that
@@ -1911,8 +2033,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
          repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
          if 'productDefinitionSearchPath' in r.macros:
              # proper build with product definition
-             searchPath = r.SearchPath(repo[x] for x in
-                 r.macros.productDefinitionSearchPath.split('\\\\n'))
+             searchPath = r.SearchPath(*[repo[x] for x in
+                 r.macros.productDefinitionSearchPath.split('\\\\n')])
          else:
              # local test build against specific version
              searchPath = r.SearchPath(
@@ -1937,8 +2059,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
             modelText = modelText.split('\n')
         model.parse(modelText, context = '(recipe):%d' % lineNum)
 
-        comp = ModelCompiler(self.flavor, self.repos, self.g)
-        sysModelSet = comp.build(model, searchPath, None)
+        comp = ModelCompiler(self.flavor, self.repos, self.g, searchPath, None)
+        sysModelSet = comp.build(model)
 
         result = sysModelSet._action(ActionClass = CopyAction)
         result.searchPath = sysModelSet.searchPath

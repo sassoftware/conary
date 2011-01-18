@@ -23,8 +23,6 @@ class AbstractModelCompiler(object):
 
     SearchPathTroveSet = None
 
-    FlattenAction = None
-
     FetchAction = troveset.FetchAction
     EraseFindAction = troveset.FindAction
     FindAction = troveset.FindAction
@@ -34,11 +32,14 @@ class AbstractModelCompiler(object):
     UnionAction = troveset.UnionAction
     OptionalAction = troveset.OptionalAction
     UpdateAction = troveset.UpdateAction
+    IncludeAction = troveset.IncludeAction
 
-    def __init__(self, flavor, repos, graph):
+    def __init__(self, flavor, repos, graph, reposTroveSet, dbTroveSet):
         self.flavor = flavor
         self.repos = repos
         self.g = graph
+        self.reposTroveSet = reposTroveSet
+        self.dbTroveSet = dbTroveSet
 
     def _splitFind(self, actionClass, searchSet, specList, op):
         if not specList:
@@ -58,7 +59,11 @@ class AbstractModelCompiler(object):
 
         return matchSet
 
-    def build(self, model, reposTroveSet, dbTroveSet):
+    def build(self, model):
+        finalTroveSet = self.InitialTroveTupleSet(graph = self.g)
+        return self.augment(model, self.reposTroveSet, finalTroveSet)
+
+    def augment(self, model, totalSearchSet, finalTroveSet):
         collections = set()
         for op in model.modelOps:
             if isinstance(op, model.SearchOperation):
@@ -74,7 +79,6 @@ class AbstractModelCompiler(object):
 
         # this represents the path from "search" lines
         newSearchPath = []
-        totalSearchSet = reposTroveSet
         rebuildTotalSearchSet = False
         # the "total search" searches the current troveset first, then the
         # search path. we only reset this when an operation changed the
@@ -84,7 +88,6 @@ class AbstractModelCompiler(object):
 
         # finalTroveSet is the current working set of what's been selected
         # so far
-        finalTroveSet = self.InitialTroveTupleSet(graph = reposTroveSet.g)
 
         for op in model.modelOps:
             if isinstance(op, model.SearchOperation):
@@ -94,10 +97,10 @@ class AbstractModelCompiler(object):
                             searchsource.NetworkSearchSource(self.repos,
                                                              [ partialTup ],
                                                              self.flavor),
-                            graph = reposTroveSet.g)
+                            graph = self.g)
                     newSearchSet = newSearchTroveSet
                 elif partialTup[0] is not None:
-                    newSearchSet = reposTroveSet.find(partialTup)
+                    newSearchSet = self.reposTroveSet.find(partialTup)
                 else:
                     assert(0)
 
@@ -130,6 +133,11 @@ class AbstractModelCompiler(object):
                         index = op.getLocation())
                 continue
 
+            if isinstance(op, model.IncludeOperation):
+                # we need a complete total search set to pass into the sub
+                # ops, since they have their compilation deferred
+                rebuildTotalSearchSet = True
+
             if rebuildTotalSearchSet:
                 totalSearchSet = self.SearchPathTroveSet( newSearchPath +
                                                            [ totalSearchSet ],
@@ -139,7 +147,7 @@ class AbstractModelCompiler(object):
 
             searchMatches = self._splitFind(self.FindAction, totalSearchSet,
                                             searchSpecs, op)
-            localMatches = self._splitFind(self.FindAction, dbTroveSet,
+            localMatches = self._splitFind(self.FindAction, self.dbTroveSet,
                                            localSpecs, op)
 
             if searchMatches and localMatches:
@@ -151,7 +159,16 @@ class AbstractModelCompiler(object):
             else:
                 matches = localMatches
 
-            if isinstance(op, model.InstallTroveOperation):
+            if isinstance(op, model.IncludeOperation):
+                assert(not localMatches)
+                finalTroveSet = finalTroveSet._action(
+                                matches, totalSearchSet,
+                                compiler = self,
+                                ActionClass = self.IncludeAction,
+                                SearchPathClass = self.SearchPathTroveSet)
+                totalSearchSet = finalTroveSet.finalSearchSet
+                continue
+            elif isinstance(op, model.InstallTroveOperation):
                 finalTroveSet = finalTroveSet._action(matches,
                                         ActionClass = self.UnionAction,
                                         index = op.getLocation())

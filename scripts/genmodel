@@ -212,11 +212,42 @@ def initialForesightModel(installedTroves, model):
                                    fmtVer(trv.getVersion()),
                                    str(trv.getFlavor())) ] ))
 
+def parseKickstart(path):
+    if not os.path.exists(path):
+        return None
+
+    f = open(path)
+    line = f.readline()
+    while line:
+        if line.startswith('%packages'):
+            break
+        line = f.readline()
+
+    if not line:
+        return None
+
+    line = f.readline()
+    model = []
+    while line:
+        line = line[:-1]
+        if line[0] == '@':
+            model.append(cml.IncludeOperation(
+                            item = TroveSpec("comp-group-%s" % line[1:],
+                                             None, None)))
+        else:
+            model.append(cml.InstallTroveOperation(
+                            item = [ TroveSpec(line, None, None) ] ))
+
+        line = f.readline()
+
+    return model
 
 def initialRedHatModel(client, model):
     groupOs = findParent(client, "/etc/redhat-release", "group-os")
     groupRpath = findParent(client, "/usr/bin/conary", "group-rpath-packages",
-			    latest = True)
+                            latest = True)
+
+    label = "oot.rpath.org@" + str(groupOs[1].trailingLabel()).split('@')[1]
 
     model.appendOp(cml.SearchTrove(
                                 item = TroveSpec(groupOs[0],
@@ -227,16 +258,26 @@ def initialRedHatModel(client, model):
                                                  fmtVer(groupRpath[1]),
                                                  str(groupRpath[2]))))
 
-    if 'rhel' in groupOs[1].asString():
-        model.appendOp(cml.InstallTroveOperation(
-                item = [ TroveSpec("group-rhel-standard",
-                                   fmtVer(groupOs[1]),
-                                   str(groupOs[2])) ] ))
+    model.appendOp(cml.SearchTrove(
+                                item = TroveSpec('group-comps',
+                                                 label,
+                                                 str(groupRpath[2]))))
+
+    ksModel = parseKickstart('/root/anaconda-ks.cfg')
+    if ksModel:
+        for op in ksModel:
+            model.appendOp(op)
     else:
-        model.appendOp(cml.InstallTroveOperation(
-                item = [ TroveSpec("group-standard",
-                                   fmtVer(groupOs[1]),
-                                   str(groupOs[2])) ] ))
+        if 'rhel' in groupOs[1].asString():
+            model.appendOp(cml.InstallTroveOperation(
+                    item = [ TroveSpec("group-rhel-standard",
+                                       fmtVer(groupOs[1]),
+                                       str(groupOs[2])) ] ))
+        else:
+            model.appendOp(cml.InstallTroveOperation(
+                    item = [ TroveSpec("group-standard",
+                                       fmtVer(groupOs[1]),
+                                       str(groupOs[2])) ] ))
 
     print "\t" + "\n\t".join(model.iterFormat())
 
@@ -324,7 +365,8 @@ if __name__ == '__main__':
 
                 if pkgTuple in newInstalls:
                     print "   updating model for job", jobList
-                    if len(jobList) == 2:
+                    if (len(jobList) == 2 and
+                        not sum(x[0].endswith('rpm') for x in jobList)):
                         # pick out the one component we use
                         installJob = [ x for x in jobList if
                                        (x[0], x[1][0], x[1][1]) != pkgTuple ]
@@ -416,6 +458,12 @@ if __name__ == '__main__':
             # we can only combine items from the same class
             emitDeferred(specClass, deferredItems)
 
+        if isinstance(op, cml.IncludeOperation):
+            # we cannot combine include
+            emitDeferred(specClass, deferredItems)
+            finalModel.appendOp(op)
+            continue
+
         specClass = op.__class__
         if isinstance(op, cml.SearchTrove):
             # already handled above
@@ -425,7 +473,9 @@ if __name__ == '__main__':
         simpleSpecs = [ (findMap.get(spec, spec), spec)
                         for spec in op ]
         for newSpec, spec in simpleSpecs:
-            if 'local@' in spec.version:
+            if spec.version is None:
+                newSpecs.append(newSpec);
+            elif 'local@' in spec.version:
                 # never simplify any local versions
                 newSpecs.append(spec);
             elif specClass in addOps and newSpec.version is not None:

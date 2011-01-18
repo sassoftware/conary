@@ -963,13 +963,14 @@ _TROVEINFO_TAG_SOURCENAME     =  1
 _TROVEINFO_TAG_BUILDTIME      =  2
 _TROVEINFO_TAG_CONARYVER      =  3
 _TROVEINFO_TAG_BUILDDEPS      =  4
-_TROVEINFO_TAG_LOADEDTROVES   =  5
+_TROVEINFO_TAG_LOADEDTROVES   =  5  # recipe troves loaded during a build
 _TROVEINFO_TAG_INSTALLBUCKET  =  6          # unused as of 0.62.16
 _TROVEINFO_TAG_FLAGS          =  7
 _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10
-_TROVEINFO_TAG_LABEL_PATH     = 11
+_TROVEINFO_TAG_LABEL_PATH     = 11  # old style group recipes used this
+                                    # instead of search path. sometimes.
 _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
@@ -990,14 +991,18 @@ _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_COPIED_FROM    = 21
 _TROVEINFO_TAG_IMAGE_GROUP    = 22
 _TROVEINFO_TAG_FACTORY        = 23
-_TROVEINFO_TAG_SEARCH_PATH    = 24
+_TROVEINFO_TAG_SEARCH_PATH    = 24  # final search path for old-style group
+                                    # builds
 _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
 _TROVEINFO_TAG_CAPSULE        = 28
 _TROVEINFO_TAG_MTIMES         = 29
 _TROVEINFO_TAG_PROPERTIES     = 30
-_TROVEINFO_TAG_LAST           = 30
+_TROVEINFO_TAG_BUILD_REFS     = 31  # group set recipes track troves which
+                                    # were named during a build but did not
+                                    # make it into the final groups
+_TROVEINFO_TAG_LAST           = 31
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1315,6 +1320,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
         _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
         _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
+        _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1756,6 +1762,7 @@ class Trove(streams.StreamSet):
         new.weakTroves = self.weakTroves.copy()
         new.provides.thaw(self.provides.freeze())
         new.requires.thaw(self.requires.freeze())
+        new.redirects.thaw(self.redirects.freeze())
         new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
         new.troveInfo.thaw(self.troveInfo.freeze())
         return new
@@ -3186,6 +3193,14 @@ class Trove(streams.StreamSet):
     def getLoadedTroves(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor())
                  for x in self.troveInfo.loadedTroves.iterAll() ]
+
+    def setBuildRefs(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.buildRefs.add(name, ver, release)
+
+    def getBuildRefs(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor())
+                 for x in self.troveInfo.buildRefs.iterAll() ]
 
     def setDerivedFrom(self, itemList):
         for (name, ver, release) in itemList:
