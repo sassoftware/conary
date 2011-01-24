@@ -16,6 +16,7 @@
 import os
 import sys
 import smtplib
+import traceback
 # python 2.4 does not have email.mime; email.MIMEText is available in 2.6
 from email.MIMEText import MIMEText
 
@@ -102,8 +103,8 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         pid2 = os.fork()
         if not pid2:
             #child 2
-            doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, maxsize, argSet)
-            sys.exit(0)
+            exitCode = doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, maxsize, argSet)
+            sys.exit(exitCode)
         else:
             #parent 2
             pid2, status = os.waitpid(pid2, 0)
@@ -114,6 +115,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
 
 
 def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr, maxsize, argSet):
+    exitCode = 0
     tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
     os.unlink(tmppath)
     tmpfile = os.fdopen(tmpfd)
@@ -146,7 +148,22 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
                 print '%s=%s%s' %(sourceName, shortver, old)
                 print 'cvc rdiff %s -1 %s' %(sourceName[:-7], ver)
                 print '================================'
-                checkin.rdiff(repos, cfg.buildLabel, sourceName, '-1', ver)
+                try:
+                    checkin.rdiff(repos, cfg.buildLabel, sourceName, '-1', ver)
+                except:
+                    exitCode = 2
+                    print 'rdiff failed for %s' %sourceName
+                    try:
+                        t, v, tb = sys.exc_info()
+                        for line in traceback.format_exception(t, v):
+                            print line
+                        traceback.print_last(file=sys.stderr)
+                    except:
+                        print 'Failed to print exception information'
+
+                    print ''
+                    print 'Please include a copy of this message in an issue'
+                    print 'filed at https://issues.rpath.com/'
                 print
         if sourceuser:
             print 'Committed by: %s' %sourceuser
@@ -198,7 +215,7 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
         sendMail(tmpfile, subject, fromaddr, maxsize, argSet['email'], mailhost)
         os.dup2(oldStdOut, 1)
 
-    return 0
+    return exitCode
 
 def sendMail(tmpfile, subject, fromaddr, maxsize, addresses, mailhost='localhost'):
     # stdout is the tmpfile, so make sure it has been flushed!
