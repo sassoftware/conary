@@ -174,7 +174,10 @@ def collectNewTrovesFromRPMDb(cfg):
 
         troveInfo = repos.getTroveInfo(trove._TROVEINFO_TAG_CAPSULE, troveList)
         allNevras = dict()
-        for capsuleInfo, trvTuple in itertools.izip(troveInfo, troveList):
+        # reversed sorted in order to find newest versions first; we need
+        # this so that when we rebuild capsules to fix bugs, we find the
+        # latest version with bugs fixed, rather than an earlier version
+        for trvTuple, capsuleInfo in reversed(sorted(zip(troveList, troveInfo))):
             if not capsuleInfo or (capsuleInfo.type() !=
                                    trove._TROVECAPSULE_TYPE_RPM):
                 continue
