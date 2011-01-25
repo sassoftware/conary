@@ -161,7 +161,12 @@ def findParent(client, path, grpName, latest = False):
     if latest:
         return possibleGroupList[-1]
 
-    return possibleGroupList[0]
+    # take the latest build of this group version
+    targetVersion = possibleGroupList[0][1].trailingRevision().getVersion()
+    bestMatch = [ x for x in possibleGroupList if
+			x[1].trailingRevision().getVersion() == targetVersion ]
+
+    return bestMatch[-1]
 
 def groupDataCompare(tup1, tup2):
     ver1 = tup1[1]

@@ -189,7 +189,10 @@ def collectNewTrovesFromRPMDb(cfg):
             if key not in allNevras:
                 allNevras[key] = trvTuple
             else:
-                for flavor in cfg.flavorPreferences:
+                prefList = cfg.flavorPreferences
+                if not prefList:
+                    prefList = cfg.flavor
+                for flavor in prefList:
                     existingScore = flavor.score(allNevras[key][2])
                     newScore = flavor.score(trvTuple[2])
                     if (existingScore is False or
