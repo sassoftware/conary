@@ -140,6 +140,14 @@ class Conary(CPackageRecipe):
 
         # emerge is not supported on encapsulated platforms
         #r.UtilizeUser('emerge', '%(sitepkgs)s/conary/cvc.py')
+        # emerge really requires all of conary-build, so if
+        # it moves to cvc we can remove this whiteout
+        r.Requires(exceptDeps=('(%(bindir)s/conary|conarycmd.py)',
+                               'python: conary.build.cook'))
+        # CNY-3314 -- conary.commit should not depend on conary.cvc
+        r.Requires(exceptDeps=('.*/conary/commit\.py.*$',
+                               'python: conary.cvc'))
+
 
         # This exception needs to be here in order to bootstrap perl;
         # if we don't have perl, we won't be using this file or those

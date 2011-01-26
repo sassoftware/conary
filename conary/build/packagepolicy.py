@@ -2160,6 +2160,7 @@ class _dependency(policy.Policy):
                         recipe.Requires(_privateDepMap=(oldname, soDep))
 
         if usesLinuxAbi and not isProvides:
+            # from conary.lib import epdb; epdb.st()
             isnset = m.contents.get('isnset', None)
             if elfClass == 'ELF32' and isnset == 'x86':
                 main = 'ELF32/ld-linux.so.2'
