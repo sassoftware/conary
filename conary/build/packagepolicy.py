@@ -30,7 +30,9 @@ from conary.build import buildpackage, filter, policy, recipe, tags, use
 from conary.build import smartform
 from conary.deps import deps
 from conary.lib import elf, magic, util, pydeps, fixedglob, graph
-from conary.local import database
+
+from conary.build.action import TARGET_LINUX
+from conary.build.action import TARGET_WINDOWS
 
 try:
     from xml.etree import ElementTree
@@ -69,6 +71,7 @@ class _filterSpec(policy.Policy):
     """
     bucket = policy.PACKAGE_CREATION
     processUnmodified = False
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
     def __init__(self, *args, **keywords):
         self.extraFilters = []
         policy.Policy.__init__(self, *args, **keywords)
@@ -101,6 +104,7 @@ class _addInfo(policy.Policy):
         'included': {},
         'excluded': {}
     }
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def updateArgs(self, *args, **keywords):
         """
@@ -421,7 +425,7 @@ class ComponentSpec(_filterSpec):
                                           self.derivedFilters,
                                           self.configFilters,
                                           self.baseFilters):
-            if not isinstance(filteritem, filter.Filter):
+            if not isinstance(filteritem, (filter.Filter, filter.PathSet)):
                 name = filteritem[0] % self.macros
                 assert(name != 'source')
                 args, kwargs = self.filterExpArgs(filteritem[1:], name=name)
@@ -608,7 +612,7 @@ class PackageSpec(_filterSpec):
         # can change the package to which a file is assigned
         for filteritem in itertools.chain(self.extraFilters,
                                           self.derivedFilters):
-            if not isinstance(filteritem, filter.Filter):
+            if not isinstance(filteritem, (filter.Filter, filter.PathSet)):
                 name = filteritem[0] % self.macros
                 if not trove.troveNameIsValid(name):
                     self.error('%s is not a valid package name', name)
@@ -1323,6 +1327,7 @@ class ExcludeDirectories(policy.Policy):
         ('MakeDevices', policy.CONDITIONAL_PRIOR),
     )
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def doFile(self, path):
         # temporarily do nothing for capsules, we might do something later
@@ -1395,6 +1400,7 @@ class ByDefault(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
     filetree = policy.NO_FILES
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     invariantexceptions = [':test', ':debuginfo']
 
@@ -1679,6 +1685,7 @@ class ComponentRequires(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.depMap = {
@@ -1772,6 +1779,7 @@ class ComponentProvides(policy.Policy):
         ('PackageSpec', policy.REQUIRED_PRIOR),
         ('ExcludeDirectories', policy.CONDITIONAL_PRIOR),
     )
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.flags = set()
@@ -2062,7 +2070,8 @@ class _dependency(policy.Policy):
 
     def _createELFDepSet(self, m, elfinfo, recipe=None, basedir=None,
                          soname=None, soflags=None,
-                         libPathMap={}, getRPATH=None, path=None):
+                         libPathMap={}, getRPATH=None, path=None,
+                         isProvides=None):
         """
         Add dependencies from ELF information.
 
@@ -2072,10 +2081,12 @@ class _dependency(policy.Policy):
         @param basedir: directory to add into dependency
         @param soname: alternative soname to use
         @param libPathMap: mapping from base dependency name to new dependency name
+        @param isProvides: whether the dependency being created is a provides
         """
         abi = m.contents['abi']
         elfClass = abi[0]
         nameMap = {}
+        usesLinuxAbi = False
 
         depSet = deps.DependencySet()
         for depClass, main, flags in elfinfo:
@@ -2122,7 +2133,13 @@ class _dependency(policy.Policy):
                                   pathString)
 
                 curClass = deps.SonameDependencies
-                flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
+                for flag in abi[1]:
+                    if flag == 'Linux':
+                        usesLinuxAbi = True
+                        flags.append(('SysV', deps.FLAG_SENSE_REQUIRED))
+                    else:
+                        flags.append((flag, deps.FLAG_SENSE_REQUIRED))
+
                 dep = deps.Dependency(main, flags)
 
             elif depClass == 'abi':
@@ -2141,6 +2158,22 @@ class _dependency(policy.Policy):
                     if newName in nameMap:
                         oldName = nameMap[newName]
                         recipe.Requires(_privateDepMap=(oldname, soDep))
+
+        if usesLinuxAbi and not isProvides:
+            isnset = m.contents.get('isnset', None)
+            if elfClass == 'ELF32' and isnset == 'x86':
+                main = 'ELF32/ld-linux.so.2'
+            elif elfClass == 'ELF64' and isnset == 'x86_64':
+                main = 'ELF64/ld-linux-x86-64.so.2'
+            else:
+                self.error('%s: unknown ELF class %s or instruction set %s',
+                           path, elfClass, isnset)
+                return depSet
+            flags = [('Linux', deps.FLAG_SENSE_REQUIRED),
+                     ('SysV', deps.FLAG_SENSE_REQUIRED),
+                     (isnset, deps.FLAG_SENSE_REQUIRED)]
+            dep = deps.Dependency(main, flags)
+            depSet.addDep(curClass, dep)
 
         return depSet
 
@@ -2703,7 +2736,7 @@ class Provides(_dependency):
         depSet = self._createELFDepSet(m, elfinfo,
                                        recipe=self.recipe, basedir=basedir,
                                        soname=soname, soflags=soflags,
-                                       path=path)
+                                       path=path, isProvides=True)
         for pkg, _ in pkgFiles:
             self._addDepSetToMap(path, pkg.providesMap, depSet)
 
@@ -3586,7 +3619,7 @@ class Requires(_addInfo, _dependency):
         depSet = self._createELFDepSet(m, m.contents['requires'],
                                        libPathMap=self._privateDepMap,
                                        getRPATH=_findSonameInRpath,
-                                       path=path)
+                                       path=path, isProvides=False)
         for pkg, _ in pkgFiles:
             self._addDepSetToMap(path, pkg.requiresMap, depSet)
 
@@ -3997,7 +4030,8 @@ class Requires(_addInfo, _dependency):
                 depClass = deps.SonameDependencies
                 for depType, dep, f in m.contents['requires']:
                     if depType == 'abi':
-                        flags = f
+                        flags = tuple(x == 'Linux' and 'SysV' or x
+                                      for x in f) # CNY-3604
                         info = '%s/%s' %(dep, info.split(None, 1)[1])
                         info = os.path.normpath(info)
             else: # by process of elimination, must be a trove
@@ -4126,6 +4160,7 @@ class RemoveSelfProvidedRequires(policy.Policy):
     requires = (
         ('Requires', policy.REQUIRED_PRIOR),
     )
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def do(self):
         if use.Use.bootstrap._get():
@@ -4167,6 +4202,7 @@ class Flavor(policy.Policy):
         ('ExcludeDirectories', policy.REQUIRED_PRIOR),
     )
     filetree = policy.PACKAGE
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def preProcess(self):
         self.libRe = re.compile(
@@ -4496,6 +4532,7 @@ class reportExcessBuildRequires(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.found = set()
@@ -4587,6 +4624,7 @@ class reportMissingBuildRequires(policy.Policy):
     bucket = policy.ERROR_REPORTING
     processUnmodified = True
     filetree = policy.NO_FILES
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.errors = set()
@@ -4614,6 +4652,7 @@ class reportErrors(policy.Policy, policy.GroupPolicy):
     processUnmodified = True
     filetree = policy.NO_FILES
     groupError = False
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
 
     def __init__(self, *args, **keywords):
         self.errors = []

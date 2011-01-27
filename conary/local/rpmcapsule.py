@@ -131,6 +131,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         SingleCapsuleOperation.__init__(self, *args, **kwargs)
 
         self.netSharedPath = set()
+
         nsp = rpmExpandMacro('%_netsharedpath')
         if nsp != '%_netsharedpath':
             self.netSharedPath = set(nsp.split(':'))

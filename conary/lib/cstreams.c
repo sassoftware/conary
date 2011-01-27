@@ -35,7 +35,6 @@ static PyMethodDef CStreamsMethods[] = {
     { NULL },
 };
 
-#if PY_MAJOR_VERSION >= 3
 static PyModuleDef CStreamsModule = {
 	PyModuleDef_HEAD_INIT,
 	"cstreams",
@@ -43,7 +42,6 @@ static PyModuleDef CStreamsModule = {
 	-1,
 	CStreamsMethods
 };
-#endif
 
 struct singleStream allStreams[];
 
@@ -52,7 +50,7 @@ PYMODULE_INIT(cstreams)
     PyObject* m;
     int i;
 
-    m = PYMODULE_CREATE("cstreams", CStreamsMethods, "", &CStreamsModule);
+    m = PYMODULE_CREATE(&CStreamsModule);
     if (m == NULL)
         PYMODULE_RETURN(NULL);
 

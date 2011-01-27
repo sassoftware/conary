@@ -15,8 +15,9 @@
 import itertools
 
 from conary import trove, versions
+from conary.conaryclient import cml
 from conary.deps import deps
-from conary.errors import TroveSpecsNotFound
+from conary.errors import ConaryError, TroveSpecsNotFound
 from conary.lib import graph, sha1helper
 from conary.repository import searchsource, trovesource
 
@@ -53,11 +54,14 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
     """
 
     def __init__(self, troveCache, troveSet, flavor,
-                 filterFn = lambda *args: False, depDb = None):
+                 filterFn = None, depDb = None):
         assert(depDb)
         self.depDb = depDb
         self.troveSet = troveSet
-        self.filterFn = filterFn
+        if filterFn is None:
+            self.filterFn = lambda *args: False
+        else:
+            self.filterFn = filterFn
 
         self.troveTupList = []
         for troveTup, inInstall, isExplicit in \
@@ -191,7 +195,7 @@ class TroveSet(object):
         self.index = index
 
     def __str__(self):
-        return self.__class__.__name__
+        return self.__class__.__name__ #+ '%' + str(id(self))
 
     def _action(self, *args, **kwargs):
         ActionClass = kwargs.pop('ActionClass')
@@ -229,8 +233,7 @@ class TroveTupleSet(TroveSet):
 
         return self._troveSource
 
-    def _getResolveSource(self, filterFn = lambda *args: False,
-                          depDb = None):
+    def _getResolveSource(self, filterFn = None, depDb = None):
         if self._resolveSource is None:
             resolveTroveSource = ResolveTroveTupleSetTroveSource(
                                         self.g.actionData.troveCache, self,
@@ -457,8 +460,13 @@ class DelayedTupleSet(TroveTupleSet):
         self.realized = True
 
     def realize(self, data):
-        self.action(data)
-        self.beenRealized(data)
+        result = self.action(data)
+        assert(result is not None)  # don't let actions forget to return a bool
+        if result:
+            self.beenRealized(data)
+            return True
+
+        return False
 
 class StaticTroveTupleSet(TroveTupleSet):
 
@@ -481,7 +489,7 @@ class SearchSourceTroveSet(TroveSet):
         return self.searchSource.findTroves(troveTuple, requireLatest = True,
                                             allowMissing = allowMissing)
 
-    def _getResolveSource(self, depDb = None):
+    def _getResolveSource(self, depDb = None, filterFn = None):
         return self.searchSource
 
     def _getSearchSource(self):
@@ -494,24 +502,40 @@ class SearchSourceTroveSet(TroveSet):
 
 class SearchPathTroveSet(SearchSourceTroveSet):
 
-    def __init__(self, troveSetList, graph = None, index = None):
+    def __init__(self, troveSetList = None, graph = None, index = None):
         SearchSourceTroveSet.__init__(self, None, graph = graph,
                                       index = index)
 
-        self.troveSetList = []
+        self.troveSetList = None
+
+        if troveSetList is not None:
+            self.setTroveSetList(self.fetch(troveSetList))
+
+    def fetch(self, troveSetList):
+        # fetch all of the trovesets in troveSetList. it is acceptable
+        # for the caller to do this manually, in which case setTroveList()
+        # can be used directly to avoid this step
+        resultList = []
         for i, troveSet in enumerate(troveSetList):
             if isinstance(troveSet, TroveTupleSet):
                 fetched = troveSet._action(ActionClass = FetchAction)
-                self.troveSetList.append(fetched)
-                graph.addEdge(fetched, self, value = str(i + 1))
+                resultList.append(fetched)
+                self.g.addEdge(fetched, self, value = str(i + 1))
             else:
-                self.troveSetList.append(troveSet)
-                graph.addEdge(troveSet, self, value = str(i + 1))
+                resultList.append(troveSet)
+                self.g.addEdge(troveSet, self, value = str(i + 1))
 
-    def _getResolveSource(self, depDb = None):
+        return resultList
+
+    def setTroveSetList(self, troveSetList, fetch = True):
+        # troveSetList must be fetched before calling this
+        assert(self.troveSetList is None)
+        self.troveSetList = troveSetList
+
+    def _getResolveSource(self, depDb = None, filterFn = None):
         # we search differently then we resolve; resolving is recursive
         # while searching isn't
-        sourceList = [ ts._getResolveSource(depDb = depDb)
+        sourceList = [ ts._getResolveSource(depDb = depDb, filterFn = filterFn)
                             for ts in self.troveSetList ]
         return searchsource.SearchSourceStack(*sourceList)
 
@@ -575,6 +599,8 @@ class DifferenceAction(DelayedTupleSetAction):
         self.outSet._setInstall(left._getInstallSet().difference(all))
         self.outSet._setOptional(left._getOptionalSet().difference(all))
 
+        return True
+
     __call__ = differenceAction
 
     def __init__(self, primaryTroveSet, other):
@@ -601,9 +627,12 @@ class FetchAction(ParallelAction):
 
         self._fetch(actionList, data);
 
+        return True
+
     __call__ = fetchAction
 
-    def _fetch(self, actionList, data):
+    @staticmethod
+    def _fetch(actionList, data):
         troveTuples = set()
 
         for action in actionList:
@@ -668,6 +697,8 @@ class FindAction(ParallelAction):
         if notFound:
             raise TroveSpecsNotFound(sorted(notFound))
 
+        return True
+
     __call__ = findAction
 
     def __str__(self):
@@ -705,6 +736,8 @@ class UnionAction(DelayedTupleSetAction):
         for troveSet in tsList:
             self.outSet._setInstall(troveSet._getInstallSet())
 
+        return True
+
     __call__ = unionAction
 
 class OptionalAction(DelayedTupleSetAction):
@@ -716,6 +749,8 @@ class OptionalAction(DelayedTupleSetAction):
         for troveSet in self._inputSets:
             self.outSet._setOptional(troveSet._getOptionalSet())
             self.outSet._setOptional(troveSet._getInstallSet())
+
+        return True
 
     __call__ = optionalAction
 
@@ -740,6 +775,8 @@ class RemoveAction(DelayedTupleSetAction):
                                     - explicitRemoveSet - implicitRemoveSet)
         self.outSet._setOptional(self.primaryTroveSet._getOptionalSet()
                                     | explicitRemoveSet)
+
+        return True
 
     __call__ = removeAction
 
@@ -818,6 +855,8 @@ class PatchAction(AbstractModifyAction):
 
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
+
+        return True
 
     __call__ = patchAction
 
@@ -960,6 +999,8 @@ class UpdateAction(AbstractModifyAction):
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
 
+        return True
+
     __call__ = updateAction
 
     def _handleTrove(self, data, beforeInfo, afterInfo, oldTuple, newTuple,
@@ -999,17 +1040,133 @@ class UpdateAction(AbstractModifyAction):
             if oldTuple != newTuple:
                 optionalSet.add(oldTuple)
 
+class IncludeException(ConaryError):
+
+    pass
+
+class IncludeAction(DelayedTupleSetAction):
+
+    def __init__(self, primaryTroveSet, includeSet, searchSet,
+                 compiler = None, SearchPathClass = None):
+        DelayedTupleSetAction.__init__(self, primaryTroveSet,
+                                       includeSet, searchSet)
+
+        self.includeSet = includeSet
+        self.searchSet = searchSet
+        self.compiler = compiler
+        self.resultSet = None
+        self.SearchPathClass = SearchPathClass
+
+    def getResultTupleSet(self, graph = None, index = None):
+        result = DelayedTupleSetAction.getResultTupleSet(self,
+                                                         graph = graph,
+                                                         index = index)
+        self.outSet.finalSearchSet = self.SearchPathClass(graph = graph,
+                                                          index = index)
+        self.outSet.g.addEdge(result, self.outSet.finalSearchSet)
+        return result
+
+    def getCML(self, troveCache, nvf):
+        key = "%s=%s[%s]" % nvf
+        lines = troveCache.getCachedFile(key)
+        if lines is not None:
+            return lines
+
+        cs = troveCache.getRepos().createChangeSet(
+            [ (nvf[0], (None, None), (nvf[1], nvf[2]), True) ],
+            withFiles = True, withFileContents = True)
+
+        trv = trove.Trove(cs.getNewTroveVersion(*nvf))
+
+        files = list(trv.iterFileList())
+        if nvf[0].endswith(':source'):
+            files = [ x for x in files if x[1].endswith('.cml') ]
+        if len(files) > 1:
+            raise IncludeException('Too many cml files found in %s=%s[%s]: %s'
+                        % (nvf + (" ".join(x[1] for x in sorted(files)),)))
+        elif not files:
+            raise IncludeException('No cml files found in %s=%s[%s]' % nvf)
+
+        fileContents = cs.getFileContents(files[0][0], files[0][2])
+        lines = fileContents[1].get().readlines()
+        troveCache.cacheFile(key, lines)
+
+        return lines
+
+    def includeAction(self, data):
+        if self.resultSet:
+            self.outSet._setInstall(self.resultSet._getInstallSet())
+            self.outSet._setOptional(self.resultSet._getOptionalSet())
+
+            return True
+
+        assert(not self.includeSet._getOptionalSet())
+        assert(not self.includeSet._getInstallSet() == 1)
+
+        nvf = list(self.includeSet._getInstallSet())[0]
+
+        if not trove.troveIsComponent(nvf[0]):
+            assert(trove.troveIsPackage(nvf[0]))
+            # getTrove is sometimes disabled to prevent one at a time calls
+            # can't be helped here
+            trv = data.troveCache.getTroves([ nvf], withFiles=False)[0]
+            found = None
+            for subNVF in trv.iterTroveList(strongRefs = True):
+                if subNVF[0].endswith(':cml'):
+                    found = subNVF
+                    break
+
+            if not found:
+                raise IncludeException('Package %s=%s[%s] does not contain a '
+                                       'cml component for inclusion' % nvf)
+            nvf = found
+        elif nvf[0].split(':')[1] not in [ 'cml', 'source' ]:
+            raise IncludeException('Include only supports source and cml '
+                                   'components')
+
+        if nvf in self.outSet.g.included:
+            raise IncludeException('Include loop detected involving %s=%s[%s]'
+                                   % nvf)
+
+        self.outSet.g.included.add(nvf)
+
+        cmlFileLines = self.getCML(data.troveCache, nvf)
+
+        model = cml.CML(None, context = nvf[0])
+        model.parse(fileData = cmlFileLines)
+        self.resultSet = self.compiler.augment(model, self.searchSet,
+                                               self.primaryTroveSet)
+        self.outSet.g.addEdge(self.resultSet, self.outSet)
+
+        self.outSet.finalSearchSet.setTroveSetList(
+                            self.outSet.finalSearchSet.fetch(
+                                            [ self.resultSet.searchPath ]) )
+
+        return False
+
+    def augment(self, model, totalSearchSet, finalTroveSet):
+
+        return False
+
+    __call__ = includeAction
 
 class OperationGraph(graph.DirectedGraph):
+
+    def __init__(self, *args, **kwargs):
+        graph.DirectedGraph.__init__(self, *args, **kwargs)
+        self.included = set()
 
     def realize(self, data):
         # this is a hack
         self.actionData = data
 
-        transpose = self.transpose()
-        ordering = self.getTotalOrdering()
-
+        reset = True
         while True:
+            if reset:
+                transpose = self.transpose()
+                ordering = self.getTotalOrdering()
+                reset = False
+
             # grab as many bits as we can whose parents have been realized
             layer = []
             needWork = False
@@ -1044,7 +1201,8 @@ class OperationGraph(graph.DirectedGraph):
                         node.beenRealized(data)
                 else:
                     for node in nodeList:
-                        node.realize(data)
+                        if not node.realize(data):
+                            reset = True
 
     def trace(self, troveSpecList):
         ordering = self.getTotalOrdering()

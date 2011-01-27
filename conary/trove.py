@@ -963,13 +963,14 @@ _TROVEINFO_TAG_SOURCENAME     =  1
 _TROVEINFO_TAG_BUILDTIME      =  2
 _TROVEINFO_TAG_CONARYVER      =  3
 _TROVEINFO_TAG_BUILDDEPS      =  4
-_TROVEINFO_TAG_LOADEDTROVES   =  5
+_TROVEINFO_TAG_LOADEDTROVES   =  5  # recipe troves loaded during a build
 _TROVEINFO_TAG_INSTALLBUCKET  =  6          # unused as of 0.62.16
 _TROVEINFO_TAG_FLAGS          =  7
 _TROVEINFO_TAG_CLONEDFROM     =  8
 _TROVEINFO_TAG_SIGS           =  9
 _TROVEINFO_TAG_PATH_HASHES    = 10
-_TROVEINFO_TAG_LABEL_PATH     = 11
+_TROVEINFO_TAG_LABEL_PATH     = 11  # old style group recipes used this
+                                    # instead of search path. sometimes.
 _TROVEINFO_TAG_POLICY_PROV    = 12
 _TROVEINFO_TAG_TROVEVERSION   = 13
 _TROVEINFO_TAG_INCOMPLETE     = 14
@@ -990,19 +991,28 @@ _TROVEINFO_TAG_BUILD_FLAVOR   = 20
 _TROVEINFO_TAG_COPIED_FROM    = 21
 _TROVEINFO_TAG_IMAGE_GROUP    = 22
 _TROVEINFO_TAG_FACTORY        = 23
-_TROVEINFO_TAG_SEARCH_PATH    = 24
+_TROVEINFO_TAG_SEARCH_PATH    = 24  # final search path for old-style group
+                                    # builds
 _TROVEINFO_TAG_DERIVEDFROM    = 25
 _TROVEINFO_TAG_PKGCREATORDATA = 26
 _TROVEINFO_TAG_CLONEDFROMLIST = 27
 _TROVEINFO_TAG_CAPSULE        = 28
 _TROVEINFO_TAG_MTIMES         = 29
 _TROVEINFO_TAG_PROPERTIES     = 30
-_TROVEINFO_TAG_LAST           = 30
+_TROVEINFO_TAG_BUILD_REFS     = 31  # group set recipes track troves which
+                                    # were named during a build but did not
+                                    # make it into the final groups
+_TROVEINFO_TAG_LAST           = 31
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
+_TROVECAPSULE_MSI             = 2
+_TROVECAPSULE_WIM             = 3
+
 _TROVECAPSULE_TYPE_CONARY     = ''
 _TROVECAPSULE_TYPE_RPM        = 'rpm'
+_TROVECAPSULE_TYPE_MSI        = 'msi'
+_TROVECAPSULE_TYPE_WIM        = 'wim'
 
 _TROVECAPSULE_RPM_NAME        = 0
 _TROVECAPSULE_RPM_VERSION     = 1
@@ -1012,9 +1022,26 @@ _TROVECAPSULE_RPM_EPOCH       = 4
 _TROVECAPSULE_RPM_OBSOLETES   = 5
 _TROVECAPSULE_RPM_SHA1HEADER  = 6
 
+_TROVECAPSULE_MSI_NAME        = 0
+_TROVECAPSULE_MSI_VERSION     = 1
+_TROVECAPSULE_MSI_PLATFORM    = 2
+_TROVECAPSULE_MSI_PCODE       = 3
+_TROVECAPSULE_MSI_UCODE       = 4
+_TROVECAPSULE_MSI_COMPONENTS  = 5
+_TROVECAPSULE_MSI_ARGUMENTS   = 6
+
+_TROVECAPSULE_WIM_NAME        = 0
+_TROVECAPSULE_WIM_VERSION     = 1
+_TROVECAPSULE_WIM_VOLUMEINDEX = 2
+_TROVECAPSULE_WIM_INFOXML     = 3
+
 _RPM_OBSOLETE_NAME    = 0
 _RPM_OBSOLETE_FLAGS   = 1
 _RPM_OBSOLETE_VERSION = 2
+
+_MSI_COMPONENT_UUID   = 0
+_MSI_COMPONENT_PATH   = 1
+
 
 class SingleRpmObsolete(streams.StreamSet):
 
@@ -1071,16 +1098,87 @@ class TroveRpmCapsule(streams.StreamSet):
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
 
+class MsiComponent(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _MSI_COMPONENT_UUID     : (DYNAMIC, streams.StringStream, 'uuid'),
+        _MSI_COMPONENT_PATH     : (DYNAMIC, streams.StringStream, 'path'),
+    }
+
+    def __cmp__(self, other):
+        return (cmp(self.uuid(), other.uuid()) or
+                cmp(self.freeze(), other.freeze()))
+
+class MsiComponents(streams.StreamCollection):
+    streamDict = { 1 : MsiComponent }
+
+    def add(self, uuid, path):
+        comp = MsiComponent()
+        comp.uuid.set(uuid)
+        comp.path.set(path)
+        self.addStream(1, comp)
+
+class TroveMsiCapsule(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_MSI_NAME      :
+            (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_MSI_VERSION   :
+            (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_MSI_PLATFORM  :
+            (DYNAMIC, streams.StringStream, 'platform' ),
+        _TROVECAPSULE_MSI_PCODE     :
+            (DYNAMIC, streams.StringStream, 'productCode' ),
+        _TROVECAPSULE_MSI_UCODE     :
+            (DYNAMIC, streams.StringStream, 'upgradeCode' ),
+        _TROVECAPSULE_MSI_COMPONENTS:
+            (DYNAMIC, MsiComponents, 'components' ),
+        _TROVECAPSULE_MSI_ARGUMENTS :
+            (DYNAMIC, streams.StringStream, 'msiArgs' ),
+    }
+
+    def reset(self):
+        self.name.set(None)
+        self.version.set(None)
+        self.platform.set(None)
+        self.productCode.set(None)
+        self.upgradeCode.set(None)
+        self.components = MsiComponents()
+        self.msiArgs.set(None)
+
+class TroveWimCapsule(streams.StreamSet):
+    ignoreUnknown = streams.PRESERVE_UNKNOWN
+    streamDict = {
+        _TROVECAPSULE_WIM_NAME      :
+            (DYNAMIC, streams.StringStream, 'name' ),
+        _TROVECAPSULE_WIM_VERSION   :
+            (DYNAMIC, streams.StringStream, 'version' ),
+        _TROVECAPSULE_WIM_VOLUMEINDEX     :
+            (DYNAMIC, streams.IntStream, 'volumeIndex' ),
+        _TROVECAPSULE_WIM_INFOXML     :
+            (DYNAMIC, streams.StringStream, 'infoXml' ),
+    }
+
+    def reset(self):
+        self.name.set(None)
+        self.version.set(None)
+        self.volumeIndex.set(None)
+        self.infoXml.set(None)
+
 class TroveCapsule(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
         _TROVECAPSULE_TYPE     : (SMALL, streams.StringStream, 'type'),
-        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,      'rpm'  ),
+        _TROVECAPSULE_RPM      : (SMALL, TroveRpmCapsule,         'rpm'  ),
+        _TROVECAPSULE_MSI      : (SMALL, TroveMsiCapsule,         'msi'  ),
+        _TROVECAPSULE_WIM      : (SMALL, TroveWimCapsule,         'wim'  ),
     }
 
     def reset(self):
         self.type.set(None)
         self.rpm.reset()
+        self.msi.reset()
+        self.wim.reset()
 
 def _getTroveInfoSigExclusions(streamDict):
     return [ streamDef[2] for tag, streamDef in streamDict.items()
@@ -1222,6 +1320,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_CAPSULE       : (DYNAMIC, TroveCapsule,        'capsule' ),
         _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
         _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
+        _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1663,6 +1762,7 @@ class Trove(streams.StreamSet):
         new.weakTroves = self.weakTroves.copy()
         new.provides.thaw(self.provides.freeze())
         new.requires.thaw(self.requires.freeze())
+        new.redirects.thaw(self.redirects.freeze())
         new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
         new.troveInfo.thaw(self.troveInfo.freeze())
         return new
@@ -1777,6 +1877,30 @@ class Trove(streams.StreamSet):
                 sha1helper.sha1FromString(sha1header))
 
         self.troveInfo.capsule.rpm.obsoletes.addFromHeader(hdr)
+
+    def addMsiCapsule(self, path, version, fileId, winHelper):
+        assert(len(fileId) == 20)
+        dir, base = os.path.split(path)
+        self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
+        self.troveInfo.capsule.type.set('msi')
+        self.troveInfo.capsule.msi.name.set(winHelper.productName)
+        self.troveInfo.capsule.msi.version.set(winHelper.version)
+        self.troveInfo.capsule.msi.platform.set(winHelper.platform)
+        self.troveInfo.capsule.msi.productCode.set(winHelper.productCode)
+        self.troveInfo.capsule.msi.upgradeCode.set(winHelper.upgradeCode)
+        self.troveInfo.capsule.msi.msiArgs.set(winHelper.msiArgs)
+        for uuid, path in winHelper.components:
+            self.troveInfo.capsule.msi.components.add(uuid, path)
+
+    def addWimCapsule(self, path, version, fileId, winHelper):
+        assert(len(fileId) == 20)
+        dir, base = os.path.split(path)
+        self.idMap[CAPSULE_PATHID] = (dir, base, fileId, version)
+        self.troveInfo.capsule.type.set('wim')
+        self.troveInfo.capsule.wim.name.set(winHelper.volume['name'])
+        self.troveInfo.capsule.wim.version.set(winHelper.volume['version'])
+        self.troveInfo.capsule.wim.volumeIndex.set(winHelper.volumeIndex)
+        self.troveInfo.capsule.wim.infoXml.set(winHelper.wimInfoXml)
 
     def computePathHashes(self):
         self.troveInfo.pathHashes.clear()
@@ -3069,6 +3193,14 @@ class Trove(streams.StreamSet):
     def getLoadedTroves(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor())
                  for x in self.troveInfo.loadedTroves.iterAll() ]
+
+    def setBuildRefs(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.buildRefs.add(name, ver, release)
+
+    def getBuildRefs(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor())
+                 for x in self.troveInfo.buildRefs.iterAll() ]
 
     def setDerivedFrom(self, itemList):
         for (name, ver, release) in itemList:

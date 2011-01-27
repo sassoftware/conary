@@ -1169,7 +1169,7 @@ class DependencyChecker:
 
             def _order(self):
                 if self._changeSetList is None:
-                    a, b = orderer()
+                    a, b = self.orderer()
                     self._changeSetList = a
                     self._criticalUpdates = b
 
@@ -1181,6 +1181,7 @@ class DependencyChecker:
                 self._changeSetList = None
                 self._criticalUpdates = None
                 self._linkedJobs = set()
+                self.orderer = orderer
 
         if createGraph or self.findOrdering:
             orderer = lambda : self._findOrdering(sqlResult,
@@ -1521,7 +1522,9 @@ class DependencyTables:
         depSetList = list(set(depSetList))
 
         selectTemplate = "SELECT depNum, provInstanceId FROM (%s)"
-        depList, cu = self._resolve(depSetList, selectTemplate)
+        depList, cu = self._resolve(depSetList, selectTemplate,
+                                    restrictor = restrictor,
+                                    restrictBy = restrictBy)
 
         result = {}
         depSolutions = [ [] for x in xrange(len(depList)) ]

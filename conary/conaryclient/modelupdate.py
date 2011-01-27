@@ -97,6 +97,9 @@ class CMLTroveCache(trovecache.TroveCache):
 
         return self.componentMap[troveTup]
 
+    def getRepos(self):
+        return self.repos
+
 class DatabaseTroveSet(troveset.SearchSourceTroveSet):
 
     # this class changes the name of the node in the dot graph. handy.
@@ -127,6 +130,8 @@ class CMLExcludeTrovesAction(troveset.DelayedTupleSetAction):
 
         self.outSet._setInstall(installSet)
         self.outSet._setOptional(optionalSet)
+
+        return True
 
     __call__ = cmlExcludeTrovesAction
 
@@ -178,6 +183,8 @@ class CMLFindAction(troveset.FindAction):
 
             action.outSet._setOptional(optionalSet)
             action.outSet._setInstall(installSet)
+
+        return True
 
     __call__ = cmlFindAction
 
@@ -264,45 +271,7 @@ class FlattenedTroveTupleSet(troveset.DelayedTupleSet):
 
         return troveset.DelayedTupleSet._walk(self, *args, **kwargs)
 
-class CMLFlattenAction(troveset.DelayedTupleSetAction):
-
-    prefilter = troveset.FetchAction
-    resultClass = FlattenedTroveTupleSet
-
-    def cmlFlattenAction(self, data):
-        installs = []
-        available = []
-
-        for refTrove, inInstall, explicit in self.primaryTroveSet._walk(
-                                            data.troveCache, recurse = True):
-            if inInstall:
-                installs.append(refTrove)
-            else:
-                available.append(refTrove)
-
-        self.outSet._setInstall(installs)
-        self.outSet._setOptional(available)
-        self.outSet._flat = True
-
-    __call__ = cmlFlattenAction
-
 class CMLSearchPath(troveset.SearchPathTroveSet):
-
-    def _getResolveSource(self, depDb, filterFn):
-        # don't bother with items in the install set; those are being installed
-        # already so aren't a good choice for suggestions
-        sourceList = []
-        for ts in self.troveSetList:
-            if isinstance(ts, troveset.TroveTupleSet):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn,
-                                                       depDb = depDb))
-            elif isinstance(ts, CMLSearchPath):
-                sourceList.append(ts._getResolveSource(filterFn = filterFn,
-                                                       depDb = depDb))
-            else:
-                sourceList.append(ts._getResolveSource())
-
-        return searchsource.SearchSourceStack(*sourceList)
 
     def find(self, *troveSpecs):
         return self._action(ActionClass = CMLFindAction, *troveSpecs)
@@ -311,6 +280,9 @@ class CMLSearchPath(troveset.SearchPathTroveSet):
         for ts in self.troveSetList:
             if isinstance(ts, troveset.TroveTupleSet):
                 if troveTup in ts._getOptionalSet():
+                    return True
+            elif isinstance(ts, CMLSearchPath):
+                if ts.hasOptionalTrove(troveTup):
                     return True
 
         return False
@@ -375,41 +347,12 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
 
     SearchPathTroveSet = CMLSearchPath
     FindAction = CMLFindAction
-    FlattenAction = CMLFlattenAction
 
-    def __init__(self, cfg, repos, db):
+    def __init__(self, cfg, repos, db, changeSetList = []):
         self.db =  db
         g = ModelGraph()
         self.cfg = cfg
-        modelgraph.AbstractModelCompiler.__init__(self, cfg.flavor, repos, g)
 
-    def _createRepositoryTroveSet(self, csTroveSet = None):
-        if csTroveSet is None:
-            path = []
-        else:
-            path = [ csTroveSet ]
-
-        repos = troveset.SearchSourceTroveSet(
-                searchsource.NetworkSearchSource(self.repos, [],
-                                                 self.cfg.flavor),
-                graph = self.g)
-        path.append(repos)
-
-        return CMLSearchPath(path, graph = self.g)
-
-    def _createDatabaseTroveSet(self, csTroveSet = None):
-        if csTroveSet is None:
-            path = []
-        else:
-            path = [ csTroveSet ]
-
-        dbSearchSource = searchsource.SearchSource(self.db, self.cfg.flavor)
-        dbTroveSet = DatabaseTroveSet(dbSearchSource, graph = self.g)
-
-        path.append(dbTroveSet)
-        return CMLSearchPath(path, graph = self.g)
-
-    def build(self, model, changeSetList = []):
         if changeSetList:
             csTroveSource = trovesource.ChangesetFilesTroveSource(self.db,
                                                              storeDeps = True)
@@ -417,22 +360,50 @@ class ModelCompiler(modelgraph.AbstractModelCompiler):
             csSearchSource = searchsource.SearchSource(csTroveSource,
                                                        self.cfg.flavor)
             csTroveSet = troveset.SearchSourceTroveSet(csSearchSource,
-                                                       graph = self.g)
+                                                       graph = g)
         else:
             csTroveSet = None
 
-        reposTroveSet = self._createRepositoryTroveSet(csTroveSet = csTroveSet)
-        dbTroveSet = self._createDatabaseTroveSet(csTroveSet = csTroveSet)
+        reposTroveSet = self._createRepositoryTroveSet(repos, g,
+                                                       csTroveSet = csTroveSet)
+        dbTroveSet = self._createDatabaseTroveSet(db, g,
+                                                  csTroveSet = csTroveSet)
 
-        return modelgraph.AbstractModelCompiler.build(self, model,
-                                                      reposTroveSet, dbTroveSet)
+        modelgraph.AbstractModelCompiler.__init__(self, cfg.flavor, repos, g,
+                                                  reposTroveSet, dbTroveSet)
 
+
+    def _createRepositoryTroveSet(self, repos, g, csTroveSet = None):
+        if csTroveSet is None:
+            path = []
+        else:
+            path = [ csTroveSet ]
+
+        repos = troveset.SearchSourceTroveSet(
+                searchsource.NetworkSearchSource(repos, [], self.cfg.flavor),
+                graph = g)
+        path.append(repos)
+
+        return CMLSearchPath(path, graph = g)
+
+    def _createDatabaseTroveSet(self, db, g, csTroveSet = None):
+        if csTroveSet is None:
+            path = []
+        else:
+            path = [ csTroveSet ]
+
+        dbSearchSource = searchsource.SearchSource(db, self.cfg.flavor)
+        dbTroveSet = DatabaseTroveSet(dbSearchSource, graph = g)
+
+        path.append(dbTroveSet)
+        return CMLSearchPath(path, graph = g)
 
 class CMLClient(object):
 
     def cmlGraph(self, model, changeSetList = []):
-        c = ModelCompiler(self.cfg, self.getRepos(), self.getDatabase())
-        troveSet = c.build(model, changeSetList)
+        c = ModelCompiler(self.cfg, self.getRepos(), self.getDatabase(),
+                          changeSetList)
+        troveSet = c.build(model)
 
         # we need to explicitly fetch this before we can walk it
         preFetch = troveSet._action(ActionClass = CMLFinalFetchAction)
@@ -561,7 +532,7 @@ class CMLClient(object):
     def _updateFromTroveSetGraph(self, uJob, troveSet, troveCache,
                             split = True, fromChangesets = [],
                             criticalUpdateInfo=None, applyCriticalOnly = False,
-                            restartInfo = None,
+                            restartInfo = None, callback = None,
                             ignoreMissingDeps = False):
         """
         Populates an update job based on a set of trove update and erase
@@ -642,6 +613,9 @@ class CMLClient(object):
 
         searchPath = troveSet.searchPath
 
+        if callback:
+            callback.executingSystemModel()
+
         #depSearch = CMLSearchPath([ preFetch, searchPath ],
                                                #graph = preFetch.g)
         depSearch = searchPath
@@ -668,6 +642,9 @@ class CMLClient(object):
 
         self._closePackages(troveCache, targetTrv)
         job = targetTrv.diff(existsTrv, absolute = False)[2]
+
+        if callback:
+            callback.resolvingDependencies()
 
         # don't resolve against local troves (we can do this because either
         # they're installed and show up in the unresolveable list or they
@@ -709,6 +686,14 @@ class CMLClient(object):
                                     criticalJobs = criticalJobs,
                                     finalJobs = finalJobs,
                                     criticalOnly = criticalOnly)
+            # this is horrible. it forces the dependency graph which is used
+            # for ordering to be updated with the results of each dep pass
+            # (note that we do this after the depCheck() call in the loop
+            # below. it's really a bug that it happens here and it not internal
+            # to the dep checker, but changing that would affect the non
+            # system model update path which I don't want to do (even if doing
+            # so would be a bug fix)
+            result._order()
 
             suggMap = {}
             while True:
@@ -765,7 +750,9 @@ class CMLClient(object):
                                         criticalJobs = criticalJobs,
                                         finalJobs = finalJobs,
                                         criticalOnly = criticalOnly)
+                result._order()
 
+            check.done()
             log.info("job dependency closed; %s jobs resulted", len(job))
 
             # if any of the things we're about to install or remove use
@@ -810,5 +797,8 @@ class CMLClient(object):
         for needingTroveTup, neededSet in suggMap.items():
             if not neededSet:
                 del suggMap[needingTroveTup]
+
+        if callback:
+            callback.done()
 
         return suggMap

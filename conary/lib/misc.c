@@ -382,8 +382,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
     char tag[12];
 
     if (!PYINT_CheckExact(tagObj)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
-        free(depList);
+        PyErr_SetString(PyExc_TypeError, "'tag' attribute of dep class object must be an int");
         return -1;
     }
 
@@ -1631,24 +1630,6 @@ static PyObject * rpmExpandMacro(PyObject *self, PyObject *args) {
 }
 
 
-#define MODULE_DOCSTR "miscellaneous low-level C functions for conary"
-
-#if PY_MAJOR_VERSION >= 3
-static PyModuleDef MiscModule = {
-    PyModuleDef_HEAD_INIT,
-    "misc",
-    MODULE_DOCSTR,
-    -1,
-    MiscMethods
-};
-#endif
-
-PYMODULE_INIT(misc)
-{
-    PyObject *m = PYMODULE_CREATE("misc", MiscMethods, MODULE_DOCSTR,
-            &MiscModule);
-    PYMODULE_RETURN(m);
-}
-
+PYMODULE_DECLARE(misc, MiscMethods, "miscellaneous low-level C functions for conary");
 
 /* vim: set sts=4 sw=4 expandtab : */

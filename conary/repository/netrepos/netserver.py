@@ -1068,15 +1068,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
                 assert(withFlavors)
 
-                ts = [float(x) for x in timeStamps.split(":")]
-                version = versions.VersionFromString(versionStr, timeStamps=ts)
-
                 d = troveVersions.get(troveName, None)
                 if d is None:
                     d = {}
                     troveVersions[troveName] = d
 
-                version = version.freeze()
+                version = self.versionStringToFrozen(versionStr, timeStamps)
                 l = d.get(version, None)
                 if l is None:
                     l = []
@@ -1095,10 +1092,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 for (finalTimestamp, flavorScore, versionStr, timeStamps,
                      flavor) in versionDict.itervalues():
-                    ts = [float(x) for x in timeStamps.split(":")]
-                    version = versions.VersionFromString(versionStr, timeStamps=ts)
-                    version = self.freezeVersion(version)
-
+                    version = self.versionStringToFrozen(versionStr, timeStamps)
                     if withFlavors:
                         flist = l.setdefault(version, [])
                         flist.append(flavor or '')
@@ -1234,9 +1228,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute(query)
         ret = {}
         for (trove, version, flavor, timeStamps) in cu:
-            # FIXME: we hardcode the timestamp format here for speed reasons
-            version = versions.strToFrozen(version, [ "%.3f" % (float(x),)
-                                                      for x in timeStamps.split(":") ])
+            version = self.versionStringToFrozen(version, timeStamps)
             retname = ret.setdefault(trove, {})
             flist = retname.setdefault(version, [])
             flist.append(flavor or '')
@@ -3164,8 +3156,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(4, "executing query", query, mark)
         ret = []
         for name, version, flavor, timeStamps, mark, troveType in cu:
-            version = versions.strToFrozen(version, [
-                "%.3f" % (float(x),) for x in timeStamps.split(":") ])
+            version = self.versionStringToFrozen(version, timeStamps)
             ret.append( (mark, (name, version, flavor), troveType) )
             if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
@@ -3673,6 +3664,9 @@ class ServerConfig(ConfigFile):
     bugsFromEmail           = CfgString
     bugsEmailName           = (CfgString, 'Conary Repository')
     bugsEmailSubject        = (CfgString, 'Conary Repository Error Message')
+    memCache                = CfgString
+    memCacheUserAuth        = (CfgBool, True)
+    memCacheTimeout         = (CfgInt, -1)
     changesetCacheDir       = CfgPath
     changesetCacheLogFile   = CfgPath
     closed                  = CfgString

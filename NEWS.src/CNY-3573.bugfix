@@ -1,2 +1,0 @@
-Content injection for capsules is no longer retrieving the changeset over HTTP
-when it is available locally.

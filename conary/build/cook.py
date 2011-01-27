@@ -48,7 +48,8 @@ CookError = builderrors.CookError
 RecipeFileError = builderrors.RecipeFileError
 
 # -------------------- private below this line -------------------------
-def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
+def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo,
+                     winHelper=None):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
@@ -67,8 +68,18 @@ def _createComponent(repos, bldPkg, newVersion, ident, capsuleInfo):
         m = magic.magic(capsulePath)
         fileObj = files.FileFromFilesystem(capsulePath,
                                            trove.CAPSULE_PATHID)
-        p.addRpmCapsule(os.path.basename(capsulePath),
-                          newVersion, fileObj.fileId(), m.hdr)
+        if capsuleInfo[0] == 'rpm':
+            p.addRpmCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), m.hdr)
+        elif capsuleInfo[0] == 'msi':
+            p.addMsiCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
+        elif capsuleInfo[0] == 'wim':
+            p.addWimCapsule(os.path.basename(capsulePath),
+                            newVersion, fileObj.fileId(), winHelper)
+        else:
+            # This shouldn't be able to happen
+            raise
         fileMap[fileObj.pathId()] = (fileObj, capsulePath,
                                      os.path.basename(capsulePath))
 
@@ -819,6 +830,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
             grpTrv.setSearchPath(recipeObj.getSearchPath())
+            grpTrv.setBuildRefs(group.getBuildRefs())
             grpTrv.troveInfo.imageGroup.set(group.imageGroup)
             compatClass = group.compatibilityClass
             if compatClass is not None:
@@ -1468,8 +1480,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         assert(comp)
         grp = grpMap[main]
 
-        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion, idgen,
-                                recipeObj._getCapsule(buildPkg.getName()))
+        (p, fileMap) = _createComponent(repos, buildPkg, targetVersion,
+                idgen, recipeObj._getCapsule(buildPkg.getName()),
+                getattr(recipeObj, 'winHelper', None))
 
         built.append((compName, p.getVersion().asString(), p.getFlavor()))
 
@@ -2011,6 +2024,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
     @param changeSetFile: file to write changeset out to.
     @type changeSetFile: str
     """
+
     targetLabel = None
 
     use.track(True)
@@ -2451,6 +2465,7 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
     troveDict.update(dict(zip(oldTroveTups, oldTroves)))
 
     unmatchedComponents = []
+    componentsToFetch = []
     for newTup in toMatch:
         newTrove = troveDict[newTup]
         if newTup not in metadataMatches:
@@ -2476,17 +2491,18 @@ def _getTroveMetadataFromRepo(repos, troveList, recipeObj):
         # match up those components that existed both in the old collection
         # and the new one.
         componentMatches = set(newTroveComponents) & set(oldTroveComponents)
-        componentMatches = [ (x, oldTup[1], oldTup[2])
+        componentsToFetch += [ (x, oldTup[1], oldTup[2])
                                 for x in componentMatches ]
-        hasTroves = repos.hasTroves(componentMatches)
-        componentMatches = [x for x in componentMatches if hasTroves[x]]
-        componentMatches = repos.getTroves(componentMatches, withFiles=False)
-        componentMatches = dict((x.getName(), x) for x in componentMatches)
-        for childTrv in childrenByTrove.get(
-                                    newTrove.getNameVersionFlavor(), []):
-            match = componentMatches.get(childTrv.getName(), None)
-            if match:
-                allMatches.append((childTrv, match, False))
+
+    hasTroves = repos.hasTroves(componentsToFetch)
+    componentsToFetch = [x for x in componentsToFetch if hasTroves[x]]
+    componentsToFetch = repos.getTroves(componentsToFetch, withFiles=False)
+    componentsToFetch = dict((x.getName(), x) for x in componentsToFetch)
+    for childTrv in childrenByTrove.get(
+                                newTrove.getNameVersionFlavor(), []):
+        match = componentsToFetch.get(childTrv.getName(), None)
+        if match:
+            allMatches.append((childTrv, match, False))
 
     if unmatchedComponents:
         # some components must have been added in this build from the

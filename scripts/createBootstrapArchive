@@ -1,0 +1,124 @@
+#!/bin/sh
+#
+# Copyright (c) 2010-2011 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+# The process for using this script is documented at:
+# https://issues.rpath.com/browse/KB-26
+
+# Encapsulated RHEL configuration:
+# Variables in ALL CAPS are the most likely things to need to be modified
+# as part of site customization
+NAMESPACES='rhel-4-as rhel-5-server rhel-5-client-workstation'
+FLAVORS='32 64'
+REPOSITORY='rhel.rpath.com'
+# Must use local rBuilder instance with RHN subscription for RHEL RPMs
+RBUILDER='rbuilder.example.com'
+#CUSTOMLABELS='platform.rbuilder.example.com@example:imports-$namespace'
+
+# Encapsulated CentOS configuration:
+#NAMESPACES='centos-5e'
+#FLAVORS='32 64'
+#REPOSITORY='centos.rpath.com'
+## Use local rBuilder with centos configured if you have one; otherwise,
+## leave blank to use rPath's upstream repository
+#RBUILDER=''
+#CUSTOMLABELS='platform.rbuilder.example.com@example:imports-$namespace'
+
+# eval echo for brace expansion
+BOOTSTRAP_TROVES="$(eval echo 'python-conary{,:{lib,runtime,devel,devellib,supdoc}} \
+                               conary{,:{config,data,doc,python,runtime,supdoc}} \
+                               libelf-lgpl{,:lib}')"
+BOOTSTRAP_PACKAGES=$(echo $BOOTSTRAP_TROVES | sed 's/[^ ]\+:[^ ]\+//g')
+
+declare -a flavorMap
+flavorMap[32]="is: x86(~i486,~i586,~i686)"
+flavorMap[64]="is: x86_64"
+declare -a flavorNameMap
+flavorNameMap[32]="x86"
+flavorNameMap[64]="x86_64"
+
+if [ -n "$RBUILDER" ] ; then
+    conaryProxy="conaryProxy http http://${RBUILDER}"
+    conaryProxyS="conaryProxy https https://${RBUILDER}"
+fi
+
+for namespace in $NAMESPACES; do
+    for flavor in $FLAVORS; do
+        T=$(mktemp -d) || { echo could not make temp dir; exit;}
+        # rhel-5-server and rhel-5-client-workstation share tools on rhel-5
+        # similar pattern for rhel4 and centos
+        toolspace=$(echo $namespace | sed '/rhel-5/s/-5-.*$/-5/;
+                                           /rhel-4/s/-4-.*$/-4/;
+                                           /centos-5e/s/-5e\(-.*\)\?$/-5-common/')
+        conary update --no-deps --no-restart --no-interactive --root=$T \
+            $BOOTSTRAP_TROVES \
+            --config="flavor ${flavorMap[$flavor]}" \
+            --no-recurse \
+            ${conaryProxy:+--config="$conaryProxy"} \
+            ${conaryProxyS:+--config="$conaryProxyS"} \
+            --install-label=${REPOSITORY}@rpath:$toolspace
+        mkdir -p $T/etc/conary/config.d
+        echo "installLabelPath ${REPOSITORY}@rpath:$namespace $CUSTOMLABELS" > $T/etc/conary/config.d/installLabelPath
+        if [ -n "${RBUILDER}" ] ; then
+            echo "${conaryProxy}" > $T/etc/conary/config.d/proxy
+            echo "${conaryProxyS}" >> $T/etc/conary/config.d/proxy
+        fi
+        rm -rf $T/var/lib/conarydb/rollbacks/*
+        echo > $T/var/log/conary
+        rm $T/var/lib/conarydb/manifest
+        mkdir -p $T/root/conaryBootstrap
+
+        # Note that /usr/share/conary/recreatedb is first packaged in
+        # Conary 2.1.16
+        cat > $T/root/conaryBootstrap/adopt <<'EOF'
+#!/bin/sh
+# install links for libelf-lgpl
+ldconfig
+# install rpm bindings
+/root/conaryBootstrap/installrpm
+# populate conary database from rpm database
+/usr/share/conary/recreatedb rpmdb /
+EOF
+        chmod 755 $T/root/conaryBootstrap/adopt
+
+        cat > $T/root/conaryBootstrap/installrpm <<EOF
+#!/bin/sh
+rpmver=\$(rpm -q rpm | sed 's/rpm-//;s/-/_/')
+echo 'Ensuring correct permissions in bootstrap Conary packages...'
+/usr/bin/conary repair $BOOTSTRAP_PACKAGES
+echo 'Installing RPM python bindings for Conary...'
+set -x
+/usr/bin/conary update \$(ls -1 /root/conaryBootstrap/rpmpython-\${rpmver}*.ccs | head -1)
+EOF
+        chmod 755 $T/root/conaryBootstrap/installrpm
+
+        for rpmver in $(conary rq \
+                        ${conaryProxy:+--config="$conaryProxy"} \
+                        ${conaryProxyS:+--config="$conaryProxyS"} \
+                        --all-versions \
+                        rpm:python=${REPOSITORY}@rpath:$namespace | \
+                        sed 's/rpm:python=//') ; do
+            conary changeset \
+                rpm:python=${REPOSITORY}@rpath:$namespace/$rpmver \
+                --config="flavor ${flavorMap[$flavor]}" \
+                ${conaryProxy:+--config="$conaryProxy"} \
+                ${conaryProxyS:+--config="$conaryProxyS"} \
+                $T/root/conaryBootstrap/rpmpython-$rpmver.ccs
+        done
+        tar -c -z -C $T \
+            -f $namespace-${flavorNameMap[$flavor]}-conaryBootstrap.tar.gz \
+            $(cd $T; find . -type f)
+        rm -rf $T
+    done
+done

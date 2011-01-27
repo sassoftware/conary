@@ -699,6 +699,7 @@ class ConaryContext(ConfigSection):
     verifyDirsNoNewFiles  =  (CfgPathList, ('/proc', '/sys', '/home', '/dev',
                                             '/mnt', '/tmp', '/var',
                                             '/media', '/initrd' ))
+    windowsBuildService   = CfgString
 
     def _resetSigMap(self):
         self.resetToDefault('signatureKeyMap')

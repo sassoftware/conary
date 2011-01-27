@@ -21,7 +21,6 @@ pinTroves, excludeTroves, and so forth.
 
 import shlex
 
-from conary import conaryclient
 from conary import errors
 from conary import trovetup
 from conary import versions
@@ -41,6 +40,7 @@ from conary.lib.compat import namedtuple as _namedtuple
 # installTroves := list of troveTuples
 # patchTroves := list of troveTuples
 # offerTroves := list of troveTuples
+# includeTrove := troveTuple
 
 
 # There are four kinds of string formatting used in these objects:
@@ -107,7 +107,11 @@ class CMLocation(_namedtuple('CMLocation', 'line context op spec')):
             spec = self.spec.asString()
         else:
             spec = ''
-        return ':'.join((x for x in (context, str(self.line), spec) if x))
+        if self.line is None:
+            line = 'new-line'
+        else:
+            line = str(self.line)
+        return ':'.join((x for x in (context, line, spec) if x))
     asString = __str__
 
 
@@ -250,6 +254,16 @@ class SearchLabel(SearchOperation):
         self.item = versions.Label(text)
 
 
+class IncludeOperation(_CMOperation):
+    key = 'include'
+
+    def asString(self):
+        return shellStr(self.item.asString())
+
+    def parse(self, text):
+        self.item = CMTroveSpec(text)
+
+
 class _TextOp(_CMOperation):
     def parse(self, text):
         self.item = text
@@ -331,12 +345,13 @@ class OfferTroveOperation(TroveOperation):
 class PatchTroveOperation(TroveOperation):
     key = 'patch'
 
-troveOpMap = {
+opMap = {
     UpdateTroveOperation.key  : UpdateTroveOperation,
     EraseTroveOperation.key   : EraseTroveOperation,
     InstallTroveOperation.key : InstallTroveOperation,
     OfferTroveOperation.key   : OfferTroveOperation,
     PatchTroveOperation.key   : PatchTroveOperation,
+    IncludeOperation.key      : IncludeOperation,
 }
 
 class CM:
@@ -345,6 +360,7 @@ class CM:
     SearchTrove = SearchTrove
     SearchLabel = SearchLabel
     SearchOperation = SearchOperation
+    IncludeOperation = IncludeOperation
     NoOperation = NoOperation
     UpdateTroveOperation = UpdateTroveOperation
     EraseTroveOperation = EraseTroveOperation
@@ -414,7 +430,7 @@ class CM:
     def appendNoOpByText(self, text, **kwargs):
         self.appendNoOperation(NoOperation(text, **kwargs))
 
-    def appendOp(self, op, deDup=True):
+    def appendOp(self, op):
         self.modelOps.append(op)
         self._addIndex(op)
 
@@ -436,19 +452,19 @@ class CM:
         self.modelOps[i] = newOp
         self._addIndex(newOp)
 
-    def appendTroveOpByName(self, key, *args, **kwargs):
-        deDup = kwargs.pop('deDup', True)
-        op = troveOpMap[key](*args, **kwargs)
-        self.appendOp(op, deDup=deDup)
+    def appendOpByName(self, key, *args, **kwargs):
+        op = opMap[key](*args, **kwargs)
+        self.appendOp(op)
         return op
 
     def _iterOpTroveItems(self):
         for op in self.modelOps:
-            if isinstance(op, (SearchTrove, TroveOperation)):
+            if isinstance(op, (SearchTrove, TroveOperation, IncludeOperation)):
                 for item in op:
                     yield item
 
     def refreshVersionSnapshots(self):
+        from conary import conaryclient
         cfg = self.cfg
         cclient = conaryclient.ConaryClient(cfg)
         repos = cclient.getRepos()
@@ -491,7 +507,7 @@ class CM:
                 if newItem != op.item:
                     # at least one spec was replaced; update the line
                     op.update(newItem)
-            elif isinstance(op, SearchTrove):
+            elif isinstance(op, (SearchTrove, IncludeOperation)):
                 if op.item in replaceSpecs:
                     op.update(replaceSpecs[op.item])
 
@@ -601,6 +617,11 @@ class CM:
                                         self._simplificationCandidate(opList):
                 oldOp, oldSpec = opList[oldIdx]
                 newOp, newSpec = opList[newIdx]
+                if newOp.index != None:
+                    # We may later add aggressive simplification:
+                    # if not simplifyAllLocalOps and newOp.index != None:
+                    continue
+
                 result = simplifyClass.check(troveCache, g, oldOp, oldSpec,
                                              newOp, newSpec)
                 if result is False:
@@ -646,6 +667,7 @@ class CM:
 
         return localTroveTups - troveTups
 
+
 class CML(CM):
     '''
     Implements the abstract system model persisting in a text format,
@@ -653,6 +675,7 @@ class CML(CM):
 
     The format is::
         search troveSpec|label
+        include troveSpec
         update troveSpec+
         erase troveSpec+
         install troveSpec+
@@ -690,6 +713,14 @@ class CML(CM):
     in the search path as created by C{search} lines, looking first
     in the most recent previous C{search} line and working back to
     the first C{search} line.
+
+    C{include} lines take a single troveSpec, which B{may} be enclosed
+    in single or double quote characters.  Each of these lines
+    references a single trove which contains an additional block of
+    CML that is executed at this point in the current model.  Any
+    C{search} lines in the included CML apply only while executing
+    the included CML.  Otherwise, the included CML is processed as
+    if it were literally included.
 
     Whole-line comments are retained, and ordering is preserved
     with respect to non-comment lines.
@@ -735,12 +766,12 @@ class CML(CM):
                 raise CMError('%s: Invalid statement "%s"'
                               %(CMLocation(index, self.context), line))
 
-            if verb == 'version':
+            if verb == VersionOperation.key:
                 nouns = nouns.split('#')[0].strip()
                 self.setVersion(VersionOperation(text=nouns,
                     modified=False, index=index, context=self.context))
 
-            elif verb == 'search':
+            elif verb == SearchOperation.key:
                 # Handle it if quoted, but it doesn't need to be
                 try:
                     nouns = ' '.join(shlex.split(nouns, comments=True))
@@ -759,12 +790,26 @@ class CML(CM):
                             CMLocation(index, self.context), str(e)))
                 self.appendOp(searchOp)
 
-            elif verb in troveOpMap:
+            elif verb == IncludeOperation.key:
+                # Handle it if quoted, but it doesn't need to be
                 try:
-                    self.appendTroveOpByName(verb,
+                    nouns = ' '.join(shlex.split(nouns, comments=True))
+                except ValueError, e:
+                    raise CMError('%s: %s' %(
+                        CMLocation(index, self.context), str(e)))
+                try:
+                    includeOp = IncludeOperation(text=nouns,
+                       modified=False, index=index, context=self.context)
+                except cmdline.TroveSpecError, e:
+                    raise CMError('%s: %s' %(
+                        CMLocation(index, self.context), str(e)))
+                self.appendOp(includeOp)
+
+            elif verb in opMap:
+                try:
+                    self.appendOpByName(verb,
                         text=shlex.split(nouns, comments=True),
-                        modified=False, index=index, context=self.context,
-                        deDup=False)
+                        modified=False, index=index, context=self.context)
                 except ValueError, e:
                     raise CMError('%s: %s' %(
                         CMLocation(index, self.context), str(e)))

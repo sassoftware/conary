@@ -128,6 +128,15 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.csText = text
         self.update()
 
+    def executingSystemModel(self):
+        self.updateMsg("Processing system model")
+
+    def loadingModelCache(self):
+        self.updateMsg("Loading system model cache")
+
+    def savingModelCache(self):
+        self.updateMsg("Saving system model cache")
+
     def preparingChangeSet(self):
         """
         @see: callbacks.ChangesetCallback.preparingChangeSet
@@ -389,7 +398,7 @@ def displayChangedJobs(addedJobs, removedJobs, cfg):
         for line in formatter.formatJobTups(addedJobs, indent='    '):
             print line
 
-def displayUpdateInfo(updJob, cfg):
+def displayUpdateInfo(updJob, cfg, noRestart=False):
     jobLists = updJob.getJobs()
     db = conaryclient.ConaryClient(cfg).db
 
@@ -410,7 +419,7 @@ def displayUpdateInfo(updJob, cfg):
             print 'Job %d of %d:' % (num + 1, totalJobs)
         for line in formatter.formatJobTups(job, indent='    '):
             print line
-    if updJob.getCriticalJobs():
+    if updJob.getCriticalJobs() and not noRestart:
         criticalJobs = updJob.getCriticalJobs()
         if len(criticalJobs) > 1:
             jobPlural = 's'
@@ -502,9 +511,10 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
         defArgs = [x for x in otherArgs
                     if not (x.startswith('+') or x.startswith('-'))]
 
-        # find any default arguments that represent changesets
+        # find any default arguments that represent changesets to
+        # install/update
         for defArg in list(defArgs):
-            if util.exists(defArg):
+            if kwargs['updateByDefault'] and os.path.isfile(defArg):
                 try:
                     cs = changeset.ChangeSetFromFile(defArg)
                     fromChangesets.append((cs, defArg))
@@ -519,7 +529,7 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
             rmArgs += defArgs
 
         if rmArgs:
-            sysmodel.appendTroveOpByName('erase', text=rmArgs)
+            sysmodel.appendOpByName('erase', text=rmArgs)
 
         updateName = { False: 'update',
                        True: 'install' }[kwargs['keepExisting']]
@@ -577,10 +587,10 @@ def doModelUpdate(cfg, sysmodel, modelFile, otherArgs, **kwargs):
                     for x in disallowedChangesets))
 
         if addArgs:
-            sysmodel.appendTroveOpByName(updateName, text=addArgs)
+            sysmodel.appendOpByName(updateName, text=addArgs)
 
         if patchArgs:
-            sysmodel.appendTroveOpByName('patch', text=patchArgs)
+            sysmodel.appendOpByName('patch', text=patchArgs)
 
 
         kwargs['fromChangesets'] = [x[0] for x in fromChangesets]
@@ -678,17 +688,19 @@ def _updateTroves(cfg, applyList, **kwargs):
                                                    callback = callback,
                                                    changeSetList =
                                                         changeSetList)
-            tcPath = cfg.root + '/var/lib/conarydb/modelcache'
+            tcPath = cfg.root + cfg.dbPath + '/modelcache'
             if loadTroveCache:
                 if os.path.exists(tcPath):
                     log.info("loading %s", tcPath)
+                    callback.loadingModelCache()
                     tc.load(tcPath)
             ts = client.cmlGraph(model, changeSetList = changeSetList)
             if modelGraph is not None:
                 ts.g.generateDotFile(modelGraph)
             suggMap = client._updateFromTroveSetGraph(updJob, ts, tc,
                                         fromChangesets = changeSetList,
-                                        criticalUpdateInfo = criticalUpdates)
+                                        criticalUpdateInfo = criticalUpdates,
+                                        callback = callback)
             if modelTrace is not None:
                 ts.g.trace([ parseTroveSpec(x) for x in modelTrace ] )
 
@@ -720,7 +732,9 @@ def _updateTroves(cfg, applyList, **kwargs):
 
             if tc.cacheModified():
                 log.info("saving %s", tcPath)
+                callback.savingModelCache()
                 tc.save(tcPath)
+                callback.done()
         else:
             suggMap = client.prepareUpdateJob(updJob, applyList, **kwargs)
     except:
@@ -730,7 +744,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if info:
         callback.done()
-        displayUpdateInfo(updJob, cfg)
+        displayUpdateInfo(updJob, cfg, noRestart=noRestart)
         if restartInfo and not model:
             callback.done()
             newJobs = set(itertools.chain(*updJob.getJobs()))
@@ -795,7 +809,7 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     elif askInteractive:
         print 'The following updates will be performed:'
-        displayUpdateInfo(updJob, cfg)
+        displayUpdateInfo(updJob, cfg, noRestart=noRestart)
 
     if migrate and cfg.interactive:
         print ('Migrate erases all troves not referenced in the groups'
@@ -970,7 +984,9 @@ def updateAll(cfg, **kwargs):
     if restartInfo:
         util.rmtree(restartInfo, ignore_errors=True)
 
-def changePins(cfg, troveStrList, pin = True):
+def changePins(cfg, troveStrList, pin = True,
+               systemModel = None, systemModelFile = None,
+               callback = None):
     client = conaryclient.ConaryClient(cfg)
     client.checkWriteableRoot()
     troveList = []
@@ -980,6 +996,10 @@ def changePins(cfg, troveStrList, pin = True):
         troveList += troves
 
     client.pinTroves(troveList, pin = pin)
+
+    if systemModel and systemModelFile and not pin:
+        doModelUpdate(cfg, systemModel, systemModelFile, [], callback=callback)
+
 
 def revert(cfg):
     conaryclient.ConaryClient.revertJournal(cfg)

@@ -1,0 +1,201 @@
+#!/usr/bin/python
+#
+# Copyright (C) 2011 rPath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.rpath.com/permanent/licenses/CPL-1.0.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any warranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+#
+# Because redirects are not included in groups, they are not promoted in
+# the normal workflow.  This does not matter in the migrate mode, but
+# in any update mode where labels are used (old update model or system
+# model) or in any workflow where groups may be rebuilt on downstream
+# labels and the group depends on following redirects, it may be important
+# that redirects be promoted to downstream labels.
+
+import itertools
+import optparse
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+from conary.lib import util
+sys.excepthook = util.genExcepthook(debug=True)
+
+from conary import conarycfg, conaryclient, trove, versions
+from conary.cmds import clone
+from conary.deps import deps
+from conary.repository import netclient
+
+if __name__ == '__main__':
+    parser = optparse.OptionParser(
+        usage='%prog [options] [-s] sourceLabel [[-d] destLabel]')
+    parser.add_option("-l", "--list", dest = "list", default = False,
+                      action = "store_true",
+                      help = "list redirect packages on label")
+    parser.add_option("-n", "--new", dest = "new", default = False,
+                      action = "store_true",
+                      help = "list redirect packages on label"
+                             " not yet on target")
+    parser.add_option("-s", "--source", dest = "source",
+                      help = "source label")
+    parser.add_option("-d", "--dest", dest = "dest",
+                      help = "destination label")
+    parser.add_option("-z", "--zero-version", dest = "srcver",
+                      default = False,
+                      action = "store_const", const = "0",
+                      help = 'consider only troves with "0" source version')
+    parser.add_option("-v", "--sv", "--redirect-sourcever",
+                      dest = "srcver", default = None,
+                      help = 'consider only troves with specified'
+                             ' source version')
+    parser.add_option("-t", "--to-changeset",
+                      dest = "changeset", default = None,
+                      help = 'clone to named changeset instead of repository')
+    options, args = parser.parse_args()
+
+    if options.source is None and len(args):
+        options.source = args.pop(0)
+
+    if options.dest is None and len(args):
+        options.dest = args.pop(0)
+    if options.dest is None and options.new:
+        parser.print_help()
+        sys.exit(1)
+
+    if not options.source:
+        parser.print_help()
+        sys.exit(1)
+    
+    sourceLabel = versions.Label(options.source)
+    if options.dest:
+        destLabel = versions.Label(options.dest)
+
+    cfg = conarycfg.ConaryConfiguration(readConfigFiles = True)
+    cfg.initializeFlavors()
+
+    client = conaryclient.ConaryClient(cfg = cfg)
+    repos = client.getRepos()
+
+    queryDict = {'': {sourceLabel: None}}
+
+    sys.stderr.write('Fetching source trove list...')
+    sys.stderr.flush()
+    results = repos.getTroveLatestByLabel(queryDict,
+        bestFlavor=False, troveTypes = netclient.TROVE_QUERY_PRESENT)
+    resultLen = len(results)
+    sys.stderr.write(' done.\n')
+
+    # redirects and regular troves will show up together; we care only
+    # about the latest version in the repository
+    newResults = {}
+    for troveName in results.iterkeys():
+        # results = {name: {version: [flavor list]}, ...}
+        newVer = sorted(results[troveName].keys())[-1]
+        newResults[troveName] = {}
+        newResults[troveName][newVer] = results[troveName][newVer]
+    results = newResults
+
+    sys.stderr.write('\rFetching trove data...')
+    sys.stderr.flush()
+    troveTups = []
+    redirects = []
+    processed = 0
+    for name, versionDict in results.iteritems():
+        processed += 1
+        if trove.troveIsPackage(name) or trove.troveIsFileSet(name):
+            for version, flavorList in versionDict.iteritems():
+                if (not options.srcver or
+                    version.trailingRevision().asString().startswith(
+                        options.srcver + '-')):
+                    for flav in flavorList:
+                        troveTups.append((name, version, flav))
+        if len(troveTups) > 200 or processed >= resultLen:
+            trvs = repos.getTroves(troveTups, withFiles=False)
+            redirects += [x for x in trvs if x.isRedirect()]
+            troveTups[:] = []
+            sys.stderr.write('\rProcessed %d of %d troves...' %(
+                             processed, resultLen))
+            sys.stderr.flush()
+
+    sys.stderr.write(' done.\n')
+
+    sys.stderr.write('Fetching component data for %d packages...' %
+                      len(redirects))
+    sys.stderr.flush()
+    components = repos.getTroves(
+        [y for y in itertools.chain(*[x.strongTroves.keys()
+                                      for x in redirects])], withFiles=False)
+    sys.stderr.write(' done.\n')
+
+    if options.list:
+        for comp in components:
+            redirs = [x for x in comp.redirects.iter()]
+            if redirs:
+                for redir in redirs:
+                    print "%s -> %s=%s" % (comp.name(), redir.name(),
+                        redir.branch().label().asString())
+            else:
+                print "%s -> Nothing" % comp.name()
+
+    if not options.dest:
+        sys.exit(0)
+
+
+    queryDict = dict((x.getName(), {destLabel: None}) for x in redirects)
+    sys.stderr.write('Fetching %d target troves...' %len(queryDict))
+    sys.stderr.flush()
+    results = repos.getTroveLatestByLabel(queryDict,
+        bestFlavor=False, troveTypes = netclient.TROVE_QUERY_PRESENT)
+    troveTups = []
+    for name, versionDict in results.iteritems():
+        for version, flavorList in versionDict.iteritems():
+            for flav in flavorList:
+                troveTups.append((name, version, flav))
+    destTrvs = repos.getTroves(troveTups, withFiles=False)
+    sys.stderr.write(' done.\n')
+
+    needRedirectTrvs = [x for x in destTrvs if not x.isRedirect()]
+    needRedirectsBinaries = sorted(set((x.getName() for x in needRedirectTrvs)))
+
+    if options.new and needRedirectTrvs:
+        needRedirects = {}
+        for redirectTrv in needRedirectTrvs:
+            srcName = redirectTrv.getSourceName()
+            needRedirects.setdefault(srcName, set())
+            needRedirects[srcName].add(redirectTrv.getName())
+
+        print 'source: binary troves needing redirects:'
+        for srcName in sorted(needRedirects.keys()):
+            print '%s: %s' %(srcName, ' '.join(sorted(needRedirects[srcName])))
+
+        print 'binary troves needing redirects: %s' %' '.join(
+            needRedirectsBinaries),
+
+    if needRedirectTrvs:
+        sys.stderr.write('cvc promote %s %s--%s\n' %(
+                            ' '.join(needRedirectsBinaries),
+                            options.source,
+                            options.dest))
+        labelMapList = [(options.source, options.dest)]
+        if not cfg.buildLabel:
+            cfg.buildLabel = sourceLabel
+        clone.promoteTroves(cfg, needRedirectsBinaries, labelMapList,
+                            message='Automated promote of redirect',
+                            cloneSources=True, allFlavors=True,
+                            targetFile=options.changeset)

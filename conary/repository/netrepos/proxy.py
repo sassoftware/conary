@@ -26,7 +26,7 @@ from conary.lib import digestlib, sha1helper, tracelog, urlparse, util
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
-from conary.repository.netrepos import netserver, reposlog
+from conary.repository.netrepos import cache, netserver, reposlog
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -77,6 +77,8 @@ class ExtraInfo(object):
         return self.responseHeaders.get('Via', None)
 
 class ProxyCaller:
+
+    # shim object used by Proxy servers to relay calls to other servers
 
     def callByName(self, methodname, *args, **kwargs):
         # args[0] is protocolVersion
@@ -178,6 +180,9 @@ class ProxyCallFactory:
         return ProxyCaller(url, proxy, transporter)
 
 class RepositoryCaller(xmlshims.NetworkConvertors):
+
+    # shim object used by internal filters (which share code with the
+    # proxies) to let the filters call internal classes
 
     def callByName(self, methodname, *args, **kwargs):
         rc = self.repos.callWrapper(self.protocol, self.port, methodname,
@@ -422,6 +427,11 @@ class ChangeSetInfo(object):
 
 class ChangesetFilter(BaseProxy):
 
+    # Implements changeset caching, content injection for capsules, and
+    # format conversion between changeset versions. The changeset cache
+    # is passed in as an object rather than created here to allow different
+    # types of changeset caches to be used in the future.
+
     forceGetCsVersion = None
     forceSingleCsJob = False
     withCapsuleInjection = False
@@ -656,6 +666,14 @@ class ChangesetFilter(BaseProxy):
                 pass
         return fingerprints
 
+    # mixins can override this (to provide fingerprint caching, perhaps)
+    def lookupFingerprints(self, caller, authToken, chgSetList, recurse,
+                           withFiles, withFileContents, excludeAutoSource,
+                           mirrorMode):
+        return self._callGetChangeSetFingerprints(
+                            caller, chgSetList, recurse, withFiles,
+                            withFileContents, excludeAutoSource, mirrorMode)
+
     def _callGetChangeSet(self, caller, changeSetList, getCsVersion,
                 wireCsVersion, neededCsVersion, neededFiles, recurse,
                 withFiles, withFileContents, excludeAutoSource, mirrorMode,
@@ -773,7 +791,7 @@ class ChangesetFilter(BaseProxy):
             recurse, withFiles, withFileContents, excludeAutoSource,
             mirrorMode, infoOnly, _recursed = False):
 
-        fingerprints = self._callGetChangeSetFingerprints(caller, chgSetList,
+        fingerprints = self.lookupFingerprints(caller, authToken, chgSetList,
             recurse, withFiles, withFileContents, excludeAutoSource,
             mirrorMode)
 
@@ -1328,6 +1346,8 @@ class ChangesetFilter(BaseProxy):
         return dest
 
 class BaseCachingChangesetFilter(ChangesetFilter):
+    # Changeset filter which uses a directory to create a ChangesetCache
+    # instance for the cache
     def __init__(self, cfg, basicUrl):
         if cfg.changesetCacheDir:
             util.mkdirChain(cfg.changesetCacheDir)
@@ -1339,6 +1359,12 @@ class BaseCachingChangesetFilter(ChangesetFilter):
         ChangesetFilter.__init__(self, cfg, basicUrl, csCache)
 
 class RepositoryFilterMixin(object):
+
+    # Simple mixin which lets a BaseProxy derivative sit in front of a
+    # in-process repository class (defined in netrepos.py) rather than
+    # acting as a proxy for a network repository somewhere else. repos
+    # is a netrepos.NetworkRepositoryServer instance
+
     forceGetCsVersion = ChangesetFilter.SERVER_VERSIONS[-1]
     forceSingleCsJob = False
 
@@ -1346,10 +1372,93 @@ class RepositoryFilterMixin(object):
         self.repos = repos
         self.callFactory = RepositoryCallFactory(repos, self.log)
 
-class SimpleRepositoryFilter(BaseCachingChangesetFilter, RepositoryFilterMixin):
+class Memcache(object):
+
+    # mixin for providing memcache based caching of fingerprint, troveinfo
+    # and deplists
+
+    def __init__(self, cfg):
+        self.memCacheTimeout = cfg.memCacheTimeout
+        self.memCacheLocation = cfg.memCache
+        self.memCacheUserAuth = cfg.memCacheUserAuth
+
+        if self.memCacheTimeout >= 0:
+            self.memCache = cache.getCache(self.memCacheLocation)
+        else:
+            self.memCache = cache.EmptyCache()
+
+    def _coalesce(self, authToken, callable, listArg, *extraArgs, **kwargs):
+        key_prefix = kwargs.pop('key_prefix')
+        emptyVal = kwargs.pop('emptyVal')
+
+        if self.memCacheUserAuth:
+            authInfo = (authToken[0], authToken[1], tuple(authToken[2]))
+        else:
+            authInfo = ()
+
+        keys = [ str(authInfo + (x,) + extraArgs +
+                     tuple(sorted(kwargs.items())))
+                    for x in listArg ]
+        keys = [ sha1helper.sha1ToString(sha1helper.sha1String(x)) for x
+                    in keys ]
+        cachedDict = self.memCache.get_multi(keys, key_prefix = key_prefix)
+        finalResults = [ cachedDict.get(x, emptyVal) for x in keys ]
+
+        needed = [ (i, x) for i, x in enumerate(listArg)
+                    if keys[i] not in cachedDict ]
+
+        if needed:
+            others = callable([x[1] for x in needed], *extraArgs, **kwargs)
+
+            for (i, x), result in itertools.izip(needed, others):
+                finalResults[i] = result
+
+            updates = dict( (keys[i], result) for
+                            (i, x), result in itertools.izip(needed, others) )
+            self.memCache.set_multi(updates,
+                            key_prefix = key_prefix,
+                            time = self.memCacheTimeout)
+
+        return finalResults
+
+    def lookupFingerprints(self, caller, authToken, chgSetList, recurse,
+                           withFiles, withFileContents, excludeAutoSource,
+                           mirrorMode):
+        return self._coalesce(authToken,
+                lambda *args : self._callGetChangeSetFingerprints(
+                                    caller, *args),
+                chgSetList,
+                recurse, withFiles, withFileContents, excludeAutoSource,
+                mirrorMode, key_prefix = "FPRINT", emptyVal = '')
+
+    def getDepsForTroveList(self, caller, authToken, clientVersion, troveList,
+                            provides = True, requires = True):
+        # this could merge provides/requires in the cache (perhaps always
+        # requesting both?), but doesn't
+        return self._coalesce(authToken,
+                lambda *args, **kwargs :
+                        caller.getDepsForTroveList(clientVersion, *args,
+                                                   **kwargs),
+                troveList, provides = provides, requires = requires,
+                key_prefix = "DEPS", emptyVal = {})
+
+    def getTroveInfo(self, caller, authToken, clientVersion, infoType,
+                     troveList):
+        return self._coalesce(authToken,
+                lambda nTroveList, nInfoType:
+                        caller.getTroveInfo(clientVersion, nInfoType,
+                                            nTroveList),
+                troveList, infoType,
+                key_prefix = "TROVEINFO", emptyVal = None)
+
+class SimpleRepositoryFilter(Memcache, BaseCachingChangesetFilter, RepositoryFilterMixin):
     withCapsuleInjection = False
 
+    # Basic class used for creating repositories with Conary. It places
+    # a changeset caching layer on top of an in-memory repository.
+
     def __init__(self, cfg, basicUrl, repos):
+        Memcache.__init__(self, cfg)
         BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         RepositoryFilterMixin.__init__(self, repos)
 
@@ -1358,6 +1467,10 @@ class SimpleRepositoryFilter(BaseCachingChangesetFilter, RepositoryFilterMixin):
 
 
 class FileCachingChangesetFilter(BaseCachingChangesetFilter):
+
+    # Adds caching for getFileContents() call to allow proxies to keep
+    # those results around
+
     def __init__(self, cfg, basicUrl):
         BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         util.mkdirChain(cfg.proxyContentsDir)
@@ -1540,14 +1653,17 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
         fobj.seek(0)
         return fobj
 
+class ProxyRepositoryServer(Memcache, FileCachingChangesetFilter):
 
-class ProxyRepositoryServer(FileCachingChangesetFilter):
+    # class for proxy servers used by standalone and apache implementations
+    # adds a proxy specific version of getFileContentsFromTrove()
 
     SERVER_VERSIONS = range(42, netserver.SERVER_VERSIONS[-1] + 1)
     forceSingleCsJob = False
     withCapsuleInjection = True
 
     def __init__(self, cfg, basicUrl):
+        Memcache.__init__(self, cfg)
         FileCachingChangesetFilter.__init__(self, cfg, basicUrl)
         self.callFactory = ProxyCallFactory()
 
@@ -1648,6 +1764,11 @@ class ProxyRepositoryServer(FileCachingChangesetFilter):
 class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin):
     withCapsuleInjection = False
 
+    # Base class for creating a repository which has file content injection.
+    # This is not used by Conary itself, but is used by rBuilder for creating
+    # repositories which need injected capsule content. Adds a
+    # getFileContents() call which can handle content injections.
+
     def __init__(self, cfg, basicUrl, repos):
         FileCachingChangesetFilter.__init__(self, cfg, basicUrl)
         RepositoryFilterMixin.__init__(self, repos)
@@ -1697,6 +1818,9 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
             return self._saveFileContentsChangeset(clientVersion, fileList)
 
 class ChangesetCache(object):
+
+    # Provides a place to cache changeset; uses a directory for them
+    # all indexed by fingerprint
 
     def __init__(self, dataStore, logPath=None):
         self.dataStore = dataStore
@@ -1813,6 +1937,17 @@ class ChangesetCache(object):
                 key[0], key[1], status, extra)
         open(self.logPath, 'a').write(rec)
 
+class AuthenticationInformation(object):
+
+    # summarizes authentication information to keep in a cache
+
+    __slots__ = ( 'name', 'pw', 'entitlements' )
+
+    def __init__(self, authToken, entitlements):
+        self.name = authToken[0]
+        # this will
+        self.pw = sha1helper.sha1ToString(authToken[1])
+        self.entitlements = sorted(entitlements)
 
 def redirectUrl(authToken, url):
     # return the url to use for the final server

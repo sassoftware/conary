@@ -21,7 +21,30 @@ from conary.lib import log, util
 from conary.repository import changeset, filecontainer, filecontents
 from conary.repository import netclient, trovesource
 
+
+class CacheDict(dict):
+
+    def has(self, troveTup, withFiles = False):
+        if not withFiles or trove.troveIsCollection(troveTup[0]):
+            return troveTup in self
+
+        return self.get(troveTup, (None, False))[1] is True
+
+    def __setitem__(self, troveTup, trv):
+        dict.__setitem__(self, troveTup, (False, trv))
+
+    def __getitem__(self, troveTup):
+        return dict.__getitem__(self, troveTup)[1]
+
+    def add(self, troveTup, trv, withFiles=False):
+        dict.__setitem__(self, troveTup, (withFiles, trv))
+
 class TroveCache(trovesource.AbstractTroveSource):
+
+    VERSION = (1, 0)                    # (major, minor)
+
+    troveCacheVersionFileId = 'TROVE-CACHE-FILE-VERSION--------'
+    troveCacheVersionPathId = '\0' * 40
 
     depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
     depCacheFileId = '\0' * 40
@@ -35,19 +58,25 @@ class TroveCache(trovesource.AbstractTroveSource):
     timeStampsPathId = 'SYSTEM-MODEL-TIMESTAMP-CACHE----'
     timeStampsFileId = '\0' * 40
 
+    includeFilePathId = 'SYSTEM-MODEL-INCLUDE-FILE-CACHE-'
+    includeFileFileId = '\0' * 40
+
     def __init__(self, troveSource):
         self.troveInfoCache = {}
         self.depCache = {}
         self.depSolutionCache = {}
         self.timeStampCache = {}
-        self.cache = {}
+        self.cache = CacheDict()
         self.troveSource = troveSource
         self.findCache = {}
+        self.fileCache = {}
+        self.callback = None
         self._startingSizes = self._getSizeTuple()
 
-    def _addToCache(self, troveTupList, troves, _cached = None):
+    def _addToCache(self, troveTupList, troves, _cached = None,
+                    withFiles = False):
         for troveTup, trv in izip(troveTupList, troves):
-            self.cache[troveTup] = trv
+            self.cache.add(troveTup, trv, withFiles = withFiles)
 
         if _cached:
             _cached(troveTupList, troves)
@@ -67,19 +96,21 @@ class TroveCache(trovesource.AbstractTroveSource):
                        len([ x[1] for x in self.depCache.itervalues()
                                  if x[1] is not None ]) ] ),
                  len(self.depSolutionCache), len(self.timeStampCache),
-                 len(self.findCache) )
+                 len(self.findCache), len(self.fileCache) )
 
-    def cacheTroves(self, troveTupList, _cached = None):
-        troveTupList = [x for x in troveTupList if x not in self.cache]
+    def cacheTroves(self, troveTupList, _cached = None, withFiles = False):
+        troveTupList = [x for x in troveTupList
+                            if not self.cache.has(x, withFiles = withFiles) ]
         if not troveTupList:
             return
 
         self._caching(troveTupList)
 
-        troves = self.troveSource.getTroves(troveTupList, withFiles=False,
+        troves = self.troveSource.getTroves(troveTupList, withFiles=withFiles,
                                             callback = self.callback)
 
-        self._addToCache(troveTupList, troves, _cached = _cached)
+        self._addToCache(troveTupList, troves, _cached = _cached,
+                         withFiles=withFiles)
 
     def addFindResult(self, spec, result):
         self.findCache[(None, spec)] = result
@@ -268,8 +299,7 @@ class TroveCache(trovesource.AbstractTroveSource):
                         [ (name, version, flavor) ], withFiles = False)[0]
 
     def getTroves(self, tupList, withFiles = False, _cached = None):
-        assert(not withFiles)
-        self.cacheTroves(tupList, _cached = _cached)
+        self.cacheTroves(tupList, _cached = _cached, withFiles = withFiles)
         return [ self.cache[x] for x in tupList ]
 
     def iterTroveListInfo(self, troveTup):
@@ -290,7 +320,22 @@ class TroveCache(trovesource.AbstractTroveSource):
             trv = trove.Trove(trvCs, skipIntegrityChecks = True)
             self.cache[trv.getNameVersionFlavor()] = trv
 
-        self._cached(self.cache.keys(), self.cache.values())
+        self._cached(self.cache.keys(), [ x[1] for x in self.cache.values() ])
+
+        try:
+            contType, depContents = cs.getFileContents(
+                               self.troveCacheVersionPathId,
+                               self.troveCacheVersionFileId)
+        except KeyError:
+            self.version = (0, 0)
+            cs.reset()
+        else:
+            versionList = depContents.get().read().split(' ')
+            self.version = (int(versionList[0]), int(versionList[1]))
+
+        if self.version[0] > self.VERSION[0]:
+            # major number is too big for us; we can't load this
+            return
 
         contType, depContents = cs.getFileContents(
                            self.depCachePathId, self.depCacheFileId)
@@ -319,25 +364,47 @@ class TroveCache(trovesource.AbstractTroveSource):
                            self.findCachePathId, self.findCacheFileId)
         self.findCache = cPickle.loads(fileCache.get().read())
 
-        try:
-            contType, versionTimeStamps = cs.getFileContents(
-                               self.timeStampsPathId, self.timeStampsFileId)
-        except KeyError:
-            pass
-        else:
-            pickled = versionTimeStamps.get().read()
-            timeStampList = cPickle.loads(pickled)
+        if self.version[0] >= 1:
+            contType, includeFileContents = cs.getFileContents(
+                               self.includeFilePathId, self.includeFileFileId)
+            pickled = includeFileContents.get().read()
+            self.fileCache = cPickle.loads(pickled)
 
-            for (name, frozenVersion) in timeStampList:
-                thawed = versions.ThawVersion(frozenVersion)
-                self.timeStampCache[(name, thawed)] = thawed
+        contType, versionTimeStamps = cs.getFileContents(
+                           self.timeStampsPathId, self.timeStampsFileId)
+
+        pickled = versionTimeStamps.get().read()
+        timeStampList = cPickle.loads(pickled)
+
+        for (name, frozenVersion) in timeStampList:
+            thawed = versions.ThawVersion(frozenVersion)
+            self.timeStampCache[(name, thawed)] = thawed
 
         self._startingSizes = self._getSizeTuple()
 
     def save(self, path):
+        # return early if we aren't going to have permission to save
+        try:
+            fd, cacheName = tempfile.mkstemp(
+                    prefix=os.path.basename(path) + '.',
+                    dir=os.path.dirname(path))
+            os.close(fd)
+        except (IOError, OSError):
+            # may not have permissions; say, not running as root
+            return
+
         cs = changeset.ChangeSet()
-        for trv in self.cache.values():
+        for withFiles, trv in self.cache.values():
+            # we just assume everything in the cache is w/o files. it's
+            # fine for system model, safe, and we don't need the cache
+            # anywhere else
             cs.newTrove(trv.diff(None, absolute = True)[0])
+
+        cs.addFileContents(self.troveCacheVersionPathId,
+                           self.troveCacheVersionFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString("%d %d" % self.VERSION),
+                           False)
 
         depList = []
         for troveTup, (prov, req) in self.depCache.iteritems():
@@ -385,10 +452,11 @@ class TroveCache(trovesource.AbstractTroveSource):
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString(timeStampsStr), False)
 
-        fd, cacheName = tempfile.mkstemp(
-                prefix=os.path.basename(path) + '.',
-                dir=os.path.dirname(path))
-        os.close(fd)
+        cs.addFileContents(self.includeFilePathId, self.includeFileFileId,
+                           changeset.ChangedFileTypes.file,
+                           filecontents.FromString(
+                                cPickle.dumps(self.fileCache)),
+                           False)
 
         try:
             try:
@@ -414,3 +482,8 @@ class TroveCache(trovesource.AbstractTroveSource):
     def troveReferencesTrove(self, troveTup, troveRef):
         return self.cache[troveTup].hasTrove(*troveRef)
 
+    def cacheFile(self, key, contents):
+        self.fileCache[key] = contents
+
+    def getCachedFile(self, key):
+        return self.fileCache.get(key)
