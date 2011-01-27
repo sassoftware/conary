@@ -908,6 +908,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 def rdiffChangeSet(repos, job):
     # creates a changeset, but only puts in file contents for config files, and
     # always puts those contents in as diffs (unless the file is new of course)
+    # returns a list of the files whose contents are included in the changeset
     oldTroveInfo = (job[0], job[1][0], job[1][1])
     newTroveInfo = (job[0], job[2][0], job[2][1])
 
@@ -960,6 +961,7 @@ def rdiffChangeSet(repos, job):
             contentRequest.append((newFileId, newFileVersion))
 
     contents = repos.getFileContents(contentRequest)
+    pathList = []
     for (pathId, oldFile, oldFileHasContents, newFile, newFileId) \
                                                     in contentsNeeded:
         if oldFileHasContents:
@@ -974,7 +976,9 @@ def rdiffChangeSet(repos, job):
 
         cs.addFileContents(pathId, newFileId, contType, cont, True)
 
-    return cs
+        pathList.append(newTrove.getFile(pathId)[0])
+
+    return cs, pathList
 
 def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
@@ -1012,10 +1016,12 @@ def _getIterRdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     else:
         new = repos.getTrove(*new)
 
-    cs = rdiffChangeSet(repos, (troveName, (oldV, deps.deps.Flavor()),
-                                           (newV, deps.deps.Flavor()), False) )
+    cs, pathList = rdiffChangeSet(repos,
+                                  (troveName, (oldV, deps.deps.Flavor()),
+                                              (newV, deps.deps.Flavor()),
+                                   False) )
 
-    return _iterChangeSet(repos, cs, old, new)
+    return _iterChangeSet(repos, cs, old, new, pathList = pathList)
 
 def revert(repos, fileList):
     conaryState = ConaryStateFromFile("CONARY")
@@ -1110,7 +1116,7 @@ def _getIterDiff(repos, versionStr, pathList=None, logErrors=True, dirName='.'):
         error("no versions have been committed")
         return 2
 
-    if pathList:
+    if pathList is not None:
         for path in pathList:
             if not os.path.exists(path):
                 error("File %s can not be found" % path)
@@ -1170,7 +1176,7 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
             yield '%s: new' % path
             chg = changeSet.getFileChange(None, fileId)
             f = files.ThawFile(chg, pathId)
-            if pathList:
+            if pathList is not None:
                 continue;
 
 
@@ -1198,7 +1204,7 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
             dispStr = path
 
         #if files to show diff passed - check if current is in
-        if pathList and os.path.basename(dispStr) not in pathList:
+        if pathList is not None and os.path.basename(dispStr) not in pathList:
             continue;
 
         oldFileId = oldTrove.getFile(pathId)[1]
