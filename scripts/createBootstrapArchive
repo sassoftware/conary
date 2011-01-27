@@ -36,9 +36,10 @@ RBUILDER='rbuilder.example.com'
 #CUSTOMLABELS='platform.rbuilder.example.com@example:imports-$namespace'
 
 # eval echo for brace expansion
-BOOTSTRAP_PACKAGES="$(eval echo 'python-conary{,:{lib,runtime,devel,devellib}} \
-                                 conary{,:{config,data,doc,python,runtime,supdoc}} \
-                                 libelf-lgpl{,:lib}')"
+BOOTSTRAP_TROVES="$(eval echo 'python-conary{,:{lib,runtime,devel,devellib,supdoc}} \
+                               conary{,:{config,data,doc,python,runtime,supdoc}} \
+                               libelf-lgpl{,:lib}')"
+BOOTSTRAP_PACKAGES=$(echo $BOOTSTRAP_TROVES | sed 's/[^ ]\+:[^ ]\+//g')
 
 declare -a flavorMap
 flavorMap[32]="is: x86(~i486,~i586,~i686)"
@@ -61,7 +62,7 @@ for namespace in $NAMESPACES; do
                                            /rhel-4/s/-4-.*$/-4/;
                                            /centos-5e/s/-5e\(-.*\)\?$/-5-common/')
         conary update --no-deps --no-restart --no-interactive --root=$T \
-            $BOOTSTRAP_PACKAGES \
+            $BOOTSTRAP_TROVES \
             --config="flavor ${flavorMap[$flavor]}" \
             --no-recurse \
             ${conaryProxy:+--config="$conaryProxy"} \
@@ -94,8 +95,8 @@ EOF
         cat > $T/root/conaryBootstrap/installrpm <<EOF
 #!/bin/sh
 rpmver=\$(rpm -q rpm | sed 's/rpm-//;s/-/_/')
-#echo 'Ensuring correct permissions in bootstrap Conary packages...'
-#/usr/bin/conary repair $BOOTSTRAP_PACKAGES
+echo 'Ensuring correct permissions in bootstrap Conary packages...'
+/usr/bin/conary repair $BOOTSTRAP_PACKAGES
 echo 'Installing RPM python bindings for Conary...'
 set -x
 /usr/bin/conary update \$(ls -1 /root/conaryBootstrap/rpmpython-\${rpmver}*.ccs | head -1)
