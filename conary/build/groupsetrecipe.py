@@ -2031,14 +2031,18 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         might look like this::
 
          repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+         # Fetch latest packages on build label first
+         searchPathList = [ r.macros.buildlabel ]
          if 'productDefinitionSearchPath' in r.macros:
              # proper build with product definition
-             searchPath = r.SearchPath(*[repo[x] for x in
+             searchPathList.extend([repo[x] for x in
                  r.macros.productDefinitionSearchPath.split('\\\\n')])
          else:
              # local test build against specific version
-             searchPath = r.SearchPath(
+             searchPathList.extend(
                  repo['group-os=conary.rpath.com@rpl:2/2.0.1-0.9-30'])
+         searchPath = r.SearchPath(*searchPathList)
+
          ts = r.CML('''
              install group-appliance-platform
              install httpd
