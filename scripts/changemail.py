@@ -155,9 +155,9 @@ def doWork(repos, cfg, srcMap, pkgMap, grpMap, sourceuser, binaryuser, fromaddr,
                     print 'rdiff failed for %s' %sourceName
                     try:
                         t, v, tb = sys.exc_info()
-                        for line in traceback.format_exception(t, v):
-                            print line
-                        traceback.print_last(file=sys.stderr)
+                        tbd = traceback.format_exception(t, v, tb)
+                        sys.stdout.write(''.join(tbd[-min(2, len(tbd)):]))
+                        sys.stderr.write(''.join(tbd))
                     except:
                         print 'Failed to print exception information'
 
