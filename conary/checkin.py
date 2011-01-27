@@ -1176,9 +1176,8 @@ def _iterChangeSet(repos, changeSet, oldTrove, newTrove,
             yield '%s: new' % path
             chg = changeSet.getFileChange(None, fileId)
             f = files.ThawFile(chg, pathId)
-            if pathList is not None:
-                continue;
-
+            if pathList is not None and os.path.basename(path) not in pathList:
+                continue
 
             if (displayAutoSourceFiles or not f.flags.isAutoSource()) \
                     and f.hasContents and f.flags.isConfig():
