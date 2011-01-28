@@ -153,11 +153,17 @@ as a new file.) The \fBremove\fP command can also be invoked as \fBrm\fP.
 .TP
 .B repair \fI<trove>[=version]*\fP
 Conary examines all of the files currently owned by the specifid troves and
-ensures that there contents and attributes match those expected by the troves.
+ensures that their contents and attributes match those expected by the troves.
 Any inconsistencies are resolved by updating the filesystem.  No rollback is
-created for this operation, so it is not possible to undo its affects. Files
+created for this operation, so it is not possible to undo its effects. Files
 which have had their ownership revoked from the trove are unaffected; see the
 \fBrestore\fR command for how to peform a similiar operation in such a case.
+
+The conary repair operation will fail when files to be repaired
+change during repair operation.  Attempting to repair conary or
+python, in particular, may fail by python recompiling python modules
+that conary is using during the repair operation.  A workaround
+for this is to use the \f(CW--debug-all\fP command-line argument.
 
 Please note that this command is currently considered \fBexperimental\fR
 and likely has bugs. 
