@@ -12,89 +12,220 @@
 # full details.
 #
 
-"""
-Extensions to the "HTTPConnection" class available from the httplib standard
-library module.
-"""
-
+import base64
+import errno
 import glob
 import httplib
 import os
+import select
+import socket
+import time
+import warnings
+
+from conary import constants
 
 
 try:
-    # Use m2crypto for checking server certificates
     from M2Crypto import SSL
     SSLVerificationError = SSL.Checker.SSLVerificationError
 except ImportError:
     SSL = None
-
     class SSLVerificationError(Exception):
-        # If M2Crypto is not installed, no verification is performed, so this
-        # is just a placeholder to simplify exception handling
         pass
 
 
-class HTTPSConnection(httplib.HTTPConnection):
+class Connection(object):
+    """Connection to a single endpoint, possibly encrypted and/or proxied
+    and/or tunneled.
+
+    May be kept alive betwen requests and reopened if a kept-alive connection
+    fails on subsequent use. Will not attempt to retry on other network errors,
+    nor will it interpret HTTP responses.
     """
-    HTTPS connection that supports m2crypto contexts plus some other features.
 
-    m2crypto's httpslib isn't used here because it is too simple to bother
-    inheriting.
+    userAgent = "conary-http-client/%s" % constants.version
 
-    Currently supported "extra" features:
-     * Can pass in a list of peer certificate authorities.
-     * Can set the hostname used to check the peer's certificate.
-    """
-    default_port = httplib.HTTPS_PORT
-
-    def __init__(self, host, port=None, strict=None, caCerts=None,
-            commonName=None):
-        httplib.HTTPConnection.__init__(self, host, port, strict)
+    def __init__(self, endpoint, proxy=None, caCerts=None, commonName=None):
+        # endpoint and proxy must be HostPort objects, not names.
+        self.endpoint = endpoint
+        self.proxy = proxy
         self.caCerts = caCerts
+        if proxy:
+            self.local = proxy
+        else:
+            self.local = endpoint
+        if commonName is None:
+            commonName = self.local.host
         self.commonName = commonName
-
-        self.ssl_ctx = SSL.Context('sslv23')
-        if caCerts:
-            self.ssl_ctx.set_verify(SSL.verify_peer, depth=9)
-            paths = []
-            for path in caCerts:
-                paths.extend(sorted(list(glob.glob(path))))
-            for path in paths:
-                if os.path.isdir(path):
-                    self.ssl_ctx.load_verify_locations(capath=path)
-                elif os.path.exists(path):
-                    self.ssl_ctx.load_verify_locations(cafile=path)
-
-    def connect(self):
-        self.sock = SSL.Connection(self.ssl_ctx)
-        self.sock.clientPostConnectionCheck = self.checkSSL
-        self.sock.connect((self.host, self.port))
-
-    def adopt(self, sock):
-        """
-        Set this connection's underlying socket to C{sock} and wrap it with the
-        SSL connection object. Assume the socket is already open but has not
-        exchanged any SSL traffic.
-        """
-        self.sock = SSL.Connection(self.ssl_ctx, sock)
-        self.sock.setup_ssl()
-        self.sock.set_connect_state()
-        self.sock.connect_ssl()
-        if not self.checkSSL(self.sock.get_peer_cert(), self.host):
-            raise SSLVerificationError('post connection check failed')
+        self.doTunnel = None
+        self.doSSL = None
+        # Cached HTTPConnection object
+        self.cached = None
 
     def close(self):
-        # See M2Crypto/httpslib.py:67
-        pass
+        if self.cached:
+            self.cached.close()
+            self.cached = None
 
-    def checkSSL(self, cert, host):
-        """
-        Peer cert checker that will use an alternate hostname for the
-        comparison, e.g. if the actual connect host is an IP this can be used
-        to specify the original hostname.
-        """
-        if self.commonName:
-            host = self.commonName
-        checker = SSL.Checker.Checker()
-        return checker(cert, host)
+    def request(self, req):
+        if self.cached:
+            try:
+                return self.requestOnce(self.cached, req)
+            except ConnectionDeadError, err:
+                err.wrapped.clear()
+                self.cached.close()
+                self.cached = None
+        conn = self.openConnection()
+        try:
+            ret = self.requestOnce(conn, req)
+        except ConnectionDeadError, err:
+            # Don't eat it this time -- rethrow the wrapped exception.
+            err.wrapped.throw()
+        if not ret.will_close:
+            self.cached = conn
+        return ret
+
+    def openConnection(self):
+        sock = self.connectSocket()
+        sock = self.startTunnel(sock)
+        sock = self.startSSL(sock)
+
+        conn = httplib.HTTPConnection(self.endpoint.host, self.endpoint.port,
+                strict=True)
+        conn.sock = sock
+        conn.auto_open = False
+        return conn
+
+    def connectSocket(self):
+        """Open a connection to the proxy, or endpoint if no proxy."""
+        host, port = self.local
+        if port is None:
+            if self.doSSL:
+                port = 443
+            else:
+                port = 80
+        sock = socket.socket(host.family, socket.SOCK_STREAM)
+        sock.connect((str(host), port))
+        return sock
+
+    def startTunnel(self, sock):
+        """If needed, start a HTTP CONNECT tunnel on the proxy connection."""
+        if not self.doTunnel:
+            return sock
+
+        # Send request
+        lines = [
+                "CONNECT %s HTTP/1.0" % (self.endpoint,),
+                "User-Agent: %s" % (self.userAgent,),
+                ]
+        if self.proxy.userpass:
+            lines.append("Proxy-Authorization: Basic " +
+                    base64.b64encode(":".join(self.proxy.userpass)))
+        lines.extend(['', ''])
+        sock.sendall('\r\n'.join(lines))
+
+        # Parse response to make sure the tunnel was opened successfully.
+        resp = httplib.HTTPResponse(sock, strict=True)
+        try:
+            resp.begin()
+        except httplib.BadStatusLine:
+            raise ProxyError(socket.error(-42, "Bad Status Line"),
+                    host=self.proxy.host)
+        if resp.status != 200:
+            raise socket.error(-71, "Error talking to HTTP proxy %s: %s %s" %
+                    (self.proxy, resp.status, resp.reason))
+
+        # We can safely close the response, it duped the original socket
+        resp.close()
+        return sock
+
+    def startSSL(self, sock):
+        """If needed, start SSL on the proxy or endpoint connection."""
+        if not self.doSSL:
+            return sock
+        if self.caCerts:
+            # If cert checking is requested use m2crypto
+            if SSL:
+                return startSSLWithChecker(sock, self.caCerts, self.commonName)
+            else:
+                warnings.warn("m2crypto is not installed; server certificates "
+                        "will not be validated!")
+        try:
+            # Python >= 2.6
+            import ssl
+            return ssl.SSLSocket(sock)
+        except ImportError:
+            # Python < 2.6
+            sslSock = socket.ssl(sock, None, None)
+            return httplib.FakeSocket(sock, sslSock)
+
+    def requestOnce(self, conn, req):
+        req.sendRequest(conn)
+
+        # Wait for a response.
+        poller = select.poll()
+        poller.register(conn.sock.fileno(), select.POLLIN)
+        lastTimeout = time.time()
+        while True:
+            # Wait 5 seconds for a response.
+            try:
+                active = poller.poll(5000)
+            except select.error, err:
+                if err.args[0] == errno.EINTR:
+                    # Interrupted system call -- we caught a signal but it was
+                    # handled safely.
+                    continue
+                raise
+            if active:
+                break
+
+            # Still no response from the server. Send blank lines to keep the
+            # connection alive, in case the server is behind a load balancer or
+            # firewall with short connection timeouts.
+            now = time.time()
+            if now - lastTimeout >= 15:
+                conn.send('\r\n')
+                lastTimeout = now
+
+        return conn.getresponse()
+
+
+def startSSLWithChecker(sock, caCerts, commonName):
+    """Start SSL on the given socket and do server certificate validation.
+
+    Returns the new M2Crypto SSL Connection object.
+    """
+    ssl_ctx = SSL.Context('sslv23')
+    ssl_ctx.set_verify(SSL.verify_peer, depth=9)
+    paths = []
+    for path in caCerts:
+        paths.extend(sorted(list(glob.glob(path))))
+    for path in paths:
+        if os.path.isdir(path):
+            ssl_ctx.load_verify_locations(capath=path)
+        elif os.path.exists(path):
+            ssl_ctx.load_verify_locations(cafile=path)
+    sslSock = SSL.Connection(ssl_ctx, sock)
+    sslSock.setup_ssl()
+    sslSock.set_connect_state()
+    sslSock.connect_ssl()
+    checker = SSL.Checker.Checker()
+    if not checker(sslSock.get_peer_cert(), commonName):
+        raise SSLVerificationError("post connection check failed")
+    return sslSock
+
+
+class ProxyError(RuntimeError):
+
+    def __init__(self, exception, *args, **kwargs):
+        self.exception = exception
+        self.host = kwargs.pop('host', None)
+        RuntimeError.__init__(self, *args, **kwargs)
+
+
+class ConnectionDeadError(RuntimeError):
+    """A cached connection is no longer valid."""
+
+    def __init__(self, wrapped):
+        self.wrapped = wrapped
+        RuntimeError.__init__(self)

@@ -2131,6 +2131,25 @@ class LZMAFile:
         os.close(outfd)
 
 
+class SavedException(object):
+
+    def __init__(self, exc_info=None):
+        if not exc_info:
+            exc_info = sys.exc_info()
+        self.type, self.value, self.tb = exc_info
+
+    def __repr__(self):
+        return "<saved %s exception>" % (
+                self.type.__module__, self.type.__name__)
+
+    def throw(self):
+        raise self.type, self.value, self.tb
+
+    def clear(self):
+        """Free the exception and traceback to avoid reference loops."""
+        self.value = self.tb = None
+
+
 def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
     '''
     Re-throw an exception, either from C{sys.exc_info()} (the default)

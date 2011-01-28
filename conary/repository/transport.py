@@ -101,10 +101,6 @@ class Transport(xmlrpclib.Transport):
     # override?
     user_agent = "xmlrpclib.py/%s (www.pythonware.com modified by " \
         "rPath, Inc.)" % xmlrpclib.__version__
-    # make this a class variable so that across all attempts to transport
-    # we'll only
-    # spew messages once per host.
-    failedHosts = set()
     UrlOpenerFactory = XMLOpener
 
     def __init__(self, https=False, proxies=None, proxyMap=None,
