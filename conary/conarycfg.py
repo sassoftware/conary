@@ -24,7 +24,7 @@ import pwd
 
 from conary.deps import deps, arch
 from conary.lib import util, api
-from conary.lib.cfg import *
+from conary.lib.cfg import *  # pyflakes=ignore
 from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions
