@@ -98,6 +98,7 @@ class Request(object):
         self.headers = HTTPHeaders(headers)
         self.abortCheck = lambda: False
         self.data = None
+        self.size = None
         self.chunked = False
         self.callback = None
 
@@ -145,6 +146,8 @@ class Request(object):
         self._sendData(conn)
 
     def _sendData(self, conn):
+        if self.data is None:
+            return
         data = self.data
         size = self.size
         if data is None:

@@ -16,8 +16,7 @@ import socket
 
 from conary.lib import util
 
-LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1',
-                  socket.gethostname()])
+LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1'])
 
 
 class IPCache(object):

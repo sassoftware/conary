@@ -1763,8 +1763,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # by the proxy no matter what.
             forceProxy = server.usedProxy()
             try:
-                inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap,
-                                                forceProxy=forceProxy).open(url)
+                inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
+                        url, forceProxy=forceProxy)
             except transport.TransportError, e:
                 raise errors.RepositoryError(*e.args)
 
@@ -2362,8 +2362,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # how to handle that.  So, we force the url to be reinterpreted
         # by the proxy no matter what.
         forceProxy = self.c[server].usedProxy()
-        inF = transport.ConaryURLOpener(proxyMap = self.c.proxyMap,
-                                        forceProxy=forceProxy).open(url)
+        inF = transport.ConaryURLOpener(proxyMap = self.c.proxyMap).open(url,
+                forceProxy=forceProxy)
 
         if callback:
             wrapper = callbacks.CallbackRateWrapper(

@@ -18,6 +18,7 @@ import logging
 import socket
 import urllib
 
+from conary.lib import httputils
 from conary.lib import util
 from conary.lib import timeutil
 from conary.lib.http import connection as conn_mod
@@ -54,7 +55,7 @@ class URLOpener(object):
             req.setData(data)
         return req
 
-    def open(self, url, data=None, method=None, headers=()):
+    def open(self, url, data=None, method=None, headers=(), forceProxy=False):
         if isinstance(url, req_mod.Request):
             req = url
         else:
@@ -75,7 +76,7 @@ class URLOpener(object):
         req.headers.setdefault('Content-Type', self.contentType)
         req.headers.setdefault('User-Agent', self.userAgent)
 
-        response = self.doRequest(req)
+        response = self._doRequest(req, forceProxy=forceProxy)
 
         if response.status == 200:
             encoding = response.getheader('content-encoding', None)
@@ -99,13 +100,15 @@ class URLOpener(object):
             raise http_error.TransportError("Unable to open %s%s: %s %s" %
                     (url, via, response.status, response.reason))
 
-    def doRequest(self, req):
+    def _doRequest(self, req, forceProxy):
         connIterator = self.proxyMap.getProxyIter(req.url,
                 protocolFilter=self.proxyFilter)
         resetResolv = False
         lastError = response = None
         for proxySpec in connIterator:
             if proxySpec is proxy_map.DirectConnection:
+                proxySpec = None
+            elif not forceProxy and self._shouldBypass(req.url, proxySpec):
                 proxySpec = None
             try:
                 response = self._requestOnce(req, proxySpec)
@@ -149,6 +152,18 @@ class URLOpener(object):
                         % (req.url.hostport,))
 
         return response
+
+    def _shouldBypass(self, url, proxy):
+        dest = url.hostport.host
+        proxy = proxy.hostport.host
+
+        # Don't proxy localhost unless the proxy is also localhost.
+        if dest in httputils.LocalHosts and proxy not in httputils.LocalHosts:
+            return True
+
+        # Check no_proxy
+        npFilt = util.noproxyFilter()
+        return npFilt.bypassProxy(dest)
 
     def _requestOnce(self, req, proxy):
         """Issue a request to a a single destination, retrying if the
