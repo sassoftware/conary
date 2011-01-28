@@ -23,6 +23,8 @@ import time
 import warnings
 
 from conary import constants
+from conary.lib import util
+from conary.lib.http import http_error
 
 
 try:
@@ -46,7 +48,17 @@ class Connection(object):
     userAgent = "conary-http-client/%s" % constants.version
 
     def __init__(self, endpoint, proxy=None, caCerts=None, commonName=None):
-        # endpoint and proxy must be HostPort objects, not names.
+        """
+        @param endpoint: Destination URL (host, port, optional SSL, optional
+            authorization)
+        @param proxy: Optional proxy URL (host, port, optional SSL, optional
+            authorization)
+        @param caCerts: Optional list of CA certificate paths to check servers
+            against.
+        @param commonName: Optional hostname to use for checking server
+            certificates.
+        """
+        # endpoint and proxy must be URL objects, not names.
         self.endpoint = endpoint
         self.proxy = proxy
         self.caCerts = caCerts
@@ -55,10 +67,10 @@ class Connection(object):
         else:
             self.local = endpoint
         if commonName is None:
-            commonName = self.local.host
+            commonName = self.endpoint.hostport.host
         self.commonName = commonName
-        self.doTunnel = None
-        self.doSSL = None
+        self.doSSL = endpoint.scheme == 'https'
+        self.doTunnel = bool(proxy) and self.doSSL
         # Cached HTTPConnection object
         self.cached = None
 
@@ -69,16 +81,18 @@ class Connection(object):
 
     def request(self, req):
         if self.cached:
+            # Try once to use the cached connection; if it fails to send the
+            # request then discard and try again.
             try:
                 return self.requestOnce(self.cached, req)
-            except ConnectionDeadError, err:
+            except http_error.RequestError, err:
                 err.wrapped.clear()
                 self.cached.close()
                 self.cached = None
         conn = self.openConnection()
         try:
             ret = self.requestOnce(conn, req)
-        except ConnectionDeadError, err:
+        except http_error.RequestError, err:
             # Don't eat it this time -- rethrow the wrapped exception.
             err.wrapped.throw()
         if not ret.will_close:
@@ -90,20 +104,17 @@ class Connection(object):
         sock = self.startTunnel(sock)
         sock = self.startSSL(sock)
 
-        conn = httplib.HTTPConnection(self.endpoint.host, self.endpoint.port,
-                strict=True)
+        host, port = self.endpoint.hostport
+        conn = httplib.HTTPConnection(host, port, strict=True)
         conn.sock = sock
         conn.auto_open = False
         return conn
 
     def connectSocket(self):
         """Open a connection to the proxy, or endpoint if no proxy."""
-        host, port = self.local
-        if port is None:
-            if self.doSSL:
-                port = 443
-            else:
-                port = 80
+        host, port = self.local.hostport
+        if hasattr(host, 'resolve'):
+            host = host.resolve()[0]
         sock = socket.socket(host.family, socket.SOCK_STREAM)
         sock.connect((str(host), port))
         return sock
@@ -115,7 +126,7 @@ class Connection(object):
 
         # Send request
         lines = [
-                "CONNECT %s HTTP/1.0" % (self.endpoint,),
+                "CONNECT %s HTTP/1.0" % (self.endpoint.hostport,),
                 "User-Agent: %s" % (self.userAgent,),
                 ]
         if self.proxy.userpass:
@@ -129,8 +140,8 @@ class Connection(object):
         try:
             resp.begin()
         except httplib.BadStatusLine:
-            raise ProxyError(socket.error(-42, "Bad Status Line"),
-                    host=self.proxy.host)
+            raise socket.error(-42, "Bad Status Line from proxy %s" %
+                    self.proxy)
         if resp.status != 200:
             raise socket.error(-71, "Error talking to HTTP proxy %s: %s %s" %
                     (self.proxy, resp.status, resp.reason))
@@ -160,13 +171,20 @@ class Connection(object):
             return httplib.FakeSocket(sock, sslSock)
 
     def requestOnce(self, conn, req):
-        req.sendRequest(conn)
+        try:
+            req.sendRequest(conn)
+        except:
+            wrapped = util.SavedException()
+            raise http_error.RequestError(wrapped)
 
         # Wait for a response.
         poller = select.poll()
         poller.register(conn.sock.fileno(), select.POLLIN)
         lastTimeout = time.time()
         while True:
+            if req.abortCheck():
+                raise http_error.AbortError()
+
             # Wait 5 seconds for a response.
             try:
                 active = poller.poll(5000)
@@ -213,19 +231,3 @@ def startSSLWithChecker(sock, caCerts, commonName):
     if not checker(sslSock.get_peer_cert(), commonName):
         raise SSLVerificationError("post connection check failed")
     return sslSock
-
-
-class ProxyError(RuntimeError):
-
-    def __init__(self, exception, *args, **kwargs):
-        self.exception = exception
-        self.host = kwargs.pop('host', None)
-        RuntimeError.__init__(self, *args, **kwargs)
-
-
-class ConnectionDeadError(RuntimeError):
-    """A cached connection is no longer valid."""
-
-    def __init__(self, wrapped):
-        self.wrapped = wrapped
-        RuntimeError.__init__(self)

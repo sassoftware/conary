@@ -12,34 +12,38 @@
 # full details.
 #
 
-import urllib
+import StringIO
 import urlparse
+import zlib
 
 from conary.lib import networking
 from conary.lib import util
 from conary.lib.compat import namedtuple
+from conary.lib.http import http_error
 
 
 class URL(namedtuple('URL', 'scheme userpass hostport path')):
 
     @classmethod
-    def parse(cls, url, defaultPort=None):
-        scheme, netloc, path, query, fragment = urlparse.urlsplit(url)
-        userpass, hostport = urllib.splituser(netloc)
-        if userpass:
-            username, password = userpass.split(':', 1)
-            password = util.ProtectedString(password)
-            userpass = username, password
-        else:
-            userpass = None, None
-        hostport = networking.HostPort(hostport)
-        if hostport.port is None:
+    def parse(cls, url, defaultScheme='http'):
+        (scheme, username, password, host, port, path, query, fragment,
+                ) = util.urlSplit(url)
+        if not scheme and defaultScheme is not None:
+            scheme = defaultScheme
+        if not port:
             if scheme == 'https':
-                hostport = hostport._replace(port=443)
+                port = 443
             else:
-                hostport = hostport._replace(port=80)
+                port = 80
+        hostport = networking.HostPort(host, port)
         path = urlparse.urlunsplit(('', '', path, query, fragment))
-        return cls(scheme, userpass, hostport, path)
+        return cls(scheme, (username, password), hostport, path)
+
+    def __str__(self):
+        username, password = self.userpass
+        host, port = self.hostport
+        return util.urlUnsplit((self.scheme, username, password, host, port,
+            self.path, '', ''))
 
 
 class HTTPHeaders(object):
@@ -68,6 +72,10 @@ class HTTPHeaders(object):
         key = self.canonical(key)
         del self._headers[key]
 
+    def __contains__(self, key):
+        key = self.canonical(key)
+        return key in self._headers
+
     def get(self, key, default=None):
         key = self.canonical(key)
         return self._headers.get(key)
@@ -75,29 +83,95 @@ class HTTPHeaders(object):
     def iteritems(self):
         return self._headers.iteritems()
 
+    def setdefault(self, key, default):
+        key = self.canonical(key)
+        return self._headers.setdefault(key, default)
+
 
 class Request(object):
 
-    def __init__(self, url, body=None, method='GET', headers=()):
+    def __init__(self, url, method='GET', headers=()):
         if isinstance(url, basestring):
             url = URL.parse(url)
         self.url = url
-        self.body = body
         self.method = method
         self.headers = HTTPHeaders(headers)
+        self.abortCheck = lambda: False
+        self.data = None
+        self.chunked = False
+        self.callback = None
+
+    def setData(self, data, size=None, compress=False, callback=None):
+        if compress:
+            data = zlib.compress(data, 9)
+            size = len(data)
+            self.headers['Accept-Encoding'] = 'deflate'
+            self.headers['Content-Encoding'] = 'deflate'
+        self.data = data
+        self.callback = callback
+        if size is None:
+            try:
+                size = len(data)
+            except TypeError:
+                pass
+        self.size = size
+        self.headers['Content-Length'] = str(size)
+        if size is None:
+            self.chunked = True
+            self.headers['Transfer-Encoding'] = 'chunked'
+        else:
+            self.chunked = False
+
+    def setAbortCheck(self, abortCheck):
+        if not abortCheck:
+            abortCheck = lambda: False
+        self.abortCheck = abortCheck
 
     def sendRequest(self, conn):
-        conn.putrequest(self.method, self.url.path, skip_host=1)
-        sentHost = False
+        conn.putrequest(self.method, self.url.path, skip_host=1,
+                skip_accept_encoding=1)
+        self.headers.setdefault('Accept-Encoding', 'identity')
         for key, value in self.headers.iteritems():
             conn.putheader(key, value)
-            if key.lower() == 'host':
-                sentHost = True
-        if not sentHost:
-            host = str(self.url.hostport)
+        if 'Host' not in self.headers:
+            if self.url.hostport.port in (80, 443):
+                host = str(self.url.hostport.host)
+            else:
+                host = str(self.url.hostport)
             if isinstance(host, unicode):
                 host = host.encode('idna')
             conn.putheader("Host", host)
         conn.endheaders()
-        if self.body is not None:
-            conn.send(self.body)
+        self._sendData(conn)
+
+    def _sendData(self, conn):
+        data = self.data
+        size = self.size
+        if data is None:
+            return
+        if not self.chunked:
+            assert size is not None
+            if not hasattr(data, 'read'):
+                conn.send(data)
+                return
+            util.copyfileobj(data, conn, callback=self.callback,
+                    sizeLimit=size, abortCheck=self.abortCheck)
+            return
+        if not hasattr(data, 'read'):
+            data = StringIO.StringIO(data)
+        while size or size is None:
+            if self.abortCheck():
+                raise http_error.AbortError()
+            # send in 256k chunks
+            chunk = 262144
+            if size is not None and chunk > size:
+                chunk = size
+            chunk_data = data.read(chunk)
+            conn.send(''.join((
+                '%x\r\n' % len(chunk_data),
+                chunk_data,
+                '\r\n')))
+            if size is not None:
+                size -= chunk
+        # terminate the chunked encoding
+        conn.send('0\r\n\r\n')
