@@ -27,3 +27,24 @@ class AbortError(Exception):
 
 class TransportError(Exception):
     pass
+
+
+class ResponseError(TransportError):
+
+    def __init__(self, url, proxy, errcode, reason):
+        TransportError.__init__(self, url, proxy, errcode, reason)
+        self.url = url
+        self.proxy = proxy
+        self.errcode = errcode
+        self.reason = reason
+
+    def __str__(self):
+        if self.proxy:
+            via = " via %s proxy %s" % (self.proxy.scheme, self.proxy.hostport,)
+        else:
+            via = ""
+        safe_url = str(self.url)
+        if hasattr(safe_url, '__safe_str__'):
+            safe_url = safe_url.__safe_str__()
+        return "Error opening %s%s: %s %s" % (safe_url, via, self.errcode,
+                self.reason)

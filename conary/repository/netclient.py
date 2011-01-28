@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -31,6 +31,9 @@ from conary.cmds import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util, api
+from conary.lib import httputils
+from conary.lib.http import http_error
+from conary.lib.http import proxy_map
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
@@ -121,7 +124,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
         try:
             rc = self.__send(self.__name, newArgs)
-        except xmlrpclib.ProtocolError, e:
+        except http_error.ResponseError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission(
                     repoName = self.__serverName, url = e.url)
@@ -184,26 +187,14 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                     # password handling goodness
                     return self.doCall(clientVersion, *args)
                 raise
-        except xmlrpclib.ProtocolError, err:
+        except http_error.ResponseError, err:
             if err.errcode == 500:
                 raise errors.InternalServerError(err)
-            self._postprocessProtocolError(err)
             raise
         except:
             raise
 
         return self.__doCall(clientVersion, args)
-
-    def _postprocessProtocolError(self, err):
-        proxyHost = getattr(self._transport, 'proxyHost', 'None')
-        if proxyHost is None:
-            return
-        proxyProtocol = self._transport.proxyProtocol
-        if proxyProtocol.startswith('http'):
-            pt = 'HTTP'
-        else:
-            pt = 'Conary'
-        err.url = "%s (via %s proxy %s)" % (err.url, pt, proxyHost)
 
     def handleError(self, clientVersion, result):
         if clientVersion < 60:
@@ -346,7 +337,7 @@ class ServerCache:
         self.pwPrompt = pwPrompt
         self.entitlements = entitlements
         if proxyMap is None:
-            proxyMap = self.TransportFactory.UrlOpenerFactory.newProxyMapFromDict(proxies)
+            proxyMap = proxy_map.ProxyMap.fromDict(proxies)
         self.proxyMap = proxyMap
         self.entitlementDir = entitlementDir
         self.caCerts = caCerts
@@ -500,6 +491,9 @@ class ServerCache:
             serverVersions = server.checkVersion()
         except errors.InsufficientPermission:
             raise
+        except http_error.ResponseError:
+            # Already has URL information, keep as-is
+            util.rethrow(errors.OpenError, False)
         except Exception, e:
             if isinstance(e, socket.error):
                 errmsg = e[1]
@@ -1485,7 +1479,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return jobSizes
 
     def _clearHostCache(self):
-        transport.httputils.IPCache.clear()
+        httputils.IPCache.clear()
 
     def _cacheHostLookups(self, hosts):
         if not self.c.proxyMap.isEmpty:
@@ -3157,10 +3151,6 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     that has a callback() method which takes amount, total, rate
     """
 
-    url = util.URL(url)
-    assert(url.protocol in ('http', 'https'))
-    ssl = (url.protocol == 'https')
-
     callbackFn = None
     if callback:
         wrapper = callbacks.CallbackRateWrapper(callback,
@@ -3168,9 +3158,11 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                                                 size)
         callbackFn = wrapper.callback
 
-    opener = transport.XMLOpener(proxies=proxies, proxyMap=proxyMap)
-    data = transport.httputils.HttpData(inFile, bufferSize=8192,
-        callback=callbackFn, size=size, chunked=chunked, method='PUT')
-
-    usedAnonymous, infourl = opener.open_http(url, data, ssl=ssl)
+    if proxies and not proxyMap:
+        proxyMap = proxy_map.ProxyMap.fromDict(proxies)
+    opener = transport.XMLOpener(proxyMap=proxyMap)
+    req = opener.newRequest(url, method='PUT')
+    req.setData(inFile, size, callback=callbackFn, chunked=chunked,
+            rateLimit=rateLimit)
+    infourl = opener.open(req)
     return infourl.code, infourl.msg

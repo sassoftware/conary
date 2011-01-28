@@ -67,7 +67,7 @@ class Connection(object):
         else:
             self.local = endpoint
         if commonName is None:
-            commonName = self.endpoint.hostport.host
+            commonName = str(self.endpoint.hostport.host)
         self.commonName = commonName
         self.doSSL = endpoint.scheme == 'https'
         self.doTunnel = bool(proxy) and self.doSSL
@@ -129,7 +129,7 @@ class Connection(object):
                 "CONNECT %s HTTP/1.0" % (self.endpoint.hostport,),
                 "User-Agent: %s" % (self.userAgent,),
                 ]
-        if self.proxy.userpass:
+        if self.proxy.userpass[0]:
             lines.append("Proxy-Authorization: Basic " +
                     base64.b64encode(":".join(self.proxy.userpass)))
         lines.extend(['', ''])
@@ -143,7 +143,8 @@ class Connection(object):
             raise socket.error(-42, "Bad Status Line from proxy %s" %
                     self.proxy)
         if resp.status != 200:
-            raise socket.error(-71, "Error talking to HTTP proxy %s: %s %s" %
+            raise socket.error(-71,
+                    "HTTP response error from HTTP proxy %s: %s %s" %
                     (self.proxy, resp.status, resp.reason))
 
         # We can safely close the response, it duped the original socket
@@ -171,8 +172,11 @@ class Connection(object):
             return httplib.FakeSocket(sock, sslSock)
 
     def requestOnce(self, conn, req):
+        if self.proxy and self.proxy.userpass[0] and not self.doTunnel:
+            req.headers['Proxy-Authorization'] = ('Basic ' +
+                    base64.b64encode(":".join(self.proxy.userpass)))
         try:
-            req.sendRequest(conn)
+            req.sendRequest(conn, isProxied=(self.proxy is not None))
         except:
             wrapped = util.SavedException()
             raise http_error.RequestError(wrapped)

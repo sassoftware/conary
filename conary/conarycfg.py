@@ -493,6 +493,9 @@ class CfgProxyMap(CfgType):
 
     def updateFromString(self, val, string):
         parts = string.split()
+        if parts == ['[]']:
+            val.clear()
+            return val
         if len(parts) < 2:
             raise ParseError("Expected: proxyMap <pattern> "
                     "[http://proxy1|DIRECT] [proxy2 ...]")
@@ -502,7 +505,7 @@ class CfgProxyMap(CfgType):
 
     def toStrings(self, value, displayOptions):
         for pattern, targets in value.filterList:
-            yield ' '.join((str(pattern), [str(x) for x in targets]))
+            yield ' '.join([str(pattern)] + [str(x) for x in targets])
 
 
 def _getDefaultPublicKeyrings():
@@ -1074,18 +1077,12 @@ def getProxyMap(cfg):
     # This creates a new proxyMap instance. We don't want to override the
     # config's proxyMap, since old consumers of the API may modify the settings
     # in-place and expect the changes to take effect.
-    proxyMap = proxy_map.ProxyMap()
     proxyDict = urllib.getproxies()
-    # We're only interested in a limited set of proxies
-    proxyDict = dict((x, y) for (x, y) in proxyDict.items()
-        if x in pMap)
-    proxyDict.pop('conary', None)
     proxyDict.update(cfg.proxy)
-    proxies = [(pMap[scheme], [server])
-                   for (scheme, server) in proxyDict.iteritems()]
-    proxies.extend((cpMap[scheme], [server])
-                   for (scheme, server) in cfg.conaryProxy.iteritems())
-    for key, value in proxies:
-        proxyMap.update(key, "*", value)
-
-    return proxyMap
+    for scheme, url in cfg.conaryProxy.items():
+        if url.startswith('http:'):
+            url = 'conary:' + url[5:]
+        elif url.startswith('https:'):
+            url = 'conarys:' + url[6:]
+        proxyDict[scheme] = url
+    return proxy_map.ProxyMap.fromDict(proxyDict)

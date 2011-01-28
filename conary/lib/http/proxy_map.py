@@ -13,6 +13,7 @@
 #
 
 import random
+import urllib
 
 from conary.lib import networking
 from conary.lib import util
@@ -31,12 +32,18 @@ class ProxyMap(object):
     def __nonzero__(self):
         return bool(self.filterList)
 
+    def items(self):
+        return self.filterList[:]
+
+    def clear(self):
+        self.filterList = []
+
     def addStrategy(self, matchHost, targets):
         filterSpec = FilterSpec(matchHost)
         targets2 = []
         for target in targets:
             if isinstance(target, basestring):
-                if target == 'DIRECT':
+                if target.lower() == 'direct':
                     target = DirectConnection
                 else:
                     target = req_mod.URL.parse(target)
@@ -46,10 +53,18 @@ class ProxyMap(object):
     @classmethod
     def fromDict(cls, values):
         val = cls()
-        for scheme, url in sorted(values.items()):
+        if isinstance(values, dict):
+            values = values.iteritems()
+        elif values is None:
+            return val
+        for scheme, url in sorted(values):
             if scheme in ('http', 'https'):
                 val.addStrategy(scheme + ':*', [url])
         return val
+
+    @classmethod
+    def fromEnvironment(cls):
+        return cls.fromDict(urllib.getproxies())
 
     def blacklistUrl(self, url, error=None):
         assert isinstance(url, req_mod.URL)
@@ -74,7 +89,7 @@ class ProxyMap(object):
 
         hasMatches = False
         for filterSpec, targets in self.filterList[:]:
-            if not filterSpec.match(url.hostport):
+            if not filterSpec.match(url):
                 # Filter doesn't match the current request.
                 continue
             targets = targets[:]
@@ -101,16 +116,20 @@ class ProxyMap(object):
 class FilterSpec(object):
 
     def __init__(self, value):
-        if value.startswith('http:'):
-            self.protocol = 'http'
-            address = value[5:]
-        elif value.startswith('https:'):
-            self.protocol = 'https'
-            address = value[6:]
+        if isinstance(value, FilterSpec):
+            self.protocol = value.protocol
+            self.address = value.address
         else:
-            self.protocol = None
-            address = value
-        self.address = networking.HostPort(address)
+            if value.startswith('http:'):
+                self.protocol = 'http'
+                address = value[5:]
+            elif value.startswith('https:'):
+                self.protocol = 'https'
+                address = value[6:]
+            else:
+                self.protocol = None
+                address = value
+            self.address = networking.HostPort(address)
 
     def __str__(self):
         value = str(self.address)
@@ -118,6 +137,11 @@ class FilterSpec(object):
             return ':'.join((self.protocol, value))
         else:
             return value
+
+    def match(self, url):
+        if self.protocol and self.protocol != url.scheme:
+            return False
+        return self.address.match(url.hostport)
 
 
 class DirectConnection(object):

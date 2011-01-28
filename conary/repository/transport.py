@@ -20,6 +20,7 @@ import base64
 import xmlrpclib
 
 from conary.lib import util
+from conary.lib.http import connection
 from conary.lib.http import http_error
 from conary.lib.http import opener
 from conary.lib.http import proxy_map
@@ -30,8 +31,35 @@ TransportError = http_error.TransportError
 URLOpener = opener.URLOpener
 
 
+class ConaryConnector(connection.Connection):
+
+    def __init__(self, endpoint, proxy=None, caCerts=None, commonName=None):
+        connection.Connection.__init__(self, endpoint, proxy, caCerts,
+                commonName)
+        # Always talk to conary proxies using the protocol from the proxy URL.
+        # In other words, a SSL connection through a non-SSL conary proxy
+        # should be unencrypted.
+        if proxy:
+            if proxy.scheme == 'conarys':
+                self.commonName = str(proxy.hostport.host)
+                self.doTunnel = False
+                self.doSSL = True
+            elif proxy.scheme == 'conary':
+                self.doTunnel = False
+                self.doSSL = False
+
+
 class ConaryURLOpener(opener.URLOpener):
     proxyFilter = ('http', 'https', 'conary', 'conarys')
+    connectionFactory = ConaryConnector
+
+    def __init__(self, proxyMap=None, caCerts=None, proxies=None):
+        if not proxyMap:
+            if proxies:
+                proxyMap = proxy_map.ProxyMap.fromDict(proxies)
+            else:
+                proxyMap = proxy_map.ProxyMap.fromEnvironment()
+        opener.URLOpener.__init__(self, proxyMap=proxyMap, caCerts=caCerts)
 
     def _requestOnce(self, req, proxy):
         if proxy and proxy.scheme in ('conary', 'conarys'):
@@ -58,8 +86,11 @@ class Transport(xmlrpclib.Transport):
         self.https = https
         self.compress = False
         self.abortCheck = None
-        if proxyMap is None:
-            proxyMap = proxy_map.fromDict(proxies)
+        if not proxyMap:
+            if proxies:
+                proxyMap = proxy_map.ProxyMap.fromDict(proxies)
+            else:
+                proxyMap = proxy_map.ProxyMap.fromEnvironment()
         self.proxyMap = proxyMap
         self.serverName = serverName
         self.setExtraHeaders(extraHeaders)

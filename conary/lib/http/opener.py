@@ -76,6 +76,11 @@ class URLOpener(object):
         req.headers.setdefault('Content-Type', self.contentType)
         req.headers.setdefault('User-Agent', self.userAgent)
 
+        if req.url.scheme == 'file':
+            return self._handleFileRequest(req)
+        elif req.url.scheme not in ('http', 'https'):
+            raise TypeError("Unknown URL scheme %r" % (req.url.scheme,))
+
         response = self._doRequest(req, forceProxy=forceProxy)
 
         if response.status == 200:
@@ -89,16 +94,15 @@ class URLOpener(object):
                 fp = response.fp
 
             protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
-            return InfoURL(fp, response.msg, url, protocolVersion,
+            return InfoURL(fp, response.msg, req.url, protocolVersion,
                     code=response.status, msg=response.reason)
         else:
             self._handleProxyErrors(response.status)
-            if self.lastProxy:
-                via = " via proxy %s" % (self.lastProxy.hostport,)
-            else:
-                via = ""
-            raise http_error.TransportError("Unable to open %s%s: %s %s" %
-                    (url, via, response.status, response.reason))
+            raise http_error.ResponseError(req.url, self.lastProxy,
+                    response.status, response.reason)
+
+    def _handleFileRequest(self, req):
+        return open(req.url.path, 'rb')
 
     def _doRequest(self, req, forceProxy):
         connIterator = self.proxyMap.getProxyIter(req.url,
@@ -110,10 +114,10 @@ class URLOpener(object):
                 proxySpec = None
             elif not forceProxy and self._shouldBypass(req.url, proxySpec):
                 proxySpec = None
+            # If a proxy was used, save it here
+            self.lastProxy = proxySpec
             try:
                 response = self._requestOnce(req, proxySpec)
-                # If a proxy was used, save it here
-                self.lastProxy = proxySpec
                 break
 
             except socket.error, err:
@@ -154,12 +158,16 @@ class URLOpener(object):
         return response
 
     def _shouldBypass(self, url, proxy):
-        dest = url.hostport.host
-        proxy = proxy.hostport.host
+        dest = str(url.hostport.host)
+        pdest = str(proxy.hostport.host)
 
         # Don't proxy localhost unless the proxy is also localhost.
-        if dest in httputils.LocalHosts and proxy not in httputils.LocalHosts:
+        if dest in httputils.LocalHosts and pdest not in httputils.LocalHosts:
             return True
+
+        # Ignore no_proxy for Conary proxies.
+        if proxy.scheme in ('conary', 'conarys'):
+            return False
 
         # Check no_proxy
         npFilt = util.noproxyFilter()
@@ -169,11 +177,6 @@ class URLOpener(object):
         """Issue a request to a a single destination, retrying if the
         conditions allow it.
         """
-        if proxy:
-            # TODO: figure out at what level conary/conarys proxies will be
-            # handled
-            assert proxy.scheme in ('http', 'https')
-
         key = (req.url.scheme, req.url.hostport, proxy)
         conn = self.connectionCache.get(key)
         if conn is None:
@@ -200,6 +203,7 @@ class URLOpener(object):
                 log.info("Successfully reached %s after %d attempts.",
                         req.url.hostport, attempt + 1)
             return result
+        raise
 
     def _handleProxyErrors(self, errcode):
         """Translate proxy error codes into exceptions."""
@@ -218,7 +222,12 @@ class URLOpener(object):
         """Append proxy information to an exception."""
         if not self.lastProxy:
             return
-        msgError = "%s (via %s)" % (error[1], self.lastProxy.hostport)
+        if self.lastProxy.scheme in ('conary', 'conarys'):
+            kind = 'Conary'
+        else:
+            kind = 'HTTP'
+        msgError = "%s (via %s proxy %s)" % (error[1], kind,
+                self.lastProxy)
         error.args = (error[0], msgError)
         if hasattr(error, 'strerror'):
             error.strerror = msgError

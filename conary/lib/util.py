@@ -562,7 +562,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
     copied = 0
 
-    if abortCheck:
+    if abortCheck and hasattr(source, 'fileno'):
         pollObj = select.poll()
         pollObj.register(source.fileno(), select.POLLIN)
     else:
@@ -572,7 +572,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if sizeLimit and (sizeLimit - copied < bufSize):
             bufSize = sizeLimit - copied
 
-        if abortCheck:
+        if pollObj:
             # if we need to abortCheck, make sure we check it every time
             # read returns, and every five seconds
             l = []

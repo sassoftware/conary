@@ -23,6 +23,7 @@ import urllib2
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, urlparse, util
+from conary.lib.http import http_error
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
@@ -91,8 +92,8 @@ class ProxyCaller:
         try:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
-            raise errors.ProxyError(e.strerror[1])
-        except util.xmlrpclib.ProtocolError, e:
+            raise errors.ProxyError(e.strerror)
+        except http_error.ResponseError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission
 
@@ -1037,7 +1038,7 @@ class ChangesetFilter(BaseProxy):
         try:
             inF = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
         except transport.TransportError, e:
-            raise errors.RepositoryError(e.args[0])
+            raise errors.RepositoryError(str(e))
 
         for (jobIdx, (rawJob, fingerprint)), csInfo in \
                         itertools.izip(neededHere, csInfoList):
