@@ -17,6 +17,8 @@
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
+import socket
+import sys
 import xmlrpclib
 
 from conary.lib import util
@@ -24,6 +26,7 @@ from conary.lib.http import connection
 from conary.lib.http import http_error
 from conary.lib.http import opener
 from conary.lib.http import proxy_map
+from conary.repository import errors
 
 # For compatibility
 AbortError = http_error.AbortError
@@ -159,7 +162,34 @@ class Transport(xmlrpclib.Transport):
         # Make sure we capture some useful information from the
         # opener, even if we failed
         try:
-            response = opener.open(req)
+            try:
+                response = opener.open(req)
+            except http_error.ResponseError, err:
+                if err.errcode == 403:
+                    raise errors.InsufficientPermission(
+                            repoName=self.serverName, url=url)
+                elif err.errcode == 500:
+                    raise errors.InternalServerError(err)
+                else:
+                    # Already has adequate URL information, so just rethrow it
+                    # without modifying the message.
+                    util.rethrow(errors.OpenError)
+            except:
+                e_type, e_value, e_tb = sys.exc_info()
+                if isinstance(e_value, socket.error):
+                    errmsg = e_value[1]
+                elif isinstance(e_value, EnvironmentError):
+                    errmsg = e_value.sterror
+                    # sometimes there is a socket error hiding inside an
+                    # IOError!
+                    if isinstance(errmsg, socket.error):
+                        errmsg = errmsg[1]
+                else:
+                    e_name = getattr(e_type, '__name__', 'Unknown Error')
+                    errmsg = '%s: %s' % (e_name, e_value)
+                raise errors.OpenError(
+                        "Error occurred opening repository %s: %s" %
+                        (url, errmsg)), None, e_tb
         finally:
             self.usedProxy = opener.lastProxy is not None
             self._proxyHost = opener.lastProxy

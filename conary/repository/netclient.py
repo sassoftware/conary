@@ -122,14 +122,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
         start = time.time()
 
-        try:
-            rc = self.__send(self.__name, newArgs)
-        except http_error.ResponseError, e:
-            if e.errcode == 403:
-                raise errors.InsufficientPermission(
-                    repoName = self.__serverName, url = e.url)
-            raise
-
+        rc = self.__send(self.__name, newArgs)
         if clientVersion < 60:
             usedAnonymous, isException, result = rc
         else:
@@ -187,13 +180,6 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                     # password handling goodness
                     return self.doCall(clientVersion, *args)
                 raise
-        except http_error.ResponseError, err:
-            if err.errcode == 500:
-                raise errors.InternalServerError(err)
-            raise
-        except:
-            raise
-
         return self.__doCall(clientVersion, args)
 
     def handleError(self, clientVersion, result):
@@ -487,32 +473,7 @@ class ServerCache:
         # Avoid poking at __transport
         server._transport = transporter
 
-        try:
-            serverVersions = server.checkVersion()
-        except errors.InsufficientPermission:
-            raise
-        except http_error.ResponseError:
-            # Already has URL information, keep as-is
-            util.rethrow(errors.OpenError, False)
-        except Exception, e:
-            if isinstance(e, socket.error):
-                errmsg = e[1]
-            # includes OS and IO errors
-            elif isinstance(e, EnvironmentError):
-                errmsg = e.strerror
-                # sometimes there is a socket error hiding
-                # inside an IOError!
-                if isinstance(errmsg, socket.error):
-                    errmsg = errmsg[1]
-            else:
-                errmsg = str(e)
-            url = _cleanseUrl(protocol, url)
-            if not errmsg:
-                errmsg = '%r' % e
-            tb = sys.exc_traceback
-            raise errors.OpenError('Error occurred opening repository '
-                        '%s: %s' % (url, errmsg)), None, tb
-
+        serverVersions = server.checkVersion()
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)
         if not intersection:
             url = _cleanseUrl(protocol, url)
