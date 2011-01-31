@@ -1,0 +1,1 @@
+Corrected a bug that would allow authenticated repository users to grant themselves additional repository privileges including additional read access and write access, but not administrative privileges or access to repository mirror services.
