@@ -1,3 +1,3 @@
-Conary was too vigilent enforcing file conflict checking during RPM updates.
+Conary was too vigilant enforcing file conflict checking during RPM updates.
 Many cases need to be caught by the database layer instead of the capsule
 installation layer to avoid false positives.
