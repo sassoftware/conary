@@ -19,6 +19,7 @@
 import base64
 import socket
 import sys
+import urllib
 import xmlrpclib
 
 from conary.lib import util
@@ -140,17 +141,29 @@ class Transport(xmlrpclib.Transport):
             return 'https'
         return 'http'
 
-    def request(self, host, handler, body, verbose=0):
+    def request(self, userhost, handler, body, verbose=0):
         self.verbose = verbose
 
         protocol = self._protocol()
 
         opener = self.openerFactory(proxyMap=self.proxyMap,
                 caCerts=self.caCerts)
-        host, extra_headers, x509 = self.get_host_info(host)
+        host, extra_headers, x509 = self.get_host_info(userhost)
         url = ''.join([protocol, '://', host, handler])
-
         req = opener.newRequest(url, method='POST', headers=extra_headers)
+
+        # Make a url with username:<PASSWD> for error messages
+        # Ideally netclient would pass down the URL object instead of making us
+        # reassemble it (twice)
+        userpass, _ = urllib.splituser(userhost)
+        if userpass:
+            username, password = urllib.unquote(userpass).split(':', 1)
+        else:
+            username = password = None
+        cleanUrl = str(req.url._replace(userpass=(username, password)))
+        if hasattr(cleanUrl, '__safe_str__'):
+            cleanUrl = cleanUrl.__safe_str__()
+
         req.setAbortCheck(self.abortCheck)
         req.setData(body, compress=self.compress)
         if self.entitlement:
@@ -167,14 +180,14 @@ class Transport(xmlrpclib.Transport):
             except http_error.ResponseError, err:
                 if err.errcode == 403:
                     raise errors.InsufficientPermission(
-                            repoName=self.serverName, url=url)
+                            repoName=self.serverName, url=cleanUrl)
                 elif err.errcode == 500:
                     raise errors.InternalServerError(err)
                 else:
                     # Already has adequate URL information, so just rethrow it
                     # without modifying the message.
-                    util.rethrow(errors.OpenError)
-            except:
+                    util.rethrow(errors.OpenError, False)
+            except (socket.error, EnvironmentError):
                 e_type, e_value, e_tb = sys.exc_info()
                 if isinstance(e_value, socket.error):
                     errmsg = e_value[1]
@@ -189,7 +202,7 @@ class Transport(xmlrpclib.Transport):
                     errmsg = '%s: %s' % (e_name, e_value)
                 raise errors.OpenError(
                         "Error occurred opening repository %s: %s" %
-                        (url, errmsg)), None, e_tb
+                        (cleanUrl, errmsg)), None, e_tb
         finally:
             self.usedProxy = opener.lastProxy is not None
             self._proxyHost = opener.lastProxy
