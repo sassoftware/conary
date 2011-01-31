@@ -452,6 +452,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                     filecontents.FromFilesystem(absolutePath),
                                 *info[0:4])
                         action = ACTION_RESTORE
+                    else:
+                        # it's not up to us to decide if this is a true
+                        # conflict; the database layer will do that for
+                        # us (see checkPathConflicts)
+                        action = ACTION_RESTORE
             elif flags.replaceUnmanagedFiles:
                 # we don't own it, but it's on disk. RPM will just write over
                 # it and we have the flag saying we're good with that
