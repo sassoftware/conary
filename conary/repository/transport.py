@@ -177,6 +177,8 @@ class Transport(xmlrpclib.Transport):
         try:
             try:
                 response = opener.open(req)
+            except AbortError:
+                raise
             except http_error.ResponseError, err:
                 if err.errcode == 403:
                     raise errors.InsufficientPermission(
