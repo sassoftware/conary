@@ -144,8 +144,8 @@ class Transport(xmlrpclib.Transport):
 
         opener = self.openerFactory(proxyMap=self.proxyMap,
                 caCerts=self.caCerts)
-        url = ''.join([protocol, '://', host, handler])
         host, extra_headers, x509 = self.get_host_info(host)
+        url = ''.join([protocol, '://', host, handler])
 
         req = opener.newRequest(url, method='POST', headers=extra_headers)
         req.setAbortCheck(self.abortCheck)
