@@ -116,9 +116,17 @@ EOF
                 ${conaryProxyS:+--config="$conaryProxyS"} \
                 $T/root/conaryBootstrap/rpmpython-$rpmver.ccs
         done
-        tar -c -z -C $T \
-            -f $namespace-${flavorNameMap[$flavor]}-conaryBootstrap.tar.gz \
-            $(cd $T; find . -type f)
+        # This python invocation fixes ownership in the archive,
+        # which prevents "conary repair" from breaking (CNY-3618)
+        (cd $T; find . -type f | python -c 'import tarfile, sys
+t = tarfile.open(fileobj=sys.stdout, mode="w:gz")
+for fn in [x.strip() for x in sys.stdin.readlines()]:
+    ti = t.gettarinfo(fn)
+    ti.uid = ti.gid = 0
+    ti.uname = ti.gname = "root"
+    t.addfile(ti, fileobj=file(fn))
+t.close()
+') > $namespace-${flavorNameMap[$flavor]}-conaryBootstrap.tar.gz
         rm -rf $T
     done
 done
