@@ -475,7 +475,7 @@ class ConfigFile(_Config):
                     timeout *= 2
                     socket.setdefaulttimeout(timeout)
                     continue
-                except IOError, err:
+                except (IOError, socket.error), err:
                     raise CfgEnvironmentError(url, err.args[1])
                 except EnvironmentError, err:
                     raise CfgEnvironmentError(err.filename, err.msg)
