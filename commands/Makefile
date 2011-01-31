@@ -24,7 +24,8 @@ dist_files = $(bin_files) $(extra_dist)
 
 all: default-all
 	mkdir -p $(TOPDIR)/bin
-	install -m755 conary-wrapper $(TOPDIR)/bin/conary-wrapper
+	sed -e 's#/usr/bin/python#$(PYTHON)#g' conary-wrapper >$(TOPDIR)/bin/conary-wrapper
+	chmod 0755 $(TOPDIR)/bin/conary-wrapper
 	for f in $(bin_files); do \
 		ln -sf conary-wrapper $(TOPDIR)/bin/$$f; \
 	done

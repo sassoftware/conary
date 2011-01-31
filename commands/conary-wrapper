@@ -16,5 +16,6 @@
 bindir=$(dirname $0)
 bin=$(basename $0)
 importdir=$(cd $bindir/.. 2> /dev/null && pwd -P;)
+PYTHON=/usr/bin/python
 export PYTHONPATH=$importdir:$PYTHONPATH
-exec $importdir/commands/$bin "$@"
+exec $PYTHON $importdir/commands/$bin "$@"
