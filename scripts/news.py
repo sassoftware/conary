@@ -109,7 +109,7 @@ def preview(repo, modifiedOK=True):
                     entry))
 
     out = ['Changes in %s:' % _getVersion()]
-    htmlOut = ['<p>%s %s is a maintainence release</p>' % (PRODUCT_NAME,
+    htmlOut = ['<p>%s %s is a maintenance release</p>' % (PRODUCT_NAME,
                                                            _getVersion())]
     for kind, heading in HEADINGS:
         entries = kind_map.get(kind, ())
