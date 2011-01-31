@@ -1,2 +1,0 @@
-Several potential SQL injection vulnerabilities have been eliminated.
-These vectors require repository administrator privileges and a non-standard configuration to exploit, so potential impact is low.

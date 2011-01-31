@@ -1,1 +1,0 @@
-Corrected a bug that would allow authenticated repository users with limited mirror privileges to deny repository mirror services to other authenticated users.

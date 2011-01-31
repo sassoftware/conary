@@ -1,3 +1,0 @@
-The changemail script will now send mail even if rdiff fails when
-attempting to generate a list of changes between versions of source
-packages.

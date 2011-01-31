@@ -1,2 +1,0 @@
-cvc rdiff tried to show changes in autosource files whose names didn't change,
-causing a traceback

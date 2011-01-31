@@ -1,3 +1,42 @@
+Changes in 2.2.10:
+  o New Features:
+    * Added basic support for memcached for fingerprints, dependencies,
+      and troveInfo. The support is for both the proxy and the
+      repository, but the cache is not actively invalidated.
+
+  o Bug Fixes:
+    * Promoting redirect troves now rewrites versions in redirects when
+      the target of the redirect has been promoted according to the
+      promote map, and leaves other redirects untouched.   Previously,
+      it converted the redirect into a redirect to nothing.
+      Additionally, a script called "promote-redirects" has been added
+      to automate the process of finding and promoting redirect packages
+      between labels. (CNY-1900)
+    * The changemail script will now send mail even if rdiff fails when
+      attempting to generate a list of changes between versions of
+      source packages.
+    * cvc rdiff tried to show changes in autosource files whose names
+      didn't change, causing a traceback (CNY-3383)
+    * Several potential SQL injection vulnerabilities have been
+      eliminated. These vectors require repository administrator
+      privileges and a non-standard configuration to exploit, so
+      potential impact is low. (CNY-3612)
+    * Corrected a bug that would allow authenticated repository users to
+      grant themselves additional repository privileges including
+      additional read access and write access, but not administrative
+      privileges or access to repository mirror services. (CNY-3611)
+    * Corrected a bug that would allow authenticated repository users
+      with limited mirror privileges to deny repository mirror services
+      to other authenticated users. (CNY-3610)
+    * Conary was too vigilant enforcing file conflict checking during
+      RPM updates. Many cases need to be caught by the database layer
+      instead of the capsule installation layer to avoid false
+      positives. (CNY-3620)
+
+  o Internal Changes:
+    * Some limitations of the "conary repair" command have been
+      documented. (CNY-3618)
+
 Changes in 2.2.9:
   o New Features:
     * The "cvc explain" command now honors the PAGER environment
