@@ -54,6 +54,8 @@ class HostPort(namedtuple('HostPort', 'host port'), Endpoint):
 
     def __str__(self):
         out = str(self.host)
+        if ':' in out:
+            out = '[%s]' % (out,)
         if self.port is not None:
             out += ':%s' % self.port
         return out
