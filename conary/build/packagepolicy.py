@@ -988,14 +988,22 @@ class Properties(policy.Policy):
 
     SYNOPSIS
     ========
-    C{r.Properties(I{exceptions=filterexp})}
+    C{r.Properties(I{exceptions=filterexp} || [I{contents=xml},
+                   I{package=pkg:component}])}
 
     DESCRIPTION
     ===========
     The C{r.Properties()} policy automatically parses iconfig property
     definition files, making the properties available for configuration
     management with iconfig.
+
+    To add configuration properties manually, use the syntax:
+    C{r.Properties(I{contents=ipropcontents}, I{package=pkg:component}}
+    Where contents is the xml string that would normally be stored in the iprop
+    file and package is the component where to attach the config metadata.
+    (NOTE: This component must exist)
     """
+    supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
     bucket = policy.PACKAGE_CREATION
     processUnmodified = True
     invariantinclusions = [ r'%(prefix)s/lib/iconfig/properties/.*\.iprop' ]
@@ -1003,6 +1011,20 @@ class Properties(policy.Policy):
         # We need to know what component files have been assigned to
         ('PackageSpec', policy.REQUIRED_PRIOR),
     )
+
+    def __init__(self, *args, **kwargs):
+        policy.Policy.__init__(self, *args, **kwargs)
+
+        self.contents = []
+
+    def updateArgs(self, *args, **kwargs):
+        if 'contents' in kwargs:
+            contents = kwargs.pop('contents')
+            pkg = kwargs.pop('package', None)
+
+            self.contents.append((pkg, contents))
+
+        policy.Policy.updateArgs(self, *args, **kwargs)
 
     def doFile(self, path):
         fullpath = self.recipe.macros.destdir + path
@@ -1015,10 +1037,19 @@ class Properties(policy.Policy):
         main, comp = componentMap[path].getName().split(':')
 
         xml = open(fullpath).read()
+        self._parsePropertyData(xml, main, comp)
+
+    def postProcess(self):
+        for pkg, content in self.contents:
+            pkg = pkg % self.macros
+            pkgName, compName = pkg.split(':')
+            self._parsePropertyData(content, pkgName, compName)
+
+    def _parsePropertyData(self, xml, pkgName, compName):
         xmldata = smartform.SmartFormFieldParser(xml)
 
         self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM,
-            main, comp, xmldata.name, xml, xmldata.default)
+            pkgName, compName, xmldata.name, xml, xmldata.default)
 
 
 class MakeDevices(policy.Policy):
