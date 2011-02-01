@@ -82,24 +82,34 @@ class URLOpener(object):
             raise TypeError("Unknown URL scheme %r" % (req.url.scheme,))
 
         response = self._doRequest(req, forceProxy=forceProxy)
-
         if response.status == 200:
-            encoding = response.getheader('content-encoding', None)
-            if encoding == 'deflate':
-                # disable until performace is better
-                #fp = DecompressFileObj(fp)
-                fp = util.decompressStream(response.fp)
-                fp.seek(0)
-            else:
-                fp = response.fp
-
-            protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
-            return InfoURL(fp, response.msg, req.url, protocolVersion,
-                    code=response.status, msg=response.reason)
+            return self._handleResponse(req, response)
         else:
-            self._handleProxyErrors(response.status)
-            raise http_error.ResponseError(req.url, self.lastProxy,
-                    response.status, response.reason)
+            return self._handleError(req, response)
+
+    def _handleResponse(self, req, response):
+        fp = response.fp
+        # Constrain reads of non-chunked responses to the specified
+        # Content-Length, otherwise the consumer will block waiting for more
+        # data if the connection stays open after the response is over. Ideally
+        # HTTPResponse would do this already, but it does not.
+        if response.length is not None:
+            fp = req_mod.LengthConstrainedReader(fp, response.length)
+        encoding = response.getheader('content-encoding', None)
+        if encoding == 'deflate':
+            # disable until performace is better
+            #fp = DecompressFileObj(fp)
+            fp = util.decompressStream(fp)
+            fp.seek(0)
+
+        protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
+        return InfoURL(fp, response.msg, req.url, protocolVersion,
+                code=response.status, msg=response.reason)
+
+    def _handleError(self, req, response):
+        self._handleProxyErrors(response.status)
+        raise http_error.ResponseError(req.url, self.lastProxy,
+                response.status, response.reason)
 
     def _handleFileRequest(self, req):
         return open(req.url.path, 'rb')

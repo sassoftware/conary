@@ -201,3 +201,26 @@ class ChunkedSender(object):
 
     def close(self, trailer=''):
         self.target.send("0\r\n%s\r\n" % (trailer,))
+
+
+class LengthConstrainedReader(object):
+    """
+    Wrap a read()able object but stop returning data after a preconfigured
+    number of bytes have been read.
+    """
+
+    def __init__(self, source, length):
+        self.source = source
+        self.length = length
+
+    def read(self, size=None):
+        if size is not None:
+            toRead = min(size, self.length)
+        else:
+            toRead = self.length
+        if toRead:
+            buf = self.source.read(toRead)
+            self.length -= len(buf)
+            return buf
+        else:
+            return ''
