@@ -16,8 +16,6 @@ import base64
 import gzip
 import itertools
 import os
-import socket
-import sys
 import time
 import urllib
 import xml
@@ -32,7 +30,6 @@ from conary import trove
 from conary import versions
 from conary.lib import util, api
 from conary.lib import httputils
-from conary.lib.http import http_error
 from conary.lib.http import proxy_map
 from conary.repository import calllog
 from conary.repository import changeset
@@ -3125,5 +3122,5 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     req = opener.newRequest(url, method='PUT')
     req.setData(inFile, size, callback=callbackFn, chunked=chunked,
             rateLimit=rateLimit)
-    infourl = opener.open(req)
-    return infourl.code, infourl.msg
+    response = opener.open(req)
+    return response.status, response.headers

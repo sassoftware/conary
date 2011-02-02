@@ -239,9 +239,12 @@ class ResponseWrapper(object):
         self.fp = fp
         self.response = response
 
-        self.read = fp.read
+        self.status = response.status
+        self.reason = response.reason
         self.headers = response.msg
         self.protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
+
+        self.read = fp.read
 
     def close(self):
         self.fp.close()
@@ -257,3 +260,7 @@ class ResponseWrapper(object):
     def readline(self):
         self._readlineify()
         return self.fp.readline()
+
+    # Backwards compatibility with urllib.addinfourl
+    code = property(lambda self: self.status)
+    msg = property(lambda self: self.headers)
