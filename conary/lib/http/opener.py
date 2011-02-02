@@ -16,7 +16,6 @@ import errno
 import httplib
 import logging
 import socket
-import urllib
 
 from conary.lib import httputils
 from conary.lib import util
@@ -88,23 +87,14 @@ class URLOpener(object):
             return self._handleError(req, response)
 
     def _handleResponse(self, req, response):
-        fp = response.fp
-        # Constrain reads of non-chunked responses to the specified
-        # Content-Length, otherwise the consumer will block waiting for more
-        # data if the connection stays open after the response is over. Ideally
-        # HTTPResponse would do this already, but it does not.
-        if response.length is not None:
-            fp = req_mod.LengthConstrainedReader(fp, response.length)
+        fp = response
         encoding = response.getheader('content-encoding', None)
         if encoding == 'deflate':
             # disable until performace is better
             #fp = DecompressFileObj(fp)
             fp = util.decompressStream(fp)
             fp.seek(0)
-
-        protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
-        return InfoURL(fp, response.msg, req.url, protocolVersion,
-                code=response.status, msg=response.reason)
+        return ResponseWrapper(fp, response)
 
     def _handleError(self, req, response):
         self._handleProxyErrors(response.status)
@@ -243,16 +233,27 @@ class URLOpener(object):
             error.strerror = msgError
 
 
-class InfoURL(urllib.addinfourl):
-    def __init__(self, fp, headers, url, protocolVersion, code=None, msg=None):
-        urllib.addinfourl.__init__(self, fp, headers, url)
-        self.protocolVersion = protocolVersion
-        self.code = code
-        self.msg = msg
+class ResponseWrapper(object):
 
-    def getheader(self, headerName, default=None):
-        """
-        Compatibility method for python 2.7, which expects the response to
-        be an httplib.Response object
-        """
-        return self.headers.getheader(headerName, default)
+    def __init__(self, fp, response):
+        self.fp = fp
+        self.response = response
+
+        self.read = fp.read
+        self.headers = response.msg
+        self.protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
+
+    def close(self):
+        self.fp.close()
+        self.response.close()
+
+    def _readlineify(self):
+        if hasattr(self.fp, 'readline'):
+            return
+        fp = util.BoundedStringIO()
+        util.copyfileobj(self.fp, fp)
+        self.fp = fp
+
+    def readline(self):
+        self._readlineify()
+        return self.fp.readline()

@@ -106,6 +106,7 @@ class Transport(xmlrpclib.Transport):
         self._proxyHost = None  # Can be a URL object
         self.proxyHost = None
         self.proxyProtocol = None
+        self.opener = self.openerFactory(proxyMap=proxyMap, caCerts=caCerts)
 
     def setEntitlements(self, entitlementList):
         self.entitlements = entitlementList
@@ -146,11 +147,9 @@ class Transport(xmlrpclib.Transport):
 
         protocol = self._protocol()
 
-        opener = self.openerFactory(proxyMap=self.proxyMap,
-                caCerts=self.caCerts)
         host, extra_headers, x509 = self.get_host_info(userhost)
         url = ''.join([protocol, '://', host, handler])
-        req = opener.newRequest(url, method='POST', headers=extra_headers)
+        req = self.opener.newRequest(url, method='POST', headers=extra_headers)
 
         # Make a url with username:<PASSWD> for error messages
         # Ideally netclient would pass down the URL object instead of making us
@@ -176,7 +175,7 @@ class Transport(xmlrpclib.Transport):
         # opener, even if we failed
         try:
             try:
-                response = opener.open(req)
+                response = self.opener.open(req)
             except AbortError:
                 raise
             except http_error.ResponseError, err:
@@ -206,8 +205,8 @@ class Transport(xmlrpclib.Transport):
                         "Error occurred opening repository %s: %s" %
                         (cleanUrl, errmsg)), None, e_tb
         finally:
-            self.usedProxy = opener.lastProxy is not None
-            self._proxyHost = opener.lastProxy
+            self.usedProxy = self.opener.lastProxy is not None
+            self._proxyHost = self.opener.lastProxy
             if self._proxyHost:
                 self.proxyHost = self._proxyHost.hostport
                 self.proxyProtocol = self._proxyHost.scheme
