@@ -572,14 +572,17 @@ def copyfileobj(source, dest, callback = None, digest = None,
         if sizeLimit and (sizeLimit - copied < bufSize):
             bufSize = sizeLimit - copied
 
-        if pollObj:
+        if abortCheck:
             # if we need to abortCheck, make sure we check it every time
             # read returns, and every five seconds
             l = []
             while not l:
                 if abortCheck():
                     return None
-                l = pollObj.poll(5000)
+                if pollObj:
+                    l = pollObj.poll(5000)
+                else:
+                    break
 
         buf = source.read(bufSize)
         if not buf:
