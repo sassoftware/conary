@@ -268,4 +268,4 @@ class ResponseWrapper(object):
 
     # Backwards compatibility with urllib.addinfourl
     code = property(lambda self: self.status)
-    msg = property(lambda self: self.headers)
+    msg = property(lambda self: self.reason)

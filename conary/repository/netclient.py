@@ -3123,4 +3123,4 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     req.setData(inFile, size, callback=callbackFn, chunked=chunked,
             rateLimit=rateLimit)
     response = opener.open(req)
-    return response.status, response.headers
+    return response.status, response.reason
