@@ -204,18 +204,23 @@ class Transport(xmlrpclib.Transport):
                 raise errors.OpenError(
                         "Error occurred opening repository %s: %s" %
                         (cleanUrl, errmsg)), None, e_tb
+
+            else:
+                usedAnonymous = 'X-Conary-UsedAnonymous' in response.headers
+                self.responseHeaders = response.headers
+                self.responseProtocol = response.protocolVersion
+                resp = self.parse_response(response)
+                rc = ([usedAnonymous] + resp[0], )
+                return rc
         finally:
             self.usedProxy = self.opener.lastProxy is not None
             self._proxyHost = self.opener.lastProxy
             if self._proxyHost:
                 self.proxyHost = self._proxyHost.hostport
                 self.proxyProtocol = self._proxyHost.scheme
-        usedAnonymous = 'X-Conary-UsedAnonymous' in response.headers
-        self.responseHeaders = response.headers
-        self.responseProtocol = response.protocolVersion
-        resp = self.parse_response(response)
-        rc = ([usedAnonymous] + resp[0], )
-        return rc
+            # More investigation about how persistent connections affect Conary
+            # operation is needed. For now, just close the cached connections.
+            self.opener.close()
 
     def getparser(self):
         return util.xmlrpcGetParser()

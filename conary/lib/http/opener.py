@@ -232,6 +232,11 @@ class URLOpener(object):
         if hasattr(error, 'strerror'):
             error.strerror = msgError
 
+    def close(self):
+        for conn in self.connectionCache.values():
+            conn.close()
+        self.connectionCache.clear()
+
 
 class ResponseWrapper(object):
 
