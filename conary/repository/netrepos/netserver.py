@@ -2279,6 +2279,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu = self.db.cursor()
 
         roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            return {}
 
         def _lookupIds(cu, itemList, selectQlist):
             schema.resetTable(cu, "tmpPaths")
@@ -2574,6 +2576,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getPackageCreatorTroves(self, authToken, clientVersion, serverName):
         cu = self.db.cursor()
         roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            return []
         query = """
         SELECT Items.item, Versions.version, Flavors.flavor,
                TroveInfo.data
@@ -3330,6 +3334,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             prov.append({})
 
         roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            return zip(prov, req)
 
         tblList = []
 
@@ -3540,6 +3546,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getLabelsForHost(self, authToken, clientVersion, serverName):
         cu = self.db.cursor()
         roleIds = self.auth.getAuthRoles(cu, authToken)
+        if not roleIds:
+            return []
         cu.execute('''
              SELECT branch FROM
                 (SELECT DISTINCT branchId
