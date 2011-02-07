@@ -2137,8 +2137,13 @@ class SavedException(object):
         self.type, self.value, self.tb = exc_info
 
     def __repr__(self):
-        return "<saved %s exception>" % (
-                self.type.__module__, self.type.__name__)
+        return "<saved %s exception>" % self.getName()
+
+    def getName(self):
+        return '.'.join((self.type.__module__, self.type.__name__))
+
+    def format(self):
+        return self.getName() + ': ' + str(self.value)
 
     def throw(self):
         raise self.type, self.value, self.tb

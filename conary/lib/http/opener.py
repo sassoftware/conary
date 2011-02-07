@@ -127,6 +127,9 @@ class URLOpener(object):
 
         failedProxies = set()
         for proxySpec in connIterator:
+            if lastError:
+                log.warning("Failed to open URL %s; trying the next proxy: %s",
+                        req.url, lastError.format())
             if proxySpec is proxy_map.DirectConnection:
                 proxySpec = None
             elif not forceProxy and self._shouldBypass(req.url, proxySpec):
@@ -143,12 +146,18 @@ class URLOpener(object):
                     err = err.args[1]
                 self._processSocketError(err)
                 lastError.replace(err)
+                # 'pass' if the error should fail-over, 'break' if it should be
+                # fatal.
                 if isinstance(err, socket.gaierror):
                     if err.args[0] == socket.EAI_AGAIN:
                         pass
                     else:
                         break
                 elif isinstance(err, socket.sslerror):
+                    pass
+                elif err.args[0] in (errno.ECONNREFUSED, errno.EACCES,
+                        errno.EAFNOSUPPORT, errno.ENETUNREACH,
+                        errno.ETIMEDOUT):
                     pass
                 else:
                     break
@@ -163,6 +172,8 @@ class URLOpener(object):
             if not resetResolv:
                 util.res_init()
                 resetResolv = True
+            if proxySpec:
+                failedProxies.add(proxySpec)
 
         if not response:
             if lastError:
@@ -171,6 +182,17 @@ class URLOpener(object):
                 # There wasn't anything to connect to, for some reason.
                 raise http_error.TransportError("Unable to connect to host %s"
                         % (req.url.hostport,))
+
+        # Only blacklist proxies if something succeeded, otherwise we might
+        # blacklist all strategies.
+        if failedProxies:
+            if self.lastProxy:
+                lastStr = "via proxy %s" % (self.lastProxy,)
+            else:
+                lastStr = "directly"
+            log.warning("Successfully contacted remote server %s", lastStr)
+        for proxySpec in failedProxies:
+            self.proxyMap.blacklistUrl(proxySpec)
 
         return response
 
