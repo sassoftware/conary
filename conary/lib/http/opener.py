@@ -55,6 +55,18 @@ class URLOpener(object):
         return req
 
     def open(self, url, data=None, method=None, headers=(), forceProxy=False):
+        """Open a URL and return a file-like object from which to read the
+        response.
+
+        @param url: The URL to open as a string or URL object, or a Request
+            object. If a Request object, C{data}, C{method}, and C{headers} are
+            ignored.
+        @param data: A request entity to POST to the URL.
+        @param method: The HTTP verb to use for the request.
+        @param headers: Extra headers to send with the request.
+        @param forceProxy: Use the given proxy spec instead of the
+            pre-configured proxyMap. C{None} forces thes use of no proxy.
+        """
         if isinstance(url, req_mod.Request):
             req = url
         else:
@@ -105,10 +117,15 @@ class URLOpener(object):
         return open(req.url.path, 'rb')
 
     def _doRequest(self, req, forceProxy):
-        connIterator = self.proxyMap.getProxyIter(req.url,
-                protocolFilter=self.proxyFilter)
         resetResolv = False
         lastError = response = None
+        if forceProxy is False:
+            connIterator = self.proxyMap.getProxyIter(req.url,
+                    protocolFilter=self.proxyFilter)
+        else:
+            connIterator = [forceProxy]
+
+        failedProxies = set()
         for proxySpec in connIterator:
             if proxySpec is proxy_map.DirectConnection:
                 proxySpec = None
@@ -158,6 +175,8 @@ class URLOpener(object):
         return response
 
     def _shouldBypass(self, url, proxy):
+        if proxy is None:
+            return False
         dest = str(url.hostport.host)
         pdest = str(proxy.hostport.host)
 

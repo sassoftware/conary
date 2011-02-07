@@ -101,7 +101,7 @@ class Transport(xmlrpclib.Transport):
         self.caCerts = caCerts
         self.responseHeaders = None
         self.responseProtocol = None
-        self.usedProxy = False
+        self.usedProxy = None
         self.entitlement = None
         self._proxyHost = None  # Can be a URL object
         self.proxyHost = None
@@ -213,7 +213,7 @@ class Transport(xmlrpclib.Transport):
                 rc = ([usedAnonymous] + resp[0], )
                 return rc
         finally:
-            self.usedProxy = self.opener.lastProxy is not None
+            self.usedProxy = self.opener.lastProxy
             self._proxyHost = self.opener.lastProxy
             if self._proxyHost:
                 self.proxyHost = self._proxyHost.hostport

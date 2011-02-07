@@ -1709,10 +1709,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            # FIXME: This check is for broken conary proxies that
-            # return a URL with "localhost" in it.  The proxy will know
-            # how to handle that.  So, we force the url to be reinterpreted
-            # by the proxy no matter what.
+            # "forceProxy" here makes sure that multi-part requests go back
+            # through the same proxy on subsequent requests.
             forceProxy = server.usedProxy()
             try:
                 inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
@@ -2309,10 +2307,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         sizes = [ int(x) for x in sizes ]
         assert(len(sizes) == len(fileList))
 
-        # FIXME: This check is for broken conary proxies that
-        # return a URL with "localhost" in it.  The proxy will know
-        # how to handle that.  So, we force the url to be reinterpreted
-        # by the proxy no matter what.
+        # "forceProxy" here makes sure that multi-part requests go back through
+        # the same proxy on subsequent requests.
         forceProxy = self.c[server].usedProxy()
         inF = transport.ConaryURLOpener(proxyMap = self.c.proxyMap).open(url,
                 forceProxy=forceProxy)
