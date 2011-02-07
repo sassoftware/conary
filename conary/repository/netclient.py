@@ -1718,7 +1718,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
                         url, forceProxy=forceProxy)
             except transport.TransportError, e:
-                raise errors.RepositoryError(*e.args)
+                raise errors.RepositoryError(str(e))
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
