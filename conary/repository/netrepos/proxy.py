@@ -20,10 +20,10 @@ import tempfile
 import time
 import urllib
 import urllib2
-import urlparse
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
-from conary.lib import digestlib, sha1helper, tracelog, util
+from conary.lib import digestlib, sha1helper, tracelog, urlparse, util
+from conary.lib.http import http_error
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
@@ -92,8 +92,8 @@ class ProxyCaller:
         try:
             rc = self.proxy.__getattr__(methodname)(*args)
         except IOError, e:
-            raise errors.ProxyError(e.strerror[1])
-        except util.xmlrpclib.ProtocolError, e:
+            raise errors.ProxyError(e.strerror)
+        except http_error.ResponseError, e:
             if e.errcode == 403:
                 raise errors.InsufficientPermission
 
@@ -134,7 +134,7 @@ class ProxyCaller:
 class ProxyCallFactory:
 
     @staticmethod
-    def createCaller(protocol, port, rawUrl, proxies, authToken, localAddr,
+    def createCaller(protocol, port, rawUrl, proxyMap, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
                      remoteIp, isSecure, baseUrl):
         entitlementList = authToken[2][:]
@@ -170,7 +170,7 @@ class ProxyCallFactory:
         addSSL = ':' not in urlHost and (bool(injEntList) or bool(userOverride))
         withSSL = urlProtocol == 'https' or addSSL
         transporter = transport.Transport(https = withSSL,
-                                          proxies = proxies,
+                                          proxyMap = proxyMap,
                                           serverName = targetServerName)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)
@@ -221,7 +221,7 @@ class RepositoryCallFactory:
         self.repos = repos
         self.log = logger
 
-    def createCaller(self, protocol, port, rawUrl, proxies, authToken,
+    def createCaller(self, protocol, port, rawUrl, proxyMap, authToken,
                      localAddr, protocolString, headers, cfg,
                      targetServerName, remoteIp, isSecure, baseUrl):
         if 'via' in headers:
@@ -245,7 +245,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.logFile = cfg.logFile
         self.tmpPath = cfg.tmpDir
         util.mkdirChain(self.tmpPath)
-        self.proxies = conarycfg.getProxyFromConfig(cfg)
+        self.proxyMap = conarycfg.getProxyMap(cfg)
         self.repositoryVersionCache = RepositoryVersionCache()
 
         self.log = tracelog.getLog(None)
@@ -288,7 +288,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         # we could get away with one total since we're just changing
         # hostname/username/entitlement
         caller = self.callFactory.createCaller(protocol, port, rawUrl,
-                                               self.proxies, authToken,
+                                               self.proxyMap, authToken,
                                                localAddr, protocolString,
                                                headers, self.cfg,
                                                targetServerName,
@@ -412,6 +412,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
             commonVersions = parentVersions
 
         return commonVersions
+
+    def getContentsStore(self):
+        return None
+
 
 class ChangeSetInfo(object):
 
@@ -1038,9 +1042,9 @@ class ChangesetFilter(BaseProxy):
 
     def _cacheChangeSet(self, url, neededHere, csInfoList, changeSetList):
         try:
-            inF = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            inF = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
         except transport.TransportError, e:
-            raise errors.RepositoryError(e.args[0])
+            raise errors.RepositoryError(str(e))
 
         for (jobIdx, (rawJob, fingerprint)), csInfo in \
                         itertools.izip(neededHere, csInfoList):
@@ -1355,7 +1359,7 @@ class BaseCachingChangesetFilter(ChangesetFilter):
         if cfg.changesetCacheDir:
             util.mkdirChain(cfg.changesetCacheDir)
             csCache = ChangesetCache(
-                    datastore.DataStore(cfg.changesetCacheDir),
+                    datastore.ShallowDataStore(cfg.changesetCacheDir),
                     cfg.changesetCacheLogFile)
         else:
             csCache = None
@@ -1484,6 +1488,10 @@ class SimpleRepositoryFilter(Memcache, BaseCachingChangesetFilter, RepositoryFil
         BaseCachingChangesetFilter.__init__(self, cfg, basicUrl)
         RepositoryFilterMixin.__init__(self, repos)
 
+    def getContentsStore(self):
+        return self.repos.getContentsStore()
+
+
 class FileCachingChangesetFilter(BaseCachingChangesetFilter):
 
     # Adds caching for getFileContents() call to allow proxies to keep
@@ -1585,7 +1593,7 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
             dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
             os.close(fd)
             os.unlink(tmpPath)
-            inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+            inUrl = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
             size = util.copyfileobj(inUrl, dest)
             inUrl.close()
             dest.seek(0)
@@ -1723,7 +1731,7 @@ class ProxyRepositoryServer(Memcache, FileCachingChangesetFilter):
         dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
         os.close(fd)
         os.unlink(tmpPath)
-        inUrl = transport.ConaryURLOpener(proxies = self.proxies).open(url)
+        inUrl = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url)
         size = util.copyfileobj(inUrl, dest)
         inUrl.close()
         dest.seek(0)
@@ -1993,13 +2001,15 @@ class ChangesetFileReader(object):
         self.tmpDir = tmpDir
 
     @staticmethod
-    def readNestedFile(name, tag, rawSize, subfile):
+    def readNestedFile(name, tag, rawSize, subfile, contentsStore):
         """Use with ChangeSet.dumpIter to handle external file references."""
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
             # this is a reference to a compressed file in the contents store
-            path = subfile.read()
-            expandedSize = os.stat(path).st_size
+            entry = subfile.read()
+            sha1, expandedSize = entry.split(' ')
+            expandedSize = int(expandedSize)
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+            path = contentsStore.hashToPath(sha1)
             fobj = open(path, 'rb')
             return tag, expandedSize, util.iterFileChunks(fobj)
         else:
@@ -2036,12 +2046,13 @@ class ChangesetFileReader(object):
             items = [ (localName, size, 0, 0) ]
         return items
 
-    def writeItems(self, items, wfile):
+    def writeItems(self, items, wfile, contentsStore=None):
         for path, size, isChangeset, preserveFile in items:
             if isChangeset:
                 cs = filecontainer.FileContainer(util.ExtendedFile(path,
                                                      buffering = False))
-                for data in cs.dumpIter(self.readNestedFile):
+                for data in cs.dumpIter(self.readNestedFile,
+                        args=(contentsStore,)):
                     wfile.write(data)
 
                 del cs
