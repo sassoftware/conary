@@ -1,0 +1,2 @@
+Changeset cache is now one directory deep instead of two, using the 8 bit
+prefix for the directory names

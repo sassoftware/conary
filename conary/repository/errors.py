@@ -87,7 +87,7 @@ class InsufficientPermission(ConaryError):
             repoMsg = ("repository %s" % repoName)
         if url:
             self.url = url
-            urlMsg = ("via %s" % url)
+            urlMsg = ("via %s" % (url,))
         if server or repoName or url:
             msg = "Insufficient permission to access %s %s %s" %(
                 repoMsg, serverMsg, urlMsg)

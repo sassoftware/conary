@@ -19,11 +19,13 @@ import sys
 import xml
 import re
 import traceback
+import urllib
 import pwd
 
 from conary.deps import deps, arch
 from conary.lib import util, api
-from conary.lib.cfg import *
+from conary.lib.cfg import *  # pyflakes=ignore
+from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions
 from conary import flavorcfg
@@ -277,7 +279,7 @@ class RepoMap(ServerGlobList):
         return True
 
     def __contains__(self, key):
-        return self.has_key(key)
+        return key in self
 
     def clear(self):
         del self[:]
@@ -486,6 +488,26 @@ class CfgSearchPathItem(CfgType):
 CfgSearchPath = CfgLineList(CfgSearchPathItem)
 
 
+class CfgProxyMap(CfgType):
+    default = proxy_map.ProxyMap()
+
+    def updateFromString(self, val, string):
+        parts = string.split()
+        if parts == ['[]']:
+            val.clear()
+            return val
+        if len(parts) < 2:
+            raise ParseError("Expected: proxyMap <pattern> "
+                    "[http://proxy1|DIRECT] [proxy2 ...]")
+        pattern, targets = parts[0], parts[1:]
+        val.addStrategy(pattern, targets)
+        return val
+
+    def toStrings(self, value, displayOptions):
+        for pattern, targets in value.filterList:
+            yield ' '.join([str(pattern)] + [str(x) for x in targets])
+
+
 def _getDefaultPublicKeyrings():
     publicKeyrings = []
     # If we are root, don't use the keyring in $HOME, since a process started
@@ -571,6 +593,7 @@ class ConaryContext(ConfigSection):
     conaryProxy           =  CfgProxy
     # HTTP proxy
     proxy                 =  CfgProxy
+    proxyMap              =  CfgProxyMap
     # The first keyring in the list is writable, and is used for storing the
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
@@ -675,8 +698,8 @@ class ConaryConfiguration(SectionedConfigFile):
 
         util.settempdir(self.tmpDir)
 
-    def _getProxies(self):
-        return self.proxy
+    def getProxyMap(self):
+        return getProxyMap(self)
 
     def readEntitlementDirectory(self):
         if not os.path.isdir(self.entitlementDirectory):
@@ -1042,3 +1065,24 @@ def getProxyFromConfig(cfg):
     if proxy:
         return proxy
     return cfg.proxy
+
+def getProxyMap(cfg):
+    """
+    Return the proxyMap, or create it from old-style proxy/conaryProxy
+    entries.
+    """
+    if cfg.proxyMap:
+        return cfg.proxyMap
+
+    # This creates a new proxyMap instance. We don't want to override the
+    # config's proxyMap, since old consumers of the API may modify the settings
+    # in-place and expect the changes to take effect.
+    proxyDict = urllib.getproxies()
+    proxyDict.update(cfg.proxy)
+    for scheme, url in cfg.conaryProxy.items():
+        if url.startswith('http:'):
+            url = 'conary:' + url[5:]
+        elif url.startswith('https:'):
+            url = 'conarys:' + url[6:]
+        proxyDict[scheme] = url
+    return proxy_map.ProxyMap.fromDict(proxyDict)
