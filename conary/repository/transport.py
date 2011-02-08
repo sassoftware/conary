@@ -22,6 +22,7 @@ import sys
 import urllib
 import xmlrpclib
 
+from conary.lib import timeutil
 from conary.lib import util
 from conary.lib.http import connection
 from conary.lib.http import http_error
@@ -31,6 +32,7 @@ from conary.repository import errors
 
 # For compatibility
 AbortError = http_error.AbortError
+BackoffTimer = timeutil.BackoffTimer
 TransportError = http_error.TransportError
 URLOpener = opener.URLOpener
 
