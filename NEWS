@@ -1,3 +1,15 @@
+Changes in 2.2.11:
+  o New Features:
+    * Added the ability to manually specify configuration properties,
+      rather than requiring a packaged file. (CNY-3619)
+
+  o Bug Fixes:
+    * Conary 2.2.9 introduced the PathConflict policy, which was added
+      to allow building groups with intentionally conflicting paths. If
+      path conflicts were allowed in inner groups, Conary would build
+      groups lacking weakrefs.  This has been fixed, and affects only
+      Conary 2.2.9 and 2.2.10. (CNY-3625)
+
 Changes in 2.2.10:
   o New Features:
     * Added basic support for memcached for fingerprints, dependencies,
