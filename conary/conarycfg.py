@@ -1079,10 +1079,11 @@ def getProxyMap(cfg):
     # in-place and expect the changes to take effect.
     proxyDict = urllib.getproxies()
     proxyDict.update(cfg.proxy)
-    for scheme, url in cfg.conaryProxy.items():
-        if url.startswith('http:'):
-            url = 'conary:' + url[5:]
-        elif url.startswith('https:'):
-            url = 'conarys:' + url[6:]
-        proxyDict[scheme] = url
+    if hasattr(cfg, 'conaryProxy'):
+        for scheme, url in cfg.conaryProxy.items():
+            if url.startswith('http:'):
+                url = 'conary:' + url[5:]
+            elif url.startswith('https:'):
+                url = 'conarys:' + url[6:]
+            proxyDict[scheme] = url
     return proxy_map.ProxyMap.fromDict(proxyDict)
