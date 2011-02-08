@@ -1421,11 +1421,10 @@ class Memcache(object):
         @param kwargs: Additional keyword arguments.
         """
         key_prefix = kwargs.pop('key_prefix')
-        emptyVal = kwargs.pop('emptyVal')
 
         keys = self._getKeys(authToken, listArg, extraArgs, kwargs)
         cachedDict = self.memCache.get_multi(keys, key_prefix = key_prefix)
-        finalResults = [ cachedDict.get(x, emptyVal) for x in keys ]
+        finalResults = [ cachedDict.get(x) for x in keys ]
 
         needed = [ (i, x) for i, x in enumerate(listArg)
                     if keys[i] not in cachedDict ]
@@ -1452,7 +1451,7 @@ class Memcache(object):
                                     caller, *args),
                 chgSetList,
                 recurse, withFiles, withFileContents, excludeAutoSource,
-                mirrorMode, key_prefix = "FPRINT", emptyVal = '')
+                mirrorMode, key_prefix = "FPRINT")
 
     def getDepsForTroveList(self, caller, authToken, clientVersion, troveList,
                             provides = True, requires = True):
@@ -1463,7 +1462,7 @@ class Memcache(object):
                         caller.getDepsForTroveList(clientVersion, *args,
                                                    **kwargs),
                 troveList, provides = provides, requires = requires,
-                key_prefix = "DEPS", emptyVal = {})
+                key_prefix = "DEPS")
 
     def getTroveInfo(self, caller, authToken, clientVersion, infoType,
                      troveList):
@@ -1472,7 +1471,7 @@ class Memcache(object):
                         caller.getTroveInfo(clientVersion, nInfoType,
                                             nTroveList),
                 troveList, infoType,
-                key_prefix = "TROVEINFO", emptyVal = None)
+                key_prefix = "TROVEINFO")
 
 class SimpleRepositoryFilter(Memcache, BaseCachingChangesetFilter, RepositoryFilterMixin):
     withCapsuleInjection = False
