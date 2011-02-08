@@ -1384,20 +1384,40 @@ class Memcache(object):
         else:
             self.memCache = cache.EmptyCache()
 
-    def _coalesce(self, authToken, callable, listArg, *extraArgs, **kwargs):
-        key_prefix = kwargs.pop('key_prefix')
-        emptyVal = kwargs.pop('emptyVal')
-
+    def _getKeys(self, authToken, listArgs, extraArgs=(), extraKwargs=None):
+        if extraKwargs is None:
+            extraKwargs = ()
+        else:
+            extraKwargs = tuple(sorted(extraKwargs.items()))
         if self.memCacheUserAuth:
             authInfo = (authToken[0], authToken[1], tuple(authToken[2]))
         else:
             authInfo = ()
+        # Hash the common arguments separately to save a few cycles.
+        # Microbenchmarks indicate that this adds effectively zero cost even
+        # with only one item.
+        common = digestlib.sha1(
+                str(authInfo + extraArgs + extraKwargs)
+                ).digest()
+        return [digestlib.sha1(common + str(x)).hexdigest() for x in listArgs]
 
-        keys = [ str(authInfo + (x,) + extraArgs +
-                     tuple(sorted(kwargs.items())))
-                    for x in listArg ]
-        keys = [ sha1helper.sha1ToString(sha1helper.sha1String(x)) for x
-                    in keys ]
+    def _coalesce(self, authToken, callable, listArg, *extraArgs, **kwargs):
+        """Memoize a proxy repository call.
+
+        @param authToken: Caller's credentials, used to partition the saved
+            results and in the method call if necessary.
+        @param callable: Callable to invoke to retrieve results. It should
+            accept a list of queries as the first argument, and return a
+            parallel list of results.
+        @param listArg: List to pass as the first argument to C{callable}.
+        @param extraArgs: Additional positional arguments.
+        @param key_prefix: String to prepend to the cache key. (keyword only)
+        @param kwargs: Additional keyword arguments.
+        """
+        key_prefix = kwargs.pop('key_prefix')
+        emptyVal = kwargs.pop('emptyVal')
+
+        keys = self._getKeys(authToken, listArg, extraArgs, kwargs)
         cachedDict = self.memCache.get_multi(keys, key_prefix = key_prefix)
         finalResults = [ cachedDict.get(x, emptyVal) for x in keys ]
 
