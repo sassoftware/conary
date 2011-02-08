@@ -2089,19 +2089,6 @@ def buildGroups(recipeObj, cfg, repos, callback, troveCache=None):
         childGroups = recipeObj.getChildGroups(group.name)
         groupMap = recipeObj.getGroupMap()
 
-        # check to see if any of our children groups have conflicts,
-        # if so, we won't bother building up this group since it's
-        # bound to have a conflict as well.
-        badGroup = False
-        for childGroup, byDefault, isExplicit in childGroups:
-            if byDefault and childGroup.name in groupsWithConflicts:
-                badGroup = True
-                # mark this group as having a conflict
-                groupsWithConflicts[group.name] = []
-                break
-        if badGroup:
-            continue
-
         # add troves to this group.
         if isinstance(group, SingleGroup):
             unmatchedGlobalReplaceSpecs &= addTrovesToGroup(group, troveMap,
