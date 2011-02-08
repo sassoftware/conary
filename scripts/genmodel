@@ -317,7 +317,8 @@ if __name__ == '__main__':
                                 in db.iterAllTroves(withPins = True) )
 
     model = cml.CML(cfg)
-    if os.path.exists("/etc/redhat-release"):
+    if ('group-core' not in [ x[0] for x in installedTroves ] and
+                os.path.exists("/etc/redhat-release")):
         initialRedHatModel(client, model)
         componentPriorities = [ ( 'rpm', ),
                                 ( 'runtime', ),
