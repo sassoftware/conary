@@ -308,15 +308,21 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         try:
             if hasattr(self, methodname):
-                # handled internally
+                # Special handling at the proxy level. The logged method name
+                # is prefixed with a '+' to differentiate it from a vanilla
+                # call.
                 method = self.__getattribute__(methodname)
 
                 if self.callLog:
-                    self.callLog.log(remoteIp, authToken, methodname, args,
-                                     kwargs)
+                    self.callLog.log(remoteIp, authToken, '+' + methodname,
+                            args, kwargs)
 
                 r = method(caller, authToken, *args, **kwargs)
             else:
+                # Forward directly to the next server.
+                if self.callLog:
+                    self.callLog.log(remoteIp, authToken, methodname, args,
+                            kwargs)
                 r = caller.callByName(methodname, *args, **kwargs)
 
             r = (False, r)
