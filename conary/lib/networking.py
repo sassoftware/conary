@@ -29,6 +29,10 @@ class Endpoint(object):
         """
         return False
 
+    def __deepcopy__(self, memo=None):
+        return self
+    __copy__ = __deepcopy__
+
 
 class HostPort(namedtuple('HostPort', 'host port'), Endpoint):
     """Pair (host, port) where host is an address and port is None or a
