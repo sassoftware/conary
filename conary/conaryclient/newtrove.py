@@ -37,7 +37,8 @@ class ClientNewTrove(object):
 
     def createSourceTrove(self, name, label, upstreamVersion, pathDict,
                           changeLog, factory = None,
-                          pkgCreatorData = None):
+                          pkgCreatorData = None,
+                          metadata = None):
         """
             Create a source trove.
             @param name: trove name of source components.
@@ -58,6 +59,9 @@ class ClientNewTrove(object):
             @param pkgCreatorData: arbitrary string set in
             _TROVEINFO_TAG_PKGCREATORDATA
             @type pkgCreatorData: str
+            @param metadata: additional metadata to be attached to the source
+            trove
+            @type metadata: dict
         """
         if not name.endswith(':source'):
             raise RuntimeError('Only source components allowed')
@@ -69,7 +73,11 @@ class ClientNewTrove(object):
         troveObj.setFactory(factory)
         if pkgCreatorData:
             troveObj.troveInfo.pkgCreatorData.set(pkgCreatorData)
-
+        if metadata:
+            mi = trove.MetadataItem()
+            for k, v in metadata.iteritems():
+                mi.keyValue[k] = v
+            troveObj.troveInfo.metadata.addItem(mi)
         return self._createTroves([(troveObj, pathDict)])
 
 
