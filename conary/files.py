@@ -400,7 +400,7 @@ class File(streams.StreamSet):
         return streams.StreamSet.twm(self, diff[2:], base, skip = skip)
 
     def __eq__(self, other, ignoreOwnerGroup = False):
-        if other.lsTag != self.lsTag: return False
+        if other is None or other.lsTag != self.lsTag: return False
 
         if ignoreOwnerGroup:
             return streams.StreamSet.__eq__(self, other,

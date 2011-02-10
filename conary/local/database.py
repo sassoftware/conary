@@ -1951,12 +1951,20 @@ class Database(SqlDbRepository):
                 localTrove.getVersion().createShadow(
                                             label = versions.LocalLabel()))
             hasChanges = False
+            pathIdsHandled = set()
             for (pathId, content, fileObj) in fileList:
                 if asMissing:
                     hasChanges = True
                     fileObj = files.MissingFile(pathId)
                 elif not content:
                     continue
+                elif pathId in pathIdsHandled:
+                    # dedup fileList as it will contain multiple matches
+                    # if multiple troves are overriding the file being
+                    # removed
+                    continue
+
+                pathIdsHandled.add(pathId)
 
                 fileId = fileObj.fileId()
                 cs.addFile(None, fileId, fileObj.freeze())
