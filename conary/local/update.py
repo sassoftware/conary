@@ -23,14 +23,12 @@ import select
 import stat
 import sys
 import tempfile
-import zlib
 import weakref
 
 from conary import errors, files, trove, versions
 from conary.build import tags
 from conary.callbacks import UpdateCallback
-from conary.deps import deps
-from conary.lib import digestlib, log, patch, sha1helper, util, fixedglob
+from conary.lib import log, patch, sha1helper, util, fixedglob
 from conary.local import capsules
 from conary.local.errors import *
 from conary.local.journal import NoopJobJournal
@@ -54,10 +52,19 @@ class UpdateFlags(util.Flags):
     """
 
     __slots__ = [ 'merge', 'ignoreUGids', 'missingFilesOkay',
-                  'ignoreInitialContents', 'replaceManagedFiles',
+                  'ignoreInitialContents', '_replaceManagedFiles',
                   'replaceUnmanagedFiles', 'replaceModifiedFiles',
                   'replaceModifiedConfigFiles', 'ignoreMissingFiles',
-                  'skipCapsuleOps' ]
+                  'skipCapsuleOps', '_replaceManagedSet' ]
+
+    def __init__(self, replaceManagedFiles = False, replaceManagedSet = set(),
+                 **kwargs):
+        util.Flags.__init__(self, **kwargs)
+        self._replaceManagedFiles = replaceManagedFiles
+        object.__setattr__(self, '_replaceManagedSet', replaceManagedSet)
+
+    def replaceManagedFiles(self, path):
+        return self._replaceManagedFiles or (path in self._replaceManagedSet)
 
 class LastRestored(object):
 
@@ -1064,7 +1071,7 @@ class FilesystemJob:
                                             headPath, justPresent = True))
 
                 if existingOwners:
-                    replaceThisFile = flags.replaceManagedFiles
+                    replaceThisFile = flags.replaceManagedFiles(headPath)
                 else:
                     replaceThisFile = flags.replaceUnmanagedFiles
 
@@ -1165,7 +1172,7 @@ class FilesystemJob:
                 self._restore(headFile, headRealPath, newTroveInfo,
                               "creating %s",
                               overrideInternalConflicts =
-                                                    flags.replaceManagedFiles,
+                                        flags.replaceManagedFiles(headPath),
                               fileId = headFileId)
                 if isSrcTrove:
                     fsTrove.addFile(pathId, headPath, headFileVersion,
@@ -1321,7 +1328,7 @@ class FilesystemJob:
                               "creating %s with contents "
                               "from repository",
                               overrideInternalConflicts =
-                                    flags.replaceManagedFiles,
+                                    flags.replaceManagedFiles(finalPath),
                               fileId = headFileId)
                 continue
             elif isSrcTrove:
@@ -1382,7 +1389,7 @@ class FilesystemJob:
                         # something else instead of a directory
                         forceUpdate = True
                         attributesChanged = True
-                elif (flags.replaceManagedFiles or
+                elif (flags.replaceManagedFiles(finalPath) or
                                         baseFile.lsTag == fsFile.lsTag):
                     # the file type changed between versions. Force an
                     # update because changes cannot be be merged
@@ -1489,7 +1496,7 @@ class FilesystemJob:
                                       "config file",
                                       contentsOverride = headFileContents,
                                       overrideInternalConflicts =
-                                            flags.replaceManagedFiles,
+                                        flags.replaceManagedFiles(finalPath),
                                       fileId = headFileId)
                     else:
                         # switch the fsFile to the sha1 for the new file
@@ -1500,7 +1507,7 @@ class FilesystemJob:
                                       "replacing %s with contents "
                                       "from repository",
                                       overrideInternalConflicts =
-                                            flags.replaceManagedFiles,
+                                        flags.replaceManagedFiles(finalPath),
                                       fileId = headFileId)
 
                     beenRestored = True
@@ -1547,7 +1554,8 @@ class FilesystemJob:
                     self._restore(fsFile, realPath, newTroveInfo,
                           "merging changes from repository into %s",
                           contentsOverride = cont,
-                          overrideInternalConflicts = flags.replaceManagedFiles,
+                          overrideInternalConflicts =
+                            flags.replaceManagedFiles(finalPath),
                           fileId = headFileId)
                     beenRestored = True
 
@@ -1573,7 +1581,8 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
                       "merging changes from repository into %s",
                       contentsOverride = None,
-                      overrideInternalConflicts = flags.replaceManagedFiles,
+                      overrideInternalConflicts =
+                        flags.replaceManagedFiles(finalPath),
                       fileId = headFileId)
             elif not attributesChanged and not beenRestored and headChanges:
                 # Nothing actually changed, but the diff isn't empty
@@ -1586,7 +1595,8 @@ class FilesystemJob:
                 self._restore(fsFile, realPath, newTroveInfo,
                       "file has not changed",
                       contentsOverride = None,
-                      overrideInternalConflicts = flags.replaceManagedFiles,
+                      overrideInternalConflicts =
+                        flags.replaceManagedFiles(finalPath),
                       fileId = headFileId, restoreFile = restoreFile)
 
             if pathOkay and contentsOkay:

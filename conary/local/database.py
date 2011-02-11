@@ -519,6 +519,12 @@ class UpdateJob:
     def setItemList(self, itemList):
         self._itemList = itemList
 
+    def setAllowedPathConflicts(self, pathSet):
+        self._allowedPathConflicts = pathSet
+
+    def getAllowedPathConflicts(self):
+        return self._allowedPathConflicts
+
     def getKeywordArguments(self):
         return self._kwargs
 
@@ -1206,6 +1212,8 @@ class UpdateJob:
         self._previousVersion = None
         # Features of the previous Conary
         self._features = UpdateJobFeatures()
+        # Path conflicts which groups have said are acceptable
+        self._allowedPathConflicts = set()
 
         self._commitFlags = None
 
@@ -1782,7 +1790,7 @@ class Database(SqlDbRepository):
                     dbCache, cs, callback, autoPinList,
                     allowIncomplete = (rollbackPhase is not None),
                     userReplaced = fsJob.userRemovals,
-                    replaceFiles = flags.replaceManagedFiles,
+                    replaceFileCheck = flags.replaceManagedFiles,
                     sharedFiles = fsJob.sharedFilesByTrove)
             except DatabasePathConflicts, e:
                 for (path, (pathId, (troveName, version, flavor)),
@@ -2047,7 +2055,8 @@ class Database(SqlDbRepository):
             replaceUnmanagedFiles = commitFlags.replaceUnmanagedFiles,
             replaceModifiedFiles = commitFlags.replaceModifiedFiles,
             replaceModifiedConfigFiles = commitFlags.replaceModifiedConfigFiles,
-            skipCapsuleOps = commitFlags.skipCapsuleOps)
+            skipCapsuleOps = commitFlags.skipCapsuleOps,
+            replaceManagedSet = uJob.getAllowedPathConflicts() )
 
         if rollbackPhase:
             flags.missingFilesOkay = True
@@ -2378,6 +2387,23 @@ class Database(SqlDbRepository):
         uJob = UpdateJob(self)
         self.commitChangeSet(repairCs, uJob, callback = UpdateCallback(),
                              repair = True)
+
+    def buildPathConflictExceptions(self, jobList, newTroveLookupFn):
+        pathDict = dict(
+            self.db.getAllTroveInfo(trove._TROVEINFO_TAG_PATHCONFLICTS))
+        for job in jobList:
+            if job[1][0] is not None:
+                oldTrove = (job[0],) + job[1]
+                pathDict.pop(oldTrove, None)
+
+            if job[2][0] is not None:
+                newTrove = (job[0],) + job[2]
+                lookup = newTroveLookupFn(newTrove)
+                if lookup is not None:
+                    pathDict[newTrove] = lookup
+
+        import epdb;epdb.st('f')
+        return set().union(*[ set(x) for x in pathDict.values() ] )
 
     def commitLock(self, acquire):
         if not acquire:
