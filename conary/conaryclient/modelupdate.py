@@ -512,6 +512,20 @@ class CMLClient(object):
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves
 
+    def _findAcceptablePathConflicts(self, jobList, uJob, troveCache):
+        troveInfoNeeded = []
+        for job in jobList:
+            if trove.troveIsGroup(job[0]) and job[2][0] is not None:
+                troveInfoNeeded.append((job[0],) + job[2])
+
+        troveInfo = troveCache.getTroveInfo(
+                        trove._TROVEINFO_TAG_PATHCONFLICTS, troveInfoNeeded)
+        troveInfoDict = dict( (tt, ti) for (tt, ti) in
+                                itertools.izip(troveInfoNeeded, troveInfo) )
+
+        uJob.setAllowedPathConflicts(
+            self.db.buildPathConflictExceptions(jobList, troveInfoDict.get))
+
     def _closePackages(self, cache, trv, newTroves = None):
         packagesAdded = set()
         if newTroves is None:
@@ -782,6 +796,8 @@ class CMLClient(object):
         # this prevents us from using the changesetList as a searchSource
         log.info("processing job list")
         self._processCMLJobList(job, uJob, troveCache)
+        log.info("gathering group defined path conflicts")
+        self._findAcceptablePathConflicts(job, uJob, troveCache)
         log.info("combining jobs")
         self._combineJobs(uJob, splitJob, criticalUpdates)
         log.info("combining jobs")

@@ -684,6 +684,18 @@ class OrderedStreamCollection(StreamCollection):
             self._data = None
             self._thawedItems = dict([ (x, []) for x in self.streamDict ])
 
+class StringOrderedStreamCollection(OrderedStreamCollection):
+    streamDict = { 1 : StringStream }
+    ignoreSkipSet = True
+
+    def append(self, item):
+        s = StringStream()
+        s.set(item)
+        self.addStream(1, s)
+
+    def __iter__(self):
+        return ( x[1]() for x in self.iterAll() )
+
 class AbsoluteStreamCollection(StreamCollection):
     """
     AbsolteStreamCollection is like a StreamCollection.  It

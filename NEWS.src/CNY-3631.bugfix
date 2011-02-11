@@ -1,0 +1,2 @@
+Jobs which install shared contents for a file would fail if those contents
+were delivered in the update changeset as both a diff and complete contents

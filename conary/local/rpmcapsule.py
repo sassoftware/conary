@@ -344,10 +344,13 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 continue
 
             if pathId in changedByPathId:
-                fileObj = fileObjsByPathId[pathId]
                 oldFileId = oldTrv.getFile(pathId)[1]
                 fileChange = self.changeSet.getFileChange(oldFileId, fileId)
-                fileObj.twm(fileChange, fileObj)
+                if fileChange[0] == '\x01':
+                    fileObj = fileObjsByPathId[pathId]
+                    fileObj.twm(fileChange, fileObj)
+                else:
+                    fileObj = files.ThawFile(fileChange, pathId)
             elif pathId in unchangedByPathId:
                 fileObj = fileObjsByPathId[pathId]
             else:
@@ -438,7 +441,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                         #
                         # yes, really
                         action = ACTION_SKIP
-                    elif (flags.replaceManagedFiles or
+                    elif (flags.replaceManagedFiles(path) or
                           1 in [ files.rpmFileColorCmp(fileObj, x)
                                  for x in existingFiles ]):
                         # The files are different. Bail unless we're supposed

@@ -1675,6 +1675,16 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 self.configCache[key] = f
             elif len(key) == 16:
                 raise PathIdsConflictError(key)
+            elif (self.configCache[key][0] == ChangedFileTypes.diff and
+                  f[0] == ChangedFileTypes.file):
+                # happily replace a diff with proper file contents; we can
+                # deal with that everywhere. no reason to conflict.
+                self.configCache[key] = f
+            elif (self.configCache[key][0] == ChangedFileTypes.file and
+                  f[0] == ChangedFileTypes.diff):
+                # happily let a file we already found override a diff, same
+                # as above
+                pass
             elif (self.configCache[key][0] == ChangedFileTypes.diff or
                   f[0] == ChangedFileTypes.diff):
                 raise ChangeSetKeyConflictError(key)

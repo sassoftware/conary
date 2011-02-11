@@ -1819,6 +1819,12 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         if extraMacros:
             self.macros.update(extraMacros)
 
+    def _findSources(self, *args, **kwargs):
+        # GroupSetRecipe does not implement recursive builds, so just
+        # return an empty list -- this allows rmake builds of
+        # GroupSetRecipe groups to work.
+        return []
+
     def _realizeGraph(self, cache, callback):
         data = GroupActionData(troveCache = GroupSetTroveCache(self, cache),
                                groupRecipe = self)

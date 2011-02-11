@@ -73,13 +73,19 @@ class PathConflicts(policy.GroupEnforcementPolicy):
 
     def do(self):
         conflicts = {}
-        for group in self.groupsWithConflicts.keys():
-            for trvs, paths in self.groupsWithConflicts[group]:
+        for grpTrv in self.recipe.troveMap.values():
+            groupName = grpTrv.getNameVersionFlavor()[0]
+            if groupName not in self.groupsWithConflicts.keys():
+                continue
+
+            for trvs, paths in self.groupsWithConflicts[groupName]:
                 isConflict = True
                 for exception in self.pathExceptions:
                     failPaths = [p for p in paths if not exception.match(p)]
                     if len(failPaths) == 0:
                         # all these paths are excepted
+                        for path in paths:
+                            grpTrv.troveInfo.pathConflicts.append(path)
                         isConflict = False
                         continue
                     if len(failPaths) != len(paths):
@@ -97,7 +103,7 @@ class PathConflicts(policy.GroupEnforcementPolicy):
                             # don't print out troves that have been ignored
                             trvs = failTrvs
                 if isConflict:
-                    l = conflicts.setdefault(group, [])
+                    l = conflicts.setdefault(groupName, [])
                     l.append((trvs, paths))
             
         if conflicts:
