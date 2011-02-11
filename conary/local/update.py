@@ -30,7 +30,11 @@ from conary.build import tags
 from conary.callbacks import UpdateCallback
 from conary.lib import log, patch, sha1helper, util, fixedglob
 from conary.local import capsules
-from conary.local.errors import *
+from conary.local.errors import (DatabasePathConflictError,
+        DirectoryInWayError, DirectoryToNonDirectoryError,
+        DirectoryToSymLinkError, DuplicatePath, FileAttributesConflictError,
+        FileContentsConflictError, FileInWayError, FileTypeChangedError,
+        PathConflictError)
 from conary.local.journal import NoopJobJournal
 from conary.repository import changeset, filecontents
 
