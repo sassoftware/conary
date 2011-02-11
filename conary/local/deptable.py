@@ -833,8 +833,8 @@ class DependencyChecker:
         return criticalJobsSets
 
     def _orderJobSets(self, jobSets, criticalJobSetsList):
-        # sort jobSets so that critical jobs are first, then
-        # info packages, then packages/groups, then sort alphabetically.
+        # sort jobSets so info packages are first, then critical jobs,
+        # then packages/groups, then sort alphabetically.
         # This ordering will determine how the jobs are ordered when there's
         # no dependency reason to order them a particular way.
         jobComp = {}
@@ -859,7 +859,7 @@ class DependencyChecker:
             compJobSet = [((x[0][0], (str(x[0][1][0]), x[0][1][1]),
                            (str(x[0][2][0]), x[0][1][1]), x[0][3]), x[1])
                            for x in jobSet]
-            cmpValue = (-isCritical, -hasInfo, -hasPackage, compJobSet)
+            cmpValue = (-hasInfo, -isCritical, -hasPackage, compJobSet)
             jobComp[tuple(jobSet)] = cmpValue
 
         jobSets.sort(key=lambda x: jobComp[tuple(x)])
