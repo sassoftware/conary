@@ -225,9 +225,11 @@ class URLOpener(object):
             self.connectionCache[key] = conn
 
         timer = timeutil.BackoffTimer()
+        result = None
         for attempt in range(self.maxRetries + 1):
             if attempt:
                 timer.sleep()
+            result = None
             try:
                 result = conn.request(req)
             except socket.error, err:
@@ -243,8 +245,12 @@ class URLOpener(object):
             if attempt:
                 log.info("Successfully reached %s after %d attempts.",
                         req.url.hostport, attempt + 1)
+            break
+
+        if result:
             return result
-        raise
+        else:
+            raise
 
     def _handleProxyErrors(self, errcode):
         """Translate proxy error codes into exceptions."""
