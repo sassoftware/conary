@@ -38,7 +38,7 @@ class ProxyMap(object):
     def clear(self):
         self.filterList = []
 
-    def addStrategy(self, matchHost, targets):
+    def addStrategy(self, matchHost, targets, replaceScheme=None):
         filterSpec = FilterSpec(matchHost)
         targets2 = []
         for target in targets:
@@ -47,6 +47,11 @@ class ProxyMap(object):
                     target = DirectConnection
                 else:
                     target = req_mod.URL.parse(target)
+            if (replaceScheme and target is not DirectConnection and
+                    target.scheme.startswith('http')):
+                # https -> conarys, etc.
+                target = target._replace(
+                        scheme=replaceScheme + target.scheme[4:])
             targets2.append(target)
         self.filterList.append((filterSpec, targets2))
 
