@@ -314,6 +314,16 @@ class ResponseWrapper(object):
         self._readlineify()
         return self.fp.readline()
 
+    def __iter__(self):
+        while True:
+            line = self.readline()
+            if not line:
+                break
+            yield line
+
+    def readlines(self):
+        return list(self)
+
     # Backwards compatibility with urllib.addinfourl
     code = property(lambda self: self.status)
     msg = property(lambda self: self.reason)
