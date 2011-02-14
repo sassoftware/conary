@@ -468,10 +468,10 @@ class ClientClone(object):
                                 callback):
         self._checkCloneListSanity(chooser.getPrimaryTroveList())
         trvs = troveCache.getTroves(chooser.getPrimaryTroveList())
-        toClone = []
+        #toClone = []
 
         for trv in trvs:
-            toClone.append(trv.getNameVersionFlavor())
+            #toClone.append(trv.getNameVersionFlavor())
             cloneMap.updateChildMap(trv)
 
         seen = set()

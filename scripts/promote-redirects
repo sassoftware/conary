@@ -188,9 +188,11 @@ if __name__ == '__main__':
     # FIXME: should really check whether the target of the redirect is the same
     # modulo label mapping
     needRedirectTrvs = [x for x in destTrvs if not x.isRedirect()]
+    needRedirectsSrcTrvs = [redirectSrcTrvs[x.getName()]
+                            for x in needRedirectTrvs]
     needRedirectsBinaries = sorted(set(
         ('%s=%s' %(x.getName(), x.getVersion().trailingLabel().asString())
-         for x in needRedirectTrvs)))
+         for x in needRedirectsSrcTrvs)))
 
     if options.new and needRedirectTrvs:
         needRedirects = {}
