@@ -307,6 +307,7 @@ class ResponseWrapper(object):
             return
         fp = util.BoundedStringIO()
         util.copyfileobj(self.fp, fp)
+        fp.seek(0)
         self.fp = fp
 
     def readline(self):
