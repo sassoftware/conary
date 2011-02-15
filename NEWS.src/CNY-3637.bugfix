@@ -1,0 +1,3 @@
+A single job with overlapping files would erroneously include local file
+information on one of the versions of the file in the rollback, preventing
+that rollbacks from being applied.
