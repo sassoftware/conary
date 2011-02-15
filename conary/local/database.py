@@ -1809,7 +1809,9 @@ class Database(SqlDbRepository):
             # database only; the files may be missing in the filesystem
             # altogether
             self.mergeRemoveRollback(localRollback,
-                         self.createRemoveRollback(csJob.iterDbRemovals(),
+                         self.createRemoveRollback(
+                                (x for x in csJob.iterDbRemovals()
+                                    if x[0] not in cs.newTroves),
                                                    asMissing = True))
 
         # we have to do this before files get removed from the database,
