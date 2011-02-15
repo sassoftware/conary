@@ -32,6 +32,11 @@ class ProxyMap(object):
     def __nonzero__(self):
         return bool(self.filterList)
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return self.filterList == other.filterList
+
     def items(self):
         return self.filterList[:]
 
@@ -118,23 +123,30 @@ class ProxyMap(object):
             yield DirectConnection
 
 
-class FilterSpec(object):
+class FilterSpec(networking.namedtuple('FilterSpec', 'protocol address')):
+    __slots__ = ()
 
-    def __init__(self, value):
+    def __new__(cls, value, address=None):
         if isinstance(value, FilterSpec):
-            self.protocol = value.protocol
-            self.address = value.address
+            protocol = value.protocol
+            address = value.address
         else:
-            if value.startswith('http:'):
-                self.protocol = 'http'
+            if value is None:
+                protocol = None
+            elif value.startswith('http:'):
+                protocol = 'http'
                 address = value[5:]
             elif value.startswith('https:'):
-                self.protocol = 'https'
+                protocol = 'https'
                 address = value[6:]
+            elif address is not None:
+                protocol = value
             else:
-                self.protocol = None
+                protocol = None
                 address = value
-            self.address = networking.HostPort(address)
+            if not isinstance(address, networking.HostPort):
+                address = networking.HostPort(address)
+        return tuple.__new__(cls, (protocol, address))
 
     def __str__(self):
         value = str(self.address)
@@ -150,6 +162,7 @@ class FilterSpec(object):
 
 
 class DirectConnection(object):
+    __slots__ = ()
 
     def __str__(self):
         return 'DIRECT'

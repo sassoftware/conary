@@ -503,6 +503,10 @@ class CfgProxyMap(CfgType):
         val.addStrategy(pattern, targets)
         return val
 
+    def setFromString(self, val, string):
+        pm = val.__class__()
+        return self.updateFromString(pm, string)
+
     def toStrings(self, value, displayOptions):
         for pattern, targets in value.filterList:
             yield ' '.join([str(pattern)] + [str(x) for x in targets])
