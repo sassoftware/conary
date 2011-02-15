@@ -2404,8 +2404,11 @@ class Database(SqlDbRepository):
                 if lookup is not None:
                     pathDict[newTrove] = lookup
 
-        import epdb;epdb.st('f')
-        return set().union(*[ set(x) for x in pathDict.values() ] )
+        s = set()
+        for x in pathDict.values():
+            s.update(x)
+
+        return s
 
     def commitLock(self, acquire):
         if not acquire:
