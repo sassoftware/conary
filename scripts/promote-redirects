@@ -182,17 +182,23 @@ if __name__ == '__main__':
     destTrvs = repos.getTroves(troveTups, withFiles=False)
     sys.stderr.write(' done.\n')
 
+    # ignore flavors
+    redirectSrcTrvs = dict((x.getName(), x) for x in allRedirects)
+
     # FIXME: should really check whether the target of the redirect is the same
-    needRedirectTrvs = [(x, y) for (x, y) in zip(allRedirects, destTrvs)
-                        if not y.isRedirect()]
+    # modulo label mapping
+    needRedirectTrvs = [x for x in destTrvs if not x.isRedirect()]
+    needRedirectsSrcTrvs = [redirectSrcTrvs[x.getName()]
+                            for x in needRedirectTrvs]
     needRedirectsBinaries = sorted(set(
         ('%s=%s' %(x.getName(), x.getVersion().trailingLabel().asString())
-         for x, y in needRedirectTrvs)))
+         for x in needRedirectsSrcTrvs)))
 
     if options.new and needRedirectTrvs:
         needRedirects = {}
-        for redirectTrv, _ in needRedirectTrvs:
-            srcName = redirectTrv.getSourceName()
+        for redirectTrv in needRedirectTrvs:
+            srcTrv = redirectSrcTrvs[redirectTrv.getName()]
+            srcName = srcTrv.getSourceName()
             needRedirects.setdefault(srcName, set())
             needRedirects[srcName].add(redirectTrv.getName())
 
