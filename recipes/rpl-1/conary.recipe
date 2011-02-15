@@ -21,13 +21,13 @@ class Conary(CPackageRecipe):
         'openssl:devel', 'zlib:devel', ])
 
     def setup(r):
-        r.macros.sqlitever = '3.6.18'
-        r.macros.sqlite = 'sqlite-%(sqlitever)s'
+        r.macros.sqlitever = '3070500'
+        r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
         r.addMercurialSnapshot('http://hg.rpath.com/conary/')
         # r.addArchive('ftp://download.rpath.com/conary/')
 
         # Use embedded sqlite
-        r.addArchive('http://sqlite.org/sqlite-amalgamation-%(sqlitever)s.tar.gz',
+        r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
             dir='%(maindir)s/conary/pysqlite3/')
 
         if Use.bootstrap:
