@@ -40,6 +40,7 @@ import textwrap
 
 #conary imports
 from conary import trove
+from conary.deps import deps
 from conary.errors import TroveNotFound
 from conary.build import action, errors
 from conary.lib import fixedglob, digestlib, log, util
@@ -4092,6 +4093,13 @@ class BuildMSI(BuildAction):
         jobCfg.product.icon = 'icon.ico'
         jobCfg.product.packageName = 'Setup'
         jobCfg.product.allUsers = 'true'
+
+        # Use the build flavor to determine which arch we are building for.
+        buildFlavor = self.recipe.cfg.buildFlavor
+        if buildFlavor.stronglySatisfies(deps.parseFlavor('is: x86_64')):
+            jobCfg.product.platform = 'x64'
+        else:
+            jobCfg.product.platform = 'x86'
 
         # Send component information
         jobCfg.product.components = []
