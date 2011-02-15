@@ -2029,7 +2029,7 @@ order by
             SELECT troveName, version, flavor, data FROM TroveInfo
                 JOIN Instances USING (instanceId)
                 JOIN Flavors USING (flavorId)
-                JOIN Versions USING (versionId)
+                JOIN Versions ON Instances.versionId = Versions.versionId
                 WHERE infoType = ?
         """, troveInfoTag)
 
