@@ -481,7 +481,7 @@ function_callback(sqlite3_context *context, int argc, sqlite3_value **argv)
 
 	args = PyTuple_New(argc);
 	for (i = 0; i < argc; i++) {
-		const char *s = sqlite3_value_text(argv[i]);
+		const char *s = (const char *)sqlite3_value_text(argv[i]);
 		if (s == NULL) {
 			Py_INCREF(Py_None);
 			PyTuple_SetItem(args, i, Py_None);
@@ -547,7 +547,7 @@ aggregate_step(sqlite3_context *context, int argc, sqlite3_value **argv)
 
 	args = PyTuple_New(argc);
 	for (i = 0; i < argc; i++) {
-		const char *s = sqlite3_value_text(argv[i]);
+		const char *s = (const char *)sqlite3_value_text(argv[i]);
 		if (s == NULL) {
 			Py_INCREF(Py_None);
 			PyTuple_SetItem(args, i, Py_None);
@@ -996,7 +996,7 @@ pysqlite_encode(PyObject *self, PyObject *args)
 	if (out == NULL) {
 		return PyErr_NoMemory();
 	}
-	sqlite_encode_binary(in, n, out);
+	sqlite_encode_binary((unsigned char *)in, n, (unsigned char *)out);
 	res = Py_BuildValue("s", out);
 	free(out);
 	return res;
@@ -1022,7 +1022,7 @@ pysqlite_decode(PyObject *self, PyObject *args)
 	if (out == NULL) {
 		return PyErr_NoMemory();
 	}
-	n = sqlite_decode_binary(in, out);
+	n = sqlite_decode_binary((unsigned char *)in, (unsigned char *)out);
 	res = Py_BuildValue("s#", out, n);
 	free(out);
 	return res;
