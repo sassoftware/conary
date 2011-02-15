@@ -1,8 +1,9 @@
-\.(py[co]|o|so|sw[op]|orig|rej|egg-info)$
+\.(py[co]|o|so|a|la|sw[op]|orig|rej|egg-info)$
 ~$
 ^(bin|tmp)/
 conary/constants.py$
 conary/pysqlite3/build
+conary/pysqlite3/embed
 conary/pysqlite3/sqlite-.*/
 conary/sqlite3
 # These are auto-generated stubs that must not be checked in:

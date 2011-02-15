@@ -14,10 +14,16 @@
 
 .PHONY: all dist clean install
 
-sqlite_lib = sqlite-*/.libs/libsqlite3.a
+sqlite_dir = sqlite-*
+sqlite_lib = $(sqlite_dir)/.libs/libsqlite3.a
+sqlite_inc = $(sqlite_dir)/sqlite3*.h
 
 all:
-	[ -f $(sqlite_lib) ] && cp $(sqlite_lib) . || :
+	if [ -f $(sqlite_lib) ]; then \
+		rm -rf embed; \
+		mkdir embed; \
+		cp $(sqlite_lib) $(sqlite_inc) embed/; \
+	fi
 	$(PYTHON) setup.py build
 	$(PYTHON) setup.py install --install-lib=..
 
@@ -25,7 +31,7 @@ install:
 	$(PYTHON) setup.py install --install-lib=$(DESTDIR)/$(conarydir)
 
 clean:
-	rm -rf build dist libsqlite3.a
+	rm -rf build dist embed
 	$(PYTHON) setup.py clean
 
 dist: clean
