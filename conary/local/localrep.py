@@ -117,7 +117,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
         return self.replacedFiles.iteritems()
 
     def __init__(self, repos, cs, callback, autoPinList,
-                 allowIncomplete = False, replaceFiles = False,
+                 allowIncomplete = False, replaceFileCheck = False,
                  userReplaced = None, sharedFiles = {}):
         assert(not cs.isAbsolute())
 
@@ -142,7 +142,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
         # this raises an exception if this install would create conflicts
         self.replacedFiles = self.repos.db.db.checkPathConflicts(
-                                    self.trovesAdded, replaceFiles,
+                                    self.trovesAdded, replaceFileCheck,
                                     sharedFiles)
 
         for (pathId, fileVersion, sha1) in self.oldFileList():

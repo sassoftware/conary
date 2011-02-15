@@ -1000,7 +1000,7 @@ order by
 
         cu.execute("DROP TABLE UserReplaced")
 
-    def checkPathConflicts(self, instanceIdList, replaceFiles, sharedFiles):
+    def checkPathConflicts(self, instanceIdList, replaceCheck, sharedFiles):
         cu = self.db.cursor()
         cu2 = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE NewInstances (instanceId integer)")
@@ -1089,7 +1089,7 @@ order by
                     # gross. following a hack in a rhel4/rhel5 patch to rpm.
                     continue
 
-            if replaceFiles:
+            if replaceCheck(path):
                 replaceExisting = True
 
             if replaceExisting:
@@ -2022,6 +2022,19 @@ order by
 
         if troveNames:
             cu.execute("DROP TABLE tmpInst", start_transaction = False)
+
+    def getAllTroveInfo(self, troveInfoTag):
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT troveName, version, flavor, data FROM TroveInfo
+                JOIN Instances USING (instanceId)
+                JOIN Flavors USING (flavorId)
+                JOIN Versions ON Instances.versionId = Versions.versionId
+                WHERE infoType = ?
+        """, troveInfoTag)
+
+        return [ ( (x[0], versions.VersionFromString(x[1]),
+                    deps.deps.ThawFlavor(x[2])), x[3]) for x in cu ]
 
     def _getTroveInfo(self, troveList, troveInfoTag):
         # returns a list parallel to troveList, None for troveinfo not present

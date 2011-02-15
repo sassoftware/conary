@@ -1162,7 +1162,11 @@ class setModes(policy.Policy):
         policy.Policy.updateArgs(self, **keywords)
 
     def doFile(self, path):
+        # Don't set modes on capsule files
         if self.recipe._getCapsulePathsForFile(path):
+            return
+        # Skip files that aren't part of the package
+        if path not in self.recipe.autopkg.pathMap:
             return
         newmode = oldmode = self.recipe.autopkg.pathMap[path].inode.perms()
         if path in self.userbits:

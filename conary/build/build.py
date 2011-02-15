@@ -3925,7 +3925,7 @@ class BuildMSI(BuildAction):
 
     SYNOPSIS
     ========
-    C{r.BuildMSI('I{archive}', dest='I{conontent_installation_path}',
+    C{r.BuildMSI('I{archive}', dest='I{content_installation_path}',
         manufacturer='I{manufacturer}', description='I{description}')}
 
     DESCRIPTION

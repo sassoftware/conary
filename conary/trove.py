@@ -35,6 +35,7 @@ from conary.streams import FrozenVersionStream
 from conary.streams import SMALL, LARGE, DYNAMIC
 from conary.streams import OptionalFlavorStream
 from conary.streams import StringVersionStream
+from conary.streams import StringOrderedStreamCollection
 
 TROVE_VERSION=10
 # the difference between 10 and 11 is that the REMOVED type appeared,
@@ -1002,7 +1003,8 @@ _TROVEINFO_TAG_PROPERTIES     = 30
 _TROVEINFO_TAG_BUILD_REFS     = 31  # group set recipes track troves which
                                     # were named during a build but did not
                                     # make it into the final groups
-_TROVEINFO_TAG_LAST           = 31
+_TROVEINFO_TAG_PATHCONFLICTS  = 32
+_TROVEINFO_TAG_LAST           = 32
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1321,6 +1323,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_MTIMES        : (DYNAMIC, TroveMtimes,         'mtimes' ),
         _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
         _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
+        _TROVEINFO_TAG_PATHCONFLICTS : (DYNAMIC, StringOrderedStreamCollection, "pathConflicts" ),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)

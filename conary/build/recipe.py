@@ -460,7 +460,9 @@ class Recipe(object):
         for a in actions:
             self._lcstate.completedActions.add(a)
             ps = a.getPathAndSuffix()
-            if ps[0].find('://') != -1: # we have an autosourced file
+
+            # check if we have an autosourced file
+            if ps[0].find('://') != -1 or ps[0].find(':pserver:') != -1:
                 # use guess name if it is provided
                 k = os.path.basename(ps[0]) or ps[1]
                 assert(k)
