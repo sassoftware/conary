@@ -1239,6 +1239,7 @@ class ChangeSetKeyConflictError(Exception):
     name = "ChangeSetKeyConflictError"
 
     def __init__(self, key, trove1=None, file1=None, trove2=None, file2=None):
+        import epdb;epdb.st()
         if len(key) == 16:
             self.pathId = key
             self.fileId = None
@@ -1682,6 +1683,11 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                   f[0] == ChangedFileTypes.diff):
                 # happily let a file we already found override a diff, same
                 # as above
+                pass
+            elif (self.configCache[key][0] == f[0] and
+                     self.configCache[key][1].get().read() ==
+                     f[1].get().read()):
+                # they're the same anyway; doesn't much matter which we pick
                 pass
             elif (self.configCache[key][0] == ChangedFileTypes.diff or
                   f[0] == ChangedFileTypes.diff):
