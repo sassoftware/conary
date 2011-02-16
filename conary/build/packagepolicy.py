@@ -4258,8 +4258,14 @@ class Flavor(policy.Policy):
         instructionDeps += list(self.recipe._buildFlavor.iterDepsByClass(TISD))
         self.allowableIsnSets = [ x.name for x in instructionDeps ]
 
-
     def postProcess(self):
+        # If this is a Windows package, include the flavor from the windows
+        # helper.
+        if self._getTarget() == TARGET_WINDOWS:
+            flavorStr = self.recipe.winHelper.flavor
+            if flavorStr:
+                self.packageFlavor.union(deps.parseFlavor(flavorStr))
+
         # all troves need to share the same flavor so that we can
         # distinguish them later
         for pkg in self.recipe.autopkg.components.values():
@@ -4324,6 +4330,7 @@ class Flavor(policy.Policy):
         flv.union(self.archFlavor)
         if isnset in self.allowableIsnSets:
             self.packageFlavor.union(flv)
+
 
 class _ProcessInfoPackage(policy.UserGroupBasePolicy):
     bucket = policy.PACKAGE_CREATION

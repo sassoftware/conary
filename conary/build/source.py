@@ -38,7 +38,7 @@ from conary.repository import transport
 from conary.build.action import TARGET_LINUX
 from conary.build.action import TARGET_WINDOWS
 
-class WindowsHelper:
+class WindowsHelper(object):
     def __init__(self):
         self.path = None
         self.version = None
@@ -48,6 +48,15 @@ class WindowsHelper:
         self.upgradeCode = None
         self.components = []
         self.msiArgs = None
+
+    @property
+    def flavor(self):
+        if 'x64' in self.platform:
+            return 'is: x86_64'
+        elif 'x86' in self.platform:
+            return 'is: x86'
+        else:
+            return ''
 
     def extractMSIInfo(self, path, wbs):
         import robj
@@ -90,7 +99,6 @@ class WindowsHelper:
             self.resource.delete()
         except httplib.ResponseNotReady:
             pass
-
 
     def extractWIMInfo(self, path, wbs, volumeIndex=1):
         self.volumeIndex = volumeIndex
