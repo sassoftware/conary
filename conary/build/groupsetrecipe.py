@@ -886,13 +886,14 @@ class GroupSearchPathTroveSet(troveset.SearchPathTroveSet):
 
     SYNOPSIS
     ========
-    C{sp = r.SearchPath('troveSpec1', 'label1', ..., 'troveOrLabelN')}
+    C{sp = r.SearchPath(TroveSet | Repository, ...)}
 
     DESCRIPTION
     ===========
-    An object which searches multiple other objects (troves or labels)
-    in the order specified.  Troves can be looked up in the result, and
-    the result can also be used for resolving dependencies.
+    An object which searches multiple C{TroveSet} or C{Repository} objects
+    in the order specified.  Troves can be looked up in that C{SearchPath}
+    object with the C{find} method, and the C{SearchPath} object can also
+    be used for resolving dependencies.
 
     METHODS
     =======
@@ -1970,7 +1971,8 @@ class _GroupSetRecipe(_BaseGroupRecipe):
             if type(label) == str:
                 labelList[i] = versions.Label(label)
             elif not isinstance(label, versions.Label):
-                raise CookError("String label or Label object expected")
+                raise CookError('String label or Label object expected, got %r'%
+                                label)
 
         if type(flavor) == str:
             flavor = deps.parseFlavor(flavor)
@@ -1985,6 +1987,11 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         '''
         See SearchPath.
         '''
+        notTroveSets = [repr(x) for x in troveSets
+                        if not isinstance(x, troveset.TroveSet)]
+        if notTroveSets:
+            raise CookError('Invalid arguments %s: SearchPath arguments must be'
+                            ' Repository or TroveSet' %', '.join(notTroveSets))
         return GroupSearchPathTroveSet(troveSets, graph = self.g)
 
     def CML(self, modelText, searchPath = None):
@@ -2038,7 +2045,7 @@ class _GroupSetRecipe(_BaseGroupRecipe):
 
          repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
          # Fetch latest packages on build label first
-         searchPathList = [ r.macros.buildlabel ]
+         searchPathList = [ r.Repository(r.macros.buildlabel, r.flavor) ]
          if 'productDefinitionSearchPath' in r.macros:
              # proper build with product definition
              searchPathList.extend([repo[x] for x in

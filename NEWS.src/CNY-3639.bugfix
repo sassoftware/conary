@@ -1,0 +1,3 @@
+The GroupSetRecipe SearchPath method is now correctly documented to
+take Repository or TroveSet objects as methods, and now checks its
+arguments for sanity and reports errors usefully.
