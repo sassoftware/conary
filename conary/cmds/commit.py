@@ -19,6 +19,7 @@ from conary import conaryclient
 from conary import versions
 from conary.cmds import updatecmd
 from conary.lib import log
+from conary.local import database
 from conary.repository import changeset
 from conary.repository import errors
 from conary.repository import filecontainer
@@ -74,7 +75,8 @@ def doLocalCommit(db, changeSetFile):
     if not cs.isLocal():
         log.error("repository changesets must be applied with update instead")
     else:
-        db.commitChangeSet(cs, set(), rollbackPhase = db.ROLLBACK_PHASE_LOCAL,
+        db.commitChangeSet(cs, database.UpdateJob(db),
+                           rollbackPhase = db.ROLLBACK_PHASE_LOCAL,
                            updateDatabase = False)
 
 
