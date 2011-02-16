@@ -1683,6 +1683,11 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
                 # happily let a file we already found override a diff, same
                 # as above
                 pass
+            elif (self.configCache[key][0] == f[0] and
+                     self.configCache[key][1].get().read() ==
+                     f[1].get().read()):
+                # they're the same anyway; doesn't much matter which we pick
+                pass
             elif (self.configCache[key][0] == ChangedFileTypes.diff or
                   f[0] == ChangedFileTypes.diff):
                 raise ChangeSetKeyConflictError(key)

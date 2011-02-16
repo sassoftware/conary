@@ -1,2 +1,2 @@
-Creating rollbacks for individaul files being replaced during an update would
-fail if multiple incoming troves owned the file in question
+Creating rollbacks for individual files being replaced during an update would
+fail if multiple incoming troves owned the file in question.

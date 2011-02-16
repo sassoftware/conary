@@ -1817,7 +1817,9 @@ class Database(SqlDbRepository):
             # database only; the files may be missing in the filesystem
             # altogether
             self.mergeRemoveRollback(localRollback,
-                         self.createRemoveRollback(csJob.iterDbRemovals(),
+                         self.createRemoveRollback(
+                                (x for x in csJob.iterDbRemovals()
+                                    if x[0] not in cs.newTroves),
                                                    asMissing = True))
 
         # we have to do this before files get removed from the database,
@@ -2402,8 +2404,11 @@ class Database(SqlDbRepository):
                 if lookup is not None:
                     pathDict[newTrove] = lookup
 
-        import epdb;epdb.st('f')
-        return set().union(*[ set(x) for x in pathDict.values() ] )
+        s = set()
+        for x in pathDict.values():
+            s.update(x)
+
+        return s
 
     def commitLock(self, acquire):
         if not acquire:

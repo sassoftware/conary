@@ -26,8 +26,8 @@ class Conary(CPackageRecipe):
     buildRequires.append('python-conary:devel')
 
     def setup(r):
-        r.macros.sqlitever = '3.6.18'
-        r.macros.sqlite = 'sqlite-%(sqlitever)s'
+        r.macros.sqlitever = '3070500'
+        r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
         r.macros.pymaj = '2.6'
         r.macros.pyver = '2.6'
@@ -46,8 +46,7 @@ class Conary(CPackageRecipe):
         #r.addPatch('ptys.patch')
 
         ### Build internal sqlite library for Conary to use
-        r.addArchive('http://sqlite.org/'
-                     'sqlite-amalgamation-%(sqlitever)s.tar.gz',
+        r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
             dir='%(maindir)s/conary/pysqlite3/')
         r.Configure('--disable-shared --enable-threadsafe',
                     dir='conary/pysqlite3/%(sqlite)s')
