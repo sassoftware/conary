@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -16,8 +16,6 @@ import base64
 import gzip
 import itertools
 import os
-import socket
-import sys
 import time
 import urllib
 import xml
@@ -31,6 +29,8 @@ from conary.cmds import metadata
 from conary import trove
 from conary import versions
 from conary.lib import util, api
+from conary.lib import httputils
+from conary.lib.http import proxy_map
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
@@ -119,14 +119,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
         start = time.time()
 
-        try:
-            rc = self.__send(self.__name, newArgs)
-        except xmlrpclib.ProtocolError, e:
-            if e.errcode == 403:
-                raise errors.InsufficientPermission(
-                    repoName = self.__serverName, url = e.url)
-            raise
-
+        rc = self.__send(self.__name, newArgs)
         if clientVersion < 60:
             usedAnonymous, isException, result = rc
         else:
@@ -184,26 +177,7 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
                     # password handling goodness
                     return self.doCall(clientVersion, *args)
                 raise
-        except xmlrpclib.ProtocolError, err:
-            if err.errcode == 500:
-                raise errors.InternalServerError(err)
-            self._postprocessProtocolError(err)
-            raise
-        except:
-            raise
-
         return self.__doCall(clientVersion, args)
-
-    def _postprocessProtocolError(self, err):
-        proxyHost = getattr(self._transport, 'proxyHost', 'None')
-        if proxyHost is None:
-            return
-        proxyProtocol = self._transport.proxyProtocol
-        if proxyProtocol.startswith('http'):
-            pt = 'HTTP'
-        else:
-            pt = 'Conary'
-        err.url = "%s (via %s proxy %s)" % (err.url, pt, proxyHost)
 
     def handleError(self, clientVersion, result):
         if clientVersion < 60:
@@ -335,15 +309,19 @@ class ServerProxy(util.ServerProxy):
         self.__callLog = callLog
 
 class ServerCache:
+    TransportFactory = transport.Transport
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
-            callback=None, proxies=None, entitlementDir=None, caCerts=None):
+            callback=None, proxies=None, proxyMap=None, entitlementDir=None,
+            caCerts=None):
         self.cache = {}
         self.shareCache = {}
         self.map = repMap
         self.userMap = userMap
         self.pwPrompt = pwPrompt
         self.entitlements = entitlements
-        self.proxies = proxies
+        if proxyMap is None:
+            proxyMap = proxy_map.ProxyMap.fromDict(proxies)
+        self.proxyMap = proxyMap
         self.entitlementDir = entitlementDir
         self.caCerts = caCerts
         self.callLog = None
@@ -479,8 +457,8 @@ class ServerCache:
 
         protocol, uri = urllib.splittype(url)
         uri = util.ProtectedString(uri)
-        transporter = transport.Transport(https = (protocol == 'https'),
-                proxies=self.proxies, serverName=serverName,
+        transporter = self.TransportFactory(https = (protocol == 'https'),
+                proxyMap=self.proxyMap, serverName=serverName,
                 caCerts=self.caCerts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
@@ -492,29 +470,7 @@ class ServerCache:
         # Avoid poking at __transport
         server._transport = transporter
 
-        try:
-            serverVersions = server.checkVersion()
-        except errors.InsufficientPermission:
-            raise
-        except Exception, e:
-            if isinstance(e, socket.error):
-                errmsg = e[1]
-            # includes OS and IO errors
-            elif isinstance(e, EnvironmentError):
-                errmsg = e.strerror
-                # sometimes there is a socket error hiding
-                # inside an IOError!
-                if isinstance(errmsg, socket.error):
-                    errmsg = errmsg[1]
-            else:
-                errmsg = str(e)
-            url = _cleanseUrl(protocol, url)
-            if not errmsg:
-                errmsg = '%r' % e
-            tb = sys.exc_traceback
-            raise errors.OpenError('Error occurred opening repository '
-                        '%s: %s' % (url, errmsg)), None, tb
-
+        serverVersions = server.checkVersion()
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)
         if not intersection:
             url = _cleanseUrl(protocol, url)
@@ -555,7 +511,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     # fixme: take a cfg object instead of all these parameters
     def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
             entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
-            entitlements=None, proxy=None, caCerts=None):
+            entitlements=None, proxy=None, proxyMap=None, caCerts=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -566,9 +522,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.uploadRateLimit = uploadRateLimit
 
         if proxy:
-            self.proxies = proxy
+            proxies = proxy
         else:
-            self.proxies = None
+            proxies = None
 
         if entitlements is None:
             entitlements = conarycfg.EntitlementList()
@@ -579,8 +535,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             entitlements = newEnts
 
         self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
-                proxies=self.proxies, entitlementDir=entitlementDir,
-                caCerts=caCerts)
+                proxies=proxies, entitlementDir=entitlementDir,
+                caCerts=caCerts, proxyMap=proxyMap)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
@@ -1481,10 +1437,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return jobSizes
 
     def _clearHostCache(self):
-        transport.clearIPCache()
+        httputils.IPCache.clear()
 
     def _cacheHostLookups(self, hosts):
-        if self.proxies:
+        if not self.c.proxyMap.isEmpty:
             return
         hosts = set(hosts)
         for host in hosts:
@@ -1493,7 +1449,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 mappedHost = urllib.splithost(urllib.splittype(url)[1])[0]
             else:
                 mappedHost = host
-            transport.getIPAddress(mappedHost)
+            transport.httputils.IPCache.get(mappedHost)
 
     def createChangeSet(self, jobList, withFiles = True,
                         withFileContents = True,
@@ -1753,16 +1709,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            # FIXME: This check is for broken conary proxies that
-            # return a URL with "localhost" in it.  The proxy will know
-            # how to handle that.  So, we force the url to be reinterpreted
-            # by the proxy no matter what.
+            # "forceProxy" here makes sure that multi-part requests go back
+            # through the same proxy on subsequent requests.
             forceProxy = server.usedProxy()
             try:
-                inF = transport.ConaryURLOpener(proxies=self.proxies,
-                                                forceProxy=forceProxy).open(url)
+                inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
+                        url, forceProxy=forceProxy)
             except transport.TransportError, e:
-                raise errors.RepositoryError(*e.args)
+                raise errors.RepositoryError(str(e))
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -2353,13 +2307,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         sizes = [ int(x) for x in sizes ]
         assert(len(sizes) == len(fileList))
 
-        # FIXME: This check is for broken conary proxies that
-        # return a URL with "localhost" in it.  The proxy will know
-        # how to handle that.  So, we force the url to be reinterpreted
-        # by the proxy no matter what.
+        # "forceProxy" here makes sure that multi-part requests go back through
+        # the same proxy on subsequent requests.
         forceProxy = self.c[server].usedProxy()
-        inF = transport.ConaryURLOpener(proxies = self.proxies,
-                                        forceProxy=forceProxy).open(url)
+        inF = transport.ConaryURLOpener(proxyMap = self.c.proxyMap).open(url,
+                forceProxy=forceProxy)
 
         if callback:
             wrapper = callbacks.CallbackRateWrapper(
@@ -3091,7 +3043,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             status, reason = httpPutFile(url, inFile, size, callback = callback,
                                          rateLimit = self.uploadRateLimit,
-                                         proxies = self.proxies,
+                                         proxyMap = self.c.proxyMap,
                                          chunked = chunked)
 
             # give a slightly more helpful message for 403
@@ -3147,20 +3099,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             server.setAbortCheck(None)
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
-                proxies = None, chunked=False):
+                proxies = None, proxyMap=None, chunked=False):
     """
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
     """
-
-    protocol, uri = urllib.splittype(url)
-    assert(protocol in ('http', 'https'))
-
-    opener = transport.XMLOpener(proxies=proxies)
-    c, urlstr, selector, headers = opener.createConnection(uri,
-        ssl = (protocol == 'https'), withProxy=True)
-
-    BUFSIZE = 8192
 
     callbackFn = None
     if callback:
@@ -3169,50 +3112,11 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
                                                 size)
         callbackFn = wrapper.callback
 
-    c.putrequest("PUT", selector)
-    for k, v in headers:
-        c.putheader(k, v)
-
-    if chunked:
-        c.putheader('Transfer-Encoding', 'chunked')
-        try:
-            c.endheaders()
-        except socket.error, e:
-            opener._processSocketError(e)
-            raise
-
-        # keep track of the total amount of data sent so that the
-        # callback passed in to copyfileobj can report progress correctly
-        total = 0
-        while size:
-            # send in 256k chunks
-            chunk = 262144
-            if chunk > size:
-                chunk = size
-            # first send the hex-encoded size
-            c.send('%x\r\n' %chunk)
-            # then the chunk of data
-            util.copyfileobj(inFile, c, bufSize=chunk, callback=callbackFn,
-                             rateLimit = rateLimit, sizeLimit = chunk,
-                             total=total)
-            # send \r\n after the chunked data
-            c.send("\r\n")
-            total =+ chunk
-            size -= chunk
-        # terminate the chunked encoding
-        c.send('0\r\n\r\n')
-    else:
-        c.putheader('Content-length', str(size))
-        try:
-            c.endheaders()
-        except socket.error, e:
-            opener._processSocketError(e)
-            raise
-
-        util.copyfileobj(inFile, c, bufSize=BUFSIZE, callback=callbackFn,
-                         rateLimit = rateLimit, sizeLimit = size)
-
-    resp = c.getresponse()
-    if resp.status != 200:
-        opener.handleProxyErrors(resp.status)
-    return resp.status, resp.reason
+    if proxies and not proxyMap:
+        proxyMap = proxy_map.ProxyMap.fromDict(proxies)
+    opener = transport.XMLOpener(proxyMap=proxyMap)
+    req = opener.newRequest(url, method='PUT')
+    req.setData(inFile, size, callback=callbackFn, chunked=chunked,
+            rateLimit=rateLimit)
+    response = opener.open(req)
+    return response.status, response.reason

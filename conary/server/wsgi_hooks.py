@@ -447,7 +447,8 @@ class WSGIServer(object):
             if isChangeset:
                 csFile = util.ExtendedFile(path, 'rb', buffering=False)
                 changeSet = filecontainer.FileContainer(csFile)
-                for data in changeSet.dumpIter(readNestedFile):
+                for data in changeSet.dumpIter(readNestedFile,
+                        args=(self.proxyServer.repos.repos.contentsStore,)):
                     yield data
                 del changeSet
             else:

@@ -206,7 +206,7 @@ class FileContainer:
             footer = struct.pack('!HH', len(name), len(tag))
         return ''.join((header, name, tag)), footer
 
-    def dumpIter(self, readFileFunc):
+    def dumpIter(self, readFileFunc, args=()):
         """Dump the changeset as a byte stream, yielding chunks of bytes.
 
         C{readFileFunc} allows the caller to replace placeholders with actual
@@ -215,6 +215,11 @@ class FileContainer:
         return a tuple C{(tag, expandedSize, dataIter)}. C{tag} replaces the
         old tag. C{dataIter} is an iterable that yields bytestrings totalling
         C{expandedSize} bytes.
+
+        @param readFileFunc: File reading callback
+        @type  readFileFunc: callable
+        @param args: Extra arguments to pass to C{readFileFunc}
+        @type  args: C{tuple}
         """
         assert not self.mutable
 
@@ -226,7 +231,7 @@ class FileContainer:
             name, tag, subfile = next
             rawSize = subfile.size
             tag, expandedSize, dataIter = readFileFunc(name, tag, rawSize,
-                    subfile)
+                    subfile, *args)
             header, footer = self._packFileHeader(name, tag, expandedSize)
 
             yield header
