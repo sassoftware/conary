@@ -1,1 +1,0 @@
-Changed job ordering to install info packages before the critical section.

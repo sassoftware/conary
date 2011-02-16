@@ -1,1 +1,0 @@
-No longer attempt to set the mode of files that are not part of the package. These files are normally side effects of other policy actions.

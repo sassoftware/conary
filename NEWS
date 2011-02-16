@@ -1,3 +1,49 @@
+Changes in 2.2.12:
+  o New Features:
+    * conaryclient.newtrove's createSourceTrove now accepts an
+      additional keyword argument "metadata", containing key/value
+      metadata to be stored in the newly created source trove.
+      (CNY-3628)
+    * GroupRecipe PathConflicts policy now records the conflicting paths
+      which were explicitly allowed and the system model based install
+      code treats those paths as if --replace-managed-files were enabled
+      whenever that group would be present at the end of the operation
+      (CNY-3634)
+    * Added support for building 64bit MSIs based on the build flavor.
+      (CNY-3617)
+    * Added support for determining flavor for encapsulated MSI
+      packages. (CNY-3636)
+
+  o Bug Fixes:
+    * Fixed typo in BuildMSI build action documentation. (CNY-3627)
+    * Jobs which install shared contents for a file would fail if those
+      contents were delivered in the update changeset as both a diff and
+      complete contents (CNY-3631)
+    * Always use the cached source when building sources from CVS
+      repositories. (CNY-3336)
+    * No longer attempt to set the mode of files that are not part of
+      the package. These files are normally side effects of other policy
+      actions. (CNY-3607)
+    * Changed job ordering to install info packages before the critical
+      section. (CNY-3629)
+    * Groups implemented as GroupSetRecipe will now build under rMake.
+      (CNY-3624)
+    * A single job with overlapping files would erroneously include
+      local file information on one of the versions of the file in the
+      rollback, preventing that rollbacks from being applied. (CNY-3637)
+    * RPM capsule installation no longer fails when file types change.
+      (CNY-3630)
+    * Creating rollbacks for individual files being replaced during an
+      update would fail if multiple incoming troves owned the file in
+      question. (CNY-3633)
+    * The GroupSetRecipe SearchPath method is now correctly documented
+      to take Repository or TroveSet objects as methods, and now checks
+      its arguments for sanity and reports errors usefully. (CNY-3639)
+
+  o Internal Changes:
+    * The recommended version of SQLite for use with Conary has been
+      upgraded to 3.7.5
+
 Changes in 2.2.11:
   o New Features:
     * Added the ability to manually specify configuration properties,
