@@ -4179,9 +4179,14 @@ class BuildMSI(BuildAction):
         self.recipe.winHelper = WindowsHelper()
         self.recipe.winHelper.productName = self.name
         self.recipe.winHelper.version = self.version
-        self.recipe.winHelper.platform = platform
         self.recipe.winHelper.productCode = str(results.productCode)
         self.recipe.winHelper.upgradeCode = str(results.upgradeCode)
+
+        # If we are talking to a WBS that exposes output MSI info, use it.
+        if 'msi' in results.elements:
+            self.recipe.winHelper.platform = str(results.msi.platform)
+        else:
+            self.recipe.winHelper.platform = platform
 
         self.recipe.winHelper.components = [
             (x.uuid.encode('utf-8'), x.path.encode('utf-8'))
