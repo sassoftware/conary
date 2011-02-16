@@ -355,14 +355,17 @@ class GroupSetRecipe(_GroupSetRecipe, BaseRequiresRecipe):
          def setup(r):
              r.dumpAll()
              repo = r.Repository('conary.rpath.com@rpl:2', r.flavor)
+             searchPathList = [ r.Repository(r.macros.buildlabel, r.flavor) ]
              if 'productDefinitionSearchPath' in r.macros:
                  # proper build with product definition
-                 searchPath = r.SearchPath(repo[x] for x in
-                     r.macros.productDefinitionSearchPath.split('\\\\n'))
+                 searchPathList.extend([repo[x] for x in
+                     r.macros.productDefinitionSearchPath.split('\\\\n')])
              else:
                  # local test build
-                 searchPath = r.SearchPath(
+                 searchPathList.append(
                      repo['group-os=conary.rpath.com@rpl:2'])
+             searchPath = r.SearchPath(*searchPathList)
+
              base = searchPath['group-appliance-platform']
              additions = searchPath.find(
                  'httpd',
