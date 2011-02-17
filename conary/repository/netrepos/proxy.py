@@ -1843,6 +1843,10 @@ class CachingRepositoryServer(FileCachingChangesetFilter, RepositoryFilterMixin)
         else:
             return self._saveFileContentsChangeset(clientVersion, fileList)
 
+    def getContentsStore(self):
+        return self.repos.getContentsStore()
+
+
 class ChangesetCache(object):
 
     # Provides a place to cache changeset; uses a directory for them
