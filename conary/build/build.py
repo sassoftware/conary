@@ -4103,7 +4103,7 @@ class BuildMSI(BuildAction):
         jobCfg.product.package.platform = platform
 
         # Send component information
-        jobCfg.product.components = []
+        jobCfg.product.package.components = []
         for uuid, path in componentInfo:
             jobCfg.product.package.components.append(dict(
                 uuid=uuid,
