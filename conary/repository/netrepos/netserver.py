@@ -2446,6 +2446,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         schema.resetTable(cu, 'tmpFilePaths')
         for row, path in enumerate(pathList):
+            if not isinstance(path, basestring):
+                # Somebody's broken script sends requests where the paths are
+                # lists, so handle that without throwing an exception.
+                return {}
             dirname, basename = os.path.split(path)
             cu.execute("INSERT INTO tmpFilePaths (row, dirname, basename) VALUES (?, ?, ?)",
                        (row, dirname, basename), start_transaction=False)
