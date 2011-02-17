@@ -4100,12 +4100,12 @@ class BuildMSI(BuildAction):
             platform = 'x64'
         else:
             platform = 'x86'
-        jobCfg.product.platform = platform
+        jobCfg.product.package.platform = platform
 
         # Send component information
         jobCfg.product.components = []
         for uuid, path in componentInfo:
-            jobCfg.product.components.append(dict(
+            jobCfg.product.package.components.append(dict(
                 uuid=uuid,
                 path=path,
             ), post=False)
