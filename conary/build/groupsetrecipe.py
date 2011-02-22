@@ -1447,7 +1447,8 @@ class MakeOptionalAction(GroupDelayedTupleSetAction):
             self.outSet._setInstall(self.primaryTroveSet._getInstallSet())
             self.outSet._setOptional(
                     (self.optionalTroveSet._getInstallSet() |
-                     self.optionalTroveSet._getOptionalSet()))
+                     self.optionalTroveSet._getOptionalSet() |
+                     self.primaryTroveSet._getOptionalSet()))
         else:
             self.outSet._setOptional(self.primaryTroveSet._getInstallSet() |
                                      self.primaryTroveSet._getOptionalSet())

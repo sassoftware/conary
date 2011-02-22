@@ -1,0 +1,3 @@
+The TroveSet.makeOptional method was (inappropriately) discarding all
+optional troves from the base TroveSet.  It now includes those optional
+troves in the optional set of the result.
