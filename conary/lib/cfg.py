@@ -16,7 +16,6 @@ Provides a generic config file format that supports creating your own config
 types and value types.
 """
 import copy
-import errno
 import inspect
 import os
 import socket
@@ -25,6 +24,7 @@ import textwrap
 import urllib2
 
 from conary.lib import cfgtypes, util, api
+from conary.lib.http import proxy_map
 from conary import constants, errors
 from conary.repository import transport
 
@@ -447,8 +447,8 @@ class ConfigFile(_Config):
                                                             % (fileName,
                                                                lineno, msg, key)
 
-    def _getProxies(self):
-        return {}
+    def getProxyMap(self):
+        return proxy_map.ProxyMap()
 
     def _openUrl(self, url):
         oldTimeout = socket.getdefaulttimeout()
@@ -459,29 +459,24 @@ class ConfigFile(_Config):
             'X-Conary-Version' : constants.version or "UNRELEASED",
             'X-Conary-Config-Version' : int(configVersion),
         }
-        opener = transport.URLOpener(proxies=self._getProxies())
-        for key, value in headers.items():
-            opener.addheader(key, value)
+        opener = transport.URLOpener(proxyMap=self.getProxyMap())
         try:
             for i in range(4):
                 try:
-                    return opener.open(url)
-                except urllib2.HTTPError, err:
-                    raise CfgEnvironmentError(err.filename, err.msg)
-                except IOError, err:
-                    if (err.strerror and isinstance(err.strerror,
-                                                    socket.timeout)):
-                        # CNY-1161
-                        # We double the socket time out after each run; this
-                        # should allow very slow links to catch up while
-                        # providing some feedback to the user. For now, only
-                        # on stderr since logging is not enabled yet.
-                        sys.stderr.write("Timeout reading configuration "
-                            "file %s; retrying...\n" % url)
-                        timeout *= 2
-                        socket.setdefaulttimeout(timeout)
-                        continue
-                    raise CfgEnvironmentError(url, err.strerror.args[1])
+                    return opener.open(url, headers=headers)
+                except socket.timeout:
+                    # CNY-1161
+                    # We double the socket time out after each run; this
+                    # should allow very slow links to catch up while
+                    # providing some feedback to the user. For now, only
+                    # on stderr since logging is not enabled yet.
+                    sys.stderr.write("Timeout reading configuration "
+                        "file %s; retrying...\n" % url)
+                    timeout *= 2
+                    socket.setdefaulttimeout(timeout)
+                    continue
+                except (IOError, socket.error), err:
+                    raise CfgEnvironmentError(url, err.args[1])
                 except EnvironmentError, err:
                     raise CfgEnvironmentError(err.filename, err.msg)
             else: # for
