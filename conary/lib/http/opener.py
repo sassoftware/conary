@@ -39,11 +39,12 @@ class URLOpener(object):
     proxyFilter = ('http', 'https')
     maxRetries = 3
 
-    def __init__(self, proxyMap=None, caCerts=None):
+    def __init__(self, proxyMap=None, caCerts=None, persist=False):
         if proxyMap is None:
             proxyMap = proxy_map.ProxyMap()
         self.proxyMap = proxyMap
         self.caCerts = caCerts
+        self.persist = persist
 
         self.connectionCache = {}
         self.lastProxy = None
@@ -222,7 +223,11 @@ class URLOpener(object):
         conn = self.connectionCache.get(key)
         if conn is None:
             conn = self.connectionFactory(req.url, proxy, self.caCerts)
-            self.connectionCache[key] = conn
+            if self.persist:
+                self.connectionCache[key] = conn
+
+        if not self.persist:
+            req.headers.setdefault('Connection', 'close')
 
         timer = timeutil.BackoffTimer()
         result = None
@@ -296,6 +301,7 @@ class ResponseWrapper(object):
         self.headers = response.msg
         self.protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
 
+        self.getheader = response.getheader
         self.read = fp.read
 
     def close(self):

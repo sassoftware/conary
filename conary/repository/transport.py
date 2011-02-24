@@ -59,13 +59,15 @@ class ConaryURLOpener(opener.URLOpener):
     proxyFilter = ('http', 'https', 'conary', 'conarys')
     connectionFactory = ConaryConnector
 
-    def __init__(self, proxyMap=None, caCerts=None, proxies=None):
+    def __init__(self, proxyMap=None, caCerts=None, proxies=None,
+            persist=False):
         if not proxyMap:
             if proxies:
                 proxyMap = proxy_map.ProxyMap.fromDict(proxies)
             else:
                 proxyMap = proxy_map.ProxyMap.fromEnvironment()
-        opener.URLOpener.__init__(self, proxyMap=proxyMap, caCerts=caCerts)
+        opener.URLOpener.__init__(self, proxyMap=proxyMap, caCerts=caCerts,
+                persist=persist)
 
     def _requestOnce(self, req, proxy):
         if proxy and proxy.scheme in ('conary', 'conarys'):
@@ -108,7 +110,10 @@ class Transport(xmlrpclib.Transport):
         self._proxyHost = None  # Can be a URL object
         self.proxyHost = None
         self.proxyProtocol = None
-        self.opener = self.openerFactory(proxyMap=proxyMap, caCerts=caCerts)
+        # More investigation about how persistent connections affect Conary
+        # operation is needed. For now, just close the cached connections.
+        self.opener = self.openerFactory(proxyMap=proxyMap, caCerts=caCerts,
+                persist=False)
 
     def setEntitlements(self, entitlementList):
         self.entitlements = entitlementList
@@ -220,9 +225,6 @@ class Transport(xmlrpclib.Transport):
             if self._proxyHost:
                 self.proxyHost = self._proxyHost.hostport
                 self.proxyProtocol = self._proxyHost.scheme
-            # More investigation about how persistent connections affect Conary
-            # operation is needed. For now, just close the cached connections.
-            self.opener.close()
 
     def getparser(self):
         return util.xmlrpcGetParser()
