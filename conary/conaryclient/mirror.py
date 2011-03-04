@@ -75,16 +75,30 @@ def parseArgs(argv):
 
     return options
 
-class VerboseChangesetCallback(clientCallbacks.ChangesetCallback):
+
+class CapsuleMirrorCallbackMixin(object):
+    allowMissingFiles = False
+
+    def missingFiles(self, fileList):
+        return self.allowMissingFiles
+
+
+class VerboseChangesetCallback(CapsuleMirrorCallbackMixin,
+        clientCallbacks.ChangesetCallback):
+
     def done(self):
         self.clearPrefix()
         self._message('\r')
 
-class ChangesetCallback(callbacks.ChangesetCallback):
+
+class ChangesetCallback(CapsuleMirrorCallbackMixin,
+        callbacks.ChangesetCallback):
+
     def setPrefix(self, *args):
         pass
     def clearPrefix(self):
         pass
+
 
 class MirrorConfigurationSection(cfg.ConfigSection):
     repositoryMap         =  conarycfg.CfgRepoMap
@@ -108,6 +122,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     useHiddenCommits = (cfg.CfgBool, True)
     absoluteChangesets = (cfg.CfgBool, False)
     includeSources = (cfg.CfgBool, False)
+    excludeCapsuleContents = (cfg.CfgBool, False)
 
     _allowNewSections = True
     _defaultSectionType = MirrorConfigurationSection
@@ -205,6 +220,7 @@ def Main(argv=None):
         callback = VerboseChangesetCallback()
     if options.fastSync: # make --fast-sync imply --full-trove-sync
         options.sync = True
+    callback.allowMissingFiles = cfg.excludeCapsuleContents
     try:
         mainWorkflow(cfg, callback, options.test,
                  sync = options.sync, infoSync = options.infoSync,
