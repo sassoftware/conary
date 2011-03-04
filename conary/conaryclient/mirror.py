@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2006-2009 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -205,9 +205,14 @@ def Main(argv=None):
         callback = VerboseChangesetCallback()
     if options.fastSync: # make --fast-sync imply --full-trove-sync
         options.sync = True
-    mainWorkflow(cfg, callback, options.test,
+    try:
+        mainWorkflow(cfg, callback, options.test,
                  sync = options.sync, infoSync = options.infoSync,
                  fastSync = options.fastSync, checkSync = options.checkSync)
+    except KeyboardInterrupt:
+        print >> sys.stderr
+        print >> sys.stderr, 'Terminating due to user interrupt'
+
 
 def groupTroves(troveList):
     # combine the troves into indisolvable groups based on their version and
