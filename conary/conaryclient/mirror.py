@@ -228,6 +228,7 @@ def Main(argv=None):
     except KeyboardInterrupt:
         print >> sys.stderr
         print >> sys.stderr, 'Terminating due to user interrupt'
+        sys.exit(1)
 
 
 def groupTroves(troveList):
