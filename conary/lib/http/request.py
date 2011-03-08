@@ -12,6 +12,7 @@
 # full details.
 #
 
+import base64
 import urlparse
 import zlib
 
@@ -159,6 +160,9 @@ class Request(object):
             if isinstance(host, unicode):
                 host = host.encode('idna')
             conn.putheader("Host", host)
+        if 'Authorization' not in self.headers and self.url.userpass[0]:
+            conn.putheader("Authorization",
+                    "Basic " + base64.b64encode(":".join(self.url.userpass)))
         conn.endheaders()
         self._sendData(conn)
 
