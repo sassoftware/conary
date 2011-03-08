@@ -67,106 +67,6 @@ class PartialResultsError(Exception):
         self.partialResults = partialResults
 
 
-class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
-
-    def __init__(self, send, name, protocolVersion,
-            transport, serverName, entitlementDir, callLog):
-        xmlrpclib._Method.__init__(self, send, name)
-        self.__name = name
-        self.__protocolVersion = protocolVersion
-        self.__serverName = serverName
-        self.__entitlementDir = entitlementDir
-        self._transport = transport
-        self.__callLog = callLog
-
-    def __repr__(self):
-        return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name)
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __call__(self, *args, **kwargs):
-        # Keyword arguments are ignored, we just use them to override the
-        # protocol version
-        protocolVersion = (kwargs.pop('protocolVersion', None) or
-            self.__protocolVersion)
-
-        # always use protocol version 50 for checkVersion.  If we're about
-        # to talk to a pre-protocol-version 51 server, we will make it
-        # trace back with too many arguments if we try to pass kwargs
-        if self.__name == 'checkVersion':
-            protocolVersion = min(protocolVersion, 50)
-
-        if protocolVersion < 51:
-            assert(not kwargs)
-            return self.doCall(protocolVersion, args)
-
-        return self.doCall(protocolVersion, (args, kwargs))
-
-    def doCall(self, clientVersion, argList,
-                 retryOnEntitlementTimeout = True):
-        newArgs = ( clientVersion, ) + argList
-
-        start = time.time()
-
-        rc = self.__send(self.__name, newArgs)
-        if clientVersion < 60:
-            usedAnonymous, isException, result = rc
-        else:
-            isException, result = rc
-
-        if self.__callLog:
-            host = str(self.__url.hostport)
-            self.__callLog.log(host, self._transport.getEntitlements(),
-                               self.__name, rc, newArgs,
-                               latency = time.time() - start)
-
-        if not isException:
-            return result
-
-        try:
-            self.handleError(clientVersion, result)
-        except errors.EntitlementTimeout:
-            if not retryOnEntitlementTimeout:
-                raise
-
-            entList = self._transport.getEntitlements()
-            exception = errors.EntitlementTimeout(result[1])
-
-            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
-                                                  self.__serverName)
-            # remove entitlement(s) which timed out
-            newEntList = [ x for x in entList if x[1] not in
-                                exception.getEntitlements() ]
-            newEntList.insert(0, singleEnt[1:])
-
-            # try again with the new entitlement
-            self._transport.setEntitlements(newEntList)
-            return self.doCall(clientVersion, argList,
-                                 retryOnEntitlementTimeout = False)
-        else:
-            # this can't happen as handleError should always result in
-            # an exception
-            assert(0)
-
-    def handleError(self, clientVersion, result):
-        if clientVersion < 60:
-            exceptionName = result[0]
-            exceptionArgs = result[1:]
-            exceptionKwArgs = {}
-        else:
-            exceptionName = result[0]
-            exceptionArgs = result[1]
-            exceptionKwArgs = result[2]
-        raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
-
-    def __getattr__(self, name):
-        # Don't invoke methods that start with _
-        if name.startswith('_'):
-            raise AttributeError(name)
-        return xmlrpclib._Method.__getattr__(self, name)
-
-
 def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
     conv = xmlshims.NetworkConvertors()
     if exceptionName == "TroveIntegrityError" and len(exceptionArgs) > 1:
@@ -190,13 +90,17 @@ def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
                 return klass(exceptionArgs[0])
         return errors.UnknownException(exceptionName, exceptionArgs)
 
+
+class _Method(xmlrpclib._Method):
+
+    def __call__(self, *args, **kwargs):
+        return self.__send(self.__name, args, kwargs)
+
+
 class ServerProxy(util.ServerProxy):
 
     def _createMethod(self, name):
-        return _Method(self._request, name,
-                       self.getProtocolVersion(),
-                       self.__transport, self.__serverName,
-                       self.__entitlementDir, self.__callLog)
+        return _Method(self._request, name)
 
     def usedProxy(self):
         return self.__transport.usedProxy
@@ -209,6 +113,81 @@ class ServerProxy(util.ServerProxy):
 
     def getProtocolVersion(self):
         return self.__protocolVersion
+
+    def _request(self, method, args, kwargs):
+        protocolVersion = (kwargs.pop('protocolVersion', None) or
+            self.__protocolVersion)
+
+        # always use protocol version 50 for checkVersion.  If we're about
+        # to talk to a pre-protocol-version 51 server, we will make it
+        # trace back with too many arguments if we try to pass kwargs
+        if method == 'checkVersion':
+            protocolVersion = min(protocolVersion, 50)
+
+        if protocolVersion < 51:
+            assert not kwargs
+            argList = args
+        else:
+            argList = (args, kwargs)
+        return self._marshalCall(method, protocolVersion, argList)
+
+    def _marshalCall(self, method, clientVersion, argList,
+            retryOnEntitlementTimeout=True):
+        newArgs = ( clientVersion, ) + argList
+
+        start = time.time()
+
+        rc = util.ServerProxy._request(self, method, newArgs)
+        if clientVersion < 60:
+            usedAnonymous, isException, result = rc
+        else:
+            isException, result = rc
+
+        if self.__callLog:
+            host = str(self.__url.hostport)
+            elapsed = time.time() - start
+            self.__callLog.log(host, self.__transport.getEntitlements(),
+                    method, rc, newArgs, latency=elapsed)
+
+        if not isException:
+            return result
+
+        try:
+            self._handleError(clientVersion, result)
+        except errors.EntitlementTimeout:
+            if not retryOnEntitlementTimeout:
+                raise
+
+            entList = self.__transport.getEntitlements()
+            exception = errors.EntitlementTimeout(result[1])
+
+            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
+                                                  self.__serverName)
+            # remove entitlement(s) which timed out
+            newEntList = [ x for x in entList if x[1] not in
+                                exception.getEntitlements() ]
+            newEntList.insert(0, singleEnt[1:])
+
+            # try again with the new entitlement
+            self.__transport.setEntitlements(newEntList)
+            return self._marshalCall(method, clientVersion, argList,
+                    retryOnEntitlementTimeout=False)
+        else:
+            # this can't happen as handleError should always result in
+            # an exception
+            assert False
+
+    @staticmethod
+    def _handleError(clientVersion, result):
+        if clientVersion < 60:
+            exceptionName = result[0]
+            exceptionArgs = result[1:]
+            exceptionKwArgs = {}
+        else:
+            exceptionName = result[0]
+            exceptionArgs = result[1]
+            exceptionKwArgs = result[2]
+        raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
 
     def __init__(self, url, serverName, transporter,
                  entitlementDir, callLog):
