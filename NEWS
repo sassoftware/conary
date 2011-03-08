@@ -1,3 +1,15 @@
+Changes in 2.2.13:
+  o New Features:
+    * Added support for setting package flavor based on MSI information
+      from the Windows Build Service when generating MSIs. (CNY-3641)
+
+  o Bug Fixes:
+    * Platform and component information is now properly passed to the
+      Windows Build Service. (CNY-3642)
+    * The TroveSet.makeOptional method was inappropriately discarding
+      all optional troves from the base TroveSet.  It now includes those
+      optional troves in the optional set of the result. (CNY-3646)
+
 Changes in 2.2.12:
   o New Features:
     * conaryclient.newtrove's createSourceTrove now accepts an

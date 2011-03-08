@@ -31,15 +31,30 @@ from conary.lib import digestlib
 from conary.lib import sha1helper
 from conary.repository import errors, filecontents
 
+
+_cached_umask = None
+
+
 class AbstractDataStore:
 
     @staticmethod
-    def _writeFile(fileObj, outFds, precompressed, computeSha1):
+    def _fchmod(fd, mode=0666):
+        global _cached_umask
+        if _cached_umask is None:
+            # The only way to get the current umask is to change the umask and
+            # then change it back.
+            _cached_umask = os.umask(022)
+            os.umask(_cached_umask)
+        util.fchmod(fd, mode & ~_cached_umask)
+
+    @classmethod
+    def _writeFile(cls, fileObj, outFds, precompressed, computeSha1):
         if precompressed and hasattr(fileObj, '_fdInfo'):
             (fd, start, size) = fileObj._fdInfo()
             pid = os.getpid()
             realHash = misc.sha1Copy((fd, start, size), outFds)
             for x in outFds:
+                cls._fchmod(fd)
                 os.close(x)
 
             return realHash
@@ -63,6 +78,7 @@ class AbstractDataStore:
                     dest.close()
 
                 # this closes tmpFd for us
+                cls._fchmod(fd)
                 outFileObj.close()
                 fileObj.seek(0)
 
