@@ -91,7 +91,8 @@ class URLOpener(object):
         if req.url.scheme == 'file':
             return self._handleFileRequest(req)
         elif req.url.scheme not in ('http', 'https'):
-            raise TypeError("Unknown URL scheme %r" % (req.url.scheme,))
+            raise http_error.ParameterError(
+                    "Unknown URL scheme %r" % (req.url.scheme,))
 
         response = self._doRequest(req, forceProxy=forceProxy)
         if response.status == 200:

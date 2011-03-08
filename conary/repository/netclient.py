@@ -30,7 +30,7 @@ from conary import trove
 from conary import versions
 from conary.lib import util, api
 from conary.lib import httputils
-from conary.lib.http import proxy_map
+from conary.lib.http import proxy_map, request as req_mod
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
@@ -66,20 +66,13 @@ class PartialResultsError(Exception):
     def __init__(self, partialResults):
         self.partialResults = partialResults
 
-# mask out the username and password for error messages
-def _cleanseUrl(protocol, url):
-    if url.find('@') != -1:
-        return protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
-    return url
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
-    def __init__(self, send, name, host, pwCallback, protocolVersion,
+    def __init__(self, send, name, protocolVersion,
             transport, serverName, entitlementDir, callLog):
         xmlrpclib._Method.__init__(self, send, name)
         self.__name = name
-        self.__host = host
-        self.__pwCallback = pwCallback
         self.__protocolVersion = protocolVersion
         self.__serverName = serverName
         self.__entitlementDir = entitlementDir
@@ -106,11 +99,11 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
         if protocolVersion < 51:
             assert(not kwargs)
-            return self.doCall(protocolVersion, *args)
+            return self.doCall(protocolVersion, args)
 
-        return self.doCall(protocolVersion, args, kwargs)
+        return self.doCall(protocolVersion, (args, kwargs))
 
-    def __doCall(self, clientVersion, argList,
+    def doCall(self, clientVersion, argList,
                  retryOnEntitlementTimeout = True):
         newArgs = ( clientVersion, ) + argList
 
@@ -123,7 +116,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             isException, result = rc
 
         if self.__callLog:
-            self.__callLog.log(self.__host, self._transport.getEntitlements(),
+            host = str(self.__url.hostport)
+            self.__callLog.log(host, self._transport.getEntitlements(),
                                self.__name, rc, newArgs,
                                latency = time.time() - start)
 
@@ -148,22 +142,12 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
             # try again with the new entitlement
             self._transport.setEntitlements(newEntList)
-            return self.__doCall(clientVersion, argList,
+            return self.doCall(clientVersion, argList,
                                  retryOnEntitlementTimeout = False)
         else:
             # this can't happen as handleError should always result in
             # an exception
             assert(0)
-
-    def doCall(self, clientVersion, *args):
-        try:
-            return self.__doCall(clientVersion, args)
-        except errors.InsufficientPermission:
-            # no password was specified -- prompt for it
-            if self.__pwCallback():
-                return self.__doCall(clientVersion, args)
-            else:
-                raise
 
     def handleError(self, clientVersion, result):
         if clientVersion < 60:
@@ -177,8 +161,8 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
 
     def __getattr__(self, name):
-        # Don't invoke methods that start with __
-        if name.startswith('__'):
+        # Don't invoke methods that start with _
+        if name.startswith('_'):
             raise AttributeError(name)
         return xmlrpclib._Method.__getattr__(self, name)
 
@@ -208,48 +192,9 @@ def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
 
 class ServerProxy(util.ServerProxy):
 
-    def __passwordCallback(self):
-        if self.__pwCallback is None:
-            return False
-
-        l = self.__host.split('@', 1)
-        if len(l) == 1:
-            fullHost = l[0]
-            user, password = self.__pwCallback(self.__serverName)
-            if not user or not password:
-                return False
-            if not self.__usedMap:
-                # the user didn't specify what protocol to use, therefore
-                # we assume that when we need a user/password we need
-                # to use https
-                self.__transport.https = True
-        else:
-            user, fullHost = l
-            if user[-1] != ':':
-                return False
-
-            user = user[:-1]
-
-            # if there is a port number, strip it off
-            l = fullHost.split(':', 1)
-            if len(l) == 2:
-                host = l[0]
-            else:
-                host = fullHost
-
-            user, password = self.__pwCallback(self.__serverName, user)
-            if not user or not password:
-                return False
-
-        password = util.ProtectedString(password)
-        self.__host = util.ProtectedTemplate('${user}:${passwd}@${host}',
-                            user = user, passwd = password, host = fullHost)
-
-        return True
-
     def _createMethod(self, name):
-        return _Method(self._request, name, self.__host,
-                       self.__passwordCallback, self.getProtocolVersion(),
+        return _Method(self._request, name,
+                       self.getProtocolVersion(),
                        self.__transport, self.__serverName,
                        self.__entitlementDir, self.__callLog)
 
@@ -265,17 +210,14 @@ class ServerProxy(util.ServerProxy):
     def getProtocolVersion(self):
         return self.__protocolVersion
 
-    def __init__(self, url, serverName, transporter, pwCallback, usedMap,
+    def __init__(self, url, serverName, transporter,
                  entitlementDir, callLog):
         try:
-            util.ServerProxy.__init__(self, url, transporter)
+            util.ServerProxy.__init__(self, url=url, transport=transporter)
         except IOError, e:
-            proto, url = urllib.splittype(url)
             raise errors.OpenError('Error occurred opening repository '
-                                   '%s: %s' % (_cleanseUrl(proto, url), e))
-        self.__pwCallback = pwCallback
+                    '%s: %s' % (url, e))
         self.__serverName = serverName
-        self.__usedMap = usedMap
         self.__protocolVersion = CLIENT_VERSIONS[-1]
         self.__entitlementDir = entitlementDir
         self.__callLog = callLog
@@ -308,6 +250,7 @@ class ServerCache:
         user, pw = self.pwPrompt(host, user)
         if user is None or pw is None:
             return None, None
+        pw = util.ProtectedString(pw)
         self.userMap.addServerGlob(host, user, pw)
         return user, pw
 
@@ -392,7 +335,6 @@ class ServerCache:
         if singleEnt and singleEnt[1:] not in entList:
             entList.append(singleEnt[1:])
 
-        usedMap = url is not None
         if url is None:
             if entList or userInfo:
                 # if we have authentication information, use https
@@ -400,26 +342,17 @@ class ServerCache:
             else:
                 # if we are using anonymous, use http
                 protocol = 'http'
+            url = "%s://%s/conary/" % (protocol, serverName)
 
-            if userInfo is None:
-                url = "%s://%s/conary/" % (protocol, serverName)
-            else:
-                url = "%s://%s:%s@%s/conary/"
-                url = util.ProtectedString(url   % (protocol,
-                                                 quote(userInfo[0]),
-                                                 quote(userInfo[1]),
-                                                 serverName))
-        elif userInfo:
-            s = url.split('/')
-            if s[1]:
-                # catch "http/server/"
-                raise errors.OpenError(
-                    'Invalid URL "%s" when trying access the %s repository. '
-                    'Check your repositoryMap entries' % (url, serverName))
-            s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
-            s[2] = util.ProtectedString(s[2])
-            url = util.ProtectedString('/'.join(s))
-            usedMap = True
+        url = req_mod.URL.parse(url)
+        if userInfo:
+            if not userInfo[1]:
+                # Prompt user for a password
+                userInfo = self.__getPassword(serverName, userInfo[0])
+            if userInfo[1]:
+                # Protect the password string if it isn't already protected.
+                userInfo = userInfo[0], util.ProtectedString(userInfo[1])
+            url = url._replace(userpass=userInfo)
 
         shareTuple = (url, userInfo, tuple(entList), serverName)
         server = self.shareCache.get(shareTuple, None)
@@ -427,17 +360,14 @@ class ServerCache:
             self.cache[serverName] = server
             return server
 
-        protocol, uri = urllib.splittype(url)
-        uri = util.ProtectedString(uri)
-        transporter = self.TransportFactory(https = (protocol == 'https'),
+        transporter = self.TransportFactory(
                 proxyMap=self.proxyMap, serverName=serverName,
                 caCerts=self.caCerts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
-        server = ServerProxy(url, serverName, transporter, self.__getPassword,
-                             usedMap = usedMap,
-                             entitlementDir = self.entitlementDir,
-                             callLog = self.callLog)
+        server = ServerProxy(url=url, serverName=serverName,
+                transporter=transporter, entitlementDir=self.entitlementDir,
+                callLog=self.callLog)
 
         # Avoid poking at __transport
         server._transport = transporter
@@ -445,13 +375,12 @@ class ServerCache:
         serverVersions = server.checkVersion()
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)
         if not intersection:
-            url = _cleanseUrl(protocol, url)
             raise errors.InvalidServerVersion(
-                "While talking to repository " + url + ":\n"
+                "While talking to repository %s:\n"
                 "Invalid server version.  Server accepts client "
                 "versions %s, but this client only supports versions %s"
                 " - download a valid client from wiki.rpath.com" %
-                (",".join([str(x) for x in serverVersions]),
+                (url, ",".join([str(x) for x in serverVersions]),
                  ",".join([str(x) for x in CLIENT_VERSIONS])))
 
         # this is the protocol version we should use when talking

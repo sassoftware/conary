@@ -1881,29 +1881,13 @@ def xmlrpcLoad(stream):
 class ServerProxy(object):
     # This used to inherit from xmlrpclib but it replaced everything anyway...
 
-    def __init__(self, uri, transport=None, encoding=None, allow_none=False):
-        scheme, uri = urllib.splittype(uri)
-        if scheme not in ('http', 'https'):
-            raise IOError("unsupported XML-RPC protocol")
-        host, handler = urllib.splithost(uri)
-        userpass, hostport = urllib.splituser(host)
-        if userpass:
-            # Hide password
-            user, passwd = urllib.splitpasswd(userpass)
-            passwd = ProtectedString(urllib.quote(passwd))
-            userpass = '%s:${passwd}' % user
-            host = ProtectedTemplate('%s@%s' % (userpass, hostport),
-                    passwd=passwd)
-        if not handler:
-            handler = '/RPC2'
-        if transport is None:
-            if scheme == 'https':
-                transport = xmlrpclib.SafeTransport()
-            else:
-                transport = xmlrpclib.Transport()
-
-        self.__host = host
-        self.__handler = handler
+    def __init__(self, url, transport, encoding=None, allow_none=False):
+        if isinstance(url, basestring):
+            # Have to import here to avoid an import loop -- one of the many
+            # dangers of having a monolithic util.py
+            from conary.lib.http.request import URL
+            url = URL.parse(url)
+        self.__url = url
         self.__transport = transport
         self.__encoding = encoding
         self.__allow_none = allow_none
@@ -1913,10 +1897,7 @@ class ServerProxy(object):
         request = xmlrpcDump(params, methodname,
             encoding = self.__encoding, allow_none=self.__allow_none)
 
-        response = self.__transport.request(
-            self.__host,
-            self.__handler,
-            request)
+        response = self.__transport.request(self.__url, request)
 
         if len(response) == 1:
             response = response[0]
@@ -1925,7 +1906,7 @@ class ServerProxy(object):
 
     def __getattr__(self, name):
         # magic method dispatcher
-        if name.startswith('__'):
+        if name.startswith('_'):
             raise AttributeError(name)
         return self._createMethod(name)
 
@@ -1933,7 +1914,7 @@ class ServerProxy(object):
         return xmlrpclib._Method(self._request, name)
 
     def __repr__(self):
-        return "<ServerProxy for %s%s>" % (repr(self.__host), self.__handler)
+        return "<ServerProxy for %s>" % (self.__url,)
 
     __str__ = __repr__
 

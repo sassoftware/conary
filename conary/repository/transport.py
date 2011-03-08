@@ -89,19 +89,11 @@ class Transport(xmlrpclib.Transport):
 
     openerFactory = XMLOpener
 
-    def __init__(self, https=False, proxies=None, proxyMap=None,
-                 serverName=None, extraHeaders=None, caCerts=None):
-        self.https = https
+    def __init__(self, proxyMap=None, serverName=None, caCerts=None):
         self.compress = False
         self.abortCheck = None
-        if not proxyMap:
-            if proxies:
-                proxyMap = proxy_map.ProxyMap.fromDict(proxies)
-            else:
-                proxyMap = proxy_map.ProxyMap.fromEnvironment()
         self.proxyMap = proxyMap
         self.serverName = serverName
-        self.setExtraHeaders(extraHeaders)
         self.caCerts = caCerts
         self.responseHeaders = None
         self.responseProtocol = None
@@ -132,43 +124,16 @@ class Transport(xmlrpclib.Transport):
     def getEntitlements(self):
         return self.entitlements
 
-    def setExtraHeaders(self, extraHeaders):
-        self.extraHeaders = extraHeaders or {}
-
-    def addExtraHeaders(self, extraHeaders):
-        self.extraHeaders.update(extraHeaders)
-
     def setCompress(self, compress):
         self.compress = compress
 
     def setAbortCheck(self, abortCheck):
         self.abortCheck = abortCheck
 
-    def _protocol(self):
-        if self.https:
-            return 'https'
-        return 'http'
-
-    def request(self, userhost, handler, body, verbose=0):
+    def request(self, url, body, verbose=0):
         self.verbose = verbose
 
-        protocol = self._protocol()
-
-        host, extra_headers, x509 = self.get_host_info(userhost)
-        url = ''.join([protocol, '://', host, handler])
-        req = self.opener.newRequest(url, method='POST', headers=extra_headers)
-
-        # Make a url with username:<PASSWD> for error messages
-        # Ideally netclient would pass down the URL object instead of making us
-        # reassemble it (twice)
-        userpass, _ = urllib.splituser(userhost)
-        if userpass:
-            username, password = urllib.unquote(userpass).split(':', 1)
-        else:
-            username = password = None
-        cleanUrl = str(req.url._replace(userpass=(username, password)))
-        if hasattr(cleanUrl, '__safe_str__'):
-            cleanUrl = cleanUrl.__safe_str__()
+        req = self.opener.newRequest(url, method='POST')
 
         req.setAbortCheck(self.abortCheck)
         req.setData(body, compress=self.compress)
@@ -188,14 +153,14 @@ class Transport(xmlrpclib.Transport):
             except http_error.ResponseError, err:
                 if err.errcode == 403:
                     raise errors.InsufficientPermission(
-                            repoName=self.serverName, url=cleanUrl)
+                            repoName=self.serverName, url=url)
                 elif err.errcode == 500:
                     raise errors.InternalServerError(err)
                 else:
                     # Already has adequate URL information, so just rethrow it
                     # without modifying the message.
                     util.rethrow(errors.OpenError, False)
-            except (socket.error, EnvironmentError):
+            except (socket.error, EnvironmentError, http_error.TransportError):
                 e_type, e_value, e_tb = sys.exc_info()
                 if isinstance(e_value, socket.error):
                     errmsg = e_value[1]
@@ -210,7 +175,7 @@ class Transport(xmlrpclib.Transport):
                     errmsg = '%s: %s' % (e_name, e_value)
                 raise errors.OpenError(
                         "Error occurred opening repository %s: %s" %
-                        (cleanUrl, errmsg)), None, e_tb
+                        (url, errmsg)), None, e_tb
 
             else:
                 usedAnonymous = 'X-Conary-UsedAnonymous' in response.headers
