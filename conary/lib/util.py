@@ -1878,6 +1878,21 @@ def xmlrpcLoad(stream):
     return u.close(), u.getmethodname()
 
 
+class ServerProxyMethod(object):
+
+    def __init__(self, send, name):
+        self._send = send
+        self._name = name
+
+    def __getattr__(self, name):
+        if name.startswith('_'):
+            raise AttributeError(name)
+        return self.__class__(self._send, "%s.%s" % (self._name, name))
+
+    def __call__(self, *args):
+        return self._send(self._name, args)
+
+
 class ServerProxy(object):
     # This used to inherit from xmlrpclib but it replaced everything anyway...
 
@@ -1887,17 +1902,17 @@ class ServerProxy(object):
             # dangers of having a monolithic util.py
             from conary.lib.http.request import URL
             url = URL.parse(url)
-        self.__url = url
-        self.__transport = transport
-        self.__encoding = encoding
-        self.__allow_none = allow_none
+        self._url = url
+        self._transport = transport
+        self._encoding = encoding
+        self._allow_none = allow_none
 
     def _request(self, methodname, params):
         # Call a method on the remote server
         request = xmlrpcDump(params, methodname,
-            encoding = self.__encoding, allow_none=self.__allow_none)
+            encoding = self._encoding, allow_none=self._allow_none)
 
-        response = self.__transport.request(self.__url, request)
+        response = self._transport.request(self._url, request)
 
         if len(response) == 1:
             response = response[0]
@@ -1911,10 +1926,10 @@ class ServerProxy(object):
         return self._createMethod(name)
 
     def _createMethod(self, name):
-        return xmlrpclib._Method(self._request, name)
+        return ServerProxyMethod(self._request, name)
 
     def __repr__(self):
-        return "<ServerProxy for %s>" % (self.__url,)
+        return "<ServerProxy for %s>" % (self._url,)
 
     __str__ = __repr__
 

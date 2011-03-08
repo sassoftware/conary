@@ -91,32 +91,32 @@ def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
         return errors.UnknownException(exceptionName, exceptionArgs)
 
 
-class _Method(xmlrpclib._Method):
+class ServerProxyMethod(util.ServerProxyMethod):
 
     def __call__(self, *args, **kwargs):
-        return self.__send(self.__name, args, kwargs)
+        return self._send(self._name, args, kwargs)
 
 
 class ServerProxy(util.ServerProxy):
 
     def _createMethod(self, name):
-        return _Method(self._request, name)
+        return ServerProxyMethod(self._request, name)
 
     def usedProxy(self):
-        return self.__transport.usedProxy
+        return self._transport.usedProxy
 
     def setAbortCheck(self, check):
-        self.__transport.setAbortCheck(check)
+        self._transport.setAbortCheck(check)
 
     def setProtocolVersion(self, val):
-        self.__protocolVersion = val
+        self._protocolVersion = val
 
     def getProtocolVersion(self):
-        return self.__protocolVersion
+        return self._protocolVersion
 
     def _request(self, method, args, kwargs):
         protocolVersion = (kwargs.pop('protocolVersion', None) or
-            self.__protocolVersion)
+            self._protocolVersion)
 
         # always use protocol version 50 for checkVersion.  If we're about
         # to talk to a pre-protocol-version 51 server, we will make it
@@ -143,10 +143,10 @@ class ServerProxy(util.ServerProxy):
         else:
             isException, result = rc
 
-        if self.__callLog:
-            host = str(self.__url.hostport)
+        if self._callLog:
+            host = str(self._url.hostport)
             elapsed = time.time() - start
-            self.__callLog.log(host, self.__transport.getEntitlements(),
+            self._callLog.log(host, self._transport.getEntitlements(),
                     method, rc, newArgs, latency=elapsed)
 
         if not isException:
@@ -158,18 +158,18 @@ class ServerProxy(util.ServerProxy):
             if not retryOnEntitlementTimeout:
                 raise
 
-            entList = self.__transport.getEntitlements()
+            entList = self._transport.getEntitlements()
             exception = errors.EntitlementTimeout(result[1])
 
-            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
-                                                  self.__serverName)
+            singleEnt = conarycfg.loadEntitlement(self._entitlementDir,
+                    self._serverName)
             # remove entitlement(s) which timed out
             newEntList = [ x for x in entList if x[1] not in
                                 exception.getEntitlements() ]
             newEntList.insert(0, singleEnt[1:])
 
             # try again with the new entitlement
-            self.__transport.setEntitlements(newEntList)
+            self._transport.setEntitlements(newEntList)
             return self._marshalCall(method, clientVersion, argList,
                     retryOnEntitlementTimeout=False)
         else:
@@ -196,10 +196,10 @@ class ServerProxy(util.ServerProxy):
         except IOError, e:
             raise errors.OpenError('Error occurred opening repository '
                     '%s: %s' % (url, e))
-        self.__serverName = serverName
-        self.__protocolVersion = CLIENT_VERSIONS[-1]
-        self.__entitlementDir = entitlementDir
-        self.__callLog = callLog
+        self._serverName = serverName
+        self._protocolVersion = CLIENT_VERSIONS[-1]
+        self._entitlementDir = entitlementDir
+        self._callLog = callLog
 
 class ServerCache:
     TransportFactory = transport.Transport

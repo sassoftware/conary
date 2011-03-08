@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -18,12 +18,12 @@ import os
 import resource
 import tempfile
 import time
-import urllib
 import urllib2
 
 from conary import constants, conarycfg, rpmhelper, trove, versions
 from conary.lib import digestlib, sha1helper, tracelog, urlparse, util
 from conary.lib.http import http_error
+from conary.lib.http import request as req_mod
 from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
@@ -46,7 +46,7 @@ CHANGESET_VERSIONS_PRECEDENCE = {
 class RepositoryVersionCache:
 
     def get(self, caller):
-        basicUrl = util.stripUserPassFromUrl(caller.url)
+        basicUrl = str(caller._getBasicUrl())
         uri = basicUrl.split(':', 1)[1]
 
         if uri not in self.d:
@@ -126,10 +126,14 @@ class ProxyCaller:
             raise AttributeError(method)
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
+    def _getBasicUrl(self):
+        return self.url._replace(userpass=(None, None))
+
     def __init__(self, url, proxy, transport):
-        self.url = util.stripUserPassFromUrl(url)
+        self.url = url
         self.proxy = proxy
         self._transport = transport
+
 
 class ProxyCallFactory:
 
@@ -148,6 +152,7 @@ class ProxyCallFactory:
             authToken[0], authToken[1] = userOverride
 
         url = redirectUrl(authToken, rawUrl)
+        url = req_mod.URL.parse(url)
 
         via = []
         # Via is a multi-valued header. Multiple occurences will be collapsed
@@ -160,17 +165,15 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
-        urlProtocol, urlRest = urllib.splittype(url)
-        urlUserHost, urlRest = urllib.splithost(urlRest)
-        _, urlHost = urllib.splituser(urlUserHost)
         # If the proxy injected entitlements or user information, switch to
         # SSL -- IF they are using
         # default ports (if they specify ports, we have no way of
         # knowing what port to use)
-        addSSL = ':' not in urlHost and (bool(injEntList) or bool(userOverride))
-        withSSL = urlProtocol == 'https' or addSSL
-        transporter = transport.Transport(https = withSSL,
-                                          proxyMap = proxyMap,
+        if (url.hostport.port == 80 and
+                (bool(injEntList) or bool(userOverride))):
+            hostport = url.hostport._replace(port=443)
+            url = url._replace(scheme='https', hostport=hostport)
+        transporter = transport.Transport(proxyMap=proxyMap,
                                           serverName = targetServerName)
         transporter.setExtraHeaders(lheaders)
         transporter.setEntitlements(entitlementList)

@@ -93,6 +93,7 @@ class Transport(xmlrpclib.Transport):
         self.compress = False
         self.abortCheck = None
         self.proxyMap = proxyMap
+        self.extraHeaders = ()
         self.serverName = serverName
         self.caCerts = caCerts
         self.responseHeaders = None
@@ -124,6 +125,12 @@ class Transport(xmlrpclib.Transport):
     def getEntitlements(self):
         return self.entitlements
 
+    def setExtraHeaders(self, extraHeaders):
+        self.extraHeaders = extraHeaders or {}
+
+    def addExtraHeaders(self, extraHeaders):
+        self.extraHeaders.update(extraHeaders)
+
     def setCompress(self, compress):
         self.compress = compress
 
@@ -133,7 +140,8 @@ class Transport(xmlrpclib.Transport):
     def request(self, url, body, verbose=0):
         self.verbose = verbose
 
-        req = self.opener.newRequest(url, method='POST')
+        req = self.opener.newRequest(url, method='POST',
+                headers=self.extraHeaders)
 
         req.setAbortCheck(self.abortCheck)
         req.setData(body, compress=self.compress)
