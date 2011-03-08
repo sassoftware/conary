@@ -74,15 +74,12 @@ def _cleanseUrl(protocol, url):
 
 class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
-    def __init__(self, send, name, host, pwCallback, anonymousCallback,
-                 altHostCallback, protocolVersion, transport, serverName,
-                 entitlementDir, callLog):
+    def __init__(self, send, name, host, pwCallback, protocolVersion,
+            transport, serverName, entitlementDir, callLog):
         xmlrpclib._Method.__init__(self, send, name)
         self.__name = name
         self.__host = host
         self.__pwCallback = pwCallback
-        self.__anonymousCallback = anonymousCallback
-        self.__altHostCallback = altHostCallback
         self.__protocolVersion = protocolVersion
         self.__serverName = serverName
         self.__entitlementDir = entitlementDir
@@ -123,16 +120,12 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         if clientVersion < 60:
             usedAnonymous, isException, result = rc
         else:
-            usedAnonymous = False
             isException, result = rc
 
         if self.__callLog:
             self.__callLog.log(self.__host, self._transport.getEntitlements(),
                                self.__name, rc, newArgs,
                                latency = time.time() - start)
-
-        if usedAnonymous:
-            self.__anonymousCallback()
 
         if not isException:
             return result
@@ -167,17 +160,10 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
             return self.__doCall(clientVersion, args)
         except errors.InsufficientPermission:
             # no password was specified -- prompt for it
-            if not self.__pwCallback():
-                # It's possible we switched to anonymous
-                # for an earlier query, and now need to
-                # switch back to our specified user/passwd
-                if self.__altHostCallback and self.__altHostCallback():
-                    self.__altHostCallback = None
-                    # recursively call doCall to get all the
-                    # password handling goodness
-                    return self.doCall(clientVersion, *args)
+            if self.__pwCallback():
+                return self.__doCall(clientVersion, args)
+            else:
                 raise
-        return self.__doCall(clientVersion, args)
 
     def handleError(self, clientVersion, result):
         if clientVersion < 60:
@@ -261,22 +247,9 @@ class ServerProxy(util.ServerProxy):
 
         return True
 
-    def __usedAnonymousCallback(self):
-        self.__altHost = self.__host
-        self.__host = self.__host.split('@')[-1]
-
-    def __altHostCallback(self):
-        if self.__altHost:
-            self.__host = self.__altHost
-            self.__altHost = None
-            return True
-        else:
-            return False
-
     def _createMethod(self, name):
         return _Method(self._request, name, self.__host,
-                       self.__passwordCallback, self.__usedAnonymousCallback,
-                       self.__altHostCallback, self.getProtocolVersion(),
+                       self.__passwordCallback, self.getProtocolVersion(),
                        self.__transport, self.__serverName,
                        self.__entitlementDir, self.__callLog)
 
@@ -301,7 +274,6 @@ class ServerProxy(util.ServerProxy):
             raise errors.OpenError('Error occurred opening repository '
                                    '%s: %s' % (_cleanseUrl(proto, url), e))
         self.__pwCallback = pwCallback
-        self.__altHost = None
         self.__serverName = serverName
         self.__usedMap = usedMap
         self.__protocolVersion = CLIENT_VERSIONS[-1]
