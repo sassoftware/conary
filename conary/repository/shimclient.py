@@ -245,7 +245,7 @@ class ShimServerProxy(netclient.ServerProxy):
 
         if self._callLog:
             self._callLog.log("shim-" + self._server.repos.serverNameList[0],
-                               [], self._name, result, args,
+                               [], method, result, args,
                                latency = time.time() - start)
 
         return result

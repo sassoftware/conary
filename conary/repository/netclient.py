@@ -116,7 +116,7 @@ class ServerProxy(util.ServerProxy):
 
     def _request(self, method, args, kwargs):
         protocolVersion = (kwargs.pop('protocolVersion', None) or
-            self._protocolVersion)
+            self.getProtocolVersion())
 
         # always use protocol version 50 for checkVersion.  If we're about
         # to talk to a pre-protocol-version 51 server, we will make it
