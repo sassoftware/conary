@@ -141,7 +141,7 @@ class Connection(object):
             resp.begin()
         except httplib.BadStatusLine:
             raise socket.error(-42, "Bad Status Line from proxy %s" %
-                    self.proxy)
+                    (self.proxy,))
         if resp.status != 200:
             raise socket.error(-71,
                     "HTTP response error from HTTP proxy %s: %s %s" %
