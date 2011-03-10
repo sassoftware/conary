@@ -598,6 +598,8 @@ class ConaryContext(ConfigSection):
     # HTTP proxy
     proxy                 =  CfgProxy
     proxyMap              =  CfgProxyMap
+    connectAttempts       = (CfgInt, 3, "Number of connection attempts to make "
+            "for outbound HTTP requests.")
     # The first keyring in the list is writable, and is used for storing the
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.

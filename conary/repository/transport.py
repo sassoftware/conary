@@ -60,14 +60,14 @@ class ConaryURLOpener(opener.URLOpener):
     connectionFactory = ConaryConnector
 
     def __init__(self, proxyMap=None, caCerts=None, proxies=None,
-            persist=False):
+            persist=False, connectAttempts=None):
         if not proxyMap:
             if proxies:
                 proxyMap = proxy_map.ProxyMap.fromDict(proxies)
             else:
                 proxyMap = proxy_map.ProxyMap.fromEnvironment()
         opener.URLOpener.__init__(self, proxyMap=proxyMap, caCerts=caCerts,
-                persist=persist)
+                persist=persist, connectAttempts=connectAttempts)
 
     def _requestOnce(self, req, proxy):
         if proxy and proxy.scheme in ('conary', 'conarys'):
@@ -89,7 +89,8 @@ class Transport(xmlrpclib.Transport):
 
     openerFactory = XMLOpener
 
-    def __init__(self, proxyMap=None, serverName=None, caCerts=None):
+    def __init__(self, proxyMap=None, serverName=None, caCerts=None,
+            connectAttempts=None):
         self.compress = False
         self.abortCheck = None
         self.proxyMap = proxyMap
@@ -106,7 +107,7 @@ class Transport(xmlrpclib.Transport):
         # More investigation about how persistent connections affect Conary
         # operation is needed. For now, just close the cached connections.
         self.opener = self.openerFactory(proxyMap=proxyMap, caCerts=caCerts,
-                persist=False)
+                persist=False, connectAttempts=connectAttempts)
 
     def setEntitlements(self, entitlementList):
         self.entitlements = entitlementList
