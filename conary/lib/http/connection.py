@@ -95,6 +95,8 @@ class Connection(object):
         # as side effects may have occurred.
         try:
             conn = self.openConnection()
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except:
             wrapped = util.SavedException()
             raise http_error.RequestError(wrapped)
@@ -182,6 +184,8 @@ class Connection(object):
                     base64.b64encode(":".join(self.proxy.userpass)))
         try:
             req.sendRequest(conn, isProxied=(self.proxy is not None))
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except:
             wrapped = util.SavedException()
             raise http_error.RequestError(wrapped)
