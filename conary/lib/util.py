@@ -2130,6 +2130,8 @@ class SavedException(object):
     def __init__(self, exc_info=None):
         if not exc_info:
             exc_info = sys.exc_info()
+        elif isinstance(exc_info, Exception):
+            exc_info = exc_info.__class__, exc_info, None
         self.type, self.value, self.tb = exc_info
 
     def __repr__(self):
@@ -2154,6 +2156,12 @@ class SavedException(object):
         """
         self.type = value.__class__
         self.value = value
+
+    def check(self, *types):
+        for type_ in types:
+            if issubclass(self.type, type_):
+                return True
+        return False
 
 
 def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
