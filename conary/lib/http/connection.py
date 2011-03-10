@@ -89,12 +89,17 @@ class Connection(object):
                 err.wrapped.clear()
                 self.cached.close()
                 self.cached = None
-        conn = self.openConnection()
+        # If a problem occurs before or during the sending of the request, then
+        # throw a wrapper exception so that the caller knows it is safe to
+        # retry. Once the request is sent retries must be done more carefully
+        # as side effects may have occurred.
         try:
-            ret = self.requestOnce(conn, req)
-        except http_error.RequestError, err:
-            # Don't eat it this time -- rethrow the wrapped exception.
-            err.wrapped.throw()
+            conn = self.openConnection()
+        except:
+            wrapped = util.SavedException()
+            raise http_error.RequestError(wrapped)
+        # Note that requestOnce may also throw RequestError, see above.
+        ret = self.requestOnce(conn, req)
         if not ret.will_close:
             self.cached = conn
         return ret

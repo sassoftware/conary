@@ -37,7 +37,7 @@ class URLOpener(object):
 
     # Only try proxies with these schemes.
     proxyFilter = ('http', 'https')
-    maxRetries = 3
+    maxAttempts = 3
 
     def __init__(self, proxyMap=None, caCerts=None, persist=False):
         if proxyMap is None:
@@ -120,61 +120,69 @@ class URLOpener(object):
     def _doRequest(self, req, forceProxy):
         resetResolv = False
         lastError = response = None
-        if forceProxy is False:
-            connIterator = self.proxyMap.getProxyIter(req.url,
-                    protocolFilter=self.proxyFilter)
-        else:
-            connIterator = [forceProxy]
-
-        failedProxies = set()
-        for proxySpec in connIterator:
-            if lastError:
-                log.warning("Failed to open URL %s; trying the next proxy: %s",
-                        req.url, lastError.format())
-            if proxySpec is proxy_map.DirectConnection:
-                proxySpec = None
-            elif not forceProxy and self._shouldBypass(req.url, proxySpec):
-                proxySpec = None
-            # If a proxy was used, save it here
-            self.lastProxy = proxySpec
-            try:
-                response = self._requestOnce(req, proxySpec)
+        timer = timeutil.BackoffTimer()
+        totalAttempts = 0
+        # Make at least 'maxAttempts' connection attempts, stopping after both
+        # passing the maxAttempts limit *and* hitting the end of the iterator.
+        while True:
+            if totalAttempts >= self.maxAttempts:
                 break
+            # Reset the failed proxy list each time around so we don't end up
+            # blacklisting everything if a second pass succeeds.
+            failedProxies = set()
 
-            except socket.error, err:
-                lastError = util.SavedException()
-                if err.args[0] == 'socket error':
-                    err = err.args[1]
-                self._processSocketError(err)
-                lastError.replace(err)
-                # 'pass' if the error should fail-over, 'break' if it should be
-                # fatal.
-                if isinstance(err, socket.gaierror):
-                    if err.args[0] == socket.EAI_AGAIN:
-                        pass
+            if forceProxy is False:
+                connIterator = self.proxyMap.getProxyIter(req.url,
+                        protocolFilter=self.proxyFilter)
+            else:
+                connIterator = [forceProxy]
+
+            for proxySpec in connIterator:
+                totalAttempts += 1
+                if proxySpec is proxy_map.DirectConnection:
+                    proxySpec = None
+                elif not forceProxy and self._shouldBypass(req.url, proxySpec):
+                    proxySpec = None
+                if lastError:
+                    if proxySpec == self.lastProxy:
+                        log.warning("Failed to open URL %s; trying again: %s",
+                                req.url, lastError.format())
                     else:
-                        break
-                elif isinstance(err, socket.sslerror):
-                    pass
-                elif err.args[0] in (errno.ECONNREFUSED, errno.EACCES,
-                        errno.EAFNOSUPPORT, errno.ENETUNREACH,
-                        errno.ETIMEDOUT):
-                    pass
-                else:
+                        log.warning("Failed to open URL %s; trying the next "
+                                "proxy: %s", req.url, lastError.format())
+                # If a proxy was used, save it here
+                self.lastProxy = proxySpec
+
+                try:
+                    response = self._requestOnce(req, proxySpec)
                     break
-            except httplib.BadStatusLine:
-                # closed connection without sending a response.
-                lastError = util.SavedException()
-            except socket.error, e:
-                self._processSocketError(e)
-                util.rethrow(e)
-            # try resetting the resolver - /etc/resolv.conf
-            # might have changed since this process started.
-            if not resetResolv:
-                util.res_init()
-                resetResolv = True
-            if proxySpec:
-                failedProxies.add(proxySpec)
+                except http_error.RequestError, err:
+                    # Retry if an error occurred while sending the request.
+                    lastError = err.wrapped
+                    err = lastError.value
+                    if lastError.check(socket.error):
+                        self._processSocketError(err)
+                        lastError.replace(err)
+                except httplib.BadStatusLine:
+                    # closed connection without sending a response.
+                    lastError = util.SavedException()
+                except socket.error, err:
+                    # Fatal error, but attach proxy information to it.
+                    self._processSocketError(err)
+                    util.rethrow(err, False)
+
+                # try resetting the resolver - /etc/resolv.conf
+                # might have changed since this process started.
+                if not resetResolv:
+                    util.res_init()
+                    resetResolv = True
+                if proxySpec:
+                    failedProxies.add(proxySpec)
+
+                timer.sleep()
+
+            if response:
+                break
 
         if not response:
             if lastError:
@@ -216,9 +224,7 @@ class URLOpener(object):
         return npFilt.bypassProxy(dest)
 
     def _requestOnce(self, req, proxy):
-        """Issue a request to a a single destination, retrying if the
-        conditions allow it.
-        """
+        """Issue a request to a a single destination."""
         key = (req.url.scheme, req.url.hostport, proxy)
         conn = self.connectionCache.get(key)
         if conn is None:
@@ -229,33 +235,9 @@ class URLOpener(object):
         if not self.persist:
             req.headers.setdefault('Connection', 'close')
 
-        timer = timeutil.BackoffTimer()
-        result = None
-        for attempt in range(self.maxRetries + 1):
-            if attempt:
-                timer.sleep()
-            result = None
-            try:
-                result = conn.request(req)
-            except socket.error, err:
-                if err.args[0] in (errno.ECONNREFUSED, socket.EAI_AGAIN):
-                    # Server is down or the nameserver was unreachable, these
-                    # are harmless enough to retry.
-                    continue
-                raise
-            if result.status in (502, 503):
-                # The remote server is down or the proxy is misconfigured, try
-                # again.
-                continue
-            if attempt:
-                log.info("Successfully reached %s after %d attempts.",
-                        req.url.hostport, attempt + 1)
-            break
-
-        if result:
-            return result
-        else:
-            raise
+        response = conn.request(req)
+        self._handleProxyErrors(response.status)
+        return response
 
     def _handleProxyErrors(self, errcode):
         """Translate proxy error codes into exceptions."""
@@ -267,8 +249,9 @@ class URLOpener(object):
             e = socket.error(111, "Bad Gateway (error reported by proxy)")
         else:
             return
-        self._processSocketError(e)
-        raise e
+        # Proxy errors are treated as request errors, which are retriable.
+        saved = util.SavedException(e)
+        raise http_error.RequestError(saved)
 
     def _processSocketError(self, error):
         """Append proxy information to an exception."""
