@@ -707,6 +707,10 @@ class ConaryConfiguration(SectionedConfigFile):
     def getProxyMap(self):
         return getProxyMap(self)
 
+    def _getOpener(self):
+        return transport.URLOpener(proxyMap=self.getProxyMap(),
+                connectAttempts=self.connectAttempts)
+
     def readEntitlementDirectory(self):
         if not os.path.isdir(self.entitlementDirectory):
             return

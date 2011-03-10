@@ -450,6 +450,9 @@ class ConfigFile(_Config):
     def getProxyMap(self):
         return proxy_map.ProxyMap()
 
+    def _getOpener(self):
+        return transport.URLOpener(proxyMap=self.getProxyMap())
+
     def _openUrl(self, url):
         oldTimeout = socket.getdefaulttimeout()
         timeout = 2
@@ -459,7 +462,7 @@ class ConfigFile(_Config):
             'X-Conary-Version' : constants.version or "UNRELEASED",
             'X-Conary-Config-Version' : int(configVersion),
         }
-        opener = transport.URLOpener(proxyMap=self.getProxyMap())
+        opener = self._getOpener()
         try:
             for i in range(4):
                 try:
