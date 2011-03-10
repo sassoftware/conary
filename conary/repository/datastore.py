@@ -54,7 +54,7 @@ class AbstractDataStore:
             pid = os.getpid()
             realHash = misc.sha1Copy((fd, start, size), outFds)
             for x in outFds:
-                cls._fchmod(fd)
+                cls._fchmod(x)
                 os.close(x)
 
             return realHash
