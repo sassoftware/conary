@@ -312,7 +312,7 @@ class ServerCache:
     TransportFactory = transport.Transport
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
             callback=None, proxies=None, proxyMap=None, entitlementDir=None,
-            caCerts=None):
+            caCerts=None, connectAttempts=None):
         self.cache = {}
         self.shareCache = {}
         self.map = repMap
@@ -324,6 +324,7 @@ class ServerCache:
         self.proxyMap = proxyMap
         self.entitlementDir = entitlementDir
         self.caCerts = caCerts
+        self.connectAttempts = connectAttempts
         self.callLog = None
 
         if 'CONARY_CLIENT_LOG' in os.environ:
@@ -459,7 +460,7 @@ class ServerCache:
         uri = util.ProtectedString(uri)
         transporter = self.TransportFactory(https = (protocol == 'https'),
                 proxyMap=self.proxyMap, serverName=serverName,
-                caCerts=self.caCerts)
+                caCerts=self.caCerts, connectAttempts=self.connectAttempts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
         server = ServerProxy(url, serverName, transporter, self.__getPassword,
@@ -511,7 +512,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     # fixme: take a cfg object instead of all these parameters
     def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
             entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
-            entitlements=None, proxy=None, proxyMap=None, caCerts=None):
+            entitlements=None, proxy=None, proxyMap=None, caCerts=None,
+            connectAttempts=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -536,7 +538,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
                 proxies=proxies, entitlementDir=entitlementDir,
-                caCerts=caCerts, proxyMap=proxyMap)
+                caCerts=caCerts, proxyMap=proxyMap,
+                connectAttempts=connectAttempts)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)

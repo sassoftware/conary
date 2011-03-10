@@ -37,14 +37,17 @@ class URLOpener(object):
 
     # Only try proxies with these schemes.
     proxyFilter = ('http', 'https')
-    maxAttempts = 3
+    connectAttempts = 3
 
-    def __init__(self, proxyMap=None, caCerts=None, persist=False):
+    def __init__(self, proxyMap=None, caCerts=None, persist=False,
+            connectAttempts=None):
         if proxyMap is None:
             proxyMap = proxy_map.ProxyMap()
         self.proxyMap = proxyMap
         self.caCerts = caCerts
         self.persist = persist
+        if connectAttempts:
+            self.connectAttempts = connectAttempts
 
         self.connectionCache = {}
         self.lastProxy = None
@@ -122,10 +125,11 @@ class URLOpener(object):
         lastError = response = None
         timer = timeutil.BackoffTimer()
         totalAttempts = 0
-        # Make at least 'maxAttempts' connection attempts, stopping after both
-        # passing the maxAttempts limit *and* hitting the end of the iterator.
+        # Make at least 'connectAttempts' connection attempts, stopping after
+        # both passing the connectAttempts limit *and* hitting the end of the
+        # iterator.
         while True:
-            if totalAttempts >= self.maxAttempts:
+            if totalAttempts >= self.connectAttempts:
                 break
             # Reset the failed proxy list each time around so we don't end up
             # blacklisting everything if a second pass succeeds.
