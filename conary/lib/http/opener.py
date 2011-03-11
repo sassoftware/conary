@@ -12,7 +12,6 @@
 # full details.
 #
 
-import errno
 import httplib
 import logging
 import socket
@@ -266,9 +265,14 @@ class URLOpener(object):
             kind = 'Conary'
         else:
             kind = 'HTTP'
-        msgError = "%s (via %s proxy %s)" % (error[1], kind,
-                self.lastProxy)
-        error.args = (error[0], msgError)
+        if len(error.args) > 1:
+            msg = error[1]
+            args = (error[0],)
+        else:
+            msg = error[0]
+            args = ()
+        msgError = "%s (via %s proxy %s)" % (msg, kind, self.lastProxy)
+        error.args = args + (msgError,)
         if hasattr(error, 'strerror'):
             error.strerror = msgError
 
