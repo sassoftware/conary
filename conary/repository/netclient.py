@@ -30,7 +30,7 @@ from conary import trove
 from conary import versions
 from conary.lib import util, api
 from conary.lib import httputils
-from conary.lib.http import proxy_map
+from conary.lib.http import proxy_map, request as req_mod
 from conary.repository import calllog
 from conary.repository import changeset
 from conary.repository import errors
@@ -66,136 +66,6 @@ class PartialResultsError(Exception):
     def __init__(self, partialResults):
         self.partialResults = partialResults
 
-# mask out the username and password for error messages
-def _cleanseUrl(protocol, url):
-    if url.find('@') != -1:
-        return protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
-    return url
-
-class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
-
-    def __init__(self, send, name, host, pwCallback, anonymousCallback,
-                 altHostCallback, protocolVersion, transport, serverName,
-                 entitlementDir, callLog):
-        xmlrpclib._Method.__init__(self, send, name)
-        self.__name = name
-        self.__host = host
-        self.__pwCallback = pwCallback
-        self.__anonymousCallback = anonymousCallback
-        self.__altHostCallback = altHostCallback
-        self.__protocolVersion = protocolVersion
-        self.__serverName = serverName
-        self.__entitlementDir = entitlementDir
-        self._transport = transport
-        self.__callLog = callLog
-
-    def __repr__(self):
-        return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name)
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __call__(self, *args, **kwargs):
-        # Keyword arguments are ignored, we just use them to override the
-        # protocol version
-        protocolVersion = (kwargs.pop('protocolVersion', None) or
-            self.__protocolVersion)
-
-        # always use protocol version 50 for checkVersion.  If we're about
-        # to talk to a pre-protocol-version 51 server, we will make it
-        # trace back with too many arguments if we try to pass kwargs
-        if self.__name == 'checkVersion':
-            protocolVersion = min(protocolVersion, 50)
-
-        if protocolVersion < 51:
-            assert(not kwargs)
-            return self.doCall(protocolVersion, *args)
-
-        return self.doCall(protocolVersion, args, kwargs)
-
-    def __doCall(self, clientVersion, argList,
-                 retryOnEntitlementTimeout = True):
-        newArgs = ( clientVersion, ) + argList
-
-        start = time.time()
-
-        rc = self.__send(self.__name, newArgs)
-        if clientVersion < 60:
-            usedAnonymous, isException, result = rc
-        else:
-            usedAnonymous = False
-            isException, result = rc
-
-        if self.__callLog:
-            self.__callLog.log(self.__host, self._transport.getEntitlements(),
-                               self.__name, rc, newArgs,
-                               latency = time.time() - start)
-
-        if usedAnonymous:
-            self.__anonymousCallback()
-
-        if not isException:
-            return result
-
-        try:
-            self.handleError(clientVersion, result)
-        except errors.EntitlementTimeout:
-            if not retryOnEntitlementTimeout:
-                raise
-
-            entList = self._transport.getEntitlements()
-            exception = errors.EntitlementTimeout(result[1])
-
-            singleEnt = conarycfg.loadEntitlement(self.__entitlementDir,
-                                                  self.__serverName)
-            # remove entitlement(s) which timed out
-            newEntList = [ x for x in entList if x[1] not in
-                                exception.getEntitlements() ]
-            newEntList.insert(0, singleEnt[1:])
-
-            # try again with the new entitlement
-            self._transport.setEntitlements(newEntList)
-            return self.__doCall(clientVersion, argList,
-                                 retryOnEntitlementTimeout = False)
-        else:
-            # this can't happen as handleError should always result in
-            # an exception
-            assert(0)
-
-    def doCall(self, clientVersion, *args):
-        try:
-            return self.__doCall(clientVersion, args)
-        except errors.InsufficientPermission:
-            # no password was specified -- prompt for it
-            if not self.__pwCallback():
-                # It's possible we switched to anonymous
-                # for an earlier query, and now need to
-                # switch back to our specified user/passwd
-                if self.__altHostCallback and self.__altHostCallback():
-                    self.__altHostCallback = None
-                    # recursively call doCall to get all the
-                    # password handling goodness
-                    return self.doCall(clientVersion, *args)
-                raise
-        return self.__doCall(clientVersion, args)
-
-    def handleError(self, clientVersion, result):
-        if clientVersion < 60:
-            exceptionName = result[0]
-            exceptionArgs = result[1:]
-            exceptionKwArgs = {}
-        else:
-            exceptionName = result[0]
-            exceptionArgs = result[1]
-            exceptionKwArgs = result[2]
-        raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
-
-    def __getattr__(self, name):
-        # Don't invoke methods that start with __
-        if name.startswith('__'):
-            raise AttributeError(name)
-        return xmlrpclib._Method.__getattr__(self, name)
-
 
 def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
     conv = xmlshims.NetworkConvertors()
@@ -220,93 +90,116 @@ def unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs):
                 return klass(exceptionArgs[0])
         return errors.UnknownException(exceptionName, exceptionArgs)
 
+
+class ServerProxyMethod(util.ServerProxyMethod):
+
+    def __call__(self, *args, **kwargs):
+        return self._send(self._name, args, kwargs)
+
+
 class ServerProxy(util.ServerProxy):
 
-    def __passwordCallback(self):
-        if self.__pwCallback is None:
-            return False
-
-        l = self.__host.split('@', 1)
-        if len(l) == 1:
-            fullHost = l[0]
-            user, password = self.__pwCallback(self.__serverName)
-            if not user or not password:
-                return False
-            if not self.__usedMap:
-                # the user didn't specify what protocol to use, therefore
-                # we assume that when we need a user/password we need
-                # to use https
-                self.__transport.https = True
-        else:
-            user, fullHost = l
-            if user[-1] != ':':
-                return False
-
-            user = user[:-1]
-
-            # if there is a port number, strip it off
-            l = fullHost.split(':', 1)
-            if len(l) == 2:
-                host = l[0]
-            else:
-                host = fullHost
-
-            user, password = self.__pwCallback(self.__serverName, user)
-            if not user or not password:
-                return False
-
-        password = util.ProtectedString(password)
-        self.__host = util.ProtectedTemplate('${user}:${passwd}@${host}',
-                            user = user, passwd = password, host = fullHost)
-
-        return True
-
-    def __usedAnonymousCallback(self):
-        self.__altHost = self.__host
-        self.__host = self.__host.split('@')[-1]
-
-    def __altHostCallback(self):
-        if self.__altHost:
-            self.__host = self.__altHost
-            self.__altHost = None
-            return True
-        else:
-            return False
-
     def _createMethod(self, name):
-        return _Method(self._request, name, self.__host,
-                       self.__passwordCallback, self.__usedAnonymousCallback,
-                       self.__altHostCallback, self.getProtocolVersion(),
-                       self.__transport, self.__serverName,
-                       self.__entitlementDir, self.__callLog)
+        return ServerProxyMethod(self._request, name)
 
     def usedProxy(self):
-        return self.__transport.usedProxy
+        return self._transport.usedProxy
 
     def setAbortCheck(self, check):
-        self.__transport.setAbortCheck(check)
+        self._transport.setAbortCheck(check)
 
     def setProtocolVersion(self, val):
-        self.__protocolVersion = val
+        self._protocolVersion = val
 
     def getProtocolVersion(self):
-        return self.__protocolVersion
+        return self._protocolVersion
 
-    def __init__(self, url, serverName, transporter, pwCallback, usedMap,
+    def _request(self, method, args, kwargs):
+        protocolVersion = (kwargs.pop('protocolVersion', None) or
+            self.getProtocolVersion())
+
+        # always use protocol version 50 for checkVersion.  If we're about
+        # to talk to a pre-protocol-version 51 server, we will make it
+        # trace back with too many arguments if we try to pass kwargs
+        if method == 'checkVersion':
+            protocolVersion = min(protocolVersion, 50)
+
+        if protocolVersion < 51:
+            assert not kwargs
+            argList = args
+        else:
+            argList = (args, kwargs)
+        return self._marshalCall(method, protocolVersion, argList)
+
+    def _marshalCall(self, method, clientVersion, argList,
+            retryOnEntitlementTimeout=True):
+        newArgs = ( clientVersion, ) + argList
+
+        start = time.time()
+
+        rc = util.ServerProxy._request(self, method, newArgs)
+        if clientVersion < 60:
+            usedAnonymous, isException, result = rc
+        else:
+            isException, result = rc
+
+        if self._callLog:
+            host = str(self._url.hostport)
+            elapsed = time.time() - start
+            self._callLog.log(host, self._transport.getEntitlements(),
+                    method, rc, newArgs, latency=elapsed)
+
+        if not isException:
+            return result
+
+        try:
+            self._handleError(clientVersion, result)
+        except errors.EntitlementTimeout:
+            if not retryOnEntitlementTimeout:
+                raise
+
+            entList = self._transport.getEntitlements()
+            exception = errors.EntitlementTimeout(result[1])
+
+            singleEnt = conarycfg.loadEntitlement(self._entitlementDir,
+                    self._serverName)
+            # remove entitlement(s) which timed out
+            newEntList = [ x for x in entList if x[1] not in
+                                exception.getEntitlements() ]
+            newEntList.insert(0, singleEnt[1:])
+
+            # try again with the new entitlement
+            self._transport.setEntitlements(newEntList)
+            return self._marshalCall(method, clientVersion, argList,
+                    retryOnEntitlementTimeout=False)
+        else:
+            # this can't happen as handleError should always result in
+            # an exception
+            assert False
+
+    @staticmethod
+    def _handleError(clientVersion, result):
+        if clientVersion < 60:
+            exceptionName = result[0]
+            exceptionArgs = result[1:]
+            exceptionKwArgs = {}
+        else:
+            exceptionName = result[0]
+            exceptionArgs = result[1]
+            exceptionKwArgs = result[2]
+        raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
+
+    def __init__(self, url, serverName, transporter,
                  entitlementDir, callLog):
         try:
-            util.ServerProxy.__init__(self, url, transporter)
+            util.ServerProxy.__init__(self, url=url, transport=transporter)
         except IOError, e:
-            proto, url = urllib.splittype(url)
             raise errors.OpenError('Error occurred opening repository '
-                                   '%s: %s' % (_cleanseUrl(proto, url), e))
-        self.__pwCallback = pwCallback
-        self.__altHost = None
-        self.__serverName = serverName
-        self.__usedMap = usedMap
-        self.__protocolVersion = CLIENT_VERSIONS[-1]
-        self.__entitlementDir = entitlementDir
-        self.__callLog = callLog
+                    '%s: %s' % (url, e))
+        self._serverName = serverName
+        self._protocolVersion = CLIENT_VERSIONS[-1]
+        self._entitlementDir = entitlementDir
+        self._callLog = callLog
 
 class ServerCache:
     TransportFactory = transport.Transport
@@ -337,6 +230,7 @@ class ServerCache:
         user, pw = self.pwPrompt(host, user)
         if user is None or pw is None:
             return None, None
+        pw = util.ProtectedString(pw)
         self.userMap.addServerGlob(host, user, pw)
         return user, pw
 
@@ -421,7 +315,6 @@ class ServerCache:
         if singleEnt and singleEnt[1:] not in entList:
             entList.append(singleEnt[1:])
 
-        usedMap = url is not None
         if url is None:
             if entList or userInfo:
                 # if we have authentication information, use https
@@ -429,26 +322,17 @@ class ServerCache:
             else:
                 # if we are using anonymous, use http
                 protocol = 'http'
+            url = "%s://%s/conary/" % (protocol, serverName)
 
-            if userInfo is None:
-                url = "%s://%s/conary/" % (protocol, serverName)
-            else:
-                url = "%s://%s:%s@%s/conary/"
-                url = util.ProtectedString(url   % (protocol,
-                                                 quote(userInfo[0]),
-                                                 quote(userInfo[1]),
-                                                 serverName))
-        elif userInfo:
-            s = url.split('/')
-            if s[1]:
-                # catch "http/server/"
-                raise errors.OpenError(
-                    'Invalid URL "%s" when trying access the %s repository. '
-                    'Check your repositoryMap entries' % (url, serverName))
-            s[2] = ('%s:%s@' % (quote(userInfo[0]), quote(userInfo[1]))) + s[2]
-            s[2] = util.ProtectedString(s[2])
-            url = util.ProtectedString('/'.join(s))
-            usedMap = True
+        url = req_mod.URL.parse(url)
+        if userInfo:
+            if not userInfo[1]:
+                # Prompt user for a password
+                userInfo = self.__getPassword(serverName, userInfo[0])
+            if userInfo[1]:
+                # Protect the password string if it isn't already protected.
+                userInfo = userInfo[0], util.ProtectedString(userInfo[1])
+            url = url._replace(userpass=userInfo)
 
         shareTuple = (url, userInfo, tuple(entList), serverName)
         server = self.shareCache.get(shareTuple, None)
@@ -456,17 +340,14 @@ class ServerCache:
             self.cache[serverName] = server
             return server
 
-        protocol, uri = urllib.splittype(url)
-        uri = util.ProtectedString(uri)
-        transporter = self.TransportFactory(https = (protocol == 'https'),
+        transporter = self.TransportFactory(
                 proxyMap=self.proxyMap, serverName=serverName,
                 caCerts=self.caCerts, connectAttempts=self.connectAttempts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
-        server = ServerProxy(url, serverName, transporter, self.__getPassword,
-                             usedMap = usedMap,
-                             entitlementDir = self.entitlementDir,
-                             callLog = self.callLog)
+        server = ServerProxy(url=url, serverName=serverName,
+                transporter=transporter, entitlementDir=self.entitlementDir,
+                callLog=self.callLog)
 
         # Avoid poking at __transport
         server._transport = transporter
@@ -474,13 +355,12 @@ class ServerCache:
         serverVersions = server.checkVersion()
         intersection = set(serverVersions) & set(CLIENT_VERSIONS)
         if not intersection:
-            url = _cleanseUrl(protocol, url)
             raise errors.InvalidServerVersion(
-                "While talking to repository " + url + ":\n"
+                "While talking to repository %s:\n"
                 "Invalid server version.  Server accepts client "
                 "versions %s, but this client only supports versions %s"
                 " - download a valid client from wiki.rpath.com" %
-                (",".join([str(x) for x in serverVersions]),
+                (url, ",".join([str(x) for x in serverVersions]),
                  ",".join([str(x) for x in CLIENT_VERSIONS])))
 
         # this is the protocol version we should use when talking

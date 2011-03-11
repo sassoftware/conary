@@ -29,6 +29,10 @@ class TransportError(Exception):
     pass
 
 
+class ParameterError(TransportError):
+    pass
+
+
 class ResponseError(TransportError):
 
     def __init__(self, url, proxy, errcode, reason):
