@@ -44,7 +44,7 @@ class URL(namedtuple('URL', 'scheme userpass hostport path')):
         path = urlparse.urlunsplit(('', '', path, query, fragment))
         return cls(scheme, (username, password), hostport, path)
 
-    def __str__(self):
+    def unsplit(self):
         username, password = self.userpass
         host, port = self.hostport
         if (self.scheme == 'http' and port == 80) or (
@@ -52,6 +52,12 @@ class URL(namedtuple('URL', 'scheme userpass hostport path')):
             port = None
         return util.urlUnsplit((self.scheme, username, password, str(host),
             port, self.path, None, None))
+
+    def __str__(self):
+        rv = self.unsplit()
+        if hasattr(rv, '__safe_str__'):
+            rv = rv.__safe_str__()
+        return rv
 
 
 class HTTPHeaders(object):
