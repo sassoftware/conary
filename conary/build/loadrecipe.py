@@ -417,7 +417,7 @@ class RecipeLoaderFromString(object):
                                        buildFlavor,
                                        allowMissing=True,
                                        bestFlavor=True)
-        except (IOError, errors.ProxyError), err:
+        except errors.OpenError, err:
             nvfDict = {}
 
         neededTroveSpecs = [ x for x in troveSpecs if x not in nvfDict ]
