@@ -1,3 +1,16 @@
+Changes in 2.2.14:
+  o New Features:
+    * A new command, search, was added, to allow for model searching.
+      (CNY-3649)
+    * Repository contents files are now created world-readable by
+      default. The actual permissions are dependent on the process'
+      umask parameter.
+    * Mirror script configuration files now accept an
+      "excludeCapsuleContents" option which permits mirroring of troves
+      from repositories that do not contain capsule contents.
+    * Repositories now log full stack traces to a file in /tmp, the path
+      of which is logged in the main error log.
+
 Changes in 2.2.13:
   o New Features:
     * Added support for setting package flavor based on MSI information
