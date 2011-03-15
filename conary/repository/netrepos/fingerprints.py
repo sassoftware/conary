@@ -101,8 +101,6 @@ def expandJobList(db, chgSetList, recurse):
     """)
 
     for (idx, name, version, flavor, flags) in cu:
-        idx = abs(idx) - 1
-
         newJobList[idx].append( (name, (None, None),
                                        (version, flavor), True) )
         if flags & schema.TROVE_TROVES_WEAKREF > 0:
