@@ -822,7 +822,7 @@ class GroupDelayedTroveTupleSet(GroupTupleSetMethods,
 
             for (name, version, flavor) in sorted(tupleSet):
                 if isinstance(version, versions.NewVersion):
-                    log.info("\t\t%s (newly created)")
+                    log.info("\t\t%s (newly created)" % name)
                 else:
                     log.info("\t\t%s=%s/%s[%s]"
                                     % (name, version.trailingLabel(),

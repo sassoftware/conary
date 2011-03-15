@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -19,6 +19,7 @@ import os
 import sys
 import time
 import smtplib
+import tempfile
 import traceback
 
 from conary.lib import coveragehook
@@ -97,7 +98,6 @@ def sendMail(fromEmail, fromEmailName, toEmail, subject, body):
 def logAndEmail(req, cfg, header, msg):
     timeStamp = time.ctime(time.time())
 
-    log.error(header)
     if not cfg.bugsFromEmail or not cfg.bugsToEmail:
         return
     log.error('sending mail to %s' % cfg.bugsToEmail)
@@ -120,7 +120,8 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
         req.hostname, exception.__name__, e)
 
     # Nicely format the exception
-    out = util.BoundedStringIO()
+    tbFd, tbPath = tempfile.mkstemp('.txt', 'repos-error-')
+    out = os.fdopen(tbFd, 'w+')
     formatTrace(exception, e, bt, stream = out, withLocals = False)
     out.write("\nFull stack:\n")
     formatTrace(exception, e, bt, stream = out, withLocals = True)
@@ -129,7 +130,11 @@ def logErrorAndEmail(req, cfg, exception, e, bt):
 
     logAndEmail(req, cfg, header, msg)
     # log error
-    log.error(''.join(traceback.format_exception(*sys.exc_info())))
+    lines = traceback.format_exception(*sys.exc_info())
+    lines.insert(0, "Unhandled exception from conary repository:\n")
+    lines.append('Extended traceback at %s\n' % (tbPath,))
+    log.error(''.join(lines))
+
 
 def handler(req):
     coveragehook.install()
@@ -140,6 +145,8 @@ def handler(req):
 
 def _handler(req):
     log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
+    # Keep CONARY_LOG entries from being double-logged
+    log.logger.handlers = []
 
     repName = req.filename
     if repName in repositories:

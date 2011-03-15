@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- mode: python -*-
 #
-# Copyright (c) 2004-2007 rPath, Inc.
+# Copyright (c) 2004-2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -46,6 +46,7 @@ from conary.cmds import cscmd
 from conary.cmds import query
 from conary.cmds import queryrep
 from conary.cmds import rollbacks
+from conary.cmds import search
 from conary.cmds import showchangeset
 from conary.cmds import updatecmd
 from conary.cmds import verify
@@ -1375,6 +1376,20 @@ class VerifyCommand(ConaryCommand):
                       newFiles = newFiles)
 
 _register(VerifyCommand)
+
+class SearchCommand(ConaryCommand):
+    commands = ['search']
+    paramHelp = "<pkgname>[=<version>][[flavor]]*"
+    help = 'Search the system model for available packages'
+    docs = {}
+    commandGroup = 'Information Display'
+    ignoreConfigErrors = True
+    cmdClass = verify.verify
+
+    def runCommand(self, cfg, argSet, otherArgs):
+        client = conaryclient.ConaryClient(cfg)
+        search.search(client, otherArgs[2:])
+_register(SearchCommand)
 
 class ConaryMain(command.MainHandler):
     name = 'conary'
