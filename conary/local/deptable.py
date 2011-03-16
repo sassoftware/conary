@@ -17,8 +17,6 @@ from conary.deps import deps
 from conary.lib import graph
 from conary.local import schema
 
-import itertools
-
 DEP_REASON_ORDER = 0
 DEP_REASON_OLD_NEEDS_OLD = 1
 DEP_REASON_NEW_NEEDS_NEW = 2
@@ -535,7 +533,6 @@ class DependencyChecker:
                                 wasIn):
         from conary.local import sqldb
         flavorCache = sqldb.FlavorCache()
-        versionCache = sqldb.VersionCache()
         def _depItemsToSet(idxList, depInfoList, provInfo = True,
                            wasIn = None):
             failedSets = [ None ] * len(self.nodes)
@@ -788,7 +785,6 @@ class DependencyChecker:
         def _findRelatedJobs(job):
             # return jobs that must be updated before or after job
             # due to dependencies in order to have a consistent system.
-            jobs = []
             if job[2][0]:
                 nodeId = self.newInfoToNodeId[job[0], job[2][0], job[2][1]]
             else:
@@ -839,8 +835,6 @@ class DependencyChecker:
         # no dependency reason to order them a particular way.
         jobComp = {}
         for jobSet in jobSets:
-            value = []
-
             isCritical = 0
             for idx, jobSetList in enumerate(reversed(criticalJobSetsList)):
                 if jobSet in jobSetList:
@@ -1060,9 +1054,6 @@ class DependencyChecker:
                 (provides, requires) = allDeps.pop(0)
 
                 newNodeId = self._addJob(job)
-                #requires = requires - provides
-                r1 = requires.copy()
-
                 newRequires = self._findNewDependencies(newNodeId, requires,
                                                         self.requiresToNodeId)
 
