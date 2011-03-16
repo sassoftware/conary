@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -700,14 +700,6 @@ class CMLClient(object):
                                     criticalJobs = criticalJobs,
                                     finalJobs = finalJobs,
                                     criticalOnly = criticalOnly)
-            # this is horrible. it forces the dependency graph which is used
-            # for ordering to be updated with the results of each dep pass
-            # (note that we do this after the depCheck() call in the loop
-            # below. it's really a bug that it happens here and it not internal
-            # to the dep checker, but changing that would affect the non
-            # system model update path which I don't want to do (even if doing
-            # so would be a bug fix)
-            result._order()
 
             suggMap = {}
             while True:
@@ -764,7 +756,6 @@ class CMLClient(object):
                                         criticalJobs = criticalJobs,
                                         finalJobs = finalJobs,
                                         criticalOnly = criticalOnly)
-                result._order()
 
             check.done()
             log.info("job dependency closed; %s jobs resulted", len(job))

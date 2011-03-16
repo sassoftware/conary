@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1005,13 +1005,8 @@ class DependencyChecker:
         return self.g
 
 
-    def _findOrdering(self, result, brokenByErase, satisfied, linkedJobSets,
-                      criticalJobs, finalJobs):
+    def _findOrdering(self, criticalJobs):
         changeSetList = []
-        self._createDepGraph(result, brokenByErase, satisfied, linkedJobSets,
-                             criticalJobs, finalJobs,
-                             createCollectionEdges=True)
-
         componentLists, criticalUpdates = self._stronglyConnect(criticalJobs)
 
         for componentList in componentLists:
@@ -1115,7 +1110,7 @@ class DependencyChecker:
         self.cu.execute(stmt)
 
         # it's a shame we instantiate this, but merging _gatherResoltion
-        # and _findOrdering doesn't seem like any fun
+        # and _createDepGraph doesn't seem like any fun
         sqlResult = self.cu.fetchall()
 
         # None in depList means the dependency got resolved; we track
@@ -1183,12 +1178,15 @@ class DependencyChecker:
                 self._linkedJobs = set()
                 self.orderer = orderer
 
+        # During the dependency resolution process this method is invoked
+        # several times, each time with a disjoint set of edges. Therefore we
+        # need to merge the edges we're given each time around.
+        self._createDepGraph(sqlResult, brokenByErase, satisfied, linkedJobs,
+                criticalJobs, finalJobs, createCollectionEdges=True)
+
+
         if createGraph or self.findOrdering:
-            orderer = lambda : self._findOrdering(sqlResult,
-                                                  brokenByErase, satisfied,
-                                                  linkedJobSets = linkedJobs,
-                                                  criticalJobs = criticalJobs,
-                                                  finalJobs = finalJobs)
+            orderer = lambda : self._findOrdering(criticalJobs)
         else:
             orderer = lambda : ([], [])
 
