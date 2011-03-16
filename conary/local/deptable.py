@@ -1144,14 +1144,15 @@ class DependencyChecker:
             self.cu.execute("update tmprequires set satisfied=1 where "
                         "depNum in (%s)" % ",".join(["%d" % x for x in l]))
 
-        # During the dependency resolution process this method is invoked
-        # several times, each time with a disjoint set of edges. Therefore we
-        # need to merge the edges we're given each time around.
-        self._createDepGraph(sqlResult, brokenByErase, satisfied, linkedJobs,
-                criticalJobs, finalJobs, createCollectionEdges=True)
-
-
         if createGraph or self.findOrdering:
+            # During the dependency resolution process this method is invoked
+            # several times, each time with a disjoint set of edges. Therefore
+            # we need to merge the edges we're given each time around in order
+            # to calculate the ordering later.
+            self._createDepGraph(sqlResult, brokenByErase, satisfied,
+                    linkedJobs, criticalJobs, finalJobs,
+                    createCollectionEdges=True)
+
             orderer = lambda : self._findOrdering(criticalJobs)
         else:
             orderer = lambda : ([], [])
