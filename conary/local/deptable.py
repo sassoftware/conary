@@ -1179,21 +1179,6 @@ class DependencyChecker:
                            createGraph=False, criticalJobs=criticalJobs,
                            finalJobs=finalJobs)
 
-    def createDepGraph(self, linkedJobs=None):
-        result = self._check(linkedJobs=linkedJobs, createGraph=True)
-
-        externalDepGraph = graph.DirectedGraph()
-        for nodeId in depGraph.iterNodes():
-            # translate from nodeId -> job for external consumption
-            job = self.nodes[nodeId][0]
-            externalDepGraph.addNode(job)
-        for fromNode, toNode in depGraph.iterEdges():
-            externalDepGraph.addEdge(self.nodes[fromNode][0],
-                                     self.nodes[toNode][0])
-
-        return (result.unsatisfiedList, result.unresolveableList,
-                result.externalDepGraph)
-
     def done(self):
         if self.inTransaction:
             self.db.rollback()
