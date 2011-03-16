@@ -1150,7 +1150,7 @@ class DependencyChecker:
                     continue
                 l.add(reqDepNum)
 
-        self.cu.execute("update tmprequires set satisfied=1 where "
+            self.cu.execute("update tmprequires set satisfied=1 where "
                         "depNum in (%s)" % ",".join(["%d" % x for x in l]))
 
         # During the dependency resolution process this method is invoked
