@@ -1153,31 +1153,6 @@ class DependencyChecker:
         self.cu.execute("update tmprequires set satisfied=1 where "
                         "depNum in (%s)" % ",".join(["%d" % x for x in l]))
 
-        class _CheckResult:
-            def getChangeSetList(self):
-                self._order()
-                return self._changeSetList
-
-            def getCriticalUpdates(self):
-                self._order()
-                return self._criticalUpdates
-
-            def _order(self):
-                if self._changeSetList is None:
-                    a, b = self.orderer()
-                    self._changeSetList = a
-                    self._criticalUpdates = b
-
-            def __init__(self, unsatisfiedList, unresolveableList,
-                         depGraph, orderer):
-                self.unsatisfiedList = unsatisfiedList
-                self.unresolveableList = unresolveableList
-                self.depGraph = depGraph
-                self._changeSetList = None
-                self._criticalUpdates = None
-                self._linkedJobs = set()
-                self.orderer = orderer
-
         # During the dependency resolution process this method is invoked
         # several times, each time with a disjoint set of edges. Therefore we
         # need to merge the edges we're given each time around.
@@ -1640,3 +1615,29 @@ class DependencyDatabase(DependencyTables):
     def resolve(self, label, depSetList, leavesOnly=False,
                 troveIdList = None):
         return self.resolveToIds(list(depSetList), troveIdList = troveIdList)
+
+
+class _CheckResult(object):
+
+    def __init__(self, unsatisfiedList, unresolveableList, depGraph, orderer):
+        self.unsatisfiedList = unsatisfiedList
+        self.unresolveableList = unresolveableList
+        self.depGraph = depGraph
+        self._changeSetList = None
+        self._criticalUpdates = None
+        self._linkedJobs = set()
+        self.orderer = orderer
+
+    def getChangeSetList(self):
+        self._order()
+        return self._changeSetList
+
+    def getCriticalUpdates(self):
+        self._order()
+        return self._criticalUpdates
+
+    def _order(self):
+        if self._changeSetList is None:
+            a, b = self.orderer()
+            self._changeSetList = a
+            self._criticalUpdates = b
