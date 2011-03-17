@@ -1,0 +1,2 @@
+Changed how fingerprints are calculated to facilitate fingerprint caching in
+the future (this invalidates all fingerprints in existing caches)

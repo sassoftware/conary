@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,7 +13,23 @@
 #
 
 import logging
+import random
 import time
+
+
+class BackoffTimer(object):
+    """Helper for functions that need an exponential backoff."""
+
+    factor = 2.7182818284590451
+    jitter = 0.11962656472
+
+    def __init__(self, delay=0.1):
+        self.delay = delay
+
+    def sleep(self):
+        time.sleep(self.delay)
+        self.delay *= self.factor
+        self.delay = random.normalvariate(self.delay, self.delay * self.jitter)
 
 
 class ISOFormatter(logging.Formatter):

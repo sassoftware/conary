@@ -1,0 +1,2 @@
+Modified cached changesets to not store paths for files being spliced in from
+the content store to enable content stores to be moved
