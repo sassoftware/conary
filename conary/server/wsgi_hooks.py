@@ -474,6 +474,11 @@ class WSGIServer(object):
             raise NotImplementedError("Changeset uploading through a proxy "
                     "is not implemented yet")
 
+        try:
+            stream = self._getStream()
+        except WrappedResponse, wrapper:
+            yield wrapper.response
+
         # Copy request body to the designated temporary file.
         out = self._openForPut()
         if out is None:
@@ -482,7 +487,7 @@ class WSGIServer(object):
                     "ERROR: Illegal changeset upload.\r\n")
             return
 
-        util.copyfileobj(self.environ['wsgi.input'], out)
+        util.copyfileobj(stream, out)
         out.close()
 
         yield self._response('200 Ok', '')
