@@ -37,14 +37,21 @@ def application(environ, start_response):
     yielded = False
     try:
         for chunk in server:
-            yield chunk
+            try:
+                yield chunk
+            except GeneratorExit:
+                # Client went away
+                return
             yielded = True
     except:
         traceback.print_exc()
         if not yielded:
             headers = [('Content-type', 'text/plain')]
             start_response('500 Internal Server Error', headers)
-            yield "ERROR: Internal server error.\r\n"
+            try:
+                yield "ERROR: Internal server error.\r\n"
+            except GeneratorExit:
+                return
 
 
 class WSGIServer(object):
