@@ -1658,6 +1658,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         sigItems = []
 
         for fullJob in newJobList:
+            if fullJob is None:
+                # uncacheable job
+                continue
             for job in fullJob:
                 version = versions.VersionFromString(job[2][0])
                 if version.trailingLabel().getHost() in self.serverNameList:

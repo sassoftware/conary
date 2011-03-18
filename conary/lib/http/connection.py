@@ -46,6 +46,7 @@ class Connection(object):
     """
 
     userAgent = "conary-http-client/%s" % constants.version
+    connectTimeout = 15
 
     def __init__(self, endpoint, proxy=None, caCerts=None, commonName=None):
         """
@@ -123,7 +124,10 @@ class Connection(object):
         if hasattr(host, 'resolve'):
             host = host.resolve()[0]
         sock = socket.socket(host.family, socket.SOCK_STREAM)
+        oldTimeout = sock.gettimeout()
+        sock.settimeout(self.connectTimeout)
         sock.connect((str(host), port))
+        sock.settimeout(oldTimeout)
         return sock
 
     def startTunnel(self, sock):
