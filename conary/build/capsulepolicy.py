@@ -15,22 +15,19 @@
 Module used to override and augment packagepolicy specifically for Capsule
 Recipes
 """
-import codecs
-import imp
-import itertools
+
 import os
 import re
-import site
-import sre_constants
 import stat
-import sys
+import sre_constants
 
-from conary import files, trove, rpmhelper
-from conary.build import buildpackage, filter, policy, packagepolicy
-from conary.build import tags, use
+from conary import files
+from conary.lib import util
+from conary import rpmhelper
 from conary.deps import deps
-from conary.lib import elf, magic, util, pydeps, fixedglob, graph
-from conary.local import database
+from conary.build import filter
+from conary.build import policy
+from conary.build import packagepolicy
 
 class ComponentSpec(packagepolicy.ComponentSpec):
     # normal packages need Config before ComponentSpec to enable the
@@ -626,3 +623,64 @@ class CapsuleModifications(policy.Policy):
                     # historically that's what the code did, prior to CNY-3577
                     f.flags.isCapsuleOverride(True)
                     f.flags.isEncapsulatedContent(False)
+
+
+class RemoveCapsuleFiles(packagepolicy._filterSpec):
+    """
+    NAME
+    ====
+    B{C{r.RemoveCapsuleFiles()}} - Remove a encapsulated file from the Conary
+    package manifest.
+
+    SYNOPSIS
+    ========
+    C{r.RemoveCapsuleFiles(I{packagename, I{filterexp})}
+
+    DESCRIPTION
+    ===========
+    The C{r.RemoveCapsuleFiles()} policy removes encapsulated files from the
+    specified package that match the specified regular expression. This policy
+    is meant to be used in the case that Conary incorrectly handles an RPM
+    update due to path conflict checking.
+
+    NOTE: The excluded file will still be installed and only managed by RPM.
+
+    EXAMPLES
+    ========
+    C{r.RemoveCapsuleFiles('foo:rpm', '/opt')}
+
+    Specifies taht the directory C{/opt} should be removed from the Conary
+    package manifest.
+    """
+
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+
+    def do(self):
+        """
+        Remove files from the Conary package manifest that match any specified
+        filters.
+        """
+
+        # Compile the set of filters.
+        filters = {}
+        for name, regex in self.extraFilters:
+            name %= self.macros
+            filters.setdefault(name, []).append(
+                filter.Filter(regex, self.macros, name=name))
+
+        # Get a mapping of component name to component object
+        components = dict((x.name, x) for x in
+            self.recipe.autopkg.getComponents())
+
+        for name, fltrs in filters.iteritems():
+            # make a copy of the files list since it will be modified in place.
+            files = components[name].keys()
+            for fn in files:
+                for fltr in fltrs:
+                    if fltr.match(fn):
+                        self.recipe.autopkg.delFile(fn)
+                        self.recipe._capsulePathMap.pop(fn)
+                        self.recipe._capsuleDataMap.pop(fn)
+                        break
