@@ -227,12 +227,23 @@ class RPMProvides(policy.Policy):
     that cannot be automatically discovered and are not provided by the RPM
     header.
 
+    For unusual cases where you want to remove a provision Conary
+    automatically finds in the encapsulated RPM, you can specify
+    C{r.RPMProvides(exceptDeps='regexp')} to override all provisions matching
+    a regular expression, C{r.RPMProvides(exceptDeps=('filterexp', 'regexp'))}
+    to override provisions matching a regular expression only for components
+    matching filterexp, or
+    C{r.RPMProvides(exceptDeps=(('filterexp', 'regexp'), ...))} to specify
+    multiple overrides.
+
     A C{I{provision}} can only specify an rpm provision in the form of I{rpm:
     dependency(FLAG1...)}
 
     EXAMPLES
     ========
     C{r.RPMProvides('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
+
+    C{r.RPMProvides(exceptDeps='rpm: libstdc++.*')}
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -248,6 +259,7 @@ class RPMProvides(policy.Policy):
     def __init__(self, *args, **keywords):
         policy.Policy.__init__(self, *args, **keywords)
         self.mergeKmodSymbols = False
+        self.exceptDeps = []
 
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
@@ -276,6 +288,16 @@ class RPMProvides(policy.Policy):
                 deps.dependencyClassesByName[depClass],
                 deps.Dependency(dep, flags))
 
+        exceptDeps = keywords.pop('exceptDeps', None)
+        if exceptDeps:
+            if type(exceptDeps) is str:
+                exceptDeps = ('.*', exceptDeps)
+            assert(type(exceptDeps) == tuple)
+            if type(exceptDeps[0]) is tuple:
+                self.exceptDeps.extend(exceptDeps)
+            else:
+                self.exceptDeps.append(exceptDeps)
+
         # CNY-3518: set the default for whether to merge modules --
         # this should be passed in only from RPMRequires
         if '_mergeKmodSymbols' in keywords:
@@ -283,21 +305,49 @@ class RPMProvides(policy.Policy):
 
         policy.Policy.updateArgs(self, **keywords)
 
+    def preProcess(self):
+        exceptDeps = []
+        for fE, rE in self.exceptDeps:
+            try:
+                exceptDeps.append((filter.Filter(fE, self.macros),
+                                   re.compile(rE % self.macros)))
+            except sre_constants.error, e:
+                self.error('Bad regular expression %s for file spec %s: %s',
+                    rE, fE, e)
+        self.exceptDeps = exceptDeps
 
     def do(self):
         for comp in self.recipe.autopkg.components.items():
-            capsule =  self.recipe._getCapsule(comp[0])
+            capsule = self.recipe._getCapsule(comp[0])
 
             if capsule and capsule[0] == 'rpm':
                 path = capsule[1]
                 h = rpmhelper.readHeader(file(path))
                 prov = h.getProvides(mergeKmodSymbols=self.mergeKmodSymbols)
-                comp[1].provides.union(prov)
+
+                fltrprov = self._filterProvides(comp[0], prov)
+
+                comp[1].provides.union(fltrprov)
 
                 if self.provisions:
                     userProvs = self.provisions.get(comp[0])
                     if userProvs:
                         comp[1].provides.union(userProvs)
+
+    def _filterProvides(self, compName, provides):
+        removeDeps = deps.DependencySet()
+
+        for depClass, dep in provides.iterDeps():
+            for compRe, depRe in self.exceptDeps:
+                if not compRe.match(compName):
+                    continue
+                depName = '%s: %s' % (depClass.tagName, str(dep))
+                if depRe.match(depName):
+                    removeDeps.addDep(depClass, dep)
+                    break
+
+        return provides - removeDeps
+
 
 class RPMRequires(policy.Policy):
     """
