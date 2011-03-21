@@ -841,6 +841,7 @@ class DependencyChecker:
                     isCritical = idx + 1
                     break
 
+            hasRPM = 0
             hasInfo = 0
             hasPackage = 0
             for comp, idx in jobSet:
@@ -848,12 +849,14 @@ class DependencyChecker:
                     hasInfo = 1
                 if ':' not in comp[0]:
                     hasPackage = 1
+                if ':rpm' in comp[0]:
+                    hasRPM = 1
 
             # we can't sort versions w/o timeStamps, so convert them to strings
             compJobSet = [((x[0][0], (str(x[0][1][0]), x[0][1][1]),
                            (str(x[0][2][0]), x[0][1][1]), x[0][3]), x[1])
                            for x in jobSet]
-            cmpValue = (-hasInfo, -isCritical, -hasPackage, compJobSet)
+            cmpValue = (-hasInfo, -isCritical, -hasPackage, -hasRPM, compJobSet)
             jobComp[tuple(jobSet)] = cmpValue
 
         jobSets.sort(key=lambda x: jobComp[tuple(x)])
