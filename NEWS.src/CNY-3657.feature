@@ -1,1 +1,1 @@
-Conary now provides a method for excluding encapsulated content from the Conary package manifest through the r.RemoveCapsuleFiles policy.
+Added the r.RemoveCapsuleFiles policy to exclude encapsulated files and directories from Conary package manifests.

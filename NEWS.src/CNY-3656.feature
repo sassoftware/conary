@@ -1,1 +1,1 @@
-Conary now allows you to whiteout the Conary representation of RPM dependencies.
+Added the capability to white-out the Conary representation of RPM dependencies.
