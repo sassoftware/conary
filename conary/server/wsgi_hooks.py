@@ -37,14 +37,21 @@ def application(environ, start_response):
     yielded = False
     try:
         for chunk in server:
-            yield chunk
+            try:
+                yield chunk
+            except GeneratorExit:
+                # Client went away
+                return
             yielded = True
     except:
         traceback.print_exc()
         if not yielded:
             headers = [('Content-type', 'text/plain')]
             start_response('500 Internal Server Error', headers)
-            yield "ERROR: Internal server error.\r\n"
+            try:
+                yield "ERROR: Internal server error.\r\n"
+            except GeneratorExit:
+                return
 
 
 class WSGIServer(object):
@@ -447,7 +454,8 @@ class WSGIServer(object):
             if isChangeset:
                 csFile = util.ExtendedFile(path, 'rb', buffering=False)
                 changeSet = filecontainer.FileContainer(csFile)
-                for data in changeSet.dumpIter(readNestedFile):
+                for data in changeSet.dumpIter(readNestedFile,
+                        args=(self.proxyServer.repos.repos.contentsStore,)):
                     yield data
                 del changeSet
             else:
@@ -466,6 +474,11 @@ class WSGIServer(object):
             raise NotImplementedError("Changeset uploading through a proxy "
                     "is not implemented yet")
 
+        try:
+            stream = self._getStream()
+        except WrappedResponse, wrapper:
+            yield wrapper.response
+
         # Copy request body to the designated temporary file.
         out = self._openForPut()
         if out is None:
@@ -474,7 +487,7 @@ class WSGIServer(object):
                     "ERROR: Illegal changeset upload.\r\n")
             return
 
-        util.copyfileobj(self.environ['wsgi.input'], out)
+        util.copyfileobj(stream, out)
         out.close()
 
         yield self._response('200 Ok', '')
