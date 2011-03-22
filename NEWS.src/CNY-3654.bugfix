@@ -1,0 +1,3 @@
+A bug in the dependency ordering code has been corrected. This bug could cause
+some troves to be installed before their requirements are installed, thus
+temporarily leaving the system in a non-dependency-closed state.
