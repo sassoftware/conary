@@ -1,3 +1,19 @@
+Changes in 2.2.15:
+  o New Features:
+    * Added support for breaking RPM jobs based on native Conary
+      dependencies. (CNY-3655)
+    * Added the capability to white-out the Conary representation of RPM
+      dependencies. (CNY-3656)
+    * Added the r.RemoveCapsuleFiles policy to exclude encapsulated
+      files and directories from Conary package manifests. (CNY-3657)
+
+  o Bug Fixes:
+    * A bug in the dependency ordering code has been corrected. This bug
+      could cause some troves to be installed before their requirements
+      are installed, thus temporarily leaving the system in a non-
+      dependency-closed state. End users are unlikely to be affected by
+      this bug. (CNY-3654)
+
 Changes in 2.2.14:
   o New Features:
     * A new command, search, was added, to allow for model searching.
