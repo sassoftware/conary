@@ -3077,11 +3077,24 @@ conary erase '%s=%s[%s]'
         # avoid it, and the component name is close enough for now. this looks
         # for the first :rpm, and combines all jobs which remain into a single
         # one. more simple than elegant
-        for i, jobList in enumerate(combinedJobs):
-            if [ x for x in jobList if ':rpm' in x[0] ]:
-                combinedJobs = (combinedJobs[:i] +
-                    [ list(itertools.chain(*combinedJobs[i:])) ] )
-                break
+        newJobs = []
+        curJob = None
+        # Combine rpm jobs iff they contain rpms and potentially packages, not
+        # if they only contain packages or other components.
+        for jobList in combinedJobs:
+            # If the job contains components that are not :rpm persist the job.
+            if [ x for x in jobList if (not ':rpm' in x[0] and ':' in x[0]) or
+                 x[0].startswith('group-') or x[0].startswith('info-') ]:
+                curJob = None
+                newJobs.append(jobList)
+            # If the job contains rpm components or only consists of packages
+            # combine the job.
+            elif not curJob:
+                curJob = jobList
+                newJobs.append(jobList)
+            else:
+                curJob.extend(jobList)
+        combinedJobs = newJobs
 
         newJob = []
         inGroup = None
@@ -3108,24 +3121,26 @@ conary erase '%s=%s[%s]'
                     assert(isInfo is False or isInfo is None)
                     isInfo = False
 
+            addJob = uJob.addJob
+
             if isCritical:
                 if newJob:
-                    uJob.addJob(newJob)
+                    addJob(newJob)
                     newJob = []
                     inGroup = None
 
                 finalCriticalJobs.append(len(uJob.getJobs()))
-                uJob.addJob(jobList)
+                addJob(jobList)
             elif isInfo:
                 if newJob:
-                    uJob.addJob(newJob)
+                    addJob(newJob)
                     newJob = []
 
-                uJob.addJob(jobList)
+                addJob(jobList)
                 isInfo = None
             elif foundGroup != inGroup:
                 if newJob:
-                    uJob.addJob(newJob)
+                    addJob(newJob)
                     newJob = []
 
                 newJob.extend(jobList)
@@ -3133,10 +3148,18 @@ conary erase '%s=%s[%s]'
             else:
                 if (updateMax and newJob and
                          (len(newJob)  + len(jobList)) > updateMax):
-                    uJob.addJob(newJob)
+
+                    addJob(newJob)
                     newJob = []
 
-                newJob.extend(jobList)
+                # If the job contains rpms, it has already been colapsed.
+                if [ x for x in jobList if ':rpm' in x[0] ]:
+                    if newJob:
+                        addJob(newJob)
+                    addJob(jobList)
+                    newJob = []
+                else:
+                    newJob.extend(jobList)
 
         if newJob:
             # we don't care if the final job is critical - there

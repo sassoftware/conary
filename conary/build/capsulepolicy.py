@@ -15,22 +15,19 @@
 Module used to override and augment packagepolicy specifically for Capsule
 Recipes
 """
-import codecs
-import imp
-import itertools
+
 import os
 import re
-import site
-import sre_constants
 import stat
-import sys
+import sre_constants
 
-from conary import files, trove, rpmhelper
-from conary.build import buildpackage, filter, policy, packagepolicy
-from conary.build import tags, use
+from conary import files
+from conary.lib import util
+from conary import rpmhelper
 from conary.deps import deps
-from conary.lib import elf, magic, util, pydeps, fixedglob, graph
-from conary.local import database
+from conary.build import filter
+from conary.build import policy
+from conary.build import packagepolicy
 
 class ComponentSpec(packagepolicy.ComponentSpec):
     # normal packages need Config before ComponentSpec to enable the
@@ -227,12 +224,23 @@ class RPMProvides(policy.Policy):
     that cannot be automatically discovered and are not provided by the RPM
     header.
 
+    For unusual cases where you want to remove a provision Conary
+    automatically finds in the encapsulated RPM, you can specify
+    C{r.RPMProvides(exceptDeps='regexp')} to override all provisions matching
+    a regular expression, C{r.RPMProvides(exceptDeps=('filterexp', 'regexp'))}
+    to override provisions matching a regular expression only for components
+    matching filterexp, or
+    C{r.RPMProvides(exceptDeps=(('filterexp', 'regexp'), ...))} to specify
+    multiple overrides.
+
     A C{I{provision}} can only specify an rpm provision in the form of I{rpm:
     dependency(FLAG1...)}
 
     EXAMPLES
     ========
     C{r.RPMProvides('rpm: bar(FLAG1 FLAG2)', 'foo:rpm')}
+
+    C{r.RPMProvides(exceptDeps='rpm: libstdc++.*')}
     """
     bucket = policy.PACKAGE_CREATION
     requires = (
@@ -248,6 +256,7 @@ class RPMProvides(policy.Policy):
     def __init__(self, *args, **keywords):
         policy.Policy.__init__(self, *args, **keywords)
         self.mergeKmodSymbols = False
+        self.exceptDeps = []
 
     def updateArgs(self, *args, **keywords):
         if len(args) is 2:
@@ -276,6 +285,16 @@ class RPMProvides(policy.Policy):
                 deps.dependencyClassesByName[depClass],
                 deps.Dependency(dep, flags))
 
+        exceptDeps = keywords.pop('exceptDeps', None)
+        if exceptDeps:
+            if type(exceptDeps) is str:
+                exceptDeps = ('.*', exceptDeps)
+            assert(type(exceptDeps) == tuple)
+            if type(exceptDeps[0]) is tuple:
+                self.exceptDeps.extend(exceptDeps)
+            else:
+                self.exceptDeps.append(exceptDeps)
+
         # CNY-3518: set the default for whether to merge modules --
         # this should be passed in only from RPMRequires
         if '_mergeKmodSymbols' in keywords:
@@ -283,21 +302,49 @@ class RPMProvides(policy.Policy):
 
         policy.Policy.updateArgs(self, **keywords)
 
+    def preProcess(self):
+        exceptDeps = []
+        for fE, rE in self.exceptDeps:
+            try:
+                exceptDeps.append((filter.Filter(fE, self.macros),
+                                   re.compile(rE % self.macros)))
+            except sre_constants.error, e:
+                self.error('Bad regular expression %s for file spec %s: %s',
+                    rE, fE, e)
+        self.exceptDeps = exceptDeps
 
     def do(self):
         for comp in self.recipe.autopkg.components.items():
-            capsule =  self.recipe._getCapsule(comp[0])
+            capsule = self.recipe._getCapsule(comp[0])
 
             if capsule and capsule[0] == 'rpm':
                 path = capsule[1]
                 h = rpmhelper.readHeader(file(path))
                 prov = h.getProvides(mergeKmodSymbols=self.mergeKmodSymbols)
-                comp[1].provides.union(prov)
+
+                fltrprov = self._filterProvides(comp[0], prov)
+
+                comp[1].provides.union(fltrprov)
 
                 if self.provisions:
                     userProvs = self.provisions.get(comp[0])
                     if userProvs:
                         comp[1].provides.union(userProvs)
+
+    def _filterProvides(self, compName, provides):
+        removeDeps = deps.DependencySet()
+
+        for depClass, dep in provides.iterDeps():
+            for compRe, depRe in self.exceptDeps:
+                if not compRe.match(compName):
+                    continue
+                depName = '%s: %s' % (depClass.tagName, str(dep))
+                if depRe.match(depName):
+                    removeDeps.addDep(depClass, dep)
+                    break
+
+        return provides - removeDeps
+
 
 class RPMRequires(policy.Policy):
     """
@@ -576,3 +623,64 @@ class CapsuleModifications(policy.Policy):
                     # historically that's what the code did, prior to CNY-3577
                     f.flags.isCapsuleOverride(True)
                     f.flags.isEncapsulatedContent(False)
+
+
+class RemoveCapsuleFiles(packagepolicy._filterSpec):
+    """
+    NAME
+    ====
+    B{C{r.RemoveCapsuleFiles()}} - Remove a encapsulated file from the Conary
+    package manifest.
+
+    SYNOPSIS
+    ========
+    C{r.RemoveCapsuleFiles(I{packagename, I{filterexp})}
+
+    DESCRIPTION
+    ===========
+    The C{r.RemoveCapsuleFiles()} policy removes encapsulated files from the
+    specified package that match the specified regular expression. This policy
+    is meant to be used in the case that Conary incorrectly handles an RPM
+    update due to path conflict checking.
+
+    NOTE: The excluded file will still be installed and only managed by RPM.
+
+    EXAMPLES
+    ========
+    C{r.RemoveCapsuleFiles('foo:rpm', '/opt')}
+
+    Specifies taht the directory C{/opt} should be removed from the Conary
+    package manifest.
+    """
+
+    requires = (
+        ('PackageSpec', policy.REQUIRED_PRIOR),
+    )
+
+    def do(self):
+        """
+        Remove files from the Conary package manifest that match any specified
+        filters.
+        """
+
+        # Compile the set of filters.
+        filters = {}
+        for name, regex in self.extraFilters:
+            name %= self.macros
+            filters.setdefault(name, []).append(
+                filter.Filter(regex, self.macros, name=name))
+
+        # Get a mapping of component name to component object
+        components = dict((x.name, x) for x in
+            self.recipe.autopkg.getComponents())
+
+        for name, fltrs in filters.iteritems():
+            # make a copy of the files list since it will be modified in place.
+            files = components[name].keys()
+            for fn in files:
+                for fltr in fltrs:
+                    if fltr.match(fn):
+                        self.recipe.autopkg.delFile(fn)
+                        self.recipe._capsulePathMap.pop(fn)
+                        self.recipe._capsuleDataMap.pop(fn)
+                        break
