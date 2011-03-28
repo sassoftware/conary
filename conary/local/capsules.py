@@ -53,7 +53,9 @@ class ConaryOwnedJournal(journal.JobJournal):
     # of those files away from the underlying packaging tool
 
     def __init__(self, root = '/'):
-        tmpfd, tmpname = tempfile.mkstemp()
+        tmpDir = os.path.join(root, 'var/tmp')
+        util.mkdirChain(tmpDir)
+        tmpfd, tmpname = tempfile.mkstemp(dir=tmpDir)
         journal.JobJournal.__init__(self, tmpname, root = root, create = True)
         os.close(tmpfd)
         os.unlink(tmpname)
@@ -162,6 +164,8 @@ class MetaCapsuleOperations(CapsuleOperation):
         self.capsuleClasses = {}
 
     def apply(self, justDatabase = False, noScripts = False):
+        tmpDir = os.path.join(self.root, 'var/tmp')
+        util.mkdirChain(tmpDir)
         fileDict = {}
         for kind, obj in sorted(self.capsuleClasses.items()):
             fileDict.update(
@@ -169,8 +173,8 @@ class MetaCapsuleOperations(CapsuleOperation):
 
         try:
             for ((pathId, fileId, sha1), path) in sorted(fileDict.items()):
-                tmpfd, tmpname = tempfile.mkstemp(prefix = path,
-                                                  suffix = '.conary')
+                tmpfd, tmpname = tempfile.mkstemp(dir=tmpDir, prefix=path,
+                        suffix='.conary')
                 fObj = self.changeSet.getFileContents(pathId, fileId)[1].get()
                 d = digestlib.sha1()
                 util.copyfileobj(fObj, os.fdopen(tmpfd, "w"), digest = d)
