@@ -53,9 +53,7 @@ class ConaryOwnedJournal(journal.JobJournal):
     # of those files away from the underlying packaging tool
 
     def __init__(self, root = '/'):
-        tmpDir = os.path.join(root, 'var/tmp')
-        util.mkdirChain(tmpDir)
-        tmpfd, tmpname = tempfile.mkstemp(dir=tmpDir)
+        tmpfd, tmpname = tempfile.mkstemp()
         journal.JobJournal.__init__(self, tmpname, root = root, create = True)
         os.close(tmpfd)
         os.unlink(tmpname)
@@ -165,7 +163,9 @@ class MetaCapsuleOperations(CapsuleOperation):
 
     def apply(self, justDatabase = False, noScripts = False):
         tmpDir = os.path.join(self.root, 'var/tmp')
-        util.mkdirChain(tmpDir)
+        if not os.path.isdir(tmpDir):
+            util.mkdirChain(tmpDir)
+            os.chmod(tmpDir, 01777)
         fileDict = {}
         for kind, obj in sorted(self.capsuleClasses.items()):
             fileDict.update(
