@@ -35,6 +35,10 @@ from conary.cmds import updatecmd
 from conary.deps import deps
 TroveSpec = cml.CMTroveSpec
 
+# pyflakes=ignore
+from conary.lib import log
+
+
 def buildSimplificationMap(g):
     findMap = {}
 

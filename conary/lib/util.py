@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -19,14 +19,11 @@ import errno
 import fcntl
 import fnmatch
 import gzip
-import itertools
-import log
 import misc
 import os
 import re
 import select
 import shutil
-import signal
 import stat
 import string
 import StringIO
@@ -37,12 +34,12 @@ import tempfile
 import time
 import types
 import urllib
-import urlparse
 import weakref
 import xmlrpclib
 import zlib
 
-from conary.lib import fixedglob, graph, log, api
+from conary.lib import fixedglob, log, api, urlparse
+from conary.lib import networking
 
 # Imported for the benefit of older code,
 from conary.lib.formattrace import formatTrace
@@ -565,7 +562,7 @@ def copyfileobj(source, dest, callback = None, digest = None,
 
     copied = 0
 
-    if abortCheck:
+    if abortCheck and hasattr(source, 'fileno'):
         pollObj = select.poll()
         pollObj.register(source.fileno(), select.POLLIN)
     else:
@@ -582,7 +579,10 @@ def copyfileobj(source, dest, callback = None, digest = None,
             while not l:
                 if abortCheck():
                     return None
-                l = pollObj.poll(5000)
+                if pollObj:
+                    l = pollObj.poll(5000)
+                else:
+                    break
 
         buf = source.read(bufSize)
         if not buf:
@@ -1690,7 +1690,8 @@ def urlSplit(url, defaultPort = None):
     """
     scheme, netloc, path, query, fragment = urlparse.urlsplit(url)
     userpass, hostport = urllib.splituser(netloc)
-    host, port = urllib.splitnport(hostport, None)
+    host, port = networking.splitHostPort(hostport)
+
     if userpass:
         user, passwd = urllib.splitpasswd(userpass)
         if passwd:
@@ -1710,9 +1711,13 @@ def urlUnsplit(urlTuple):
             userpass = "%s:${passwd}" % (urllib.quote(user))
         else:
             userpass = urllib.quote(user)
-    hostport = host
-    if port:
-        hostport = urllib.quote("%s:%s" % (host, port), safe = ':')
+    if host and ':' in host:
+        # Support IPv6 addresses as e.g. [dead::beef]:80
+        host = '[%s]' % (host,)
+    if port is not None:
+        hostport = urllib.quote("%s:%s" % (host, port), safe = ':[]')
+    else:
+        hostport = host
     netloc = hostport
     if userpass:
         netloc = "%s@%s" % (userpass, hostport)
@@ -1720,6 +1725,7 @@ def urlUnsplit(urlTuple):
     if passwd is None:
         return urlTempl
     return ProtectedTemplate(urlTempl, passwd = ProtectedString(urllib.quote(passwd)))
+
 
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
     """Marshaller for XMLRPC data"""
@@ -1872,18 +1878,41 @@ def xmlrpcLoad(stream):
     return u.close(), u.getmethodname()
 
 
-class ServerProxy(xmlrpclib.ServerProxy):
+class ServerProxyMethod(object):
+
+    def __init__(self, send, name):
+        self._send = send
+        self._name = name
+
+    def __getattr__(self, name):
+        if name.startswith('_'):
+            raise AttributeError(name)
+        return self.__class__(self._send, "%s.%s" % (self._name, name))
+
+    def __call__(self, *args):
+        return self._send(self._name, args)
+
+
+class ServerProxy(object):
+    # This used to inherit from xmlrpclib but it replaced everything anyway...
+
+    def __init__(self, url, transport, encoding=None, allow_none=False):
+        if isinstance(url, basestring):
+            # Have to import here to avoid an import loop -- one of the many
+            # dangers of having a monolithic util.py
+            from conary.lib.http.request import URL
+            url = URL.parse(url)
+        self._url = url
+        self._transport = transport
+        self._encoding = encoding
+        self._allow_none = allow_none
 
     def _request(self, methodname, params):
         # Call a method on the remote server
         request = xmlrpcDump(params, methodname,
-            encoding = self.__encoding, allow_none=self.__allow_none)
+            encoding = self._encoding, allow_none=self._allow_none)
 
-        response = self.__transport.request(
-            self.__host,
-            self.__handler,
-            request,
-            verbose=self.__verbose)
+        response = self._transport.request(self._url, request)
 
         if len(response) == 1:
             response = response[0]
@@ -1892,30 +1921,18 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
     def __getattr__(self, name):
         # magic method dispatcher
-        if name.startswith('__'):
+        if name.startswith('_'):
             raise AttributeError(name)
-        #from conary.lib import log
-        #log.debug('Calling %s:%s' % (self.__host.split('@')[-1], name)
         return self._createMethod(name)
 
     def _createMethod(self, name):
-        return xmlrpclib._Method(self._request, name)
+        return ServerProxyMethod(self._request, name)
 
     def __repr__(self):
-        return "<ServerProxy for %s%s>" % (repr(self.__host), self.__handler)
+        return "<ServerProxy for %s>" % (self._url,)
 
     __str__ = __repr__
 
-    def __init__(self, *args, **kwargs):
-        xmlrpclib.ServerProxy.__init__(self, *args, **kwargs)
-        # Hide password
-        userpass, hostport = urllib.splituser(self.__host)
-        if userpass:
-            user, passwd = urllib.splitpasswd(userpass)
-            passwd = ProtectedString(urllib.quote(passwd))
-            userpass = '%s:${passwd}' % user
-            self.__host = ProtectedTemplate('%s@%s' % (userpass, hostport),
-                passwd = passwd)
 
 def copyStream(src, dest, length = None, bufferSize = 16384):
     """Copy from one stream to another, up to a specified length"""
@@ -1941,6 +1958,7 @@ def decompressStream(src, bufferSize = 8092):
             break
         sio.write(z.decompress(buf))
     sio.write(z.flush())
+    sio.seek(0)
     return sio
 
 def compressStream(src, level = 5, bufferSize = 16384):
@@ -2105,6 +2123,45 @@ class LZMAFile:
                 os._exit(1)
 
         os.close(outfd)
+
+
+class SavedException(object):
+
+    def __init__(self, exc_info=None):
+        if not exc_info:
+            exc_info = sys.exc_info()
+        elif isinstance(exc_info, Exception):
+            exc_info = exc_info.__class__, exc_info, None
+        self.type, self.value, self.tb = exc_info
+
+    def __repr__(self):
+        return "<saved %s exception>" % self.getName()
+
+    def getName(self):
+        return '.'.join((self.type.__module__, self.type.__name__))
+
+    def format(self):
+        return self.getName() + ': ' + str(self.value)
+
+    def throw(self):
+        raise self.type, self.value, self.tb
+
+    def clear(self):
+        """Free the exception and traceback to avoid reference loops."""
+        self.value = self.tb = None
+
+    def replace(self, value):
+        """Replace the saved exception with a new one. The traceback is
+        preserved.
+        """
+        self.type = value.__class__
+        self.value = value
+
+    def check(self, *types):
+        for type_ in types:
+            if issubclass(self.type, type_):
+                return True
+        return False
 
 
 def rethrow(newClassOrInstance, prependClassName=True, oldTup=None):
@@ -2478,6 +2535,7 @@ class TimestampedMap(object):
     If delta is set to None, new entries will never go stale.
     """
     __slots__ = [ 'delta', '_map' ]
+    _MISSING = object()
     def __init__(self, delta = None):
         self.delta = delta
         self._map = dict()
@@ -2500,6 +2558,13 @@ class TimestampedMap(object):
 
     def clear(self):
         self._map.clear()
+
+    def iteritems(self, stale=False):
+        now = time.time()
+        ret = sorted(self._map.items(), key = lambda x: x[1][1])
+        ret = [ (k, v[0]) for (k, v) in ret
+            if stale or now <= v[1] ]
+        return ret
 
 
 def statFile(pathOrFile, missingOk=False, inodeOnly=False):
