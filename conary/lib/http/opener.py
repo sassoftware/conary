@@ -265,12 +265,7 @@ class URLOpener(object):
             kind = 'Conary'
         else:
             kind = 'HTTP'
-        if len(error.args) > 1:
-            msg = error[1]
-            args = (error[0],)
-        else:
-            msg = error[0]
-            args = ()
+        args, msg = http_error.splitSocketError(error)
         msgError = "%s (via %s proxy %s)" % (msg, kind, self.lastProxy)
         error.args = args + (msgError,)
         if hasattr(error, 'strerror'):

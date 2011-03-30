@@ -52,3 +52,14 @@ class ResponseError(TransportError):
             safe_url = safe_url.__safe_str__()
         return "Error opening %s%s: %s %s" % (safe_url, via, self.errcode,
                 self.reason)
+
+
+def splitSocketError(error):
+    """Break a socket.error into a message and a "everything else" tuple."""
+    if len(error.args) > 1:
+        msg = error[1]
+        args = (error[0],)
+    else:
+        msg = error[0]
+        args = ()
+    return args, msg

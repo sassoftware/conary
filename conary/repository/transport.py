@@ -172,13 +172,13 @@ class Transport(xmlrpclib.Transport):
             except (socket.error, EnvironmentError, http_error.TransportError):
                 e_type, e_value, e_tb = sys.exc_info()
                 if isinstance(e_value, socket.error):
-                    errmsg = e_value[1]
+                    errmsg = http_error.splitSocketError(e_value)[1]
                 elif isinstance(e_value, EnvironmentError):
                     errmsg = e_value.sterror
                     # sometimes there is a socket error hiding inside an
                     # IOError!
                     if isinstance(errmsg, socket.error):
-                        errmsg = errmsg[1]
+                        errmsg = http_error.splitSocketError(errmsg)[1]
                 else:
                     e_name = getattr(e_type, '__name__', 'Unknown Error')
                     errmsg = '%s: %s' % (e_name, e_value)
