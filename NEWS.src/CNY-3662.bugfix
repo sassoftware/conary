@@ -1,0 +1,1 @@
+Conary 2.2.12 changed the structure of the update.UpdateFlags object. Since we no longer restart after critical updates, rpmcapsule.py needs to accept both the old style flags and the new style ones, in case it has updated from pre-2.2.12.
