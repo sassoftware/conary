@@ -1912,12 +1912,7 @@ class ServerProxy(object):
         request = xmlrpcDump(params, methodname,
             encoding = self._encoding, allow_none=self._allow_none)
 
-        response = self._transport.request(self._url, request)
-
-        if len(response) == 1:
-            response = response[0]
-
-        return response
+        return self._transport.request(self._url, request)
 
     def __getattr__(self, name):
         # magic method dispatcher
