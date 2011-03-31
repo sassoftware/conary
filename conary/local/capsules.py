@@ -164,8 +164,9 @@ class MetaCapsuleOperations(CapsuleOperation):
     def apply(self, justDatabase = False, noScripts = False):
         tmpDir = os.path.join(self.root, 'var/tmp')
         if not os.path.isdir(tmpDir):
-            util.mkdirChain(tmpDir)
-            os.chmod(tmpDir, 01777)
+            # For empty roots or roots that are not systems (e.g. source
+            # checkouts), just put capsules in the root directory.
+            tmpDir = self.root
         fileDict = {}
         for kind, obj in sorted(self.capsuleClasses.items()):
             fileDict.update(
