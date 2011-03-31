@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -21,6 +21,7 @@ import zlib
 
 from conary.lib import log, util
 from conary.repository import errors, netclient
+from conary.repository import xmlshims
 from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
 from conary.web.webauth import getAuth
@@ -53,13 +54,14 @@ def post(port, isSecure, repos, req):
             # to the client
             print >> sys.stderr, 'error reading from client: %s' %e
             method = 'unknown - client timeout'
-            result = (False, True, ('ClientTimeout',
+            response = xmlshims.ResponseArgs.newException('ClientTimeout',
                                     'The server was not able to read the '
                                     'XML-RPC request sent by this client. '
                                     'This is sometimes caused by MTU problems '
                                     'on your network connection.  Using a '
                                     'smaller MTU may work around this '
-                                    'problem.'))
+                                    'problem.')
+            headers = {}
             startTime = time.time()
         else:
             # otherwise, we've read the data, let's process it
@@ -101,27 +103,28 @@ def post(port, isSecure, repos, req):
                 # we want to use 4.5.6.7
                 clients = req.headers_in['X-Forwarded-For']
                 remoteIp = clients.split(',')[-1].strip()
+            request = xmlshims.RequestArgs.fromWire(params)
             try:
-                result = repos.callWrapper(protocol, port, method, authToken,
-                                           params,
-                                           remoteIp = remoteIp,
-                                           rawUrl = req.unparsed_uri,
-                                           localAddr = localAddr,
-                                           protocolString = req.protocol,
-                                           headers = req.headers_in,
-                                           isSecure = isSecure)
-                # Get the extra information from the end of result
-                extraInfo = result[-1]
-                result = result[:-1]
+                response, extraInfo = repos.callWrapper(
+                        protocol=protocol,
+                        port=port,
+                        methodname=method,
+                        authToken=authToken,
+                        request=request,
+                        remoteIp=remoteIp,
+                        rawUrl=req.unparsed_uri,
+                        localAddr=localAddr,
+                        protocolString=req.protocol,
+                        headers=req.headers_in,
+                        isSecure=isSecure,
+                        )
             except errors.InsufficientPermission:
                 return apache.HTTP_FORBIDDEN
 
-
-        usedAnonymous = result[0]
-        result = result[1:]
+        rawResponse, headers = response.toWire(request.version)
 
         sio = util.BoundedStringIO()
-        util.xmlrpcDump((result,), stream=sio, methodresponse=1)
+        util.xmlrpcDump((rawResponse,), stream=sio, methodresponse=1)
         respLen = sio.tell()
         repos.log(1, method, "time=%.3f size=%d" % (time.time()-startTime,
                                                     respLen))
@@ -135,20 +138,13 @@ def post(port, isSecure, repos, req):
             sio = util.compressStream(sio, 5)
             respLen = sio.tell()
         req.headers_out['Content-length'] = '%d' % respLen
-        if usedAnonymous:
-            req.headers_out["X-Conary-UsedAnonymous"] = "1"
+        for key, value in sorted(headers.items()):
+            req.headers_out[key] = value
         if extraInfo:
             # If available, send to the client the via headers all the way up
             # to us
-            via = extraInfo.getVia()
-            if via:
-                req.headers_out['Via'] = via
-            # And add our own via header
-            # Note that we don't do this if we are the origin server
-            # (talking to a repository; extraInfo is None in that case)
-            # We are HTTP/1.0 compliant
-            via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
-            req.headers_out['Via'] = via
+            req.headers_out['Via'] = proxy.formatViaHeader(localAddr,
+                    'HTTP/1.0', prefix=extraInfo.getVia())
 
         sio.seek(0)
         util.copyStream(sio, req)

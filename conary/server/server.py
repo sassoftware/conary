@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- mode: python -*-
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,14 +15,12 @@
 #
 
 import base64
-import errno
 import os
 import posixpath
 import select
 import socket
 import sys
 import urllib
-import zlib
 import BaseHTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
@@ -50,6 +48,7 @@ from conary.lib import util
 from conary.lib.cfg import CfgBool, CfgInt, CfgPath
 from conary.lib.tracelog import initLog, logMe
 from conary.repository import errors, netclient
+from conary.repository import xmlshims
 from conary.repository.netrepos import netserver, proxy
 from conary.repository.netrepos.proxy import ProxyRepositoryServer, ChangesetFileReader
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
@@ -209,15 +208,23 @@ class HttpRequests(SimpleHTTPRequestHandler):
             repos = self.netRepos
 
         localAddr = "%s:%s" % self.request.getsockname()
+        request = xmlshims.RequestArgs.fromWire(params)
 
         if repos is not None:
             try:
-                result = repos.callWrapper('http', None, method, authToken,
-                            params, remoteIp = self.connection.getpeername()[0],
-                            rawUrl = self.path, localAddr = localAddr,
-                            protocolString = self.request_version,
-                            headers = self.headers,
-                            isSecure = self.server.isSecure)
+                response, extraInfo = repos.callWrapper(
+                        protocol='http',
+                        port=None,
+                        methodname=method,
+                        authToken=authToken,
+                        request=request,
+                        remoteIp=self.connection.getpeername()[0],
+                        rawUrl=self.path,
+                        localAddr=localAddr,
+                        protocolString=self.request_version,
+                        headers=self.headers,
+                        isSecure=self.server.isSecure,
+                        )
             except errors.InsufficientPermission:
                 self.send_error(403)
                 return None
@@ -232,13 +239,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 return None
             logMe(3, "returned from", method)
 
-        usedAnonymous = result[0]
-        # Get the extra information from the end of result
-        extraInfo = result[-1]
-        result = result[1:-1]
+        rawResponse, headers = response.toWire(request.version)
 
         sio = util.BoundedStringIO()
-        util.xmlrpcDump((result,), stream = sio, methodresponse=1)
+        util.xmlrpcDump((rawResponse,), stream = sio, methodresponse=1)
         respLen = sio.tell()
         logMe(3, "encoded xml-rpc response to %d bytes" % respLen)
 
@@ -251,20 +255,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header('Content-encoding', 'deflate')
         self.send_header("Content-type", "text/xml")
         self.send_header("Content-length", str(respLen))
-        if usedAnonymous:
-            self.send_header("X-Conary-UsedAnonymous", '1')
+        for key, value in sorted(headers.items()):
+            self.send_header(key, value)
         if extraInfo:
             # If available, send to the client the via headers all the way up
             # to us
-            via = extraInfo.getVia()
-            if via:
-                self.send_header('Via', via)
-            # And add our own via header
-            # Note that we don't do this if we are the origin server
-            # (talking to a repository; extraInfo is None in that case)
-            # We are HTTP/1.0 compliant
-            via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
-            self.send_header('Via', via)
+            self.send_header('Via', proxy.formatViaHeader(localAddr,
+                'HTTP/1.0', prefix=extraInfo.getVia()))
 
         self.end_headers()
         sio.seek(0)
