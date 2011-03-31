@@ -22,6 +22,7 @@ import sys
 import urllib
 import xmlrpclib
 
+from conary import constants
 from conary.lib import timeutil
 from conary.lib import util
 from conary.lib.http import connection
@@ -84,8 +85,7 @@ class XMLOpener(ConaryURLOpener):
 class Transport(xmlrpclib.Transport):
 
     # override?
-    user_agent = "xmlrpclib.py/%s (www.pythonware.com modified by " \
-        "rPath, Inc.)" % xmlrpclib.__version__
+    user_agent = "Conary/%s" % constants.version
 
     openerFactory = XMLOpener
 
