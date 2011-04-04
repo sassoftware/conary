@@ -22,6 +22,7 @@ from conary.lib import log as cny_log
 from conary.lib import util
 from conary.repository import errors
 from conary.repository import filecontainer
+from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
 from conary.web import webauth
@@ -55,6 +56,9 @@ def application(environ, start_response):
 
 
 class WSGIServer(object):
+
+    _requestFilter = xmlshims.RequestArgs
+    _responseFilter = xmlshims.ResponseArgs
 
     def __init__(self, environ, start_response):
         self.environ = environ
@@ -322,15 +326,16 @@ class WSGIServer(object):
 
         localAddr = ':'.join((self.environ['SERVER_NAME'],
             self.environ['SERVER_PORT']))
+        request = self._requestFilter.fromWire(params)
 
         # Execution phase -- locate and call the target method
         try:
-            result = self.proxyServer.callWrapper(
+            response, extraInfo = self.proxyServer.callWrapper(
                     protocol=None,
                     port=None,
                     methodname=method,
                     authToken=self.auth,
-                    args=params,
+                    request=request,
                     remoteIp=self.auth.remote_ip,
                     rawUrl=self.rawUrl,
                     localAddr=localAddr,
@@ -342,32 +347,26 @@ class WSGIServer(object):
                     "ERROR: Insufficient permissions.\r\n")
             return
 
-        usedAnonymous, result, extraInfo = result[0], result[1:-1], result[-1]
+        rawResponse, headers = response.toWire(request.version)
 
         # Output phase -- serialize and write the response
         sio = util.BoundedStringIO()
-        util.xmlrpcDump((result,), stream=sio, methodresponse=1)
+        util.xmlrpcDump((rawResponse,), stream=sio, methodresponse=1)
         respLen = sio.tell()
 
-        headers = [('Content-type', 'text/xml')]
+        headers['Content-type'] = 'text/xml'
         accept = self.environ.get('HTTP_ACCEPT_ENCODING', '')
         if respLen > 200 and 'deflate' in accept:
-            headers.append(('Content-encoding', 'deflate'))
+            headers['Content-encoding'] = 'deflate'
             sio.seek(0)
             sio = util.compressStream(sio, 5)
             respLen = sio.tell()
-        headers.append(('Content-length', str(respLen)))
-
-        if usedAnonymous:
-            headers.append(('X-Conary-UsedAnonymous', '1'))
+        headers['Content-length'] = str(respLen)
         if extraInfo:
-            via = extraInfo.getVia()
-            if via:
-                headers.append(('Via', via))
-            via = proxy.formatViaHeader(localAddr, 'HTTP/1.0')
-            headers.append(('Via', via))
+            headers['Via'] = proxy.formatViaHeader(localAddr,
+                    self.environ['SERVER_PROTOCOL'], prefix=extraInfo.getVia())
 
-        self.start_response('200 OK', headers)
+        self.start_response('200 OK', sorted(headers.items()))
 
         sio.seek(0)
         for data in util.iterFileChunks(sio):

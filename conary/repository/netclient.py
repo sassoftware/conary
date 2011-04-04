@@ -19,7 +19,6 @@ import os
 import time
 import urllib
 import xml
-import xmlrpclib
 
 #conary
 from conary import callbacks
@@ -52,7 +51,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 70 + 1)
+CLIENT_VERSIONS = range(36, 71 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -99,6 +98,9 @@ class ServerProxyMethod(util.ServerProxyMethod):
 
 class ServerProxy(util.ServerProxy):
 
+    _requestFilter = xmlshims.RequestArgs
+    _responseFilter = xmlshims.ResponseArgs
+
     def _createMethod(self, name):
         return ServerProxyMethod(self._request, name)
 
@@ -123,71 +125,44 @@ class ServerProxy(util.ServerProxy):
         # trace back with too many arguments if we try to pass kwargs
         if method == 'checkVersion':
             protocolVersion = min(protocolVersion, 50)
-
-        if protocolVersion < 51:
-            assert not kwargs
-            argList = args
-        else:
-            argList = (args, kwargs)
-        return self._marshalCall(method, protocolVersion, argList)
-
-    def _marshalCall(self, method, clientVersion, argList,
-            retryOnEntitlementTimeout=True):
-        newArgs = ( clientVersion, ) + argList
-
-        start = time.time()
-
-        rc = util.ServerProxy._request(self, method, newArgs)
-        if clientVersion < 60:
-            usedAnonymous, isException, result = rc
-        else:
-            isException, result = rc
-
-        if self._callLog:
-            host = str(self._url.hostport)
-            elapsed = time.time() - start
-            self._callLog.log(host, self._transport.getEntitlements(),
-                    method, rc, newArgs, latency=elapsed)
-
-        if not isException:
-            return result
-
+        request = self._requestFilter(version=protocolVersion, args=args,
+                kwargs=kwargs)
         try:
-            self._handleError(clientVersion, result)
-        except errors.EntitlementTimeout:
-            if not retryOnEntitlementTimeout:
-                raise
-
+            return self._marshalCall(method, request)
+        except errors.EntitlementTimeout, err:
             entList = self._transport.getEntitlements()
-            exception = errors.EntitlementTimeout(result[1])
 
             singleEnt = conarycfg.loadEntitlement(self._entitlementDir,
                     self._serverName)
             # remove entitlement(s) which timed out
             newEntList = [ x for x in entList if x[1] not in
-                                exception.getEntitlements() ]
+                    err.getEntitlements() ]
             newEntList.insert(0, singleEnt[1:])
 
             # try again with the new entitlement
             self._transport.setEntitlements(newEntList)
-            return self._marshalCall(method, clientVersion, argList,
-                    retryOnEntitlementTimeout=False)
-        else:
-            # this can't happen as handleError should always result in
-            # an exception
-            assert False
+            return self._marshalCall(method, request)
 
-    @staticmethod
-    def _handleError(clientVersion, result):
-        if clientVersion < 60:
-            exceptionName = result[0]
-            exceptionArgs = result[1:]
-            exceptionKwArgs = {}
+    def _marshalCall(self, method, request):
+        start = time.time()
+        rawRequest = request.toWire()
+        rawResponse = util.ServerProxy._request(self, method, rawRequest)
+        # XMLRPC responses are a 1-tuple
+        rawResponse, = rawResponse
+        response = self._responseFilter.fromWire(request.version, rawResponse,
+                self._transport.responseHeaders)
+
+        if self._callLog:
+            host = str(self._url.hostport)
+            elapsed = time.time() - start
+            self._callLog.log(host, self._transport.getEntitlements(),
+                    method, rawRequest, rawResponse, latency=elapsed)
+
+        if response.isException:
+            raise unmarshalException(response.excName, response.excArgs,
+                    response.excKwargs)
         else:
-            exceptionName = result[0]
-            exceptionArgs = result[1]
-            exceptionKwArgs = result[2]
-        raise unmarshalException(exceptionName, exceptionArgs, exceptionKwArgs)
+            return response.result
 
     def __init__(self, url, serverName, transporter,
                  entitlementDir, callLog):
