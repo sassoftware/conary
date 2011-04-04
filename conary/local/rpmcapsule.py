@@ -12,7 +12,7 @@
 # full details.
 #
 
-import itertools, re, rpm, os, pwd, stat, tempfile
+import inspect, itertools, re, rpm, os, pwd, stat, tempfile
 
 from conary import files, trove
 from conary.lib import elf, misc, util, log
@@ -441,7 +441,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                         #
                         # yes, really
                         action = ACTION_SKIP
-                    elif (flags.replaceManagedFiles(path) or
+                    elif (self._checkReplaceManagedFiles(flags, path) or
                           1 in [ files.rpmFileColorCmp(fileObj, x)
                                  for x in existingFiles ]):
                         # The files are different. Bail unless we're supposed
@@ -494,6 +494,14 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                 "restoring %s from RPM",
                                 restoreFile = False,
                                 fileId = fileId)
+
+    @classmethod
+    def _checkReplaceManagedFiles(cls, flags, path):
+        # CNY-3662 - make sure we accept old-style flags too
+        if inspect.ismethod(flags.replaceManagedFiles):
+            return flags.replaceManagedFiles(path)
+        # Prior to conary 2.2.11, this was a simple flag, so treat it as such
+        return bool(flags.replaceManagedFiles)
 
     def remove(self, trv):
         SingleCapsuleOperation.remove(self, trv)
