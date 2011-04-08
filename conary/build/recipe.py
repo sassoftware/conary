@@ -946,10 +946,13 @@ class Recipe(object):
                                     if x[0] not in ignorePaths and
                                        x[0] in self._capsuleDataMap]:
             oldDatum, _ = self._capsuleDataMap[fileName][-1]
+            # Ignore mtime
+            oldDatum = oldDatum[:4]
+            fileDatum = fileDatum[:4]
             if oldDatum != fileDatum:
                 self.reportErrors(
                     'file %s added with conflicting contents:'
-                    ' %s:%s 0%0o %s %d != %s:%s 0%0o %s %d',
+                    ' %s:%s 0%0o %s != %s:%s 0%0o %s',
                     *((fileName,)+oldDatum+fileDatum))
 
     def _setPathInfoForCapsule(self, capsulePath, fileData, packageName):
