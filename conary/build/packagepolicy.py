@@ -4261,7 +4261,9 @@ class Flavor(policy.Policy):
     def postProcess(self):
         # If this is a Windows package, include the flavor from the windows
         # helper.
-        if self._getTarget() == TARGET_WINDOWS:
+        if (self._getTarget() == TARGET_WINDOWS and
+            hasattr(self.recipe, 'winHelper')):
+
             flavorStr = self.recipe.winHelper.flavor
             if flavorStr:
                 self.packageFlavor.union(deps.parseFlavor(flavorStr))
