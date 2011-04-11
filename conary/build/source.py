@@ -51,7 +51,9 @@ class WindowsHelper(object):
 
     @property
     def flavor(self):
-        if 'x64' in self.platform:
+        if self.platform is None:
+            return ''
+        elif 'x64' in self.platform:
             return 'is: x86_64'
         elif 'x86' in self.platform:
             return 'is: x86'
