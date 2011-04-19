@@ -2803,56 +2803,33 @@ class Provides(_dependency):
 
 
     def _getPythonProvidesSysPath(self, path):
-        """ Generate a correct sys.path based on both the installed
-            system (in case a buildreq affects the sys.path) and the
-            destdir (for newly added sys.path directories).  Use site.py
-            to generate a list of such dirs.  Note that this list of dirs
-            should NOT have destdir in front.
-            Returns tuple: (sysPath, pythonVersion)
-        """
+        """Generate an ordered list of python paths for the target package.
 
+        This includes the current system path, plus any paths added by the new
+        package in the destdir through .pth files or a newly built python.
+
+        @return: (sysPath, pythonVersion)
+        """
         pythonPath, bootstrapPython = self._getPython(self.macros, path)
         if not pythonPath:
             # Most likely bad interpreter path in a .py file
             return (None, None)
-
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
-
-        oldSysPath = sys.path
-        oldSysPrefix = sys.prefix
-        oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
         libdir = self.macros.libdir
+        pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
 
-        try:
-            # get preferred sys.path (not modified by Conary wrapper)
-            # from python just built in destdir, or if that is not
-            # available, from system conary
-            systemPaths = set(self._stripDestDir(
-                self._getPythonSysPath(pythonPath, destdir, libdir), destdir))
-
-            pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
-
-            # Unlike Requires, we always provide version and
-            # libname (lib/lib64/...) in order to facilitate
-            # migration.
-
-            # determine created destdir site-packages, and add them to
-            # the list of acceptable provide paths
-            sys.path = []
-            sys.prefix = destdir + sys.prefix
-            sys.exec_prefix = destdir + sys.exec_prefix
-            site.PREFIXES=[sys.prefix, sys.exec_prefix]
-            site.addsitepackages(None)
-            systemPaths.update(self._stripDestDir(sys.path, destdir))
-
-            # later, we will need to truncate paths using longest path first
-            sysPath = sorted(systemPaths, key=len, reverse=True)
-        finally:
-            sys.path = oldSysPath
-            sys.prefix = oldSysPrefix
-            sys.exec_prefix = oldSysExecPrefix
+        # Get default sys.path from python interpreter, either the one just
+        # built (in the case of a python bootstrap) or from the system.
+        systemPaths = set(self._getPythonSysPath(pythonPath, destdir, libdir,
+            useDestDir=False))
+        # Now add paths from the destdir's site-packages, typically due to
+        # newly installed .pth files.
+        systemPaths.update(self._getPythonSysPath(pythonPath, destdir, libdir,
+            useDestDir=True))
+        # Sort in descending order so that the longest path matches first.
+        sysPath = sorted(self._stripDestDir(systemPaths, destdir), reverse=True)
 
         self.pythonSysPathMap[pythonPath] = (sysPath, pythonVersion)
         return self.pythonSysPathMap[pythonPath]
