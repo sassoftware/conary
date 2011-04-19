@@ -23,6 +23,7 @@ import re
 import site
 import sre_constants
 import stat
+import subprocess
 import sys
 
 from conary import files, trove
@@ -1922,39 +1923,64 @@ class _dependency(policy.Policy):
     def _isPythonModuleCandidate(self, path):
         return path.endswith('.so') or self._isPython(path)
 
-    def _getPythonLibraryPath(self, pythonPath, destdir, libdir):
-        ldLibraryPath = ''
-        if pythonPath.startswith(destdir):
-            ldLibraryPath = 'LD_LIBRARY_PATH=%s%s' %(destdir, libdir)
-        return ldLibraryPath
+    def _runPythonScript(self, binPath, destdir, libdir, scriptLines):
+        script = '\n'.join(scriptLines)
+        environ = {}
+        if binPath.startswith(destdir):
+            environ['LD_LIBRARY_PATH'] = destdir + libdir
+        proc = subprocess.Popen([binPath, '-Ec', script],
+                executable=binPath,
+                stdout=subprocess.PIPE,
+                shell=False,
+                env=environ,
+                )
+        stdout, _ = proc.communicate()
+        if proc.returncode:
+            raise RuntimeError("Process exited with status %s" %
+                    (proc.returncode,))
+        return stdout
 
     def _getPythonVersion(self, pythonPath, destdir, libdir):
-        ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         if pythonPath not in self.pythonVersionCache:
-            pyVerCmd = util.popen(
-                r"""%s %s -Ec 'import sys;"""
-                 """ print("%%d.%%d" %%sys.version_info[0:2])'"""
-                 %(ldLibraryPath, pythonPath))
-            self.pythonVersionCache[pythonPath] = pyVerCmd.read().strip()
             try:
-                pyVerCmd.close()
-            except RuntimeError:
+                stdout = self._runPythonScript(pythonPath, destdir, libdir,
+                        ["import sys", "print('%d.%d' % sys.version_info[:2])"])
+                self.pythonVersionCache[pythonPath] = stdout.strip()
+            except (OSError, RuntimeError):
+                self.warn("Unable to determine Python version directly; "
+                        "guessing based on path.")
                 self.pythonVersionCache[pythonPath] = self._getPythonVersionFromPath(pythonPath, destdir)
         return self.pythonVersionCache[pythonPath]
 
-    def _getPythonSysPath(self, pythonPath, destdir, libdir):
-        ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
-        pySysPathCmd = util.popen(
-                r"""%s %s -Ec 'import sys; print("\0".join(sys.path))'"""
-                %(ldLibraryPath, pythonPath))
-        sysPath = [x.strip() for x in pySysPathCmd.read().split('\0') if x]
+    def _getPythonSysPath(self, pythonPath, destdir, libdir, useDestDir=False):
+        """Return the system path for the python interpreter at C{pythonPath}
+
+        @param pythonPath: Path to the target python interpreter
+        @param destdir: Destination root, in case of a python bootstrap
+        @param libdir: Destination libdir, in case of a python bootstrap
+        @param useDestDir: If True, look in the destdir instead.
+        """
+        script = ["import sys, site"]
+        if useDestDir:
+            # Repoint site.py at the destdir so it picks up .pth files there.
+            script.extend([
+                    "sys.path = []",
+                    "sys.prefix = %r + sys.prefix" % (destdir,),
+                    "sys.exec_prefix = %r + sys.exec_prefix" % (destdir,),
+                    "site.PREFIXES = [sys.prefix, sys.exec_prefix]",
+                    "site.addsitepackages(None)",
+                    ])
+        script.append(r"print('\0'.join(sys.path))")
+
         try:
-            pySysPathCmd.close()
-        except RuntimeError:
+            stdout = self._runPythonScript(pythonPath, destdir, libdir, script)
+        except (OSError, RuntimeError):
             # something went wrong, don't trust any output
             self.info('Could not run system python "%s", guessing sys.path...',
                       pythonPath)
             sysPath = []
+        else:
+            sysPath = [x.strip() for x in stdout.split('\0') if x.strip()]
 
         if sysPath == []:
             # probably a cross-build -- let's try a decent assumption
