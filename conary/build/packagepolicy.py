@@ -3675,51 +3675,28 @@ class Requires(_addInfo, _dependency):
         pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
         if not pythonPath:
             return (None, None, None)
-
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
-
-        oldSysPath = sys.path
-        oldSysPrefix = sys.prefix
-        oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
         libdir = self.macros.libdir
-        pythonVersion = None
+        pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
 
-        try:
-            # get preferred sys.path (not modified by Conary wrapper)
-            # from python just built in destdir, or if that is not
-            # available, from system conary
-            systemPaths = self._getPythonSysPath(pythonPath, destdir, libdir)
-
-            pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
-
-            if not bootstrapPython:
-                # update pythonTroveFlagCache to require correct flags
-                self._getPythonTroveFlags(pythonPath)
-
-            # generate site-packages list for destdir
-            # (look in python base directory first)
-            pythonDir = os.popen("""%s -c 'import os,sys; print sys.modules["os"].__file__'""" % pythonPath).read().strip()
-
-            sys.path = [destdir + pythonDir]
-            sys.prefix = destdir + sys.prefix
-            sys.exec_prefix = destdir + sys.exec_prefix
-            site.PREFIXES=[sys.prefix, sys.exec_prefix]
-            site.addsitepackages(None)
-            systemPaths = sys.path + systemPaths
-
-            # make an unsorted copy for module finder
-            sysPathForModuleFinder = list(systemPaths)
-
-            # later, we will need to truncate paths using longest path first
-            sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
-                                  key=len, reverse=True)
-
-        finally:
-            sys.path = oldSysPath
-            sys.prefix = oldSysPrefix
-            sys.exec_prefix = oldSysExecPrefix
+        # Start with paths inside the destdir so that imports within a package
+        # are discovered correctly.
+        systemPaths = self._getPythonSysPath(pythonPath, destdir, libdir,
+                useDestDir=True)
+        # Now add paths from the system (or bootstrap python)
+        systemPaths += self._getPythonSysPath(pythonPath, destdir, libdir,
+                useDestDir=False)
+        if not bootstrapPython:
+            # update pythonTroveFlagCache to require correct flags
+            self._getPythonTroveFlags(pythonPath)
+        # Keep original order for use with the module finder.
+        sysPathForModuleFinder = list(systemPaths)
+        # Strip destdir and sort in descending order for converting paths to
+        # qualified python module names.
+        sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
+                reverse=True)
 
         # load module finder after sys.path is restored
         # in case delayed importer is installed.
