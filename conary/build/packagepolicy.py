@@ -2854,20 +2854,29 @@ class Provides(_dependency):
         if not sysPath:
             return
 
-        depPath = None
+        # Add provides for every match in sys.path. For example, PIL.Imaging
+        # and Imaging should both be provided since they are both reachable
+        # names.
         for sysPathEntry in sysPath:
-            if path.startswith(sysPathEntry):
-                newDepPath = path[len(sysPathEntry)+1:]
-                if newDepPath not in ('__init__.py', '__init__'):
-                    # we don't allow bare __init__ as a python import
-                    # hopefully we'll find this init as a deeper import at some
-                    # other point in the sysPath
-                    depPath = newDepPath
-                    break
+            if not path.startswith(sysPathEntry):
+                continue
+            newDepPath = path[len(sysPathEntry)+1:]
+            if newDepPath.split('.')[0] == '__init__':
+                # we don't allow bare __init__ as a python import
+                # hopefully we'll find this init as a deeper import at some
+                # other point in the sysPath
+                continue
+            elif '-' in newDepPath:
+                # Not a valid python name, e.g. gtk-2.0/atk.so
+                continue
+            # Note that it's possible to have a false positive here. For
+            # example, in the PIL case if PIL/__init__.py did not exist,
+            # PIL.Imaging would still be provided. The odds of this causing
+            # problems are so small that it is not checked for here.
+            self._addPythonProvidesSingle(path, m, pkgFiles, macros,
+                    newDepPath)
 
-        if not depPath:
-            return
-
+    def _addPythonProvidesSingle(self, path, m, pkgFiles, macros, depPath):
         # remove extension
         depPath, extn = depPath.rsplit('.', 1)
 
