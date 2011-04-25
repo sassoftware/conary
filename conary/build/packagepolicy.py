@@ -2866,9 +2866,6 @@ class Provides(_dependency):
                 # hopefully we'll find this init as a deeper import at some
                 # other point in the sysPath
                 continue
-            elif '-' in newDepPath:
-                # Not a valid python name, e.g. gtk-2.0/atk.so
-                continue
             # Note that it's possible to have a false positive here. For
             # example, in the PIL case if PIL/__init__.py did not exist,
             # PIL.Imaging would still be provided. The odds of this causing
