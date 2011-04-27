@@ -211,38 +211,13 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
         self.c = FakeServerCache(proxy, repMap, userMap, conaryProxies)
 
 
-class _ShimMethod(netclient._Method):
-    def __init__(self, server, protocol, port, authToken, name, callLog = None):
-        self._server = server
-        self._authToken = authToken
-        self._name = name
-        self._protocol = protocol
-        self._port = port
-        self._callLog = callLog
-
-    def __repr__(self):
-        return "<server._ShimMethod(%r)>" % (self._name)
-
-    def __call__(self, *args, **kwargs):
-        args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
-        start = time.time()
-        result = self._server.callWrapper(self._protocol, self._port,
-                                          self._name, self._authToken, args,
-                                          kwargs)
-
-        if self._callLog:
-            self._callLog.log("shim-" + self._server.repos.serverNameList[0],
-                               [], self._name, result, args,
-                               latency = time.time() - start)
-
-        return result
-
 class ShimServerProxy(netclient.ServerProxy):
     def __init__(self, server, protocol, port, authToken):
         self._authToken = authToken
         self._server = server
         self._protocol = protocol
         self._port = port
+        self._protocolVersion = netclient.CLIENT_VERSIONS[-1]
 
         if 'CONARY_CLIENT_LOG' in os.environ:
             self._callLog = calllog.ClientCallLogger(
@@ -250,6 +225,8 @@ class ShimServerProxy(netclient.ServerProxy):
         else:
             self._callLog = None
 
+    def __repr__(self):
+        return '<ShimServerProxy for %r>' % (self._server,)
 
     def setAbortCheck(self, *args):
         pass
@@ -260,7 +237,15 @@ class ShimServerProxy(netclient.ServerProxy):
     def usedProxy(self, *args):
         return False
 
-    def __getattr__(self, name):
-        return _ShimMethod(self._server,
-            self._protocol, self._port,
-            self._authToken, name, self._callLog)
+    def _request(self, method, args, kwargs):
+        args = [self._protocolVersion] + list(args)
+        start = time.time()
+        result = self._server.callWrapper(self._protocol, self._port, method,
+                self._authToken, args, kwargs)
+
+        if self._callLog:
+            self._callLog.log("shim-" + self._server.repos.serverNameList[0],
+                               [], method, result, args,
+                               latency = time.time() - start)
+
+        return result
