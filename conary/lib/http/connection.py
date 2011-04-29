@@ -46,7 +46,7 @@ class Connection(object):
     """
 
     userAgent = "conary-http-client/%s" % constants.version
-    connectTimeout = 15
+    connectTimeout = 30
 
     def __init__(self, endpoint, proxy=None, caCerts=None, commonName=None):
         """
