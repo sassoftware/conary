@@ -1,0 +1,1 @@
+Specifying tags for addBzrSnapshot is now less restrictive, by not forcing a tag: specification. As a result, one can now specify tags like revno: or branch: too. See http://wiki.bazaar.canonical.com/BzrRevisionSpec for revision specifications.

@@ -2332,8 +2332,12 @@ class addBzrSnapshot(_RevisionControl):
                 (lookasideDir, self.url, self.tagArg))
 
     def showInfo(self, lookasideDir):
-        log.info('Most recent repository commit message:')
-        util.execute("bzr log -r -1 --long '%s'" % lookasideDir)
+        log.info('Repository commit message:')
+        if self.tag:
+            self.revno=self.tag
+        else:
+            self.revno='-1'
+        util.execute("bzr log -r '%s' --long '%s'" % (self.revno, lookasideDir))
 
     def createSnapshot(self, lookasideDir, target):
         log.info('Creating repository snapshot for %s %s', self.url,
@@ -2345,7 +2349,7 @@ class addBzrSnapshot(_RevisionControl):
         self.url = url % recipe.macros
         if tag:
             self.tag = tag % recipe.macros
-            self.tagArg = '-r tag:%s' % self.tag
+            self.tagArg = '-r %s' % self.tag
         else:
             self.tag = tag
             self.tagArg = ''
