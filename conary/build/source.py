@@ -51,7 +51,9 @@ class WindowsHelper(object):
 
     @property
     def flavor(self):
-        if 'x64' in self.platform:
+        if self.platform is None:
+            return ''
+        elif 'x64' in self.platform:
             return 'is: x86_64'
         elif 'x86' in self.platform:
             return 'is: x86'
@@ -1447,7 +1449,7 @@ class addCapsule(_Source):
 
     SYNOPSIS
     ========
-    C{r.addCapsule(I{capsulename}, [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{mode}=,] [I{package}=,] [I{sourceDir}=,] I{ignoreConflictingPaths}=,] I{ignoreAllConflictingTimes}=])}
+    C{r.addCapsule(I{capsulename}, [I{dir}=,] [I{httpHeaders}=,] [I{keyid}=,] [I{mode}=,] [I{package}=,] [I{sourceDir}=,] [I{ignoreConflictingPaths}=,])}
 
     DESCRIPTION
     ===========
@@ -1498,9 +1500,6 @@ class addCapsule(_Source):
     B{ignoreConflictingPaths} : A list of paths in which C{r.addCapsule} will
     not check files for conflicting contents.
 
-    B{ignoreAllConflictingTimes} : When checking for conflicts between
-    files contained in multiple capsules, ignore the mtime on the files.
-
     B{wimVolumeIndex} : The image index of a Windows Imaging Formatted file that
     will be reprented in this package.
 
@@ -1533,7 +1532,7 @@ class addCapsule(_Source):
     """
 
     keywords = {'ignoreConflictingPaths': set(),
-                'ignoreAllConflictingTimes': False,
+                'ignoreAllConflictingTimes': None,  # deprecated
                 'wimVolumeIndex' : 1,
                 'msiArgs': None,
                }
@@ -1565,8 +1564,6 @@ class addCapsule(_Source):
         for files.
         @keyword ignoreConflictingPaths: A list of paths that will not be
         checked for conflicting file contents
-        @keyword ignoreAllConflictingTimes: When checking for conflicts between
-        files contained in multiple capsules, ignore the mtime on the files.
         """
         self.capsuleMagic = None
         self.capsuleType = None
@@ -1685,11 +1682,7 @@ class addCapsule(_Source):
             # CNY-3304: some RPM versions allow impossible modes on symlinks
             if stat.S_ISLNK(mode):
                 mode = stat.S_IFLNK | 0777
-            if self.ignoreAllConflictingTimes:
-                checkTime = 0 # CNY-3415
-            else:
-                checkTime = mtime
-            totalPathData.append((path, user, group, mode, digest, checkTime))
+            totalPathData.append((path, user, group, mode, digest, mtime))
 
             devtype = None
             if stat.S_ISBLK(mode):

@@ -1,0 +1,1 @@
+Python modules provided in a directory added using .pth files are now detected properly when building with a different Python interpreter than the system Python.
