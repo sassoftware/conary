@@ -1,0 +1,1 @@
+Importing RPMs that contain a prelinked executable no longer crashes.

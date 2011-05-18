@@ -767,13 +767,11 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
                     stdout = subprocess.PIPE,
                     close_fds = True,
                     shell = False)
-            s = ''
             d = digestlib.sha1()
             content = prelink.stdout.read()
             size = 0
             while content:
                 d.update(content)
-                s += content
                 size += len(content)
                 content = prelink.stdout.read()
 
