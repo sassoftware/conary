@@ -1,3 +1,23 @@
+Changes in 2.3.2:
+  o New Features:
+    * The new "proxyMap" configuration item has been added, making proxy
+      management now more extensive and configurable.  This allows for
+      load balancing and failover across multiple proxies of the same
+      type. (CNY-3427)
+
+  o Internal Changes:
+    * The transport code has been refactored into a different module to
+      simplify subclassing and robustness in flaky network scenarios. To
+      simplify the code running on different python versions, urlparse
+      from python 2.7 was backported and internalized. (CNY-3458)
+    * Changed how fingerprints are calculated to facilitate fingerprint
+      caching in the future (this invalidates all fingerprints in
+      existing caches)
+    * Changeset caches are now one directory deep instead of two.
+    * Changesets cached by a repository no longer encode full paths to
+      file contents. This allows content stores to be moved without
+      flushing the cache.
+
 Changes in 2.2.16:
   o New Features:
     * Capsule files will no longer conflict at build time due to mtime
