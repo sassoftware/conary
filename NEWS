@@ -1,3 +1,31 @@
+Changes in 2.2.16:
+  o New Features:
+    * Capsule files will no longer conflict at build time due to mtime
+      differences; the ignoreAllConflictingTimes flag to addCapsule is
+      now ignored.
+    * Python modules reachable through multiple sys.path entries are now
+      provided under each of those paths.
+
+  o Bug Fixes:
+    * Conary 2.2.12 changed the structure of the update.UpdateFlags
+      object. Since we no longer restart after critical updates,
+      rpmcapsule.py needs to accept both the old style flags and the new
+      style ones, in case it has updated from pre-2.2.12. (CNY-3662)
+    * A bug that caused WIM capsule package builds to fail has been
+      fixed. (CNY-3663)
+    * An issue that caused a traceback when building native packages for
+      a Windows platform has been fixed. (CNY-3664)
+    * Python modules provided in a directory added using .pth files are
+      now detected properly when building with a different Python
+      interpreter than the system Python. (CNY-3667)
+    * Specifying tags for addBzrSnapshot is now less restrictive, by not
+      forcing a tag: specification. As a result, one can now specify
+      tags like revno: or branch: too. See
+      http://wiki.bazaar.canonical.com/BzrRevisionSpec for revision
+      specifications. (CNY-3647)
+    * Importing RPMs that contain a prelinked executable no longer
+      crashes. (CNY-3671)
+
 Changes in 2.2.15:
   o New Features:
     * Added support for breaking RPM jobs based on native Conary
