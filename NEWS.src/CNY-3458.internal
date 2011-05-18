@@ -1,1 +1,1 @@
-The transport code has been refactored into a different module, to simplify subclassing and robustness in flaky network scenarios. To simplify the code running on different python versions, urlparse from python 2.7 was backported and internalized.
+The transport code has been refactored into a different module to simplify subclassing and robustness in flaky network scenarios. To simplify the code running on different python versions, urlparse from python 2.7 was backported and internalized.

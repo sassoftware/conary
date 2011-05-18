@@ -1,2 +1,1 @@
-Modified cached changesets to not store paths for files being spliced in from
-the content store to enable content stores to be moved
+Changesets cached by a repository no longer encode full paths to file contents. This allows content stores to be moved without flushing the cache.
