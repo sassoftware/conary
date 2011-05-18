@@ -23,6 +23,7 @@ import re
 import site
 import sre_constants
 import stat
+import subprocess
 import sys
 
 from conary import files, trove
@@ -1922,39 +1923,64 @@ class _dependency(policy.Policy):
     def _isPythonModuleCandidate(self, path):
         return path.endswith('.so') or self._isPython(path)
 
-    def _getPythonLibraryPath(self, pythonPath, destdir, libdir):
-        ldLibraryPath = ''
-        if pythonPath.startswith(destdir):
-            ldLibraryPath = 'LD_LIBRARY_PATH=%s%s' %(destdir, libdir)
-        return ldLibraryPath
+    def _runPythonScript(self, binPath, destdir, libdir, scriptLines):
+        script = '\n'.join(scriptLines)
+        environ = {}
+        if binPath.startswith(destdir):
+            environ['LD_LIBRARY_PATH'] = destdir + libdir
+        proc = subprocess.Popen([binPath, '-Ec', script],
+                executable=binPath,
+                stdout=subprocess.PIPE,
+                shell=False,
+                env=environ,
+                )
+        stdout, _ = proc.communicate()
+        if proc.returncode:
+            raise RuntimeError("Process exited with status %s" %
+                    (proc.returncode,))
+        return stdout
 
     def _getPythonVersion(self, pythonPath, destdir, libdir):
-        ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
         if pythonPath not in self.pythonVersionCache:
-            pyVerCmd = util.popen(
-                r"""%s %s -Ec 'import sys;"""
-                 """ print("%%d.%%d" %%sys.version_info[0:2])'"""
-                 %(ldLibraryPath, pythonPath))
-            self.pythonVersionCache[pythonPath] = pyVerCmd.read().strip()
             try:
-                pyVerCmd.close()
-            except RuntimeError:
+                stdout = self._runPythonScript(pythonPath, destdir, libdir,
+                        ["import sys", "print('%d.%d' % sys.version_info[:2])"])
+                self.pythonVersionCache[pythonPath] = stdout.strip()
+            except (OSError, RuntimeError):
+                self.warn("Unable to determine Python version directly; "
+                        "guessing based on path.")
                 self.pythonVersionCache[pythonPath] = self._getPythonVersionFromPath(pythonPath, destdir)
         return self.pythonVersionCache[pythonPath]
 
-    def _getPythonSysPath(self, pythonPath, destdir, libdir):
-        ldLibraryPath = self._getPythonLibraryPath(pythonPath, destdir, libdir)
-        pySysPathCmd = util.popen(
-                r"""%s %s -Ec 'import sys; print("\0".join(sys.path))'"""
-                %(ldLibraryPath, pythonPath))
-        sysPath = [x.strip() for x in pySysPathCmd.read().split('\0') if x]
+    def _getPythonSysPath(self, pythonPath, destdir, libdir, useDestDir=False):
+        """Return the system path for the python interpreter at C{pythonPath}
+
+        @param pythonPath: Path to the target python interpreter
+        @param destdir: Destination root, in case of a python bootstrap
+        @param libdir: Destination libdir, in case of a python bootstrap
+        @param useDestDir: If True, look in the destdir instead.
+        """
+        script = ["import sys, site"]
+        if useDestDir:
+            # Repoint site.py at the destdir so it picks up .pth files there.
+            script.extend([
+                    "sys.path = []",
+                    "sys.prefix = %r + sys.prefix" % (destdir,),
+                    "sys.exec_prefix = %r + sys.exec_prefix" % (destdir,),
+                    "site.PREFIXES = [sys.prefix, sys.exec_prefix]",
+                    "site.addsitepackages(None)",
+                    ])
+        script.append(r"print('\0'.join(sys.path))")
+
         try:
-            pySysPathCmd.close()
-        except RuntimeError:
+            stdout = self._runPythonScript(pythonPath, destdir, libdir, script)
+        except (OSError, RuntimeError):
             # something went wrong, don't trust any output
             self.info('Could not run system python "%s", guessing sys.path...',
                       pythonPath)
             sysPath = []
+        else:
+            sysPath = [x.strip() for x in stdout.split('\0') if x.strip()]
 
         if sysPath == []:
             # probably a cross-build -- let's try a decent assumption
@@ -2777,56 +2803,33 @@ class Provides(_dependency):
 
 
     def _getPythonProvidesSysPath(self, path):
-        """ Generate a correct sys.path based on both the installed
-            system (in case a buildreq affects the sys.path) and the
-            destdir (for newly added sys.path directories).  Use site.py
-            to generate a list of such dirs.  Note that this list of dirs
-            should NOT have destdir in front.
-            Returns tuple: (sysPath, pythonVersion)
-        """
+        """Generate an ordered list of python paths for the target package.
 
+        This includes the current system path, plus any paths added by the new
+        package in the destdir through .pth files or a newly built python.
+
+        @return: (sysPath, pythonVersion)
+        """
         pythonPath, bootstrapPython = self._getPython(self.macros, path)
         if not pythonPath:
             # Most likely bad interpreter path in a .py file
             return (None, None)
-
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
-
-        oldSysPath = sys.path
-        oldSysPrefix = sys.prefix
-        oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
         libdir = self.macros.libdir
+        pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
 
-        try:
-            # get preferred sys.path (not modified by Conary wrapper)
-            # from python just built in destdir, or if that is not
-            # available, from system conary
-            systemPaths = set(self._stripDestDir(
-                self._getPythonSysPath(pythonPath, destdir, libdir), destdir))
-
-            pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
-
-            # Unlike Requires, we always provide version and
-            # libname (lib/lib64/...) in order to facilitate
-            # migration.
-
-            # determine created destdir site-packages, and add them to
-            # the list of acceptable provide paths
-            sys.path = []
-            sys.prefix = destdir + sys.prefix
-            sys.exec_prefix = destdir + sys.exec_prefix
-            site.PREFIXES=[sys.prefix, sys.exec_prefix]
-            site.addsitepackages(None)
-            systemPaths.update(self._stripDestDir(sys.path, destdir))
-
-            # later, we will need to truncate paths using longest path first
-            sysPath = sorted(systemPaths, key=len, reverse=True)
-        finally:
-            sys.path = oldSysPath
-            sys.prefix = oldSysPrefix
-            sys.exec_prefix = oldSysExecPrefix
+        # Get default sys.path from python interpreter, either the one just
+        # built (in the case of a python bootstrap) or from the system.
+        systemPaths = set(self._getPythonSysPath(pythonPath, destdir, libdir,
+            useDestDir=False))
+        # Now add paths from the destdir's site-packages, typically due to
+        # newly installed .pth files.
+        systemPaths.update(self._getPythonSysPath(pythonPath, destdir, libdir,
+            useDestDir=True))
+        # Sort in descending order so that the longest path matches first.
+        sysPath = sorted(self._stripDestDir(systemPaths, destdir), reverse=True)
 
         self.pythonSysPathMap[pythonPath] = (sysPath, pythonVersion)
         return self.pythonSysPathMap[pythonPath]
@@ -2851,20 +2854,26 @@ class Provides(_dependency):
         if not sysPath:
             return
 
-        depPath = None
+        # Add provides for every match in sys.path. For example, PIL.Imaging
+        # and Imaging should both be provided since they are both reachable
+        # names.
         for sysPathEntry in sysPath:
-            if path.startswith(sysPathEntry):
-                newDepPath = path[len(sysPathEntry)+1:]
-                if newDepPath not in ('__init__.py', '__init__'):
-                    # we don't allow bare __init__ as a python import
-                    # hopefully we'll find this init as a deeper import at some
-                    # other point in the sysPath
-                    depPath = newDepPath
-                    break
+            if not path.startswith(sysPathEntry):
+                continue
+            newDepPath = path[len(sysPathEntry)+1:]
+            if newDepPath.split('.')[0] == '__init__':
+                # we don't allow bare __init__ as a python import
+                # hopefully we'll find this init as a deeper import at some
+                # other point in the sysPath
+                continue
+            # Note that it's possible to have a false positive here. For
+            # example, in the PIL case if PIL/__init__.py did not exist,
+            # PIL.Imaging would still be provided. The odds of this causing
+            # problems are so small that it is not checked for here.
+            self._addPythonProvidesSingle(path, m, pkgFiles, macros,
+                    newDepPath)
 
-        if not depPath:
-            return
-
+    def _addPythonProvidesSingle(self, path, m, pkgFiles, macros, depPath):
         # remove extension
         depPath, extn = depPath.rsplit('.', 1)
 
@@ -3672,51 +3681,28 @@ class Requires(_addInfo, _dependency):
         pythonPath, bootstrapPython = self._getPython(self.macros, pathName)
         if not pythonPath:
             return (None, None, None)
-
         if pythonPath in self.pythonSysPathMap:
             return self.pythonSysPathMap[pythonPath]
-
-        oldSysPath = sys.path
-        oldSysPrefix = sys.prefix
-        oldSysExecPrefix = sys.exec_prefix
         destdir = self.macros.destdir
         libdir = self.macros.libdir
-        pythonVersion = None
+        pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
 
-        try:
-            # get preferred sys.path (not modified by Conary wrapper)
-            # from python just built in destdir, or if that is not
-            # available, from system conary
-            systemPaths = self._getPythonSysPath(pythonPath, destdir, libdir)
-
-            pythonVersion = self._getPythonVersion(pythonPath, destdir, libdir)
-
-            if not bootstrapPython:
-                # update pythonTroveFlagCache to require correct flags
-                self._getPythonTroveFlags(pythonPath)
-
-            # generate site-packages list for destdir
-            # (look in python base directory first)
-            pythonDir = os.popen("""%s -c 'import os,sys; print sys.modules["os"].__file__'""" % pythonPath).read().strip()
-
-            sys.path = [destdir + pythonDir]
-            sys.prefix = destdir + sys.prefix
-            sys.exec_prefix = destdir + sys.exec_prefix
-            site.PREFIXES=[sys.prefix, sys.exec_prefix]
-            site.addsitepackages(None)
-            systemPaths = sys.path + systemPaths
-
-            # make an unsorted copy for module finder
-            sysPathForModuleFinder = list(systemPaths)
-
-            # later, we will need to truncate paths using longest path first
-            sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
-                                  key=len, reverse=True)
-
-        finally:
-            sys.path = oldSysPath
-            sys.prefix = oldSysPrefix
-            sys.exec_prefix = oldSysExecPrefix
+        # Start with paths inside the destdir so that imports within a package
+        # are discovered correctly.
+        systemPaths = self._getPythonSysPath(pythonPath, destdir, libdir,
+                useDestDir=True)
+        # Now add paths from the system (or bootstrap python)
+        systemPaths += self._getPythonSysPath(pythonPath, destdir, libdir,
+                useDestDir=False)
+        if not bootstrapPython:
+            # update pythonTroveFlagCache to require correct flags
+            self._getPythonTroveFlags(pythonPath)
+        # Keep original order for use with the module finder.
+        sysPathForModuleFinder = list(systemPaths)
+        # Strip destdir and sort in descending order for converting paths to
+        # qualified python module names.
+        sysPath = sorted(set(self._stripDestDir(systemPaths, destdir)),
+                reverse=True)
 
         # load module finder after sys.path is restored
         # in case delayed importer is installed.
@@ -3733,20 +3719,17 @@ class Requires(_addInfo, _dependency):
         if self.recipe.isCrossCompiling():
             return None
         if pythonPath not in self.pythonModuleFinderMap:
-            if not bootstrapPython and pythonPath == sys.executable:
-                self.pythonModuleFinderMap[pythonPath] = pydeps.DirBasedModuleFinder(destdir, sysPath)
-            else:
-                try:
-                    self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, libdir, sysPath, self.error)
-                except pydeps.ModuleFinderInitializationError, e:
-                    if bootstrapPython:
-                        # another case, like isCrossCompiling, where we cannot
-                        # run pythonPath -- ModuleFinderInitializationError
-                        # is raised before looking at any path, so should
-                        # be consistent for any pythonPath
-                        self.pythonModuleFinderMap[pythonPath] = None
-                    else:
-                        raise
+            try:
+                self.pythonModuleFinderMap[pythonPath] = pydeps.moduleFinderProxy(pythonPath, destdir, libdir, sysPath, self.error)
+            except pydeps.ModuleFinderInitializationError, e:
+                if bootstrapPython:
+                    # another case, like isCrossCompiling, where we cannot
+                    # run pythonPath -- ModuleFinderInitializationError
+                    # is raised before looking at any path, so should
+                    # be consistent for any pythonPath
+                    self.pythonModuleFinderMap[pythonPath] = None
+                else:
+                    raise
         return self.pythonModuleFinderMap[pythonPath]
 
     def _delPythonRequiresModuleFinder(self):
@@ -4261,7 +4244,9 @@ class Flavor(policy.Policy):
     def postProcess(self):
         # If this is a Windows package, include the flavor from the windows
         # helper.
-        if self._getTarget() == TARGET_WINDOWS:
+        if (self._getTarget() == TARGET_WINDOWS and
+            hasattr(self.recipe, 'winHelper')):
+
             flavorStr = self.recipe.winHelper.flavor
             if flavorStr:
                 self.packageFlavor.union(deps.parseFlavor(flavorStr))
