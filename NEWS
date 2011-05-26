@@ -1,3 +1,10 @@
+Changes in 2.3.3:
+  o Bug Fixes:
+    * Including configuration files over HTTP on Python 2.7 was broken
+      since 2.3.0, this has been fixed. (CNY-3672)
+    * A bug in handling launchpad URLs with addBzrSnapshot first
+      introduced in 2.3.0 has been corrected. (CNY-3674)
+
 Changes in 2.3.2:
   o New Features:
     * The new "proxyMap" configuration item has been added, making proxy

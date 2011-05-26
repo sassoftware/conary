@@ -1,1 +1,0 @@
-A bug in handling launchpad URLs with addBzrSnapshot first introduced in 2.3.0 has been corrected.
