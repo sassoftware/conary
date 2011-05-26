@@ -1,3 +1,58 @@
+Changes in 2.3.3:
+  o Bug Fixes:
+    * Including configuration files over HTTP on Python 2.7 was broken
+      since 2.3.0, this has been fixed. (CNY-3672)
+    * A bug in handling launchpad URLs with addBzrSnapshot first
+      introduced in 2.3.0 has been corrected. (CNY-3674)
+
+Changes in 2.3.2:
+  o New Features:
+    * The new "proxyMap" configuration item has been added, making proxy
+      management now more extensive and configurable.  This allows for
+      load balancing and failover across multiple proxies of the same
+      type. (CNY-3427)
+
+  o Internal Changes:
+    * The transport code has been refactored into a different module to
+      simplify subclassing and robustness in flaky network scenarios. To
+      simplify the code running on different python versions, urlparse
+      from python 2.7 was backported and internalized. (CNY-3458)
+    * Changed how fingerprints are calculated to facilitate fingerprint
+      caching in the future (this invalidates all fingerprints in
+      existing caches)
+    * Changeset caches are now one directory deep instead of two.
+    * Changesets cached by a repository no longer encode full paths to
+      file contents. This allows content stores to be moved without
+      flushing the cache.
+
+Changes in 2.2.16:
+  o New Features:
+    * Capsule files will no longer conflict at build time due to mtime
+      differences; the ignoreAllConflictingTimes flag to addCapsule is
+      now ignored.
+    * Python modules reachable through multiple sys.path entries are now
+      provided under each of those paths.
+
+  o Bug Fixes:
+    * Conary 2.2.12 changed the structure of the update.UpdateFlags
+      object. Since we no longer restart after critical updates,
+      rpmcapsule.py needs to accept both the old style flags and the new
+      style ones, in case it has updated from pre-2.2.12. (CNY-3662)
+    * A bug that caused WIM capsule package builds to fail has been
+      fixed. (CNY-3663)
+    * An issue that caused a traceback when building native packages for
+      a Windows platform has been fixed. (CNY-3664)
+    * Python modules provided in a directory added using .pth files are
+      now detected properly when building with a different Python
+      interpreter than the system Python. (CNY-3667)
+    * Specifying tags for addBzrSnapshot is now less restrictive, by not
+      forcing a tag: specification. As a result, one can now specify
+      tags like revno: or branch: too. See
+      http://wiki.bazaar.canonical.com/BzrRevisionSpec for revision
+      specifications. (CNY-3647)
+    * Importing RPMs that contain a prelinked executable no longer
+      crashes. (CNY-3671)
+
 Changes in 2.2.15:
   o New Features:
     * Added support for breaking RPM jobs based on native Conary

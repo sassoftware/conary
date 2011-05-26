@@ -136,7 +136,7 @@ def preview(repo, modifiedOK=True):
 
 def generate(repo):
     version = _getVersion()
-    old = open('NEWS').read()
+    old = codecs.open('NEWS', 'r', 'utf8').read()
     if '@NEW@' in old:
         sys.exit("error: NEWS contains a @NEW@ section")
     elif ('Changes in %s:' % version) in old:
@@ -147,8 +147,8 @@ def generate(repo):
     newHtml = '\n'.join(htmlLines) + '\n'
 
     doc = new + old
-    open('NEWS', 'w').write(doc)
-    open('NEWS.html', 'w').write(newHtml)
+    codecs.open('NEWS', 'w', 'utf8').write(doc)
+    codecs.open('NEWS.html', 'w', 'utf8').write(newHtml)
 
     sys.stdout.write(new)
     print >> sys.stderr, "Updated NEWS"
