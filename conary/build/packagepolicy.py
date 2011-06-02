@@ -2866,6 +2866,13 @@ class Provides(_dependency):
                 # hopefully we'll find this init as a deeper import at some
                 # other point in the sysPath
                 continue
+            elif 'site-packages' in newDepPath:
+                # site-packages should be specifically excluded since both it
+                # and its parent are always in sys.path. However, invalid
+                # python package names in general are allowed due to certain
+                # cases where relative imports happen inside a hyphenated
+                # directory and the requires detector picks up on that.
+                continue
             # Note that it's possible to have a false positive here. For
             # example, in the PIL case if PIL/__init__.py did not exist,
             # PIL.Imaging would still be provided. The odds of this causing
