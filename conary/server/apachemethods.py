@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -27,8 +27,9 @@ from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
 
-def post(port, isSecure, repos, req):
-    authToken = getAuth(req)
+def post(port, isSecure, repos, req, authToken=None):
+    if authToken is None:
+        authToken = getAuth(req)
     if authToken is None:
         return apache.HTTP_BAD_REQUEST
 
@@ -176,13 +177,14 @@ def sendfile(req, size, path):
         req.sendfile(path)
 
 
-def get(port, isSecure, repos, req, restHandler=None):
+def get(port, isSecure, repos, req, restHandler=None, authToken=None):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]
     cmd = os.path.basename(uri)
 
-    authToken = getAuth(req)
+    if authToken is None:
+        authToken = getAuth(req)
 
     if authToken is None:
         return apache.HTTP_BAD_REQUEST
