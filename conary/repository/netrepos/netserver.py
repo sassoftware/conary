@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1912,7 +1912,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         userName = authToken[0]
         if not isinstance(userName, basestring):
-            userName = 'unknown'
+            if userName.username:
+                # A ValidUser token with a username specified.
+                userName = userName.username
+            else:
+                # No username available.
+                userName = 'unknown'
 
         d = { 'reppath' : self.urlBase(urlName = False),
               'user' : userName,

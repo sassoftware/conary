@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2009 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -1324,20 +1324,28 @@ class ValidUser(object):
     will entitle the user to all roles in the repository; if no arguments are
     given this is the default.
     """
-    __slots__ = ('roles',)
+    __slots__ = ('roles', 'username')
 
-    def __init__(self, *roles):
+    def __init__(self, *roles, **kwargs):
         if not roles:
             roles = ['*']
         if isinstance(roles[0], (list, tuple)):
             roles = roles[0]
         self.roles = frozenset(roles)
+        self.username = kwargs.pop('username', None)
+        if kwargs:
+            raise TypeError("Unexpected keyword argument %s" %
+                    (kwargs.popitem()[0]))
 
     def __str__(self):
-        if '*' in self.roles:
-            return '<User with all roles>'
+        if self.username:
+            user_fmt = '%r ' % (self.username,)
         else:
-            return '<User with roles %s>' % (
+            user_fmt = ''
+        if '*' in self.roles:
+            return '<User %swith all roles>' % (user_fmt,)
+        else:
+            return '<User %swith roles %s>' % (user_fmt,
                     ', '.join(unicode(x) for x in self.roles))
 
     def __repr__(self):
@@ -1347,4 +1355,7 @@ class ValidUser(object):
         # Be pickleable, but don't actually pickle the object as it could
         # then cross a RPC boundary and become a security vulnerability. Plus,
         # it would confuse logcat.
-        return str, (str(self),)
+        if self.username:
+            return str, (str(self.username),)
+        else:
+            return str, (str(self),)
