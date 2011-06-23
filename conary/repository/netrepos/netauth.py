@@ -1304,7 +1304,7 @@ class ValidPasswordTokenType(object):
         return '<Valid Password>'
 
     def __repr__(self):
-        return self.__class__.__name__
+        return 'ValidPasswordToken'
 ValidPasswordToken = ValidPasswordTokenType()
 
 
