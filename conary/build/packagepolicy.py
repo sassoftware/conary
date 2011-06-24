@@ -3265,6 +3265,11 @@ class Requires(_addInfo, _dependency):
     Demonstrates using C{r.Requires} to specify that files in the
     subdirectory C{/usr/share/vim/.*/doc} are excepted from being marked as
     requirements.
+    
+    C{r.Requires(exceptDeps='trove:$trovename')}
+    
+    Uses C{r.Requires} to specify that the trove C{trovename} is excluded 
+    from the dependencies for the package.
     """
 
     bucket = policy.PACKAGE_CREATION
