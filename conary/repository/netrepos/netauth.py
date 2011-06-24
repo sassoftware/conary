@@ -140,6 +140,8 @@ class UserAuthorization:
                 roles = set([x for x in user.roles if isinstance(x, int)])
 
                 names = set([x for x in user.roles if not isinstance(x, int)])
+                if not names:
+                    return roles
                 places = ', '.join('?' for x in names)
                 cu.execute("""SELECT userGroupId FROM UserGroups
                         WHERE userGroup IN ( %s )""" % (places,), *names)
