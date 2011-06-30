@@ -170,4 +170,8 @@ class OnDemandImporter(object):
             return None
 
 def install():
+    if hasattr(sys, 'pypy_version_info'):
+        # The lazy importer doesn't work on PyPy right now, but it could be
+        # made to.
+        return
     sys.meta_path.append(OnDemandImporter())
