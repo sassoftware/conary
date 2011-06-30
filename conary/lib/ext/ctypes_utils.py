@@ -13,6 +13,7 @@
 #
 
 import ctypes
+import os
 
 
 _libc = None
@@ -36,3 +37,9 @@ def throw_errno(libc, cls=OSError):
     libc.strerror.restype = ctypes.c_char_p
     msg = libc.strerror(err)
     raise cls(err, msg)
+
+
+def get_helper(name):
+    helperDir = os.path.dirname(os.path.abspath(__file__))
+    helperPath = os.path.join(helperDir, 'helper_%s.so' % name)
+    return ctypes.CDLL(helperPath, use_errno=True)

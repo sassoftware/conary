@@ -15,7 +15,7 @@
 SUBDIRS = epdb_embedded ext http
 
 python_files=$(wildcard *.py)
-python_modules=elf.so SHA256_nonstandard.so _versions.so
+python_modules=elf.so _versions.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 
@@ -49,11 +49,7 @@ elf.o: elf.c
 	    echo 'Stopping build due to missing libelf' ; exit 1 ; fi
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
-SHA256.o: SHA256_nonstandard.c
-	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
-
 elf.so: LIBS = $(libelf)
-SHA256_nonstandard.so: LIBS = -pthread
 
 
 filename_wrapper.so: filename_wrapper.c

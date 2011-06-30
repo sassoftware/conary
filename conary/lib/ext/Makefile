@@ -13,31 +13,37 @@
 #
 
 python_files=$(wildcard *.py)
-cython_modules = file_utils.so system.so
+
+cython_modules = file_utils.so sha256_nonstandard.so system.so
 other_modules = dep_freeze.so digest_uncompress.so pack.so streams.so
-ifndef PURE
 python_modules = $(cython_modules) $(other_modules)
-endif
+
+helper_modules = helper_sha256_nonstandard.so
 
 cython_output=$(cython_modules:.so=.c)
+ifdef PURE
+install_modules = $(helper_modules)
+all_modules = $(install_modules)
+else
+install_modules = $(cython_modules) $(other_modules)
+all_modules = $(install_modules) $(helper_modules)
+endif
 
 # Don't delete intermediate .c files -- they need to be checked into hg
 .SECONDARY: $(cython_output)
 
-all: default-subdirs $(python_modules)
+all: default-subdirs $(all_modules)
 
 install: all install-subdirs pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
-ifndef PURE
-	install -m 755 $(python_modules) $(DESTDIR)$(sitedir)/$(DIR)
-endif
+	install -m 755 $(install_modules) $(DESTDIR)$(sitedir)/$(DIR)
 
 clean: clean-subdirs default-clean
 
 dist: default-dist
 
-ext:
-	make DO_CYTHON=1
+ext: ext-clean
+	$(MAKE) DO_CYTHON=1 $(cython_output)
 
 ext-clean: clean
 	rm -f $(cython_output)
@@ -45,12 +51,12 @@ ext-clean: clean
 
 # Per-file settings
 digest_uncompress.so: LIBS = -lcrypto -lz
-system.so: LIBS = -lresolv
+sha256_nonstandard.so: helper_sha256_nonstandard.o
 streams.so: streams.o streams_numeric.o streams_string.o streams_set.o
-
+system.so: LIBS = -lresolv
 
 # Rules
-$(python_modules): %.so: %.o
+%.so: %.o
 	$(CC) $(LDFLAGS) -shared -rdynamic -o $@ $^ $(LIBS)
 
 

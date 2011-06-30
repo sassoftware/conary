@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+# pyflakes=ignore-file
 
 "Compatibility module for python 2.4 - 2.6"
 
@@ -39,5 +40,4 @@ if not isStandardSha256:
 del isStandardSha256
 
 # import backwards compatible version of sha256 with this calculation bug.
-from conary.lib import SHA256_nonstandard
-sha256_nonstandard = SHA256_nonstandard.new
+from conary.lib.ext.sha256_nonstandard import digest as sha256_nonstandard

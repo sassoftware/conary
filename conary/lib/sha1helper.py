@@ -54,9 +54,7 @@ def sha1FromString(val):
                         int(val[24:32], 16), int(val[32:40], 16))
 
 def nonstandardSha256String(buf):
-    m = digestlib.sha256_nonstandard()
-    m.update(buf)
-    return m.digest()
+    return digestlib.sha256_nonstandard(buf)
 
 def sha256ToString(buf):
     assert(len(buf) == 32)
