@@ -42,6 +42,7 @@ from conary.lib import fixedglob, log, api, urlparse
 from conary.lib import networking
 from conary.lib.ext import digest_uncompress
 from conary.lib.ext import file_utils
+from conary.lib.ext import system
 
 # Imported for the benefit of older code,
 from conary.lib.formattrace import formatTrace
@@ -1307,7 +1308,7 @@ class LineReader:
 exists = file_utils.lexists
 removeIfExists = file_utils.removeIfExists
 pread = file_utils.pread
-res_init = misc.res_init
+res_init = system.res_init
 sha1Uncompress = digest_uncompress.sha1Uncompress
 fchmod = file_utils.fchmod
 fopenIfExists = file_utils.fopenIfExists

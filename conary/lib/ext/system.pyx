@@ -12,14 +12,16 @@
 # full details.
 #
 
-from conary.lib.ext import ctypes_utils
-from ctypes import c_int
+include "common.pxi"
+
+
+cdef extern from "resolv.h" nogil:
+    int c_res_init "res_init"()
 
 
 def res_init():
-    libc = ctypes_utils.get_libc()
-    libc.__res_init.argtypes = ()
-    libc.__res_init.restype = c_int
-    rc = libc.__res_init()
+    cdef int rc
+    with nogil:
+        rc = c_res_init()
     if rc:
-        ctypes_utils.throw_errno(libc)
+        PyErr_SetFromErrno(OSError)

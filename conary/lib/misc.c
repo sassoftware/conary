@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <malloc.h>
 #include <netinet/in.h>
-#include <resolv.h>
 
 #include "pycompat.h"
 
@@ -30,13 +29,11 @@
 
 static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
-static PyObject * py_res_init(PyObject *self, PyObject *args);
 static PyObject * rpmExpandMacro(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "sendmsg", py_sendmsg, METH_VARARGS },
     { "recvmsg", py_recvmsg, METH_VARARGS },
-    { "res_init", py_res_init, METH_VARARGS },
     { "rpmExpandMacro", rpmExpandMacro, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
@@ -185,12 +182,6 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
     free(vector.iov_base);
 
     return rc;
-}
-
-
-static PyObject * py_res_init(PyObject *self, PyObject *args) {
-    int rc = res_init();
-    return Py_BuildValue("i", rc);
 }
 
 

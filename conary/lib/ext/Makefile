@@ -13,7 +13,7 @@
 #
 
 python_files=$(wildcard *.py)
-cython_modules=file_utils.so
+cython_modules = file_utils.so system.so
 other_modules = dep_freeze.so digest_uncompress.so pack.so
 ifndef PURE
 python_modules = $(cython_modules) $(other_modules)
@@ -45,6 +45,7 @@ ext-clean: clean
 
 # Per-file settings
 digest_uncompress.so: LIBS = -lcrypto -lz
+system.so: LIBS = -lresolv
 
 
 # Rules
