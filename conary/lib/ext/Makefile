@@ -14,7 +14,7 @@
 
 python_files=$(wildcard *.py)
 cython_modules = file_utils.so system.so
-other_modules = dep_freeze.so digest_uncompress.so pack.so
+other_modules = dep_freeze.so digest_uncompress.so pack.so streams.so
 ifndef PURE
 python_modules = $(cython_modules) $(other_modules)
 endif
@@ -46,6 +46,7 @@ ext-clean: clean
 # Per-file settings
 digest_uncompress.so: LIBS = -lcrypto -lz
 system.so: LIBS = -lresolv
+streams.so: streams.o streams_numeric.o streams_string.o streams_set.o
 
 
 # Rules

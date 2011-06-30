@@ -18,7 +18,7 @@
 #include <netinet/in.h>
 
 #include "pycompat.h"
-#include "cstreams.h"
+#include "streams.h"
 
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)

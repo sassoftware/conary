@@ -18,7 +18,7 @@
 #include <netinet/in.h>
 
 #include "pycompat.h"
-#include "cstreams.h"
+#include "streams.h"
 
 #include <stdio.h>
 

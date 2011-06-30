@@ -21,14 +21,14 @@ from conary import versions
 
 from conary.deps import deps
 
-from conary.lib import cstreams, sha1helper
+from conary.lib import sha1helper
 from conary.lib.ext import pack
+from conary.lib.ext import streams as cstreams
 
 IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
 StreamSet = cstreams.StreamSet
-StreamSetDef = cstreams.StreamSetDef
 ByteStream = cstreams.ByteStream
 LongLongStream = cstreams.LongLongStream
 
