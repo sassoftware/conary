@@ -14,7 +14,7 @@
 
 python_files=$(wildcard *.py)
 cython_modules=file_utils.so
-other_modules = dep_freeze.so
+other_modules = dep_freeze.so pack.so
 ifndef PURE
 python_modules = $(cython_modules) $(other_modules)
 endif

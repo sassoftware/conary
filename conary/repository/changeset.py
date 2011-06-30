@@ -28,8 +28,9 @@ except ImportError:
     from StringIO import StringIO
 
 from conary import files, rpmhelper, streams, trove, versions
-from conary.lib import base85, enum, log, misc, patch, sha1helper, util, api
+from conary.lib import base85, enum, log, patch, sha1helper, util, api
 from conary.lib import cpiostream
+from conary.lib.ext import pack
 from conary.repository import filecontainer, filecontents, errors
 
 # cft is a string used by the EnumeratedType class; it's not a type itself!
@@ -86,7 +87,7 @@ class ChangeSetNewTroveList(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
         l = [ x[1].freeze() for x in sorted(self.items()) ]
-        return misc.pack("!" + "SI" * len(l), *l)
+        return pack.pack("!" + "SI" * len(l), *l)
 
     def thaw(self, data):
         # this is only used to reset the list; thawFromFile is used for
@@ -163,7 +164,7 @@ class ChangeSetFileDict(dict, streams.InfoStream):
     def thaw(self ,data):
         i = 0
         while i < len(data):
-            i, ( frzFile, ) = misc.unpack("!SI", i, data)
+            i, ( frzFile, ) = pack.unpack("!SI", i, data)
             info = FileInfo(frzFile)
 
             newFileId = info.newFileId()

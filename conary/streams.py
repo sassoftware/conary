@@ -21,7 +21,8 @@ from conary import versions
 
 from conary.deps import deps
 
-from conary.lib import cstreams, misc, sha1helper
+from conary.lib import cstreams, sha1helper
+from conary.lib.ext import pack
 
 IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
@@ -391,7 +392,7 @@ class OrderedBinaryStringsStream(StringsStream):
             return ''
         l = []
         for s in self:
-            l.append(misc.dynamicSize(len(s)))
+            l.append(pack.dynamicSize(len(s)))
             l.append(s)
         return ''.join(l)
 
@@ -401,7 +402,7 @@ class OrderedBinaryStringsStream(StringsStream):
             return
         i = 0
         while i < len(frz):
-            i, (s,) = misc.unpack("!D", i, frz)
+            i, (s,) = pack.unpack("!D", i, frz)
             self.append(s)
 
 class ReferencedTroveList(list, InfoStream):
@@ -492,7 +493,7 @@ class StreamCollection(InfoStream):
                 s = item.freeze()
                 if len(s) >= (1 << 16):
                     raise OverflowError
-                l.append(misc.pack("!BSH", typeId, s))
+                l.append(pack.pack("!BSH", typeId, s))
 
         return "".join(l)
 
@@ -505,7 +506,7 @@ class StreamCollection(InfoStream):
         self._thawedItems = dict([ (x, {}) for x in self.streamDict ])
 
         while (i < len(self._data)):
-            i, (typeId, s) = misc.unpack("!BSH", i, self._data)
+            i, (typeId, s) = pack.unpack("!BSH", i, self._data)
             item = self.streamDict[typeId](s)
             self._thawedItems[typeId][item] = True
 
@@ -594,7 +595,7 @@ class OrderedStreamCollection(StreamCollection):
             for item in itemList:
                 s = item.freeze(skipSet = skipSet)
                 l.append(struct.pack('!B', typeId))
-                l.append(misc.dynamicSize(len(s)))
+                l.append(pack.dynamicSize(len(s)))
                 l.append(s)
 
         return "".join(l)
@@ -604,7 +605,7 @@ class OrderedStreamCollection(StreamCollection):
         self._thawedItems = dict([ (x, []) for x in self.streamDict ])
 
         while (i < len(self._data)):
-            i, (typeId, s) = misc.unpack('!BD', i, self._data)
+            i, (typeId, s) = pack.unpack('!BD', i, self._data)
             item = self.streamDict[typeId](s)
             self._thawedItems[typeId].append(item)
 
@@ -650,7 +651,7 @@ class OrderedStreamCollection(StreamCollection):
         for typeId, item in removed:
             s = item.freeze()
             l.append(struct.pack('!B', typeId))
-            l.append(misc.dynamicSize(len(s)))
+            l.append(pack.dynamicSize(len(s)))
             l.append(s)
 
         # make sure the additions are ordered
@@ -658,7 +659,7 @@ class OrderedStreamCollection(StreamCollection):
             if (typeId, item) in added:
                 s = item.freeze()
                 l.append(struct.pack('!B', typeId))
-                l.append(misc.dynamicSize(len(s)))
+                l.append(pack.dynamicSize(len(s)))
                 l.append(s)
 
         return "".join(l)
@@ -669,7 +670,7 @@ class OrderedStreamCollection(StreamCollection):
         i = 4
 
         for x in xrange(numRemoved + numAdded):
-            i, (typeId, s) = misc.unpack("!BD", i, diff)
+            i, (typeId, s) = pack.unpack("!BD", i, diff)
             item = self.streamDict[typeId](s)
             if x < numRemoved:
                 l = self._items[typeId]
