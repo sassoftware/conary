@@ -15,7 +15,7 @@
 SUBDIRS = epdb_embedded ext http
 
 python_files=$(wildcard *.py)
-python_modules=elf.so _versions.so
+python_modules=elf.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 
