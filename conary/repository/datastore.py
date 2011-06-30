@@ -26,9 +26,10 @@ import itertools
 import os
 import tempfile
 
-from conary.lib import misc, util
+from conary.lib import util
 from conary.lib import digestlib
 from conary.lib import sha1helper
+from conary.lib.ext import digest_uncompress
 from conary.repository import errors, filecontents
 
 
@@ -52,7 +53,7 @@ class AbstractDataStore:
         if precompressed and hasattr(fileObj, '_fdInfo'):
             (fd, start, size) = fileObj._fdInfo()
             pid = os.getpid()
-            realHash = misc.sha1Copy((fd, start, size), outFds)
+            realHash = digest_uncompress.sha1Copy((fd, start, size), outFds)
             for x in outFds:
                 cls._fchmod(x)
                 os.close(x)

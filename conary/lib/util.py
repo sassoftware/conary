@@ -40,6 +40,7 @@ import zlib
 
 from conary.lib import fixedglob, log, api, urlparse
 from conary.lib import networking
+from conary.lib.ext import digest_uncompress
 from conary.lib.ext import file_utils
 
 # Imported for the benefit of older code,
@@ -1307,7 +1308,7 @@ exists = file_utils.lexists
 removeIfExists = file_utils.removeIfExists
 pread = file_utils.pread
 res_init = misc.res_init
-sha1Uncompress = misc.sha1Uncompress
+sha1Uncompress = digest_uncompress.sha1Uncompress
 fchmod = file_utils.fchmod
 fopenIfExists = file_utils.fopenIfExists
 

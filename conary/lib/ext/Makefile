@@ -14,7 +14,7 @@
 
 python_files=$(wildcard *.py)
 cython_modules=file_utils.so
-other_modules = dep_freeze.so pack.so
+other_modules = dep_freeze.so digest_uncompress.so pack.so
 ifndef PURE
 python_modules = $(cython_modules) $(other_modules)
 endif
@@ -23,7 +23,6 @@ cython_output=$(cython_modules:.so=.c)
 
 # Don't delete intermediate .c files -- they need to be checked into hg
 .SECONDARY: $(cython_output)
-
 
 all: default-subdirs $(python_modules)
 
@@ -44,8 +43,13 @@ ext-clean: clean
 	rm -f $(cython_output)
 
 
+# Per-file settings
+digest_uncompress.so: LIBS = -lcrypto -lz
+
+
+# Rules
 $(python_modules): %.so: %.o
-	$(CC) $(LDFLAGS) -shared $< -o $@
+	$(CC) $(LDFLAGS) -shared -rdynamic -o $@ $^ $(LIBS)
 
 
 %.c: %.pyx common.pxi
