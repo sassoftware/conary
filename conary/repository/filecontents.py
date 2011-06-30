@@ -126,14 +126,6 @@ class FromChangeSet(FileContents):
 class FromString(FileContents):
 
     __slots__ = "str"
-    _tag = 'fc-fs'
-
-    def _sendInfo(self):
-        return ([], self.str)
-
-    @staticmethod
-    def _fromInfo(fileList, s):
-        return FromString(s)
 
     def copy(self):
         return self.__class__(self.str)
@@ -151,7 +143,7 @@ class FromString(FileContents):
     def __init__(self, str, compressed = False):
         self.str = str
         self.compressed = compressed
-util.SendableFileSet._register(FromString)
+
 
 class FromFile(FileContents):
 

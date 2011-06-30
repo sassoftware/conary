@@ -15,7 +15,7 @@
 SUBDIRS = epdb_embedded ext http
 
 python_files=$(wildcard *.py)
-python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so _versions.so
+python_modules=elf.so cstreams.so SHA256_nonstandard.so _versions.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
@@ -55,7 +55,6 @@ SHA256.o: SHA256_nonstandard.c
 
 elf.so: LIBS = $(libelf)
 SHA256_nonstandard.so: LIBS = -pthread
-misc.so: LIBS = -lcrypto -lz -lresolv
 $(cstreamsmodule_objs): cstreams.h
 cstreams.so: $(cstreamsmodule_objs)
 

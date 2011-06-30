@@ -178,70 +178,6 @@ class ChangeSetFileDict(dict, streams.InfoStream):
         if data:
             self.thaw(data)
 
-class ChangeSetFileContentsTuple(tuple):
-
-    """
-    Wrapper class for for the tuples stored in ChangeSet.configCache and
-    ChangeSet.fileContents dicts which allow them to be sent through
-    util.SendableFileSet.
-    """
-
-    _tag = 'ccs-tup'
-
-    def _sendInfo(self):
-        contType, contents, compressed = self
-
-        if compressed:
-            c = '1'
-        else:
-            c = '0'
-
-        return ([ contents ], c + contType)
-
-    @staticmethod
-    def _fromInfo(fileObjList, s):
-        if s[0] == '0':
-            compressed = False
-        else:
-            compressed = True
-
-        return ChangeSetFileContentsTuple((s[1:], fileObjList[0], compressed))
-util.SendableFileSet._register(ChangeSetFileContentsTuple)
-
-class ChangeSetFileContentsDict(dict):
-
-    """
-    Wrapper class for the ChangeSet.configCache and ChangeSet.fileContents
-    dicts which can be sent through a util.SendableFileSet.
-    """
-
-    _tag = 'ccs-cd'
-
-    def __hash__(self):
-        return id(self)
-
-    def _sendInfo(self):
-        s = "".join([ "%s%s" % (struct.pack("B", len(x)), x)
-                        for x in self.iterkeys() ])
-        return (self.values(), s)
-
-    @staticmethod
-    def _fromInfo(fileObjList, s):
-        d = ChangeSetFileContentsDict()
-        if not fileObjList:
-            return d
-
-        i = 0
-        for fileObj in fileObjList:
-            keyLen = struct.unpack("B", s[i])[0]
-            i += 1
-            key = s[i:i + keyLen]
-            i += keyLen
-            d[key] = fileObj
-
-        return d
-
-util.SendableFileSet._register(ChangeSetFileContentsDict)
 
 class ChangeSet(streams.StreamSet):
 
@@ -256,7 +192,6 @@ class ChangeSet(streams.StreamSet):
            (LARGE, ChangeSetFileDict,        "files"           ),
     }
     ignoreUnknown = True
-    _tag = 'ccs-rw'
 
     def _resetTroveLists(self):
         # XXX hack
@@ -376,9 +311,7 @@ class ChangeSet(streams.StreamSet):
                 # two different diffs is an error
                 raise ChangeSetKeyConflictError(key)
         else:
-            cache[key] = ChangeSetFileContentsTuple((contType,
-                                                     contents,
-                                                     compressed))
+            cache[key] = (contType, contents, compressed)
 
     def getFileContents(self, pathId, fileId, compressed = False):
         key = makeKey(pathId, fileId)
@@ -1002,32 +935,6 @@ class ChangeSet(streams.StreamSet):
 
         return False
 
-    def _sendInfo(self):
-        new = self.newTroves.freeze()
-        old = self.oldTroves.freeze()
-
-        s = self.freeze()
-
-        return ([ self.configCache, self.fileContents ], s)
-
-    @staticmethod
-    def _fromInfo(fileObjList, s):
-        cs = ChangeSet(s)
-        cs.configCache, cs.fileContents = fileObjList
-        return cs
-
-    def send(self, sock):
-        """
-        Sends this changeset over a unix-domain socket. This object remains
-        a valid changeset (it is not affected by the send operation).
-
-        @param sock: File descriptor for unix domain socket
-        @type sock: int
-        """
-        fileSet = util.SendableFileSet()
-        fileSet.add(self)
-        fileSet.send(sock)
-
     def _makeFileGitDiff(self, troveSource, pathId,
                          (oldPath, oldFileId, oldFileVersion, oldFileObj),
                          (newPath, newFileId, newFileObj)):
@@ -1222,11 +1129,11 @@ class ChangeSet(streams.StreamSet):
 
     def __init__(self, data = None):
         streams.StreamSet.__init__(self, data)
-        self.configCache = ChangeSetFileContentsDict()
-        self.fileContents = ChangeSetFileContentsDict()
+        self.configCache = {}
+        self.fileContents = {}
         self.absolute = False
         self.local = 0
-util.SendableFileSet._register(ChangeSet)
+
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
@@ -1783,34 +1690,6 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.filesRead = False
 
-    _tag = 'ccs-ro'
-
-    def _sendInfo(self):
-        (fileList, hdr) = ChangeSet._sendInfo(self)
-
-        fileList = [ x.file for x in self.fileContainers ] + fileList
-
-        s = struct.pack("!I", len(self.fileContainers)) + hdr
-        return (fileList, s)
-
-    @staticmethod
-    def _fromInfo(fileObjList, s):
-        containerCount = struct.unpack("!I", s[0:4])[0]
-        fileContainers = fileObjList[0:containerCount]
-
-        partialCs = ChangeSet._fromInfo(fileObjList[containerCount:], s[4:])
-        fullCs = ReadOnlyChangeSet()
-        fullCs.merge(partialCs)
-
-        for fObj in fileContainers:
-            csf = filecontainer.FileContainer(fObj)
-            fullCs.fileContainers.append(csf)
-
-        # this sets up fullCs.fileQueue based on the containers we just loaded
-        fullCs.reset()
-
-        return fullCs
-
     def __init__(self, data = None):
         ChangeSet.__init__(self, data = data)
         self.filesRead = False
@@ -1819,7 +1698,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.lastCsf = None
         self.fileQueue = []
-util.SendableFileSet._register(ReadOnlyChangeSet)
+
 
 class ChangeSetFromFile(ReadOnlyChangeSet):
     @api.publicApi
@@ -1900,11 +1779,6 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         if nextFile:
             self.fileQueue.append(nextFile + (csf,))
 
-def ChangeSetFromSocket(sock):
-
-    fileObjs = util.SendableFileSet.recv(sock)
-    assert(len(fileObjs) == 1)
-    return fileObjs[0]
 
 # old may be None
 def fileChangeSet(pathId, old, new):

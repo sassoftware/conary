@@ -19,7 +19,6 @@ import errno
 import fcntl
 import fnmatch
 import gzip
-import misc
 import os
 import re
 import select
@@ -846,154 +845,15 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
         dir = _tempdir
     return tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=dir, text=text)
 
-class SendableFileSet:
-
-    tags = {}
-    ptrSize = len(struct.pack("@P", 0))
-
-    @staticmethod
-    def _register(klass):
-        SendableFileSet.tags[klass._tag] = klass
-
-    def __init__(self):
-        self.l = []
-
-    @staticmethod
-    def sendObjIds(sock, l):
-        sendmsg(sock, [ struct.pack("@" + ("P" * len(l)),
-                                   *[ id(x) for x in l] ) ])
-
-    @staticmethod
-    def recvObjIds(sock, count):
-        s = recvmsg(sock, SendableFileSet.ptrSize * count)
-        idList = struct.unpack("@" + ("P" * count), s)
-        return idList
-
-    def add(self, f):
-        self.l.append(f)
-
-    def send(self, sock):
-        stack = self.l[:]
-        allFds = []
-        toSend = []
-        handled = set()
-
-        while stack:
-            f = stack.pop()
-
-            if f in handled:
-                continue
-
-            fd = None
-            objDepList = []
-
-            dependsOn, s = f._sendInfo()
-
-            if type(dependsOn) == int:
-                fd = dependsOn
-            elif dependsOn is not None:
-                assert(type(dependsOn) == list)
-
-                notHandled = list(set(dependsOn) - set(handled))
-                if notHandled:
-                    stack.append(f)
-                    stack.extend(notHandled)
-                    continue
-
-                # we depend on something we know about
-                objDepList = dependsOn
-
-            toSend.append((f, fd, objDepList, s))
-            handled.add(f)
-
-        fds = list(set([ x[1] for x in toSend if x[1] is not None]))
-        objsById = dict( (id(x[2]), x[2]) for x in toSend )
-
-        sendmsg(sock, [ struct.pack("@I", len(fds)) ] )
-        sendmsg(sock, [ struct.pack("@II", len(self.l), len(toSend)) ], fds)
-
-        for f, fd, objDepList, s in toSend:
-            if fd is None:
-                fdIndex = 0xffffffff
-            else:
-                fdIndex = fds.index(fd)
-
-            depList = objDepList
-
-            sendmsg(sock, [ struct.pack("@BIIIP", len(f._tag), fdIndex,
-                                        len(s), len(depList), id(f)),
-                            f._tag, s ])
-            self.sendObjIds(sock, depList)
-
-        self.sendObjIds(sock, self.l)
-
-    @staticmethod
-    def recv(sock):
-        hdrSize = len(struct.pack("@BIIPP", 0, 0, 0, 0, 0))
-
-        q = IterableQueue()
-        s = recvmsg(sock, 4)
-        fdCount = struct.unpack("@I", s)[0]
-        if fdCount:
-            s, fds = recvmsg(sock, 8, fdCount)
-        else:
-            s = recvmsg(sock, 8, 0)
-
-        objCount, fileCount = struct.unpack("@II", s)
-
-        fileList = []
-        objById = {}
-
-        for i in range(fileCount):
-            s = recvmsg(sock, hdrSize)
-            tagLen, fdIndex, dataLen, depLen, thisId = struct.unpack("@BIIIP", s)
-            tag = recvmsg(sock, tagLen)
-            if dataLen:
-                s = recvmsg(sock, dataLen)
-            else:
-                s = ''
-
-            if not depLen:
-                depList = []
-            else:
-                depList = SendableFileSet.recvObjIds(sock, depLen)
-
-            if fdIndex != 0xffffffff:
-                assert(not depList)
-                dep = fds[fdIndex]
-            elif depList:
-                assert(fdIndex == 0xffffffff)
-                dep = [ objById[x] for x in depList ]
-            else:
-                dep = None
-
-            f = SendableFileSet.tags[tag]._fromInfo(dep, s)
-            objById[thisId] = f
-
-            fileList.append(f)
-
-        fileIds = SendableFileSet.recvObjIds(sock, objCount)
-        files = [ objById[x] for x in fileIds]
-
-        return files
 
 class ExtendedFdopen(object):
 
-    _tag = 'efd'
     __slots__ = [ 'fd' ]
 
     def __init__(self, fd):
         self.fd = fd
         # set close-on-exec flag
         fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
-
-    @staticmethod
-    def _fromInfo(fd, s):
-        assert(s == '-')
-        return ExtendedFdopen(fd)
-
-    def _sendInfo(self):
-        return (self.fd, '-')
 
     def fileno(self):
         return self.fd
@@ -1038,7 +898,6 @@ class ExtendedFdopen(object):
         # 1 is SEEK_CUR
         return os.lseek(self.fd, 0, 1)
 
-SendableFileSet._register(ExtendedFdopen)
 
 class ExtendedFile(ExtendedFdopen):
 
@@ -1068,16 +927,6 @@ class ExtendedFile(ExtendedFdopen):
 
 class ExtendedStringIO(StringIO.StringIO):
 
-    _tag = 'efs'
-
-    @staticmethod
-    def _fromInfo(ef, s):
-        assert(ef is None)
-        return ExtendedStringIO(s)
-
-    def _sendInfo(self):
-        return (None, self.getvalue())
-
     def pread(self, bytes, offset):
         pos = self.tell()
         self.seek(offset, 0)
@@ -1085,11 +934,8 @@ class ExtendedStringIO(StringIO.StringIO):
         self.seek(pos, 0)
         return data
 
-SendableFileSet._register(ExtendedStringIO)
 
 class SeekableNestedFile:
-
-    _tag = "snf"
 
     def __init__(self, file, size, start = -1):
         self.file = file
@@ -1101,15 +947,6 @@ class SeekableNestedFile:
             self.start = file.tell()
         else:
             self.start = start
-
-    @staticmethod
-    def _fromInfo(efList, s):
-        assert(len(efList) == 1)
-        size, start = struct.unpack("!II", s)
-        return SeekableNestedFile(efList[0], size, start = start)
-
-    def _sendInfo(self):
-        return ([ self.file ], struct.pack("!II", self.size, self.start))
 
     def _fdInfo(self):
         if hasattr(self.file, '_fdInfo'):
@@ -1166,7 +1003,7 @@ class SeekableNestedFile:
 
     def tell(self):
         return self.pos
-SendableFileSet._register(SeekableNestedFile)
+
 
 class BZ2File:
     def __init__(self, fobj):
@@ -1996,35 +1833,6 @@ def nullifyFileDescriptor(fdesc):
         os.dup2(fd, fdesc)
         os.close(fd)
 
-def sendmsg(sock, dataList, fdList = []):
-    """
-    Sends multiple strings and an optional list of file descriptors through
-    a unix domain socket.
-
-    @param sock: Unix domain socket to send message through
-    @type sock: socket
-    @param dataList: List of strings to send
-    @type dataList: list of str
-    @param fdList: File descriptors to send
-    @type fdList: list of int
-    @rtype: None
-    """
-    return misc.sendmsg(sock.fileno(), dataList, fdList)
-
-def recvmsg(sock, dataSize, fdCount = 0):
-    """
-    Receives data and optional file descriptors from a unix domain socket.
-    Returns a (data, fdList) tuple.
-
-    @param sock: Unix domain socket to send message through
-    @type sock: socket
-    @param dataSize: Number of bytes to try to read from the socket.
-    @type dataSize: int
-    @param fdCount: Exact number of file descriptors to read from the socket
-    @type fdCount: int
-    @rtype: tuple
-    """
-    return misc.recvmsg(sock.fileno(), dataSize, fdCount)
 
 class Timer:
 
