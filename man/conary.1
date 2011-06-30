@@ -434,7 +434,12 @@ Verify all troves on the system.
 .TP 4
 .B \-\-diff
 Display changes as a git-compatible diff (see \fBhttp://git-scm.com\fP
-for more information).
+for more information). 
+.TP
+.B \-\-diff-binaries
+Display changes as a git-compatible diff (see \fBhttp://git-scm.com\fP
+for more information); modified binary files are included base85 encoded.
+This option implies \fB\-\-diff.
 .TP
 .B \-\-hash
 Normally files are assumed to be unchanged if their size and mtime have
@@ -622,42 +627,11 @@ Repository querying matches this behavior to help you see what trove will be ins
 .B Displaying Trove Differences From The Repository
 .RS 4
 .TP
-.B rdiff \fItrovename\fP=\fIoldver\fP[\fI<flavor>\fP]--\fInewver\fP[\fI<flavor>\fP] [\fI--buildreqs\fP] [\fI--deps\fP] [\fI--show-empty\fP] [\fI--ls\fP] [\fI--lsl\fP] [\fI--file-deps\fP] [\fI--file-versions\fP] [\fI--tags\fP] [\fI--file-contents\fP]  [\fI--labels\fP]  [\fI--flavors\fP]  [\fI--full-versions\fP] [\fI--tags\fP]
+.B rdiff \fItrovename\fP=\fIoldver\fP[\fI<flavor>\fP]--\fInewver\fP[\fI<flavor>\fP] 
 .TP
 Report differences between the two specified troves.
 .TP
-The command line options explicitly turn on extra output for different sections.
-.RS 4
-.TP
-.B \-\-buildreqs
-Display changes in build requirements.
-.TP
-.B \-\-deps
-Display changes in trove dependencies. For file dependencies, see \fI--file-deps\fP below.
-.TP
-.B \-\-show-empty
-By default, troves that have not changed do not get displayed. This option includes these in the output as well.
-.TP
-.B \-\-tags
-Display changes in file tags.
-.TP
-.B \-\-ls
-Show added, removed and changed files.
-.TP
-.B \-\-lsl
-Detailed output of how the file has changed. The output for the new file omits the elements that have not changed.
-.TP
-.B \-\-file-deps
-Display changes in file dependencies.
-.TP
-.B \-\-file-versions
-Turn on the display for file versions.
-.TP
-.B \-\-labels
-Displays <label>/<revision> instead of abbreviated version numbers.
-.TP
-.B \-\-full-versions
-Full version strings are displayed instead of abbreviated version numbers
+The command line options are the same as for \fBshowcs\fR command.
 
 .RE
 For example, to see the difference between python 2.4.1-20.7-1 (x86 flavor) and

@@ -1669,13 +1669,23 @@ class SourceStack(object):
         return cs, jobList
 
     def getFileVersions(self, fileIds):
+        results = [ None ] * len(fileIds)
+        needed = list(enumerate(fileIds))
         for source in self.sources:
             try:
-                return source.getFileVersions(fileIds)
+                newResults = source.getFileVersions([ x[1] for x in needed ])
+                for result, (i, info) in itertools.izip(newResults, needed):
+                    if info:
+                        results[i] = result
+                needed = [ tup for tup in needed if results[tup[0]] is None ]
+                if not needed:
+                    break
+
             # FIXME: there should be a better error for this
             except (KeyError, NotImplementedError), e:
                 continue
-        return None
+
+        return results
 
 
     def getFileVersion(self, pathId, fileId, version):
@@ -2088,8 +2098,7 @@ class ChangeSetJobSource(JobSource):
             oldTrove = None
         else:
             oldTrove = self.oldTroveSource.getTrove(n, oldVer, oldFla,
-                                                    withFiles=True,
-                                                    pristine=True)
+                                                    withFiles=True)
             trvCs = None
 
         if not withFiles:

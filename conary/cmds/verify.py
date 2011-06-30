@@ -39,7 +39,8 @@ class _FindLocalChanges(object):
 
     def __init__(self, db, cfg, display = True, forceHashCheck = False,
                  changeSetPath = None, allMachineChanges = False,
-                 asDiff = False, repos = None, newFiles = NEW_FILES_NONE):
+                 asDiff = False, repos = None, newFiles = NEW_FILES_NONE,
+                 diffBinaries = False):
         self.db = db
         self.cfg = cfg
         self.display = display
@@ -47,7 +48,8 @@ class _FindLocalChanges(object):
         self.forceHashCheck = forceHashCheck
         self.changeSetPath = changeSetPath
         self.allMachineChanges = allMachineChanges
-        self.asDiff = asDiff
+        self.asDiff = asDiff or diffBinaries
+        self.diffBinaries = diffBinaries
         self.repos = repos
         self.statCache = {}
 
@@ -121,7 +123,8 @@ class _FindLocalChanges(object):
                 self.db = db
 
         if self.display == DISPLAY_DIFF:
-            for x in cs.gitDiff(self.diffTroveSource):
+            for x in cs.gitDiff(self.diffTroveSource,
+                                diffBinaries = self.diffBinaries):
                 sys.stdout.write(x)
         elif self.display == DISPLAY_CS:
             troveSpecs = [ '%s=%s[%s]' % x for x in trovesChanged ]
@@ -332,7 +335,10 @@ class DiffObject(_FindLocalChanges):
 
     def __init__(self, troveNameList, db, cfg, all = False,
                  changesetPath = None, forceHashCheck = False,
-                 asDiff=False, repos=None, newFiles = False):
+                 asDiff=False, repos=None, newFiles = False,
+                 diffBinaries=False):
+        asDiff = asDiff or diffBinaries;
+
         if asDiff:
             display = DISPLAY_DIFF
         elif changesetPath:
@@ -351,6 +357,7 @@ class DiffObject(_FindLocalChanges):
                                    forceHashCheck=forceHashCheck,
                                    changeSetPath=changesetPath,
                                    asDiff=asDiff, repos=repos,
+                                   diffBinaries = diffBinaries,
                                    newFiles=newFiles)
         self.run(troveNameList, all=all)
 

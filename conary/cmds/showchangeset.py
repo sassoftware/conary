@@ -36,7 +36,7 @@ def usage():
     print ""
 
 def displayChangeSet(db, cs, troveSpecs, cfg,
-                     asDiff = False,
+                     asDiff = False, diffBinaries = False,
                      # selection options
                      exactFlavors = False,
                      # trove options
@@ -52,6 +52,8 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
                      alwaysDisplayHeaders = False,  recurseRepos=False,
                      # job options
                      showChanges = False, asJob = False):
+
+    asDiff = asDiff or diffBinaries;
 
     if all:
         deps = recurse = showTroveFlags = showAllTroves = True
@@ -69,7 +71,7 @@ def displayChangeSet(db, cs, troveSpecs, cfg,
 
     if asDiff:
         troveSource = trovesource.SourceStack(client.getDatabase(), repos)
-        for x in cs.gitDiff(troveSource):
+        for x in cs.gitDiff(troveSource, diffBinaries = diffBinaries):
             sys.stdout.write(x)
     elif not asJob and not showChanges and cs.isAbsolute():
         changeSetSource = trovesource.ChangesetFilesTroveSource(None)
