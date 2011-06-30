@@ -863,7 +863,6 @@ class ShowChangesetCommand(_AbstractQueryCommand):
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
-        d = {}
         argDef['Changeset Display'] = {"all":           NO_PARAM,
                                        "diff":          NO_PARAM,
                                        "diff-binaries": NO_PARAM,
