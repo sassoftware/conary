@@ -94,6 +94,15 @@ clean: clean-subdirs default-clean
 
 check: check-subdirs
 
+# Build extension (cython) output, which is checked into source control and
+# thus not normally built.
+ext:
+	make -C conary/lib/ext ext
+
+ext-clean:
+	make -C conary/lib/ext ext-clean
+
+
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
 	sed -i 's,version = ".*",version = "$(VERSION)",' \

@@ -16,6 +16,7 @@
 PYVER=$(shell python -c 'import sys; print(sys.version[0:3])')
 PYTHON = /usr/bin/python${PYVER}
 PYINCLUDE = /usr/include/python${PYVER}
+CYTHON = $(PYTHON) /usr/bin/cython
 
 PYFLAKES = /usr/bin/pyflakes
 

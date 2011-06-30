@@ -40,6 +40,7 @@ import zlib
 
 from conary.lib import fixedglob, log, api, urlparse
 from conary.lib import networking
+from conary.lib.ext import file_utils
 
 # Imported for the benefit of older code,
 from conary.lib.formattrace import formatTrace
@@ -75,7 +76,7 @@ def _mkdirs(path, mode=0777):
         _mkdirs(head, mode)
 
     # Make the directory while ignoring errors about it existing.
-    misc.mkdirIfMissing(path)
+    file_utils.mkdirIfMissing(path)
 
 
 @api.developerApi
@@ -1026,7 +1027,7 @@ class ExtendedFdopen(object):
         return os.write(self.fd, s)
 
     def pread(self, bytes, offset):
-        return misc.pread(self.fd, bytes, offset)
+        return file_utils.pread(self.fd, bytes, offset)
 
     def seek(self, offset, whence = 0):
         return os.lseek(self.fd, offset, whence)
@@ -1266,7 +1267,7 @@ def lstat(path):
     """
     Return None if the path doesn't exist.
     """
-    if not misc.exists(path):
+    if not file_utils.lexists(path):
         return None
 
     try:
@@ -1302,13 +1303,13 @@ class LineReader:
         self.fd = fd
         self.buf = ''
 
-exists = misc.exists
-removeIfExists = misc.removeIfExists
-pread = misc.pread
+exists = file_utils.lexists
+removeIfExists = file_utils.removeIfExists
+pread = file_utils.pread
 res_init = misc.res_init
 sha1Uncompress = misc.sha1Uncompress
-fchmod = misc.fchmod
-fopenIfExists = misc.fopenIfExists
+fchmod = file_utils.fchmod
+fopenIfExists = file_utils.fopenIfExists
 
 def _LazyFile_reopen(method):
     """Decorator to perform the housekeeping of opening/closing of fds"""
@@ -1978,7 +1979,7 @@ def decompressString(s):
 def massCloseFileDescriptors(start, unusedCount):
     """Close all file descriptors starting with start, until we hit
     unusedCount consecutive file descriptors that were already closed"""
-    return misc.massCloseFileDescriptors(start, unusedCount, 0);
+    return file_utils.massCloseFileDescriptors(start, unusedCount, 0)
 
 def nullifyFileDescriptor(fdesc):
     """Connects the file descriptor to /dev/null or an open file (if /dev/null
@@ -2048,7 +2049,7 @@ class Timer:
 
 def countOpenFileDescriptors():
     """Return the number of open file descriptors for this process."""
-    return misc.countOpenFileDescriptors()
+    return file_utils.countOpenFileDescriptors()
 
 def convertPackageNameToClassName(pkgname):
     return ''.join([ x.capitalize() for x in pkgname.split('-') ])

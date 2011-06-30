@@ -39,40 +39,23 @@
 static PyObject * depSetSplit(PyObject *self, PyObject *args);
 static PyObject * depSplit(PyObject *self, PyObject *args);
 static PyObject * depSetFreeze(PyObject *self, PyObject *args);
-static PyObject * exists(PyObject *self, PyObject *args);
 static PyObject * malloced(PyObject *self, PyObject *args);
-static PyObject * removeIfExists(PyObject *self, PyObject *args);
-static PyObject * mkdirIfMissing(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * pack(PyObject * self, PyObject * args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
 static PyObject * sha1Copy(PyObject *self, PyObject *args);
 static PyObject * sha1Uncompress(PyObject *self, PyObject *args);
-static PyObject * py_pread(PyObject *self, PyObject *args);
-static PyObject * py_massCloseFDs(PyObject *self, PyObject *args);
 static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
-static PyObject * py_countOpenFDs(PyObject *self, PyObject *args);
 static PyObject * py_res_init(PyObject *self, PyObject *args);
-static PyObject * pyfchmod(PyObject *self, PyObject *args);
-static PyObject * py_fopen(PyObject *self, PyObject *args);
 static PyObject * rpmExpandMacro(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
     { "depSplit", depSplit, METH_VARARGS },
     { "depSetFreeze", depSetFreeze, METH_VARARGS },
-    { "exists", exists, METH_VARARGS,
-        "returns a boolean reflecting whether a file (even a broken symlink) "
-        "exists in the filesystem" },
     { "malloced", malloced, METH_VARARGS, 
 	"amount of memory currently allocated through malloc()" },
-    { "removeIfExists", removeIfExists, METH_VARARGS, 
-	"unlinks a file if it exists; silently fails if it does not exist. "
-	"returns a boolean indicating whether or not a file was removed" },
-    { "mkdirIfMissing", mkdirIfMissing, METH_VARARGS,
-        "Creates a directory if the file does not already exist. EEXIST "
-        "is ignored." },
     { "sha1Copy", sha1Copy, METH_VARARGS },
     { "sha1Uncompress", sha1Uncompress, METH_VARARGS,
         "Uncompresses a gzipped file descriptor into another gzipped "
@@ -80,14 +63,9 @@ static PyMethodDef MiscMethods[] = {
     { "unpack", unpack, METH_VARARGS },
     { "pack", pack, METH_VARARGS },
     { "dynamicSize", dynamicSize, METH_VARARGS },
-    { "pread", py_pread, METH_VARARGS },
-    { "massCloseFileDescriptors", py_massCloseFDs, METH_VARARGS },
     { "sendmsg", py_sendmsg, METH_VARARGS },
     { "recvmsg", py_recvmsg, METH_VARARGS },
-    { "countOpenFileDescriptors", py_countOpenFDs, METH_VARARGS },
     { "res_init", py_res_init, METH_VARARGS },
-    { "fchmod", pyfchmod, METH_VARARGS },
-    { "fopenIfExists", py_fopen, METH_VARARGS },
     { "rpmExpandMacro", rpmExpandMacro, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
@@ -575,67 +553,6 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
     return rc;
 }
 
-static PyObject * exists(PyObject *self, PyObject *args) {
-    char * fn;
-    struct stat sb;
-
-    if (!PyArg_ParseTuple(args, "s", &fn))
-        return NULL;
-
-    if (lstat(fn, &sb)) {
-        if (errno == ENOENT || errno == ENOTDIR || errno == ENAMETOOLONG || errno == EACCES) {
-            Py_INCREF(Py_False);
-            return Py_False;
-        }
-
-        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
-        return NULL;
-    }
-
-    Py_INCREF(Py_True);
-    return Py_True;
-}
-
-static PyObject * removeIfExists(PyObject *self, PyObject *args) {
-    char * fn;
-
-    if (!PyArg_ParseTuple(args, "s", &fn))
-        return NULL;
-
-    if (unlink(fn)) {
-        if (errno == ENOENT || errno == ENAMETOOLONG) {
-            Py_INCREF(Py_False);
-            return Py_False;
-        }
-
-        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
-        return NULL;
-    }
-
-    Py_INCREF(Py_True);
-    return Py_True;
-}
-
-static PyObject * mkdirIfMissing(PyObject *self, PyObject *args) {
-    char * fn;
-
-    if (!PyArg_ParseTuple(args, "s", &fn))
-        return NULL;
-
-    /* 0777 lets umask do it's thing */
-    if (mkdir(fn, 0777)) {
-        if (errno == EEXIST) {
-            Py_INCREF(Py_False);
-            return Py_False;
-        }
-
-        PyErr_SetFromErrnoWithFilename(PyExc_OSError, fn);
-        return NULL;
-    }
-
-    Py_INCREF(Py_True);
-    return Py_True;
-}
 
 int getSize(char ** s, int * val) {
     char lenStr[10];
@@ -995,129 +912,6 @@ static PyObject * dynamicSize(PyObject *self, PyObject *args) {
     return PYBYTES_FromStringAndSize(sizebuf, sizelen);
 }
 
-static PyObject * py_pread(PyObject *self, PyObject *args) {
-    void * data;
-    int fd;
-    size_t size;
-    off_t offset, rc;
-    PyObject *pysize, *pyfd, *pyoffset, *buf;
-
-    if (PyTuple_GET_SIZE(args) != 3) {
-        PyErr_SetString(PyExc_TypeError, "exactly three arguments expected");
-        return NULL;
-    }
-
-    pyfd = PyTuple_GET_ITEM(args, 0);
-    pysize = PyTuple_GET_ITEM(args, 1);
-    pyoffset = PyTuple_GET_ITEM(args, 2);
-
-    if (!PYINT_CheckExact(pyfd)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
-        return NULL;
-    } else if (!PYINT_CHECK_EITHER(pysize)) {
-        PyErr_SetString(PyExc_TypeError, "second argument must be an int or long");
-        return NULL;
-    } else if (!PYINT_CHECK_EITHER(pyoffset)) {
-        PyErr_SetString(PyExc_TypeError, "third argument must be an int or long");
-        return NULL;
-    }
-
-    fd = PYINT_AS_LONG(pyfd);
-    size = PYLONG_AS_ULL(pysize);
-    if (PyErr_Occurred())
-        return NULL;
-
-    /* sizeof(off_t) is 8 (same as long long) */
-    offset = PYLONG_AS_ULL(pyoffset);
-    if (PyErr_Occurred())
-        return NULL;
-
-    data = malloc(size);
-
-    if (NULL == data) {
-	PyErr_NoMemory();
-	return NULL;
-    }
-
-    rc = pread(fd, data, size, offset);
-    if (-1 == rc) {
-	free(data);
-        PyErr_SetFromErrno(PyExc_OSError);
-	return NULL;
-    }
-
-    buf = PYBYTES_FromStringAndSize(data, rc);
-    free(data);
-    return buf;
-}
-
-static PyObject * py_massCloseFDs(PyObject *self, PyObject *args) {
-    int start, contcount, end, i, count;
-    PyObject *pystart, *pycontcount, *pyend;
-
-    if (PyTuple_GET_SIZE(args) != 3) {
-        PyErr_SetString(PyExc_TypeError, "exactly three arguments expected");
-        return NULL;
-    }
-
-    pystart = PyTuple_GET_ITEM(args, 0);
-    pycontcount = PyTuple_GET_ITEM(args, 1);
-    pyend = PyTuple_GET_ITEM(args, 2);
-
-    if (!PYINT_CheckExact(pystart)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be an int");
-        return NULL;
-    } else if (!PYINT_CheckExact(pycontcount)) {
-        PyErr_SetString(PyExc_TypeError, "second argument must be an int");
-        return NULL;
-    } else if (!PYINT_CheckExact(pyend)) {
-        PyErr_SetString(PyExc_TypeError, "third argument must be an int");
-        return NULL;
-    }
-
-    start = PyLong_AsUnsignedLong(pystart);
-    contcount = PyLong_AsUnsignedLong(pycontcount);
-    end = PyLong_AsUnsignedLong(pyend);
-    if (PyErr_Occurred())
-        return NULL;
-
-    if (((contcount ? 1 : 0) ^ (end ? 1 : 0)) == 0) {
-        PyErr_SetString(PyExc_TypeError, "Exactly one of the second and third "
-                                         "argument must be zero");
-        return NULL;
-    }
-
-    i = start - 1;
-    count = contcount;
-    while (1) {
-        int ret;
-        i++;
-        if (contcount) {
-            /* Requested to stop after a continous number of closed fds */
-            if (count == 0) {
-                break;
-            }
-        } else if (i == end) {
-            /* Requested to stop at the end */
-            break;
-        }
-        ret = close(i);
-        if (ret == 0) {
-            /* Successful close; reset continous count */
-            count = contcount;
-            continue;
-        }
-        if (errno == EBADF) {
-            count--;
-            continue;
-        }
-        PyErr_SetFromErrno(PyExc_OSError);
-        return NULL;
-    }
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
 
 static PyObject * py_sendmsg(PyObject *self, PyObject *args) {
     PyObject * fdList, * dataList, * intObj, * sObj;
@@ -1264,43 +1058,6 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
     return rc;
 }
 
-static PyObject * py_countOpenFDs(PyObject *module, PyObject *args)
-{
-    int vfd, i, maxfd, ret;
-    struct pollfd *ufds;
-
-    /* Count the number of open file descriptors */
-
-    maxfd = getdtablesize();
-    /* Don't worry about freeing ufds */
-    ufds = (struct pollfd *)alloca(maxfd * sizeof(struct pollfd));
-
-    for (i = 0; i < maxfd; i++)
-      {
-        ufds[i].fd = i;
-        ufds[i].events = POLLIN | POLLPRI | POLLOUT;
-      }
-
-    /* We need to loop, in case poll is interrupted by a signal */
-    while (1)
-      {
-        ret = poll(ufds, maxfd, 0);
-        if (ret >= 0) /* No error */
-            break;
-        /* ret == -1 */
-        if (errno == EINTR) /* A signal occurred. Retry */
-            continue;
-        /* Real failure */
-        PyErr_SetFromErrno(PyExc_OSError);
-        return NULL;
-      }
-
-    for (i = 0, vfd = 0; i < maxfd; i++)
-        if (ufds[i].revents != POLLNVAL)
-            vfd++;
-
-    return PYINT_FromLong(vfd);
-}
 
 /* sha1Copy - Copy a compressed stream from one file descriptor to a list of
  * file descriptors, and compute a SHA-1 digest of the decompressed contents.
@@ -1551,37 +1308,6 @@ onerror:
 static PyObject * py_res_init(PyObject *self, PyObject *args) {
     int rc = res_init();
     return Py_BuildValue("i", rc);
-}
-
-static PyObject * pyfchmod(PyObject *self, PyObject *args) {
-    int fd, mode;
-
-    if (!PyArg_ParseTuple(args, "ii", &fd, &mode))
-        return NULL;
-
-    if (fchmod(fd, mode)) {
-        PyErr_SetFromErrno(PyExc_OSError);
-        return NULL;
-    }
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-
-static PyObject * py_fopen(PyObject *self, PyObject *args) {
-    /* If the file exists, return it; otherwise, return None */
-    char *fn, *mode;
-    FILE *f;
-    if (!PyArg_ParseTuple(args, "ss", &fn, &mode))
-        return NULL;
-
-    f = fopen(fn, mode);
-    if (f == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    return PyFile_FromFile(f, fn, mode, fclose);
 }
 
 

@@ -12,7 +12,7 @@
 # full details.
 #
 
-SUBDIRS = epdb_embedded http
+SUBDIRS = epdb_embedded ext http
 
 python_files=$(wildcard *.py)
 python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so _versions.so
