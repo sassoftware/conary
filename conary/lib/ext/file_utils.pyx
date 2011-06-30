@@ -110,7 +110,8 @@ def massCloseFileDescriptors(int start, int count, int end):
     if count and end:
         raise ValueError("Exactly one of count and end must be zero.")
 
-    rc = i = 0
+    rc = 0
+    i = start
     j = count
     with nogil:
         while True:
@@ -132,9 +133,10 @@ def massCloseFileDescriptors(int start, int count, int end):
             else:
                 # Some other error
                 break
+            rc = 0
             i += 1
 
-    if rc == -1:
+    if rc != 0:
         PyErr_SetFromErrno(OSError)
 
 
