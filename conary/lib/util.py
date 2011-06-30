@@ -1690,7 +1690,12 @@ def urlSplit(url, defaultPort = None):
     """
     scheme, netloc, path, query, fragment = urlparse.urlsplit(url)
     userpass, hostport = urllib.splituser(netloc)
-    host, port = networking.splitHostPort(hostport)
+    if scheme == 'lookaside':
+        # Always a local path, sometimes the first part will have a colon in it
+        # but it isn't a port, e.g. "lp:lightdm".
+        host, port = hostport, None
+    else:
+        host, port = networking.splitHostPort(hostport)
 
     if userpass:
         user, passwd = urllib.splitpasswd(userpass)

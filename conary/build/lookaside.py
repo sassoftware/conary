@@ -51,23 +51,8 @@ class laUrl(object):
     def __init__(self, urlString, parent=None, extension=None,
                  isHostname=False):
         urlString = urllib.unquote(urlString)
-        # unfortunately urlparse doesn't support unknown schemes so we
-        # parse them as http.
-        schemeTup = urlString.split('://', 1)
-        if len(schemeTup) > 1 and schemeTup[0] not in self.supportedSchemes:
-            savedScheme = schemeTup[0]
-            urlString = urlString.replace(savedScheme + '://', 'http://', 1)
-        elif len(schemeTup) == 1 and isHostname:
-            savedScheme = ''
-            urlString = 'http://' + urlString
-        else:
-            savedScheme = None
-
         (self.scheme, self.user, self.passwd, self.host, self.port,
          self.path, self.params, self.fragment) = util.urlSplit(urlString)
-
-        if savedScheme is not None:
-            self.scheme = savedScheme
 
         if parent:
             self.path = os.sep.join((self.path, parent.path))

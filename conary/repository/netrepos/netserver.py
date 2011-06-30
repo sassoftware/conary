@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -36,6 +36,7 @@ from conary.repository.netrepos import fsrepos, instances, trovestore
 from conary.repository.netrepos import accessmap, deptable, fingerprints
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
+from conary.repository.netrepos.netauth import ValidPasswordToken
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -1912,7 +1913,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         userName = authToken[0]
         if not isinstance(userName, basestring):
-            userName = 'unknown'
+            if userName.username:
+                # A ValidUser token with a username specified.
+                userName = userName.username
+            else:
+                # No username available.
+                userName = 'unknown'
 
         d = { 'reppath' : self.urlBase(urlName = False),
               'user' : userName,
@@ -3638,9 +3644,11 @@ class AuthToken(list):
 
     def __init__(self, user='anonymous', password='anonymous', entitlements=(),
             remote_ip=None):
-        if not (user == password == 'anonymous'):
-            password = util.ProtectedString(password)
-        list.__init__(self, (user, password, list(entitlements), remote_ip))
+        list.__init__(self, [None] * 4)
+        self.user = user
+        self.password = password
+        self.entitlements = list(entitlements)
+        self.remote_ip = remote_ip
 
     def _get_user(self):
         return self[self._user]
@@ -3651,7 +3659,11 @@ class AuthToken(list):
     def _get_password(self):
         return self[self._password]
     def _set_password(self, password):
-        if not (self[self._user] == password == 'anonymous'):
+        if self.user == password == 'anonymous':
+            pass
+        elif password is ValidPasswordToken:
+            pass
+        else:
             password = util.ProtectedString(password)
         self[self._password] = password
     password = property(_get_password, _set_password)

@@ -460,7 +460,7 @@ class ConfigFile(_Config):
         # Extra headers to send up
         headers = {
             'X-Conary-Version' : constants.version or "UNRELEASED",
-            'X-Conary-Config-Version' : int(configVersion),
+            'X-Conary-Config-Version' : str(configVersion),
         }
         opener = self._getOpener()
         try:

@@ -66,6 +66,7 @@ else:
            join items using (itemid)
            join versions using (versionid)
            join flavors using (flavorid)
+           where ispresent != 0
     """)
 
 troveTups = [ ((x[0], versions.VersionFromString(x[1]),
@@ -86,6 +87,9 @@ while seen < total:
         if seen % 10 == 0:
             print "%d/%d\r" % (seen, total),
             sys.stdout.flush()
+        if not trv:
+            print 'MISSING', instanceId
+            continue
         if not trv.verifyDigests():
             print "%s=%s[%s]" % trv.getNameVersionFlavor()
             if fixSigs:
