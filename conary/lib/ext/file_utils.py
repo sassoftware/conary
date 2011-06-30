@@ -23,6 +23,8 @@ acceptable.
 import ctypes
 import errno
 import os
+import resource
+import select
 from conary.lib.ext import ctypes_utils
 from ctypes import c_int, c_size_t, c_long, c_void_p
 
@@ -39,7 +41,22 @@ def _fileno(fobj):
 
 
 def countOpenFileDescriptors():
-    raise NotImplementedError
+    maxfds = resource.getrlimit(resource.RLIMIT_NOFILE)[1]
+    poller = select.poll()
+    for fd in range(maxfds):
+        poller.register(fd, select.POLLIN | select.POLLPRI | select.POLLOUT)
+    while True:
+        try:
+            res = poller.poll(0)
+        except select.error, err:
+            if err.errno == errno.EINTR:
+                continue
+            raise
+        else:
+            break
+
+    badfs = len([x for x in res if x[1] == select.POLLNVAL])
+    return maxfds - badfs
 
 
 def fchmod(fobj, mode):
@@ -67,7 +84,8 @@ def lexists(path):
 
 def massCloseFileDescriptors(start, count, end):
     to_close = count
-    for i in range(start, end):
+    i = start
+    while True:
         if count:
             # Stopping after a contiguous number of fds
             if to_close == 0:
@@ -82,10 +100,12 @@ def massCloseFileDescriptors(start, count, end):
             if err.errno == errno.EBADF:
                 # FD was not in use
                 to_close -= 1
-            raise
+            else:
+                raise
         else:
             # Successful close -- reset contiguous counter
             to_close = count
+        i += 1
 
 
 def mkdirIfMissing(path):
@@ -100,6 +120,8 @@ def mkdirIfMissing(path):
 
 
 def pread(fobj, count, offset):
+    if offset >= 0x8000000000000000:
+        raise OverflowError
     buf = ctypes.create_string_buffer(count)
     libc = ctypes_utils.get_libc()
     libc.pread.argtypes = (c_int, c_void_p, c_size_t, c_long)
