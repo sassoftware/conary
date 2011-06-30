@@ -39,7 +39,6 @@
 static PyObject * depSetSplit(PyObject *self, PyObject *args);
 static PyObject * depSplit(PyObject *self, PyObject *args);
 static PyObject * depSetFreeze(PyObject *self, PyObject *args);
-static PyObject * malloced(PyObject *self, PyObject *args);
 static PyObject * unpack(PyObject *self, PyObject *args);
 static PyObject * pack(PyObject * self, PyObject * args);
 static PyObject * dynamicSize(PyObject *self, PyObject *args);
@@ -54,8 +53,6 @@ static PyMethodDef MiscMethods[] = {
     { "depSetSplit", depSetSplit, METH_VARARGS },
     { "depSplit", depSplit, METH_VARARGS },
     { "depSetFreeze", depSetFreeze, METH_VARARGS },
-    { "malloced", malloced, METH_VARARGS, 
-	"amount of memory currently allocated through malloc()" },
     { "sha1Copy", sha1Copy, METH_VARARGS },
     { "sha1Uncompress", sha1Uncompress, METH_VARARGS,
         "Uncompresses a gzipped file descriptor into another gzipped "
@@ -70,14 +67,6 @@ static PyMethodDef MiscMethods[] = {
     {NULL}  /* Sentinel */
 };
 
-static PyObject * malloced(PyObject *self, PyObject *args) {
-    struct mallinfo ma;
-
-    ma = mallinfo();
-
-    /* worked */
-    return Py_BuildValue("i", ma.uordblks);
-}
 
 static PyObject * depSetSplit(PyObject *self, PyObject *args) {
     char * data, * dataPtr, * endPtr;
