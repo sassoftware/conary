@@ -15,13 +15,20 @@
 import ctypes
 
 
+_libc = None
+
 def get_libc():
-    for sover in ('6', '5'):
-        try:
-            return ctypes.CDLL('libc.so.' + sover, use_errno=True)
-        except:
-            pass
-    raise OSError("Could not find a suitable libc")
+    global _libc
+    if _libc is None:
+        for sover in ('6', '5'):
+            try:
+                _libc = ctypes.CDLL('libc.so.' + sover, use_errno=True)
+                break
+            except:
+                pass
+        else:
+            raise OSError("Could not find a suitable libc")
+    return _libc
 
 
 def throw_errno(libc, cls=OSError):
