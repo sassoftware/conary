@@ -15,7 +15,8 @@
 import itertools
 import re
 import weakref
-from conary.lib import misc, util, api
+from conary.lib import api
+from conary.lib.ext import dep_freeze
 from conary.errors import ParseError
 
 DEP_CLASS_ABI           = 0
@@ -548,7 +549,7 @@ class DependencyClass(object):
         if cached:
             return cached
 
-        name, flags = misc.depSplit(frozen)
+        name, flags = dep_freeze.depSplit(frozen)
 
         for i, flag in enumerate(flags):
             kind = flag[0:2]
@@ -876,8 +877,9 @@ class DependencySet(object):
             next = 0
             end = len(self._members)
             while next < end:
-                (next, classId, depStr) = misc.depSetSplit(next, self._members)
-                (name, flags) = misc.depSplit(depStr)
+                (next, classId, depStr) = dep_freeze.depSetSplit(
+                        next, self._members)
+                (name, flags) = dep_freeze.depSplit(depStr)
                 yield (classId, name, flags)
         else:
             for depClass, oneDep in self.iterDeps():
@@ -914,7 +916,7 @@ class DependencySet(object):
 
         i = 0
         a = self.addDep
-        depSetSplit = misc.depSetSplit
+        depSetSplit = dep_freeze.depSetSplit
         while i < len(frz):
             (i, tag, frozen) = depSetSplit(i, frz)
             depClass = dependencyClasses[tag]
@@ -1097,7 +1099,7 @@ class DependencySet(object):
         if type(self._members) == str:
             return self._members
         else:
-            return misc.depSetFreeze(self.members);
+            return dep_freeze.depSetFreeze(self.members)
 
     def isEmpty(self):
         return not(self._members)

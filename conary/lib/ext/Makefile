@@ -14,9 +14,9 @@
 
 python_files=$(wildcard *.py)
 cython_modules=file_utils.so
-other_modules=
+other_modules = dep_freeze.so
 ifndef PURE
-python_modules=$(cython_modules)
+python_modules = $(cython_modules) $(other_modules)
 endif
 
 cython_output=$(cython_modules:.so=.c)
@@ -57,4 +57,4 @@ endif
 include ../../../Make.rules
 
 # needs to come after including Make.rules so that PYINCLUDE is defined
-CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
+CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -I.. -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
