@@ -15,7 +15,6 @@
 
 #include <Python.h>
 
-#include <dlfcn.h>
 #include <errno.h>
 #include <malloc.h>
 #include <netinet/in.h>
@@ -29,12 +28,10 @@
 
 static PyObject * py_sendmsg(PyObject *self, PyObject *args);
 static PyObject * py_recvmsg(PyObject *self, PyObject *args);
-static PyObject * rpmExpandMacro(PyObject *self, PyObject *args);
 
 static PyMethodDef MiscMethods[] = {
     { "sendmsg", py_sendmsg, METH_VARARGS },
     { "recvmsg", py_recvmsg, METH_VARARGS },
-    { "rpmExpandMacro", rpmExpandMacro, METH_VARARGS },
     {NULL}  /* Sentinel */
 };
 
@@ -182,51 +179,6 @@ static PyObject * py_recvmsg(PyObject *self, PyObject *args) {
     free(vector.iov_base);
 
     return rc;
-}
-
-
-static PyObject * rpmExpandMacro(PyObject *self, PyObject *args) {
-    void * rpmso = NULL;
-    static int (*expandMacro)(void * in, void * context, char * out,
-                              size_t outSize) = NULL;
-    char * expansion;
-    char * input;
-    int bufSize;
-    char * libPath;
-
-    if (!PyArg_ParseTuple(args, "ss", &libPath, &input))
-        return NULL;
-
-    bufSize = strlen(input) * 100;
-    expansion = alloca(bufSize);
-    strcpy(expansion, input);
-
-    if (!expandMacro) {
-        rpmso = dlopen(libPath, RTLD_LAZY);
-
-        if (!rpmso) {
-            PyErr_SetString(PyExc_TypeError,
-                            "failed to load rpmModule for expandMacro");
-            return NULL;
-        }
-
-        expandMacro = dlsym(rpmso, "expandMacros");
-
-        if (!expandMacro) {
-            PyErr_SetString(PyExc_TypeError,
-                            "symbol expandMacro not found");
-            return NULL;
-        }
-    }
-
-    /* if this fails because the buffer isn't big enough, it prints a message
-       and continues. nice. */
-    expandMacro(NULL, NULL, expansion, bufSize);
-
-    return PyString_FromString(expansion);
-
-    Py_INCREF(Py_None);
-    return Py_None;
 }
 
 
