@@ -52,7 +52,6 @@ from conary.cmds import updatecmd
 from conary.cmds import verify
 from conary.lib import cfgtypes,log, openpgpfile, options, util
 from conary.local import database
-from conary.conaryclient import cmdline
 from conary.conaryclient import cml
 from conary.conaryclient import systemmodel
 from conary.repository import trovesource
@@ -782,73 +781,67 @@ class RepQueryCommand(_AbstractQueryCommand):
 _register(RepQueryCommand)
 
 
-class RdiffCommand(ConaryCommand):
+class RdiffCommand(_AbstractQueryCommand):
 
+    # previous versions included support for show-empty, buildreqs options
+    # which were removed when we moved to _AbstractQueryCommand
     commands = [ 'rdiff' ]
     paramHelp = "<pkgname>=<version1>[[flavor1]]--<version2>[[flavor]]"
-    help = 'Display differences between troves'
+    help = 'Display differences between troves in the repository'
     commandGroup = 'Information Display'
-    docs = { 'show-empty'  : 'Show troves even if they did not change',
-             'buildreqs'  : 'Show build requirements changes',
-             'deps'        : 'Show changes in overall dependencies',
-             'ls'          : 'Show file changes',
-             'lsl'         : 'Show detailed file changes',
-             'tags'        : 'Show changes in file tags',
-             'file-versions' : 'Show file versions',
-             'file-deps'   : 'Show file dependency changes',
-             'file-contents' : 'Show file content changes (non-binary)',
+    docs = {'all-troves'         : 'display not-by-default troves', 
+            'diff'               : 'show changes as a git style diff',
+            'diff-binaries'      : 'include changed contents for binary files',
+            'show-changes'       : ('display changes'
+                                    ' that the relative changeset contains'),
            }
     hidden = True
+    ignoreConfigErrors = True
 
     def addParameters(self, argDef):
-        ConaryCommand.addParameters(self, argDef)
-        d = {}
-        #d["components"] = NO_PARAM
-        d["deps"] = NO_PARAM
-        d["show-empty"] = NO_PARAM
-        d["buildreqs"] = NO_PARAM
-        argDef['Trove-related Changes'] = d
-
-        d = {}
-        d["ls"] = NO_PARAM
-        d["lsl"] = NO_PARAM
-        d["tags"] = NO_PARAM
-        d["file-versions"] = NO_PARAM
-        d["file-deps"] = NO_PARAM
-        d["file-contents"] = NO_PARAM
-        argDef['File-related Changes'] = d
+        _AbstractQueryCommand.addParameters(self, argDef)
+        
+        argDef['Changeset Display'] = {"all":           NO_PARAM,
+                                       "diff":          NO_PARAM,
+                                       "diff-binaries": NO_PARAM,
+                                       "show-changes":  NO_PARAM }
 
     def runCommand(self, cfg, argSet, otherArgs):
-
-        args = otherArgs[2:]
-        if len(args) != 1:
-            return self.usage()
-
-        diffSpec = args[0]
-        troveSpec = cmdline.parseChangeList(diffSpec)[0]
-        if troveSpec[1][0] is None:
-            # Most likely, syntax did not specify <old>--<new>
-            return self.usage()
-
         kw = {}
-        kw['fullFlavors'] = cfg.fullFlavors
-        kw['fullVersions'] = cfg.fullVersions
-        kw['showLabels'] = cfg.showLabels
-        kw['showEmptyDiffs'] = argSet.pop('show-empty', False)
-        kw['withBuildReqs'] = argSet.pop('buildreqs', False)
-        kw['withFileContents'] = argSet.pop('file-contents', False)
-        kw['withFileDeps'] = argSet.pop('file-deps', False)
-        kw['withFiles'] = argSet.pop('ls', False)
-        kw['withFilesStat'] = argSet.pop('lsl', False)
-        kw['withFileTags'] = argSet.pop('tags', False)
-        kw['withFileVersions'] = argSet.pop('file-versions', False)
-        kw['withTroveDeps'] = argSet.pop('deps', False)
-        if argSet:
-            raise Exception(argSet)
+        # FIXME: this overlaps with showchange
+        for opt in ('capsules', 'ls', 'lsl', 'ids', 'sha1s', 'tags',
+                ('signatures', 'digSigs'), ('buildreqs', 'showBuildReqs'),
+                ('file-deps', 'fileDeps'), 
+                ('file-flavors', 'fileFlavors'), 
+                ('file-versions', 'fileVersions'),
+                ('all-troves', 'showAllTroves'),
+                ('weak-refs', 'weakRefs'),
+                ('troves', 'showTroves'),
+                ('trove-flags', 'showTroveFlags'),
+                ('trove-headers', 'alwaysDisplayHeaders'),
+                'deps', 'info', ('show-changes', 'showChanges'),
+                ('exact-flavors', 'exactFlavors')):
+            if isinstance(opt, tuple):
+                kw[opt[1]] = argSet.pop(opt[0], False)
+            else:
+                kw[opt] = argSet.pop(opt, False)
 
-        queryrep.diffTroves(cfg, troveSpec, **kw)
+        kw['recurse'] = argSet.pop('recurse', None)
+        kw['asDiff'] = argSet.pop('diff', False)
+        kw['diffBinaries'] = argSet.pop('diff-binaries', False)
+        if 'no-recurse' in argSet:
+            kw['recurse'] = False
+            del argSet['no-recurse']
+
+        if argSet or len(otherArgs) != 3:
+            return self.usage()
+
+        client = conaryclient.ConaryClient(cfg)
+        db = database.Database(cfg.root, cfg.dbPath)
+        if queryrep.rdiffCommand(cfg, client, db, otherArgs[2], **kw) == -1:
+            return self.usage();
+
 _register(RdiffCommand)
-
 
 class ShowChangesetCommand(_AbstractQueryCommand):
 
@@ -859,6 +852,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
     docs = {'all'                : 'combine many common scs flags',
             'all-troves'         : 'display not-by-default troves', 
             'diff'               : 'show changes as a git style diff',
+            'diff-binaries'      : 'include changed contents for binary files',
             'show-changes'       : ('(for relative changeset) display changes'
                                     ' that the relative changeset contains'),
             'recurse-repository' : (VERBOSE_HELP,
@@ -869,10 +863,10 @@ class ShowChangesetCommand(_AbstractQueryCommand):
 
     def addParameters(self, argDef):
         _AbstractQueryCommand.addParameters(self, argDef)
-        d = {}
-        argDef['Changeset Display'] = {"all":          NO_PARAM,
-                                       "diff":         NO_PARAM,
-                                       "show-changes": NO_PARAM }
+        argDef['Changeset Display'] = {"all":           NO_PARAM,
+                                       "diff":          NO_PARAM,
+                                       "diff-binaries": NO_PARAM,
+                                       "show-changes":  NO_PARAM }
         argDef['Child Display']["recurse-repository"] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
@@ -900,6 +894,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
 
         kw['recurse'] = argSet.pop('recurse', None)
         kw['asDiff'] = argSet.pop('diff', None)
+        kw['diffBinaries'] = argSet.pop('diff-binaries', False)
         if 'no-recurse' in argSet:
             kw['recurse'] = False
             del argSet['no-recurse']
@@ -1338,6 +1333,7 @@ class VerifyCommand(ConaryCommand):
             'changeset' : (VERBOSE_HELP,
                            'store the verify output in the named file' ),
             'diff' : 'represent changes as a git style diff',
+            'diff-binaries'      : 'include changed contents for binary files',
             'hash' : "verify file contents even if the file's inode has "
                      "not changed",
             'new-files': "look for new files which have been added to the "
@@ -1351,6 +1347,7 @@ class VerifyCommand(ConaryCommand):
         argDef["all"] = NO_PARAM
         argDef["diff"] = NO_PARAM
         argDef["changeset"] = ONE_PARAM
+        argDef["diff-binaries"] = NO_PARAM
         argDef["hash"] = NO_PARAM
         argDef["new-files"] = NO_PARAM
 
@@ -1360,6 +1357,7 @@ class VerifyCommand(ConaryCommand):
         all = argSet.pop('all', False)
         csPath = argSet.pop('changeset', None)
         diff = argSet.pop('diff', False)
+        diffBinaries = argSet.pop('diff-binaries', False)
         hash = argSet.pop('hash', False)
         newFiles = argSet.pop('new-files', False)
 
@@ -1369,9 +1367,10 @@ class VerifyCommand(ConaryCommand):
         if (not all and not troves) or (all and troves):
             return self.usage()
 
-        self.cmdClass(troves, client.getDatabase(),
+        verify.verify(troves, client.getDatabase(),
                       cfg, all=all, changesetPath=csPath,
                       forceHashCheck=hash, asDiff=diff,
+                      diffBinaries = diffBinaries,
                       repos=client.getRepos(),
                       newFiles = newFiles)
 

@@ -937,7 +937,8 @@ class ChangeSet(streams.StreamSet):
 
     def _makeFileGitDiff(self, troveSource, pathId,
                          (oldPath, oldFileId, oldFileVersion, oldFileObj),
-                         (newPath, newFileId, newFileObj)):
+                         (newPath, newFileId, newFileObj),
+                         diffBinaries):
         if oldFileId == newFileId:
             return
 
@@ -1022,19 +1023,26 @@ class ChangeSet(streams.StreamSet):
                 for x in unified:
                     yield x
             else:
-                yield "GIT binary patch\n"
-                yield "literal %d\n" % newFileObj.contents.size()
-                for x in base85.iterencode(newContents.get(), compress = True):
-                    yield x
-                yield '\n'
+                if diffBinaries:
+                    yield "GIT binary patch\n"
+                    yield "literal %d\n" % newFileObj.contents.size()
+                    for x in base85.iterencode(newContents.get(),
+                                               compress = True):
+                        yield x
+                    yield '\n'
+                else:
+                    yield "Binary files differ"
 
-    def gitDiff(self, troveSource):
+    def gitDiff(self, troveSource, diffBinaries = False):
         """
         Represent the file changes as a GIT diff. Normal files and symlinks
         are represented; other file types (including directories) are
         excluded. Config files are encoded as normal diffs, other files
         are encoded using standard base85 gzipped binary encoding. No trove
         information is included, though removed files are represented properly.
+
+        @param diffBinaries: Include base64 differences of binary files
+        @type diffBinaries: bool
         """
         jobs = list(self.getJobSet())
         oldTroves = troveSource.getTroves(
@@ -1123,7 +1131,7 @@ class ChangeSet(streams.StreamSet):
                         itertools.chain(configList, normalList):
             newInfo = newInfo[0:2] + (files.ThawFile(newInfo[2], pathId),)
             for x in self._makeFileGitDiff(troveSource, pathId,
-                        oldInfo, newInfo):
+                        oldInfo, newInfo, diffBinaries):
                 yield x
 
 
@@ -1628,6 +1636,7 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
         self.files.update(otherCs.files)
 
         self.primaryTroveList += otherCs.primaryTroveList
+        self.absolute = self.absolute and otherCs.absolute
         self.newTroves.update(otherCs.newTroves)
 
         # keep the old trove lists unique on merge.  we erase all the
