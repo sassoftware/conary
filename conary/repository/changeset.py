@@ -1125,7 +1125,7 @@ class ChangeSet(streams.StreamSet):
                 else:
                     yield "Binary files differ"
 
-    def gitDiff(self, troveSource, diffBinaries = False):
+    def gitDiff(self, troveSource, diffBinaries=True):
         """
         Represent the file changes as a GIT diff. Normal files and symlinks
         are represented; other file types (including directories) are
