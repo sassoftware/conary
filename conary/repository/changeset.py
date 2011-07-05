@@ -1123,7 +1123,7 @@ class ChangeSet(streams.StreamSet):
                         yield x
                     yield '\n'
                 else:
-                    yield "Binary files differ"
+                    yield "Binary files differ\n"
 
     def gitDiff(self, troveSource, diffBinaries=True):
         """
