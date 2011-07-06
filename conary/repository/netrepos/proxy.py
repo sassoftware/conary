@@ -78,19 +78,28 @@ class ExtraInfo(object):
         return self.responseHeaders.get('Via', None)
 
 class ProxyCaller:
+    """
+    This class facilitates access to a remote repository using the same
+    interface as L{RepositoryCaller}.
+    """
 
-    # shim object used by Proxy servers to relay calls to other servers
+    def callByName(self, methodname, version, *args, **kwargs):
+        """Call a remote server method using the netserver convention."""
+        request = xmlshims.RequestArgs(version, args, kwargs)
+        response = self.callWithRequest(methodname, request)
+        if response.isException:
+            # exception occured. this lets us tunnel the error through
+            # without instantiating it (which would be demarshalling the
+            # thing just to remarshall it again)
+            raise ProxyRepositoryError(response.excName, response.excArgs,
+                    response.excKwargs)
+        return response.result
 
-    def callByName(self, methodname, *args, **kwargs):
-        # args[0] is protocolVersion
-        if args[0] < 51:
-            # older protocol versions didn't allow keyword arguments
-            assert(not kwargs)
-        else:
-            args = [ args[0], args[1:], kwargs ]
-
+    def callWithRequest(self, methodname, request):
+        """Call a remote server method using request/response objects."""
+        rawRequest = request.toWire()
         try:
-            rc = self.proxy.__getattr__(methodname)(*args)
+            rawResponse = self.proxy._request(methodname, rawRequest)
         except IOError, e:
             raise errors.ProxyError(e.strerror)
         except http_error.ResponseError, e:
@@ -100,21 +109,10 @@ class ProxyCaller:
             raise
         self._lastProxy = self._transport.usedProxy
 
-        if args[0] < 60:
-            # strip off useAnonymous flag
-            rc = rc[1:3]
-
-        if rc[0]:
-            # exception occured. this lets us tunnel the error through
-            # without instantiating it (which would be demarshalling the
-            # thing just to remarshall it again)
-            if args[0] < 60:
-                raise ProxyRepositoryError(rc[1][0], rc[1][1:], None)
-            else:
-                # keyword args to exceptions appear
-                raise ProxyRepositoryError(rc[1][0], rc[1][1], rc[1][2])
-
-        return rc[1]
+        # XMLRPC responses are a 1-tuple
+        rawResponse, = rawResponse
+        return xmlshims.ResponseArgs.fromWire(request.version, rawResponse,
+                self._transport.responseHeaders)
 
     def getExtraInfo(self):
         """Return extra information if available"""
@@ -122,8 +120,8 @@ class ProxyCaller:
                          self._transport.responseProtocol)
 
     def __getattr__(self, method):
-        # Don't invoke methods that start with __
-        if method.startswith('__'):
+        # Don't invoke methods that start with _
+        if method.startswith('_'):
             raise AttributeError(method)
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
@@ -186,26 +184,54 @@ class ProxyCallFactory:
         return ProxyCaller(url, proxy, transporter)
 
 class RepositoryCaller(xmlshims.NetworkConvertors):
+    """
+    This class facilitates access to a local repository object using the same
+    interface as L{ProxyCaller}.
+    """
 
-    # shim object used by internal filters (which share code with the
-    # proxies) to let the filters call internal classes
+    # Shim calls never use a proxy, of course.
+    _lastProxy = None
 
-    def callByName(self, methodname, *args, **kwargs):
-        rc = self.repos.callWrapper(self.protocol, self.port, methodname,
-                                    self.authToken, args, kwargs,
-                                    remoteIp = self.remoteIp,
-                                    rawUrl = self.rawUrl,
-                                    isSecure = self.isSecure)
+    def callByName(self, methodname, version, *args, **kwargs):
+        """Call a repository method using the netserver convention."""
+        args = (version,) + args
+        return self.repos.callWrapper(
+                protocol=self.protocol,
+                port=self.port,
+                methodname=methodname,
+                authToken=self.authToken,
+                orderedArgs=args,
+                kwArgs=kwargs,
+                remoteIp=self.remoteIp,
+                rawUrl=self.rawUrl,
+                isSecure=self.isSecure,
+                )
 
-        return rc
+    def callByRequest(self, methodname, request):
+        """Call a repository method using request/response objects."""
+        try:
+            result = self.callByName(methodname, request.version,
+                    *request.args, **request.kwargs)
+            return xmlshims.ResponseArgs.newResult(result)
+        except Exception, err:
+            if hasattr(err, 'marshall'):
+                args, kwArgs = err.marshall(self)
+                return self.responseFilter.newException(
+                        err.__class__.__name__, args, kwArgs)
+            else:
+                for cls, marshall in errors.simpleExceptions:
+                    if isinstance(err, cls):
+                        return self.responseFilter.newException(marshall,
+                                (str(err),))
+                raise
 
     def getExtraInfo(self):
         """No extra information available for a RepositoryCaller"""
         return None
 
     def __getattr__(self, method):
-        # Don't invoke methods that start with __
-        if method.startswith('__'):
+        # Don't invoke methods that start with _
+        if method.startswith('_'):
             raise AttributeError(method)
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
@@ -245,6 +271,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
     # for thoughts on this process, see the IM log at the end of this file
     SERVER_VERSIONS = netserver.SERVER_VERSIONS
     publicCalls = netserver.NetworkRepositoryServer.publicCalls
+    responseFilter = xmlshims.ResponseArgs
 
     def __init__(self, cfg, basicUrl):
         self.cfg = cfg
@@ -267,7 +294,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         self.log(1, "proxy url=%s" % basicUrl)
 
-    def callWrapper(self, protocol, port, methodname, authToken, args,
+    def callWrapper(self, protocol, port, methodname, authToken, request,
                     remoteIp = None, rawUrl = None, localAddr = None,
                     protocolString = None, headers = None, isSecure = False):
         """
@@ -276,12 +303,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
         @param protocolString: if set, the protocol version the client used
         (i.e. HTTP/1.0)
         """
+        extraInfo = None
         if methodname not in self.publicCalls:
-            if protocol < 60:
-                return (False, True, ("MethodNotSupported", methodname, ""),
-                        None)
-            else:
-                return (True, ("MethodNotSupported", methodname, ""), None)
+            return (self.responseFilter.newException(
+                "MethodNotSupported", (methodname,)), extraInfo)
 
         self._port = port
         self._protocol = protocol
@@ -302,18 +327,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                remoteIp, isSecure,
                                                self.urlBase())
 
-        # args[0] is the protocol version
-        protocolVersion = args[0]
-        if args[0] < 51:
-            kwargs = {}
-        else:
-            assert(len(args) == 3)
-            kwargs = args[2]
-            args = [ args[0], ] + args[1]
-
-        extraInfo = None
-
+        response = None
         try:
+            args = (request.version,) + request.args
+            kwargs = request.kwargs
             if hasattr(self, methodname):
                 # Special handling at the proxy level. The logged method name
                 # is prefixed with a '+' to differentiate it from a vanilla
@@ -330,26 +347,27 @@ class BaseProxy(xmlshims.NetworkConvertors):
                 if self.callLog:
                     self.callLog.log(remoteIp, authToken, methodname, args,
                             kwargs)
+                # This is incredibly silly.
                 r = caller.callByName(methodname, *args, **kwargs)
 
-            r = (False, r)
+            response = self.responseFilter.newResult(r)
             extraInfo = caller.getExtraInfo()
         except ProxyRepositoryError, e:
-            r = (True, (e.name, e.args, e.kwArgs))
+            response = self.responseFilter.newException(e.name, e.args,
+                    e.kwArgs)
         except Exception, e:
             if hasattr(e, 'marshall'):
-                marshalled = e.marshall(self)
-                args, kwArgs = marshalled
-
-                r = (True,
-                        (e.__class__.__name__, args, kwArgs) )
+                args, kwArgs = e.marshall(self)
+                response = self.responseFilter.newException(
+                        e.__class__.__name__, args, kwArgs)
             else:
-                r = None
                 for klass, marshall in errors.simpleExceptions:
                     if isinstance(e, klass):
-                        r = (True, (marshall, (str(e),), {}) )
+                        response = self.responseFilter.newException(
+                                marshall, (str(e),))
+                        break
 
-                if r is None:
+                if not response:
                     # this exception is not marshalled back to the client.
                     # re-raise it now.  comment the next line out to fall into
                     # the debugger
@@ -370,15 +388,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                         debugger.post_mortem(excInfo[2])
                     raise
 
-        if protocolVersion < 60:
-            if r[0] is True:
-                # return (useAnon, isException, (exceptName,) + ordArgs) )
-                return (False, True, (r[1][0],) + r[1][1], extraInfo)
-            else:
-                return (False, False, r[1], extraInfo)
-
-        return r + (extraInfo,)
-
+        return response, extraInfo
 
     def setBaseUrlOverride(self, rawUrl, headers, isSecure):
         if not rawUrl:
@@ -2005,9 +2015,15 @@ def redirectUrl(authToken, url):
 
     return url
 
-def formatViaHeader(localAddr, protocolString):
-    return "%s %s (Conary/%s)" % (protocolString, localAddr,
+
+def formatViaHeader(localAddr, protocolString, prefix=''):
+    via = "%s %s (Conary/%s)" % (protocolString, localAddr,
                                   constants.version)
+    if prefix:
+        return prefix + ', ' + via
+    else:
+        return via
+
 
 class ProxyRepositoryError(Exception):
 

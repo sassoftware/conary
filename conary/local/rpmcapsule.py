@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2009, 2010 rPath, Inc.
+# Copyright (c) 2011 rPath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -12,10 +12,12 @@
 # full details.
 #
 
+import ctypes
 import inspect, itertools, re, rpm, os, pwd, stat, tempfile
+from ctypes import c_void_p, c_long, c_int
 
 from conary import files, trove
-from conary.lib import elf, misc, util, log
+from conary.lib import elf, util, log
 from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors
 from conary.repository import filecontents
@@ -537,7 +539,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                    'removing rpm owned file %s',
                                    ignoreMissing = True)
 
-def rpmExpandMacro(str):
+def rpmExpandMacro(val):
     if getattr(rpm, '_rpm', ''):
         rawRpmModulePath = rpm._rpm.__file__
     else:
@@ -546,4 +548,12 @@ def rpmExpandMacro(str):
                     if x[0] == 'soname']
     rpmLibs = [ x for x in sonames if re.match('librpm[-\.].*so', x) ]
     assert(len(rpmLibs) == 1)
-    return misc.rpmExpandMacro(rpmLibs[0], str)
+    librpm = ctypes.CDLL(rpmLibs[0])
+    librpm.expandMacros.argtypes = (c_void_p, c_void_p, c_void_p, c_long)
+    librpm.expandMacros.restype = c_int
+
+    buf = ctypes.create_string_buffer(val, len(val) * 100)
+    rc = librpm.expandMacros(None, None, buf, len(buf))
+    if rc != 0:
+        raise RuntimeError("failed to expand RPM macro %r" % (val,))
+    return buf.value

@@ -19,9 +19,9 @@
 import base64
 import socket
 import sys
-import urllib
 import xmlrpclib
 
+from conary import constants
 from conary.lib import timeutil
 from conary.lib import util
 from conary.lib.http import connection
@@ -84,8 +84,7 @@ class XMLOpener(ConaryURLOpener):
 class Transport(xmlrpclib.Transport):
 
     # override?
-    user_agent = "xmlrpclib.py/%s (www.pythonware.com modified by " \
-        "rPath, Inc.)" % xmlrpclib.__version__
+    user_agent = "Conary/%s" % constants.version
 
     openerFactory = XMLOpener
 
@@ -187,12 +186,9 @@ class Transport(xmlrpclib.Transport):
                         (url, errmsg)), None, e_tb
 
             else:
-                usedAnonymous = 'X-Conary-UsedAnonymous' in response.headers
                 self.responseHeaders = response.headers
                 self.responseProtocol = response.protocolVersion
-                resp = self.parse_response(response)
-                rc = ([usedAnonymous] + resp[0], )
-                return rc
+                return self.parse_response(response)
         finally:
             self.usedProxy = self.opener.lastProxy
             self._proxyHost = self.opener.lastProxy

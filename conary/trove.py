@@ -26,9 +26,10 @@ from conary import rpmhelper
 from conary import streams
 from conary import versions
 from conary.deps import deps
-from conary.lib import misc, sha1helper, api
+from conary.lib import sha1helper, api
 from conary.lib.openpgpfile import KeyNotFound, TRUST_UNTRUSTED, TRUST_TRUSTED
 from conary.lib import openpgpkey
+from conary.lib.ext import pack
 from conary.streams import ByteStream
 from conary.streams import DependenciesStream, FlavorsStream
 from conary.streams import FrozenVersionStream
@@ -1416,13 +1417,13 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
         l = []
         for (pathId, (dirName, baseName, fileId, version)) in self.iteritems():
             v = version.asString()
-            s = misc.pack("!S16S20SHSH", pathId, fileId,
+            s = pack.pack("!S16S20SHSH", pathId, fileId,
                           os.path.join(dirName, baseName), v);
             l.append((len(s), s))
 
         l.sort()
 
-        return misc.pack("!" + "SH" * len(l), *( x[1] for x in l))
+        return pack.pack("!" + "SH" * len(l), *( x[1] for x in l))
 
     def copy(self):
         new = TroveRefsFilesStream()
@@ -3410,7 +3411,7 @@ class ReferencedFileList(list, streams.InfoStream):
         lastVer = None
         i = 0
         while i < len(data):
-            i, (pathId, path, fileId, verStr) = misc.unpack("!S16SHSHSH", i,
+            i, (pathId, path, fileId, verStr) = pack.unpack("!S16SHSHSH", i,
                                                             data)
             if not path:
                 dirName = None

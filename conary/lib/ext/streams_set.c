@@ -18,7 +18,7 @@
 #include <netinet/in.h>
 
 #include "pycompat.h"
-#include "cstreams.h"
+#include "streams.h"
 
 #include <stdio.h>
 
@@ -855,6 +855,9 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 	}
 
 	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
+        if (!attr) {
+            return -1;
+        }
 	ro = PyObject_CallMethod(attr, "thaw", "s#", streamData, size);
 	Py_DECREF(attr);
 	if (!ro) {

@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "pycompat.h"
-#include "cstreams.h"
+#include "streams.h"
 
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)
@@ -37,7 +37,7 @@ static PyMethodDef CStreamsMethods[] = {
 
 static PyModuleDef CStreamsModule = {
 	PyModuleDef_HEAD_INIT,
-	"cstreams",
+	"streams",
 	"",
 	-1,
 	CStreamsMethods
@@ -45,7 +45,7 @@ static PyModuleDef CStreamsModule = {
 
 struct singleStream allStreams[];
 
-PYMODULE_INIT(cstreams)
+PYMODULE_INIT(streams)
 {
     PyObject* m;
     int i;

@@ -1,0 +1,23 @@
+This directory contains Python extension modules, both those written in
+C and those generated using Cython from .pyx files. A pure-Python
+implementation for each module may also be provided with the same
+basename, with the goal that it can be used as a fallback if the
+extension is not compiled. Pure modules have a minimum Python version of
+2.6, allowing the use of ctypes, while extension modules have the same
+minimum version as the rest of Conary (2.4 as of the time of this
+writing).
+
+Modules fall into three categories:
+ * Those which wrap an API not available in Python, for example pread().
+   These can often be written in Cython for conciseness. Pure versions
+   use ctypes, possibly with the use of a helper module.
+   Example: file_utils uses Cython (ext) or ctypes (pure)
+ * Optimizations of frequently-used code. These are usually written in
+   C. The pure implementation is trivial.
+   Example: dep_freeze uses C (ext) or regular Python (pure)
+ * Algorithms which are best implemented in C, even for pure cases.
+   These can be written as a generic C module, and either statically
+   linked into an extension module or loaded with ctypes for the pure
+   case.
+   Example: sha256_nonstandard uses Cython or ctypes to access a shared
+   helper module, helper_sha256_nonstandard

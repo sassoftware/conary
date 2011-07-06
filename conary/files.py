@@ -290,9 +290,6 @@ class File(streams.StreamSet):
         FILE_STREAM_TAGS     : (SMALL, streams.StringsStream, "tags")
         }
 
-    # this class, and others which derive from it, need to explicitly define
-    # _streamDict to allow the find() method to work properly
-    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ "thePathId", "inode", "flags", "tags",
                   'provides', 'requires', 'flavor' ]
 
@@ -443,7 +440,6 @@ class SymbolicLink(File):
         FILE_STREAM_TARGET :   (SMALL, streams.StringStream, "target"),
     }
     streamDict.update(File.streamDict)
-    _streamDict = streams.StreamSetDef(streamDict)
     # chmod() on a symlink follows the symlink
     skipChmod = True
     __slots__ = [ "target", ]
@@ -522,7 +518,6 @@ class DeviceFile(File):
 
     streamDict = { FILE_STREAM_DEVICE : (SMALL, DeviceStream, "devt") }
     streamDict.update(File.streamDict)
-    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ 'devt' ]
 
     def compatibleWith(self, other):
@@ -575,7 +570,6 @@ class RegularFile(File):
     }
 
     streamDict.update(File.streamDict)
-    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = ('contents', 'linkGroup')
 
     lsTag = "-"

@@ -270,6 +270,12 @@ class _GroupRecipe(_BaseGroupRecipe):
 
         Uses C{r.Requires} to specify that the trove C{tmpwatch} must be
         installed in order for the group to be installed.
+        
+        C{r.Requires(exceptDeps='trove:$trovename')}
+        
+        Uses C{r.Requires} to specify that the trove C{trovename} is excluded 
+        from the dependencies for the package.
+
         """
         for group in self._getGroups(groupName):
             group.addRequires(requirement)

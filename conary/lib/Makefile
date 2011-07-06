@@ -12,13 +12,12 @@
 # full details.
 #
 
-SUBDIRS = epdb_embedded http
+SUBDIRS = epdb_embedded ext http
 
 python_files=$(wildcard *.py)
-python_modules=elf.so misc.so cstreams.so SHA256_nonstandard.so _versions.so
+python_modules=elf.so
 wrapper_libs=filename_wrapper.so
 wrapper_objs=filename_wrapper.o
-cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
 
 libelf = $(shell \
 if [ -x /usr/bin/pkg-config ] && /usr/bin/pkg-config --exists libelf; then \
@@ -50,14 +49,7 @@ elf.o: elf.c
 	    echo 'Stopping build due to missing libelf' ; exit 1 ; fi
 	$(CC) $(CFLAGS) $(libelf) -c -o $@ $^
 
-SHA256.o: SHA256_nonstandard.c
-	$(CC) $(CFLAGS) -fno-strict-aliasing -DNDEBUG -fwrapv -O3 -Wstrict-prototypes -c -o $@ $^
-
 elf.so: LIBS = $(libelf)
-SHA256_nonstandard.so: LIBS = -pthread
-misc.so: LIBS = -lcrypto -lz -lresolv
-$(cstreamsmodule_objs): cstreams.h
-cstreams.so: $(cstreamsmodule_objs)
 
 
 filename_wrapper.so: filename_wrapper.c
@@ -77,5 +69,3 @@ dist: default-dist
 include ../../Make.rules
 # needs to come after including Make.rules so that PYINCLUDE is defined
 CFLAGS:=-Wall -std=c99 -I$(PYINCLUDE) -fPIC $(CFLAGS) -g -D_FILE_OFFSET_BITS=64
-
-$(cstreamsmodule_objs): cstreams.h
