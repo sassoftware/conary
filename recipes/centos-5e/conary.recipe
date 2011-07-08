@@ -69,7 +69,7 @@ class Conary(CPackageRecipe):
 
         r.Make('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
                ' PYTHON=%(pybin)s'
-               ' CFLAGS="-fPIC -I%(pyroot)s/include/python2.6"'
+               ' PYINCLUDE="%(pyroot)s/include/python%(pymaj)s"'
                ' LDFLAGS="-Wl,-rpath,%(pyroot)s/%(lib)s"')
         r.MakeInstall('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
                       ' PYTHON=%(pybin)s')
