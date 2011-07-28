@@ -12,8 +12,6 @@
 # full details.
 #
 
-python_files = conarybugz.py
-
 extra_dist = Makefile \
              logaction.py changemail.py commitaction \
 	     perlreqs.pl findmissingbuildreqs
@@ -33,10 +31,7 @@ install: install-subdirs
 	install -m 755 $(bin_scripts) $(DESTDIR)$(bindir)
 	mkdir -p $(DESTDIR)$(datadir)/conary
 	install -m 755 $(util_scripts) $(DESTDIR)$(datadir)/conary
-	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 	install -m 755 commitaction $(DESTDIR)$(conarydir)
-	install -m 755 changemail.py $(DESTDIR)$(conarydir)
-	install -m 755 logaction.py $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
 	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 
