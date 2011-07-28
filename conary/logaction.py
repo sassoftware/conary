@@ -19,16 +19,13 @@ import sys
 if 'CONARY_PATH' in os.environ:
     sys.path.insert(0, os.environ['CONARY_PATH'])
     sys.path.insert(0, os.environ['CONARY_PATH']+"/conary/scripts")
-            
-import tempfile
-import textwrap
+
 import StringIO
 import optparse
 
-from conary import checkin
 from conary import versions
 from conary import conarycfg
-from conary.lib import options, util
+from conary.lib import options
 
 from conary import dbstore
 from conary.dbstore import idtable
@@ -189,6 +186,14 @@ def doCommit(repos, cfg, commitList, user, dbfile):
         db.commit()
     db.close()
     return 0
+
+def usage():
+    usage = "\n".join([
+        "commitaction [commitaction args] --module '/path/to/logaction --user <user> --file <dbfile>'",
+        "or"
+        "%prog --dbfile=DBFILE [--stdin --user=USER] [--list] [--show=ID]"
+        ])
+    print usage
 
 def parseArgs(argv):
     usage = "\n".join([
