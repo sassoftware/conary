@@ -1,0 +1,2 @@
+getFileContents now succeeds when a capsule itself is requested, rather than
+trying to extract contents from the capsule archive.

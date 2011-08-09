@@ -1282,10 +1282,15 @@ class ChangesetFilter(BaseProxy):
 
         def downloadCapsuleFile(self, capsuleKey, capsuleSha1sum,
                 fileName, fileSha1sum):
-            if capsuleSha1sum == fileSha1sum:
+            if capsuleSha1sum == fileSha1sum or fileName == '':
                 # Troves do contain the capsule too, it's legitimate to
                 # request it; however, we can fall back to downloadCapsule for
-                # it
+                # it.
+                # The SHA-1 check doesn't normally work because the
+                # FileStreams.sha1 column is often null for capsule files, but
+                # the repository will also return fileName='' if the capsule
+                # fileId is the same as the contents fileId. Either of these
+                # mean that the capsule itself is being requested.
                 return self.downloadCapsule(capsuleKey, capsuleSha1sum)
             url = self.getCapsuleDownloadUrl(capsuleKey, capsuleSha1sum)
             url = "%s/%s/%s" % (url, self.quote(fileName), self._sha1(fileSha1sum))
