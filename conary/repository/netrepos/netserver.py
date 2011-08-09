@@ -2040,7 +2040,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          ["idx", "instanceId"], start_transaction=False)
         self.db.analyze("tmpInstanceId")
         q = """
-        SELECT DISTINCT tmpInstanceId.idx, FileStreams.sha1
+        SELECT DISTINCT tmpInstanceId.idx, FileStreams.sha1, FileStreams.fileId
         FROM tmpInstanceId
         JOIN TroveFiles ON (tmpInstanceId.instanceId = TroveFiles.instanceId)
         JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
@@ -2048,10 +2048,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         WHERE FilePaths.pathId = ?
         """
         cu.execute(q, trove.CAPSULE_PATHID)
-        instanceIds = dict((instanceIds[i], sha1) for (i, sha1) in cu)
+        instanceIds = dict((instanceIds[i], (sha1, fileId))
+                for (i, sha1, fileId) in cu)
         fileIdMapWithResults = {}
         for fileId, trvCapsule, filePath, fileSha1, instanceId in fileIdCapsuleList:
-            capsuleSha1 = instanceIds.get(instanceId)
+            capsuleSha1, capsuleFileId = instanceIds.get(instanceId)
+            # Send back empty string for filePath if the file is actually the
+            # capsule itself.
+            if capsuleFileId == fileId:
+                filePath = ''
             epoch = trvCapsule.rpm.epoch()
             if epoch is None:
                 epoch = ''
