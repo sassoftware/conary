@@ -1,0 +1,1 @@
+Fixed a bug that caused downloading PGP keys to always fail.

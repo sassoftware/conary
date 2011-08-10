@@ -60,7 +60,7 @@ clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
 	rm -rf sqlite sqlite3
 	rm -f constants.py
-	rm -rf pysqlite3-0.0.0-py2.6.egg-info
+	rm -rf *.egg-info
 	rm -f $(compat_modules) cvc.py
 
 include ../Make.rules

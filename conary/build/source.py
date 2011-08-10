@@ -307,9 +307,7 @@ class _Source(_AnySource):
         # Uhm. Proxies are not likely to forward traffic to port 11371, so
         # avoid using the system-wide proxy setting for now.
         # proxies = self.recipe.cfg.proxy
-        proxies = {}
-
-        opener = transport.URLOpener(proxies=proxies)
+        opener = transport.URLOpener()
         url = 'http://%s:11371/pks/lookup?op=get&search=0x%s' % (
                 keyServer, self.keyid)
         handle = opener.open(url)
