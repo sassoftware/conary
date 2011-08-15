@@ -7,13 +7,13 @@ IMPORTANT -- READ CAREFULLY BEFORE USING THIS SOFTWARE:
 
 The Software governed by this license agreement is a collective work
 under the U.S. Copyright laws. The Software may be licensed under the
-Common Public License ("CPL") or a commercial software agreement from
-rPath, Inc. If the Software, under a commercial software agreement
-from rPath, is conveyed to the End User, and End User would like to
-use or distribute the Software, then the End User must comply with
-the terms contained in this EULA. If the Software, under the CPL,
-is conveyed to the End User, then the End User must comply with
-the terms of the CPL.
+GNU General Public License Version 3 ("GPLv3") or a commercial software
+agreement from rPath, Inc. If the Software, under a commercial software
+agreement from rPath, is conveyed to the End User, and End User would
+like to use or distribute the Software, then the End User must comply
+with the terms contained in this EULA. If the Software, under the GPLv3,
+is conveyed to the End User, then the End User must comply with the
+terms of the GPLv3.
 
 Upon the use of any rPath Software Application (“Software”)
 or any appliance in which the Software may be embedded, End User
@@ -159,7 +159,7 @@ to any conflict of laws provisions, except that the United Nations
 Convention on the International Sale of Goods shall not apply.
 
 
-Copyright © 2005 - 2008.  rPath, Inc.  All rights reserved.
+Copyright © 2005 - 2011.  rPath, Inc.  All rights reserved.
 
 "rPath," “rPath” Logo, “Powered by rPath” Logo, ”rPath
 Appliance Platform” logo, “Conary,”  “rMake,” “rAA,”
