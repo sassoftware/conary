@@ -15,5 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# pyflakes=ignore-file
+
 
 from conary.repository import changeset

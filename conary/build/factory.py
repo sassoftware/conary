@@ -16,9 +16,7 @@
 #
 
 
-from conary.build.packagerecipe import AbstractPackageRecipe
-from conary.build import defaultrecipes
-
+from conary.errors import ParseError
 from conary.build.recipe import RECIPE_TYPE_FACTORY
 from conary.build.errors import RecipeFileError
 

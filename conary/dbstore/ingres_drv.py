@@ -16,14 +16,9 @@
 #
 
 
-import os
-import re
-import sys
-import time
-
 import ingresdbi
 
-from base_drv import BaseDatabase, BaseCursor, BaseSequence, BaseKeywordDict, BaseBinary
+from base_drv import BaseDatabase, BaseCursor, BaseKeywordDict, BaseBinary
 import sqlerrors, sqllib
 
 class KeywordDict(BaseKeywordDict):

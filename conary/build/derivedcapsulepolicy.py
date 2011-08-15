@@ -16,12 +16,9 @@
 #
 
 
-import re, os
-
-from conary import files, trove
-from conary.build import destdirpolicy, filter, policy
-from conary.build import packagepolicy, capsulepolicy, derivedpolicy
-from conary.deps import deps
+from conary import trove
+from conary.build import filter, policy
+from conary.build import capsulepolicy, derivedpolicy
 
 class ComponentSpec(capsulepolicy.ComponentSpec):
     processUnmodified = True

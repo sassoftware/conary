@@ -16,11 +16,9 @@
 #
 
 
-import sys
-
 from conary.dbstore import sqlerrors, sqllib, idtable
 from conary.lib.tracelog import logMe
-from conary.local.schema import createDependencies, setupTempDepTables
+from conary.local.schema import createDependencies
 
 TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
