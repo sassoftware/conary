@@ -167,4 +167,4 @@ Appliance Platform” logo, “Conary,”  “rMake,” “rAA,”
 are trademarks and service marks that are the property of
 rPath, Inc.
 
-Revised January 30, 2008
+Revised August 15, 2011
