@@ -24,6 +24,7 @@ class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys.copy()
     keys.update({
         'PRIMARYKEY': 'INTEGER PRIMARY KEY AUTOINCREMENT',
+        'BIGSERIAL' : 'INTEGER AUTOINCREMENT',
         'PATHTYPE'  : 'TEXT',
         'STRING'    : 'TEXT',
         })

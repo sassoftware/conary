@@ -25,6 +25,7 @@ class KeywordDict(BaseKeywordDict):
     keys = BaseKeywordDict.keys.copy()
     keys.update( {
         'PRIMARYKEY' : 'SERIAL PRIMARY KEY',
+        'BIGSERIAL'  : 'BIGSERIAL',
         'BLOB'       : 'BYTEA',
         'MEDIUMBLOB' : 'BYTEA',
         'PATHTYPE'   : 'BYTEA',
