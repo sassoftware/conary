@@ -28,6 +28,7 @@ class KeywordDict(BaseKeywordDict):
         'BIGINT'        : 'BIGINT',
         'BIGSERIAL'     : 'BIGSERIAL',
         'BIGPRIMARYKEY' : 'BIGSERIAL PRIMARY KEY',
+        'BLOB'          : 'BYTEA',
         'MEDIUMBLOB'    : 'BYTEA',
         'PATHTYPE'      : 'BYTEA',
         'STRING'        : 'VARCHAR'
