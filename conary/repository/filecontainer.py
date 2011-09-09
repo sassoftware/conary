@@ -280,12 +280,13 @@ class FileContainer:
 
         self.file.seek(0, SEEK_END)
         if append or not self.file.tell():
-            if not append:
-                self.file.seek(SEEK_SET, 0)
-                self.file.truncate()
-
-            self.file.write(FILE_CONTAINER_MAGIC)
-            self.file.write(struct.pack("!I", version))
+            try:
+                self.file.write(FILE_CONTAINER_MAGIC)
+                self.file.write(struct.pack("!I", version))
+            except OSError, err:
+                if err.errno == errno.EBADF:
+                    raise IOError(errno.EBADF, "File is not open for writing")
+                raise
 
             self.mutable = True
         else:
