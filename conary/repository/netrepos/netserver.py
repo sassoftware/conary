@@ -3696,6 +3696,9 @@ class AuthToken(list):
         if self.entitlements:
             ents = []
             for ent in self.entitlements:
+                if isinstance(ent, (tuple, list)):
+                    # Remove entitlement class
+                    ent = ent[1]
                 ents.append('%s...' % ent[:6])
             out += ' entitlements=[%s]' % (', '.join(ents))
         if self.remote_ip:
