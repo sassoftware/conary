@@ -22,7 +22,7 @@ import os
 import pydoc, types
 from conary import versions
 from conary.build import recipe
-from conary.build import packagerecipe, redirectrecipe
+from conary.build import packagerecipe, redirectrecipe, capsulerecipe
 from conary.build import filesetrecipe, grouprecipe, groupsetrecipe, inforecipe
 
 blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'reportExcessBuildRequires', 'setModes'),
@@ -41,6 +41,14 @@ class DummyPackageRecipe(packagerecipe.PackageRecipe):
         self.name = 'package'
         self.version = '1.0'
         packagerecipe.PackageRecipe.__init__(self, cfg, None, None)
+        self._loadSourceActions(lambda x: True)
+        self.loadPolicy()
+
+class DummyCapsuleRecipe(capsulerecipe.CapsuleRecipe):
+    def __init__(self, cfg):
+        self.name = 'capsule'
+        self.version = '1.0'
+        capsulerecipe.CapsuleRecipe.__init__(self, cfg, None, None)
         self._loadSourceActions(lambda x: True)
         self.loadPolicy()
 
@@ -112,7 +120,8 @@ class DummyScripts(groupsetrecipe.GroupScripts):
     def __init__(self, *args, **kwargs):
         pass
 
-classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
+classList = [ DummyPackageRecipe, DummyCapsuleRecipe,
+          DummyGroupRecipe, DummyRedirectRecipe,
           DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe,
           DummyGroupSetRecipe,
           DummyTroveSet, DummyRepository, DummySearchPath,
