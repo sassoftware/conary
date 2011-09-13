@@ -680,6 +680,8 @@ class RemoveCapsuleFiles(packagepolicy._filterSpec):
             self.recipe.autopkg.getComponents())
 
         for name, fltrs in filters.iteritems():
+            provides = components[name].provides
+
             # make a copy of the files list since it will be modified in place.
             files = components[name].keys()
             for fn in files:
@@ -688,4 +690,6 @@ class RemoveCapsuleFiles(packagepolicy._filterSpec):
                         self.recipe.autopkg.delFile(fn)
                         self.recipe._capsulePathMap.pop(fn)
                         self.recipe._capsuleDataMap.pop(fn)
+                        provides.removeDeps(deps.FileDependencies,
+                                            [ deps.Dependency(fn) ] )
                         break
