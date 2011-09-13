@@ -1,3 +1,19 @@
+Changes in 2.3.5:
+  o New Features:
+    * The 'commitaction' repository commit hook now accepts python
+      module names, which will be searched for on the regular Python
+      search path.
+
+  o Bug Fixes:
+    * Fixed a bug that caused downloading PGP keys to always fail.
+    * getFileContents now succeeds when a capsule itself is requested,
+      rather than trying to extract contents from the capsule archive.
+      (CNY-3686)
+    * r.RemoveCapsuleFiles() now removes the automatically generated
+      provides for that path (CNY-3695)
+    * cvc explain now includes reference documentation for CapsuleRecipe
+      and its policies (CNY-3694)
+
 Changes in 2.3.4:
   o New Features:
     * `conary rdiff` is now equivalent to changeset/showcs, taking the
