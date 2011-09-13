@@ -892,11 +892,23 @@ class DependencySet(object):
     def hasDepClass(self, depClass):
         return depClass.tag in self.members
 
-    def removeDeps(self, depClass, deps):
+    def removeDeps(self, depClass, deps, missingOkay = False):
         self._hash = None
+
+        if missingOkay and depClass.tag not in self.members:
+            return
+
         c = self.members[depClass.tag]
-        for dep in deps:
-            del c.members[dep.name]
+
+        if missingOkay:
+            for dep in deps:
+                c.members.pop(dep.name, None)
+        else:
+            for dep in deps:
+                del c.members[dep.name]
+
+        if not self.members[depClass.tag].members:
+            del self.members[depClass.tag]
 
     def removeDepsByClass(self, depClass):
         self._hash = None

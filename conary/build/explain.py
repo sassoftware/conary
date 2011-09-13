@@ -22,7 +22,7 @@ import os
 import pydoc, types
 from conary import versions
 from conary.build import recipe
-from conary.build import packagerecipe, redirectrecipe
+from conary.build import packagerecipe, redirectrecipe, capsulerecipe
 from conary.build import filesetrecipe, grouprecipe, groupsetrecipe, inforecipe
 
 blacklist = {'PackageRecipe': ('InstallBucket', 'reportErrors', 'reportMissingBuildRequires', 'reportExcessBuildRequires', 'setModes'),
@@ -41,6 +41,14 @@ class DummyPackageRecipe(packagerecipe.PackageRecipe):
         self.name = 'package'
         self.version = '1.0'
         packagerecipe.PackageRecipe.__init__(self, cfg, None, None)
+        self._loadSourceActions(lambda x: True)
+        self.loadPolicy()
+
+class DummyCapsuleRecipe(capsulerecipe.CapsuleRecipe):
+    def __init__(self, cfg):
+        self.name = 'capsule'
+        self.version = '1.0'
+        capsulerecipe.CapsuleRecipe.__init__(self, cfg, None, None)
         self._loadSourceActions(lambda x: True)
         self.loadPolicy()
 
@@ -112,7 +120,8 @@ class DummyScripts(groupsetrecipe.GroupScripts):
     def __init__(self, *args, **kwargs):
         pass
 
-classList = [ DummyPackageRecipe, DummyGroupRecipe, DummyRedirectRecipe,
+classList = [ DummyPackageRecipe, DummyCapsuleRecipe,
+          DummyGroupRecipe, DummyRedirectRecipe,
           DummyGroupInfoRecipe, DummyUserInfoRecipe, DummyFilesetRecipe,
           DummyGroupSetRecipe,
           DummyTroveSet, DummyRepository, DummySearchPath,
@@ -275,6 +284,7 @@ def docObject(cfg, what):
 
     # start looking for the object that implements the method
     found = []
+    foundDocs = set()
     for klass in inspectList:
         if issubclass(klass, recipe.Recipe):
             r = klass(cfg)
@@ -297,10 +307,11 @@ def docObject(cfg, what):
             obj = obj.theclass
         if isinstance(obj, types.InstanceType):
             obj = obj.__class__
-        found.append((_parentName(klass), obj))
-
-    # collapse dups based on the doc string
-    found = dict( (x[1].__doc__, x) for x in found).values()
+        if (obj.__doc__ and obj.__doc__ not in foundDocs):
+            # let the order in inspectList determine which class we
+            # display if multiple classes provide this docstring
+            found.append((_parentName(klass), obj))
+            foundDocs.add(obj.__doc__)
 
     if len(found) == 1:
         _formatDoc(found[0][0], found[0][1])

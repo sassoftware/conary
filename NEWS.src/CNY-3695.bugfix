@@ -1,0 +1,1 @@
+r.RemoveCapsuleFiles() now removes the automatically generated provides for that path
