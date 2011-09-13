@@ -1,1 +1,1 @@
-r.RemoveCapsuleFiles() now removes the automaticaly generated provides for that path (if it exists)
+r.RemoveCapsuleFiles() now removes the automatically generated provides for that path
