@@ -71,6 +71,7 @@ This code is careful not to depend on the file pointer at all for reading
 (via pread). The file pointer is used while creating file containers.
 """
 
+import errno
 import gzip
 import struct
 
