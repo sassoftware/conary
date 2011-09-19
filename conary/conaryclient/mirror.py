@@ -170,6 +170,19 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
         downloadRateLimit = cfg.downloadRateLimit,
         entitlementDir = cfg.entitlementDirectory,
         entitlements=srcCfg.entitlement)
+
+    # Optional reference repository
+    if cfg.hasSection('reference'):
+        refCfg = cfg.getSection('reference')
+        refRepos = netclient.NetworkRepositoryClient(
+            refCfg.repositoryMap, refCfg.user,
+            uploadRateLimit = cfg.uploadRateLimit,
+            downloadRateLimit = cfg.downloadRateLimit,
+            entitlementDir = cfg.entitlementDirectory,
+            entitlements=refCfg.entitlement)
+    else:
+        refRepos = sourceRepos
+
     # we need to build a target repo client for each of the "target*"
     # sections in the config file
     targets = []
@@ -187,7 +200,7 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
         targets.append(target)
     # checkSync is a special operation...
     if checkSync:
-        return checkSyncRepos(cfg, sourceRepos, targets)
+        return checkSyncRepos(cfg, refRepos, targets)
     # we pass in the sync flag only the first time around, because after
     # that we need the targetRepos mark to advance accordingly after being
     # reset to -1
@@ -195,11 +208,15 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
                                  test = test, sync = sync,
                                  syncSigs = infoSync,
                                  callback = callback,
-                                 fastSync = fastSync)
+                                 fastSync = fastSync,
+                                 referenceRepos=refRepos,
+                                 )
     while callAgain:
         callAgain = mirrorRepository(sourceRepos, targets, cfg,
                                      test = test, callback = callback,
-                                     fastSync = fastSync)
+                                     fastSync = fastSync,
+                                     referenceRepos=refRepos,
+                                     )
 
 
 def Main(argv=None):
@@ -759,7 +776,11 @@ def _makeTargets(cfg, targetRepos, test = False):
 def mirrorRepository(sourceRepos, targetRepos, cfg,
                      test = False, sync = False, syncSigs = False,
                      callback = ChangesetCallback(),
-                     fastSync = False):
+                     fastSync = False,
+                     referenceRepos=None,
+                     ):
+    if referenceRepos is None:
+        referenceRepos = sourceRepos
     checkConfig(cfg)
     targets = _makeTargets(cfg, targetRepos, test)
     log.debug("-" * 20 + " start loop " + "-" * 20)
@@ -782,14 +803,15 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
             t.setMirrorMark(currentMark)
     # mirror gpg signatures from the src into the targets
     for t in targets:
-        t.mirrorGPG(sourceRepos, cfg.host)
+        t.mirrorGPG(referenceRepos, cfg.host)
     # mirror changed trove information for troves already mirrored
     if fastSync:
         updateCount = 0
         log.debug("skip trove info records sync because of fast-sync")
     else:
-        updateCount = mirrorTroveInfo(sourceRepos, targets, currentMark, cfg, syncSigs)
-    newMark, troveList = getTroveList(sourceRepos, cfg, currentMark)
+        updateCount = mirrorTroveInfo(referenceRepos, targets, currentMark,
+                cfg, syncSigs)
+    newMark, troveList = getTroveList(referenceRepos, cfg, currentMark)
     if not troveList:
         if newMark > currentMark: # something was returned, but filtered out
             for t in targets:
@@ -814,12 +836,12 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         troveSetList = set([x[1] for x in troveList])
         for mark, (name, version, flavor) in troveList:
             if trove.troveIsGroup(name):
-                recTroves, rmTroves = recurseTrove(sourceRepos, name, version,
-                                                   flavor, callback=callback)
+                recTroves, rmTroves = recurseTrove(referenceRepos, name,
+                        version, flavor, callback=callback)
 
                 # add sources here:
                 if cfg.includeSources:
-                    troveInfo = sourceRepos.getTroveInfo(
+                    troveInfo = referenceRepos.getTroveInfo(
                         trove._TROVEINFO_TAG_SOURCENAME, recTroves)
                     sourceComps = set()
                     for nvf, source in itertools.izip(recTroves, troveInfo):
@@ -839,7 +861,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         newHosts = set([x[1].getHost() for x in troveSetList.union(removedSet)])
         for host in newHosts.difference(set([cfg.host])):
             for t in targets:
-                t.mirrorGPG(sourceRepos, host)
+                t.mirrorGPG(referenceRepos, host)
 
     # we check which troves from the troveList are needed on each
     # target and we split the troveList into separate lists depending
@@ -932,7 +954,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     # mirroring removed troves requires one by one processing
     for target in targets:
         copySet = removedSet.copy()
-        updateCount += mirrorRemoved(sourceRepos, target.repo, copySet,
+        updateCount += mirrorRemoved(referenceRepos, target.repo, copySet,
                                      test=test, callback=callback)
     # if this was a noop because the removed troves were already mirrored
     # we need to keep going
