@@ -32,9 +32,13 @@ from conary.lib import elf
 from conary.lib import javadeps
 from conary.lib import util
 
-MSI_MAGIC_STRING = \
-    "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" \
-    "\x00\x00\x00\x00\x00\x00\x3E\x00\x03\x00\xFE\xFF\x09\x00\x06"
+MSI_MAGIC_STRINGS = (
+    ("\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+     "\x00\x00\x00\x00\x00\x00\x3E\x00\x03\x00\xFE\xFF\x09\x00\x06"),
+    ("\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+     "\x00\x00\x00\x00\x00\x00\x3e\x00\x04\x00\xfe\xff\x0c\x00\x06"),
+)
+
 WIM_MAGIC_STRING = "MSWIM\0\0"
 
 
@@ -417,8 +421,8 @@ def magic(path, basedir=''):
         return CIL(path, basedir, b)
     elif (len(b) > 4 and b[:4] == "\xed\xab\xee\xdb"):
         return RPM(path, basedir)
-    elif len(b) > len(MSI_MAGIC_STRING) and \
-            b[:len(MSI_MAGIC_STRING)] == MSI_MAGIC_STRING:
+    elif (len(b) > len(MSI_MAGIC_STRINGS[0]) and
+            [ x for x in MSI_MAGIC_STRINGS if b[:len(x)] == x ]):
         return MSI(path,basedir)
     elif len(b) > len(WIM_MAGIC_STRING) and \
             b[:len(WIM_MAGIC_STRING)] == WIM_MAGIC_STRING:
