@@ -382,6 +382,7 @@ static PyObject * stripped(PyObject *self, PyObject *args) {
 }
 
 static int isPrelinked(Elf * elf) {
+#ifdef DT_GNU_PRELINKED
     Elf_Scn * sect = NULL;
     GElf_Shdr shdr;
     Elf_Data * data = NULL;
@@ -409,6 +410,7 @@ static int isPrelinked(Elf * elf) {
 	    }
 	}
     }
+#endif
     return 0;
 }
 
