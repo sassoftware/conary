@@ -30,7 +30,7 @@
 
 /* we can not include <unistd.h> here because we're overriding most of
    its function prototypes. We still need a getpid() prototype though */
-extern pid_t getpid(void) __THROW;
+extern pid_t getpid(void);
 
 #define PRINTF(...)
 /* #define PRINTF(...) fprintf(stderr, __VA_ARGS__) */
