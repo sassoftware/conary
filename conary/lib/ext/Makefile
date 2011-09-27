@@ -61,7 +61,7 @@ system.so: LIBS = -lresolv
 
 # Rules
 %.so: %.o
-	$(CC) $(LDFLAGS) -shared -rdynamic -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -shared -rdynamic -o $@ $^ -lpython$(PYVER) $(LIBS)
 
 
 %.c: %.pyx common.pxi
