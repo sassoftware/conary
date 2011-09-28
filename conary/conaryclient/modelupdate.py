@@ -479,16 +479,13 @@ class CMLClient(object):
                     oldCompatClass = self.db.getTroveCompatibilityClass(
                                                 job[0], job[1][0], job[1][1])
                     preScript = scripts.preUpdate.script()
-                    if preScript:
-                        troveObj = troveCache.getTroves([ newTroveTup ],
-                                                        withFiles = False)[0]
                 else:
                     action = "preinstall"
                     oldCompatClass = None
-                    preSript = scripts.preInstall.script()
-                    if preScript:
-                        troveObj = troveCache.getTroves([ newTroveTup ],
-                                                        withFiles = False)[0]
+                    preScript = scripts.preInstall.script()
+                if preScript:
+                    troveObj = troveCache.getTroves([ newTroveTup ],
+                                                    withFiles=False)[0]
 
                 if compatClass:
                     compatClass = compatClass()
@@ -727,8 +724,6 @@ class CMLClient(object):
                         sugg = resolveMethod.resolveDependencies()
                         newJob = resolveMethod.filterSuggestions(
                                             result.unsatisfiedList, sugg, suggMap)
-                        newTroves = []
-
                         for (name, oldInfo, newInfo, isAbsolute) in newJob:
                             assert(isAbsolute)
                             log.info("adding for dependency %s", name)
