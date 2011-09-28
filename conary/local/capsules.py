@@ -200,6 +200,13 @@ class MetaCapsuleOperations(CapsuleOperation):
                 except:
                     pass
 
+    @classmethod
+    def preload(cls, kinds):
+        for kind in kinds:
+            modName, className = cls.availableClasses[kind]
+            if modName not in sys.modules:
+                __import__(modName)
+
     def getCapsule(self, kind):
         if kind not in self.capsuleClasses:
             module, klass = self.availableClasses[kind]

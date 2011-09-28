@@ -449,6 +449,8 @@ class CMLClient(object):
         compatibilityClasses = troveCache.getTroveInfo(
                                           trove._TROVEINFO_TAG_COMPAT_CLASS,
                                           newTroves)
+        capsuleInfo = troveCache.getTroveInfo(trove._TROVEINFO_TAG_CAPSULE,
+                newTroves)
         neededTroves = [ troveTup for (troveTup, script, compatClass)
                          in itertools.izip(newTroves, scripts,
                                            compatibilityClasses)
@@ -457,8 +459,9 @@ class CMLClient(object):
         if hasattr(troveCache, 'cacheTroves'):
             troveCache.cacheTroves(set(missingSize + neededTroves))
 
-        for job, newTroveTup, scripts, compatClass in itertools.izip(
-                        jobList, newTroves, scripts, compatibilityClasses):
+        for job, newTroveTup, scripts, compatClass, capInfo in itertools.izip(
+                jobList, newTroves, scripts, compatibilityClasses,
+                capsuleInfo):
             if newTroveTup in missingSize:
                 trv = troveCache.getTroves([newTroveTup])[0]
                 if trv.type() == trove.TROVE_TYPE_REMOVED:
@@ -510,6 +513,9 @@ class CMLClient(object):
                 rollbackFence = rollbackFence or \
                     troveCs.isRollbackFence(update = (job[1][0] is not None),
                                     oldCompatibilityClass = oldCompatClass)
+
+            if capInfo and capInfo.type():
+                updJob.addCapsuleType(capInfo.type())
 
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves

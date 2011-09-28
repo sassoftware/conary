@@ -576,6 +576,7 @@ class UpdateJob:
                 for x in self._jobPreScriptsAlreadyRun)
         drep['jobPostRBScripts'] = list(self._freezeJobPostRollbackScripts())
         drep['changesetsDownloaded'] = int(self._changesetsDownloaded)
+        drep['capsuleTypes'] = sorted(self._capsuleTypes)
 
         jobfile = os.path.join(frzdir, "jobfile")
 
@@ -688,6 +689,7 @@ class UpdateJob:
                 for x in drep.get('jobPreScriptsAlreadyRun', []))
         self._changesetsDownloaded = bool(drep.get('changesetsDownloaded', 0))
         self._fromChangesets = self._thawFromChangesets(drep.get('fromChangesets', []))
+        self._capsuleTypes = set(drep.get('capsuleTypes', ()))
 
         self.loadTroveMap(util.joinPaths(frzdir, self.trvCsDir))
 
@@ -1169,6 +1171,12 @@ class UpdateJob:
     def iterJobPreScriptsAlreadyRun(self):
         return iter(self._jobPreScriptsAlreadyRun)
 
+    def addCapsuleType(self, kind):
+        self._capsuleTypes.add(kind)
+
+    def iterCapsuleTypes(self):
+        return iter(sorted(self._capsuleTypes))
+
     def __init__(self, db, searchSource = None, lazyCache = None,
                  closeDatabase = True):
         # 20070714: lazyCache can be None for the users of the old API (when
@@ -1218,6 +1226,8 @@ class UpdateJob:
         self._features = UpdateJobFeatures()
         # Path conflicts which groups have said are acceptable
         self._allowedPathConflicts = set()
+        # All capsule types seen in the job, for early import purposes.
+        self._capsuleTypes = set()
 
         self._commitFlags = None
 

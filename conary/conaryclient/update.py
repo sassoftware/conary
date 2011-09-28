@@ -33,6 +33,7 @@ from conary.conaryclient import cmdline, resolve
 from conary.deps import deps
 from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError, DecodingError
 from conary.lib import log, util, api
+from conary.local import capsules
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
 from conary.repository.errors import TroveMissing, OpenError
@@ -1869,6 +1870,10 @@ conary erase '%s=%s[%s]'
         troves = self.db.getTroves(troveList, withFiles = False,
             withDeps = False)
         for job, scriptObj, troveObj in itertools.izip(removeList, scripts, troves):
+            capsuleType = troveObj.getTroveInfo().capsule.type()
+            if capsuleType:
+                updJob.addCapsuleType(capsuleType)
+
             if scriptObj is None: continue
             if not scriptObj.preErase.script(): continue
 
@@ -1936,6 +1941,10 @@ conary erase '%s=%s[%s]'
             rollbackFence = rollbackFence or \
                 troveCs.isRollbackFence(update = (job[1][0] is not None),
                                         oldCompatibilityClass = oldCompatClass)
+            capsuleType = troveCs.hasCapsule()
+            if capsuleType:
+                updJob.addCapsuleType(capsuleType)
+
         updJob.setInvalidateRollbacksFlag(rollbackFence)
         return missingTroves, removedTroves
 
@@ -3674,6 +3683,10 @@ conary erase '%s=%s[%s]'
         allJobs = uJob.getJobs()
 
         self._validateJob(list(itertools.chain(*allJobs)))
+
+        # Force capsule handlers to be imported now so that no imports happen
+        # once changesets start getting laid down.
+        capsules.MetaCapsuleOperations.preload(uJob.iterCapsuleTypes())
 
         # run preinstall scripts
         # But don't run the scripts here if we have a better ordering
