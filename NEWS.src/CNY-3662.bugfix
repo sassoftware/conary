@@ -1,4 +1,0 @@
-Conary now preloads all installer modules required for the entire operation
-before beginning. This prevents a bug where Conary updates itself to a new
-version with incompatible internal APIs, then attempts to load the
-now-incompatible module and crashes.

@@ -1,3 +1,20 @@
+Changes in 2.3.6:
+  o New Features:
+    * Added a "reference" section to mirror script configuration. If
+      provided, the reference repository will be used to determine what
+      troves are to be mirrored but the content will be downloaded from
+      the "source" repository. This allows mirroring only the troves
+      visible on an external mirror while using a closer copy of the
+      repository contents that might have more troves than desired.
+    * Added support for new MSI file magic.
+
+  o Bug Fixes:
+    * Conary now preloads all installer modules required for the entire
+      operation before beginning. This prevents a bug where Conary
+      updates itself to a new version with incompatible internal APIs,
+      then attempts to load the now-incompatible module and crashes.
+      (CNY-3662)
+
 Changes in 2.3.5:
   o New Features:
     * The 'commitaction' repository commit hook now accepts python
