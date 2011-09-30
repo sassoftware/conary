@@ -2876,7 +2876,10 @@ class Provides(_dependency):
                 # hopefully we'll find this init as a deeper import at some
                 # other point in the sysPath
                 continue
-            elif 'site-packages' in newDepPath:
+            elif ('site-packages' in newDepPath
+                    or 'lib-dynload' in newDepPath
+                    or 'plat-linux' in newDepPath
+                    ):
                 # site-packages should be specifically excluded since both it
                 # and its parent are always in sys.path. However, invalid
                 # python package names in general are allowed due to certain
