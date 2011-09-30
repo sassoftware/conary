@@ -1836,7 +1836,7 @@ def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
                               '"factory-"')
     elif factory != 'factory' and name.startswith('factory-'):
         raise errors.CvcError('Only factory troves may use "factory-" in '
-                              'their name')
+                'their name. Add --factory=factory to create a factory trove.')
 
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
