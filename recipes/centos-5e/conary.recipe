@@ -33,6 +33,7 @@ class Conary(CPackageRecipe):
         # This is needed due to the way python dep policy currently works
         r.macros.bindir = '/usr/conary/bin'
         r.macros.oldbindir = '/usr/bin'
+        r.macros.pylib = '%(pyroot)s/%(lib)s'
         r.macros.pybin = '%(pyroot)s/bin/python%(pymaj)s'
         r.macros.pypkgs = '%(pyroot)s/%(lib)s/python%(pymaj)s'
         r.macros.sitepkgs = '%(pypkgs)s/site-packages'
@@ -70,7 +71,7 @@ class Conary(CPackageRecipe):
         r.Make('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
                ' PYTHON=%(pybin)s'
                ' PYINCLUDE="%(pyroot)s/include/python%(pymaj)s"'
-               ' LDFLAGS="-Wl,-rpath,%(pyroot)s/%(lib)s"')
+               ' LDFLAGS="-L%(pylib)s -Wl,-rpath,%(pylib)s"')
         r.MakeInstall('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
                       ' PYTHON=%(pybin)s')
 
