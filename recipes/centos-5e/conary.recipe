@@ -37,6 +37,7 @@ class Conary(CPackageRecipe):
         r.macros.pybin = '%(pyroot)s/bin/python%(pymaj)s'
         r.macros.pypkgs = '%(pyroot)s/%(lib)s/python%(pymaj)s'
         r.macros.sitepkgs = '%(pypkgs)s/site-packages'
+        r.Environment('PATH', '%(bindir)s:/bin:/sbin:/usr/bin:/usr/sbin')
 
         r.addArchive('ftp://download.rpath.com/conary/')
         # r.addMercurialSnapshot('http://hg.rpath.com/conary-2.1', tag='adfcc5e2219b')
