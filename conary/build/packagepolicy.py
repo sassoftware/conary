@@ -1987,14 +1987,10 @@ class _dependency(policy.Policy):
         else:
             sysPath = [x.strip() for x in stdout.split('\0') if x.strip()]
 
-        if sysPath == []:
+        if not sysPath and not useDestDir:
             # probably a cross-build -- let's try a decent assumption
             # for the syspath.
-            if useDestDir:
-                self.info("Failed to detect system python path in destdir, "
-                        "using fallback")
-            else:
-                self.info("Failed to detect system python path, using fallback")
+            self.info("Failed to detect system python path, using fallback")
             pyVer = self._getPythonVersionFromPath(pythonPath, destdir)
             if not pyVer and self.bootstrapPythonFlags is not None:
                 pyVer = self._getPythonVersionFromFlags(
