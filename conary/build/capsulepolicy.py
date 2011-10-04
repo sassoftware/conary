@@ -654,7 +654,7 @@ class RemoveCapsuleFiles(packagepolicy._filterSpec):
     ========
     C{r.RemoveCapsuleFiles('foo:rpm', '/opt')}
 
-    Specifies taht the directory C{/opt} should be removed from the Conary
+    Specifies that the directory C{/opt} should be removed from the Conary
     package manifest.
     """
 
@@ -680,6 +680,10 @@ class RemoveCapsuleFiles(packagepolicy._filterSpec):
             self.recipe.autopkg.getComponents())
 
         for name, fltrs in filters.iteritems():
+            if name not in components:
+                self.error("Component %s does not exist" % name);
+                continue
+
             provides = components[name].provides
 
             # make a copy of the files list since it will be modified in place.
