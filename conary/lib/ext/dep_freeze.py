@@ -34,7 +34,9 @@ def depSetFreeze(members):
             words.append('%d#' % tag)
             words.extend(depFreeze(dep))
             words.append('|')
-    words.pop()
+    if words:
+        # Pop trailing pipe character
+        words.pop()
     return ''.join(words)
 
 
