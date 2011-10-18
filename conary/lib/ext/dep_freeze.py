@@ -44,7 +44,7 @@ def depFreeze(dep):
     words = []
     words.append(_escapeName(dep.name))
     for flag, sense in sorted(dep.flags.items()):
-        words.append(':%s%s' % (_escapeFlags(flag), senseMap[sense]))
+        words.append(':%s%s' % (senseMap[sense], _escapeFlags(flag)))
     return words
 
 
