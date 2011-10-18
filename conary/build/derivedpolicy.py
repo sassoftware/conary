@@ -16,7 +16,7 @@
 #
 
 
-import re, os
+import os
 
 from conary import files, trove
 from conary.build import destdirpolicy, filter, packagepolicy, policy
