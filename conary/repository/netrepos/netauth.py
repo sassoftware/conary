@@ -35,7 +35,7 @@ GroupAlreadyExists = errors.GroupAlreadyExists
 
 MAX_ENTITLEMENT_LENGTH = 255
 
-nameCharacterSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-'
+nameCharacterSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-\\'
 
 class UserAuthorization:
     def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
