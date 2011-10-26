@@ -25,7 +25,7 @@ class Conary(CPackageRecipe, Python.VersionMixIn):
     def setup(r):
         r.setDefaultPython()
         r.macros.sitepkgs = '%s/%%(name)s' % Python.sitepkgs
-        r.macros.sqlitever = '3070500'
+        r.macros.sqlitever = '3070800'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
         r.addMercurialSnapshot('http://hg.rpath.com/conary/')
         # r.addArchive('ftp://download.rpath.com/conary/')

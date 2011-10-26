@@ -24,7 +24,7 @@ class Conary(CPackageRecipe):
     ])
 
     def setup(r):
-        r.macros.sqlitever = '3070500'
+        r.macros.sqlitever = '3070800'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
         r.macros.pymaj = '2.6'

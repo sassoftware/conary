@@ -104,6 +104,14 @@ class StringStream(_ValueStream):
     _valueTypes = (str,)
     _valueDefault = ''
 
+    def set(self, value):
+        if value is None:
+            # Technically this isn't compatible because cstreams would return
+            # None on get later, but when freezing None is treated the same as
+            # empty string by containers.
+            value = ''
+        _ValueStream.set(self, value)
+
 
 class _NumericStream(_ValueStream):
     _valueTypes = (int, long, type(None))
