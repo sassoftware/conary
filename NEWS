@@ -1,3 +1,14 @@
+Changes in 2.3.7:
+  o New Features:
+    * The new rPath Corporate and Designated PGP signing keys have been
+      added to the default keyring. (CNY-3702)
+
+  o Bug Fixes:
+    * Derived packages no longer build regular expressions for the set
+      of files in a single component. (CNY-3594)
+    * Python requires are now resolved against the destdir Python first
+      even if there is a system Python of the same version. (CNY-3699)
+
 Changes in 2.3.6:
   o New Features:
     * Added a "reference" section to mirror script configuration. If

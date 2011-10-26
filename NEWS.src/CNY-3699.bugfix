@@ -1,1 +1,0 @@
-Python requires are now resolved against the destdir Python first even if there is a system Python of the same version.
