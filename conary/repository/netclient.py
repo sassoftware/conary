@@ -1574,9 +1574,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # "forceProxy" here makes sure that multi-part requests go back
             # through the same proxy on subsequent requests.
             forceProxy = server.usedProxy()
+            headers = [('X-Conary-Servername', server._serverName)]
             try:
                 inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
-                        url, forceProxy=forceProxy)
+                        url, forceProxy=forceProxy, headers=headers)
             except transport.TransportError, e:
                 raise errors.RepositoryError(str(e))
 
@@ -2172,8 +2173,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # "forceProxy" here makes sure that multi-part requests go back through
         # the same proxy on subsequent requests.
         forceProxy = self.c[server].usedProxy()
+        headers = [('X-Conary-Servername', server)]
         inF = transport.ConaryURLOpener(proxyMap = self.c.proxyMap).open(url,
-                forceProxy=forceProxy)
+                forceProxy=forceProxy, headers=headers)
 
         if callback:
             wrapper = callbacks.CallbackRateWrapper(
@@ -2903,10 +2905,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                              'handle.')
                 chunked = True
 
+            headers = [('X-Conary-Servername', serverName)]
             status, reason = httpPutFile(url, inFile, size, callback = callback,
                                          rateLimit = self.uploadRateLimit,
                                          proxyMap = self.c.proxyMap,
-                                         chunked = chunked)
+                                         chunked=chunked,
+                                         headers=headers,
+                                         )
 
             # give a slightly more helpful message for 403
             if status == 403:
@@ -2961,7 +2966,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             server.setAbortCheck(None)
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
-                proxies = None, proxyMap=None, chunked=False):
+        proxies=None, proxyMap=None, chunked=False, headers=()):
     """
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
@@ -2977,7 +2982,7 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     if proxies and not proxyMap:
         proxyMap = proxy_map.ProxyMap.fromDict(proxies)
     opener = transport.XMLOpener(proxyMap=proxyMap)
-    req = opener.newRequest(url, method='PUT')
+    req = opener.newRequest(url, method='PUT', headers=headers)
     req.setData(inFile, size, callback=callbackFn, chunked=chunked,
             rateLimit=rateLimit)
     response = opener.open(req)
