@@ -22,6 +22,7 @@ import sys
 from conary.lib import log
 from conary.local import database
 from conary.conaryclient import cmdline
+from conary.repository import changeset, filecontainer
 
 def listRollbacks(db, cfg):
     return formatRollbacks(cfg, db.getRollbackStack().iter(), stream=sys.stdout)
@@ -310,6 +311,26 @@ def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
 
         rollbacks = rollbackList[-rollbackCount:]
         rollbacks.reverse()
+
+    capsuleChangeSet = changeset.ReadOnlyChangeSet()
+    for path in defaults.pop('capsuleChangesets', []):
+        if os.path.isdir(path):
+            pathList = [ os.path.join(path, x) for x in os.listdir(path) ]
+        else:
+            pathList = [ path ]
+
+        for p in pathList:
+            if not os.path.isfile(p):
+                continue
+
+            try:
+                cs = changeset.ChangeSetFromFile(p)
+            except filecontainer.BadContainer:
+                continue
+
+            capsuleChangeSet.merge(cs)
+
+    defaults['capsuleChangeSet'] = capsuleChangeSet
 
     #-- Show only information and return
     if showInfoOnly or client.cfg.interactive:

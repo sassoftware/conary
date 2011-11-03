@@ -320,11 +320,12 @@ class FilesystemJob:
         return True
 
     def apply(self, journal = None, opJournal = None, justDatabase = False,
-              noScripts = False):
+              noScripts = False, capsuleChangeSet = None):
         assert(not self.errors)
         rootLen = len(self.root.rstrip('/'))
 
-        self.capsules.apply(justDatabase = justDatabase, noScripts = noScripts)
+        self.capsules.apply(justDatabase = justDatabase, noScripts = noScripts,
+                            capsuleChangeSet = capsuleChangeSet)
 
         if justDatabase:
             return

@@ -1,0 +1,3 @@
+Added --from-file to rollback command to allow passing a set of changesets
+which will be searched for capsule content. This is only needed/useful for
+localRollbacks of capsule packages.

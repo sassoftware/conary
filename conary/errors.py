@@ -226,6 +226,12 @@ class CancelOperationException(Exception):
     want a callback to stop an update at the end of the job"""
     cancelOperation = True
 
+class MissingRollbackCapsule(ConaryError):
+    """
+    An error occurred while loading the frozen representation of a data
+    structure
+    """
+
 UncatchableExceptionClasses = ( SystemExit, KeyboardInterrupt )
 
 def exceptionIsUncatchable(e):

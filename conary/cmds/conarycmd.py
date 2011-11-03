@@ -464,7 +464,9 @@ specific item in the rollback list ("conary rollback r.151" will
 rollback operation #151 and all later operations)."""
     commandGroup = 'System Modification'
 
-    docs = {'just-db'       : (VERBOSE_HELP,
+    docs = {
+            'from-file'     : (VERBOSE_HELP, 'search changeset(s) (or directories) for capsule contents'),
+            'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
             'replace-files' : ('Replace files on system with files from'
                                ' rollback if conflict'),
@@ -476,6 +478,7 @@ rollback operation #151 and all later operations)."""
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        argDef["from-file"] = MULT_PARAM
         argDef["just-db"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
         argDef["info"] = NO_PARAM
@@ -494,6 +497,7 @@ rollback operation #151 and all later operations)."""
         kwargs['noScripts'] = argSet.pop('no-scripts', False)
         kwargs['showInfoOnly'] = argSet.pop('info', False)
         kwargs['abortOnError'] = argSet.pop('abort-on-error', False)
+        kwargs['capsuleChangesets'] = argSet.pop('from-file', False)
 
         kwargs['callback'] = updatecmd.UpdateCallback(cfg)
         if argSet or len(otherArgs) != 3: return self.usage()

@@ -352,7 +352,11 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             if pathId in changedByPathId:
                 oldFileId = oldTrv.getFile(pathId)[1]
                 fileChange = self.changeSet.getFileChange(oldFileId, fileId)
-                if fileChange[0] == '\x01':
+                if (oldFileId == fileId):
+                    # only the version number changed; we don't need
+                    # to merge anything here
+                    pass
+                elif fileChange[0] == '\x01':
                     fileObj = fileObjsByPathId[pathId]
                     fileObj.twm(fileChange, fileObj)
                 else:

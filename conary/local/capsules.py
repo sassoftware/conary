@@ -18,9 +18,10 @@
 
 import os, tempfile, sys
 
-from conary import files, trove
+from conary import errors, files, trove
 from conary.lib import digestlib, util
 from conary.local import journal
+from conary.repository import changeset
 
 class CapsuleOperation(object):
 
@@ -165,7 +166,8 @@ class MetaCapsuleOperations(CapsuleOperation):
         CapsuleOperation.__init__(self, root, *args, **kwargs)
         self.capsuleClasses = {}
 
-    def apply(self, justDatabase = False, noScripts = False):
+    def apply(self, justDatabase = False, noScripts = False,
+              capsuleChangeSet = None):
         tmpDir = os.path.join(self.root, 'var/tmp')
         if not os.path.isdir(tmpDir):
             # For empty roots or roots that are not systems (e.g. source
@@ -180,7 +182,21 @@ class MetaCapsuleOperations(CapsuleOperation):
             for ((pathId, fileId, sha1), path) in sorted(fileDict.items()):
                 tmpfd, tmpname = tempfile.mkstemp(dir=tmpDir, prefix=path,
                         suffix='.conary')
-                fObj = self.changeSet.getFileContents(pathId, fileId)[1].get()
+                fType, fContents = self.changeSet.getFileContents(pathId,
+                                                                  fileId)
+                if (fType == changeset.ChangedFileTypes.hldr):
+                    if (capsuleChangeSet):
+                        try:
+                            result = capsuleChangeSet.getFileContents(pathId,
+                                                                      fileId)
+                            fObj = result[1].get()
+                        except KeyError:
+                            raise errors.MissingRollbackCapsule('Cannot find '
+                                'RPM %s to perform local rollback' % path)
+
+                else:
+                    fObj = fContents.get()
+
                 d = digestlib.sha1()
                 util.copyfileobj(fObj, os.fdopen(tmpfd, "w"), digest = d)
                 actualSha1 = d.digest()

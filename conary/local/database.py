@@ -1764,7 +1764,7 @@ class Database(SqlDbRepository):
                   reposRollback, localRollback, rollbackPhase, fsJob,
                   updateDatabase, callback, tagScript, dbCache,
                   autoPinList, flags, journal, directoryCandidates,
-                  storeRollback = True):
+                  storeRollback = True, capsuleChangeSet = None):
         if not (commitFlags.justDatabase or commitFlags.test or
                 (commitFlags.noScripts and not tagScript)):
             # run preremove scripts before updating the database, otherwise
@@ -1906,7 +1906,8 @@ class Database(SqlDbRepository):
 
         fsJob.apply(journal, opJournal = opJournal,
                     justDatabase = commitFlags.justDatabase,
-                    noScripts = commitFlags.noScripts)
+                    noScripts = commitFlags.noScripts,
+                    capsuleChangeSet = capsuleChangeSet)
 
         if (updateDatabase and not localChanges):
             for (name, version, flavor) in fsJob.getOldTroveList():
@@ -2060,7 +2061,7 @@ class Database(SqlDbRepository):
                         callback = UpdateCallback(),
                         removeHints = {}, autoPinList = RegularExpressionList(),
                         deferredScripts = None, commitFlags = None,
-                        repair = False):
+                        repair = False, capsuleChangeSet = None):
         assert(not cs.isAbsolute())
 
         if commitFlags is None:
@@ -2193,7 +2194,8 @@ class Database(SqlDbRepository):
                             opJournal, tagSet, reposRollback, localRollback,
                             rollbackPhase, fsJob, updateDatabase, callback,
                             tagScript, dbCache, autoPinList, flags, journal,
-                            directoryCandidates, storeRollback = not repair)
+                            directoryCandidates, storeRollback = not repair,
+                            capsuleChangeSet = capsuleChangeSet)
             except Exception, e:
                 if not issubclass(e.__class__, ConaryError):
                     callback.error("a critical error occured -- reverting "
@@ -2398,7 +2400,7 @@ class Database(SqlDbRepository):
                 cs.delNewTrove(*trv.getNameVersionFlavor())
 
         repairCs = cs.makeRollback(self, redirectionRollbacks = False,
-                                   repos = repos)
+                                   repos = repos, clearCapsule = True)
 
         uJob = UpdateJob(self)
         self.commitChangeSet(repairCs, uJob, callback = UpdateCallback(),
@@ -2562,7 +2564,7 @@ class Database(SqlDbRepository):
                           callback = UpdateCallback(), tagScript = None,
                           justDatabase = False, transactionCounter = None,
                           lazyCache = None, abortOnError = False,
-                          noScripts = False):
+                          noScripts = False, capsuleChangeSet = None):
         assert transactionCounter is not None, ("The transactionCounter "
             "argument is mandatory")
         if transactionCounter != self.getTransactionCounter():
@@ -2668,7 +2670,8 @@ class Database(SqlDbRepository):
                                      removeHints = removalHints,
                                      callback = callback,
                                      tagScript = tagScript,
-                                     commitFlags = commitFlags)
+                                     commitFlags = commitFlags,
+                                     capsuleChangeSet = capsuleChangeSet)
 
                     if not localCs.isEmpty():
                         itemCount += 1

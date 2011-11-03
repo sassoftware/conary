@@ -448,7 +448,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
     def applyRollback(self, rollbackSpec, replaceFiles = None,
             callback = None, tagScript = None, justDatabase = None,
             transactionCounter = None, showInfoOnly = False,
-            abortOnError = False, noScripts = False):
+            abortOnError = False, noScripts = False,
+            capsuleChangesets = []):
         """
         Apply a rollback.
 
@@ -486,6 +487,14 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
         @param abortOnError: Abort the rollback if any pre-rollback scripts
         fail.  Normally, the rollback continues even if there are pre-rollback
         script failures.
+        @type abortOnError: bool
+
+        @param capsuleChangesets: List of paths to changesets. Any capsules
+        included in those changesets are made available to the rollback
+        in case they are needed. If a directory is given, every changeset
+        in that directory is included (nonrecursively) while non-changeset
+        files are ignored.
+        @type capsuleChangesets: list of str
 
         @raise UpdateError: Generic update error. Can occur if the root is not
         writeable by the user running the command.
@@ -514,10 +523,12 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
             replaceFiles = replaceFiles,
             showInfoOnly = showInfoOnly,
             abortOnError = abortOnError,
+            capsuleChangesets = capsuleChangesets,
         )
         # If any of these arguments are None, don't even pass them, the
         # defaults are going to apply
         d = dict((x, y) for (x, y) in d.items() if y is not None)
+
         return rollbacks.applyRollback(self, rollbackSpec, **d)
 
     def close(self):

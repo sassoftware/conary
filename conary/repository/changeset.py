@@ -457,7 +457,10 @@ class ChangeSet(streams.StreamSet):
             os.unlink(outFileName)
             raise
 
-    def makeRollback(self, db, redirectionRollbacks = True, repos = None):
+    def makeRollback(self, db, redirectionRollbacks = True, repos = None,
+                     clearCapsule = False):
+        # clearCapsule is a hack to let repair work on capsules (where
+        # we neither have nor need the capsule to perform the repair)
         assert(not self.absolute)
 
         rollback = ChangeSet()
@@ -497,7 +500,8 @@ class ChangeSet(streams.StreamSet):
 
             # make a copy because we modify it locally to clear capsules
             invertedTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
-            invertedTroveInfo.capsule.reset()
+            if clearCapsule:
+                invertedTroveInfo.capsule.reset()
 
             newTroveInfo = troveCs.getTroveInfo()
             if newTroveInfo is None:
@@ -636,9 +640,14 @@ class ChangeSet(streams.StreamSet):
                 # it; if it hasn't changed the unmodified version will
                 # still be available from the database when the rollback
                 # gets applied. We may be able to get away with just reversing
-                # a diff rather then saving the full contents
-                if origFile.flags.isConfig() and newFile.flags.isConfig() and \
-                        (origFile.contents.sha1() != newFile.contents.sha1()):
+                # a diff rather then saving the full contents. capsule pathids
+                # aren't expected to be available; we mark those as special
+                if pathId == trove.CAPSULE_PATHID:
+                    rollback.addFileContents(pathId, curFileId,
+                                     ChangedFileTypes.hldr,
+                                     filecontents.FromString(""), False);
+                elif (origFile.flags.isConfig() and newFile.flags.isConfig() and
+                        (origFile.contents.sha1() != newFile.contents.sha1())):
                     if self.configFileIsDiff(newFile.pathId(), newFileId):
                         (contType, cont) = self.getFileContents(
                                     newFile.pathId(), newFileId)
