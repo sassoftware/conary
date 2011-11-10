@@ -68,11 +68,11 @@ class Conary(CPackageRecipe):
                   'config/macros')
 
         r.Make('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
-               ' PYTHON=%(pybin)s'
-               ' CFLAGS="-fPIC -I%(pyroot)s/include/python2.6"'
-               ' LDFLAGS="-Wl,-rpath,%(pyroot)s/%(lib)s"')
+               ' PYTHON=%(pybin)s PYVER=%(pymaj)s'
+               ' PYINCLUDE="%(pyroot)s/include/python%(pymaj)s"'
+               ' LDFLAGS="-L%(pylib)s -Wl,-rpath,%(pylib)s"')
         r.MakeInstall('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
-                      ' PYTHON=%(pybin)s')
+                      ' PYTHON=%(pybin)s PYVER=%(pymaj)s')
 
         # Change any #! lines to point to internal python interpreter
         r.NormalizePythonInterpreterVersion(
