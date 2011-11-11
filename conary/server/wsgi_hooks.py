@@ -323,7 +323,7 @@ class WSGIServer(object):
 
         try:
             params, method = util.xmlrpcLoad(stream)
-        except (xmlrpclib.ResponseError, UnicodeDecodeError):
+        except (xmlrpclib.ResponseError, ValueError, UnicodeDecodeError):
             log.error("Malformed XMLRPC request from %s", self.auth.remote_ip)
             yield self._response('400 Bad Request',
                     "ERROR: Malformed XMLRPC request\r\n")
