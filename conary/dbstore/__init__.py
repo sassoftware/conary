@@ -65,26 +65,6 @@ def __get_driver(driver = __DRIVER):
                 e.args + (driver,))
         else:
             return Database
-    # mysql support
-    if driver == "mysql":
-        try:
-            from mysql_drv import Database
-        except ImportError, e:
-            raise InvalidBackend(
-                "Could not locate driver for backend '%s'" % (driver,),
-                e.args + (driver,))
-        else:
-            return Database
-    # ingres support
-    if driver == "ingres":
-        try:
-            from ingres_drv import Database
-        except ImportError, e:
-            raise InvalidBackend(
-                "Could not locate driver for backend '%s'" % (driver,),
-                e.args + (driver,))
-        else:
-            return Database
     # ELSE, INVALID
     raise InvalidBackend(
         "Database backend '%s' is not supported" % (driver,),
