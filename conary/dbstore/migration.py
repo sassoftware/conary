@@ -28,7 +28,7 @@ def getDatabaseVersion(db):
         cu.execute("select * from DatabaseVersion")
     except:
         return sqllib.DBversion(0)
-    ret = cu.fetchone_dict()
+    ret = cu.fetchone()
     if ret.has_key("minor"):
         return sqllib.DBversion(ret["version"], ret["minor"])
     return sqllib.DBversion(ret["version"])

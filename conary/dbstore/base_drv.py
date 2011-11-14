@@ -100,7 +100,9 @@ class BaseCursor:
             return None
         return self.binaryClass(s)
     def frombinary(self, s):
-        return s
+        if s is None:
+            return None
+        return str(s)
 
     # this needs to be provided by the specific drivers
     def _tryExecute(self, *args, **kw):
@@ -261,6 +263,7 @@ class BaseDatabase:
     cursorClass = BaseCursor
     sequenceClass = BaseSequence
     driver = "base"
+    kind = "base"
     keywords = BaseKeywordDict()
     poolmode = False    # indicates if connections are pooled and can be open/closed cheaply
 
@@ -434,6 +437,15 @@ class BaseDatabase:
         if default is not None:
             return default
         raise NotImplementedError("This function should be provided by the SQL drivers")
+
+    def runAutoCommit(self, func, *args, **kwargs):
+        """Call the given function in auto-commit mode. Needed to execute
+        statements that cannot be run in a transaction, like CREATE
+        DATABASE.
+
+        WARNING: This will commit any open transaction!
+        """
+        return func(*args, **kwargs)
 
     # trigger schema handling
     def createTrigger(self, table, when, onAction, sql):

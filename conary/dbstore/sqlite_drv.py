@@ -132,6 +132,7 @@ class Sequence(BaseSequence):
 
 class Database(BaseDatabase):
     driver = "sqlite"
+    kind = "sqlite"
     alive_check = "select count(*) from sqlite_master"
     cursorClass = Cursor
     sequenceClass = Sequence
