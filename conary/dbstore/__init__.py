@@ -17,6 +17,7 @@
 
 
 import os
+import re
 
 from conary.lib import cfg, cfgtypes
 
@@ -28,47 +29,41 @@ from sqlerrors import InvalidBackend
 # default driver we want to use
 __DRIVER = "sqlite"
 
+_driverCache = {}
+
+
 def __get_driver(driver = __DRIVER):
     global __DRIVER
     if not driver:
         driver = __DRIVER
-    if driver == "sqlite":
-        try:
-            from sqlite_drv import Database
-        except ImportError, e:
-            raise InvalidBackend(
-                "Could not locate driver for backend '%s'" % (driver,),
-                e.args + (driver,))
-        else:
-            return Database
     # requesting a postgresql driver that is pooling aware switches to
     # the pgpool driver
     if driver == "postgresql" and os.environ.has_key("POSTGRESQL_POOL"):
         driver = "pgpool"
-    # postgresl support
-    if driver == "postgresql":
-        try:
-            from postgresql_drv import Database
-        except ImportError, e:
-            raise InvalidBackend(
-                "Could not locate driver for backend '%s'" % (driver,),
-                e.args + (driver,))
+
+    if driver not in _driverCache:
+        _loadDriver(driver)
+    return _driverCache[driver]
+
+
+def _loadDriver(name):
+    if not re.match('^[a-zA-Z0-9_]+', name):
+        raise ValueError("Invalid SQL driver name %r" % (name,))
+
+    modName = name + '_drv'
+    try:
+        driverModule = __import__(modName, globals(), locals())
+    except ImportError, err:
+        if modName in str(err):
+            # Re-throw only in cases where the dbstore driver missing.
+            raise InvalidBackend("The SQL backend %r is not supported" %
+                    (name,))
         else:
-            return Database
-    # PostgreSQL pgpool/pgbouncer support
-    if driver == "pgpool":
-        try:
-            from pgpool_drv import Database
-        except ImportError, e:
-            raise InvalidBackend(
-                "Could not locate driver for backend '%s'" % (driver,),
-                e.args + (driver,))
-        else:
-            return Database
-    # ELSE, INVALID
-    raise InvalidBackend(
-        "Database backend '%s' is not supported" % (driver,),
-        driver)
+            # Otherwise a dependency failed to load, let those bubble up
+            # normally for easy debugging.
+            raise
+    _driverCache[name] = getattr(driverModule, 'Database')
+
 
 # create a database connection and return an instance
 # all drivers parse a db string in the form:
