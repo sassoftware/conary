@@ -788,7 +788,7 @@ class TroveStore:
         """)
         cu.execute("SELECT dirNameId, dirName FROM Dirnames "
                    "WHERE dirNameId > ?", max)
-        addPrefixesFromList(self.db, [ (x[0], x[1]) for x in cu ])
+        addPrefixesFromList(self.db, [ (x[0], cu.frombinary(x[1])) for x in cu ])
 
         cu.execute("""
                 SELECT Dirnames.dirName, Dirnames.dirNameId FROM
@@ -983,7 +983,7 @@ class TroveStore:
         cu.execute(sql3)
 
         callback.updatingDatabase('latest', 4, 5)
-        if self.db.driver in [ 'postgresql', 'pgpool' ]:
+        if self.db.kind == 'postgresql':
             cu.execute("DELETE FROM LatestCache USING tmpNewTroves WHERE"
                         "   LatestCache.itemId = tmpNewTroves.itemId AND "
                        "    LatestCache.branchId = tmpNewTroves.branchId AND "
@@ -1183,7 +1183,7 @@ class TroveStore:
 
         # for PostgreSQL we have to force an execution plan that
         # uses the join order as coded in the query
-        if self.db.driver in [ 'postgresql', 'pgpool' ]:
+        if self.db.kind == 'postgresql':
             cu.execute("set join_collapse_limit to 2")
             cu.execute("set enable_seqscan to off")
 
@@ -1206,7 +1206,7 @@ class TroveStore:
         troveTrovesCursor = util.PushIterator(troveTrovesCursor)
 
         # revert changes we forced on the postgresql optimizer
-        if self.db.driver in [ 'postgresql', 'pgpool' ]:
+        if self.db.kind == 'postgresql':
             cu.execute("set join_collapse_limit to default")
             cu.execute("set enable_seqscan to default")
 
@@ -1301,10 +1301,11 @@ class TroveStore:
                 while next[0] == idx:
                     (idxA, pathId, dirname, basename, versionId, fileId,
                      stream) = next
-                    path = os.path.join(dirname, basename)
+                    fileId = cu.frombinary(fileId)
+                    path = os.path.join(cu.frombinary(dirname),
+                            cu.frombinary(basename))
                     version = versions.VersionFromString(versionId)
-                    trv.addFile(cu.frombinary(pathId), path, version,
-                                cu.frombinary(fileId))
+                    trv.addFile(cu.frombinary(pathId), path, version, fileId)
                     if stream is not None:
                         fileContents[fileId] = stream
                     next = troveFilesCursor.next()
@@ -1382,7 +1383,8 @@ class TroveStore:
         versionCache = {}
         for (pathId, dirname, basename, fileId, versionId, stream) in cu:
             version = versionCache.get(versionId, None)
-            path = os.path.join(dirname, basename)
+            path = os.path.join(cu.frombinary(dirname),
+                    cu.frombinary(basename))
             if not version:
                 version = self.versionTable.getBareId(versionId)
                 versionCache[versionId] = version
@@ -1527,7 +1529,8 @@ class TroveStore:
 
         r = cu.fetchall()
         # if sha1 is None, the file has no contents
-        candidateSha1sToRemove = [ x[1] for x in r if x[1] is not None ]
+        candidateSha1sToRemove = [ cu.frombinary(x[1]) for x in r
+                if x[1] is not None ]
         streamIdsToRemove = [ x[0] for x in r ]
 
         cu.execute("DELETE FROM TroveFiles WHERE instanceId = ?", instanceId)

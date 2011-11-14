@@ -1335,13 +1335,7 @@ def setupTempTables(db):
 
 
 def resetTable(cu, name):
-    # HACK: this is referenced in so many places that it is cheaper to just
-    # reimplement the truncate code here than to change them all to pass the
-    # database object.
-    if cu.driver in ("postgresql", "pgpool"):
-        cu.execute("TRUNCATE TABLE %s" % name, start_transaction=False)
-    else:
-        cu.execute("DELETE FROM %s" % name, start_transaction=False)
+    cu.execute("DELETE FROM %s" % name, start_transaction=False)
 
 
 # create the (permanent) server repository schema

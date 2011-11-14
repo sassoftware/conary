@@ -180,7 +180,7 @@ class UserAuthorization:
         if userPasswords and not self._checkPassword(
                                         user,
                                         cu.frombinary(userPasswords[0][0]),
-                                        userPasswords[0][1],
+                                        cu.frombinary(userPasswords[0][1]),
                                         password, remoteIp):
             result = [ x for x in result if x[3] == 'anonymous' ]
 
@@ -846,7 +846,7 @@ class NetworkAuthorization:
 
     def getPermsByRole(self, roleName):
         cu = self._queryPermsByRole(roleName)
-        results = cu.fetchall_dict()
+        results = cu.fetchall()
         # reconstruct the dictionary of values (because some
         # database engines like PostgreSQL lowercase all column names)
         l = []
@@ -1164,7 +1164,7 @@ class NetworkAuthorization:
         cu.execute("SELECT entitlement FROM Entitlements WHERE "
                    "entGroupId = ?", entClassId)
 
-        return [ x[0] for x in cu ]
+        return [ cu.frombinary(x[0]) for x in cu ]
 
     def listEntitlementClasses(self, authToken):
         cu = self.db.cursor()

@@ -2030,11 +2030,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         cu.execute(q, trove._TROVEINFO_TAG_CAPSULE)
         fileIdCapsuleList = []
         instanceIds = set()
-        for (i, instanceId, changed, data, dirname, basename, fileSha1) in cu:
+        for (i, instanceId, _, data, dirname, basename, fileSha1) in cu:
             fileId = uniqIdList[i]
             trvCapsule = trove.TroveCapsule()
-            trvCapsule.thaw(data)
+            trvCapsule.thaw(cu.frombinary(data))
             instanceIds.add(instanceId)
+            dirname = cu.frombinary(dirname)
+            basename = cu.frombinary(basename)
+            fileSha1 = cu.frombinary(fileSha1)
             if dirname:
                 filePath = util.joinPaths(dirname, basename)
             else:
@@ -2057,9 +2060,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         JOIN FileStreams ON (TroveFiles.streamId = FileStreams.streamId)
         WHERE FilePaths.pathId = ?
         """
-        cu.execute(q, trove.CAPSULE_PATHID)
-        instanceIds = dict((instanceIds[i], (sha1, fileId))
-                for (i, sha1, fileId) in cu)
+        cu.execute(q, cu.binary(trove.CAPSULE_PATHID))
+        instanceIds = dict((instanceIds[i], (cu.frombinary(sha1),
+            cu.frombinary(fileId))) for (i, sha1, fileId) in cu)
         fileIdMapWithResults = {}
         for fileId, trvCapsule, filePath, fileSha1, instanceId in fileIdCapsuleList:
             capsuleSha1, capsuleFileId = instanceIds.get(instanceId)
@@ -2212,7 +2215,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         def _lookupIds(cu, itemList, selectQlist):
             schema.resetTable(cu, "tmpPaths")
             cu.executemany("insert into tmpPaths (path) values (?)",
-                           (cu.binary(x) for x in itemList), start_transaction=False)
+                    [(cu.binary(x),) for x in itemList],
+                    start_transaction=False)
             self.db.analyze("tmpPaths")
             schema.resetTable(cu, "tmpId")
             if cu.driver == "mysql" and len(selectQlist) > 1:
@@ -2275,7 +2279,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         """ % (prefixQuery,))
         ids = {}
         for (pathId, dirname, basename, version, fileId, timeStamp) in cu:
-            encodedPath = self.fromPath( os.path.join(dirname, basename) )
+            encodedPath = self.fromPath( os.path.join(cu.frombinary(dirname),
+                cu.frombinary(basename)) )
             currVal = ids.get(encodedPath, None)
             newVal = (cu.frombinary(pathId), version, cu.frombinary(fileId))
             if currVal is None:
@@ -2535,7 +2540,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                ",".join("%d" % x for x in roleIds),
                trove._TROVEINFO_TAG_PKGCREATORDATA)
         cu.execute(query)
-        return sorted([ tuple(x) for x in cu ])
+        return sorted([ (name, version, flavor, cu.frombinary(data))
+            for (name, version, flavor, data) in cu ])
 
     @accessReadWrite
     def addMetadataItems(self, authToken, clientVersion, itemList):
@@ -2767,7 +2773,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         result = cu.fetchall()
         if not result or result[0][0] == None:
             return -1
-        return result[0][0]
+        return float(result[0][0])
 
     @accessReadWrite
     def setMirrorMark(self, authToken, clientVersion, host, mark):
@@ -2829,7 +2835,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # the fewer query parameters passed in, the better PostgreSQL optimizes the query
         # so we embed the constants in the query and bind the user supplied data
         cu.execute(query, (mark, mark))
-        l = [ (m, (n,v,f)) for n,v,f,m in cu ]
+        l = [ (float(m), (n,v,f)) for n,v,f,m in cu ]
         return list(set(l))
 
     @accessReadOnly
@@ -2838,6 +2844,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         def freezeTroveInfo(returnList, mark, trove, troveInfo):
             if not trove: return
+            mark = float(mark)
             if clientVersion <= 64:
                 # mask out extended metadata
                 returnList.add((mark, trove, troveInfo.freeze(
@@ -3193,7 +3200,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ret = []
         for name, version, flavor, timeStamps, mark, troveType in cu:
             version = self.versionStringToFrozen(version, timeStamps)
-            ret.append( (mark, (name, version, flavor), troveType) )
+            ret.append( (float(mark), (name, version, flavor), troveType) )
             if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
                 junk = cu.fetchall()
@@ -3395,6 +3402,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             AND TroveInfo.infoType = ?
         """, infoType)
         for i, data in cu:
+            data = cu.frombinary(data)
             if data is None:
                 ret[i] = (0, '') # value missing
                 continue
@@ -3409,7 +3417,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 md.thaw(data)
                 data = md.freeze(skipSet = trove.TroveInfo._newMetadataItems)
 
-            ret[i] = (1, base64.encodestring(cu.frombinary(data)))
+            ret[i] = (1, base64.encodestring(data))
         return ret
 
     @accessReadOnly
