@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <malloc.h>
 #include <openssl/sha.h>
+#include <stdint.h>
 #include <sys/param.h>
 #include <zlib.h>
 
