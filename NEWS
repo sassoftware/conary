@@ -1,3 +1,16 @@
+Changes in 2.3.8:
+  o New Features:
+    * Added an experimental psycopg2 dbstore driver.
+
+  o Bug Fixes:
+    * Added --from-file to rollback command to allow passing a set of
+      changesets which will be searched for capsule content. This is
+      only needed/useful for localRollbacks of capsule packages.
+      (CNY-3705)
+    * Requests that get or put changesets now send the X-Conary-
+      Servername header, fixing a proxying issue with some rBuilder
+      configurations.
+
 Changes in 2.3.7:
   o New Features:
     * The new rPath Corporate and Designated PGP signing keys have been

@@ -1,2 +1,0 @@
-Requests that get or put changesets now send the X-Conary-Servername header,
-fixing a proxying issue with some rBuilder configurations.
