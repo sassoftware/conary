@@ -72,6 +72,9 @@ class BaseKeywordDict(dict):
 # interface
 class BaseCursor:
     binaryClass = BaseBinary
+    _encodeRequired = True
+
+
     def __init__(self, dbh=None, encoding=DEFAULT_ENCODING):
         self.dbh = dbh
         self.encoding = encoding
@@ -144,8 +147,9 @@ class BaseCursor:
             elif isinstance(args[0], (tuple, list)):
                 args = tuple(args[0])
 
-        args = tuple(self.encode(x) for x in args)
-        kw = dict((key, self.encode(value)) for (key, value) in kw.items())
+        if self._encodeRequired:
+            args = tuple(self.encode(x) for x in args)
+            kw = dict((key, self.encode(value)) for (key, value) in kw.items())
         return args, kw
 
     # basic sanity checks for executes
