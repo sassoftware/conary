@@ -1180,6 +1180,11 @@ def ThawFlavor(frz):
     @raises ValueError: could be raised if frozen object is malformed
     """
     f = Flavor()
+    if isinstance(frz, unicode):
+        try:
+            frz = frz.encode("ascii")
+        except UnicodeEncodeError:
+            raise ParseError, ("invalid characters in flavor '%s'" % frz)
     f.thaw(frz)
     return f
 
