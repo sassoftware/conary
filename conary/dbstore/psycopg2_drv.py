@@ -127,9 +127,15 @@ class Database(BaseDatabase):
             self.dbh = psycopg2.connect(**cdb)
         except psycopg2.DatabaseError:
             raise sqlerrors.DatabaseError("Could not connect to database", cdb)
-
-        # reset the tempTables since we just lost them because of the (re)connect
         self.tempTables = sqllib.CaselessDict()
+        c = self.cursor()
+        c.execute("""
+        select c.relname as tablename from pg_class c
+        where c.relnamespace = pg_my_temp_schema()
+          and c.relkind = 'r'::"char"
+        """)
+        for table, in c.fetchall():
+            self.tempTables[table] = sqllib.Llist()
         self.closed = False
         return True
 
