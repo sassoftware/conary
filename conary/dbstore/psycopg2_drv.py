@@ -110,6 +110,17 @@ class Cursor(BaseCursor):
         else:
             return int(row[0])
 
+    def _row(self, data):
+        "Convert a data tuple to a C{Row} object."
+        assert self._cursor
+        if data is None:
+            return None
+        # This implementation does not request the unicode extension, but the
+        # underlying connection might be shared with one that does. Callers
+        # won't be expecting unicodes though so re-encode it.
+        data = [self.encode(x) for x in data]
+        return sqllib.Row(data, self.fields())
+
 
 class Database(BaseDatabase):
     driver = "psycopg2"
