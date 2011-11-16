@@ -100,8 +100,7 @@ class Cursor(BaseCursor):
     def fields(self):
         return [x[0] for x in self._cursor.description]
 
-    @property
-    def lastrowid(self):
+    def lastid(self):
         cu = self.dbh.cursor()
         cu.execute("SELECT lastval()")
         row = cu.fetchone()
@@ -109,6 +108,8 @@ class Cursor(BaseCursor):
             return None
         else:
             return int(row[0])
+
+    lastrowid = property(lastid)
 
     def _row(self, data):
         "Convert a data tuple to a C{Row} object."
