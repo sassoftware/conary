@@ -43,6 +43,7 @@ class KeywordDict(BaseKeywordDict):
 class Cursor(BaseCursor):
     binaryClass = buffer
     driver = "psycopg2"
+    _encodeRequired = False
 
     def _tryExecute(self, func, *params, **kw):
         try:
