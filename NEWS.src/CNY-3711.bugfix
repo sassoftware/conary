@@ -1,1 +1,0 @@
-Fixed the 'rollback' command failing if --from-file was not specified.
