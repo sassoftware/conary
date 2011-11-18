@@ -497,7 +497,7 @@ rollback operation #151 and all later operations)."""
         kwargs['noScripts'] = argSet.pop('no-scripts', False)
         kwargs['showInfoOnly'] = argSet.pop('info', False)
         kwargs['abortOnError'] = argSet.pop('abort-on-error', False)
-        kwargs['capsuleChangesets'] = argSet.pop('from-file', False)
+        kwargs['capsuleChangesets'] = argSet.pop('from-file', [])
 
         kwargs['callback'] = updatecmd.UpdateCallback(cfg)
         if argSet or len(otherArgs) != 3: return self.usage()
