@@ -1419,6 +1419,7 @@ class Memcache(object):
         self.memCacheTimeout = cfg.memCacheTimeout
         self.memCacheLocation = cfg.memCache
         self.memCacheUserAuth = cfg.memCacheUserAuth
+        self.memCachePrefix = cfg.memCachePrefix
 
         if self.memCacheTimeout >= 0:
             self.memCache = cache.getCache(self.memCacheLocation)
@@ -1434,6 +1435,8 @@ class Memcache(object):
             authInfo = (authToken[0], authToken[1], tuple(authToken[2]))
         else:
             authInfo = ()
+        if self.memCachePrefix:
+            extraArgs = (self.memCachePrefix,) + extraArgs
         # Hash the common arguments separately to save a few cycles.
         # Microbenchmarks indicate that this adds effectively zero cost even
         # with only one item.

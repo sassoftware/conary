@@ -3724,6 +3724,7 @@ class ServerConfig(ConfigFile):
     memCache                = CfgString
     memCacheUserAuth        = (CfgBool, True)
     memCacheTimeout         = (CfgInt, -1)
+    memCachePrefix          = CfgString
     changesetCacheDir       = CfgPath
     changesetCacheLogFile   = CfgPath
     closed                  = CfgString
