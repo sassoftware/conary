@@ -535,7 +535,7 @@ def createPGPKeys(db):
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT PGPKeys_userId_fk
                 FOREIGN KEY (userId) REFERENCES Users(userId)
-                ON DELETE CASCADE ON UPDATE CASCADE
+                ON DELETE SET NULL ON UPDATE CASCADE
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["PGPKeys"] = []
         commit = True

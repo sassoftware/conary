@@ -659,7 +659,7 @@ class MigrateTo_16(SchemaMigration):
 
 
 class MigrateTo_17(SchemaMigration):
-    Version = (17,3)
+    Version = (17,4)
 
     # given a FilePaths table that only has a path column, split that into
     # a (dirnameid, basenameId) tuple and create/update the corresponding
@@ -829,6 +829,18 @@ class MigrateTo_17(SchemaMigration):
         cu.execute("""select streamId, stream from filestreams
                       where sha1 is NULL and stream is not NULL""")
 
+        return True
+
+    def migrate4(self):
+        if self.db.kind == 'sqlite':
+            return True
+        cu = self.db.cursor()
+        cu.execute("""ALTER TABLE pgpkeys
+            DROP CONSTRAINT PGPKeys_userId_fk,
+            ADD CONSTRAINT PGPKeys_userId_fk
+                FOREIGN KEY ( userId )
+                REFERENCES Users ( userId )
+                ON DELETE SET NULL ON UPDATE CASCADE""")
         return True
 
 class MigrateTo_18(SchemaMigration):
