@@ -235,7 +235,12 @@ class AbstractTroveSource:
 
             return
 
-        yield topTrove
+        def _format(trv):
+            if asTuple:
+                return trv.getNameVersionFlavor()
+            else:
+                return trv
+        yield _format(topTrove)
         seen = { topTrove.getName() : [ (topTrove.getVersion(),
                                          topTrove.getFlavor()) ] }
 
@@ -260,7 +265,7 @@ class AbstractTroveSource:
             try:
                 trv = self.getTrove(name, version, flavor, withFiles=withFiles)
 
-                yield trv
+                yield _format(trv)
 
                 troveList = ([ x for x in
                                 sorted(trv.iterTroveList(strongRefs=True)) ]
