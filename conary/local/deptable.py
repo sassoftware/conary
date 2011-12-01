@@ -427,7 +427,7 @@ class DependencyChecker:
                                     self.iterNodes(enum = True)
                               if trove.troveIsCollection(job[0]) and
                                  job[1][0] is not None ]
-        referencesList = self.troveSource.db.getTroveReferences(
+        referencesList = self.troveSource.db.getTroveTroves(
                           [ (job[0], job[1][0], job[1][1])
                                 for i, job in oldTroveIndexes ],
                           weakRefs = True)

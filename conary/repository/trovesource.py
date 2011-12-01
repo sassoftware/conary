@@ -206,7 +206,7 @@ class AbstractTroveSource:
                 for t in tup[1]:
                     _collect(l, t)
 
-        if asTuple and hasattr(self, 'getTroveReferences'):
+        if asTuple and hasattr(self, 'getTroveTroves'):
             assert(not withFiles)
             seen = set()
             all = [ topTrove.getNameVersionFlavor(), None ]
@@ -217,7 +217,7 @@ class AbstractTroveSource:
                 if not getList:
                     break
 
-                refs = self.getTroveReferences([ x[0] for x in getList],
+                refs = self.getTroveTroves([ x[0] for x in getList],
                                                justPresent = True)
 
                 for item, refList in itertools.izip(getList, refs):

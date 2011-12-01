@@ -363,7 +363,7 @@ class ClientUpdate(object):
                     self.pinnedCache.update(
                             itertools.izip(present, pinnedList))
 
-                    referenceList = self.db.getTroveReferences(
+                    referenceList = self.db.getTroveTroves(
                                                 present, weakRefs = False,
                                                 pristineOnly = False)
                     self.referencesCache.update(

@@ -1361,9 +1361,9 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def getTroveContainers(self, l):
         return self.db.getTroveContainers(l)
 
-    def getTroveReferences(self, l, weakRefs = False, justPresent = False,
+    def getTroveTroves(self, l, weakRefs = False, justPresent = False,
                            pristineOnly = True):
-        return self.db.getTroveReferences(l, weakRefs = weakRefs,
+        return self.db.getTroveTroves(l, weakRefs = weakRefs,
                                           justPresent = justPresent,
                                           pristineOnly = pristineOnly)
 
@@ -2317,7 +2317,7 @@ class Database(SqlDbRepository):
 
             if trove.troveIsCollection(troveInfo[0]):
                 for subTroveInfo in \
-                      itertools.chain(*self.db.getTroveReferences([troveInfo])):
+                      itertools.chain(*self.db.getTroveTroves([troveInfo])):
                     q.add(subTroveInfo)
 
         return sorted(list(troveSet))
