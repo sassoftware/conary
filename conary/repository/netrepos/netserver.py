@@ -1424,7 +1424,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         exception = errors.FileContentsNotFound
 
                 if exception:
-                    raise exception(self.toFileId(encFileId),
+                    raise exception(encFileId,
                                     self.toVersion(encVersion))
 
             url = os.path.join(self.urlBase(),
