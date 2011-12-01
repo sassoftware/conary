@@ -81,9 +81,6 @@ class WSGIServer(object):
         cny_log.setupLogging(consoleLevel=logging.INFO,
                 consoleFormat='apache')
 
-        log.info("pid=%s cache=0x%x threaded=%s", os.getpid(),
-                id(_config_cache), environ['wsgi.multithread'])
-
         self._loadCfg()
         self._loadAuth()
 
