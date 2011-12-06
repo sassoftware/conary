@@ -27,21 +27,20 @@ class Conary(CPackageRecipe):
 
     def setup(r):
         r.macros.sqlitever = '3070800'
-        r.macros.sqlite = 'sqlite-autoconf-%(sqlite)s'
+        r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
-        r.macros.pymaj = '2.6'
         r.macros.pyver = '2.6'
         r.macros.pyroot = '/usr/conary'
-        r.macros.pybin = '%(pyroot)s/bin/python%(pymaj)s'
-        r.macros.pypkgs = '%(pyroot)s/%(lib)s/python%(pymaj)s'
-        r.macros.sitepkgs = '%(pypkgs)s/site-packages'
         # This is needed due to the way python dep policy currently works
-        r.macros.bindir = '/usr/conary/bin'
+        r.macros.bindir = '%(pyroot)s/bin'
         r.macros.oldbindir = '/usr/bin'
+        r.macros.pylib = '%(pyroot)s/%(lib)s'
+        r.macros.pybin = '%(bindir)s/python%(pyver)s'
+        r.macros.sitepkgs = '%(pylib)s/python%(pyver)s/site-packages'
+        r.Environment('PATH', '%(bindir)s:/bin:/sbin:/usr/bin:/usr/sbin')
 
         r.addArchive('ftp://download.rpath.com/conary/')
-        # r.addMercurialSnapshot('http://hg.rpath.com/conary-2.1', tag='e86e9ac20238')
-        
+        # r.addMercurialSnapshot('http://hg.rpath.com/conary')
         r.addPatch('sles10-build-flags.patch')
 
         # Stay backward-compatible with kernels we've already built in
@@ -49,8 +48,6 @@ class Conary(CPackageRecipe):
         r.Replace('^        self.mergeKmodSymbols = False', 
                   '        self.mergeKmodSymbols = True', 
                   'conary/build/capsulepolicy.py')
-
-        #r.addPatch('ptys.patch')
 
         ### Build internal sqlite library for Conary to use
         r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
@@ -75,11 +72,11 @@ class Conary(CPackageRecipe):
                   'config/macros')
 
         r.Make('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
-               ' PYTHON=%(pybin)s PYVER=%(pymaj)s'
-               ' PYINCLUDE="%(pyroot)s/include/python%(pymaj)s"'
+               ' PYTHON=%(pybin)s PYVER=%(pyver)s'
+               ' PYINCLUDE="%(pyroot)s/include/python%(pyver)s"'
                ' LDFLAGS="-L%(pylib)s -Wl,-rpath,%(pylib)s"')
         r.MakeInstall('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
-                      ' PYTHON=%(pybin)s PYVER=%(pymaj)s')
+                      ' PYTHON=%(pybin)s PYVER=%(pyver)s')
 
         # Change any #! lines to point to internal python interpreter
         r.NormalizePythonInterpreterVersion(
@@ -100,13 +97,6 @@ class Conary(CPackageRecipe):
                                      '    size 10M',
                                      '}',
                                      )))
-
-        for fn in ('%(datadir)s/conary/migration/database.py',
-                   '%(datadir)s/conary/migration/schema.py',
-                   '%(datadir)s/conary/migration/db2db.py',
-                   '%(datadir)s/conary/migration/tablelist.py',
-                   '%(sitepkgs)s/conary/commitaction'):
-            r.Replace('/usr/bin/env.*', '%(pybin)s', fn)
 
         r.ComponentSpec('python', '.*/site-packages/.*')
         r.PackageSpec('conary',
@@ -153,6 +143,14 @@ class Conary(CPackageRecipe):
 
         # emerge is not supported on encapsulated platforms
         #r.UtilizeUser('emerge', '%(sitepkgs)s/conary/cvc.py')
+        # emerge really requires all of conary-build, so if
+        # it moves to cvc we can remove this whiteout
+        r.Requires(exceptDeps=('(%(bindir)s/conary|conarycmd.py)',
+                               'python: conary.build.cook'))
+        # CNY-3314 -- conary.commit should not depend on conary.cvc
+        r.Requires(exceptDeps=('.*/conary/commit\.py.*$',
+                               'python: conary.cvc'))
+
 
         # This exception needs to be here in order to bootstrap perl;
         # if we don't have perl, we won't be using this file or those

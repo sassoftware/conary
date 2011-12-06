@@ -27,20 +27,18 @@ class Conary(CPackageRecipe):
         r.macros.sqlitever = '3070800'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
-        r.macros.pymaj = '2.6'
         r.macros.pyver = '2.6'
         r.macros.pyroot = '/usr/conary'
         # This is needed due to the way python dep policy currently works
-        r.macros.bindir = '/usr/conary/bin'
+        r.macros.bindir = '%(pyroot)s/bin'
         r.macros.oldbindir = '/usr/bin'
         r.macros.pylib = '%(pyroot)s/%(lib)s'
-        r.macros.pybin = '%(pyroot)s/bin/python%(pymaj)s'
-        r.macros.pypkgs = '%(pyroot)s/%(lib)s/python%(pymaj)s'
-        r.macros.sitepkgs = '%(pypkgs)s/site-packages'
+        r.macros.pybin = '%(bindir)s/python%(pyver)s'
+        r.macros.sitepkgs = '%(pylib)s/python%(pyver)s/site-packages'
         r.Environment('PATH', '%(bindir)s:/bin:/sbin:/usr/bin:/usr/sbin')
 
         r.addArchive('ftp://download.rpath.com/conary/')
-        # r.addMercurialSnapshot('http://hg.rpath.com/conary-2.1', tag='adfcc5e2219b')
+        # r.addMercurialSnapshot('http://hg.rpath.com/conary')
         r.addPatch('el5-build-flags.patch')
 
         ### Build internal sqlite library for Conary to use
@@ -70,11 +68,11 @@ class Conary(CPackageRecipe):
                   'config/macros')
 
         r.Make('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
-               ' PYTHON=%(pybin)s PYVER=%(pymaj)s'
-               ' PYINCLUDE="%(pyroot)s/include/python%(pymaj)s"'
+               ' PYTHON=%(pybin)s PYVER=%(pyver)s'
+               ' PYINCLUDE="%(pyroot)s/include/python%(pyver)s"'
                ' LDFLAGS="-L%(pylib)s -Wl,-rpath,%(pylib)s"')
         r.MakeInstall('NO_KID=1 libdir=%(libdir)s sitedir=%(sitepkgs)s'
-                      ' PYTHON=%(pybin)s PYVER=%(pymaj)s')
+                      ' PYTHON=%(pybin)s PYVER=%(pyver)s')
 
         # Change any #! lines to point to internal python interpreter
         r.NormalizePythonInterpreterVersion(
