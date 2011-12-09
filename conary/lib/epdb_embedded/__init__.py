@@ -1,34 +1,20 @@
-#!/usr/bin/env python
 #
 # Copyright (c) rPath, Inc.
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This program is distributed under the terms of the MIT License as found 
+# in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/mit-license.php.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the MIT License for full details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
 
 """ Extended pdb """
 import inspect
 import pdb
 import os
 import re
-try:
-    import erlcompleter
-    import readline
-except ImportError:
-    hasReadline = False
-else:
-    hasReadline = True
 import socket
 import string
 import sys
@@ -67,50 +53,58 @@ class Epdb(pdb.Pdb):
         self._tb = None
         self._config = {}
         pdb.Pdb.__init__(self)
-        if hasReadline:
+        try:
+            import erlcompleter
+            import readline
+        except ImportError:
+            self._readline = None
+            self._completer = None
+        else:
+            self._readline = readline
             self._completer = erlcompleter.ECompleter()
 
         self._oldHistory = []
         self.prompt = '(Epdb) '
 
     def store_old_history(self):
-        historyLen = readline.get_current_history_length()
-        oldHistory = [ readline.get_history_item(x) for x in xrange(historyLen)]
+        historyLen = self._readline.get_current_history_length()
+        oldHistory = [ self._readline.get_history_item(x)
+                for x in xrange(historyLen)]
         self._oldHistory = oldHistory
-        readline.clear_history()
+        self._readline.clear_history()
 
     def restore_old_history(self):
-        readline.clear_history()
+        self._readline.clear_history()
         for line in self._oldHistory:
             if line is None:
                 continue
-            readline.add_history(line)
+            self._readline.add_history(line)
         self._oldHistory = []
 
     def read_history(self, storeOldHistory=False):
-        if hasReadline and self._historyPath:
+        if self._readline and self._historyPath:
             if storeOldHistory:
                 self.store_old_history()
             else:
-                readline.clear_history()
+                self._readline.clear_history()
 
             try:
-                readline.read_history_file(self._historyPath)
+                self._readline.read_history_file(self._historyPath)
             except IOError:
                 pass
 
     def save_history(self, restoreOldHistory=False):
-        if hasReadline and self._historyPath:
-            readline.set_history_length(1000)
+        if self._readline and self._historyPath:
+            self._readline.set_history_length(1000)
             try:
-                readline.write_history_file(self._historyPath)
+                self._readline.write_history_file(self._historyPath)
             except IOError:
                 pass
 
             if restoreOldHistory:
                 self.restore_old_history()
             else:
-                readline.clear_history()
+                self._readline.clear_history()
 
     if hasTelnet:
         # telnet server support.
@@ -384,9 +378,9 @@ class Epdb(pdb.Pdb):
             print '  ' + firstline
             full_input.append(firstline)
         while True:
-            if hasReadline:
+            if self._readline:
                 # add the current readline position
-                old_hist.append(readline.get_current_history_length())
+                old_hist.append(self._readline.get_current_history_length())
             if self.use_rawinput:
                 try:
                     line = raw_input(self.multiline_prompt)
@@ -405,12 +399,12 @@ class Epdb(pdb.Pdb):
             full_input.append(line)
 
         # add the final readline history position
-        if hasReadline:
-            old_hist.append(readline.get_current_history_length())
+        if self._readline:
+            old_hist.append(self._readline.get_current_history_length())
 
         cmd = '\n'.join(full_input) + '\n'
 
-        if hasReadline:
+        if self._readline:
             # remove the old, individual readline history entries.
 
             # first remove any duplicate entries
@@ -420,9 +414,9 @@ class Epdb(pdb.Pdb):
             # the end of the history up.
             for pos in reversed(old_hist):
                 # get_current_history_length returns pos + 1
-                readline.remove_history_item(pos - 1)
+                self._readline.remove_history_item(pos - 1)
             # now add the full line
-            readline.add_history(cmd)
+            self._readline.add_history(cmd)
 
         locals = self.curframe.f_locals
         globals = self.curframe.f_globals
@@ -907,7 +901,7 @@ class Epdb(pdb.Pdb):
 
 
     def complete(self, text, state):
-        if hasReadline:
+        if self._readline:
             # from cmd.py, override completion to match on local variables
             allvars = {}
             globals = self.curframe.f_globals.copy()
@@ -1067,3 +1061,4 @@ def main(argv):
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
+

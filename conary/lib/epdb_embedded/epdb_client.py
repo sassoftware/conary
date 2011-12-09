@@ -1,21 +1,15 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Copyright (c) rPath, Inc.
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# This program is distributed under the terms of the MIT License as found 
+# in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/mit-license.php.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the MIT License for full details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
 
 import errno
 import fcntl
@@ -71,7 +65,9 @@ class TelnetClient(telnetlib.Telnet):
 
     def updateTerminalSize(self):
         rows, cols = getTerminalSize()
-        self.sock.sendall(IAC + SB + NAWS + chr(cols) + chr(rows) + IAC + SE)
+        out = struct.pack('>HH', cols, rows)
+        out.replace('\xFF', '\xFF\xFF')  # escape IAC
+        self.sock.sendall(IAC + SB + NAWS + out + IAC + SE)
 
     def write(self, buffer):
         if TERMKEY in buffer:
@@ -84,8 +80,8 @@ class TelnetClient(telnetlib.Telnet):
 
     def interact(self):
         self.set_raw_mode()
-        self.updateTerminalSize()
         try:
+            self.updateTerminalSize()
             writeBuffer = []
             while 1:
                 readyWriters = []
