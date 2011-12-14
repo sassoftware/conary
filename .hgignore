@@ -11,3 +11,4 @@ conary/sqlite3
 NEWS.html
 # epydoc:
 ^html/
+^venv/
