@@ -68,13 +68,12 @@ class ConaryRouter(object):
         environ.update(self.envOverrides)
         request = self.requestFactory(environ)
         try:
-            response = self.handleRequest(request)
-            return response(request.environ, start_response)
+            return self.handleRequest(request, start_response)
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
 
-    def handleRequest(self, request):
+    def handleRequest(self, request, start_response):
         if 'conary.netrepos.config_file' in request.environ:
             cfgPath = request.environ['conary.netrepos.config_file']
         else:
@@ -85,7 +84,13 @@ class ConaryRouter(object):
             cfg = netserver.ServerConfig()
             cfg.read(cfgPath)
         handler = ConaryHandler(cfg)
-        return handler.handleRequest(request)
+        try:
+            response = handler.handleRequest(request)
+            iterator = response(request.environ, start_response)
+        except:
+            handler.close()
+            raise
+        return ClosableResponseWrapper(iterator, handler.close)
 
     def handleError(self, request, exc_info, start_response):
         trace, tracePath = self._formatErrorLarge(request, exc_info)
@@ -273,7 +278,8 @@ class ConaryHandler(object):
             if self.request.path_info_peek() == '':
                 return self.postRpc()
         elif self.request.method == 'PUT':
-            pass
+            if self.request.path_info_peek() == '':
+                return self.putChangeset()
         else:
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
@@ -422,30 +428,24 @@ class ConaryHandler(object):
             if not preserveFile:
                 os.unlink(path)
 
-    def _iter_put(self):
+    def putChangeset(self):
         """PUT method -- handle changeset uploads."""
         if not self.repositoryServer:
-            # FIXME
-            raise NotImplementedError("Changeset uploading through a proxy "
-                    "is not implemented yet")
-
-        try:
-            stream = self._getStream()
-        except WrappedResponse, wrapper:
-            yield wrapper.response
+            return self._makeError('501 Not Implemented',
+                    "Committing changesets through this proxy "
+                    "is not implemented")
 
         # Copy request body to the designated temporary file.
+        stream = self.request.body_file
         out = self._openForPut()
         if out is None:
             # File already exists or is in an illegal location.
-            yield self._response('403 Forbidden',
-                    "ERROR: Illegal changeset upload.\r\n")
-            return
+            return self._makeError('403 Forbidden', "Illegal changeset upload")
 
         util.copyfileobj(stream, out)
         out.close()
 
-        yield self._response('200 Ok', '')
+        return self.responseFactory(status='200 OK')
 
     def _changesetPath(self, suffix):
         filename = self.request.query_string
@@ -466,50 +466,29 @@ class ConaryHandler(object):
                 return open(path, 'wb+')
         return None
 
-    def _getStream(self):
-        if self.environ.get('HTTP_TRANSFER_ENCODING', 'identity') != 'identity':
-            raise WrappedResponse(self._response('400 Bad Request',
-                    "ERROR: Unrecognized Transfer-Encoding\r\n"))
-        try:
-            size = int(self.environ['CONTENT_LENGTH'])
-        except ValueError:
-            raise WrappedResponse(self._response('411 Length Required',
-                    "ERROR: Invalid or missing Content-Length\r\n"))
-
-        stream = self.environ['wsgi.input']
-        return LengthConstrainingWrapper(stream, size)
-
     def close(self):
-        log.info("... closing")
         # Make sure any pooler database connections are released.
         if self.repositoryServer:
             self.repositoryServer.reset()
-
-
-class LengthConstrainingWrapper(object):
-    """
-    A file-like object that returns at most C{size} bytes before pretending to
-    hit end-of-file.
-    """
-
-    def __init__(self, fobj, size):
-        self.fobj = fobj
-        self.remaining = size
-
-    def read(self, size=None):
-        if size is None:
-            size = self.remaining
-        else:
-            size = min(size, self.remaining)
-        self.remaining -= size
-        return self.fobj.read(size)
 
 
 class ConfigurationError(RuntimeError):
     pass
 
 
-class WrappedResponse(Exception):
+class ClosableResponseWrapper(object):
 
-    def __init__(self, response):
-        self.response = response
+    def __init__(self, iterator, closeFunc):
+        self.iterator = iterator
+        self.closeFunc = closeFunc
+
+    def __len__(self): return len(self.iterator)
+    def __iter__(self): return iter(self.iterator)
+    def __getitem__(self, key): return self.iterator[key]
+
+    def close(self):
+        self.closeFunc()
+        try:
+            self.iterator.close()
+        except AttributeError:
+            pass
