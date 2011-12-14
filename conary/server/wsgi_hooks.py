@@ -19,12 +19,18 @@
 import errno
 import logging
 import os
+import socket
+import StringIO
+import sys
+import tempfile
+import time
 import webob
 import xmlrpclib
 import zlib
 
 from conary.lib import log as cny_log
 from conary.lib import util
+from conary.lib.formattrace import formatTrace
 from conary.repository import errors
 from conary.repository import filecontainer
 from conary.repository import xmlshims
@@ -46,7 +52,7 @@ def makeApp(settings):
 
 def paster_main(global_config, **settings):
     """Wrapper to enable "paster serve" """
-    #cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
+    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     return makeApp(settings)
 
 
@@ -61,8 +67,12 @@ class ConaryRouter(object):
     def __call__(self, environ, start_response):
         environ.update(self.envOverrides)
         request = self.requestFactory(environ)
-        response = self.handleRequest(request)
-        return response(request.environ, start_response)
+        try:
+            response = self.handleRequest(request)
+            return response(request.environ, start_response)
+        except:
+            exc_info = sys.exc_info()
+            return self.handleError(request, exc_info, start_response)
 
     def handleRequest(self, request):
         if 'conary.netrepos.config_file' in request.environ:
@@ -76,6 +86,64 @@ class ConaryRouter(object):
             cfg.read(cfgPath)
         handler = ConaryHandler(cfg)
         return handler.handleRequest(request)
+
+    def handleError(self, request, exc_info, start_response):
+        trace, tracePath = self._formatErrorLarge(request, exc_info)
+        short = self._formatErrorSmall(request, exc_info)
+        short += 'Extended traceback at ' + tracePath
+        log.error(short)
+
+        response = webob.Response(
+                "<h1>500 Internal Server Error</h1>\n"
+                "<p>An unexpected error occurred on the server. Consult the "
+                "server error logs for details.",
+            status='500 Internal Server Error',
+            content_type='text/html')
+        # webob doesn't support exc_info, unfortunately
+        start_response(response.status, response.headerlist, exc_info)
+        return [response.body]
+
+    def _formatErrorLarge(self, request, exc_info):
+        e_class, e_value, e_tb = exc_info
+        timestamp = time.ctime(time.time())
+
+        # Format large traceback to file
+        fd, tbPath = tempfile.mkstemp('.txt', 'repos-error-')
+        tb = os.fdopen(fd, 'w+')
+        print >> tb, "Unhandled exception from Conary repository", request.host
+        print >> tb, "Time of occurence:", timestamp
+        print >> tb, "System hostname:", socket.gethostname()
+        print >> tb, "See also:", tbPath
+        print >> tb
+        formatTrace(e_class, e_value, e_tb, stream=tb, withLocals=False)
+        print >> tb
+        print >> tb, "WSGI Environment:"
+        for key, value in sorted(request.environ.items()):
+            print >> tb, " %s = %r" % (key, value)
+        print >> tb
+        print >> tb, "Full trace:"
+        try:
+            formatTrace(e_class, e_value, e_tb, stream=tb, withLocals=True)
+        except:
+            print >> tb, "*** Traceback formatter crashed! ***"
+            print >> tb, "Formatter crash follows:"
+            new_exc = sys.exc_info()
+            formatTrace(new_exc[0], new_exc[1], new_exc[2], stream=tb,
+                    withLocals=False)
+            print >> tb, "*** End formatter crash log ***"
+        print >> tb
+        print >> tb, "End of traceback report"
+        tb.seek(0)
+        contents = tb.read()
+        tb.close()
+        return contents, tbPath
+
+    def _formatErrorSmall(self, request, exc_info):
+        e_class, e_value, e_tb = exc_info
+        tb = StringIO.StringIO()
+        print >> tb, "Unhandled exception from Conary repository", request.host
+        formatTrace(e_class, e_value, e_tb, stream=tb, withLocals=False)
+        return tb.getvalue()
 
 
 class ConaryHandler(object):
@@ -201,21 +269,17 @@ class ConaryHandler(object):
         if self.request.method == 'GET':
             if self.request.path_info_peek() == 'changeset':
                 return self.getChangeset()
-            else:
-                return self._makeError('404 Not Found',
-                        "No resource was found at the given location")
         elif self.request.method == 'POST':
             if self.request.path_info_peek() == '':
                 return self.postRpc()
-            else:
-                return self._makeError('404 Not Found',
-                        "No resource was found at the given location")
         elif self.request.method == 'PUT':
-            raise NotImplementedError
+            pass
         else:
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
                     "Supported methods: GET POST PUT")
+        return self._makeError('404 Not Found',
+                "No resource was found at the given location")
 
     def postRpc(self):
         if self.request.content_type != 'text/xml':
