@@ -46,7 +46,8 @@ def makeApp(settings):
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
-    app = ConaryRouter(envOverrides)
+    pathPrefix = settings.get('mount_point', '')
+    app = ConaryRouter(envOverrides, pathPrefix)
     return app
 
 
@@ -59,19 +60,34 @@ def paster_main(global_config, **settings):
 class ConaryRouter(object):
 
     requestFactory = webob.Request
+    responseFactory = webob.Response
 
-    def __init__(self, envOverrides=()):
+    def __init__(self, envOverrides=(), pathPrefix=''):
         self.envOverrides = envOverrides
+        self.pathPrefix = pathPrefix.split('/')
         self.configCache = {}
 
     def __call__(self, environ, start_response):
         environ.update(self.envOverrides)
         request = self.requestFactory(environ)
+        for elem in self.pathPrefix:
+            if not elem:
+                continue
+            if request.path_info_pop() != elem:
+                return self.notFound(environ, start_response)
         try:
             return self.handleRequest(request, start_response)
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
+
+    def notFound(self, environ, start_response):
+        response = self.responseFactory(
+                "<h1>404 Not Found</h1>\n"
+                "<p>No application was found at the given location\n",
+            status='404 Not Found',
+            content_type='text/html')
+        return response(environ, start_response)
 
     def handleRequest(self, request, start_response):
         if 'conary.netrepos.config_file' in request.environ:
@@ -98,7 +114,7 @@ class ConaryRouter(object):
         short += 'Extended traceback at ' + tracePath
         log.error(short)
 
-        response = webob.Response(
+        response = self.responseFactory(
                 "<h1>500 Internal Server Error</h1>\n"
                 "<p>An unexpected error occurred on the server. Consult the "
                 "server error logs for details.",
