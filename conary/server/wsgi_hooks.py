@@ -193,21 +193,14 @@ class ConaryHandler(object):
         if cfg.closed:
             # Closed repository -- returns an exception for all requests
             self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
-            self.restHandler = None
         elif cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
             self.proxyServer = proxy.ProxyRepositoryServer(cfg, self.urlBase)
-            self.restHandler = None
         else:
             # Full repository with optional changeset cache
             self.repositoryServer = netserver.NetworkRepositoryServer(cfg,
                     self.urlBase)
-            # TODO: need restlib and crest work to support WSGI
-            #if cresthooks and cfg.baseUri:
-            #    restUri = cfg.baseUri + '/api'
-            #    self.restHandler = cresthooks.ApacheHandler(restUri,
-            #            self.repositoryServer)
 
         if self.repositoryServer:
             self.proxyServer = proxy.SimpleRepositoryFilter(cfg, self.urlBase,
@@ -272,8 +265,11 @@ class ConaryHandler(object):
             self.repositoryServer.reopen()
 
         if self.request.method == 'GET':
-            if self.request.path_info_peek() == 'changeset':
+            path = self.request.path_info_pop()
+            if path == 'changeset':
                 return self.getChangeset()
+            elif path == 'api':
+                return self.getApi()
         elif self.request.method == 'POST':
             if self.request.path_info_peek() == '':
                 return self.postRpc()
@@ -465,6 +461,19 @@ class ConaryHandler(object):
             if st.st_size == 0:
                 return open(path, 'wb+')
         return None
+
+    def getApi(self):
+        if not self.repositoryServer:
+            return self._makeError('404 Not Found',
+                    "Standalone Conary proxies cannot forward API requests")
+        try:
+            from crest import webhooks
+        except ImportError:
+            return self._makeError('404 Not Found',
+                    "Conary web API is not enabled on this repository")
+        prefix = self.request.script_name
+        restHandler = webhooks.WSGIHandler(prefix, self.repositoryServer)
+        return restHandler.handle(self.request, path=None)
 
     def close(self):
         # Make sure any pooler database connections are released.
