@@ -1393,10 +1393,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getFileContents(clientVersion, fileList, rawStreams)
 
     def _getFileContents(self, clientVersion, fileList, rawStreams):
+        fd, path = tempfile.mkstemp(dir=self.tmpPath, suffix='.cf-out')
         try:
-            (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
-                                          suffix = '.cf-out')
-
             sizeList = []
             exception = None
 
