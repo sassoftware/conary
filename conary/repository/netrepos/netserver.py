@@ -3747,7 +3747,7 @@ class ServerConfig(ConfigFile):
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
     serverName              = CfgLineList(CfgString, listType = GlobListType)
-    staticPath              = (CfgPath, '/conary-static')
+    staticPath              = (CfgString, '/conary-static')
     serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog

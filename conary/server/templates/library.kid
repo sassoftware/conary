@@ -62,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <ul class="menu">
                 <li py:attrs="{'class': (lastchunk in ('', 'main', 'browse', 'troveInfo', 'files')) and 'highlighted' or None}"><a href="browse">Repository Browser</a></li>
-<!--                <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('metadata', 'getMetadata')) and 'highlighted' or None}"><a href="metadata">Metadata</a></li> -->
                 <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('pgpAdminForm', 'pgpNewKeyForm')) and 'highlighted' or None}"><a href="pgpAdminForm">PGP Keys</a></li>
                 <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'addUserForm', 'addPermForm', 'editPermForm', 'manageRoleForm',)) and 'highlighted' or None}"><a href="userlist">Users and Roles</a></li>
                 <li py:if="loggedIn" py:attrs="{'class': (lastchunk in ('chPassForm', )) and 'highlighted' or None}"><a href="chPassForm">Change Password</a></li>

@@ -30,11 +30,9 @@ from webob import exc
 from conary import trove
 from conary import versions
 from conary import conarycfg
-from conary.cmds import metadata
 from conary.deps import deps
 from conary.errors import WebError
 from conary.repository import shimclient, errors
-from conary.repository.netrepos import netserver
 from conary.server import templates
 from conary.web.fields import strFields, intFields, listFields, boolFields
 from conary.web.webauth import getAuth
@@ -358,88 +356,6 @@ class ReposWeb(object):
         response.charset = None
         response.content_length = fileStream.contents.size()
         return response
-
-    @checkAuth(write = True)
-    @strFields(troveName = "")
-    def metadata(self, auth, troveName):
-        troveList = [x for x in self.repServer.troveStore.iterTroveNames() if x.endswith(':source')]
-        troveList.sort()
-
-        # pick the next trove in the list
-        # or stay on the previous trove if canceled
-        if troveName in troveList:
-            loc = troveList.index(troveName)
-            if loc < (len(troveList)-1):
-                troveName = troveList[loc+1]
-
-        return self._write("pick_trove", troveList = troveList,
-            troveName = troveName)
-
-    @checkAuth(write = True)
-    @strFields(troveName = "", troveNameList = "", source = "")
-    def chooseBranch(self, auth, troveName, troveNameList, source):
-        if not troveName:
-            if not troveNameList:
-                return self._write("error", error = "You must provide a trove name.")
-            troveName = troveNameList
-
-        source = source.lower()
-
-        versions = self.repServer.getTroveVersionList(self.authToken,
-            netserver.SERVER_VERSIONS[-1], { troveName : None })
-
-        branches = {}
-        for version in versions[troveName]:
-            version = self.repServer.thawVersion(version)
-            branches[version.branch()] = True
-
-        branches = branches.keys()
-        if len(branches) == 1:
-            self._redirect("getMetadata?troveName=%s;branch=%s" %\
-                (troveName, branches[0].freeze()))
-        else:
-            return self._write("choose_branch",
-                           branches = branches,
-                           troveName = troveName,
-                           source = source)
-
-    @checkAuth(write = True)
-    @strFields(troveName = None, branch = None, source = "", freshmeatName = "")
-    def getMetadata(self, auth, troveName, branch, source, freshmeatName):
-        branch = self.repServer.thawVersion(branch)
-
-        if source.lower() == "freshmeat":
-            if freshmeatName:
-                fmName = freshmeatName
-            else:
-                fmName = troveName[:-7]
-            try:
-                md = metadata.fetchFreshmeat(fmName)
-            except metadata.NoFreshmeatRecord:
-                return self._write("error", error = "No Freshmeat record found.")
-        else:
-            md = self.troveStore.getMetadata(troveName, branch)
-
-        if not md: # fill a stub
-            md = metadata.Metadata(None)
-
-        return self._write("metadata", metadata = md, branch = branch,
-                                troveName = troveName)
-
-    @checkAuth(write = True)
-    @listFields(str, selUrl = [], selLicense = [], selCategory = [])
-    @strFields(troveName = None, branch = None, shortDesc = "",
-               longDesc = "", source = None)
-    def updateMetadata(self, auth, troveName, branch, shortDesc,
-                       longDesc, source, selUrl, selLicense,
-                       selCategory):
-        branch = self.repServer.thawVersion(branch)
-
-        self.troveStore.updateMetadata(troveName, branch,
-                                       shortDesc, longDesc,
-                                       selUrl, selLicense,
-                                       selCategory, source, "C")
-        self._redirect("metadata?troveName=%s" % troveName)
 
     @checkAuth(admin = True)
     def userlist(self, auth):
