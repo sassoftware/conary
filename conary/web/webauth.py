@@ -26,10 +26,19 @@ class PermissionDenied(errors.WebError):
         return "permission denied"
 
 def getAuth(req):
-    if not 'Authorization' in req.headers_in:
+    if hasattr(req, 'headers_in'):
+        # mod_python
+        headers_in = req.headers_in
+        remote_ip = req.connection.remote_ip
+    else:
+        # webob
+        headers_in = req.headers
+        remote_ip = req.remote_addr
+
+    if not 'Authorization' in headers_in:
         authToken = ['anonymous', 'anonymous']
     else:
-        info = req.headers_in['Authorization'].split(' ', 1)
+        info = headers_in['Authorization'].split(' ', 1)
         if len(info) != 2 or info[0] != "Basic":
             return None
 
@@ -47,12 +56,12 @@ def getAuth(req):
 
     try:
         entitlementList = parseEntitlement(
-                        req.headers_in.get('X-Conary-Entitlement', ''))
+                        headers_in.get('X-Conary-Entitlement', ''))
     except:
         return None
 
     authToken.append(entitlementList)
-    authToken.append(req.connection.remote_ip)
+    authToken.append(remote_ip)
     return authToken
 
 class Authorization:

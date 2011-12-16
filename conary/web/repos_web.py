@@ -16,202 +16,151 @@
 #
 
 
-from mod_python import apache
 from urllib import unquote
 import errno
 import itertools
 import kid
 import os
 import string
-import sys
 import textwrap
 import time
-import traceback
+import webob
+from webob import exc
 
 from conary import trove
 from conary import versions
 from conary import conarycfg
 from conary.cmds import metadata
 from conary.deps import deps
+from conary.errors import WebError
 from conary.repository import shimclient, errors
 from conary.repository.netrepos import netserver
 from conary.server import templates
 from conary.web.fields import strFields, intFields, listFields, boolFields
 from conary.web.webauth import getAuth
-from conary.web.webhandler import WebHandler
 
-class ServerError(Exception):
-    def __str__(self):
-        return self.str
 
-class InvalidPassword(ServerError):
-    str = """Incorrect password."""
-
-def checkAuth(write = False, admin = False):
+def checkAuth(write=False, admin=False):
     def deco(func):
-        def wrapper(self, **kwargs):
-            # this is for rBuilder.  It uses this code to provide a web
-            # interface to browse (ONLY) a _remote_ repository.  Since
-            # there isn't any administration stuff going on, we can skip
-            # the authentication checks here.  The remote repository will
-            # prevent us from accessing any information which the authToken
-            # (if any) does not allow us to see.
-            if not self.isRemoteRepository:
-                # XXX two xmlrpc calls here could possibly be condensed to one
-                # first check the password only
-                if not self.repServer.auth.check(self.authToken):
-                    raise InvalidPassword
-                # now check for proper permissions
-                if write and not self.repServer.auth.check(self.authToken,
-                                                           write = write):
-                    raise errors.InsufficientPermission
-
-                if admin and not self.repServer.auth.authCheck(self.authToken,
-                                                               admin = admin):
-                    raise errors.InsufficientPermission
-
+        def wrapped(self, **kwargs):
+            if write and not self.hasWrite:
+                raise exc.HTTPForbidden()
+            if admin and not self.isAdmin:
+                raise exc.HTTPForbidden()
             return func(self, **kwargs)
-        return wrapper
+        return wrapped
     return deco
 
-class HttpHandler(WebHandler):
-    def __init__(self, req, cfg, repServer, protocol, port):
-        WebHandler.__init__(self, req, cfg)
 
-        # see the comment about remote repositories in the checkAuth decorator
-        self.isRemoteRepository = False
-        self._poolmode = False
-        if isinstance(repServer, netserver.ClosedRepositoryServer):
-            self.repServer = self.troveStore = None
-        else:
-            self.repServer = repServer.callFactory.repos
-            self.troveStore = self.repServer.troveStore
-            if not isinstance(self.repServer, netserver.ClosedRepositoryServer):
-                self._poolmode = self.repServer.db.poolmode
-            else:
-                self._poolmode = False
+class ReposWeb(object):
 
-        self._protocol = protocol
-        self._port = port
+    responseFactory = webob.Response
 
-        if 'conary.server.templates' in sys.modules:
-            self.templatePath = os.path.dirname(sys.modules['conary.server.templates'].__file__) + os.path.sep
-        else:
-            self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
+    def __init__(self, cfg, repServer):
+        self.cfg = cfg
+        self.repServer = repServer
+        self.repServer.__class__ = shimclient.NetworkRepositoryServer
+        self.templatePath = os.path.dirname(templates.__file__)
 
-    def _getHandler(self, cmd):
+    # Request processing
+
+    def _handleRequest(self, request):
+        self.request = request
         try:
-            method = self.__getattribute__(cmd)
-        except AttributeError:
-            method = self._404
-        if not callable(method):
-            method = self._404
-        return method
+            try:
+                return self._getResponse()
+            except exc.HTTPException, err:
+                return err
+        finally:
+            self.repServer.reset()
+            self.repos = None
 
-    def _getAuth(self):
-        return getAuth(self.req)
+    def _getResponse(self):
+        self.authToken = auth = getAuth(self.request)
+        if auth is None:
+            return self._requestAuth("Invalid authentication token")
 
-    def _methodCall(self, method, auth):
-        d = dict(self.fields)
-        d['auth'] = auth
-        try:
-            output = method(**d)
-            self.req.write(output)
-            return apache.OK
-        except errors.InsufficientPermission:
-            if auth[0] == "anonymous":
-                # if an anonymous user raises errors.InsufficientPermission,
-                # ask for a real login.
-                return self._requestAuth()
-            else:
-                # if a real user raises errors.InsufficientPermission, forbid access.
-                return apache.HTTP_FORBIDDEN
-        except InvalidPassword:
-            # if password is invalid, request a new one
-            return self._requestAuth()
-        except apache.SERVER_RETURN:
-            raise
-        except:
-            self.req.log_error("Unhandled exception:")
-            traceback.print_exc()
-            sys.stderr.flush()
-            self.req.status = 500
-            self.req.write(self._write("error", shortError = "Error", error = traceback.format_exc()))
-            return apache.OK
-
-    def _methodHandler(self):
-        """Handle either an HTTP POST or GET command."""
-
-        # a closed repository
-        if self.repServer is None:
-            return apache.HTTP_SERVICE_UNAVAILABLE
-
-        auth = self._getAuth()
-        self.authToken = auth
-
-        if type(auth) is int:
-            raise apache.SERVER_RETURN, auth
-
+        # Repository setup
         self.serverNameList = self.repServer.serverNameList
-        cfg = conarycfg.ConaryConfiguration(readConfigFiles = False)
+        cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
         cfg.repositoryMap = self.repServer.map
         for serverName in self.serverNameList:
             cfg.user.addServerGlob(serverName, auth[0], auth[1])
         self.repos = shimclient.ShimNetClient(
-            self.repServer, self._protocol, self._port, auth,
-            cfg.repositoryMap, cfg.user)
+                server=self.repServer,
+                protocol=self.request.scheme,
+                port=self.request.server_port,
+                authToken=auth,
+                repMap=cfg.repositoryMap,
+                userMap=cfg.user,
+                )
 
-        if self._poolmode:
-            self.repServer.reopen()
+        # Check if the request is sane
+        methodName = self.request.path_info_peek() or 'main'
+        method = None
+        if methodName and methodName[0] != '_':
+            method = getattr(self, methodName, None)
+        if not method:
+            raise exc.HTTPNotFound()
+        self.methodName = methodName
 
-        if not self.cmd:
-            self.cmd = "main"
-
-        try:
-            method = self._getHandler(self.cmd)
-        except AttributeError:
-            raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
-
-        if self.authToken[0] != 'anonymous':
-            self.loggedIn = self.repServer.auth.checkPassword(self.authToken)
-            # if they aren't anonymous, and the password didn't check out
-            # ask again.
+        # Do authn/authz checks
+        if auth[0] != 'anonymous':
+            self.loggedIn = self.repServer.auth.checkPassword(auth)
             if not self.loggedIn:
                 return self._requestAuth()
         else:
             self.loggedIn = False
-        self.hasWrite = self.repServer.auth.check(self.authToken, write=True)
-        self.isAdmin = self.repServer.auth.authCheck(self.authToken, admin=True)
-        self.hasEntitlements = False
-        self.isAnonymous = self.authToken[0] == 'anonymous'
-        self.hasEntitlements = self.repServer.auth.listEntitlementClasses(
-            self.authToken)
 
+        # Run the method
+        self.hasWrite = self.repServer.auth.check(auth, write=True)
+        self.isAdmin = self.repServer.auth.authCheck(auth, admin=True)
         try:
-            return self._methodCall(method, auth)
-        finally:
-            if self._poolmode:
-                self.repServer.db.close()
+            result = method(auth=auth, **self.request.params)
+        except (exc.HTTPForbidden, errors.InsufficientPermission):
+            if self.loggedIn:
+                raise exc.HTTPForbidden()
+            else:
+                return self._requestAuth()
+        except WebError, err:
+            result = self._write("error", error=str(err))
 
-    def _requestAuth(self):
-        self.req.err_headers_out['WWW-Authenticate'] = \
-            'Basic realm="Conary Repository"'
-        return apache.HTTP_UNAUTHORIZED
+        # Convert response if necessary
+        if isinstance(result, basestring):
+            result = self.responseFactory(
+                    body=result,
+                    content_type='text/html',
+                    )
+        return result
+
+    # Helper methods
+
+    def _requestAuth(self, detail=None):
+        raise exc.HTTPUnauthorized(
+                detail=detail,
+                headers=[('WWW-Authenticate',
+                    'Basic realm="Conary Repository"')],
+                )
 
     def _write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
         t = kid.load_template(path)
         return t.serialize(encoding = "utf-8",
                            output = 'xhtml-strict',
+
                            cfg = self.cfg,
-                           req = self.req,
+                           methodName = self.methodName,
                            hasWrite = self.hasWrite,
                            loggedIn = self.loggedIn,
                            isAdmin = self.isAdmin,
-                           isAnonymous = self.isAnonymous,
-                           hasEntitlements = self.hasEntitlements,
+                           isAnonymous = not self.loggedIn,
+                           hasEntitlements = True,
                            currentUser = self.authToken[0],
                            **values)
+
+    def _redirect(self, url):
+        url = self.request.relative_url(url, to_application=True)
+        raise exc.HTTPFound(location=url)
 
     @checkAuth(write=False)
     def main(self, auth):
@@ -222,7 +171,10 @@ class HttpHandler(WebHandler):
         self._redirect("browse")
 
     def logout(self, auth):
-        raise InvalidPassword
+        if self.loggedIn:
+            self._requestAuth()
+        else:
+            self._redirect('browse')
 
     @checkAuth(admin=True)
     def log(self, auth):
@@ -232,13 +184,10 @@ class HttpHandler(WebHandler):
         and sending the rotated log to the client.
         This method requires admin access.
         """
-        if not self.cfg.logFile:
-            raise apache.SERVER_RETURN, apache.HTTP_NOT_IMPLEMENTED
-        if not os.path.exists(self.cfg.logFile):
-            raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
+        if not self.cfg.logFile or not os.path.exists(self.cfg.logFile):
+            raise exc.HTTPNotFound()
         if not os.access(self.cfg.logFile, os.R_OK):
-            raise apache.SERVER_RETURN, apache.HTTP_FORBIDDEN
-        self.req.content_type = "application/octet-stream"
+            raise exc.HTTPForbidden()
         # the base new pathname for the logfile
         base = self.cfg.logFile + time.strftime('-%F_%H:%M:%S')
         # an optional serial number to add to a suffic (in case two
@@ -258,8 +207,11 @@ class HttpHandler(WebHandler):
                 else:
                     raise
         os.unlink(self.cfg.logFile)
-        self.req.sendfile(rotated)
-        raise apache.SERVER_RETURN, apache.OK
+        return self.responseFactory(
+                body_file=open(rotated),
+                content_type='application/octet-stream',
+                charset=None,
+                )
 
     @strFields(char = '')
     @checkAuth(write=False)
@@ -390,22 +342,22 @@ class HttpHandler(WebHandler):
         fileId = sha1helper.sha1FromString(fileId)
         ver = versions.VersionFromString(fileV)
 
-        fileObj = self.repos.getFileVersion(pathId, fileId, ver)
+        fileStream = self.repos.getFileVersion(pathId, fileId, ver)
         contents = self.repos.getFileContents([(fileId, ver)])[0]
+        response = self.responseFactory(body_file=contents.get())
 
-        if fileObj.flags.isConfig():
-            self.req.content_type = "text/plain"
+        if fileStream.flags.isConfig():
+            response.content_type = "text/plain"
         else:
             typeGuess = guess_type(path)
-
-            self.req.headers_out["Content-Disposition"] = "attachment; filename=%s;" % path
+            response.content_disposition = "attachment; filename=%s;" % path
             if typeGuess[0]:
-                self.req.content_type = typeGuess[0]
+                response.content_type = typeGuess[0]
             else:
-                self.req.content_type = "application/octet-stream"
-
-        self.req.headers_out["Content-Length"] = fileObj.sizeString()
-        return contents.get().read()
+                response.content_type = "application/octet-stream"
+        response.charset = None
+        response.content_length = fileStream.contents.size()
+        return response
 
     @checkAuth(write = True)
     @strFields(troveName = "")
@@ -663,8 +615,8 @@ class HttpHandler(WebHandler):
     @checkAuth()
     @strFields(username = "")
     def chPassForm(self, auth, username):
-        if self.isAnonymous:
-            raise apache.SERVER_RETURN, 401
+        if not self.loggedIn:
+            return self._requestAuth()
         if username:
             askForOld = False
         else:

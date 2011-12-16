@@ -31,8 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <?python
             import os
             from conary import constants
-            uri_minus_query = self.req.uri[self.req.uri.rfind('?')+1:]
-            lastchunk = uri_minus_query[self.req.uri.rfind('/')+1:]
+            lastchunk = methodName
             imagePath = os.path.join('usr', 'share', 'conary', 'web-common', 'images')
             if (os.path.exists(os.path.join(imagePath, 'corplogo.png')) and os.path.exists(os.path.join(imagePath, 'prodlogo.gif'))):
                 branded = True
@@ -67,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li py:if="hasWrite" py:attrs="{'class': (lastchunk in ('pgpAdminForm', 'pgpNewKeyForm')) and 'highlighted' or None}"><a href="pgpAdminForm">PGP Keys</a></li>
                 <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('userlist', 'addUserForm', 'addPermForm', 'editPermForm', 'manageRoleForm',)) and 'highlighted' or None}"><a href="userlist">Users and Roles</a></li>
                 <li py:if="loggedIn" py:attrs="{'class': (lastchunk in ('chPassForm', )) and 'highlighted' or None}"><a href="chPassForm">Change Password</a></li>
-                <li py:if="hasEntitlements or isAdmin" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementKeyForm', 'addEntClassForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
+                <li py:if="isAdmin" py:attrs="{'class': (lastchunk in ('manageEntitlements', 'manageEntitlementForm', 'addEntitlementKeyForm', 'addEntClassForm')) and 'highlighted' or None}"><a href="manageEntitlements">Manage Entitlements</a></li>
             </ul>
             <ul class="menu submenu">&nbsp;</ul>
             <div class="layout" py:replace="item[:]" />

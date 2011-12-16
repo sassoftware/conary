@@ -36,6 +36,7 @@ from conary.repository import filecontainer
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
+from conary.web import repos_web
 from conary.web import webauth
 
 log = logging.getLogger('wsgi_hooks')
@@ -178,7 +179,6 @@ class ConaryHandler(object):
         self.request = None
         self.auth = None
         self.isSecure = None
-        self.urlBase = None
         self.repositoryServer = None
         self.proxyServer = None
         self.restHandler = None
@@ -206,20 +206,21 @@ class ConaryHandler(object):
             req.scheme = 'https'
         self.isSecure = req.scheme == 'https'
 
+        urlBase = req.application_url
         if cfg.closed:
             # Closed repository -- returns an exception for all requests
             self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
         elif cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
-            self.proxyServer = proxy.ProxyRepositoryServer(cfg, self.urlBase)
+            self.proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
         else:
             # Full repository with optional changeset cache
             self.repositoryServer = netserver.NetworkRepositoryServer(cfg,
-                    self.urlBase)
+                    urlBase)
 
         if self.repositoryServer:
-            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, self.urlBase,
+            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase,
                     self.repositoryServer)
 
     def _loadAuth(self):
@@ -281,13 +282,15 @@ class ConaryHandler(object):
             self.repositoryServer.reopen()
 
         if self.request.method == 'GET':
-            path = self.request.path_info_pop()
+            path = self.request.path_info_peek()
             if path == 'changeset':
                 return self.getChangeset()
             elif path == 'api':
+                self.request.path_info_pop()
                 return self.getApi()
         elif self.request.method == 'POST':
-            if self.request.path_info_peek() == '':
+            path = self.request.path_info_peek()
+            if path == '':
                 return self.postRpc()
         elif self.request.method == 'PUT':
             if self.request.path_info_peek() == '':
@@ -296,8 +299,8 @@ class ConaryHandler(object):
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
                     "Supported methods: GET POST PUT")
-        return self._makeError('404 Not Found',
-                "No resource was found at the given location")
+        web = repos_web.ReposWeb(self.cfg, self.repositoryServer)
+        return web._handleRequest(request)
 
     def postRpc(self):
         if self.request.content_type != 'text/xml':
