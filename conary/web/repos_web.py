@@ -54,10 +54,10 @@ class ReposWeb(object):
 
     responseFactory = webob.Response
 
-    def __init__(self, cfg, repServer):
+    def __init__(self, cfg, repositoryServer):
         self.cfg = cfg
-        self.repServer = repServer
-        self.repServer.__class__ = shimclient.NetworkRepositoryServer
+        self.repServer = repositoryServer
+        #self.repServer.__class__ = shimclient.NetworkRepositoryServer
         self.templatePath = os.path.dirname(templates.__file__)
 
     # Request processing

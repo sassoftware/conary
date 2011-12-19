@@ -28,11 +28,12 @@ from conary.repository import errors, netclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
+from conary.server import wsgi_adapter
 from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
 
-def post(port, isSecure, repos, req, authToken=None):
+def post(port, isSecure, repos, req, authToken=None, repServer=None):
     if authToken is None:
         authToken = getAuth(req)
     if authToken is None:
@@ -153,9 +154,10 @@ def post(port, isSecure, repos, req, authToken=None):
         return apache.OK
     else:
         # Handle HTTP (web browser) requests
-        from conary.server.http import HttpHandler
-        httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port)
-        return httpHandler._methodHandler()
+        from conary.web import repos_web
+        httpHandler = repos_web.ReposWeb(repos.cfg, repositoryServer=repServer)
+        return wsgi_adapter.modpython_to_webob(req, httpHandler._handleRequest)
+
 
 def sendfile(req, size, path):
     # FIXME: apache 2.0 can't sendfile() a file > 2 GiB.
@@ -174,7 +176,7 @@ def sendfile(req, size, path):
         req.sendfile(path)
 
 
-def get(port, isSecure, repos, req, restHandler=None, authToken=None):
+def get(port, isSecure, repos, req, restHandler=None, authToken=None, repServer=None):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]
@@ -251,15 +253,10 @@ def get(port, isSecure, repos, req, restHandler=None, authToken=None):
 
         return apache.OK
     else:
-        from conary.server.http import HttpHandler
+        from conary.web import repos_web
+        httpHandler = repos_web.ReposWeb(repos.cfg, repositoryServer=repServer)
+        return wsgi_adapter.modpython_to_webob(req, httpHandler._handleRequest)
 
-        if isSecure:
-            protocol = "https"
-        else:
-            protocol = "http"
-
-        httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port)
-        return httpHandler._methodHandler()
 
 def putFile(port, isSecure, repos, req):
     if isinstance(repos, proxy.ProxyRepositoryServer):

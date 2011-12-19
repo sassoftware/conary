@@ -224,9 +224,10 @@ def _handler(req):
                 repServer.reopen()
 
             if method == "POST":
-                return post(port, secure, proxyServer, req)
+                return post(port, secure, proxyServer, req, repServer=repServer)
             elif method == "GET":
-                return get(port, secure, proxyServer, req, restHandler)
+                return get(port, secure, proxyServer, req, restHandler,
+                        repServer=repServer)
             elif method == "PUT":
                 return putFile(port, secure, proxyServer, req)
             else:
