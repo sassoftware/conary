@@ -28,7 +28,6 @@ from conary.repository import errors, netclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import proxy
 from conary.repository.filecontainer import FileContainer
-from conary.server import wsgi_adapter
 from conary.web.webauth import getAuth
 
 BUFFER=1024 * 256
@@ -154,6 +153,7 @@ def post(port, isSecure, repos, req, authToken=None, repServer=None):
         return apache.OK
     else:
         # Handle HTTP (web browser) requests
+        from conary.server import wsgi_adapter
         from conary.web import repos_web
         httpHandler = repos_web.ReposWeb(repos.cfg, repositoryServer=repServer)
         return wsgi_adapter.modpython_to_webob(req, httpHandler._handleRequest)
@@ -253,6 +253,7 @@ def get(port, isSecure, repos, req, restHandler=None, authToken=None, repServer=
 
         return apache.OK
     else:
+        from conary.server import wsgi_adapter
         from conary.web import repos_web
         httpHandler = repos_web.ReposWeb(repos.cfg, repositoryServer=repServer)
         return wsgi_adapter.modpython_to_webob(req, httpHandler._handleRequest)
