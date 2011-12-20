@@ -1,0 +1,1 @@
+Conary 2.4 includes a new WSGI-based repository stack. Forward- and backward-compatibility with clients is maintained, however repository servers now require a minimum of Python 2.6 and depend on the WebOb library ( http://www.webob.org/ )
