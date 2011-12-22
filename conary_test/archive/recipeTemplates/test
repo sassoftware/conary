@@ -1,0 +1,12 @@
+# %(contactName)s
+# %(contact)s
+# %(year)s
+# %(name)s
+# %(upperName)s
+
+class %(upperName)s(PackageRecipe):
+    name = '%(name)s'
+    version = '0'
+
+    def setup(r):
+        r.Create('%%(prefix)s/%(name)s')

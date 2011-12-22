@@ -1,0 +1,102 @@
+#
+# Copyright (c) rPath, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+AcceptMutex fcntl
+LockFile accept.lock
+
+PidFile httpd.pid
+Timeout 300
+KeepAlive Off
+MaxKeepAliveRequests 100
+KeepAliveTimeout 15
+ServerName localhost
+
+# prefork MPM
+# StartServers: number of server processes to start
+# MinSpareServers: minimum number of server processes which are kept spare
+# MaxSpareServers: maximum number of server processes which are kept spare
+# MaxClients: maximum number of server processes allowed to start
+# MaxRequestsPerChild: maximum number of requests a server process serves
+<IfModule prefork.c>
+StartServers       1
+MinSpareServers    1
+MaxSpareServers    1
+MaxClients         1
+ServerLimit        1
+MaxRequestsPerChild  0
+</IfModule>
+
+# worker MPM
+# StartServers: initial number of server processes to start
+# MaxClients: maximum number of simultaneous client connections
+# MinSpareThreads: minimum number of worker threads which are kept spare
+# MaxSpareThreads: maximum number of worker threads which are kept spare
+# ThreadsPerChild: constant number of worker threads in each server process
+# MaxRequestsPerChild: maximum number of requests a server process serves
+<IfModule worker.c>
+StartServers         2
+MaxClients         150
+MinSpareThreads     25
+MaxSpareThreads     75 
+ThreadsPerChild     25
+MaxRequestsPerChild  0
+</IfModule>
+
+#
+# Listen: Allows you to bind Apache to specific IP addresses and/or
+# ports, in addition to the default. See also the <VirtualHost>
+# directive.
+#
+# Change this to Listen on specific IP addresses as shown below to 
+# prevent Apache from glomming onto all bound IP addresses (0.0.0.0)
+#
+Listen 127.0.0.1:@PORT@
+
+# ServerAdmin: Your address, where problems with the server should be
+# e-mailed.  This address appears on some server-generated pages, such
+# as error documents.  e.g. admin@your-domain.com
+#
+ServerAdmin root@localhost
+
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule mime_module modules/mod_mime.so
+LoadModule python_module modules/mod_python.so
+LoadModule alias_module modules/mod_alias.so
+
+DocumentRoot "@DOCROOT@"
+
+Alias / "@DOCROOT@/test.cnr/"
+
+<Directory @DOCROOT@>
+    Options FollowSymLinks
+    AllowOverride None
+    #AddHandler python-program .cnr
+    SetHandler python-program
+    PythonHandler @HANDLER@
+</Directory>
+
+# TypesConfig describes where the mime.types file (or equivalent) is
+# to be found.
+#
+TypesConfig /etc/mime.types
+
+ErrorLog error_log
+LogLevel debug
+
+LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+CustomLog access_log combined

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE project-listing SYSTEM "http://freshmeat.net/backend/fm-projects-0.4.dtd">
+<project-listing>
+  <project>
+    <project_id>10701</project_id>
+    <date_added>2000-12-20 02:59:22</date_added>
+    <date_updated>2005-09-22 14:35:29</date_updated>
+    <projectname_short>tora</projectname_short>
+    <projectname_full>TOra</projectname_full>
+    <desc_short>A tool for administrating or developing for Oracle databases.</desc_short>
+    <desc_full>TOra is a Toolkit for Oracle which aims to help the DBA or developer of
+database application. It features an SQL worksheet with PL/SQL block parsing, a
+PL/SQL debugger and editor with syntax highlighting, a Schema browser, UNICODE
+support, printing, and a full suite of DBA management tools.
+</desc_full>
+    <vitality_score>70.23</vitality_score>
+    <vitality_percent>0.01</vitality_percent>
+    <vitality_rank>3466</vitality_rank>
+    <popularity_score>4003.87</popularity_score>
+    <popularity_percent>6.77</popularity_percent>
+    <popularity_rank>396</popularity_rank>
+    <rating>8.92</rating>
+    <rating_count>16</rating_count>
+    <rating_rank>26</rating_rank>
+    <subscriptions>125</subscriptions>
+    <branch_name>Stable</branch_name>
+    <url_project_page>http://freshmeat.net/projects/tora/</url_project_page>
+    <url_homepage>http://freshmeat.net/redir/tora/17961/url_homepage/</url_homepage>
+    <url_tgz>http://freshmeat.net/redir/tora/17961/url_tgz/</url_tgz>
+    <url_bz2></url_bz2>
+    <url_zip></url_zip>
+    <url_changelog>http://freshmeat.net/redir/tora/17961/url_changelog/</url_changelog>
+    <url_rpm>http://freshmeat.net/redir/tora/17961/url_rpm/</url_rpm>
+    <url_deb></url_deb>
+    <url_osx></url_osx>
+    <url_bittorrent></url_bittorrent>
+    <url_bsdport></url_bsdport>
+    <url_autopackage></url_autopackage>
+    <url_jar></url_jar>
+    <url_purchase></url_purchase>
+    <url_cvs>http://freshmeat.net/redir/tora/17961/url_cvs/</url_cvs>
+    <url_bugtracker></url_bugtracker>
+    <url_list></url_list>
+    <url_mirror></url_mirror>
+    <url_demo></url_demo>
+    <license>GNU General Public License (GPL)</license>
+    <latest_release>
+      <latest_release_version>1.2.4</latest_release_version>
+      <latest_release_id>89784</latest_release_id>
+      <latest_release_date>2002-07-04 09:19:35</latest_release_date>
+    </latest_release>
+    <screenshot_thumb>http://download.freshmeat.net/screenshots/10701_thumb.jpg</screenshot_thumb>
+    <authors>
+      <author>
+        <author_name>Henrik Johnson</author_name>
+        <author_url>http://freshmeat.net/~hpj/</author_url>
+        <author_role>Owner</author_role>
+      </author>
+    </authors>
+    <descriminators>
+      <trove_id>232</trove_id>
+      <trove_id>3</trove_id>
+      <trove_id>200</trove_id>
+      <trove_id>165</trove_id>
+      <trove_id>254</trove_id>
+      <trove_id>68</trove_id>
+      <trove_id>47</trove_id>
+      <trove_id>230</trove_id>
+      <trove_id>11</trove_id>
+      <trove_id>15</trove_id>
+      <trove_id>871</trove_id>
+      <trove_id>4</trove_id>
+      <trove_id>823</trove_id>
+      <trove_id>207</trove_id>
+      <trove_id>201</trove_id>
+      <trove_id>9</trove_id>
+      <trove_id>229</trove_id>
+      <trove_id>2</trove_id>
+    </descriminators>
+    <dependencies>
+    </dependencies>
+  </project>
+</project-listing>

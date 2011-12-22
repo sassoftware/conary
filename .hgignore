@@ -1,4 +1,4 @@
-\.(py[co]|o|so|a|la|sw[op]|orig|rej|egg-info)$
+\.(py[co]|o|so|a|la|sw[op]|orig|rej|egg-info|ccs)$
 ~$
 ^(bin|tmp)/
 conary/constants.py$
@@ -6,6 +6,8 @@ conary/pysqlite3/build
 conary/pysqlite3/embed
 conary/pysqlite3/sqlite-.*/
 conary/sqlite3
+\.failed$
+\.times$
 # These are auto-generated stubs that must not be checked in:
 ^conary/(commit|cscmd|fmtroves|metadata|query|queryrep|rollbacks|showchangeset|updatecmd|verify|branch|clone|cvc).py$
 NEWS.html

@@ -1,0 +1,25 @@
+<trove>
+    <shortDesc>A distributed software management system.</shortDesc>
+    <longDesc>Conary is a distributed software management system
+for Linux distributions. It replaces traditional
+package management solutions (such as RPM and
+dpkg) with one designed to enable loose
+collaboration across the Internet. It enables sets
+of distributed and loosely connected repositories
+to define the components which are installed on a
+Linux system. Rather than having a full
+distribution come from a single vendor, it allows
+administrators and developers to branch a
+distribution, keeping the pieces which fit their
+environment while grabbing components from other
+repositories across the Internet.</longDesc>
+    <source>freshmeat</source>
+    <language>C</language>
+    <url>http://wiki.specifix.com/</url>
+    <url>http://freshmeat.net/projects/conary/</url>
+    <license>License :: OSI Approved :: Common Public License</license>
+    <category>Topic :: System :: Software Distribution Tools</category>
+    <category>Topic :: System :: Archiving :: Packaging</category>
+    <category>Topic :: Software Development :: Version Control</category>
+    <category>Topic :: System :: Installation/Setup</category>
+</trove>

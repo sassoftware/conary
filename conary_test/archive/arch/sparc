@@ -1,0 +1,4 @@
+archProp LE False
+archProp BE True
+archProp bits32 true
+archProp bits64 False

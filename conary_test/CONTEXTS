@@ -1,0 +1,22 @@
+The following contexts are defined:
+
+bydefault         - uses the bydefault settings for child troves
+entitlements      - check entitlement handling
+erase             - erasure tests
+fileoverlap       - files overlap
+initialcontents   - test initial content handling
+labelmultiplicity - label multiplicity tests
+localchangeset    - uses a local changeset
+migrate           - fullMigrate code
+performance       - performance tests
+pin               - troves pinned/unpinned
+redirect          - redirects
+remove            - removed troves
+repair            - repair command
+rollbacks         - use rollback code
+rpm               - test RPM container support
+splitting         - update job splitting
+sysmodel          - tests using cml / system model
+sync              - uses sync/migrate/etc behavior
+trovescripts      - test trove-specific scripts
+updateall         - deals with updateAll code path

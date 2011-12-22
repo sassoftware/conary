@@ -1,0 +1,2 @@
+# the following dummy value is for testing macro overrides
+dummyMacro      = 'stillwrong'

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# hack for testing...
+
+case $1 in
+    --assemblyref)
+        cat <<EOF
+
+AssemblyRef Table
+1: Version=2.0.3600.0
+	Name=mscorlib
+	Public Key:
+0x00000000: B7 7A 5C 56 19 34 E0 89 
+2: Version=2.0.3600.0
+	Name=System
+	Public Key:
+0x00000000: B7 7A 5C 56 19 34 E0 89 
+3: Version=2.0.3600.0
+	Name=System.Web.Services
+	Public Key:
+0x00000000: B0 3F 5F 7F 11 D5 0A 3A 
+4: Version=2.0.3600.0
+	Name=System.Xml
+	Public Key:
+0x00000000: B7 7A 5C 56 19 34 E0 89 
+
+EOF
+        ;;
+    --assembly)
+        cat <<EOF
+
+Assembly Table
+Name:          wsdl2
+Hash Algoritm: 0x00008004
+Version:       0.0.0.0
+Flags:         0x00000000
+PublicKey:     BlobPtr (0x00000000)
+	Zero sized public key
+Culture:       
+
+EOF
+        ;;
+esac
