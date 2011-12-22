@@ -1141,8 +1141,8 @@ class TestMultipleMainPackage(PackageRecipe):
         recipe2 = recipes.testRecipe1.replace("name = 'testcase'", 
                                               "name = 'testcase2'")
         # build again, so now the installed built count is 2
-            (built, d) = self.buildRecipe(recipe2, "TestRecipe1")
-            (built, d) = self.buildRecipe(recipe2, "TestRecipe1")
+        (built, d) = self.buildRecipe(recipe2, "TestRecipe1")
+        (built, d) = self.buildRecipe(recipe2, "TestRecipe1")
         # different version results in the troves getting the one matching
         # the highest 
         # 1. using the same flavor, we bump the version #
