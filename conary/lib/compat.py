@@ -1,24 +1,20 @@
-#
-# Copyright (c) rPath, Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
-
-import sys
+import sys as _sys
 from keyword import iskeyword as _iskeyword
 from operator import itemgetter as _itemgetter
+
+
+def all(iterable):
+    for element in iterable:
+        if not element:
+            return False
+    return True
+
+
+def any(iterable):
+    for element in iterable:
+        if element:
+            return True
+    return False
 
 
 def namedtuple(typename, field_names, verbose=False):
@@ -51,7 +47,7 @@ def namedtuple(typename, field_names, verbose=False):
         field_names = field_names.replace(',', ' ').split() # names separated by whitespace and/or commas
     field_names = tuple(map(str, field_names))
     for name in (typename,) + field_names:
-        if [c for c in name if not c.isalnum() and c != '_']:
+        if not all(c.isalnum() or c=='_' for c in name):
             raise ValueError('Type names and field names can only contain alphanumeric characters and underscores: %r' % name)
         if _iskeyword(name):
             raise ValueError('Type names and field names cannot be a keyword: %r' % name)
@@ -74,8 +70,8 @@ def namedtuple(typename, field_names, verbose=False):
         '%(typename)s(%(argtxt)s)' \n
         __slots__ = () \n
         _fields = %(field_names)r \n
-        def __new__(cls, %(argtxt)s):
-            return tuple.__new__(cls, (%(argtxt)s)) \n
+        def __new__(_cls, %(argtxt)s):
+            return _tuple.__new__(_cls, (%(argtxt)s)) \n
         @classmethod
         def _make(cls, iterable, new=tuple.__new__, len=len):
             'Make a new %(typename)s object from a sequence or iterable'
@@ -88,22 +84,23 @@ def namedtuple(typename, field_names, verbose=False):
         def _asdict(t):
             'Return a new dict which maps field names to their values'
             return {%(dicttxt)s} \n
-        def _replace(self, **kwds):
+        def _replace(_self, **kwds):
             'Return a new %(typename)s object replacing specified fields with new values'
-            result = self._make(map(kwds.pop, %(field_names)r, self))
+            result = _self._make(map(kwds.pop, %(field_names)r, _self))
             if kwds:
                 raise ValueError('Got unexpected field names: %%r' %% kwds.keys())
             return result \n
         def __getnewargs__(self):
             return tuple(self) \n\n''' % locals()
     for i, name in enumerate(field_names):
-        template += '        %s = property(itemgetter(%d))\n' % (name, i)
+        template += '        %s = _property(_itemgetter(%d))\n' % (name, i)
     if verbose:
         print template
 
     # Execute the template string in a temporary namespace and
     # support tracing utilities by setting a value for frame.f_globals['__name__']
-    namespace = dict(itemgetter=_itemgetter, __name__='namedtuple_%s' % typename)
+    namespace = dict(_itemgetter=_itemgetter, __name__='namedtuple_%s' % typename,
+                     _property=property, _tuple=tuple)
     try:
         exec template in namespace
     except SyntaxError, e:
@@ -113,7 +110,7 @@ def namedtuple(typename, field_names, verbose=False):
     # For pickling to work, the __module__ variable needs to be set to the frame
     # where the named tuple is created.  Bypass this step in enviroments where
     # sys._getframe is not defined (Jython for example).
-    if hasattr(sys, '_getframe'):
-        result.__module__ = sys._getframe(1).f_globals.get('__name__', '__main__')
+    if hasattr(_sys, '_getframe'):
+        result.__module__ = _sys._getframe(1).f_globals.get('__name__', '__main__')
 
     return result
