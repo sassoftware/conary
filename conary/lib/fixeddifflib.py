@@ -1158,8 +1158,8 @@ def _format_range_unified(start, stop):
     # DISABLED for parse compatibility with 2.4 difflib
     #if length == 1:
     #    return '%d' % (beginning,)
-    if not length:
-        beginning -= 1        # empty ranges begin at line just before the range
+    #if not length:
+    #    beginning -= 1        # empty ranges begin at line just before the range
     return '%d,%d' % (beginning, length)
 
 def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
