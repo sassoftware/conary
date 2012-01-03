@@ -95,6 +95,7 @@ docs:
 	cd scripts; ./gendocs
 
 clean: clean-subdirs default-clean
+	$(MAKE) -C conary_test clean
 
 check: check-subdirs
 
