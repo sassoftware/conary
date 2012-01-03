@@ -1162,7 +1162,6 @@ class testRedirect(RedirectRecipe):
         self.addCollection('redirect=1-1-1', [':runtime'])
         self.addComponent('redirect:source=1.0-1')
         built = self.build(recipestr, "testRedirect")
-        import epdb;epdb.stc('f')
         cs = self.promote('redirect', ':linux--:1',
                           cloneSources=True)
         trvs = [x for x in cs.iterNewTroveList()]

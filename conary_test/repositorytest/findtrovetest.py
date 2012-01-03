@@ -798,10 +798,7 @@ class FindTroveTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
         db = self.openDatabase()
         Flavor = deps.parseFlavor
-        def _find(spec, debug=False, getLeaves=True, bestFlavor=True):
-            if debug:
-                import epdb
-                epdb.stc('f')
+        def _find(spec, getLeaves=True, bestFlavor=True):
             cfg = self.cfg
             spec = cmdline.parseTroveSpec(spec)
             tupList = repos.findTrove(cfg.installLabelPath, spec, cfg.flavor,
@@ -919,10 +916,7 @@ class FindTroveTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
         db = self.openDatabase()
         Flavor = deps.parseFlavor
-        def _find(spec, debug=False, getLeaves=True, bestFlavor=True):
-            if debug:
-                import epdb
-                epdb.stc('f')
+        def _find(spec, getLeaves=True, bestFlavor=True):
             cfg = self.cfg
             spec = cmdline.parseTroveSpec(spec)
             tupList = repos.findTrove(cfg.installLabelPath, spec, cfg.flavor,
@@ -942,10 +936,7 @@ class FindTroveTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
         db = self.openDatabase()
         Flavor = deps.parseFlavor
-        def _find(spec, debug=False, getLeaves=True, bestFlavor=True):
-            if debug:
-                import epdb
-                epdb.stc('f')
+        def _find(spec, getLeaves=True, bestFlavor=True):
             cfg = self.cfg
             spec = cmdline.parseTroveSpec(spec)
             tupList = repos.findTrove(cfg.installLabelPath, spec, cfg.flavor,

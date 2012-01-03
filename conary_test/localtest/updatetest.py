@@ -570,7 +570,6 @@ class Foo(PackageRecipe):
                                postEraseScript = 'posterase-ccs',
                                changeSetFile = groupBazCcs)
 
-            import epdb; epdb.stc(11)
             del(runInfo[:])
             self.updatePkg(['group-foo=%s' % version12,
                             'group-baz=%s' % version12],
