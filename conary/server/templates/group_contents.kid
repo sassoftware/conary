@@ -31,7 +31,7 @@
             <tr py:for="i, (name, version, flavor) in enumerate(troves)" py:attrs="{'style': 'background: %s' % (i%2 and '#f5f5f5' or '#ffffff')}">
                 <?python #
                     from urllib import quote
-                    from conary.server.http import flavorWrap
+                    from conary.web.repos_web import flavorWrap
                     url = "files?t=%s;v=%s;f=%s" % (quote(name), quote(version.freeze()), quote(flavor.freeze()))
                 ?>
                 <td style="vertical-align: top;"><a href="${url}">${name}</a></td>

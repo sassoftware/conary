@@ -1393,10 +1393,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getFileContents(clientVersion, fileList, rawStreams)
 
     def _getFileContents(self, clientVersion, fileList, rawStreams):
+        fd, path = tempfile.mkstemp(dir=self.tmpPath, suffix='.cf-out')
         try:
-            (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
-                                          suffix = '.cf-out')
-
             sizeList = []
             exception = None
 
@@ -3749,7 +3747,7 @@ class ServerConfig(ConfigFile):
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
     serverName              = CfgLineList(CfgString, listType = GlobListType)
-    staticPath              = (CfgPath, '/conary-static')
+    staticPath              = (CfgString, '/conary-static')
     serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog

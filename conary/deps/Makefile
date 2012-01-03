@@ -16,9 +16,7 @@
 #
 
 
-python_files =	__init__.py	\
-		arch.py		\
-		deps.py
+python_files = $(wildcard *.py)
 
 extra_dist = Makefile
 

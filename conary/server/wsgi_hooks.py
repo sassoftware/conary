@@ -36,6 +36,7 @@ from conary.repository import filecontainer
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
+from conary.web import repos_web
 from conary.web import webauth
 
 log = logging.getLogger('wsgi_hooks')
@@ -46,7 +47,8 @@ def makeApp(settings):
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
-    app = ConaryRouter(envOverrides)
+    pathPrefix = settings.get('mount_point', '')
+    app = ConaryRouter(envOverrides, pathPrefix)
     return app
 
 
@@ -59,19 +61,34 @@ def paster_main(global_config, **settings):
 class ConaryRouter(object):
 
     requestFactory = webob.Request
+    responseFactory = webob.Response
 
-    def __init__(self, envOverrides=()):
+    def __init__(self, envOverrides=(), pathPrefix=''):
         self.envOverrides = envOverrides
+        self.pathPrefix = pathPrefix.split('/')
         self.configCache = {}
 
     def __call__(self, environ, start_response):
         environ.update(self.envOverrides)
         request = self.requestFactory(environ)
+        for elem in self.pathPrefix:
+            if not elem:
+                continue
+            if request.path_info_pop() != elem:
+                return self.notFound(environ, start_response)
         try:
             return self.handleRequest(request, start_response)
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
+
+    def notFound(self, environ, start_response):
+        response = self.responseFactory(
+                "<h1>404 Not Found</h1>\n"
+                "<p>No application was found at the given location\n",
+            status='404 Not Found',
+            content_type='text/html')
+        return response(environ, start_response)
 
     def handleRequest(self, request, start_response):
         if 'conary.netrepos.config_file' in request.environ:
@@ -98,7 +115,7 @@ class ConaryRouter(object):
         short += 'Extended traceback at ' + tracePath
         log.error(short)
 
-        response = webob.Response(
+        response = self.responseFactory(
                 "<h1>500 Internal Server Error</h1>\n"
                 "<p>An unexpected error occurred on the server. Consult the "
                 "server error logs for details.",
@@ -162,7 +179,6 @@ class ConaryHandler(object):
         self.request = None
         self.auth = None
         self.isSecure = None
-        self.urlBase = None
         self.repositoryServer = None
         self.proxyServer = None
         self.restHandler = None
@@ -190,27 +206,21 @@ class ConaryHandler(object):
             req.scheme = 'https'
         self.isSecure = req.scheme == 'https'
 
+        urlBase = req.application_url
         if cfg.closed:
             # Closed repository -- returns an exception for all requests
             self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
-            self.restHandler = None
         elif cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
-            self.proxyServer = proxy.ProxyRepositoryServer(cfg, self.urlBase)
-            self.restHandler = None
+            self.proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
         else:
             # Full repository with optional changeset cache
             self.repositoryServer = netserver.NetworkRepositoryServer(cfg,
-                    self.urlBase)
-            # TODO: need restlib and crest work to support WSGI
-            #if cresthooks and cfg.baseUri:
-            #    restUri = cfg.baseUri + '/api'
-            #    self.restHandler = cresthooks.ApacheHandler(restUri,
-            #            self.repositoryServer)
+                    urlBase)
 
         if self.repositoryServer:
-            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, self.urlBase,
+            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase,
                     self.repositoryServer)
 
     def _loadAuth(self):
@@ -272,10 +282,15 @@ class ConaryHandler(object):
             self.repositoryServer.reopen()
 
         if self.request.method == 'GET':
-            if self.request.path_info_peek() == 'changeset':
+            path = self.request.path_info_peek()
+            if path == 'changeset':
                 return self.getChangeset()
+            elif path == 'api':
+                self.request.path_info_pop()
+                return self.getApi()
         elif self.request.method == 'POST':
-            if self.request.path_info_peek() == '':
+            path = self.request.path_info_peek()
+            if path == '':
                 return self.postRpc()
         elif self.request.method == 'PUT':
             if self.request.path_info_peek() == '':
@@ -284,8 +299,8 @@ class ConaryHandler(object):
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
                     "Supported methods: GET POST PUT")
-        return self._makeError('404 Not Found',
-                "No resource was found at the given location")
+        web = repos_web.ReposWeb(self.cfg, self.repositoryServer)
+        return web._handleRequest(request)
 
     def postRpc(self):
         if self.request.content_type != 'text/xml':
@@ -465,6 +480,19 @@ class ConaryHandler(object):
             if st.st_size == 0:
                 return open(path, 'wb+')
         return None
+
+    def getApi(self):
+        if not self.repositoryServer:
+            return self._makeError('404 Not Found',
+                    "Standalone Conary proxies cannot forward API requests")
+        try:
+            from crest import webhooks
+        except ImportError:
+            return self._makeError('404 Not Found',
+                    "Conary web API is not enabled on this repository")
+        prefix = self.request.script_name
+        restHandler = webhooks.WSGIHandler(prefix, self.repositoryServer)
+        return restHandler.handle(self.request, path=None)
 
     def close(self):
         # Make sure any pooler database connections are released.
