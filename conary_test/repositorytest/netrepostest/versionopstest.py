@@ -1,0 +1,202 @@
+#
+# Copyright (c) rPath, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+from conary_test import dbstoretest
+
+from conary.versions import VersionFromString
+from conary.versions import ThawVersion
+from conary.versions import Label
+from conary.repository.netrepos import versionops
+from conary.repository.netrepos import trovestore
+from conary.repository.netrepos import items
+from conary.server import schema
+
+
+class VersionsSqlTest(dbstoretest.DBStoreTestBase):
+    def testVersionTable(self):
+        db = self.getDB()
+        schema.createIdTables(db)
+        tbl = trovestore.LocalRepVersionTable(db)
+
+        v1 = VersionFromString("/conary.rpath.com@test:trunk/1.2-3")
+        v2 = VersionFromString("/conary.rpath.com@test:trunk/1.4-5")
+
+        tbl.addId(v1)
+        tbl.addId(v2)
+        assert(tbl[v1] == 1)
+        assert(tbl[v2] == 2)
+        assert(tbl.getBareId(1) == v1)
+        assert(tbl.getBareId(2) == v2)
+        #assert(tbl.getTimestamp(2) == v2.timeStamp)
+
+        v2.versions[-1].timeStamp += 5
+        assert(tbl[v2] == 2)
+
+        assert(tbl.get(v1, "foo") == 1)
+        del tbl[v1]
+        assert(tbl.get(v1, "foo") == "foo")
+        tbl.delId(2)
+        self.assertRaises(KeyError, tbl.__getitem__, v2)
+        #self.assertRaises(KeyError, tbl.getTimestamp, 1000)
+
+    def testLabelTable(self):
+        db = self.getDB()
+        schema.createIdTables(db)
+        tbl = versionops.LabelTable(db)
+
+        l1 = Label("conary.rpath.com@test:trunk")
+        l2 = Label("conary.rpath.com@test:branch")
+
+        tbl.addId(l1)
+        tbl.addId(l2)
+        assert(tbl[l1] == 1)
+        assert(tbl[l2] == 2)
+
+        assert(tbl.get(l1, "foo") == 1)
+        del tbl[l1]
+        assert(tbl.get(l1, "foo") == "foo")
+        tbl.delId(2)
+        self.assertRaises(KeyError, tbl.__getitem__, l2)
+
+    def testSqlVersioning(self):
+        db = self.getDB()
+        schema.createSchema(db)
+
+        vTbl = trovestore.LocalRepVersionTable(db)
+        bTbl = versionops.BranchTable(db)
+        sv = versionops.SqlVersioning(db, vTbl, bTbl)
+        i = items.Items(db)
+        # we need the FileStreams table for eraseVersion to work
+        # properly. It is created as part of the createTroves() call
+
+        v5 = ThawVersion("/conary.rpath.com@test:trunk/5:1.2-5")
+        v10 = ThawVersion("/conary.rpath.com@test:trunk/10:1.2-10")
+        v15 = ThawVersion("/conary.rpath.com@test:trunk/15:1.2-15")
+        v20 = ThawVersion("/conary.rpath.com@test:trunk/20:1.2-20")
+
+        branch = v10.branch()
+        itemId = i.addId('foo')
+        sv.createBranch(itemId, branch)
+
+        sv.createVersion(itemId, v10, 0, "foo:source")
+        assert(bTbl.has_key(branch))
+        assert(vTbl.has_key(v10))
+        assert(sv.hasVersion(itemId, vTbl[v10]))
+        assert(i.has_key("foo:source"))
+        assert(not sv.hasVersion(2, vTbl[v10]))
+
+        branchId = bTbl[branch]
+
+        itemId2 = i.addId('bar')
+        sv.createBranch(itemId2, branch)
+        sv.createVersion(itemId2, v10, 0, None)
+        self.assertRaises(versionops.DuplicateVersionError,
+                          sv.createVersion, itemId2, v10, 0, None)
+
+        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)]
+                    == [ v10 ])
+
+        sv.createVersion(1, v20, 0, None)
+        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)]
+                    == [ v20, v10 ])
+
+        sv.createVersion(1, v15, 0, None)
+        db.commit()
+        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)] ==
+               [ v20, v15, v10 ])
+
+        sv.createVersion(1, v5, 0, None)
+        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)] ==
+               [ v20, v15, v10, v5 ])
+
+        label = Label("conary.rpath.com@test:trunk")
+        assert [bTbl.getId(x) for x in sv.branchesOfLabel(1, label) ]\
+                    == [ branch ]
+
+        brLabel = Label("conary.rpath.com@test:br1")
+
+        branch1 = v10.createBranch(brLabel, withVerRel = False)
+        branch2 = v20.createBranch(brLabel, withVerRel = False)
+
+        sv.createBranch(1, branch1)
+        sv.createBranch(1, branch2)
+
+        assert([bTbl.getId(x) for x in sv.branchesOfLabel(1, brLabel)] == \
+               [branch1, branch2])
+
+        assert([bTbl.getId(x) for x in sv.branchesOfItem(1)] ==
+                    [ branch, branch1, branch2 ])
+
+        return
+
+        # erasing doesn't work
+
+        sv.eraseVersion(1, vTbl[v20])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
+               [ v15, v10, v5 ])
+        vTbl.removeUnused()
+        assert(not vTbl.has_key(v20))
+
+        sv.eraseVersion(1, vTbl[v10])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
+                [ v15, v5 ])
+        # we created this for node 2 as well
+        vTbl.removeUnused()
+        assert(vTbl.has_key(v10))
+
+        sv.eraseVersion(1, vTbl[v5])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
+                [ v15 ])
+        vTbl.removeUnused()
+        assert(not vTbl.has_key(v5))
+
+        sv.eraseVersion(1, vTbl[v15])
+        assert([x for x in sv.versionsOnBranch(1, branchId)] == [ ])
+        vTbl.removeUnused()
+        assert(not vTbl.has_key(v15))
+
+        sv.eraseVersion(2, vTbl[v10])
+        vTbl.removeUnused()
+        assert(not vTbl.has_key(v10))
+
+        assert(bTbl.has_key(branch))
+        assert(bTbl.has_key(branch1))
+        assert(bTbl.has_key(branch2))
+        bTbl.removeUnused()
+        assert(not bTbl.has_key(branch))
+        assert(not bTbl.has_key(branch1))
+        assert(not bTbl.has_key(branch2))
+
+    def testNodesTable(self):
+        db = self.getDB()
+        schema.createSchema(db)
+        b = versionops.BranchTable(db)
+        v = trovestore.LocalRepVersionTable(db)
+        i = items.Items(db)
+        sv = versionops.SqlVersioning(db, v, b)
+        ver = ThawVersion("/a.b.c@d:e/1:1-1-1")
+        
+        itemId = i.getOrAddId("foo")
+        nodeId, versionId = sv.createVersion(itemId, ver, 0, None)
+        cu = db.cursor()
+        cu.execute("select sourceItemId from Nodes where nodeId = ?", nodeId)
+        self.failUnlessEqual(cu.fetchall()[0][0], None)
+        srcId = i.getOrAddId("foo:source")
+        sv.nodes.updateSourceItemId(nodeId, srcId)
+        cu.execute("select sourceItemId from Nodes where nodeId = ?", nodeId)
+        self.failUnlessEqual(cu.fetchall()[0][0], srcId)

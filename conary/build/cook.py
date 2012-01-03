@@ -443,8 +443,14 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
     if not groupOptions:
         groupOptions = GroupCookOptions(alwaysBumpCount=alwaysBumpCount)
 
-    assert(len(set((x.getRecipe().name, x.getRecipe().version)
-                for x in loaderList)) == 1)
+    uniqueVersions = set((x.getRecipe().name, x.getRecipe().version)
+                for x in loaderList)
+    if len(uniqueVersions) != 1:
+        uniqueVersions = '\n  '.join(sorted(
+            '%s=%s' % x for x in uniqueVersions))
+        raise builderrors.RecipeFileError("Attempted to cook different "
+                "troves together:\n  " + uniqueVersions)
+
 
     if not callback:
         callback = callbacks.CookCallback()

@@ -1,0 +1,12 @@
+SetCharacterEncodingFilter.class and servlet-api.jar are random files
+from tomcat 5.5.12 binary distribution used merely to test dependency
+generation.
+
+ o  Expr.class is from /usr/share/java/libgcj-4.1.0.jar from gcc 4.1.0
+
+ o  gcc-4.1snapshot20051125 and demonstrates symbol tables with
+    long/double entries.
+
+ o  SunJCE_e.class is from lib/ext/sunjce_provider.jar in
+    jre1.5.0_05.tar.bz2 and demonstrates symbol tables with
+    arrays.

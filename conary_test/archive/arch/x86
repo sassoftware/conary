@@ -1,0 +1,46 @@
+Name x86
+archProp LE True
+archProp BE False
+archProp bits32 True
+archProp bits64 False
+macro targetarch i386
+macro unamearch i386
+macro optflags -O2
+
+[i486]
+macro targetarch i486
+macro unamearch i486
+
+[i586]
+macro targetarch i586
+macro unamearch i586
+subsumes i486
+
+[i686]
+macro targetarch i686
+macro unamearch i686
+subsumes i586, i486
+
+[cmov]
+
+[sse]
+
+[sse2]
+subsumes sse
+
+[sse3]
+subsumes sse2,sse
+
+[mmx]
+
+[mmxext]
+subsumes mmx
+
+[3dnow]
+buildName threednow
+
+[3dnowext]
+buildName threednowext
+subsumes 3dnow
+
+[nx]

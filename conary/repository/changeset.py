@@ -16,24 +16,22 @@
 #
 
 
-import difflib
-import stat
 import struct
-import tempfile
 import errno
 import gzip
 import itertools
 import os
-import copy
 
 try:
-    from cStringIO import StringIO
+    from cStringIO import StringIO as _StringIO
+    StringIO = _StringIO
 except ImportError:
     from StringIO import StringIO
 
 from conary import files, rpmhelper, streams, trove, versions
 from conary.lib import base85, enum, log, patch, sha1helper, util, api
 from conary.lib import cpiostream
+from conary.lib import fixeddifflib
 from conary.lib.ext import pack
 from conary.repository import filecontainer, filecontents, errors
 
@@ -1024,11 +1022,11 @@ class ChangeSet(streams.StreamSet):
                 yield "--- a%s\n" % oldPath
                 yield "+++ b%s\n" % newPath
                 if oldFileId:
-                    unified = difflib.unified_diff(
+                    unified = fixeddifflib.unified_diff(
                                  oldContents.get().readlines(),
                                  newContents.get().readlines())
                 else:
-                    unified = difflib.unified_diff([],
+                    unified = fixeddifflib.unified_diff([],
                                  newContents.get().readlines())
                 # skip ---/+++ lines
                 unified.next()

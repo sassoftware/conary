@@ -39,7 +39,10 @@ elif [ -d /usr/include ] && grep 'GNU \(Library\|Lesser\) General Public' /usr/i
 elif [ -d ${SYSROOT}/usr/include ] && grep 'GNU \(Library\|Lesser\) General Public' ${SYSROOT}/usr/include/libelf.h >/dev/null; then\
     echo "-lelf"; \
 else \
+    echo >&2; \
     echo 'No appropriate libelf found' >&2 ;\
+    echo 'If building for GPL distribution, please pass "libelf=-lelf"' >&2 ;\
+    echo >&2; \
 fi)
 
 

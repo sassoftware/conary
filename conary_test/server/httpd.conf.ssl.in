@@ -1,0 +1,54 @@
+#
+# Copyright (c) rPath, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+LoadModule ssl_module modules/mod_ssl.so
+Listen 127.0.0.1:@PLAINPORT@
+
+SSLSessionCache         shmcb:/var/cache/mod_ssl/scache(512000)
+SSLSessionCacheTimeout  300
+SSLMutex fcntl:ssl-cache.lock
+SSLRandomSeed startup file:/dev/urandom  256
+SSLRandomSeed connect builtin
+SSLCryptoDevice builtin
+<VirtualHost _default_:@PORT@>
+    ServerName localhost
+    SSLEngine on
+    ErrorLog ssl_error_log
+    TransferLog ssl_access_log
+    SSLEngine on
+    SSLCipherSuite ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
+    SSLCertificateFile server.crt
+    SSLCertificateKeyFile server.key
+    SSLOptions +StdEnvVars
+
+    DocumentRoot "@DOCROOT@"
+
+    Alias / "@DOCROOT@/test.cnr/"
+
+    <Directory />
+        Options FollowSymLinks
+        AllowOverride None
+        AddHandler python-program .cnr
+        PythonHandler @HANDLER@
+    </Directory>
+    TypesConfig /etc/mime.types
+</VirtualHost>
+
+<VirtualHost _default_:@PLAINPORT@>
+    SSLEngine off
+</VirtualHost>

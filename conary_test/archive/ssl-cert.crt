@@ -1,0 +1,51 @@
+This cert is signed by ssl-cert-authority.pem
+
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 6 (0x6)
+        Signature Algorithm: sha1WithRSAEncryption
+        Issuer: O=Test Certificate Authority
+        Validity
+            Not Before: May 28 15:19:23 2009 GMT
+            Not After : Dec 31 15:19:23 2049 GMT
+        Subject: O=Test Server Certificate, CN=localhost
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+            RSA Public Key: (1024 bit)
+                Modulus (1024 bit):
+                    00:a5:a0:72:c3:38:80:6c:18:34:bd:c6:ce:46:e8:
+                    67:20:31:73:35:87:7b:f0:c1:0c:09:fe:a2:ea:48:
+                    17:6b:90:90:68:6a:2f:4f:46:d6:b6:a4:00:e5:5e:
+                    42:da:31:63:57:b4:a1:e5:19:aa:5f:1c:cc:d6:96:
+                    92:8f:98:e5:d4:1f:ce:91:38:71:2e:b3:2f:c7:6b:
+                    92:65:52:36:2f:b7:09:e0:c2:c9:8f:8f:4e:d5:85:
+                    f9:9f:cd:e5:46:3f:05:98:e2:23:1e:1c:f2:12:1d:
+                    be:91:40:bf:7c:08:18:86:20:20:0a:f9:30:93:71:
+                    ac:d5:c8:8b:db:f2:ed:50:b5
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: critical
+                CA:FALSE
+    Signature Algorithm: sha1WithRSAEncryption
+        66:b2:b7:f2:95:7d:46:c0:8f:e7:88:16:e0:b1:43:f4:3d:aa:
+        15:81:47:56:4d:a0:37:a6:59:b4:ab:01:4c:39:d8:93:90:9b:
+        97:98:45:ce:a0:9e:8c:ed:67:4f:f3:08:df:52:18:ab:5a:e5:
+        e5:75:55:30:64:39:1f:6c:e2:b8:6f:7e:e4:75:0b:19:59:fa:
+        7a:5b:27:18:e4:4b:20:0d:77:c6:e1:dd:b5:1f:d6:0d:c5:81:
+        3d:f7:27:5c:75:19:56:70:4e:ed:17:ee:fe:f7:64:a6:87:40:
+        db:b0:c0:99:9e:8c:d2:45:17:44:9d:f6:d3:78:3f:a4:da:f4:
+        b8:c6
+-----BEGIN CERTIFICATE-----
+MIIB4TCCAUqgAwIBAgIBBjANBgkqhkiG9w0BAQUFADAlMSMwIQYDVQQKExpUZXN0
+IENlcnRpZmljYXRlIEF1dGhvcml0eTAeFw0wOTA1MjgxNTE5MjNaFw00OTEyMzEx
+NTE5MjNaMDYxIDAeBgNVBAoTF1Rlc3QgU2VydmVyIENlcnRpZmljYXRlMRIwEAYD
+VQQDEwlsb2NhbGhvc3QwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAKWgcsM4
+gGwYNL3GzkboZyAxczWHe/DBDAn+oupIF2uQkGhqL09G1rakAOVeQtoxY1e0oeUZ
+ql8czNaWko+Y5dQfzpE4cS6zL8drkmVSNi+3CeDCyY+PTtWF+Z/N5UY/BZjiIx4c
+8hIdvpFAv3wIGIYgIAr5MJNxrNXIi9vy7VC1AgMBAAGjEDAOMAwGA1UdEwEB/wQC
+MAAwDQYJKoZIhvcNAQEFBQADgYEAZrK38pV9RsCP54gW4LFD9D2qFYFHVk2gN6ZZ
+tKsBTDnYk5Cbl5hFzqCejO1nT/MI31IYq1rl5XVVMGQ5H2ziuG9+5HULGVn6elsn
+GORLIA13xuHdtR/WDcWBPfcnXHUZVnBO7Rfu/vdkpodA27DAmZ6M0kUXRJ3203g/
+pNr0uMY=
+-----END CERTIFICATE-----

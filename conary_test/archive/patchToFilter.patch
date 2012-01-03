@@ -1,0 +1,10 @@
+--- testpatch-1/unpatched2.orig	2008-07-23 22:02:44.776992945 -0400
++++ testpatch-1/unpatched2	2008-07-23 22:03:00.700303619 -0400
+@@ -1 +1 @@
+-unpatched
++patched
+--- testpatch-1/unpatched1.orig	2008-07-23 22:02:42.226159548 -0400
++++ testpatch-1/unpatched1	2008-07-23 22:02:56.133303912 -0400
+@@ -1 +1 @@
+-unpatchedOops
++patched
