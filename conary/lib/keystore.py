@@ -15,20 +15,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import getpass
-from conary.lib import keystore
+try:
+    import keyutils as _keyutils
+    _keyring = _keyutils.KEY_SPEC_SESSION_KEYRING
+except ImportError:
+    _keyutils = _keyring = None
 
 
-def getPassword(server, userName=None, useCached=True):
-    if userName is None:
-        return None, None
-    keyDesc = 'conary:%s:%s' % (server, userName)
-    if useCached:
-        passwd = keystore.getPassword(keyDesc)
-        if passwd:
-            return userName, passwd
-    s = "Enter the password for %s on %s:" % (userName, server)
-    passwd = getpass.getpass(s)
-    if passwd:
-        keystore.setPassword(keyDesc, passwd)
-    return userName, passwd
+def getPassword(keyDesc):
+    if _keyutils:
+        keyId = _keyutils.request_key(keyDesc, _keyring)
+        if keyId is not None:
+            return _keyutils.read_key(keyId)
+    return None
+
+
+def setPassword(keyDesc, passwd):
+    if _keyutils:
+        _keyutils.add_key(keyDesc, passwd, _keyring)
+    return passwd
