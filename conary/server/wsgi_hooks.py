@@ -183,6 +183,22 @@ class ConaryHandler(object):
         self.proxyServer = None
         self.restHandler = None
 
+    def _getEnvBool(self, key, default=None):
+        value = self.request.environ.get(key)
+        if value is None:
+            if default is None:
+                raise KeyError("Environment variable %r must be set" % (key,))
+            else:
+                return default
+        if value.lower() in ('yes', 'y', 'true', 't', '1', 'on'):
+            return True
+        elif value.lower() in ('no', 'n', 'false', 'f', '0', 'off'):
+            return False
+        else:
+            raise ValueError(
+                    "Environment variable %r must be a boolean, not %r" % (key,
+                        value))
+
     def _loadCfg(self):
         """Load configuration and construct repository objects."""
         cfg = self.cfg
@@ -202,8 +218,17 @@ class ConaryHandler(object):
         if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
             raise ConfigurationError("tmpDir must not contain symbolic links.")
 
-        if req.environ.get('HTTPS') == 'on':
-            req.scheme = 'https'
+        self._useForwardedHeaders = self._getEnvBool(
+                'use_forwarded_headers', False)
+        if self._useForwardedHeaders:
+            for key in ('x-forwarded-scheme', 'x-forwarded-proto'):
+                if req.headers.get(key):
+                    req.scheme = req.headers[key]
+                    break
+            for key in ('x-forwarded-host', 'x-forwarded-server'):
+                if req.headers.get(key):
+                    req.host = req.headers[key]
+                    break
         self.isSecure = req.scheme == 'https'
 
         urlBase = req.application_url
@@ -228,13 +253,11 @@ class ConaryHandler(object):
         self.auth = netserver.AuthToken()
         self._loadAuthPassword()
         self._loadAuthEntitlement()
-        # XXX: it's sort of insecure to just take the client's word for it.
-        # Maybe have a configuration directive when behind a reverse proxy?
-        forward = self.request.headers.get('X-Forwarded-For')
-        if forward:
-            self.auth.remote_ip = forward.split(',')[-1].strip()
-        else:
-            self.auth.remote_ip = self.request.remote_addr
+        self.auth.remote_ip = self.request.remote_addr
+        if self._useForwardedHeaders:
+            forward = self.request.headers.get('X-Forwarded-For')
+            if forward:
+                self.auth.remote_ip = forward.split(',')[-1].strip()
 
     def _loadAuthPassword(self):
         """Extract HTTP Basic Authorization from the request."""
