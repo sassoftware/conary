@@ -215,6 +215,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if self.db.poolmode:
             self.db.close()
 
+    def close(self):
+        self.db.close()
+        self.log.close()
+        if self.callLog:
+            self.callLog.close()
+
     # does the actual method calling and the retry when hitting deadlocks
     def _callWrapper(self, method, authToken, orderedArgs, kwArgs):
         methodname = method.im_func.__name__

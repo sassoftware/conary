@@ -520,7 +520,7 @@ class ConaryHandler(object):
     def close(self):
         # Make sure any pooler database connections are released.
         if self.repositoryServer:
-            self.repositoryServer.reset()
+            self.repositoryServer.close()
 
 
 class ConfigurationError(RuntimeError):

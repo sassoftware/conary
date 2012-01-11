@@ -35,7 +35,7 @@ class AbstractCallLogger:
     def __init__(self, logPath, readOnly = False):
         self.path = logPath
         self.readOnly = readOnly
-        self.logFd = None
+        self.fobj = None
         self.inode = None
         self.reopen()
 
@@ -57,9 +57,9 @@ class AbstractCallLogger:
             return
         # otherwise, re-open the log file
         if self.readOnly:
-            self.logFd = os.open(self.path, os.O_RDONLY)
+            self.fobj = open(self.path, 'rb')
         else:
-            self.logFd = os.open(self.path, os.O_CREAT | os.O_APPEND | os.O_RDWR)
+            self.fobj = open(self.path, 'a+')
         # record the inode of the log file
         sb = os.stat(self.path)
         self.inode = (sb.st_dev, sb.st_ino)
@@ -81,18 +81,26 @@ class AbstractCallLogger:
         os.close(fd)
 
     def getEntry(self):
-        size = struct.unpack("!I", os.read(self.logFd, 4))[0]
-        return self.EntryClass(cPickle.loads(os.read(self.logFd, size)))
+        size = struct.unpack("!I", self.fobj.read(4))[0]
+        data = self.fobj.read(size)
+        return self.EntryClass(cPickle.loads(data))
 
     def follow(self):
-        where = os.lseek(self.logFd, 0, 2)
+        self.fobj.seek(0, 2)
+        where = self.fobj.tell()
         while True:
-            size = os.fstat(self.logFd).st_size
+            size = os.fstat(self.fobj.fileno()).st_size
             while where < size:
                 yield self.getEntry()
-                where = os.lseek(self.logFd, 0, 1)
+                where = self.fobj.tell()
 
             time.sleep(1)
+
+    def close(self):
+        if self.fobj is not None:
+            self.fobj.close()
+        self.fobj = None
+
 
 class ClientCallLogger(AbstractCallLogger):
 
@@ -105,4 +113,5 @@ class ClientCallLogger(AbstractCallLogger):
 
         logStr = cPickle.dumps((self.logFormatRevision, url, entitlement,
                                 methodName, args, result, latency))
-        os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
+        self.fobj.write(struct.pack("!I", len(logStr)) + logStr)
+        self.fobj.flush()

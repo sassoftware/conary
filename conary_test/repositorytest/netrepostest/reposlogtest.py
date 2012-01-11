@@ -39,10 +39,11 @@ class CallLogTest(rephelp.RepositoryHelper):
         # CNY-2739
         logPath = os.path.join(self.workDir, "logfile")
         log = reposlog.RepositoryCallLogger(logPath, None)
-        def mock_write(*args):
-            import errno
-            raise OSError(errno.ENOSPC, "No space left on file")
-        self.mock(os, "write", lambda *args: mock_write(*args))
+        class MockFile(object):
+            def write(*args):
+                import errno
+                raise IOError(errno.ENOSPC, "No space left on file")
+        log.fobj = MockFile()
         # this should not result in a blowup because of no space left on device...
         rc, s = self.captureOutput(log.log, "0", ("user", "pass", []), "someMethod", [1,2], {"a":"a"}, "testing", 1)
         self.failUnlessEqual(s, "warning: '[Errno 28] No space left on file' while logging call from (0,user) to someMethod\n\n")
