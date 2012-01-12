@@ -153,10 +153,10 @@ class URLOpener(object):
                     proxySpec = None
                 if lastError:
                     if proxySpec == self.lastProxy:
-                        log.warning("Failed to open URL %s; trying again: %s",
+                        log.debug("Failed to open URL %s; trying again: %s",
                                 req.url, lastError.format())
                     else:
-                        log.warning("Failed to open URL %s; trying the next "
+                        log.info("Failed to open URL %s; trying the next "
                                 "proxy: %s", req.url, lastError.format())
                 # If a proxy was used, save it here
                 self.lastProxy = proxySpec
