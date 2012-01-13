@@ -1459,10 +1459,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return r[pkgName].keys()[0]
 
-    def _checkPermissions(self, authToken, chgSetList):
+    def _checkPermissions(self, authToken, chgSetList, hidden=False):
         trvList = self._lookupTroves(authToken,
                                      [(x[0], x[2][0], x[2][1])
-                                      for x in chgSetList])
+                                      for x in chgSetList],
+                                     hidden=hidden)
         for isPresent, hasAccess in trvList:
             if isPresent and not hasAccess:
                 raise errors.InsufficientPermission
@@ -1487,7 +1488,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # troves needed and files needed.
         cu = self.db.cursor()
 
-        self._checkPermissions(authToken, chgSetList)
+        self._checkPermissions(authToken, chgSetList, hidden=True)
         roleIds = self.auth.getAuthRoles(cu, authToken)
         if not roleIds:
             raise errors.InsufficientPermission
@@ -1630,7 +1631,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
 
         try:
-            self._checkPermissions(authToken, chgSetList)
+            # Requesting hidden troves directly is OK, e.g. commit hooks
+            self._checkPermissions(authToken, chgSetList, hidden=True)
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
 
             rc = self._createChangeSet(outFile, chgSetList,
@@ -2315,7 +2317,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          start_transaction=False)
         self.db.analyze("tmpNVF")
         if hidden:
-            hiddenClause = ("OR (Instances.isPresent = %d AND ugi.canWrite = 1)"
+            hiddenClause = ("OR Instances.isPresent = %d"
                         % instances.INSTANCE_PRESENT_HIDDEN)
         else:
             hiddenClause = ""

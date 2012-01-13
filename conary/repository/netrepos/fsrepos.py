@@ -665,7 +665,9 @@ class _TroveListWrapper:
             self.trvIterator = self.troveStore.iterTroves(
                         troveList, withFiles = self.withFiles,
                         withFileStreams = self.withFiles,
-                        permCheckFilter = self._permCheck)
+                        permCheckFilter = self._permCheck,
+                        hidden=True,
+                        )
             self.l = self.new
             self.new = []
 
