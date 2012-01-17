@@ -1,11 +1,11 @@
 #
-# Copyright (c) 2010 rPath, Inc.
+# Copyright (c) rPath, Inc.
 # This file is distributed under the terms of the MIT License.
 # A copy is available at http://www.rpath.com/permanent/mit-license.html
 #
 
 loadInstalled('python')
-class Conary(CPackageRecipe):
+class Conary(CPackageRecipe, Python.VersionMixIn):
     name = 'conary'
     version = '2.1.20'
 
@@ -23,6 +23,7 @@ class Conary(CPackageRecipe):
         'openssl:devel', 'zlib:devel', ])
 
     def setup(r):
+        r.setDefaultPython()
         r.macros.sitepkgs = '%s/%%(name)s' % Python.sitepkgs
         r.macros.sqlitever = '3070800'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
@@ -171,3 +172,8 @@ class Conary(CPackageRecipe):
             r.Requires('python:lib', '%(sitepkgs)s/.*')
             r.Requires('pycrypto:python', '%(sitepkgs)s/lib/sha1helper.py')
             r.Requires('elementtree:python', '%(sitepkgs)s/build/packagepolicy.py')
+
+        r.macros.pybin = "/usr/bin/python%(pyver)s"
+        versionMap = [ ('/usr/bin/python%s' % x, '%(pybin)s')
+            for x in [ '', '2.4', '2.5', '2.6' ] ]
+        r.NormalizePythonInterpreterVersion(versionMap=versionMap)
