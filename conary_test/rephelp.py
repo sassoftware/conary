@@ -1249,7 +1249,15 @@ class RepositoryHelper(testhelp.TestCase):
 
         if server.needsPGPKey and not server.readOnlyRepository:
             ascKey = open(resources.get_archive('key.asc'), 'r').read()
-            repos.addNewAsciiPGPKey(label, 'test', ascKey)
+            for n in range(50):
+                try:
+                    repos.addNewAsciiPGPKey(label, 'test', ascKey)
+                    break
+                except errors.InsufficientPermission:
+                    # This seems to be the #1 cause of transient test failures.
+                    time.sleep(0.1)
+            else:
+                raise
             server.needsPGPKey = False
         return repos
 
