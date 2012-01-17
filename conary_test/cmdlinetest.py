@@ -771,13 +771,6 @@ class CmdLineTest(rephelp.RepositoryHelper):
                   ignoreKeywords=True,
                   recurse=None, capsules=True, asDiff=True)
 
-    def testUpdateConary(self):
-        self.writeFile('%s/conaryrc' % self.rootDir,
-                       'installLabelPath %s' % self.cfg.buildLabel)
-        self.checkConary('updateconary',
-                         'conary.cmds.updatecmd.updateConary',
-                         [None, constants.version])
-
     def testVerify(self):
         self.checkConary('verify tmpwatch',
                          'conary.cmds.verify.verify.__init__',

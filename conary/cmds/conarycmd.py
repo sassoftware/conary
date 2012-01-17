@@ -1324,15 +1324,6 @@ class UpdateAllCommand(_UpdateCommand):
 _register(UpdateAllCommand)
 
 
-class UpdateConaryCommand(ConaryCommand):
-    commands = ['updateconary']
-    help = 'Attempt to find a rescue version of conary and install it'
-    commandGroup = 'Hidden Commands'
-    def runCommand(self, cfg, argSet, otherArgs):
-        updatecmd.updateConary(cfg, constants.version)
-_register(UpdateConaryCommand)
-
-
 class VerifyCommand(ConaryCommand):
     commands = ['verify']
     paramHelp = "<pkgname>[=<version>][[flavor]]*"

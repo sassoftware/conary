@@ -2730,39 +2730,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self.repos.troveStore.keyTable.getUserIds(keyId)
 
     @accessReadOnly
-    def getConaryUrl(self, authtoken, clientVersion, \
-                     revStr, flavorStr):
-        """
-        Returns a url to a downloadable changeset for the conary
-        client that is guaranteed to work with this server's version.
-        """
-        # adjust accordingly.... all urls returned are relative to this
-        _baseUrl = "ftp://download.rpath.com/conary/"
-        # Note: if this hash is getting too big, we will switch to a
-        # database table. The "default" entry is a last resort.
-        _clientUrls = {
-            # revision { flavor : relative path }
-            ## "default" : { "is: x86"    : "conary.x86.ccs",
-            ##               "is: x86_64" : "conary.x86_64.ccs", }
-            }
-        self.log(2, revStr, flavorStr)
-        rev = versions.Revision(revStr)
-        revision = rev.getVersion()
-        flavor = self.toFlavor(flavorStr)
-        ret = ""
-        bestMatch = -1000000
-        match = _clientUrls.get("default", {})
-        if _clientUrls.has_key(revision):
-            match = _clientUrls[revision]
-        for mStr in match.keys():
-            mFlavor = deps.parseFlavor(mStr)
-            score = mFlavor.score(flavor)
-            if score is False:
-                continue
-            if score > bestMatch:
-                ret = match[mStr]
-        if len(ret):
-            return "%s/%s" % (_baseUrl, ret)
+    def getConaryUrl(self, authtoken, clientVersion, revStr, flavorStr):
         return ""
 
     @accessReadOnly

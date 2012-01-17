@@ -2811,25 +2811,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                               exactFlavors=exactFlavors)
         return res[(name, versionStr, flavor)]
 
-    def getConaryUrl(self, version, flavor):
-        # make sure the server supports us.
-        # XXX: when reworking the server cache one can save the extra
-        # checkVersion call below (we already called it in __getitem__)
-        serverVersions = self.c[version].checkVersion()
-        # as a result of the server cache __getitem__ work we know
-        # that this intersection is not empty
-        commonVersions = set(serverVersions) & set(CLIENT_VERSIONS)
-        # getConaryUrl call was introduced at proto version 37
-        if max(commonVersions) < 37:
-            hostInfo = version.branch().label().asString()
-            raise errors.InvalidServerVersion, \
-                  ("While talking to " + hostInfo + " ...\n"
-                   "Server protocol version does not have the "
-                   "necessary support for the updateconary call")
-        ver = version.trailingRevision()
-        return self.c[version].getConaryUrl(self.fromVersion(ver),
-                                            self.fromFlavor(flavor))
-
     def _commit(self, chgSet, fName, callback = None, mirror = False,
                 hidden = False):
         serverName = None
