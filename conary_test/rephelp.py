@@ -837,17 +837,7 @@ class ServerCache:
             if server:
                 yield server.getName()
 
-if 'CONARY_PATH_REPOS' in os.environ:
-    env = os.environ.copy()
-    env['CONARY_PATH'] = env['CONARY_PATH_REPOS']
-    del env['CONARY_PATH_REPOS']
-    # Reset PYTHONPATH
-    del env['PYTHONPATH']
-    cwd = os.environ.get('CONARY_TEST_PATH', None)
-    import serverCacheProxy
-    _servers = serverCacheProxy.ServerCacheProxy(cwd=cwd, env=env)
-else:
-    _servers = ServerCache()
+_servers = ServerCache()
 _reposDir = None
 _proxy = None
 _httpProxy = None

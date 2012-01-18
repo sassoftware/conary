@@ -1413,7 +1413,7 @@ class TagLocaleTest(PackageRecipe):
     def testFullFilenameSet(self):
         sys.oldPath = sys.path
         try:
-            sys.path[0:0] = [os.environ['CONARY_POLICY_PATH']]
+            sys.path[0:0] = self.cfg.policyDirs
             import lang
         finally:
             sys.path = sys.oldPath
