@@ -70,6 +70,7 @@ from conary.local import database
 from conary.repository import errors as repo_errors
 from conary.repository import netclient, changeset, filecontents, trovesource
 from conary.repository import searchsource
+from conary.server  import server as cny_server
 from conary.server.server import SecureHTTPServer
 #test
 from testrunner import testhelp
@@ -87,6 +88,7 @@ class _NoneArg:
 NoneArg = _NoneArg()
 
 _File = filetypes._File
+server_path = os.path.abspath(cny_server.__file__)
 
 def _isIndividual():
 # Make it compatible with testsuites that are not class-based yet
@@ -748,7 +750,7 @@ class ServerCache:
             useDefault = True
             server = os.environ.get('CONARY_SERVER', None)
         if server is None:
-            server = resources.get_path('conary', 'server', 'server.py')
+            server = server_path
 
         if useSSL and server.startswith('apache') and 'ssl' not in server:
             server = 'apachessl' + server[6:]
@@ -785,7 +787,7 @@ class ServerCache:
             if conaryProxyType == 'standalone':
                 proxyClass = StandaloneProxyServer
                 #proxyPath = server
-                proxyPath = resources.get_path('conary', 'server', 'server.py')
+                proxyPath = server_path
             elif conaryProxyType == 'apache':
                 proxyClass = ApacheProxyServer
                 proxyPath = server
@@ -3368,7 +3370,7 @@ class RepositoryHelper(testhelp.TestCase):
 
         util.mkdirChain(cProxyContentsDir)
         conaryPath = resources.get_path()
-        server = conaryPath + '/conary/server/server.py'
+        server = server_path
 
         classMap = {
             (True, True): ApacheSSLProxyServer,
