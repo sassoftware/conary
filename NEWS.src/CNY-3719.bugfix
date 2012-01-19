@@ -1,1 +1,0 @@
-Fixed a crash when updating a capsule package with a changed file version but the same fileId.
