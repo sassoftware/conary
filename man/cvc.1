@@ -226,6 +226,15 @@ user. If no user is specified, the default user for that server is used.
 .SH RECIPE BUILDING
 .TP 4
 .B cook [\fI<args>\fP]
+If the item to be cooked ends in \fB.recipe\fP, then
+it is a recipe file and the package will be cooked from the
+filesystem.  Otherwise, it must name a repository component and
+the package will be cooked from the repository.  If a version is 
+specified, it must be a source version for that component.
+.IP
+Conary caches already-downloaded sources aggresively, both on the
+local system and in the repository.  To refresh either cache, see
+the \fBrefresh\fP command.
 .RS 4
 .TP 4
 .B \-\-prep
@@ -301,16 +310,11 @@ to create trove signatures for all troves created during the cook.
 The repository must recognize the OpenPGP key that made the trove signature 
 or the respective troves will be rejected. If \-\-signature\-key None 
 is specified, generation of trove signatures will be disabled.
-.IP
-If the item to be cooked ends in \fB.recipe\fP, then
-it is a recipe file and the package will be cooked from the
-filesystem.  Otherwise, it must name a repository component and
-the package will be cooked from the repository.  If a version is 
-specified, it must be a source version for that component.
-.IP
-Conary caches already-downloaded sources aggresively, both on the
-local system and in the repository.  To refresh either cache, see
-the \fBrefresh\fP command.
+.TP 4
+.B \-\-to\-file=\fI<path>\fP 
+Writes the result of the cook as a changeset file. If not specified then local
+cooks will be written to a predetermined file, and repository cooks will be
+committed to the repository.
 .RE
 .SH REPOSITORY ACCESS
 .TP 4

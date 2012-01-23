@@ -2086,7 +2086,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
             if requireCleanSources is None:
                 requireCleanSources = False
 
-            changeSetFile = "%s-%s.ccs" % (recipeClass.name,
+            if not changeSetFile:
+                changeSetFile = "%s-%s.ccs" % (recipeClass.name,
                                            recipeClass.version)
         else:
             if resume:
@@ -2134,8 +2135,9 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         return None
 
     if emerge:
-        (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
-        os.close(fd)
+        if not changeSetFile:
+            (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % name)
+            os.close(fd)
         targetLabel = versions.EmergeLabel()
 
     built = []
@@ -2173,7 +2175,9 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 showBuildReqs = False, ignoreDeps = False,
                 profile = False, logBuild = True,
                 crossCompile = None, cookIds=None, downloadOnly=False,
-                groupOptions=None):
+                groupOptions=None,
+                changeSetFile=None,
+                ):
     # this ensures the repository exists
     client = conaryclient.ConaryClient(cfg)
     if emerge:
@@ -2214,6 +2218,9 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         else:
             for flavor in flavorList:
                 finalItems.append((name, version, [flavor]))
+
+    if changeSetFile and len(finalItems) > 1:
+        raise CookError("Cannot cook multiple troves to change set")
 
     for item in finalItems:
         # we want to fork here to isolate changes the recipe might make
@@ -2266,7 +2273,9 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                              crossCompile = crossCompile,
                              callback = CookCallback(),
                              downloadOnly = downloadOnly,
-                             groupOptions=groupOptions)
+                             groupOptions=groupOptions,
+                             changeSetFile=changeSetFile,
+                             )
             if built is None:
                 # showBuildReqs true, most likely
                 # Make sure we call os._exit in the child, sys.exit raises a
