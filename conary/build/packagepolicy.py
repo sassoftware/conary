@@ -995,7 +995,8 @@ class Properties(policy.Policy):
     SYNOPSIS
     ========
     C{r.Properties(I{exceptions=filterexp} || [I{contents=xml},
-                   I{package=pkg:component}])}
+                   I{package=pkg:component}] ||
+                   [I{/path/to/file}, I{filterexp}], I{contents=ipropcontents})}
 
     DESCRIPTION
     ===========
@@ -1008,11 +1009,17 @@ class Properties(policy.Policy):
     Where contents is the xml string that would normally be stored in the iprop
     file and package is the component where to attach the config metadata.
     (NOTE: This component must exist)
+
+    or
+
+    C{r.Properties([I{/path/to/file}, I{filterexp}], I{contents=ipropcontents})
+    Where contents is the xml string that would normally be stored in the iprop
+    file and the path or filterexp matches the files that represent the
+    conponent that the property should be attached to.
     """
     supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
     bucket = policy.PACKAGE_CREATION
     processUnmodified = True
-    invariantinclusions = [ r'%(prefix)s/lib/iconfig/properties/.*\.iprop' ]
     requires = (
         # We need to know what component files have been assigned to
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -1021,27 +1028,66 @@ class Properties(policy.Policy):
     def __init__(self, *args, **kwargs):
         policy.Policy.__init__(self, *args, **kwargs)
 
+        self.ipropFilters = []
+        self.ipropPaths = [ r'%(prefix)s/lib/iconfig/properties/.*\.iprop' ]
         self.contents = []
+        self.paths = []
+        self.fileFilters = []
+        self.propMap = {}
 
     def updateArgs(self, *args, **kwargs):
         if 'contents' in kwargs:
             contents = kwargs.pop('contents')
             pkg = kwargs.pop('package', None)
 
-            self.contents.append((pkg, contents))
+            if pkg is None and args:
+                for arg in args:
+                    self.paths.append((arg, contents))
+            else:
+                self.contents.append((pkg, contents))
 
         policy.Policy.updateArgs(self, *args, **kwargs)
 
-    def doFile(self, path):
-        fullpath = self.recipe.macros.destdir + path
-        if not os.path.isfile(fullpath) or not util.isregular(fullpath):
-            return
+    def doProcess(self, recipe):
+        for filterSpec, iprop in self.paths:
+            self.fileFilters.append((
+                filter.Filter(filterSpec, recipe.macros),
+                iprop,
+            ))
+        for ipropPath in self.ipropPaths:
+            self.ipropFilters.append(
+                filter.Filter(ipropPath, recipe.macros))
+        policy.Policy.doProcess(self, recipe)
 
+    def _getComponent(self, path):
         componentMap = self.recipe.autopkg.componentMap
         if path not in componentMap:
             return
         main, comp = componentMap[path].getName().split(':')
+        return main, comp
 
+    def doFile(self, path):
+        if path not in self.recipe.autopkg.pathMap:
+            return
+
+        for fltr, iprop in self.fileFilters:
+            if fltr.match(path):
+                main, comp = self._getComponent(path)
+                self._parsePropertyData(iprop, main, comp)
+
+        # Make sure any remaining files are actually in the root.
+        fullpath = self.recipe.macros.destdir + path
+        if not os.path.isfile(fullpath) or not util.isregular(fullpath):
+            return
+
+        # Check to see if this is an iprop file locaiton that we know about.
+        for fltr in self.ipropFilters:
+            if fltr.match(path):
+                break
+        else:
+            return
+
+        main, comp = self._getComponent(path)
         xml = open(fullpath).read()
         self._parsePropertyData(xml, main, comp)
 
@@ -1052,6 +1098,12 @@ class Properties(policy.Policy):
             self._parsePropertyData(content, pkgName, compName)
 
     def _parsePropertyData(self, xml, pkgName, compName):
+        pkgSet = self.propMap.setdefault(xml, set())
+        if (pkgName, compName) in pkgSet:
+            return
+
+        pkgSet.add((pkgName, compName))
+
         xmldata = smartform.SmartFormFieldParser(xml)
 
         self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM,
