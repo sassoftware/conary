@@ -355,7 +355,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 if (oldFileId == fileId):
                     # only the version number changed; we don't need
                     # to merge anything here
-                    pass
+                    fileObj = fileObjsByPathId[pathId]
                 elif fileChange[0] == '\x01':
                     fileObj = fileObjsByPathId[pathId]
                     fileObj.twm(fileChange, fileObj)

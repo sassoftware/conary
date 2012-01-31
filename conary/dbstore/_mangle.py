@@ -33,6 +33,15 @@ def _swapOnce(query):
     return query
 
 
+def _min(*args):
+    """Returns the smallest non-negative argument."""
+    args = [x for x in args if x > -1]
+    if args:
+        return min(args)
+    else:
+        return -1
+
+
 def swapPlaceholders(query):
     """Change ? to %s and :foo to %(foo)s while honoring quoting rules."""
     # This is worth optimizing at some point, but it currently takes on the
@@ -41,28 +50,31 @@ def swapPlaceholders(query):
     out = []
     # Mangle positional markers, while careful to ignore quoted sections.
     while query:
+        # Find the first token
         squote = query.find("'")
         dquote = query.find('"')
-        if squote != -1:
-            if dquote != -1:
-                idx = min(squote, dquote)
-            else:
-                idx = squote
-            quote = query[idx]
-        elif dquote != -1:
-            idx = dquote
-        else:
+        comment = query.find('--')
+        start = _min(squote, dquote, comment)
+        # Mangle everything before the token
+        if start > 0:
+            out.append(_swapOnce(query[:start]))
+        elif start == -1:
             out.append(_swapOnce(query))
             break
+        # Copy stuff from one token to the next, unharmed.
+        if start == comment:
+            end = query.find('\n', start + 2)
+        elif start == squote or start == dquote:
+            whichQuote = query[start]
+            end = query.find(whichQuote, start + 1)
+            if end == -1:
+                raise ValueError("Mismatched %r quote" % (whichQuote,))
 
-        quote = query[idx]
-        start = idx + 1
-        out.append(_swapOnce(query[:start]))
-        end = query.find(quote, start)
         if end == -1:
-            raise ValueError("Mismatched quote in query string")
-        end += 1
-        out.append(query[start:end])
-        query = query[end:]
+            out.append(query[start:])
+            break
+        else:
+            out.append(query[start:end+1])
+            query = query[end+1:]
     value = ''.join(out)
     return value

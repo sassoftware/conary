@@ -207,11 +207,28 @@ class ServerCache:
         if not self.pwPrompt:
             return None, None
         user, pw = self.pwPrompt(host, user)
-        if user is None or pw is None:
+        if not user or not pw:
             return None, None
         pw = util.ProtectedString(pw)
-        self.userMap.addServerGlob(host, user, pw)
-        return user, pw
+        if self._setAndCheckPassword(host, (user, pw)):
+            return user, pw
+        for x in range(3):
+            user, pw = self.pwPrompt(host, user, useCached=False)
+            if not user or not pw:
+                return None, None
+            pw = util.ProtectedString(pw)
+            if self._setAndCheckPassword(host, (user, pw)):
+                return user, pw
+        return None, None
+
+    def _setAndCheckPassword(self, host, userInfo):
+        try:
+            self._connect(host, cache=False, userInfo=userInfo)
+        except errors.InsufficientPermission:
+            return False
+        else:
+            self.userMap.addServerGlob(host, *userInfo)
+            return True
 
     @staticmethod
     def _getServerName(item):
@@ -263,17 +280,21 @@ class ServerCache:
         return True
 
     def __getitem__(self, item):
-        serverName = self._getServerName(item)
+        return self._connect(item)
+
+    def _connect(self, serverName, cache=True, userInfo=None):
+        serverName = self._getServerName(serverName)
 
         server = self.cache.get(serverName, None)
-        if server is not None:
+        if cache and server is not None:
             return server
 
         url = self.map.get(serverName, None)
         if isinstance(url, repository.AbstractTroveDatabase):
             return url
 
-        userInfo = self.userMap.find(serverName)
+        if userInfo is None:
+            userInfo = self.userMap.find(serverName)
 
         if userInfo and userInfo[1] is None:
             userInfo = (userInfo[0], "")
@@ -315,7 +336,7 @@ class ServerCache:
 
         shareTuple = (url, userInfo, tuple(entList), serverName)
         server = self.shareCache.get(shareTuple, None)
-        if server is not None:
+        if cache and server is not None:
             self.cache[serverName] = server
             return server
 
@@ -346,8 +367,9 @@ class ServerCache:
         # to this repository - the maximum we both understand
         server.setProtocolVersion(max(intersection))
 
-        self.cache[serverName] = server
-        self.shareCache[shareTuple] = server
+        if cache:
+            self.cache[serverName] = server
+            self.shareCache[shareTuple] = server
 
         return server
 
@@ -2788,25 +2810,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                               troveTypes=troveTypes,
                               exactFlavors=exactFlavors)
         return res[(name, versionStr, flavor)]
-
-    def getConaryUrl(self, version, flavor):
-        # make sure the server supports us.
-        # XXX: when reworking the server cache one can save the extra
-        # checkVersion call below (we already called it in __getitem__)
-        serverVersions = self.c[version].checkVersion()
-        # as a result of the server cache __getitem__ work we know
-        # that this intersection is not empty
-        commonVersions = set(serverVersions) & set(CLIENT_VERSIONS)
-        # getConaryUrl call was introduced at proto version 37
-        if max(commonVersions) < 37:
-            hostInfo = version.branch().label().asString()
-            raise errors.InvalidServerVersion, \
-                  ("While talking to " + hostInfo + " ...\n"
-                   "Server protocol version does not have the "
-                   "necessary support for the updateconary call")
-        ver = version.trailingRevision()
-        return self.c[version].getConaryUrl(self.fromVersion(ver),
-                                            self.fromFlavor(flavor))
 
     def _commit(self, chgSet, fName, callback = None, mirror = False,
                 hidden = False):

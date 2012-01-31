@@ -491,13 +491,16 @@ class NetServerTest(rephelp.RepositoryHelper):
         assert(not _hasTrove(repos, trv3, hidden = False))
         # anyone with write perms can ask though
         assert(    _hasTrove(normRepos, trv3, hidden = True))
-        # but read only users can't
-        assert(not _hasTrove(anonRepos, trv3, hidden = True))
+        # read-only uers can also see it (new behavior)
+        assert(    _hasTrove(anonRepos, trv3, hidden = True))
 
         # the latest should look like version 1
         assert(repos.getTroveLatestVersion(trv3.getName(),
                                           trv3.getVersion().branch())
                         == trv1.getVersion() )
+
+        # the hidden trove is fetchable if the exact NVF is known
+        anonRepos.getTrove(*trv3.getNameVersionFlavor())
 
         # until we publish the hidden versions, which normal users can't do
         self.assertRaises(errors.InsufficientPermission,

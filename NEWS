@@ -1,3 +1,20 @@
+Changes in 2.3.10:
+  o New Features:
+    * Added support for caching repository passwords with keyutils
+      (CNY-3718)
+    * "Hidden" troves committed by a mirror script are now fetchable.
+      This allows commit mail to be sent from a mirror target.
+
+  o Bug Fixes:
+    * PGP keys will no longer be deleted from the repository if the user
+      that uploaded the key is deleted. (CNY-3710)
+    * Changesets generated on systems using Python 2.7 now use a diff
+      format compatible with Conary running on older versions of Python.
+    * The never-used "conary updateconary" command, last seen in version
+      0.71.2, and associated server support have been removed.
+    * Fixed a crash when updating a capsule package with a changed file
+      version but the same fileId. (CNY-3719)
+
 Changes in 2.3.9:
   o Bug Fixes:
     * Fixed the 'rollback' command failing if --from-file was not

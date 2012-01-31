@@ -1463,10 +1463,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return r[pkgName].keys()[0]
 
-    def _checkPermissions(self, authToken, chgSetList):
+    def _checkPermissions(self, authToken, chgSetList, hidden=False):
         trvList = self._lookupTroves(authToken,
                                      [(x[0], x[2][0], x[2][1])
-                                      for x in chgSetList])
+                                      for x in chgSetList],
+                                     hidden=hidden)
         for isPresent, hasAccess in trvList:
             if isPresent and not hasAccess:
                 raise errors.InsufficientPermission
@@ -1491,7 +1492,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # troves needed and files needed.
         cu = self.db.cursor()
 
-        self._checkPermissions(authToken, chgSetList)
+        self._checkPermissions(authToken, chgSetList, hidden=True)
         roleIds = self.auth.getAuthRoles(cu, authToken)
         if not roleIds:
             raise errors.InsufficientPermission
@@ -1634,7 +1635,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
 
         try:
-            self._checkPermissions(authToken, chgSetList)
+            # Requesting hidden troves directly is OK, e.g. commit hooks
+            self._checkPermissions(authToken, chgSetList, hidden=True)
             chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
 
             rc = self._createChangeSet(outFile, chgSetList,
@@ -2319,7 +2321,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          start_transaction=False)
         self.db.analyze("tmpNVF")
         if hidden:
-            hiddenClause = ("OR (Instances.isPresent = %d AND ugi.canWrite = 1)"
+            hiddenClause = ("OR Instances.isPresent = %d"
                         % instances.INSTANCE_PRESENT_HIDDEN)
         else:
             hiddenClause = ""
@@ -2732,39 +2734,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self.repos.troveStore.keyTable.getUserIds(keyId)
 
     @accessReadOnly
-    def getConaryUrl(self, authtoken, clientVersion, \
-                     revStr, flavorStr):
-        """
-        Returns a url to a downloadable changeset for the conary
-        client that is guaranteed to work with this server's version.
-        """
-        # adjust accordingly.... all urls returned are relative to this
-        _baseUrl = "ftp://download.rpath.com/conary/"
-        # Note: if this hash is getting too big, we will switch to a
-        # database table. The "default" entry is a last resort.
-        _clientUrls = {
-            # revision { flavor : relative path }
-            ## "default" : { "is: x86"    : "conary.x86.ccs",
-            ##               "is: x86_64" : "conary.x86_64.ccs", }
-            }
-        self.log(2, revStr, flavorStr)
-        rev = versions.Revision(revStr)
-        revision = rev.getVersion()
-        flavor = self.toFlavor(flavorStr)
-        ret = ""
-        bestMatch = -1000000
-        match = _clientUrls.get("default", {})
-        if _clientUrls.has_key(revision):
-            match = _clientUrls[revision]
-        for mStr in match.keys():
-            mFlavor = deps.parseFlavor(mStr)
-            score = mFlavor.score(flavor)
-            if score is False:
-                continue
-            if score > bestMatch:
-                ret = match[mStr]
-        if len(ret):
-            return "%s/%s" % (_baseUrl, ret)
+    def getConaryUrl(self, authtoken, clientVersion, revStr, flavorStr):
         return ""
 
     @accessReadOnly

@@ -424,6 +424,8 @@ class CookCommand(CvcCommand):
             'download': 'download, but do not unpack or build',
             'resume'  : ('resume building at given loc (default at failure)',
                          '[LINENO|policy]'),
+            'to-file' : (VERBOSE_HELP, 'Write changeset to file instead of'
+                        ' committing to the repository'),
             'unknown-flags' : (VERBOSE_HELP,
                     'Set all unknown flags that are used in the recipe to False')
            }
@@ -442,6 +444,7 @@ class CookCommand(CvcCommand):
         argDef['prep'] = NO_PARAM
         argDef['download'] = NO_PARAM
         argDef['resume'] = STRICT_OPT_PARAM
+        argDef['to-file'] = ONE_PARAM
         argDef['unknown-flags'] = NO_PARAM
         argDef['allow-flavor-change'] = NO_PARAM
 
@@ -535,6 +538,7 @@ class CookCommand(CvcCommand):
 
             crossCompile = (crossHost, crossTarget, isCrossTool)
 
+        targetFile = argSet.pop("to-file", None)
         if argSet: return self.usage()
 
         groupOptions = cook.GroupCookOptions(alwaysBumpCount=True,
@@ -561,7 +565,9 @@ class CookCommand(CvcCommand):
                          allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
                          showBuildReqs=showBuildReqs, profile=profile,
                          crossCompile=crossCompile, downloadOnly=downloadOnly,
-                         groupOptions=groupOptions)
+                         groupOptions=groupOptions,
+                         changeSetFile=targetFile,
+                         )
         except builderrors.GroupFlavorChangedError, err:
             err.args = (err.args[0] +
                         '\n(Add the --allow-flavor-change flag to override this error)\n',)

@@ -172,7 +172,7 @@ class ServerTest(rephelp.RepositoryHelper):
                 os.O_RDWR | os.O_CREAT)
             os.dup2(errfd, sys.stderr.fileno())
             os.close(errfd)
-            srvpy = os.environ.get('CONARY_PATH') + '/conary/server/server.py'
+            srvpy = rephelp.server_path
             os.execv(srvpy, [ srvpy, '--config-file', cfgfile ])
             os._exit(0)
 

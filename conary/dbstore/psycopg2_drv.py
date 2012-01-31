@@ -43,6 +43,7 @@ class KeywordDict(BaseKeywordDict):
 class Cursor(BaseCursor):
     binaryClass = buffer
     driver = "psycopg2"
+    _encodeRequired = False
 
     def _tryExecute(self, func, *params, **kw):
         try:
@@ -99,8 +100,7 @@ class Cursor(BaseCursor):
     def fields(self):
         return [x[0] for x in self._cursor.description]
 
-    @property
-    def lastrowid(self):
+    def lastid(self):
         cu = self.dbh.cursor()
         cu.execute("SELECT lastval()")
         row = cu.fetchone()
@@ -108,6 +108,19 @@ class Cursor(BaseCursor):
             return None
         else:
             return int(row[0])
+
+    lastrowid = property(lastid)
+
+    def _row(self, data):
+        "Convert a data tuple to a C{Row} object."
+        assert self._cursor
+        if data is None:
+            return None
+        # This implementation does not request the unicode extension, but the
+        # underlying connection might be shared with one that does. Callers
+        # won't be expecting unicodes though so re-encode it.
+        data = [self.encode(x) for x in data]
+        return sqllib.Row(data, self.fields())
 
 
 class Database(BaseDatabase):

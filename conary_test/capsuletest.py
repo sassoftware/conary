@@ -384,6 +384,22 @@ class CapsuleTest(rephelp.RepositoryHelper):
         self.updatePkg('simple:rpm=1.0.1-1-1')
 
     @conary_test.rpm
+    def test_unchangedFileid(self):
+        # CNY-3719
+        simple10  = self.addRPMComponent("simple:rpm=1.0-1-1",
+                                         'simple-1.0-1.i386.rpm')
+        # Commit a new version so all the file versions are new
+        simple11 = self.addRPMComponent("simple:rpm=1.1-1-1",
+                                         'simple-1.1-1.i386.rpm',
+                                         versus = simple10)
+        # Now go back to the old fileids, the filevers will be new again
+        simple101  = self.addRPMComponent("simple:rpm=1.0.1-1-1",
+                                         'simple-1.0.1-1.i386.rpm',
+                                         versus = simple11)
+        self.updatePkg('simple:rpm=1.0-1-1')
+        self.updatePkg('simple:rpm=1.0.1-1-1')
+
+    @conary_test.rpm
     def test12_TroveZeroEpoch(self):
         t = trove.Trove('foo:continer', self.v1, deps.Flavor())
         t.addFile(self.id1, '/1', self.v1, self.fid1)
