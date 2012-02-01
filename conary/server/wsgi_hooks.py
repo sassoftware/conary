@@ -47,7 +47,7 @@ def makeApp(settings):
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
-    pathPrefix = settings.get('mount_point', '')
+    pathPrefix = settings.get('mount_point', 'conary')
     app = ConaryRouter(envOverrides, pathPrefix)
     return app
 
@@ -56,6 +56,11 @@ def paster_main(global_config, **settings):
     """Wrapper to enable "paster serve" """
     cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     return makeApp(settings)
+
+
+def application(environ, start_response):
+    """Trivial app entry point"""
+    return makeApp({})(environ, start_response)
 
 
 class ConaryRouter(object):
