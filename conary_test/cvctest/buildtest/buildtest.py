@@ -446,10 +446,10 @@ class TestManifest(PackageRecipe):
         r.PackageSpec('asdf', '/asdf/asdf')
         r.Create('Makefile', contents='\n'.join((
             'install:',
-            '        mkdir -p $(DESTDIR)/foo/blah',
-            '        touch $(DESTDIR)/foo/blah/bar',
-            '        mkdir -p $(DESTDIR)/asdf',
-            '        touch $(DESTDIR)/asdf/asdf',
+            '\tmkdir -p $(DESTDIR)/foo/blah',
+            '\ttouch $(DESTDIR)/foo/blah/bar',
+            '\tmkdir -p $(DESTDIR)/asdf',
+            '\ttouch $(DESTDIR)/asdf/asdf',
         )))
         r.MakeInstall(package='foo')
         r.ExcludeDirectories(exceptions='/foo')

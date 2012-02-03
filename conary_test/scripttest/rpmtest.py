@@ -32,10 +32,11 @@ from conary_test import resources
 
 class RpmTest(unittest.TestCase):
     def setUp(self):
-        p = "%s/scripts/rpm2cpio" % os.environ['CONARY_PATH']
-        if not os.path.exists(p):
-            p = "%s/../../../bin/rpm2cpio" % os.environ['CONARY_PATH']
-        self.rpm2cpio = p
+        p = resources.get_path('scripts/rpm2cpio')
+        if os.path.exists(p):
+            self.rpm2cpio = p
+        else:
+            self.rpm2cpio = '/usr/bin/rpm2cpio'
 
     def testSeekToData(self):
         f = open(resources.get_archive() + "/basesystem-8.0-2.src.rpm")

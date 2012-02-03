@@ -88,7 +88,7 @@ class _NoneArg:
 NoneArg = _NoneArg()
 
 _File = filetypes._File
-server_path = os.path.abspath(cny_server.__file__)
+server_path = os.path.abspath(cny_server.__file__).replace('.pyc', '.py')
 
 def _isIndividual():
 # Make it compatible with testsuites that are not class-based yet
