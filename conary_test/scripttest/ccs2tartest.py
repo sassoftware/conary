@@ -26,9 +26,9 @@ from conary_test import resources
 
 class Ccs2TarTest(unittest.TestCase):
     def setUp(self):
-        p = "%s/scripts/ccs2tar" % os.environ['CONARY_PATH']
+        p = resources.get_path('scripts/ccs2tar')
         if not os.path.exists(p):
-            p = "%s/../../../bin/ccs2tar" % os.environ['CONARY_PATH']
+            p = '/usr/bin/ccs2tar'
         self.ccs2tar = p
 
     @requireBinary("tar")

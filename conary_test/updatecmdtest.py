@@ -1205,7 +1205,7 @@ Job 4 of 4:
         groupDist3Error = '''\
 The following dependencies could not be resolved:
     extra:runtime=3-1-1:
-        trove: unknown:runtime'''
+\ttrove: unknown:runtime'''
         groupDist3Critical =  '''\
     Update  conary-build:python (2-1-1 -> 3-1-1)
     Update  conary:data (2-1-1 -> 3-1-1)
