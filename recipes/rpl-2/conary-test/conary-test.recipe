@@ -119,7 +119,7 @@ class ConaryTest(CPackageRecipe):
 
         # Make sure the testsuite uses the installed software.
         r.MakeDirs('../discard')
-        for name in ['commands', 'conary', 'config', 'doc', 'man', 'scripts']:
+        for name in ['commands', 'conary', 'doc', 'man']:
             r.Move(name, '../discard/' + name)
 
     def setupEnvironment(r):
