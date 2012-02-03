@@ -3456,7 +3456,7 @@ cache_log %(cacheLog)s
 cache_store_log %(storeLog)s
 pid_filename %(pidFile)s
 
-auth_param basic program %(libdir)s/squid/ncsa_auth %(passwdFile)s
+auth_param basic program %(authprog)s %(passwdFile)s
 auth_param basic children 5
 auth_param basic realm Squid proxy-caching web server
 auth_param basic credentialsttl 2 hours
@@ -3560,6 +3560,13 @@ visible_hostname localhost.localdomain
         from distutils import sysconfig
         libdir = sysconfig.get_config_vars()['LIBDIR']
 
+        for name in ('basic_ncsa_auth', 'ncsa_auth'):
+            authprog = os.path.join(libdir, 'squid', name)
+            if os.path.exists(authprog):
+                break
+        else:
+            raise RuntimeError("Couldn't find basic_ncsa_auth for squid")
+
         opts = dict(port = self.port, authPort = self.authPort,
                     cacheDir = self.cacheDir,
                     accessLog = self.accessLog, storeLog = self.storeLog,
@@ -3568,7 +3575,9 @@ visible_hostname localhost.localdomain
                     acls = "\n".join(acls),
                     libdir = libdir,
                     user = os_utils.effectiveUser,
-                    group = os_utils.effectiveGroup)
+                    group = os_utils.effectiveGroup,
+                    authprog = authprog,
+                    )
         open(self.configFile, "w+").write(self.configTemplate % opts)
 
         # Write password file too
