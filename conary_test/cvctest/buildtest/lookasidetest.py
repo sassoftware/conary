@@ -529,22 +529,18 @@ class ArchiveTest(PackageRecipe):
             self.logFilter.add()
 
             # first, look for a file that does not exist
-            assert(lookaside.findAll(self.cfg, repCache,
-                                     'http://example.conary.com/thisdir/foo', 'test', (testdir,),
-                                     allowNone=True) is None)
+            assert lookaside.findAll(self.cfg, repCache,
+                    contentURL + '/404/foo', 'test', (testdir,), allowNone=True
+                ) is None
             # make sure that we got a negative cache entry
-            assert(os.stat('/'.join((self.cacheDir, 
-                                     'NEGATIVE/test/example.conary.com/thisdir/foo')
-                                    )))
+            assert os.stat(self.cacheDir + '/NEGATIVE/test/404/foo')
 
             # now look for a file that does exist
-            assert(lookaside.findAll(self.cfg, repCache,
-                                     'http://www.google.com/intl/en/help/customize.html', 'test',
-                                     (testdir,), allowNone=True) is not None)
+            assert lookaside.findAll(self.cfg, repCache,
+                    contentURL + '/200/foo', 'test', (testdir,), allowNone=True
+                ) is not None
             # make sure that we got a the cache entry
-            assert(os.stat('/'.join((self.cacheDir, 
-                                     'test/www.google.com/intl/en/help/customize.html')
-                                    )))
+            assert os.stat(self.cacheDir + '/test/200/foo')
 
             # put two different files with the same name name in the cache 
             fooDir = os.path.join(self.cacheDir,'test/foo.conary.com/foo/')
@@ -666,7 +662,10 @@ def getRequester():
             else:
                 accessed[self.path] = 1
             response = '%s:%d\n' %(self.path, accessed[self.path])
-            self.send_response(200)
+            if '404' in self.path:
+                self.send_response(404)
+            else:
+                self.send_response(200)
             self.send_header("Content-type", "text/unknown")
             self.send_header("Content-Length", len(response))
             self.end_headers()
