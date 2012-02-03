@@ -892,32 +892,32 @@ Job 2 of 2
 
 expected_testRollbackOutput1 = """\
 r.5:
-           erased: poorpackage(:runtime) 2-1-1
+\t   erased: poorpackage(:runtime) 2-1-1
 
 r.4:
-           erased: extrapackage(:runtime) 1-1-1
-          updated: poorpackage(:runtime) 1-1-1 -> 2-1-1
-          updated: specialpackage(:runtime) 2-1-1 -> 1-1-1
-        installed: coolpackage(:runtime) 1-1-1
+\t   erased: extrapackage(:runtime) 1-1-1
+\t  updated: poorpackage(:runtime) 1-1-1 -> 2-1-1
+\t  updated: specialpackage(:runtime) 2-1-1 -> 1-1-1
+\tinstalled: coolpackage(:runtime) 1-1-1
 
 """
 expected_testRollbackOutput2 = """\
 r.3:
-           erased: coolpackage(:runtime) 2-1-1
-          updated: extrapackage(:runtime) 2-1-1 -> 1-1-1
-        installed: poorpackage(:runtime) 1-1-1
+\t   erased: coolpackage(:runtime) 2-1-1
+\t  updated: extrapackage(:runtime) 2-1-1 -> 1-1-1
+\tinstalled: poorpackage(:runtime) 1-1-1
 
 r.2:
-          updated: coolpackage(:runtime) 1-1-1 -> 2-1-1
-          updated: specialpackage(:runtime) 1-1-1 -> 2-1-1
+\t  updated: coolpackage(:runtime) 1-1-1 -> 2-1-1
+\t  updated: specialpackage(:runtime) 1-1-1 -> 2-1-1
 
 r.1:
-          updated: extrapackage(:runtime) 1-1-1 -> 2-1-1
-        installed: coolpackage(:runtime) 1-1-1
+\t  updated: extrapackage(:runtime) 1-1-1 -> 2-1-1
+\tinstalled: coolpackage(:runtime) 1-1-1
 
 r.0:
-        installed: extrapackage(:runtime) 1-1-1
-        installed: specialpackage(:runtime) 1-1-1
+\tinstalled: extrapackage(:runtime) 1-1-1
+\tinstalled: specialpackage(:runtime) 1-1-1
 
 """
 
@@ -925,61 +925,61 @@ expected_testRollbackOutput1 += expected_testRollbackOutput2
 
 expected_testRollbackOutputShowLabels = """\
 r.3:
-           erased: coolpackage(:runtime) localhost@rpl:linux/2-1-1
-          updated: extrapackage(:runtime) localhost@rpl:linux/2-1-1 -> localhost@rpl:linux/1-1-1
-        installed: poorpackage(:runtime) localhost@rpl:linux/1-1-1
+\t   erased: coolpackage(:runtime) localhost@rpl:linux/2-1-1
+\t  updated: extrapackage(:runtime) localhost@rpl:linux/2-1-1 -> localhost@rpl:linux/1-1-1
+\tinstalled: poorpackage(:runtime) localhost@rpl:linux/1-1-1
 
 r.2:
-          updated: coolpackage(:runtime) localhost@rpl:linux/1-1-1 -> localhost@rpl:linux/2-1-1
-          updated: specialpackage(:runtime) localhost@rpl:linux/1-1-1 -> localhost@rpl:linux/2-1-1
+\t  updated: coolpackage(:runtime) localhost@rpl:linux/1-1-1 -> localhost@rpl:linux/2-1-1
+\t  updated: specialpackage(:runtime) localhost@rpl:linux/1-1-1 -> localhost@rpl:linux/2-1-1
 
 r.1:
-          updated: extrapackage(:runtime) localhost@rpl:linux/1-1-1 -> localhost@rpl:linux/2-1-1
-        installed: coolpackage(:runtime) localhost@rpl:linux/1-1-1
+\t  updated: extrapackage(:runtime) localhost@rpl:linux/1-1-1 -> localhost@rpl:linux/2-1-1
+\tinstalled: coolpackage(:runtime) localhost@rpl:linux/1-1-1
 
 r.0:
-        installed: extrapackage(:runtime) localhost@rpl:linux/1-1-1
-        installed: specialpackage(:runtime) localhost@rpl:linux/1-1-1
+\tinstalled: extrapackage(:runtime) localhost@rpl:linux/1-1-1
+\tinstalled: specialpackage(:runtime) localhost@rpl:linux/1-1-1
 
 """
 
 expected_testRollbackOutputFullVersions = """\
 r.3:
-           erased: coolpackage(:runtime) /localhost@rpl:linux/2-1-1
-          updated: extrapackage(:runtime) /localhost@rpl:linux/2-1-1 -> /localhost@rpl:linux/1-1-1
-        installed: poorpackage(:runtime) /localhost@rpl:linux/1-1-1
+\t   erased: coolpackage(:runtime) /localhost@rpl:linux/2-1-1
+\t  updated: extrapackage(:runtime) /localhost@rpl:linux/2-1-1 -> /localhost@rpl:linux/1-1-1
+\tinstalled: poorpackage(:runtime) /localhost@rpl:linux/1-1-1
 
 r.2:
-          updated: coolpackage(:runtime) /localhost@rpl:linux/1-1-1 -> /localhost@rpl:linux/2-1-1
-          updated: specialpackage(:runtime) /localhost@rpl:linux/1-1-1 -> /localhost@rpl:linux/2-1-1
+\t  updated: coolpackage(:runtime) /localhost@rpl:linux/1-1-1 -> /localhost@rpl:linux/2-1-1
+\t  updated: specialpackage(:runtime) /localhost@rpl:linux/1-1-1 -> /localhost@rpl:linux/2-1-1
 
 r.1:
-          updated: extrapackage(:runtime) /localhost@rpl:linux/1-1-1 -> /localhost@rpl:linux/2-1-1
-        installed: coolpackage(:runtime) /localhost@rpl:linux/1-1-1
+\t  updated: extrapackage(:runtime) /localhost@rpl:linux/1-1-1 -> /localhost@rpl:linux/2-1-1
+\tinstalled: coolpackage(:runtime) /localhost@rpl:linux/1-1-1
 
 r.0:
-        installed: extrapackage(:runtime) /localhost@rpl:linux/1-1-1
-        installed: specialpackage(:runtime) /localhost@rpl:linux/1-1-1
+\tinstalled: extrapackage(:runtime) /localhost@rpl:linux/1-1-1
+\tinstalled: specialpackage(:runtime) /localhost@rpl:linux/1-1-1
 
 """
 
 expected_testRollbackOutputFullVersionsFlavors = """\
 r.3:
-           erased: coolpackage(:runtime) /localhost@rpl:linux/2-1-1[]
-          updated: extrapackage(:runtime) /localhost@rpl:linux/2-1-1[] -> /localhost@rpl:linux/1-1-1[]
-        installed: poorpackage(:runtime) /localhost@rpl:linux/1-1-1[]
+\t   erased: coolpackage(:runtime) /localhost@rpl:linux/2-1-1[]
+\t  updated: extrapackage(:runtime) /localhost@rpl:linux/2-1-1[] -> /localhost@rpl:linux/1-1-1[]
+\tinstalled: poorpackage(:runtime) /localhost@rpl:linux/1-1-1[]
 
 r.2:
-          updated: coolpackage(:runtime) /localhost@rpl:linux/1-1-1[] -> /localhost@rpl:linux/2-1-1[]
-          updated: specialpackage(:runtime) /localhost@rpl:linux/1-1-1[] -> /localhost@rpl:linux/2-1-1[]
+\t  updated: coolpackage(:runtime) /localhost@rpl:linux/1-1-1[] -> /localhost@rpl:linux/2-1-1[]
+\t  updated: specialpackage(:runtime) /localhost@rpl:linux/1-1-1[] -> /localhost@rpl:linux/2-1-1[]
 
 r.1:
-          updated: extrapackage(:runtime) /localhost@rpl:linux/1-1-1[] -> /localhost@rpl:linux/2-1-1[]
-        installed: coolpackage(:runtime) /localhost@rpl:linux/1-1-1[]
+\t  updated: extrapackage(:runtime) /localhost@rpl:linux/1-1-1[] -> /localhost@rpl:linux/2-1-1[]
+\tinstalled: coolpackage(:runtime) /localhost@rpl:linux/1-1-1[]
 
 r.0:
-        installed: extrapackage(:runtime) /localhost@rpl:linux/1-1-1[]
-        installed: specialpackage(:runtime) /localhost@rpl:linux/1-1-1[]
+\tinstalled: extrapackage(:runtime) /localhost@rpl:linux/1-1-1[]
+\tinstalled: specialpackage(:runtime) /localhost@rpl:linux/1-1-1[]
 
 """
 

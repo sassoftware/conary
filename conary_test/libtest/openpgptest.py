@@ -17,7 +17,6 @@
 
 
 from testrunner import testhelp
-import sys
 
 import base64
 import fcntl
@@ -440,10 +439,7 @@ class OpenPGPTest(BaseTestHelper):
         keyringf = open(keyring, "w+")
 
         # Well-known key
-        testDir = os.path.realpath(os.path.dirname(
-            sys.modules['rephelp'].__file__))
-
-        keyFile = os.path.join(testDir, "archive", "key.asc")
+        keyFile = resources.get_archive('key.asc')
         for armkey in [pubkey1, pubkey2, pubkey3]:
             # Un-armor
             key = readKey(armkey.split('\n'))

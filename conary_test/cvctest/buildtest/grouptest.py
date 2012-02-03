@@ -1005,11 +1005,11 @@ class DepCheckRecipe(GroupRecipe):
         try:
             self.build(depCheckRecipe, 'DepCheckRecipe')
         except errors.CookError, msg:
-            assert(str(msg) == '''\
+            self.assertEqual(str(msg), '''\
 Dependency failure
 Group group-test has unresolved dependencies:
 test:runtime
-        trove: other:runtime''')
+\ttrove: other:runtime''')
         else:
             assert(0)
         depCheckRecipe += '        self.add("other:runtime")'

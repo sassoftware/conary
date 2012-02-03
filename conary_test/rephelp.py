@@ -1120,7 +1120,7 @@ class RepositoryHelper(testhelp.TestCase):
                                           **kwargs)
             # We keep this open to stop others from reusing the port; tell the
             # code which tracks fd leaks so this doesn't reported
-            if hasattr(server, 'socket'):
+            if getattr(server, 'socket', None):
                 self._expectedFdLeak(server.socket.fileno())
         else:
             server.setNeedsReset()
