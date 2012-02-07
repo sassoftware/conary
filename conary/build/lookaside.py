@@ -122,13 +122,17 @@ class laUrl(object):
     def explicit(self):
         return self.scheme not in ['mirror', 'multiurl']
 
+    @property
+    def basename(self):
+        return os.path.basename(self.getHostAndPath()[1])
+
 
 def checkRefreshFilter(refreshFilter, url):
     if not refreshFilter:
         return False
     if refreshFilter(str(url)):
         return True
-    if refreshFilter(os.path.basename(url.path)):
+    if refreshFilter(url.basename):
         return True
     return False
 

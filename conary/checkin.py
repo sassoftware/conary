@@ -122,12 +122,15 @@ def _verifyAtHead(repos, headPkg, state):
 
     return True
 
-def _makeFilter(patterns):
+def _makeFilter(patterns, exactPaths=False):
     if not patterns:
-        return None
+        return lambda x: False
 
-    # convert globs to regexps, but chop off the final '$'
-    patterns = [ util.fnmatchTranslate(x) for x in patterns ]
+    if exactPaths:
+        patterns = [re.escape(x) for x in patterns]
+    else:
+        # convert globs to regexps, but chop off the final '$'
+        patterns = [ util.fnmatchTranslate(x) for x in patterns ]
 
     if len(patterns) > 1:
         filter = '(' + '|'.join(patterns) + ')'
@@ -402,9 +405,6 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
         # trove and haven't been marked as refreshed. such files don't need
         # to be downloaded again.
 
-        # this is a set of items not to download again
-        skipPatterns = set()
-
         # (pathId, fileId, version)
         if srcPkg:
             # this avoids downloding files which are autosourced by reusing
@@ -436,11 +436,12 @@ def commit(repos, cfg, message, callback=None, test=False, force=False):
 
         # there is no reason to download anything which is already in the
         # current directory and not autosourced
-        skipPatterns.update([ x[1] for x in state.iterFileList()
-                                if not state.fileIsAutoSource(x[0]) ])
-        skipFilter = _makeFilter(skipPatterns)
-
-        refreshFilter = _makeFilter(state.getFileRefreshList())
+        skipPaths = set(x[1] for x in state.iterFileList()
+                if not state.fileIsAutoSource(x[0]))
+        skipFilter = _makeFilter(skipPaths, exactPaths=True)
+        # These files are specifically marked as having been refreshed, so do
+        # not attempt to "fix" the cached copy.
+        refreshFilter = _makeFilter(state.getFileRefreshList(), exactPaths=True)
         lcache.setRefreshFilter(refreshFilter)
 
         # files have now been refreshed; reset the refresh bit
@@ -2137,13 +2138,15 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
     state = conaryState.getSourceState()
 
     if len(refreshPatterns) == 1 and refreshPatterns[0] is None:
-        refreshPatterns = [ '*' ]
+        refreshFilter = lambda x: True
     if len(refreshPatterns) == 0:
-        refreshPatterns = [ '*' ]
+        refreshFilter = lambda x: True
     else:
-        refreshPatterns.extend(state.getFileRefreshList())
-
-    refreshFilter = _makeFilter(refreshPatterns)
+        # User may pass wildcard ptterns
+        patternFilter = _makeFilter(refreshPatterns)
+        # Paths from the manifest must be exact filenames
+        pathFilter = _makeFilter(state.getFileRefreshList(), exactPaths=True)
+        refreshFilter = lambda x: patternFilter(x) or pathFilter(x)
 
     # if it's not being refreshed, don't download it
     skipPatterns = []
@@ -2151,7 +2154,7 @@ def refresh(repos, cfg, refreshPatterns=[], callback=None, dirName='.'):
         if not refreshFilter(path):
             skipPatterns.append(path)
 
-    skipFilter = _makeFilter(skipPatterns)
+    skipFilter = _makeFilter(skipPatterns, exactPaths=True)
 
     troveName = state.getName()
 

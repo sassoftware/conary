@@ -1346,7 +1346,11 @@ class RepositoryHelper(testhelp.TestCase):
 
         level = log.getVerbosity()
         log.setVerbosity(logLevel)
-        cvccmd.sourceCommand(self.cfg, [ "refresh", globs ], None,
+        if globs:
+            args = [globs]
+        else:
+            args = []
+        cvccmd.sourceCommand(self.cfg, ["refresh"] + args, None,
                              callback=callback)
         log.setVerbosity(level)
 
