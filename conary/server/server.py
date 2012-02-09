@@ -210,7 +210,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
         else:
             repos = self.netRepos
 
-        localAddr = "%s:%s" % self.request.getsockname()
+        localHost, localPort = self.request.getsockname()[:2]
+        if ':' in localHost:
+            localHost = '[%s]' % localHost
+        localAddr = '%s:%s' % (localHost, localPort)
         request = xmlshims.RequestArgs.fromWire(params)
 
         if repos is not None:
@@ -324,6 +327,17 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 class HTTPServer(BaseHTTPServer.HTTPServer):
     isSecure = False
+
+    def __init__(self, server_address, *args, **kwargs):
+        # Override to support arbitrary IPv4 or IPv6 binds, and especially so
+        # binding to '' translates to '::' which binds to both stacks.
+        host, port = server_address
+        if not host:
+            host = '::'
+        family, socktype, _, _, sockaddr = socket.getaddrinfo(host, port)[0]
+        self.address_family = family
+        self.socket_type = socktype
+        BaseHTTPServer.HTTPServer.__init__(self, (host, port), *args, **kwargs)
 
     def close_request(self, request):
         pollObj = select.poll()

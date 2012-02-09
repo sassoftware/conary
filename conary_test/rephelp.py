@@ -3683,7 +3683,11 @@ class HTTPServerController(base_server.BaseServer):
                 else:
                     klass = BaseHTTPServer.HTTPServer
                     args = ()
-                httpServer = klass(("127.0.0.1", self.port), requestHandler, *args)
+                # Sorry for modifying a stdlib class, but this is in a dead-end
+                # forked process after all! Need to bind to "IPv6 all" so that
+                # both IPv4 and IPv6 connections to "localhost" succeed.
+                klass.address_family = socket.AF_INET6
+                httpServer = klass(('::', self.port), requestHandler, *args)
                 httpServer.serve_forever()
                 os._exit(0)
             except:

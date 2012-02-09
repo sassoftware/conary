@@ -66,6 +66,7 @@ MaxRequestsPerChild  0
 # prevent Apache from glomming onto all bound IP addresses (0.0.0.0)
 #
 Listen 127.0.0.1:@PORT@
+Listen [::1]:@PORT@
 
 # ServerAdmin: Your address, where problems with the server should be
 # e-mailed.  This address appears on some server-generated pages, such
