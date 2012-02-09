@@ -223,9 +223,9 @@ class RepositoryServer(base_server.BaseServer):
 
     def getMap(self):
         if self.sslEnabled and self.useSSL:
-            dest = 'https://localhost:%d/conary/' % self.port
+            dest = 'https://127.0.0.1:%d/conary/' % self.port
         else:
-            dest = 'http://localhost:%d/conary/' % self.port
+            dest = 'http://127.0.0.1:%d/conary/' % self.port
         d = dict((name, dest) for name in self.nameList)
         return d
 
@@ -338,7 +338,7 @@ class RepositoryServer(base_server.BaseServer):
         if conaryrc:
             f = open(conaryrc, 'w')
             for serverName in self.nameList:
-                f.write('repositoryMap %s http://localhost:%s/conary/\n'
+                f.write('repositoryMap %s http://127.0.0.1:%s/conary/\n'
                             % (serverName, configValues['port']) )
             f.write('installLabelPath localhost@rpl:linux\n')
 
@@ -602,7 +602,7 @@ class ProxyServerOverrides:
         f.close()
 
     def updateConfig(self, cfg):
-        cfg.configLine("conaryProxy http http://localhost:%s" % self.port)
+        cfg.configLine("conaryProxy http http://127.0.0.1:%s" % self.port)
 
     def reset(self):
         self.contents.reset()
@@ -1181,7 +1181,7 @@ class RepositoryHelper(testhelp.TestCase):
         # overloaded, and spawning a server might take longer than 10 seconds
         # to come up
         try:
-            sock_utils.tryConnect('localhost', server.port)
+            sock_utils.tryConnect('127.0.0.1', server.port)
         except socket.error, e:
             msg = 'unable to open networked repository: %s' %str(e)
             print >> sys.stderr, msg
@@ -1200,7 +1200,7 @@ class RepositoryHelper(testhelp.TestCase):
             raise RuntimeError(msg)
 
         if self.proxy:
-            sock_utils.tryConnect('localhost', self.proxy.port)
+            sock_utils.tryConnect('127.0.0.1', self.proxy.port)
 
         # There may be other things that were not fully started yet, like HTTP
         # caches and so on. We'll now try an end-to-end connection.
@@ -3376,7 +3376,7 @@ class RepositoryHelper(testhelp.TestCase):
         ProxyClass = classMap[key]
 
         if withCapsuleContentServer:
-            capsuleServerUrl = "http://localhost:%s/toplevel" % \
+            capsuleServerUrl = "http://127.0.0.1:%s/toplevel" % \
                 self.capsuleContentServer.port
         else:
             capsuleServerUrl = None
@@ -3491,8 +3491,8 @@ visible_hostname localhost.localdomain
 
     def updateConfig(self, cfg, auth = False):
         port = (auth and self.authPort) or self.port
-        cfg.proxy = { 'http' : 'http://localhost:%d/' % port,
-                      'https' : 'https://localhost:%d/' % port,
+        cfg.proxy = { 'http' : 'http://127.0.0.1:%d/' % port,
+                      'https' : 'https://127.0.0.1:%d/' % port,
                     }
 
     def start(self):
@@ -3682,7 +3682,7 @@ class HTTPServerController(base_server.BaseServer):
             else:
                 klass = BaseHTTPServer.HTTPServer
                 args = ()
-            httpServer = klass(("127.0.0.1", self.port), requestHandler, *args)
+            httpServer = klass(('::1', self.port), requestHandler, *args)
             httpServer.serve_forever()
         finally:
             os._exit(1)
@@ -3736,7 +3736,7 @@ class HTTPServerController(base_server.BaseServer):
             s = 's'
         else:
             s = ''
-        return "http%s://localhost:%d/" % (s, self.port)
+        return "http%s://127.0.0.1:%d/" % (s, self.port)
 
     def isStarted(self):
         return self.childPid not in (None, 0)
