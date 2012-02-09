@@ -3666,24 +3666,28 @@ class HTTPServerController(base_server.BaseServer):
             return
 
         try:
-            if ssl:
-                klass = SecureHTTPServer
-                ctx = SSL.Context("sslv23")
-                if isinstance(ssl, tuple):
-                    # keypair
-                    sslCert, sslKey = ssl
+            try:
+                if ssl:
+                    klass = SecureHTTPServer
+                    ctx = SSL.Context("sslv23")
+                    if isinstance(ssl, tuple):
+                        # keypair
+                        sslCert, sslKey = ssl
+                    else:
+                        # defaults
+                        sslCert, sslKey = 'ssl-cert.crt', 'ssl-cert.key'
+                    sslCert = os.path.join(resources.get_archive(sslCert))
+                    sslKey = os.path.join(resources.get_archive(sslKey))
+                    ctx.load_cert_chain(sslCert, sslKey)
+                    args = (ctx,)
                 else:
-                    # defaults
-                    sslCert, sslKey = 'ssl-cert.crt', 'ssl-cert.key'
-                sslCert = os.path.join(resources.get_archive(sslCert))
-                sslKey = os.path.join(resources.get_archive(sslKey))
-                ctx.load_cert_chain(sslCert, sslKey)
-                args = (ctx,)
-            else:
-                klass = BaseHTTPServer.HTTPServer
-                args = ()
-            httpServer = klass(("127.0.0.1", self.port), requestHandler, *args)
-            httpServer.serve_forever()
+                    klass = BaseHTTPServer.HTTPServer
+                    args = ()
+                httpServer = klass(("127.0.0.1", self.port), requestHandler, *args)
+                httpServer.serve_forever()
+                os._exit(0)
+            except:
+                traceback.print_exc()
         finally:
             os._exit(1)
 
