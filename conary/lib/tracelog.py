@@ -69,6 +69,8 @@ class NullLog:
     def reset(self, level=None):
         if level:
             self.level = level
+    def close(self):
+        pass
     # log arguments if we're called as a function
     def __call__(self, level, *args):
         if level <= self.level:
@@ -155,10 +157,12 @@ class FileLog(NullLog):
             pass
 
     # close on exit
-    def __del__(self):
+    def close(self):
         if self.isFile:
             self.fd.close()
         self.level = self.filename = self.isFile = self.fd = None
+    def __del__(self):
+        self.close()
 
 
 # a class that keeps tabs on the time spend between calls to the log function

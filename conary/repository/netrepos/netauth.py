@@ -506,6 +506,8 @@ class NetworkAuthorization:
         if not len(rows):
             return False
         salt, challenge = rows[0]
+        salt = cu.frombinary(salt)
+        challenge = cu.frombinary(challenge)
         return self.userAuth._checkPassword(user, salt, challenge, password)
 
     # a simple call to auth.check(authToken) checks that the role
