@@ -32,6 +32,7 @@ from conary.lib.http import request
 from conary.repository import transport, errors
 from conary.repository.netrepos import netserver
 from conary.lib import httputils
+from conary.lib import networking
 from conary.lib import util
 from M2Crypto import SSL
 from testrunner import testhelp
@@ -227,6 +228,15 @@ class TransportTest(rephelp.RepositoryHelper):
             socket.gethostname = oldgethostname
             server.kill()
 
+    def _assertProxy(self, via, cProxy):
+            via = networking.HostPort(via.strip().split(' ')[1])
+            self.assertEqual(via.port, cProxy.port)
+            self.failUnlessIn(str(via.host), [
+                    '127.0.0.1',
+                    '::ffff:127.0.0.1',
+                    '::1',
+                    ])
+
     def testConaryProxy(self):
         self.openRepository()
         cProxy = self.getConaryProxy(proxies = self.cfg.conaryProxy)
@@ -252,7 +262,7 @@ class TransportTest(rephelp.RepositoryHelper):
                               os.environ.get('CONARY_PROXY', None):
                 proxyCount += 1
             self.failUnlessEqual(len(via), proxyCount)
-            self.failUnlessIn(('127.0.0.1:%s' % cProxy.port), via[-1])
+            self._assertProxy(via[-1], cProxy)
         finally:
             cProxy.stop()
 
@@ -297,8 +307,8 @@ class TransportTest(rephelp.RepositoryHelper):
                               os.environ.get('CONARY_PROXY', None):
                 proxyCount += 1
             self.failUnlessEqual(len(via), proxyCount)
-            self.failUnless(proxy1Addr in via[-2])
-            self.failUnless(proxy2Addr in via[-1])
+            self._assertProxy(via[-2], cProxy1)
+            self._assertProxy(via[-1], cProxy2)
         finally:
             if cProxy1: cProxy1.stop()
             if cProxy2: cProxy2.stop()
@@ -761,6 +771,10 @@ class TransportTest(rephelp.RepositoryHelper):
                 ('ssl-self-signed.pem', 'ssl-self-signed.pem'))
 
 
+class SimpleXMLRPCServer6(SimpleXMLRPCServer):
+    address_family = socket.AF_INET6
+
+
 class ServerController:
     def __init__(self):
         self.port = testhelp.findPorts(num = 1)[0]
@@ -769,8 +783,7 @@ class ServerController:
             sock_utils.tryConnect('127.0.0.1', self.port)
             return
 
-        server = SimpleXMLRPCServer(("127.0.0.1", self.port),
-                                    logRequests=False)
+        server = SimpleXMLRPCServer6(("::", self.port), logRequests=False)
         server.register_instance(self.handlerFactory())
         server.serve_forever()
 
