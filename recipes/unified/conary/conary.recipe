@@ -1,0 +1,209 @@
+#
+# Copyright (c) rPath, Inc.
+# This file is distributed under the terms of the MIT License.
+# A copy is available at http://www.rpath.com/permanent/mit-license.html
+#
+
+class Conary(CPackageRecipe):
+    name = 'conary'
+    version = '2'
+
+    plat = 'centos'
+    platver = '6'
+    native = True
+    encapsulated = False
+
+    have_kid = True
+    gpl = False
+    if plat == 'rpath':
+        buildRequires = [
+            'elementtree:python',
+            'kid:python',
+            'kid:runtime',
+            'libelf-lgpl:devel',
+            'openssl:devel',
+            'pycrypto:python',
+            'python:devel',
+            'zlib:devel',
+            ]  
+    elif plat == 'centos' and encapsulated:
+        buildRequires = [
+            'openssl-devel:rpm',
+            'zlib-devel:rpm',
+            'bzip2-devel:rpm',
+            ]
+        if native:
+            # System python
+            buildRequires.extend([
+                'elfutils-libelf-devel:rpm',
+                'm2crypto:rpm',
+                'python-crypto:rpm',
+                'python-devel:rpm',
+                'python-kid:rpm',
+                ])
+            gpl = True
+        else:
+            # python-conary
+            buildRequires.extend([
+                'python-conary:devel',
+                'libelf-lgpl:devel',
+                'm2crypto-conary:python',
+                ])
+            have_kid = False
+    else:
+        raise RuntimeError("Wrong value for 'plat' class variable")
+
+    def setup(r):
+        r.macros.sqlitever = '3070800'
+        r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
+
+        if r.native:
+            r.macros.pyroot = '/usr'
+        else:
+            r.macros.pyroot = '/usr/conary'
+        r.macros.bindir = '%(pyroot)s/bin'
+        r.macros.oldbindir = '/usr/bin'
+        r.macros.pylib = '%(pyroot)s/%(lib)s'
+        r.macros.pyinc = '%(pyroot)s/include/python%(pyver)s'
+        r.macros.python = '%(bindir)s/python%(pyver)s'
+        r.macros.sitepkgs = '%(pylib)s/python%(pyver)s/site-packages'
+        r.Environment('PATH', '%(bindir)s:/bin:/sbin:/usr/bin:/usr/sbin')
+
+        #r.addArchive('ftp://download.rpath.com/conary/')
+        r.addMercurialSnapshot('http://hg.rpath.com/conary')
+        r.addPatch('el5-build-flags.patch', use=(r.plat == 'centos'))
+        r.addPatch('rpl2-build-flags.patch', use=(r.plat == 'rpath' and r.platver != '1'))
+
+        ### Build internal sqlite library for Conary to use
+        r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
+            dir='%(maindir)s/conary/pysqlite3/')
+        r.Configure('--disable-shared --enable-threadsafe',
+                    dir='conary/pysqlite3/%(sqlite)s')
+        r.Make('CFLAGS="%(cflags)s -fPIC"', dir='conary/pysqlite3/%(sqlite)s')
+
+        ### Platform-specific Conary tweaks
+        # %(x11prefix)s deprecated in rPL2 (CNY-1205)
+        r.Replace('^x11prefix.*$', 'x11prefix = \'%(exec_prefix)s\'',
+                'config/macros')
+        if r.plat == 'centos':
+            # Stay backward-compatible with kernels we've already built in
+            # in this platform (CNY-3518)
+            r.Replace('^        self.mergeKmodSymbols = False', 
+                      '        self.mergeKmodSymbols = True', 
+                      'conary/build/capsulepolicy.py')
+            # RPM provides debugedit on this platform
+            r.Replace("debugedit           = 'debugedit'",
+                      "debugedit           = '/usr/lib/rpm/debugedit'",
+                      'config/macros')
+
+        ####  Finally, actually build Conary
+        mkargs = (
+            'LDFLAGS="%(ldflags)s -L%(pylib)s -Wl,-rpath,%(pylib)s" '
+            'prefix=%(pyroot)s '
+            'PYINCLUDE=%(pyinc)s '
+            'PYTHON=%(python)s '
+            'PYVER=%(pyver)s '
+            'sitedir=%(sitepkgs)s '
+            )
+        if not r.have_kid:
+            mkargs += 'NO_KID=1 '
+        if r.gpl:
+            mkargs += 'libelf=-lelf '
+        r.Make(mkargs, preMake='CFLAGS="%(cflags)s -fPIC" ')
+        r.MakeInstall(mkargs)
+
+        # Change any #! lines to point to the correct interpreter
+        r.NormalizePythonInterpreterVersion(
+            versionMap=(('/usr/bin/python', '%(python)s'),
+                        ('/usr/bin/python2.4', '%(python)s'),
+                        ('/usr/bin/python2.5', '%(python)s'),
+                        ('/usr/bin/python2.6', '%(python)s')))
+
+        ### Standard configuration
+        r.Create('%(sysconfdir)s/conaryrc',
+                 contents='includeConfigFile %(sysconfdir)s/conary/config.d/*\n')
+        r.MakeDirs('%(sysconfdir)s/conary/config.d/')
+        r.ExcludeDirectories(exceptions='%(sysconfdir)s/conary/config.d')
+
+        r.Create('%(sysconfdir)s/logrotate.d/conary',
+                 contents='\n'.join(('/var/log/conary {',
+                                     '    missingok',
+                                     '    notifempty',
+                                     '    size 10M',
+                                     '}',
+                                     )))
+
+        ### Componentization
+        r.ComponentSpec('python', '%(sitepkgs)s/')
+        r.PackageSpec('conary',
+                      '%(sitepkgs)s/conary/build/__init__.py.*',
+                      '%(sitepkgs)s/conary/build/errors.py.*',
+                      '%(sitepkgs)s/conary/build/filter.py.*',
+                      '%(sitepkgs)s/conary/build/nextversion.py.*',
+                      '%(sitepkgs)s/conary/build/tags.py.*',
+                      '%(sitepkgs)s/conary/build/use.py.*')
+        r.PackageSpec('conary-repository',
+                      '%(sitepkgs)s/conary/repository/netrepos/',
+                      r'%(sitepkgs)s/conary/repository/shimclient\.py.*',
+                      '%(sitepkgs)s/conary/web/',
+                      '%(sitepkgs)s/conary/server/',
+                      '%(datadir)s/conary/migration/',
+                      '%(datadir)s/conary/logcat')
+        r.PackageSpec('conary-build',
+                      '%(oldbindir)s/cvc(|desc)',
+                      r'%(sitepkgs)s/conary/cvc(|desc)\.py.*',
+                      r'%(sitepkgs)s/conary/cmds/(cvccmd|clone|branch)\.py.*',
+                      '%(mandir)s/.*/cvc.*',
+                      '%(sitepkgs)s/conary/build/',
+                      r'%(sitepkgs)s/conary/(checkin|clone|branch)\.py.*',
+                      '%(libdir)s/conary/',
+                      '%(libexecdir)s/conary/perlreqs.pl',
+                      '%(localstatedir)s/conary/emerge', #/var/conary for emerge
+                      '%(sysconfdir)s/conary/mirrors/',
+                      )
+        # keyrings are binary, and we are providing the initial version only
+        r.InitialContents('%(sysconfdir)s/conary/.*gpg')
+
+
+        ### Dependencies
+        r.Requires('conary-policy:lib',
+                   '%(sitepkgs)s/conary/build/packagepolicy.py')
+        # Conary pieces need to work together with the same version
+        r.ComponentProvides('%(version)s')
+        r.ComponentProvides('group-scripts')
+        r.Requires('conary:runtime(%(version)s)',
+                   '%(sitepkgs)s/conary/cvc.py')
+        r.Requires('conary:runtime(%(version)s)',
+                   '%(sitepkgs)s/conary/server/server.py')
+        r.Requires('conary:python(%(version)s)',
+                   '%(bindir)s/conary')
+
+        if not r.encapsulated:
+            r.UtilizeUser('emerge', '%(sitepkgs)s/conary/cvc.py')
+        # emerge really requires all of conary-build, so if
+        # it moves to cvc we can remove this whiteout
+        r.Requires(exceptDeps=('(%(bindir)s/conary|conarycmd.py)',
+                               'python: conary.build.cook'))
+        # CNY-3314 -- conary.commit should not depend on conary.cvc
+        r.Requires(exceptDeps=('.*/conary/commit\.py.*$',
+                               'python: conary.cvc'))
+
+        # This exception needs to be here in order to bootstrap perl;
+        # if we don't have perl, we won't be using this file or those
+        # modules anyway.
+        r.Requires(exceptions='%(libexecdir)s/conary/perlreqs.pl')
+        r.Requires(exceptDeps='perl:.*')
+
+        # .py files without #!
+        r.Requires(exceptions=r'%(sysconfdir)s/conary/components/')
+        # We can't go back and change deps on rpm:python, so white it out
+        r.Requires(exceptDeps=r'python\:\ rpm')
+        if r.plat != 'rpath':
+            r.Requires('rpm:python', '%(sitepkgs)s/conary/local/rpmcapsule.py')
+        r.ComponentRequires({'python': set(('runtime',))})
+
+        r.AutoDoc('EULA_Conary_Dual_License.txt')
+
+        if r.encapsulated:
+            r.Remove('%(oldbindir)s/rpm2cpio') # conflict with the platform
+            r.Remove('%(oldbindir)s/dbsh') # might conflict, not needed in package
