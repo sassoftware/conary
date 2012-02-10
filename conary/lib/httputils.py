@@ -20,7 +20,13 @@ import socket
 
 from conary.lib import util
 
-LocalHosts = set(['localhost', 'localhost.localdomain', '127.0.0.1'])
+LocalHosts = set([
+    'localhost', 'localhost.localdomain',
+    'localhost4', 'localhost4.localdomain4',
+    'localhost6', 'localhost6.localdomain6',
+    '127.0.0.1', '::1',
+    '::ffff:127.0.0.1',
+    ])
 
 
 class IPCache(object):

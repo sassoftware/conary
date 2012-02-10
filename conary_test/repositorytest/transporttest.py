@@ -157,8 +157,8 @@ class TransportTest(rephelp.RepositoryHelper):
 
             def url(self):
                 # make sure the child is ready
-                sock_utils.tryConnect("localhost", self.port)
-                return "http://localhost:%d/" % self.port
+                sock_utils.tryConnect("127.0.0.1", self.port)
+                return "http://127.0.0.1:%d/" % self.port
 
         class AbortChecker:
             def __init__(self):
@@ -215,7 +215,7 @@ class TransportTest(rephelp.RepositoryHelper):
                 os.waitpid(self.childPid, 0)
 
             def url(self):
-                return "http://localhost:%d/" % self.port
+                return "http://127.0.0.1:%d/" % self.port
 
         oldgethostname = socket.gethostname
         server = XMLServer()

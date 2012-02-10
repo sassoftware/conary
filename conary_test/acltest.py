@@ -20,7 +20,6 @@ import cgi
 import itertools
 import os
 from SimpleHTTPServer import SimpleHTTPRequestHandler
-from BaseHTTPServer import HTTPServer
 
 from testrunner import testhelp
 from testutils import sock_utils
@@ -30,7 +29,9 @@ from conary_test.auth_helper import AuthHelper
 from conary import conarycfg, versions, trove
 from conary.build import use
 from conary.deps import deps
+from conary.lib import httputils
 from conary.repository import errors, netclient
+from conary.server.server import HTTPServer
 
 
 class AclTest(AuthHelper):
@@ -1697,7 +1698,7 @@ class PasswordHttpRequests(SimpleHTTPRequestHandler):
             self.send_error(404)
             return
 
-        if (args['remote_ip'] != [ '127.0.0.1' ] ):
+        if args['remote_ip'][0] not in httputils.LocalHosts:
             self.send_error(400)
             return
 
@@ -1738,7 +1739,7 @@ class EntitlementRequests(SimpleHTTPRequestHandler):
             return
 
         if (args['server'] != [ 'localhost' ] or
-                    args['remote_ip'] != [ '127.0.0.1' ] ):
+                args['remote_ip'][0] not in httputils.LocalHosts):
             self.send_error(400)
             return
 
@@ -1795,8 +1796,11 @@ class AuthorizationServer:
             sock_utils.tryConnect("127.0.0.1", self.port)
             return
 
-        httpServer = HTTPServer(("127.0.0.1", self.port), self.requestHandler)
-        httpServer.serve_forever()
+        try:
+            httpServer = HTTPServer(('', self.port), self.requestHandler)
+            httpServer.serve_forever()
+        finally:
+            os._exit(70)
 
     def kill(self):
         if self.childPid == 0:

@@ -1245,7 +1245,7 @@ class RepositoryHelper(testhelp.TestCase):
                 try:
                     repos.addNewAsciiPGPKey(label, 'test', ascKey)
                     break
-                except errors.InsufficientPermission:
+                except repo_errors.InsufficientPermission:
                     # This seems to be the #1 cause of transient test failures.
                     time.sleep(0.1)
             else:
