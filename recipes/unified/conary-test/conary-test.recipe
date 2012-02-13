@@ -229,10 +229,9 @@ class ConaryTest(CPackageRecipe):
         return environ
 
     def install(r):
+        r.macros.sitepkgs = '%(libdir)s/python%(pyver)s/site-packages'
         # Install the testsuite so that other testsuites can consume it
-        r.macros.testsuite_output = '%(libdir)s/%(name)s'
-        r.MakeDirs('%(testsuite_output)s')
-        r.Run('cp -a * %(destdir)s%(testsuite_output)s/')
+        r.Run('cp -a conary_test %(sitepkgs)s/conary_test')
 
         # These archives are there for the testsuite, of course they'll cause
         # problems when actually being packaged.
@@ -240,11 +239,12 @@ class ConaryTest(CPackageRecipe):
         # EnforceJavaBuildRequirements is not useful here, if we got pass the
         # Java provides/requires extraction we have the build requirements
         # already met.
+        r.macros.archive = '%(sitepkgs)s/conary_test/archive'
         #r.EnforceJavaBuildRequirements(exceptions='.*')
-        r.Requires(exceptions='%(testsuite_output)s/archive/.*')
-        r.Provides(exceptions='%(testsuite_output)s/archive/.*')
-        r.Flavor(exceptions='%(testsuite_output)s/archive/.*')
-        r.Strip(exceptions='%(testsuite_output)s/archive/.*')
+        r.Requires(exceptions='%(archive)s/.*')
+        r.Provides(exceptions='%(archive)s/.*')
+        r.Flavor(exceptions='%(archive)s/.*')
+        r.Strip(exceptions='%(archive)s/.*')
 
         # Soft deps
         r.Requires(exceptDeps='python: webunit.*')
