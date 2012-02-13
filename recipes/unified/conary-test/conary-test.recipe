@@ -130,6 +130,7 @@ class ConaryTest(CPackageRecipe):
             'gcc-java:rpm',
             'genisoimage:rpm',
             'git:rpm',
+            'glibc-static:rpm',
             'gnupg2:rpm',
             'httpd:rpm',
             'libxml2:rpm',
