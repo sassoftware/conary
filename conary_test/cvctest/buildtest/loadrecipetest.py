@@ -635,8 +635,7 @@ Not using:
 
         self.addCollection('simplesuper=1.0', [ ':recipe' ])
         self.addCollection('group-super=1.0', [ 'simplesuper[]' ], flavor='is:x86' )
-        self.addCollection('group-super=1.0',  [ 'simplesuper[]' ], flavor='is:x86_64' )
-        self.addCollection('group-super=1.0[]', [ 'simplesuper' ] )
+        self.addCollection('group-super=1.0',  [ 'simplesuper[]' ], flavor='is:x86 x86_64' )
 
         self.addComponent('simplesuper:recipe=2.0',
                           fileContents = [ ('simplesuper.recipe', 
@@ -647,6 +646,8 @@ Not using:
 
         # ------ Load from a single group recursively
         cfg = copy.deepcopy(self.cfg)
+        if cfg.buildFlavor.stronglySatisfies(deps.parseFlavor('is: x86 x86_64')):
+            cfg.buildFlavor = deps.parseFlavor('is: x86_64')
         cfg.autoLoadRecipes.append('group-super=1.0')
 
         importer = loadrecipe.Importer()
