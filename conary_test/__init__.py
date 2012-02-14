@@ -18,22 +18,18 @@
 
 from testrunner import testhelp
 
-try:
-    __import__('conary.local.rpmcapsule')
-    hasRpm = True
-except ImportError:
-    hasRpm = False
-
 
 def rpm(func):
     # mark the context as rpm
     testhelp.context('rpm')(func)
 
     def run(*args, **kwargs):
-        if hasRpm:
-            return func(*args, **kwargs)
-        else:
+        try:
+            __import__('rpm')
+        except ImportError:
             raise testhelp.SkipTestException('RPM module not present')
+        else:
+            return func(*args, **kwargs)
 
     run.func_name = func.func_name
     run._contexts = func._contexts
