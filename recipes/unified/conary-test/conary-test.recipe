@@ -148,6 +148,10 @@ class ConaryTest(CPackageRecipe):
             'unzip:rpm',
             'util-linux-ng:rpm',
             'xz:rpm',
+
+            # Non-CentOS
+            'mod_python:runtime',
+            'python-webunit:python',
             ]
 
         if embedded:
@@ -161,9 +165,6 @@ class ConaryTest(CPackageRecipe):
                 'm2crypto:rpm',
                 'python-devel:rpm',
                 'python-setuptools:rpm',
-                # Non-CentOS
-                #'mod_python:runtime',
-                #'webunit:python',
                 ])
 
 
