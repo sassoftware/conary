@@ -10,8 +10,8 @@ class Conary(CPackageRecipe):
 
     plat = 'centos'
     platver = '6'
-    native = True
-    encapsulated = False
+    embedded = False
+    encapsulated = True
 
     have_kid = True
     gpl = False
@@ -32,7 +32,7 @@ class Conary(CPackageRecipe):
             'zlib-devel:rpm',
             'bzip2-devel:rpm',
             ]
-        if native:
+        if not embedded:
             # System python
             buildRequires.extend([
                 'elfutils-libelf-devel:rpm',
@@ -57,10 +57,10 @@ class Conary(CPackageRecipe):
         r.macros.sqlitever = '3070800'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
-        if r.native:
-            r.macros.pyroot = '/usr'
-        else:
+        if r.embedded:
             r.macros.pyroot = '/usr/conary'
+        else:
+            r.macros.pyroot = '/usr'
         r.macros.bindir = '%(pyroot)s/bin'
         r.macros.oldbindir = '/usr/bin'
         r.macros.pylib = '%(pyroot)s/%(lib)s'

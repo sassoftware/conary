@@ -21,8 +21,8 @@ class ConaryTest(CPackageRecipe):
 
     plat = 'centos'
     platver = '6'
-    encapsulated = False
-    native = True
+    embedded = False
+    encapsulated = True
 
     Flags.coverage = True
     Flags.test = True
@@ -150,7 +150,13 @@ class ConaryTest(CPackageRecipe):
             'xz:rpm',
             ]
 
-        if native:
+        if embedded:
+            buildRequires.extend([
+                'm2crypto-conary:python',
+                'python-conary:devel',
+                'python-setuptools-conary:python',
+                ])
+        else:
             buildRequires.extend([
                 'm2crypto:rpm',
                 'python-devel:rpm',
@@ -158,12 +164,6 @@ class ConaryTest(CPackageRecipe):
                 # Non-CentOS
                 #'mod_python:runtime',
                 #'webunit:python',
-                ])
-        else:
-            buildRequires.extend([
-                'm2crypto-conary:python',
-                'python-conary:devel',
-                'python-setuptools-conary:python',
                 ])
 
 
@@ -231,10 +231,10 @@ class ConaryTest(CPackageRecipe):
             r.macros.test_subset = ' --split=4/4'
 
         # Use /usr/bin/python so that the special setcap-chroot python is used.
-        if r.native:
-            r.macros.pyroot = '/usr'
-        else:
+        if r.embedded:
             r.macros.pyroot = '/usr/conary'
+        else:
+            r.macros.pyroot = '/usr'
         r.macros.bindir = '%(pyroot)s/bin'
         r.macros.oldbindir = '/usr/bin'
         r.macros.pylib = '%(pyroot)s/%(lib)s'
@@ -249,10 +249,10 @@ class ConaryTest(CPackageRecipe):
         return environ
 
     def install(r):
-        if r.native:
-            r.macros.sitepkgs = '%(libdir)s/python%(pyver)s/site-packages'
-        else:
+        if r.embedded:
             r.macros.sitepkgs = '/usr/conary/%(lib)s/python%(pyver)s/site-packages'
+        else:
+            r.macros.sitepkgs = '%(libdir)s/python%(pyver)s/site-packages'
         # Install the testsuite so that other testsuites can consume it
         r.Run('cp -a conary_test %(sitepkgs)s/conary_test')
 
