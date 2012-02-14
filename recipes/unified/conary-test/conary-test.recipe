@@ -254,6 +254,7 @@ class ConaryTest(CPackageRecipe):
         else:
             r.macros.sitepkgs = '%(libdir)s/python%(pyver)s/site-packages'
         # Install the testsuite so that other testsuites can consume it
+        r.MakeDirs('%(sitepkgs)s')
         r.Run('cp -a conary_test %(destdir)s%(sitepkgs)s/conary_test')
 
         # These archives are there for the testsuite, of course they'll cause
