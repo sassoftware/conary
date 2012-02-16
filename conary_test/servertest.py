@@ -117,10 +117,10 @@ class ServerTest(rephelp.RepositoryHelper):
 
                 if useSSL:
                     ctx = server.createSSLContext(cfg)
-                    httpServer = server.SecureHTTPServer(("localhost", cfg.port),
+                    httpServer = server.SecureHTTPServer(("", cfg.port),
                                                          HttpRequestsSubclass, ctx)
                 else:
-                    httpServer = server.HTTPServer(("localhost", cfg.port),
+                    httpServer = server.HTTPServer(("", cfg.port),
                                                    HttpRequestsSubclass)
                 self.captureOutput(server.serve, httpServer)
             finally:

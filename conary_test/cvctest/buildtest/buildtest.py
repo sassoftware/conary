@@ -1886,6 +1886,9 @@ class ActionSuggests(PackageRecipe):
         for comp in fakeTroves:
             self.addComponent("fake%s:runtime" % comp, "1",
                 fileContents = [ ("/bin/%s" % comp, "%scontent" % comp)])
+        def checkPath(prog):
+            return '/bin/' + prog
+        self.mock(util, 'checkPath', checkPath)
         self.updatePkg(self.rootDir, ["fake%s:runtime" % x for x in fakeTroves])
         recipestr = """
 class ActionSuggests(PackageRecipe):

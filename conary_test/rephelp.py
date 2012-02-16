@@ -2431,6 +2431,9 @@ class RepositoryHelper(testhelp.TestCase):
     def cookItem(self, *args, **kw):
         return self.discardOutput(cook.cookItem, *args, **kw)
 
+    # Kludge to make debugging tests that only fail in Hudson easier
+    _printOnError = False
+
     def cookObject(self, loader, prep=False, macros={}, sourceVersion = None,
                    serverIdx = 0, ignoreDeps = False, logBuild = False, 
                    targetLabel = None, repos = None, 
@@ -2452,15 +2455,19 @@ class RepositoryHelper(testhelp.TestCase):
         use.resetUsed()
 
         try:
-            builtList = self.discardOutput(cook.cookObject, repos, self.cfg, 
-                                           [loader],
-                                           sourceVersion,
-                                           prep=prep, macros=macros,
-                                           allowMissingSource=True,
-                                           ignoreDeps=ignoreDeps,
-                                           logBuild=logBuild,
-                                           groupOptions=groupOptions,
-                                           resume=resume)
+            builtList, _ = self.captureOutput(cook.cookObject,
+                    repos,
+                    self.cfg,
+                    [loader],
+                    sourceVersion,
+                    prep=prep, macros=macros,
+                    allowMissingSource=True,
+                    ignoreDeps=ignoreDeps,
+                    logBuild=logBuild,
+                    groupOptions=groupOptions,
+                    resume=resume,
+                    _printOnError=self._printOnError,
+                    )
         finally:
             repos.close()
 

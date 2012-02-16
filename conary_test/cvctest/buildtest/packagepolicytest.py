@@ -4922,7 +4922,7 @@ class TestProvides(PackageRecipe):
 """
         trv = self.build(recipestr1, "TestProvides")
         prov = str(trv.getProvides())
-        assert(prov.find('perl: foo::blah') != -1)
+        self.assertIn('perl: foo::blah', prov)
 
     def testEL5PathProvideRegexp(self):
         recipestr = """

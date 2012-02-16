@@ -738,8 +738,7 @@ class PatchTest(PackageRecipe):
         expected = """+ attempting to apply /unrelated.patch to /test/tmpwatch-2.9.0/ with patch level(s) 1, 0, 2, 3
 + patch did not apply with --dry-run, trying level 1 directly
 + patch level 1 FAILED
-+ missing header for unified diff at line 3 of patch
-can't find file to patch at input line 3
++ can't find file to patch at input line 3
 Perhaps you used the wrong -p or --strip option?
 The text leading up to this was:
 --------------------------
@@ -763,8 +762,7 @@ Skip this patch? [y]
 Skipping patch.
 1 out of 1 hunk ignored
 + patch level 2 FAILED
-+ missing header for unified diff at line 3 of patch
-can't find file to patch at input line 3
++ can't find file to patch at input line 3
 Perhaps you used the wrong -p or --strip option?
 The text leading up to this was:
 --------------------------
@@ -776,8 +774,7 @@ Skip this patch? [y]
 Skipping patch.
 1 out of 1 hunk ignored
 + patch level 3 FAILED
-+ missing header for unified diff at line 3 of patch
-can't find file to patch at input line 3
++ can't find file to patch at input line 3
 Perhaps you used the wrong -p or --strip option?
 The text leading up to this was:
 --------------------------
@@ -792,6 +789,9 @@ error: could not apply patch /unrelated.patch in directory /test/tmpwatch-2.9.0/
         # normalize variable paths in the message
         msg = msg.replace(self.buildDir, '')
         msg = msg.replace(self.sourceSearchDir, '')
+        # centos behavioral differences
+        msg = msg.replace(
+                'missing header for unified diff at line 3 of patch\n', '')
         self.failUnlessEqual(msg, expected)
         if rc[0].__class__ != source.SourceError:
             self.fail('expected SourceError exception not raised')

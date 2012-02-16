@@ -458,7 +458,7 @@ class Foo(PackageRecipe):
             loadrecipe.RecipeLoader(self.workDir + '/testcase.recipe', self.cfg,
                                     repos=None)
         except Exception, err:
-            if sys.version_info[:2] == (2, 6):
+            if sys.version_info >= (2, 5):
                 topModule = "<module>"
             else:
                 topModule = "?"

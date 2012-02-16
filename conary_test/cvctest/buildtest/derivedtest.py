@@ -112,12 +112,14 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
         if buildFlavor is not None:
             self.cfg.buildFlavor = deps.parseFlavor(buildFlavor)
         try:
+            self._printOnError, oldval = True, self._printOnError
             rc = self.build(recipe, "%sRecipe" % pkgName.replace('-', '_'),
                               sourceVersion = sourceVersion,
                               returnTrove = returnTrove,
                               prep = prep)
         finally:
             self.cfg.buildFlavor = oldBuildFlavor
+            self._printOnError = oldval
 
         return rc
 
