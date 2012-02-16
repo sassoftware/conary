@@ -3397,7 +3397,7 @@ class TestRequires(PackageRecipe):
         util.mkdirChain(sourceDir)
 
         # python 2.6 has switched to itertools
-        if pythonVer == "2.6":
+        if sys.version_info >= (2, 6):
             itertoolsModuleName = "itertools"
         else:
             itertoolsModuleName = "itertoolsmodule"
