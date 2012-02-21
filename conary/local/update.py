@@ -1913,6 +1913,11 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
     newTrove.troveInfo.capsule.type.set('')
     newTrove.changeVersion(newVersion)
 
+    # There's no point in layering file changes on top of a phantom trove
+    # because there's no way to install the original capsule.
+    if curTrove.getVersion().onPhantomLabel():
+        return False, newTrove
+
     pathIds = {}
     for (pathId, path, fileId, version) in newTrove.iterFileList():
         pathIds[pathId] = True
