@@ -16,6 +16,7 @@
 #
 
 
+import re
 from testrunner import testhelp
 
 from conary_test import rephelp
@@ -599,21 +600,19 @@ class TestRecipe(GroupSetRecipe):
 
         built, d = self.buildRecipe(redirectRecipe, "testRedirect")
 
-        self.assertRaises(cook.CookError, self._build,
-                            'g = world["redirect"]',
-                            'r.Group(g)',
-              exceptionString = ('Cannot include redirect '
-                      'redirect:runtime=/localhost@rpl:linux/2.0-1-1[] '
-                      'in a group')
-        )
+        self.assertRaisesRegexp(cook.CookError,
+                '^' + re.escape('Cannot include redirect '
+                'redirect:runtime=/localhost@rpl:linux/2.0-1-1[] in a group'
+                ) + '$',
 
-        self.assertRaises(cook.CookError, self._build,
-                            'g = world.latestPackages()',
-                            'r.Group(g)',
-              exceptionString = ('Cannot include redirect '
-                      'redirect:runtime=/localhost@rpl:linux/2.0-1-1[] '
-                      'in a group')
-        )
+                self._build, 'g = world["redirect"]', 'r.Group(g)')
+
+        self.assertRaisesRegexp(cook.CookError,
+                '^' + re.escape('Cannot include redirect '
+                'redirect:runtime=/localhost@rpl:linux/2.0-1-1[] in a group'
+                ) + '$',
+
+                self._build, 'g = world.latestPackages()', 'r.Group(g)')
 
     @testhelp.context('sysmodel')
     def testPatch(self):
