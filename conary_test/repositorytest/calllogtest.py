@@ -33,7 +33,7 @@ class CallLogTest(rephelp.RepositoryHelper):
         file(logPath, "w+")
 
         log = calllog.ClientCallLogger(logPath, readOnly = True)
-        self.failUnlessEqual(len([ x for x in log ]), 0)
+        self.assertEqual(len([ x for x in log ]), 0)
 
     def testCallLoggerSimple(self):
         logPath = os.path.join(self.workDir, "logfile")
@@ -53,16 +53,16 @@ class CallLogTest(rephelp.RepositoryHelper):
 
         log = calllog.ClientCallLogger(logPath, readOnly = True)
         ents = [ x for x in log ]
-        self.failUnlessEqual(len(ents), len(infos))
+        self.assertEqual(len(ents), len(infos))
 
         for entry, info in zip(ents, infos):
-            self.failUnlessEqual(entry.revision, info[0])
-            self.failUnlessEqual(entry.url, info[1])
-            self.failUnlessEqual(entry.entitlement, info[2])
-            self.failUnlessEqual(entry.methodName, info[3])
-            self.failUnlessEqual(entry.args, info[4])
-            self.failUnlessEqual(entry.result, info[5])
-            self.failUnlessEqual(entry.latency, info[6])
+            self.assertEqual(entry.revision, info[0])
+            self.assertEqual(entry.url, info[1])
+            self.assertEqual(entry.entitlement, info[2])
+            self.assertEqual(entry.methodName, info[3])
+            self.assertEqual(entry.args, info[4])
+            self.assertEqual(entry.result, info[5])
+            self.assertEqual(entry.latency, info[6])
 
 
         # And add an entry the "normal" way
@@ -79,13 +79,13 @@ class CallLogTest(rephelp.RepositoryHelper):
 
         log = calllog.ClientCallLogger(logPath, readOnly = True)
         ents = [ x for x in log ]
-        self.failUnlessEqual(len(ents), len(infos) + 1)
+        self.assertEqual(len(ents), len(infos) + 1)
 
         entry = ents[-1]
-        self.failUnlessEqual(entry.revision, 1000001)
-        self.failUnlessEqual(entry.url, url)
-        self.failUnlessEqual(entry.entitlement, entitlement)
-        self.failUnlessEqual(entry.methodName, methodName)
-        self.failUnlessEqual(entry.args, args)
-        self.failUnlessEqual(entry.result, result)
-        self.failUnlessEqual(entry.latency, latency)
+        self.assertEqual(entry.revision, 1000001)
+        self.assertEqual(entry.url, url)
+        self.assertEqual(entry.entitlement, entitlement)
+        self.assertEqual(entry.methodName, methodName)
+        self.assertEqual(entry.args, args)
+        self.assertEqual(entry.result, result)
+        self.assertEqual(entry.latency, latency)

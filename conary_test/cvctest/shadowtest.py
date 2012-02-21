@@ -861,14 +861,14 @@ cannot shadow earlier trove
 
         os.chdir(self.workDir)
         # This should fail period. (no callback)
-        self.failUnlessRaises(repository.errors.FileStreamMissing,
+        self.assertRaises(repository.errors.FileStreamMissing,
                               self.checkout, "testcase",
                               versionStr=shadow)
         # This call will fail because the callback throws an exception
-        self.failUnlessRaises(CustomError, self.checkout, "testcase",
+        self.assertRaises(CustomError, self.checkout, "testcase",
                               versionStr=shadow, callback=callbackF)
         # This call will fail because the callback returns False
-        self.failUnlessRaises(repository.errors.FileStreamMissing,
+        self.assertRaises(repository.errors.FileStreamMissing,
                               self.checkout, "testcase",
                               versionStr=shadow, callback=callbackF2)
 
@@ -876,7 +876,7 @@ cannot shadow earlier trove
         # This should fail period. (no callback)
         # Note that we silently convert the OpenError exception into a
         # FileStreamMissing.
-        self.failUnlessRaises(repository.errors.FileStreamMissing,
+        self.assertRaises(repository.errors.FileStreamMissing,
                               self.checkout, "testcase",
                               versionStr=shadow)
 
@@ -894,7 +894,7 @@ cannot shadow earlier trove
         repos1 = self.openRepository(1)
         repos1.createChangeSetFile(jobList, csfile, callback=callbackS)
         cs = repository.changeset.ChangeSetFromFile(csfile)
-        self.failUnlessEqual([ 'testcase:source' ],
+        self.assertEqual([ 'testcase:source' ],
                              [ t.getName() for t in cs.iterNewTroveList()])
 
         # This call succeeds
@@ -914,7 +914,7 @@ testcase.recipe
         (ret, strng) = self.captureOutput(
             c.runCommand, cmd, self.cfg, {}, 
             ['cvc', 'checkout', 'testcase=' + shadow])
-        self.failUnlessEqual(strng, expOutput)
+        self.assertEqual(strng, expOutput)
 
         os.chdir("testcase")
 
@@ -988,7 +988,7 @@ testcase.recipe
         self.mkbranch([ trvspec ], shadow2, shadow=True)
 
         # Try to shadow back to @rpl:1
-        self.failUnlessRaises(errors.VersionStringError,
+        self.assertRaises(errors.VersionStringError,
             self.mkbranch, [ trvspec ], shadow1, shadow=True)
 
         # Create a deeper shadow hierarchy
@@ -999,12 +999,12 @@ testcase.recipe
         # Shadow in the middle of the hierarchy
         # (from @rpl:1//2//3 to @rpl:1//2)
         trvspec = "foo=%s/1.0-1-1" % branch3
-        self.failUnlessRaises(errors.VersionStringError,
+        self.assertRaises(errors.VersionStringError,
             self.mkbranch, [ trvspec ], shadow2, shadow=True)
 
         # Shadow to the top parent
         # (from @rpl:1//2//3 to @rpl:1)
-        self.failUnlessRaises(errors.VersionStringError,
+        self.assertRaises(errors.VersionStringError,
             self.mkbranch, [ trvspec ], shadow1, shadow=True)
 
     def testCrossMerge(self):
@@ -1068,7 +1068,7 @@ testcase.recipe
                                versionStr = label2.asString())
         built = self.cookFromRepository('test', buildLabel = label2)
 
-        self.failUnlessEqual(built[0][1], '/localhost2@rpl:devel/1.0-2-1')
+        self.assertEqual(built[0][1], '/localhost2@rpl:devel/1.0-2-1')
 
         # Now shadow
         self.mkbranch(['test:source=' + label2.asString()], label1, shadow=True)
@@ -1079,7 +1079,7 @@ testcase.recipe
         self.updateSourceTrove('test', newRecipe, versionStr = label1.asString())
         # And build in the repo
         built = self.cookFromRepository('test', buildLabel = label1)
-        self.failUnlessEqual(built[0][1], '/localhost2@rpl:devel//localhost1@rpl:devel/1.0-2.1-1')
+        self.assertEqual(built[0][1], '/localhost2@rpl:devel//localhost1@rpl:devel/1.0-2.1-1')
 
         # Now shadow again
         self.mkbranch(['test:source=' + label1.asString()], shadowLabel, shadow=True)
@@ -1097,7 +1097,7 @@ testcase.recipe
         # And build in the repo
         built = self.cookFromRepository('test', buildLabel = shadowLabel,
                                         repos = repos)
-        self.failUnlessEqual(built[0][1], '/localhost2@rpl:devel//localhost1@rpl:devel//localhost@rpl:shadow/1.0-2.1.1-1')
+        self.assertEqual(built[0][1], '/localhost2@rpl:devel//localhost1@rpl:devel//localhost@rpl:shadow/1.0-2.1.1-1')
 
         trvList = repos.getTroves([ (x[0], VFS(x[1]), x[2])
                                   for x in built ])
@@ -1108,7 +1108,7 @@ testcase.recipe
             # the originating repo didn't reject the request (and the client
             # didn't ignore the reject), then we'd see the file version be on
             # the /localhost2 branch.
-            self.failUnlessEqual(vr.asString(), built[0][1])
+            self.assertEqual(vr.asString(), built[0][1])
 
     def testPathIdLookupShortcut(self):
         # CNY-1911
@@ -1120,7 +1120,7 @@ testcase.recipe
         shadowLabel = Label('localhost@rpl:shadow')
         self.makeSourceTrove('test', simpleRecipe, buildLabel = label2)
         built = self.cookFromRepository('test', buildLabel = label2)
-        self.failUnlessEqual(built[0][1], '/localhost2@rpl:devel/1.0-1-1')
+        self.assertEqual(built[0][1], '/localhost2@rpl:devel/1.0-1-1')
 
         # Now shadow
         self.mkbranch(['test:source=' + label2.asString()], label1, shadow=True)
@@ -1131,7 +1131,7 @@ testcase.recipe
         self.updateSourceTrove('test', newRecipe, versionStr = label1.asString())
         # And build in the repo
         built = self.cookFromRepository('test', buildLabel = label1)
-        self.failUnlessEqual(built[0][1], '/localhost2@rpl:devel//localhost1@rpl:devel/1.0-1.1-1')
+        self.assertEqual(built[0][1], '/localhost2@rpl:devel//localhost1@rpl:devel/1.0-1.1-1')
 
         # Now shadow again
         self.mkbranch(['test:source=' + label1.asString()], shadowLabel, shadow=True)

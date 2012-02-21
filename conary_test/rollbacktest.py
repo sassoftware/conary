@@ -65,7 +65,7 @@ class RollbackTest(rephelp.RepositoryHelper):
                 db.getRollbackStack().getList()
                 self.fail("ConaryError not raised")
             except errors.ConaryError, e:
-                self.failUnlessEqual(str(e),
+                self.assertEqual(str(e),
                     "Unable to open rollback directory")
             except:
                 self.fail("Wrong exception raised: %s" % sys.exc_info()[1])
@@ -77,7 +77,7 @@ class RollbackTest(rephelp.RepositoryHelper):
                 db.rollbackStack.hasRollback('r.1')
                 self.fail("ConaryError not raised")
             except errors.ConaryError, e:
-                self.failUnlessEqual(str(e),
+                self.assertEqual(str(e),
                     "Unable to open rollback directory")
             except:
                 self.fail("Wrong exception raised: %s" % sys.exc_info()[1])
@@ -117,7 +117,7 @@ class RollbackTest(rephelp.RepositoryHelper):
         try:
             self.rollback(self.rootDir, 1)
         except database.RollbackError, e:
-            self.failUnlessEqual(str(e), errstr)
+            self.assertEqual(str(e), errstr)
             self.logFilter.compare('error: ' + errstr)
         self.logFilter.clear()
         self.logCheck(self.rollback, (self.rootDir, 1, True), ())
@@ -133,65 +133,65 @@ class RollbackTest(rephelp.RepositoryHelper):
 
         self.logFilter.add()
         ret = rollbacks.applyRollback(client, 'r.2', returnOnError = True)
-        self.failUnlessEqual(ret, 1)
+        self.assertEqual(ret, 1)
         self.logFilter.compare("error: rollback 'r.2' not present")
         self.logFilter.add()
         try:
             rollbacks.applyRollback(client, 'r.2')
         except database.RollbackDoesNotExist, e:
-            self.failUnlessEqual(str(e), 'rollback r.2 does not exist')
+            self.assertEqual(str(e), 'rollback r.2 does not exist')
         else:
             self.fail("Should have raised exception")
         self.logFilter.compare("error: rollback 'r.2' not present")
 
         self.logFilter.add()
         ret = rollbacks.applyRollback(client, 'r.r', returnOnError = True)
-        self.failUnlessEqual(ret, 1)
+        self.assertEqual(ret, 1)
         self.logFilter.compare("error: rollback 'r.r' not present")
         self.logFilter.add()
         try:
             rollbacks.applyRollback(client, 'r.r')
         except database.RollbackDoesNotExist, e:
-            self.failUnlessEqual(str(e), 'rollback r.r does not exist')
+            self.assertEqual(str(e), 'rollback r.r does not exist')
         else:
             self.fail("Should have raised exception")
         self.logFilter.compare("error: rollback 'r.r' not present")
 
         self.logFilter.add()
         ret = rollbacks.applyRollback(client, 'abc', returnOnError = True)
-        self.failUnlessEqual(ret, 1)
+        self.assertEqual(ret, 1)
         self.logFilter.compare("error: integer rollback count expected instead of 'abc'")
         self.logFilter.add()
         try:
             rollbacks.applyRollback(client, 'abc')
         except database.RollbackDoesNotExist, e:
-            self.failUnlessEqual(str(e), 'rollback abc does not exist')
+            self.assertEqual(str(e), 'rollback abc does not exist')
         else:
             self.fail("Should have raised exception")
         self.logFilter.compare("error: integer rollback count expected instead of 'abc'")
 
         self.logFilter.add()
         ret = rollbacks.applyRollback(client, '-1', returnOnError = True)
-        self.failUnlessEqual(ret, 1)
+        self.assertEqual(ret, 1)
         self.logFilter.compare("error: rollback count must be positive")
         self.logFilter.add()
         try:
             rollbacks.applyRollback(client, '-1')
         except database.RollbackDoesNotExist, e:
-            self.failUnlessEqual(str(e), 'rollback -1 does not exist')
+            self.assertEqual(str(e), 'rollback -1 does not exist')
         else:
             self.fail("Should have raised exception")
         self.logFilter.compare("error: rollback count must be positive")
 
         self.logFilter.add()
         ret = rollbacks.applyRollback(client, '2', returnOnError = True)
-        self.failUnlessEqual(ret, 1)
+        self.assertEqual(ret, 1)
         self.logFilter.compare("error: rollback count higher then number of rollbacks available")
         self.logFilter.add()
         try:
             rollbacks.applyRollback(client, '2')
         except database.RollbackDoesNotExist, e:
-            self.failUnlessEqual(str(e), 'rollback 2 does not exist')
+            self.assertEqual(str(e), 'rollback 2 does not exist')
         else:
             self.fail("Should have raised exception")
         self.logFilter.compare("error: rollback count higher then number of rollbacks available")
@@ -428,12 +428,12 @@ class testRecipe(PackageRecipe):
             rollbacks.applyRollback = oldApplyRollback
 
         (conaryclient, troveSpec), kwargs = ret
-        self.failUnlessEqual(kwargs, dict(a = 1, returnOnError = True))
-        self.failUnlessEqual(troveSpec, "r.rrr")
-        self.failUnlessEqual(conaryclient.db.root, self.workDir + "/blip")
+        self.assertEqual(kwargs, dict(a = 1, returnOnError = True))
+        self.assertEqual(troveSpec, "r.rrr")
+        self.assertEqual(conaryclient.db.root, self.workDir + "/blip")
 
         newStderr.seek(0)
-        self.failUnless("rollbacks.apply is deprecated, use the client's "
+        self.assertTrue("rollbacks.apply is deprecated, use the client's "
                     "applyRollback call" in newStderr.read())
 
     @testhelp.context('rollback')
@@ -446,37 +446,37 @@ class testRecipe(PackageRecipe):
 
         client = conaryclient.ConaryClient(self.cfg)
         db = client.getDatabase()
-        self.failUnlessEqual(db.getRollbackStack().getList(), [])
+        self.assertEqual(db.getRollbackStack().getList(), [])
 
         # Invalidating the rollback stack should be a noop now
         db.rollbackStack.invalidate()
-        self.failUnlessEqual(db.getRollbackStack().getList(), [])
+        self.assertEqual(db.getRollbackStack().getList(), [])
 
         self.updatePkg('foo:runtime=1')
         db.rollbackStack._readStatus()
-        self.failUnlessEqual(db.getRollbackStack().getList(), ['r.0'])
+        self.assertEqual(db.getRollbackStack().getList(), ['r.0'])
 
         db.rollbackStack.invalidate()
-        self.failUnlessEqual(db.getRollbackStack().getList(), [])
+        self.assertEqual(db.getRollbackStack().getList(), [])
 
         # Test some of the API functions
-        self.failIf(db.rollbackStack.hasRollback('r.0'))
+        self.assertFalse(db.rollbackStack.hasRollback('r.0'))
 
         self.updatePkg('foo:runtime=2')
         self.updatePkg('foo:runtime=3')
         db.rollbackStack._readStatus()
-        self.failUnlessEqual(db.getRollbackStack().getList(), ['r.1', 'r.2'])
+        self.assertEqual(db.getRollbackStack().getList(), ['r.1', 'r.2'])
 
         # Test some of the API functions
-        self.failIf(db.rollbackStack.hasRollback('r.0'))
+        self.assertFalse(db.rollbackStack.hasRollback('r.0'))
 
-        self.failUnlessRaises(database.RollbackDoesNotExist,
+        self.assertRaises(database.RollbackDoesNotExist,
             db.applyRollbackList, client.repos, ['r.0'],
                 transactionCounter = db.getTransactionCounter())
-        self.failUnlessRaises(database.RollbackDoesNotExist,
+        self.assertRaises(database.RollbackDoesNotExist,
             db.applyRollbackList, client.repos, ['r.2', 'r.1', 'r.0'],
                 transactionCounter = db.getTransactionCounter())
-        self.failUnlessRaises(database.RollbackOrderError,
+        self.assertRaises(database.RollbackOrderError,
             db.applyRollbackList, client.repos, ['r.1', 'r.0'],
                 transactionCounter = db.getTransactionCounter())
 
@@ -484,22 +484,22 @@ class testRecipe(PackageRecipe):
         db.applyRollbackList(client.repos, ['r.2', 'r.1'],
             transactionCounter = db.getTransactionCounter())
         db.rollbackStack._readStatus()
-        self.failIf(db.rollbackStack.hasRollback('r.0'))
+        self.assertFalse(db.rollbackStack.hasRollback('r.0'))
 
         # Reinstall, invalidate, install some more just to make sure the
         # counters are still good
         self.updatePkg('foo:runtime=2')
         self.updatePkg('foo:runtime=3')
         db.rollbackStack._readStatus()
-        self.failUnlessEqual(db.getRollbackStack().getList(), ['r.1', 'r.2'])
+        self.assertEqual(db.getRollbackStack().getList(), ['r.1', 'r.2'])
 
         db.rollbackStack.invalidate()
         self.updatePkg('foo:runtime=4')
         self.updatePkg('foo:runtime=5')
         db.rollbackStack._readStatus()
-        self.failUnlessEqual(db.getRollbackStack().getList(), ['r.3', 'r.4'])
+        self.assertEqual(db.getRollbackStack().getList(), ['r.3', 'r.4'])
         for i in range(3):
-            self.failIf(db.rollbackStack.hasRollback('r.%s' % i))
+            self.assertFalse(db.rollbackStack.hasRollback('r.%s' % i))
 
     @testhelp.context('rollback')
     def testRollbackOutput(self):
@@ -563,13 +563,13 @@ class testRecipe(PackageRecipe):
         self.updatePkg(pset)
 
         rblist = self.rollbackList(self.rootDir)
-        self.failUnlessEqual(rblist, expected_testRollbackOutput1)
+        self.assertEqual(rblist, expected_testRollbackOutput1)
 
         # Roll back, see if the output still matches
         self.rollback(self.rootDir, 4)
 
         rblist = self.rollbackList(self.rootDir)
-        self.failUnlessEqual(rblist, expected_testRollbackOutput2)
+        self.assertEqual(rblist, expected_testRollbackOutput2)
 
         oldval = self.cfg.showLabels
         self.cfg.showLabels = True
@@ -577,7 +577,7 @@ class testRecipe(PackageRecipe):
             rblist = self.rollbackList(self.rootDir)
         finally:
             self.cfg.showLabels = oldval
-        self.failUnlessEqual(rblist, expected_testRollbackOutputShowLabels)
+        self.assertEqual(rblist, expected_testRollbackOutputShowLabels)
 
         oldvval = self.cfg.fullVersions
         self.cfg.fullVersions = True
@@ -585,7 +585,7 @@ class testRecipe(PackageRecipe):
             rblist = self.rollbackList(self.rootDir)
         finally:
             self.cfg.fullVersions = oldvval
-        self.failUnlessEqual(rblist, expected_testRollbackOutputFullVersions)
+        self.assertEqual(rblist, expected_testRollbackOutputFullVersions)
 
         oldfval = self.cfg.fullFlavors
         self.cfg.fullFlavors = True
@@ -595,7 +595,7 @@ class testRecipe(PackageRecipe):
         finally:
             self.cfg.fullFlavors = oldfval
             self.cfg.fullVersions = oldvval
-        self.failUnlessEqual(rblist, expected_testRollbackOutputFullVersionsFlavors)
+        self.assertEqual(rblist, expected_testRollbackOutputFullVersionsFlavors)
 
     @testhelp.context('trovescripts', 'rollback')
     def testRollbackInvalidationStatus(self):
@@ -678,14 +678,14 @@ class testRecipe(PackageRecipe):
         client = conaryclient.ConaryClient(self.cfg)
         # Make sure we get an assertion error if not passing the transaction
         # counter
-        self.failUnlessRaises(AssertionError, client.db.applyRollbackList,
+        self.assertRaises(AssertionError, client.db.applyRollbackList,
             'junk', 'junk')
         # Bogus transaction counter
         try:
             client.db.applyRollbackList('junk', 'junk',
                 transactionCounter = 1000)
         except database.RollbackError, e:
-            self.failUnlessEqual(str(e), 'rollback junk cannot be applied:\n'
+            self.assertEqual(str(e), 'rollback junk cannot be applied:\n'
                 'Database state has changed, please run the rollback '
                 'command again')
         else:
@@ -815,9 +815,9 @@ class testRecipe(PackageRecipe):
             stdin = StringIO.StringIO('y')
             sys.stdin = stdin
             (retVal, output) = self.captureOutput(self.rollback, self.rootDir, 1)
-            self.failUnlessEqual(output, expected_testRollbackInteractive1)
+            self.assertEqual(output, expected_testRollbackInteractive1)
             (retVal, output) = self.captureOutput(self.rollback, self.rootDir, 0)
-            self.failUnlessEqual(output, expected_testRollbackInteractive2)
+            self.assertEqual(output, expected_testRollbackInteractive2)
         finally:
             sys.stdin = oldsysstdin
         return 0
@@ -834,7 +834,7 @@ class testRecipe(PackageRecipe):
         self.cfg.showInfoOnly = True
         
         (retVal, output) = self.captureOutput(self.rollback, self.rootDir, 0, showInfoOnly = True)
-        self.failUnlessEqual(output, expected_testRollbackShowInfo)
+        self.assertEqual(output, expected_testRollbackShowInfo)
         return 0
 
     @testhelp.context('rollback')
@@ -994,7 +994,7 @@ class RollbackScriptsTest(rephelp.RepositoryHelper):
         newCompatClass = 1
         data = rollbacks._RollbackScripts._serializeMeta(101, job,
             oldCompatClass, newCompatClass)
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             'index: 101',
             'job: trv=--/a@b:c/1.1-1[is: x86]',
             'oldCompatibilityClass: 0',
@@ -1005,37 +1005,37 @@ class RollbackScriptsTest(rephelp.RepositoryHelper):
         job2 = ('trv', (None, None),
                 ('/a@b:c/1.1-1', deps.deps.parseFlavor('is: x86')), False)
         ret = rollbacks._RollbackScripts._parseMeta(data)
-        self.failUnlessEqual(ret[0], 101)
-        self.failUnlessEqual(ret[1], (job2, oldCompatClass, newCompatClass))
+        self.assertEqual(ret[0], 101)
+        self.assertEqual(ret[1], (job2, oldCompatClass, newCompatClass))
 
         data = rollbacks._RollbackScripts._serializeMeta(101, job2,
             oldCompatClass, newCompatClass)
-        self.failUnlessEqual(ret[0], 101)
-        self.failUnlessEqual(ret[1], (job2, oldCompatClass, newCompatClass))
+        self.assertEqual(ret[0], 101)
+        self.assertEqual(ret[1], (job2, oldCompatClass, newCompatClass))
 
         # Pathological cases
         ret = rollbacks._RollbackScripts._parseMeta(data[:-1])
-        self.failUnlessEqual(ret, None)
+        self.assertEqual(ret, None)
 
         # A non-integer value in a compatibility class will not trip the code
         data2 = data[:-1]
         data2.append('newCompatibilityClass: a')
         ret = rollbacks._RollbackScripts._parseMeta(data2)
-        self.failUnlessEqual(ret[0], 101)
-        self.failUnlessEqual(ret[1], (job2, oldCompatClass, None))
+        self.assertEqual(ret[0], 101)
+        self.assertEqual(ret[1], (job2, oldCompatClass, None))
 
         # same with None, which is the right value (rolling back an install)
         data2 = data[:-1]
         data2.append('newCompatibilityClass: None')
         ret = rollbacks._RollbackScripts._parseMeta(data2)
-        self.failUnlessEqual(ret[0], 101)
-        self.failUnlessEqual(ret[1], (job2, oldCompatClass, None))
+        self.assertEqual(ret[0], 101)
+        self.assertEqual(ret[1], (job2, oldCompatClass, None))
 
 
         data2 = data[:]
         data2[0] = 'index: not a number'
         ret = rollbacks._RollbackScripts._parseMeta(data2)
-        self.failUnlessEqual(ret, None)
+        self.assertEqual(ret, None)
 
         data2 = data[:]
         data2.append('')
@@ -1043,8 +1043,8 @@ class RollbackScriptsTest(rephelp.RepositoryHelper):
         data2.append('key, no value, missing space:')
         data2.append('unknown line: ')
         ret = rollbacks._RollbackScripts._parseMeta(data2)
-        self.failUnlessEqual(ret[0], 101)
-        self.failUnlessEqual(ret[1], (job2, oldCompatClass, newCompatClass))
+        self.assertEqual(ret[0], 101)
+        self.assertEqual(ret[1], (job2, oldCompatClass, newCompatClass))
 
     @testhelp.context('rollback')
     def testLoadSave(self):
@@ -1065,37 +1065,37 @@ class RollbackScriptsTest(rephelp.RepositoryHelper):
         tdir = os.path.join(self.workDir, "rb")
 
         expectedFiles = ['post-scripts.meta', 'post-script.1', 'post-script.0']
-        self.failUnlessEqual(rbs.getCreatedFiles(tdir),
+        self.assertEqual(rbs.getCreatedFiles(tdir),
             set([os.path.join(tdir, x) for x in expectedFiles]))
 
         # Missing dest dir
-        e = self.failUnlessRaises(rollbacks.RollbackScriptsError,
+        e = self.assertRaises(rollbacks.RollbackScriptsError,
             rbs.save, tdir)
-        self.failUnlessEqual(str(e),
+        self.assertEqual(str(e),
             "Open error: 2: %s/post-scripts.meta: No such file or directory"
                 % tdir)
 
         os.mkdir(tdir)
         rbs.save(tdir)
 
-        self.failUnlessEqual(set(os.listdir(tdir)), set(expectedFiles))
+        self.assertEqual(set(os.listdir(tdir)), set(expectedFiles))
 
         rbs2 = rollbacks._RollbackScripts.load(tdir)
 
-        self.failUnlessEqual(rbs._items, rbs2._items)
+        self.assertEqual(rbs._items, rbs2._items)
 
         # Get rid of one of the scripts
         os.unlink(os.path.join(tdir, "post-script.1"))
 
         rbs2 = rollbacks._RollbackScripts.load(tdir)
-        self.failUnlessEqual(rbs._items[:-1], rbs2._items)
+        self.assertEqual(rbs._items[:-1], rbs2._items)
 
         # Get rid of the metadata file
         os.unlink(os.path.join(tdir, "post-scripts.meta"))
 
-        e = self.failUnlessRaises(rollbacks.RollbackScriptsError,
+        e = self.assertRaises(rollbacks.RollbackScriptsError,
             rollbacks._RollbackScripts.load, tdir)
-        self.failUnlessEqual(str(e),
+        self.assertEqual(str(e),
             "Open error: 2: %s/post-scripts.meta: No such file or directory"
                 % tdir)
 
@@ -1137,7 +1137,7 @@ exit 0
             # this one should succeed without problems
             self.rollback(self.rootDir, 2, abortOnError=True)
             # this one should fail with a preScriptError
-            self.failUnlessRaises(database.PreScriptError, self.rollback,
+            self.assertRaises(database.PreScriptError, self.rollback,
                                   self.rootDir, 1, abortOnError=True)
 
             # now we do it the old way and everything should succeed

@@ -215,7 +215,7 @@ class WritersTest(testhelp.TestCase):
 
         lines = data.splitlines()
         messageLine = [x for x in lines if 'message2' in x]
-        self.failIf('<foo>bar baz</foo>' not in messageLine[0])
+        self.assertFalse('<foo>bar baz</foo>' not in messageLine[0])
 
     def testSubscriptionLog(self):
         marker = 'IGNOREME'
@@ -241,11 +241,11 @@ class WritersTest(testhelp.TestCase):
             lgr.synchronize()
 
             lines = file(tmpFile).readlines()
-            self.failIf('ignore' in lines[0])
-            self.failUnless('.' in lines[0])
-            self.failUnless('one find' in lines[1])
-            self.failUnless('one continued find' in lines[2])
-            self.failUnless('.' in lines[3])
+            self.assertFalse('ignore' in lines[0])
+            self.assertTrue('.' in lines[0])
+            self.assertTrue('one find' in lines[1])
+            self.assertTrue('one continued find' in lines[2])
+            self.assertTrue('.' in lines[3])
 
         finally:
             self.unmock() # do not confuse time logging
@@ -432,5 +432,5 @@ class MiscTest(testhelp.TestCase):
             "abc\\ndef\\nghi\\nabc\ndef\nghi\n",
         ]
         for s in testStrings:
-            self.failUnlessEqual(s,
+            self.assertEqual(s,
                 logger.unescapeMessage(logger.escapeMessage(s)))

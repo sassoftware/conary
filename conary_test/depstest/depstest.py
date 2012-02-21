@@ -385,9 +385,9 @@ class DepsTest(unittest.TestCase):
     def testUnicodeFlavor(self):
         # CNY-3381
         flv = u"is: x86"
-        self.failUnlessEqual(parseFlavor(flv).freeze(), "1#x86")
+        self.assertEqual(parseFlavor(flv).freeze(), "1#x86")
         flv = u"is: \u0163"
-        self.failUnlessRaises(errors.ParseError, parseFlavor, flv)
+        self.assertRaises(errors.ParseError, parseFlavor, flv)
 
     def testStrongFlavor(self):
         def strong(flavor):
@@ -802,7 +802,7 @@ class DepsTest(unittest.TestCase):
         frozen = ds.freeze()
 
         x = ThawDependencySet(frozen)
-        self.failUnlessEqual(str(x), "unknown-%s: %s(%s)" % 
+        self.assertEqual(str(x), "unknown-%s: %s(%s)" % 
             (intTag, depName, depFlag))
 
     def testUnknownFlavor(self):
@@ -827,10 +827,10 @@ class DepsTest(unittest.TestCase):
         x = ThawFlavor(frozen)
         # The code that implements str is very specific to what's currently
         # implemented
-        self.failUnlessEqual(str(x), '')
+        self.assertEqual(str(x), '')
         # However, it's not the empty flavor
-        self.failIfEqual(x, parseFlavor(''))
-        self.failUnlessEqual(x.freeze(), '65535#was:flag1')
+        self.assertNotEqual(x, parseFlavor(''))
+        self.assertEqual(x.freeze(), '65535#was:flag1')
 
     def testFilterFlavor(self):
         def _test(flavor, filterList, result):

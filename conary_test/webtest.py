@@ -165,7 +165,7 @@ class WebFrontEndTest(WebRepositoryHelper):
 
         # check to make sure that buildtime is represented properly when
         # no buildtime is set in troveinfo (CNY-990)
-        self.failUnless('<td>Build time:</td><td>(unknown)' in page.body,
+        self.assertTrue('<td>Build time:</td><td>(unknown)' in page.body,
                         'Expected build time to be (unknown)')
 
         dom = page.getDOM()
@@ -216,7 +216,7 @@ class WebFrontEndTest(WebRepositoryHelper):
 
         repos = self.getRepositoryClient('newuser', 'newpass')
         # the role should not be automatically added (CNY-2604)
-        self.failUnlessEqual(repos.getRoles('localhost'), [])
+        self.assertEqual(repos.getRoles('localhost'), [])
 
     def testAddRole(self):
         # make sure that authenticaion is required

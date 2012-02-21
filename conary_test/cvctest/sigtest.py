@@ -154,7 +154,7 @@ class SigTest(rephelp.RepositoryHelper):
         f = deps.parseFlavor('')
         t = repos.getTrove('test:doc', v, f)
         self._checkDigitalSig(t, fingerprint)
-        self.failUnlessEqual(t.verifyDigitalSignatures(),
+        self.assertEqual(t.verifyDigitalSignatures(),
                 (openpgpfile.TRUST_TRUSTED, [], set()))
 
         # add another signature.  This exercises code such as the
@@ -179,7 +179,7 @@ class SigTest(rephelp.RepositoryHelper):
         t = repos.getTrove('test:doc', v, f)
         self._checkDigitalSig(t, fingerprint)
         self._checkDigitalSig(t, fingerprint2)
-        self.failUnlessEqual(t.verifyDigitalSignatures(),
+        self.assertEqual(t.verifyDigitalSignatures(),
             (openpgpfile.TRUST_TRUSTED, [], set()))
 
 
@@ -257,7 +257,7 @@ class SigTest(rephelp.RepositoryHelper):
 
         callback = C_(trustThreshold=self.cfg.trustThreshold)
         # We should catch our own exception now
-        self.discardOutput(self.failUnlessRaises, MyException,
+        self.discardOutput(self.assertRaises, MyException,
                            doUpdate, self.cfg, "test:doc",
                            callback=callback)
 
@@ -549,11 +549,11 @@ class SigTest(rephelp.RepositoryHelper):
         cfg.configLine("signatureKeyMap conary\.example\.com %s" % \
                        fingerprints[2])
 
-        self.failIf(signtrove.selectSignatureKey( \
+        self.assertFalse(signtrove.selectSignatureKey( \
             cfg, 'conary.example.com@rpl:devel') == fingerprints[2],
                     "regexp for selectSignatureKey missed first match")
 
-        self.failIf(signtrove.selectSignatureKey(cfg, 'WILDLYWRONG') != \
+        self.assertFalse(signtrove.selectSignatureKey(cfg, 'WILDLYWRONG') != \
                     fingerprints[0],
                     "selectSignatureKey invoked signatureKeyMap incorrectly")
 
@@ -566,7 +566,7 @@ class SigTest(rephelp.RepositoryHelper):
         cfg.configLine("signatureKeyMap foo.example.com %s" % fingerprint)
         cfg.configLine("buildLabel foo.example.com@rpl:devel")
 
-        self.failIf(not signtrove.selectSignatureKey(cfg, 'local@local'),
+        self.assertFalse(not signtrove.selectSignatureKey(cfg, 'local@local'),
                     "selectSignatureKey didn't convert local to buildLabel")
 
     def testSelectWithLabel(self):
@@ -579,10 +579,10 @@ class SigTest(rephelp.RepositoryHelper):
         cfg.configLine("signatureKey None")
         cfg.configLine("signatureKeyMap %s %s" % (labelStr, fingerprint))
 
-        self.failIf(signtrove.selectSignatureKey(cfg, labelStr) != fingerprint,
+        self.assertFalse(signtrove.selectSignatureKey(cfg, labelStr) != fingerprint,
                     "selectSignatureKey mismatched labelStr")
 
-        self.failIf(signtrove.selectSignatureKey(cfg, labelStr) != \
+        self.assertFalse(signtrove.selectSignatureKey(cfg, labelStr) != \
                     signtrove.selectSignatureKey(cfg, label),
                     "selectSignatureKey did not accomodate a label object")
 
@@ -723,7 +723,7 @@ class SigTest(rephelp.RepositoryHelper):
 
         fingerprint = '95B457D16843B21EA3FC73BBC7C32FC1F94E405E'
         keyData = repos.getAsciiOpenPGPKey(self.cfg.buildLabel, fingerprint)
-        self.failUnlessEqual(keyData, refKeyData)
+        self.assertEqual(keyData, refKeyData)
 
     def testListRepoKeys(self):
         fingerprint = '95B457D16843B21EA3FC73BBC7C32FC1F94E405E'
@@ -945,10 +945,10 @@ class SigTest(rephelp.RepositoryHelper):
             trv = repos.getTrove('testcase', v, f)
 
 
-            self.failIf(not trv.getSigs().digitalSigs.freeze(),
+            self.assertFalse(not trv.getSigs().digitalSigs.freeze(),
                         "Package was not signed when cooked")
 
-            self.failIf(trv.verifyDigitalSignatures() !=
+            self.assertFalse(trv.verifyDigitalSignatures() !=
                 (openpgpfile.TRUST_TRUSTED, [], set()),
                 "Bad digital signature for cooked package")
         finally:
@@ -972,10 +972,10 @@ class SigTest(rephelp.RepositoryHelper):
             # ensure components of cooked trove are also signed.
             trv = repos.getTrove('testcase:runtime', v, f)
 
-            self.failIf(not trv.getSigs().digitalSigs.freeze(),
+            self.assertFalse(not trv.getSigs().digitalSigs.freeze(),
                         "Component was not signed when package was cooked")
 
-            self.failIf(trv.verifyDigitalSignatures() !=
+            self.assertFalse(trv.verifyDigitalSignatures() !=
                    (openpgpfile.TRUST_TRUSTED, [], set()),
                         "Bad digital signature for coponent of cooked package")
         finally:
@@ -993,10 +993,10 @@ class SigTest(rephelp.RepositoryHelper):
 
             pkg = self.build(basicFileset, "basicFileset")
 
-            self.failIf(not pkg.getSigs().digitalSigs.freeze(),
+            self.assertFalse(not pkg.getSigs().digitalSigs.freeze(),
                         "Fileset was not signed when cooked")
 
-            self.failIf(pkg.verifyDigitalSignatures() !=
+            self.assertFalse(pkg.verifyDigitalSignatures() !=
                     (openpgpfile.TRUST_TRUSTED, [], set()),
                     "Bad digital signature for cooked fileset")
         finally:
@@ -1020,7 +1020,7 @@ class SigTest(rephelp.RepositoryHelper):
             trv = repos.getTrove('test', v, f)
 
             # signatures should not propogate.
-            self.failIf(trv.getSigs().digitalSigs.freeze(),
+            self.assertFalse(trv.getSigs().digitalSigs.freeze(),
                         "Signature cascaded during fileset cook")
         finally:
             self.cfg.signatureKey = signatureKey
@@ -1035,10 +1035,10 @@ class SigTest(rephelp.RepositoryHelper):
             self.cfg.signatureKey = fingerprint
             grp = self.build(testGroup, "GroupTest")
 
-            self.failIf(not grp.getSigs().digitalSigs.freeze(),
+            self.assertFalse(not grp.getSigs().digitalSigs.freeze(),
                         "Group was not signed when cooked")
 
-            self.failIf(grp.verifyDigitalSignatures() !=
+            self.assertFalse(grp.verifyDigitalSignatures() !=
                     (openpgpfile.TRUST_TRUSTED, [], set()),
                     "Bad digital signature for gooked group")
         finally:
@@ -1062,7 +1062,7 @@ class SigTest(rephelp.RepositoryHelper):
             trv = repos.getTrove('testcase', v, f)
 
             # signatures should not propogate.
-            self.failIf(trv.getSigs().digitalSigs.freeze(),
+            self.assertFalse(trv.getSigs().digitalSigs.freeze(),
                         "Signature cascaded during group cook")
         finally:
             self.cfg.signatureKey = signatureKey
@@ -1079,10 +1079,10 @@ class SigTest(rephelp.RepositoryHelper):
         try:
             self.cfg.signatureKey = fingerprint
             pkg = self.build(redirectRecipe, "testRedirect")
-            self.failIf(not pkg.getSigs().digitalSigs.freeze(),
+            self.assertFalse(not pkg.getSigs().digitalSigs.freeze(),
                         "Redirect was not signed when cooked")
 
-            self.failIf(pkg.verifyDigitalSignatures() !=
+            self.assertFalse(pkg.verifyDigitalSignatures() !=
                     (openpgpfile.TRUST_TRUSTED, [], set()),
                     "Bad digital signature for cooked redirect")
         finally:
@@ -1108,7 +1108,7 @@ class SigTest(rephelp.RepositoryHelper):
             trv = repos.getTrove('test:runtime', v, f)
 
             # signatures should not propogate.
-            self.failIf(trv.getSigs().digitalSigs.freeze(),
+            self.assertFalse(trv.getSigs().digitalSigs.freeze(),
                         "Signatures cascaded during redirect cook")
         finally:
             self.cfg.signatureKey = signatureKey

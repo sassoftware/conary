@@ -411,11 +411,11 @@ class CapsuleTest(rephelp.RepositoryHelper):
               rpmhelper.EPOCH   : [ 0 ] }
         t.addRpmCapsule('foo.rpm', self.v1, self.fid5, h)
 
-        self.failUnlessEqual(t.troveInfo.capsule.rpm.name(), 'foorpm')
-        self.failUnlessEqual(t.troveInfo.capsule.rpm.epoch(), 0)
-        self.failUnlessEqual(t.troveInfo.capsule.rpm.version(), '1.0')
-        self.failUnlessEqual(t.troveInfo.capsule.rpm.release(), '1')
-        self.failUnlessEqual(t.troveInfo.capsule.rpm.arch(), 'i386')
+        self.assertEqual(t.troveInfo.capsule.rpm.name(), 'foorpm')
+        self.assertEqual(t.troveInfo.capsule.rpm.epoch(), 0)
+        self.assertEqual(t.troveInfo.capsule.rpm.version(), '1.0')
+        self.assertEqual(t.troveInfo.capsule.rpm.release(), '1')
+        self.assertEqual(t.troveInfo.capsule.rpm.arch(), 'i386')
 
     @conary_test.rpm
     def testChangesetExploder(self):

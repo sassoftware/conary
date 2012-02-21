@@ -150,7 +150,7 @@ class FilesetTest(rephelp.RepositoryHelper):
         try:
             self.build(one, two, { 'case' : case } )
         except errors.RecipeFileError, e:
-            self.failIf(str(e) != msg, "incorrect exception: %s" % str(e))
+            self.assertFalse(str(e) != msg, "incorrect exception: %s" % str(e))
         else:
             self.fail("exception expected")
 
@@ -210,7 +210,7 @@ class FilesetFoo(FilesetRecipe):
         self.overrideBuildFlavor('is:x86')
         pkg = self.build(fileSetRecipe, "FilesetFoo")
 
-        self.failUnless(str(pkg.getBuildFlavor()))
+        self.assertTrue(str(pkg.getBuildFlavor()))
 
         self.overrideBuildFlavor('is:x86_64')
         pkg2 = self.build(fileSetRecipe, "FilesetFoo")

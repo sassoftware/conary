@@ -239,9 +239,9 @@ contents(size sha1)
         self.writeFile("test.source", ''.join(lines))
         self.commit()
         rc = self.rdiff('testcase', '-1', '1.0-1')
-        self.failUnless(rc.startswith(rdiffOutputNew), rc)
-        self.failUnlessIn(rdiffOutputNewTestcase, rc)
-        self.failUnlessIn(rdiffOutputNewSource, rc)
+        self.assertTrue(rc.startswith(rdiffOutputNew), rc)
+        self.assertIn(rdiffOutputNewTestcase, rc)
+        self.assertIn(rdiffOutputNewSource, rc)
         rc = self.rdiff('testcase', '1.0-1', '1.0-2')
         self.assertEquals(rc, rdiffOutputDiff)
         rc = self.rdiff('testcase', '-1', '1.0-2')
@@ -418,7 +418,7 @@ contents(sha1)
         # Output the format and the file name
         expectedString = "\n".join([ "%s  %s" % items for items in expected ])
         expectedString += '\n'
-        self.failUnlessEqual(rc, expectedString)
+        self.assertEqual(rc, expectedString)
 
         #cleanup
         os.chdir("..")
@@ -486,7 +486,7 @@ contents(sha1)
 
         # test annotate on a file that never changed (CNY-1066)
         rc = self.annotate('neverchange')
-        self.failUnlessEqual(rc, '1.0-1 (Tset): never changes\n')
+        self.assertEqual(rc, '1.0-1 (Tset): never changes\n')
 
         # test annotate up a branch tree
         self.mkbranch("1.0-2", "@rpl:branch", "testcase:source")
@@ -1051,7 +1051,7 @@ contents(sha1)
             f = open('CONARY', 'r')
             lines = f.readlines()[5:]
             files = [ line.split()[1] for line in lines ]
-            self.failUnlessEqual(sorted(files), sorted(l))
+            self.assertEqual(sorted(files), sorted(l))
 
         sourceDir = os.path.join(self.workDir, 'sourceSearch')
         self.cfg.sourceSearchDir = sourceDir
@@ -1829,8 +1829,8 @@ class SimpleRecipe(PackageRecipe):
             self.updatePkg('simple')
             file1 = os.path.join(self.rootDir, 'asdf/baz')
             file2 = os.path.join(self.rootDir, 'asdf/boop')
-            self.failUnlessEqual(file(file1).read(), '//foo%20bar/baz:1\n')
-            self.failUnlessEqual(file(file2).read(), '//foo%20bar/boop:1\n')
+            self.assertEqual(file(file1).read(), '//foo%20bar/baz:1\n')
+            self.assertEqual(file(file2).read(), '//foo%20bar/boop:1\n')
         finally:
             contentServer.kill()
 
@@ -2007,7 +2007,7 @@ class SimpleRecipe(PackageRecipe):
 
         os.chmod('foo.recipe', 0200)
         self.revertSource()
-        self.failUnlessEqual(perms, os.stat('foo.recipe').st_mode & 0777)
+        self.assertEqual(perms, os.stat('foo.recipe').st_mode & 0777)
 
         self.logCheck(self.commit, (),
                       '+ no changes have been made to commit')
@@ -2027,7 +2027,7 @@ class SimpleRecipe(PackageRecipe):
         try:
             self.revertSource('distcc-2.9.tar.bz2')
         except cvcerrors.CvcError, e:
-            self.failUnlessEqual(str(e), 'autosource files cannot be reverted')
+            self.assertEqual(str(e), 'autosource files cannot be reverted')
         else:
             assert(0)
 
@@ -2041,7 +2041,7 @@ class SimpleRecipe(PackageRecipe):
 
         os.unlink('symlink')
         self.revertSource()
-        self.failUnlessEqual(os.readlink('symlink'), 'other')
+        self.assertEqual(os.readlink('symlink'), 'other')
 
         # make sure removing something from the source component, not just
         # from the filesystem, gets reverted
@@ -2051,7 +2051,7 @@ class SimpleRecipe(PackageRecipe):
         self.verifyFile('other', 'some contents\n')
         self.diff()
         newState = open('CONARY').read()
-        self.failUnlessEqual(oldState, newState)
+        self.assertEqual(oldState, newState)
 
     def testMarkRemovedSource(self):
         self.addComponent('simple:source', '1', '', 
@@ -2425,9 +2425,9 @@ class R(PackageRecipe):
         r.addArchive("distcc-2.9.tar.bz2", keyid = "3C63CA3FA0B3E88B")
         r.Create("%(datadir)s/some-file", contents = "aaa")
 """
-        e = self.failUnlessRaises(source.SourceError,
+        e = self.assertRaises(source.SourceError,
             self.buildRecipe, recipestr, "R")
-        self.failUnlessEqual(str(e),
+        self.assertEqual(str(e),
             'Failed to retrieve PGP key 3C63CA3FA0B3E88B')
 
     def testRedundantUpdate(self):

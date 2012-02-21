@@ -41,6 +41,6 @@ class RpmCapsule(testhelp.TestCase):
                 return (path == "managed")
 
         meth = rpmcapsule.RpmCapsuleOperation._checkReplaceManagedFiles
-        self.failUnlessEqual(meth(OldFlags(), 'aaa'), True)
-        self.failUnlessEqual(meth(NewFlags(), 'managed'), True)
-        self.failUnlessEqual(meth(NewFlags(), 'unmanaged'), False)
+        self.assertEqual(meth(OldFlags(), 'aaa'), True)
+        self.assertEqual(meth(NewFlags(), 'managed'), True)
+        self.assertEqual(meth(NewFlags(), 'unmanaged'), False)

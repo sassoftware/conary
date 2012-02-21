@@ -24,13 +24,13 @@ class ArchTest(testhelp.TestCase):
     def testFlavorPreferences(self):
         self.mock(arch, 'baseArch', 'i686')
         currentArch = arch.flags_i686()
-        self.failUnlessEqual(arch.getFlavorPreferences(currentArch),
+        self.assertEqual(arch.getFlavorPreferences(currentArch),
             [])
         self.unmock()
 
         self.mock(arch, 'baseArch', 'x86_64')
         currentArch = arch.flags_x86_64()
-        self.failUnlessEqual(arch.getFlavorPreferences(currentArch),
+        self.assertEqual(arch.getFlavorPreferences(currentArch),
             [ arch.deps.parseFlavor(x)
                 for x in ['is: x86_64', 'is: x86'] ])
         self.unmock()
@@ -39,14 +39,14 @@ class ArchTest(testhelp.TestCase):
         self.mock(arch, 'baseArch', 'x86_64')
         currentArch = arch.flags_x86_64()
         archKey = arch.FlavorPreferences._getCurrentArchIS(currentArch)
-        self.failUnlessEqual(archKey, 'x86 x86_64')
+        self.assertEqual(archKey, 'x86 x86_64')
 
     def testGetMajorArch(self):
         deplist = deps.parseFlavor('is: x86 x86_64').iterDepsByClass(
             deps.InstructionSetDependency)
-        self.failUnlessEqual(arch.getMajorArch(deplist).name, 'x86_64')
+        self.assertEqual(arch.getMajorArch(deplist).name, 'x86_64')
 
         deplist = deps.parseFlavor('is: x86 ppc').iterDepsByClass(
             deps.InstructionSetDependency)
-        self.failUnlessRaises(arch.IncompatibleInstructionSets,
+        self.assertRaises(arch.IncompatibleInstructionSets,
                               arch.getMajorArch, deplist)

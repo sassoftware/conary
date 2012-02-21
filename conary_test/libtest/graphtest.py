@@ -65,29 +65,29 @@ class GraphTest(testhelp.TestCase):
         g.addEdge('c','b')
         g.addEdge('c','d')
         starts, finishes, trees, pred, depth = g.doBFS(start='a')
-        self.failUnlessEqual([ starts[x] for x in [ a, b, c, d ] ],
+        self.assertEqual([ starts[x] for x in [ a, b, c, d ] ],
             [0, 1, 3, 5])
-        self.failUnlessEqual([ finishes[x] for x in [ a, b, c, d ] ],
+        self.assertEqual([ finishes[x] for x in [ a, b, c, d ] ],
             [2, 4, 6, 7])
         assert(len(trees) == 1)
-        self.failUnlessEqual(depth[a], 0)
-        self.failUnlessEqual(depth[b], 1)
-        self.failUnlessEqual(depth[c], 2)
-        self.failUnlessEqual(depth[d], 3)
+        self.assertEqual(depth[a], 0)
+        self.assertEqual(depth[b], 1)
+        self.assertEqual(depth[c], 2)
+        self.assertEqual(depth[d], 3)
 
         starts, finishes, trees, pred, depth = g.doBFS(start='b')
-        self.failUnlessEqual([ starts[x] for x in [ a, b, c, d ] ],
+        self.assertEqual([ starts[x] for x in [ a, b, c, d ] ],
             [6, 0, 1, 3])
-        self.failUnlessEqual([ finishes[x] for x in [ a, b, c, d ] ],
+        self.assertEqual([ finishes[x] for x in [ a, b, c, d ] ],
             [7, 2, 4, 5])
 
         assert(len(trees) == 2)
         assert(len(trees[a]) == 1)
         assert(len(trees[b]) == 3)
-        self.failUnlessEqual(depth[a], 0)
-        self.failUnlessEqual(depth[b], 0)
-        self.failUnlessEqual(depth[c], 1)
-        self.failUnlessEqual(depth[d], 2)
+        self.assertEqual(depth[a], 0)
+        self.assertEqual(depth[b], 0)
+        self.assertEqual(depth[c], 1)
+        self.assertEqual(depth[d], 2)
 
     def testDynamicBFS(self):
         # Dynamic graphs (the graph structure is not known in advance)
@@ -122,45 +122,45 @@ class GraphTest(testhelp.TestCase):
         starts, finishes, trees, pred, depth = g.doBFS(start='a',
             getChildrenCallback = getChildrenCallback)
 
-        self.failUnless(len([ x for x in g.iterNodes()]), 13)
-        self.failIf(g.getIndex('a') in pred)
-        self.failUnlessEqual(pred[g.getIndex('b')], g.getIndex('a'))
-        self.failUnlessEqual(pred[g.getIndex('c')], g.getIndex('a'))
-        self.failUnlessEqual(pred[g.getIndex('d')], g.getIndex('a'))
+        self.assertTrue(len([ x for x in g.iterNodes()]), 13)
+        self.assertFalse(g.getIndex('a') in pred)
+        self.assertEqual(pred[g.getIndex('b')], g.getIndex('a'))
+        self.assertEqual(pred[g.getIndex('c')], g.getIndex('a'))
+        self.assertEqual(pred[g.getIndex('d')], g.getIndex('a'))
 
-        self.failUnlessEqual(pred[g.getIndex('e')], g.getIndex('b'))
-        self.failUnlessEqual(pred[g.getIndex('f')], g.getIndex('b'))
+        self.assertEqual(pred[g.getIndex('e')], g.getIndex('b'))
+        self.assertEqual(pred[g.getIndex('f')], g.getIndex('b'))
 
-        self.failUnlessEqual(pred[g.getIndex('g')], g.getIndex('c'))
-        self.failUnlessEqual(pred[g.getIndex('h')], g.getIndex('c'))
+        self.assertEqual(pred[g.getIndex('g')], g.getIndex('c'))
+        self.assertEqual(pred[g.getIndex('h')], g.getIndex('c'))
 
-        self.failUnlessEqual(pred[g.getIndex('i')], g.getIndex('e'))
-        self.failUnlessEqual(pred[g.getIndex('j')], g.getIndex('i'))
-        self.failUnlessEqual(pred[g.getIndex('k')], g.getIndex('j'))
+        self.assertEqual(pred[g.getIndex('i')], g.getIndex('e'))
+        self.assertEqual(pred[g.getIndex('j')], g.getIndex('i'))
+        self.assertEqual(pred[g.getIndex('k')], g.getIndex('j'))
 
-        self.failUnlessEqual(depth[g.getIndex('a')], 0)
-        self.failUnlessEqual(depth[g.getIndex('b')], 1)
-        self.failUnlessEqual(depth[g.getIndex('c')], 1)
+        self.assertEqual(depth[g.getIndex('a')], 0)
+        self.assertEqual(depth[g.getIndex('b')], 1)
+        self.assertEqual(depth[g.getIndex('c')], 1)
         for i in ['e', 'f', 'g', 'h']:
-            self.failUnlessEqual(depth[g.getIndex(i)], 2)
-        self.failUnlessEqual(depth[g.getIndex('i')], 3)
-        self.failUnlessEqual(depth[g.getIndex('j')], 4)
-        self.failUnlessEqual(depth[g.getIndex('k')], 5)
+            self.assertEqual(depth[g.getIndex(i)], 2)
+        self.assertEqual(depth[g.getIndex('i')], 3)
+        self.assertEqual(depth[g.getIndex('j')], 4)
+        self.assertEqual(depth[g.getIndex('k')], 5)
 
         # Same thing, but limit the depth
         initialized.clear()
         starts, finishes, trees, pred, depth = g.doBFS(start='a',
             getChildrenCallback = getChildrenCallback, depthLimit = 3)
-        self.failUnlessEqual(len(trees), 1)
+        self.assertEqual(len(trees), 1)
 
-        self.failUnlessEqual(depth[g.getIndex('a')], 0)
-        self.failUnlessEqual(depth[g.getIndex('b')], 1)
-        self.failUnlessEqual(depth[g.getIndex('c')], 1)
+        self.assertEqual(depth[g.getIndex('a')], 0)
+        self.assertEqual(depth[g.getIndex('b')], 1)
+        self.assertEqual(depth[g.getIndex('c')], 1)
         for i in ['e', 'f', 'g', 'h']:
-            self.failUnlessEqual(depth[g.getIndex(i)], 2)
-        self.failUnlessEqual(depth[g.getIndex('i')], 3)
-        self.failIf(g.getIndex('j') in pred)
-        self.failIf(g.getIndex('k') in pred)
+            self.assertEqual(depth[g.getIndex(i)], 2)
+        self.assertEqual(depth[g.getIndex('i')], 3)
+        self.assertFalse(g.getIndex('j') in pred)
+        self.assertFalse(g.getIndex('k') in pred)
 
     def testSCC(self):
         g = graph.DirectedGraph()
@@ -206,7 +206,7 @@ class GraphTest(testhelp.TestCase):
         g.addNode('f')
         g.addEdge('e', 'f')
         g.addEdge('f', 'a')
-        self.failUnlessRaises(graph.BackEdgeError, g.getTotalOrdering, nodeSort)
+        self.assertRaises(graph.BackEdgeError, g.getTotalOrdering, nodeSort)
 
         g.delete('f')
 

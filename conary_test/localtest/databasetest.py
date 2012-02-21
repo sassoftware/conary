@@ -41,7 +41,7 @@ class Database(testhelp.TestCase):
 
     def testFindTrove(self):
         db = database.Database(':memory:', ':memory:')
-        self.failUnlessEqual(db.getTransactionCounter(), 0)
+        self.assertEqual(db.getTransactionCounter(), 0)
         flavor = deps.parseFlavor('~readline,!foo')
         v10 = ThawVersion("/conary.rpath.com@test:trunk/10:1.2-10-1")
         f1 = files.FileFromFilesystem("/etc/passwd", self.id1)
@@ -69,9 +69,9 @@ class Database(testhelp.TestCase):
         assert(db.findTrove([Label('conary.rpath.com@blah:foo')], 
                             ('testcomp', '@test:trunk', None)) == tup)
         # Transaction counter changes upon commit
-        self.failUnlessEqual(db.getTransactionCounter(), 0)
+        self.assertEqual(db.getTransactionCounter(), 0)
         db.commit()
-        self.failUnlessEqual(db.getTransactionCounter(), 1)
+        self.assertEqual(db.getTransactionCounter(), 1)
 
     def testIntermediateDirNotWritable(self):
         # CNY-2405
@@ -81,7 +81,7 @@ class Database(testhelp.TestCase):
             try:
                 db = database.Database(d, '/var/lib/conarydb/conarydb')
             except database.OpenError, e:
-                self.failUnlessEqual(str(e),
+                self.assertEqual(str(e),
                        'Unable to open database %s/var/lib/conarydb/conarydb: '
                        'cannot create directory %s/var/lib' % (d, d))
         finally:
@@ -98,7 +98,7 @@ class Database(testhelp.TestCase):
             try:
                 db = database.Database(fn, '/var/lib/conarydb/conarydb')
             except database.OpenError, e:
-                self.failUnlessEqual(str(e),
+                self.assertEqual(str(e),
                        'Unable to open database %s/var/lib/conarydb/conarydb: '
                        '%s is not a directory' % (fn, fn))
         finally:
@@ -113,7 +113,7 @@ class Database(testhelp.TestCase):
             try:
                 db = database.Database(d, '/var/lib/conarydb/conarydb')
             except database.OpenError, e:
-                self.failUnlessEqual(str(e),
+                self.assertEqual(str(e),
                        'Unable to open database %s/var/lib/conarydb/conarydb: '
                        '%s/var is not a directory' % (d, d))
         finally:
@@ -131,7 +131,7 @@ class Database(testhelp.TestCase):
             try:
                 db.iterAllTroves()
             except errors.DatabaseLockedError, e:
-                self.failUnlessEqual(str(e), "The local database is locked.  It is possible that a database journal file exists that needs to be rolled back, but you don't have write permission to the database.")
+                self.assertEqual(str(e), "The local database is locked.  It is possible that a database journal file exists that needs to be rolled back, but you don't have write permission to the database.")
             except:
                 self.fail('unexpected exception')
             else:
@@ -186,7 +186,7 @@ class Database(testhelp.TestCase):
         tmout = 12345
         try:
             db = database.Database(d, '/conarydb', timeout = tmout)
-            self.failUnlessEqual(db.db.timeout, tmout)
+            self.assertEqual(db.db.timeout, tmout)
         finally:
             shutil.rmtree(d)
 
@@ -195,7 +195,7 @@ class Database(testhelp.TestCase):
         jobFile = os.path.join(resources.get_archive(), "job-invocation")
         uJob = database.UpdateJob(None)
         uJob.loadInvocationInfo(jobFile)
-        self.failUnlessEqual(uJob.getItemList(),
+        self.assertEqual(uJob.getItemList(),
             [('group-appliance', (None, None), (None, None), True)])
 
     def testEnsureReadableRollbacks(self):
@@ -220,13 +220,13 @@ class Database(testhelp.TestCase):
 class UpdateFeaturesTest(testhelp.TestCase):
     def testSetUpdateFeatures(self):
         ft = database.UpdateJobFeatures()
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, True)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, True)
 
         ft.setAll(False)
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, False)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, False)
 
         ft.setAll(True)
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, True)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, True)
 
     def testUpdateFeaturesLoadSave(self):
         fd, fpath = tempfile.mkstemp()
@@ -237,36 +237,36 @@ class UpdateFeaturesTest(testhelp.TestCase):
 
         # Loading from a file that doesn't exist - flags should be unset
         ft.loadFromFile(fpath)
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, False)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, False)
 
         # No flags set
         ft.setAll(False)
         ft.saveToFile(fpath)
-        self.failUnlessEqual(file(fpath).read(), "")
+        self.assertEqual(file(fpath).read(), "")
 
         # Empty file means no flags set
         ft = database.UpdateJobFeatures()
         ft.loadFromFile(fpath)
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, False)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, False)
 
         # Saving to a bad file
         ft = database.UpdateJobFeatures()
-        self.failUnlessRaises(IOError, ft.saveToFile, "/some/path")
+        self.assertRaises(IOError, ft.saveToFile, "/some/path")
 
         ft.saveToFile(fpath)
-        self.failUnless(os.path.exists(fpath))
-        self.failUnlessEqual(file(fpath).readline().strip(),
+        self.assertTrue(os.path.exists(fpath))
+        self.assertEqual(file(fpath).readline().strip(),
                             "postRollbackScriptsOnRollbackStack")
 
         # Munge permissions
         os.chmod(fpath, 0)
         ft.loadFromFile(fpath)
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, False)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, False)
 
         # Munge permissions back
         os.chmod(fpath, 0644)
         ft.loadFromFile(fpath)
-        self.failUnlessEqual(ft.postRollbackScriptsOnRollbackStack, True)
+        self.assertEqual(ft.postRollbackScriptsOnRollbackStack, True)
 
         os.unlink(fpath)
 
@@ -287,8 +287,8 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
 
         uJob = database.UpdateJob(db)
         uJob.thaw(self.workDir)
-        self.failUnlessEqual(uJob._jobPreScriptsByJob, None)
-        self.failUnlessEqual(uJob.getTransactionCounter(), 100)
+        self.assertEqual(uJob._jobPreScriptsByJob, None)
+        self.assertEqual(uJob.getTransactionCounter(), 100)
         shutil.rmtree(self.workDir); os.mkdir(self.workDir)
 
         uJob = database.UpdateJob(db)
@@ -304,7 +304,7 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
 
         uJob = database.UpdateJob(db)
         uJob.thaw(self.workDir)
-        self.failUnlessEqual(uJob._jobPreScriptsByJob, [
+        self.assertEqual(uJob._jobPreScriptsByJob, [
             [(0, [0, 1]), (1, [2, 3])],
             [(10, [10, 11]), (11, [12, 13])],
             [(20, [20, 21]), (21, [22, 23])],
@@ -330,8 +330,8 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
 
         uJob = database.UpdateJob(db)
         uJob.thaw(self.workDir)
-        self.failUnlessEqual(uJob.getTransactionCounter(), 100)
-        self.failUnlessEqual(uJob._jobPreScriptsAlreadyRun,
+        self.assertEqual(uJob.getTransactionCounter(), 100)
+        self.assertEqual(uJob._jobPreScriptsAlreadyRun,
             set(runScripts))
 
     def testFreezeThawTroveMap(self):
@@ -357,11 +357,11 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
 
         uJob = database.UpdateJob(db)
         uJob.thaw(self.workDir)
-        self.failUnlessEqual(uJob.getTransactionCounter(), 100)
-        self.failUnlessEqual(set(uJob._troveMap.keys()), expKeys)
-        self.failUnlessEqual(trv1.diff(None)[0].freeze(),
+        self.assertEqual(uJob.getTransactionCounter(), 100)
+        self.assertEqual(set(uJob._troveMap.keys()), expKeys)
+        self.assertEqual(trv1.diff(None)[0].freeze(),
             uJob._troveMap[nvf1].diff(None)[0].freeze())
-        self.failUnlessEqual(trv2.diff(None)[0].freeze(),
+        self.assertEqual(trv2.diff(None)[0].freeze(),
             uJob._troveMap[nvf2].diff(None)[0].freeze())
 
     def testUpdateJobiterJobPreScriptsForJobSet(self):
@@ -394,10 +394,10 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
             [(0, [4]), (1, [5])],
         ]
         ret = list(uJob.iterJobPreScriptsForJobSet(0))
-        self.failUnlessEqual(ret, [ sc7, sc1, sc3, sc5 ])
+        self.assertEqual(ret, [ sc7, sc1, sc3, sc5 ])
 
         ret = list(uJob.iterJobPreScriptsForJobSet(1))
-        self.failUnlessEqual(ret, [ sc8, sc2, sc4, sc6 ])
+        self.assertEqual(ret, [ sc8, sc2, sc4, sc6 ])
 
         # Trigger an AssertionError
         uJob._jobPreScriptsByJob = [
@@ -406,13 +406,13 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
             [],
             []
         ]
-        self.failUnlessRaises(AssertionError,
+        self.assertRaises(AssertionError,
             list, uJob.iterJobPreScriptsForJobSet(0))
 
         # No data
         uJob._jobPreScriptsByJob = None
         ret = list(uJob.iterJobPreScriptsForJobSet(0))
-        self.failUnlessEqual(ret, [])
+        self.assertEqual(ret, [])
 
 class UpdateJobTests(testhelp.TestCase):
     def testClose(self):
@@ -424,7 +424,7 @@ class UpdateJobTests(testhelp.TestCase):
 
         uJob = database.UpdateJob(dbobj)
         uJob.close()
-        self.failUnlessEqual(dbobj._db, None)
+        self.assertEqual(dbobj._db, None)
 
         # We close correctly even if the search source object doesn't have a
         # db property
@@ -434,7 +434,7 @@ class UpdateJobTests(testhelp.TestCase):
             pass
         uJob.setSearchSource(MockSearchSource())
         uJob.close()
-        self.failUnlessEqual(dbobj._db, None)
+        self.assertEqual(dbobj._db, None)
 
         # or the property is None
         uJob = database.UpdateJob(dbobj)
@@ -442,7 +442,7 @@ class UpdateJobTests(testhelp.TestCase):
             db = None
         uJob.setSearchSource(MockSearchSource())
         uJob.close()
-        self.failUnlessEqual(dbobj._db, None)
+        self.assertEqual(dbobj._db, None)
 
         # ... or real
         uJob = database.UpdateJob(dbobj)
@@ -451,5 +451,5 @@ class UpdateJobTests(testhelp.TestCase):
             db = dbobj2
         uJob.setSearchSource(MockSearchSource())
         uJob.close()
-        self.failUnlessEqual(dbobj._db, None)
-        self.failUnlessEqual(dbobj2._db, None)
+        self.assertEqual(dbobj._db, None)
+        self.assertEqual(dbobj2._db, None)

@@ -55,27 +55,27 @@ class MagicTest(rephelp.RepositoryHelper):
             pn, pe, pv, pr, pa, isSource, summary, description, license = data
             fpath = os.path.join(resources.get_archive(), pkg)
             m = magic.magic(fpath)
-            self.failUnlessEqual(m.contents['name'], pn)
-            self.failUnlessEqual(m.contents['version'], pv)
-            self.failUnlessEqual(m.contents['release'], pr)
-            self.failUnlessEqual(m.contents['arch'], pa)
-            self.failUnlessEqual(m.contents['epoch'], pe)
-            self.failUnlessEqual(m.contents['isSource'], isSource)
-            self.failUnlessEqual(m.contents['summary'], summary)
-            self.failUnlessEqual(m.contents['description'], description)
-            self.failUnlessEqual(m.contents['license'], license)
+            self.assertEqual(m.contents['name'], pn)
+            self.assertEqual(m.contents['version'], pv)
+            self.assertEqual(m.contents['release'], pr)
+            self.assertEqual(m.contents['arch'], pa)
+            self.assertEqual(m.contents['epoch'], pe)
+            self.assertEqual(m.contents['isSource'], isSource)
+            self.assertEqual(m.contents['summary'], summary)
+            self.assertEqual(m.contents['description'], description)
+            self.assertEqual(m.contents['license'], license)
 
     def testCarArchive(self):
         # for now, just make sure we don't treat them as zip
         m = magic.magic(os.path.join(resources.get_archive(), 'Transmitter.car'))
         if sys.version_info[:2] == (2, 6):
-            self.failIf(m is None)
+            self.assertFalse(m is None)
         else:
-            self.failUnlessEqual(m, None)
+            self.assertEqual(m, None)
 
     def testDeb(self):
         m = magic.magic(os.path.join(resources.get_archive(), 'bash.deb'))
-        self.failUnless(isinstance(m, magic.deb))
+        self.assertTrue(isinstance(m, magic.deb))
 
     def testJavaMagic(self):
         def _p(fpath):
@@ -107,18 +107,18 @@ class MagicTest(rephelp.RepositoryHelper):
 
         for fpath, expClass, metadata in tests:
             m = magic.magic(fpath)
-            self.failUnlessEqual(m.__class__, expClass)
+            self.assertEqual(m.__class__, expClass)
             if not metadata:
                 continue
             displayName, description = metadata
-            self.failUnlessEqual(m.contents['displayName'], displayName)
+            self.assertEqual(m.contents['displayName'], displayName)
             if description is not None:
-                self.failUnlessEqual(m.contents['description'], description)
+                self.assertEqual(m.contents['description'], description)
 
     def testEARErrors(self):
         # No zip file object
-        e = self.failUnlessRaises(ValueError, magic.EAR, '/dev/null')
-        self.failUnlessEqual(str(e), "Expected a Zip file object")
+        e = self.assertRaises(ValueError, magic.EAR, '/dev/null')
+        self.assertEqual(str(e), "Expected a Zip file object")
         # Dummy ear file
         fdir = os.path.join(self.workDir, "somedir")
         metainfDir = os.path.join(fdir, "META-INF")
@@ -133,8 +133,8 @@ class MagicTest(rephelp.RepositoryHelper):
 
         z = zipfile.ZipFile(zipfilename)
         e = magic.EAR(zipfilename, '', z, set(ddRelPath))
-        self.failIf('displayName' in e.contents)
-        self.failIf('description' in e.contents)
+        self.assertFalse('displayName' in e.contents)
+        self.assertFalse('description' in e.contents)
         z.close()
 
     def testGzipFile(self):

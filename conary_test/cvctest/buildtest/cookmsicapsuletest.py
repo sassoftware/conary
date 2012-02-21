@@ -68,17 +68,17 @@ class TestCookWithMSICapsule(CapsuleRecipe):
 
         ti = [ tcs.getTroveInfo() for tcs in cs.iterNewTroveList()
                if tcs.name() == 'foo:msi'][0]
-        self.failUnlessEqual(ti.capsule.msi.name(),
+        self.assertEqual(ti.capsule.msi.name(),
                              fakeWinHelper.productName)
-        self.failUnlessEqual(ti.capsule.msi.version(),
+        self.assertEqual(ti.capsule.msi.version(),
                              fakeWinHelper.version)
-        self.failUnlessEqual(ti.capsule.msi.platform(),
+        self.assertEqual(ti.capsule.msi.platform(),
                              fakeWinHelper.platform)
-        self.failUnlessEqual(ti.capsule.msi.productCode(),
+        self.assertEqual(ti.capsule.msi.productCode(),
                              fakeWinHelper.productCode)
-        self.failUnlessEqual(ti.capsule.msi.upgradeCode(),
+        self.assertEqual(ti.capsule.msi.upgradeCode(),
                              fakeWinHelper.upgradeCode)
-        self.failUnlessEqual(ti.capsule.msi.msiArgs(),
+        self.assertEqual(ti.capsule.msi.msiArgs(),
                              '/q /l*v /i')
 
         self.assertEquals(pkgNames, [pkgName, pkgName +':msi'])

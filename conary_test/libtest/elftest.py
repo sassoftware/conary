@@ -94,18 +94,18 @@ class ElfTest(testhelp.TestCase):
             fname = os.path.join(libPath, soPrefix + '.so')
             syms = elf.getDynSym(fname)
             initfunc = 'init' + os.path.basename(soPrefix)
-            self.failUnless(initfunc in syms,
+            self.assertTrue(initfunc in syms,
                             "%s not in %s" % (initfunc, syms))
 
         # Not a python module
         fname = os.path.join(libPath, 'filename_wrapper.so')
         if os.path.exists(fname):
             syms = elf.getDynSym(fname)
-            self.failUnless('chdir' in syms)
+            self.assertTrue('chdir' in syms)
 
         # Grab a random, non-.so file, expect an error
         fname = os.path.join(resources.get_archive(), 'basesystem-8.0-2.src.rpm')
-        self.failUnlessRaises(elf.error, elf.getDynSym, fname)
+        self.assertRaises(elf.error, elf.getDynSym, fname)
 
     def testPrelink(self):
         archiveDir = resources.get_archive()

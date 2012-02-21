@@ -173,15 +173,15 @@ class MirrorTest(rephelp.RepositoryHelper):
                                              troveTypes = netclient.TROVE_QUERY_ALL)
         troveL1 = self._flatten(troveD1)
         troveL2 = self._flatten(troveD2)
-        self.failUnlessEqual(troveL1, troveL2)
+        self.assertEqual(troveL1, troveL2)
 
         troves1 = repos1.getTroves(troveL1)
         troves2 = repos2.getTroves(troveL2)
-        self.failUnlessEqual(troves1, troves2)
+        self.assertEqual(troves1, troves2)
 
         pgpKeys1 = repos1.getNewPGPKeys("localhost", -1)
         pgpKeys2 = repos2.getNewPGPKeys("localhost", -1)
-        self.failUnlessEqual(set(pgpKeys1), set(pgpKeys2))
+        self.assertEqual(set(pgpKeys1), set(pgpKeys2))
 
     @skipproxy
     def testMirrorOptions(self):
@@ -243,7 +243,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         mirrorFile = self.createConfigurationFile()
         self.createTroves(sourceRepos, 1,1)
         # repos should be different
-        self.failUnlessRaises(AssertionError, self.compareRepositories,
+        self.assertRaises(AssertionError, self.compareRepositories,
                           sourceRepos, targetRepos)
         self.runMirror(mirrorFile)
         self.compareRepositories(sourceRepos, targetRepos)
@@ -251,7 +251,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         sourceRepos.addNewAsciiPGPKey(self.cfg.buildLabel, 'test', sigtest.unexpiredKey)
         self.cfg.signatureKey = '7CCD34B5C5D9CD1F637F6743D4F8F127C267B79D'
         signtrove.signTroves(self.cfg, [ "test1:runtime" ])
-        self.failUnlessRaises(AssertionError, self.compareRepositories,
+        self.assertRaises(AssertionError, self.compareRepositories,
                           sourceRepos, targetRepos)
         self.runMirror(mirrorFile)
         self.compareRepositories(sourceRepos, targetRepos)
@@ -265,7 +265,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         tl = sourceRepos.getTroveVersionList("localhost", {"test1:runtime":None})
         tl = self._flatten(tl)
         sourceRepos.setTroveInfo(zip(tl, [ti] * len(tl)))
-        self.failUnlessRaises(AssertionError, self.compareRepositories,
+        self.assertRaises(AssertionError, self.compareRepositories,
                           sourceRepos, targetRepos)
         self.runMirror(mirrorFile)
         self.compareRepositories(sourceRepos, targetRepos)
@@ -282,10 +282,10 @@ class MirrorTest(rephelp.RepositoryHelper):
         self.runMirror(mirrorFile)
         src = sourceRepos.getTroveVersionList("localhost", { None : None })
         src = self._flatten(src)
-        self.failUnlessEqual(len(src), 6)
+        self.assertEqual(len(src), 6)
         dst = targetRepos.getTroveVersionList("localhost", { None : None })
         dst = self._flatten(dst)
-        self.failUnlessEqual(len(dst), 2)
+        self.assertEqual(len(dst), 2)
         # test mirroring signatures
         sourceRepos.addNewAsciiPGPKey(self.cfg.buildLabel, 'test', sigtest.unexpiredKey)
         self.cfg.signatureKey = '7CCD34B5C5D9CD1F637F6743D4F8F127C267B79D'
@@ -295,7 +295,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         self.runMirror(mirrorFile)
         troves1 = sourceRepos.getTroves(dst)
         troves2 = targetRepos.getTroves(dst)
-        self.failUnlessEqual(troves1, troves2)
+        self.assertEqual(troves1, troves2)
                                 
     @skipproxy
     def testMirrorInfo(self):
@@ -329,7 +329,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         for tidx in (21, 20, 10):
             t = "test%d:runtime" % tidx
             sourceRepos.setTroveInfo([((t, tl[t][0], tl[t][1]), ti)])
-            self.failUnlessRaises(AssertionError, self.compareRepositories,
+            self.assertRaises(AssertionError, self.compareRepositories,
                                   sourceRepos, targetRepos)
             if tidx == 10:
                 self.createTroves(sourceRepos, 30, 10, "3.0")
@@ -343,7 +343,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         for tidx in (21, 20, 10):
             t = "test%d:runtime" % tidx
             sourceRepos.addMetadataItems([((t,tl[t][0],tl[t][1]), mi)])
-            self.failUnlessRaises(AssertionError, self.compareRepositories,
+            self.assertRaises(AssertionError, self.compareRepositories,
                                   sourceRepos, targetRepos)
             if tidx == 10:
                 self.createTroves(sourceRepos, 40, 10, "3.1")
@@ -416,7 +416,7 @@ class MirrorTest(rephelp.RepositoryHelper):
             tl = repo.getTroveVersionList("localhost", { None : None },
                                           troveTypes = netclient.TROVE_QUERY_ALL)
             tl = self._flatten(tl)
-            self.failUnlessEqual(len(tl), count)
+            self.assertEqual(len(tl), count)
         # add troves that should not be mirrored
         self.createTroves(sourceRepos, 1, 5)
         # nothing should have made it in the target
@@ -608,14 +608,14 @@ class MirrorTest(rephelp.RepositoryHelper):
         self.mirrorRepositoryRun = False
         def mockedMirrorRepository(*args, **kwargs):
             callback = kwargs['callback']
-            self.failUnless(hasattr(callback, 'missingFiles'))
+            self.assertTrue(hasattr(callback, 'missingFiles'))
             self.mirrorRepositoryRun = True
             return oldMirrorRepository(*args, **kwargs)
 
         try:
             mirror.mirrorRepository = mockedMirrorRepository
             self.runMirror(mirrorFile)
-            self.failUnless(self.mirrorRepositoryRun)
+            self.assertTrue(self.mirrorRepositoryRun)
         finally:
             mirror.mirrorRepository = oldMirrorRepository
             del self.mirrorRepositoryRun
@@ -631,7 +631,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         # test11 should not have made it through
         dstDict = dst.getTroveVersionList("localhost", { None : None },
                                           troveTypes = netclient.TROVE_QUERY_ALL)
-        self.failUnless(set(dstDict.keys()) == set(["test10", "test10:runtime", "group-test"]))
+        self.assertTrue(set(dstDict.keys()) == set(["test10", "test10:runtime", "group-test"]))
         # add test11 and mirror again
         self.addCollection("group-test", "11", [("test10", "1.0"), ("test11", "1.0")], repos=src)
         self.runMirror(mirrorFile)
@@ -650,14 +650,14 @@ class MirrorTest(rephelp.RepositoryHelper):
         dst1 = self.getRepositoryClient("nomirror", "nomirror", serverIdx=1)
         self.createTroves(src, 10, 2)
         self.createTroves(src1, 20, 2)
-        self.failUnlessRaises(AssertionError, self.compareRepositories, src, dst)
+        self.assertRaises(AssertionError, self.compareRepositories, src, dst)
         # this needs to raise an assertionerror before insufficient permission
-        self.failUnlessRaises(AssertionError, self.compareRepositories, src1, dst1)
+        self.assertRaises(AssertionError, self.compareRepositories, src1, dst1)
 
         # test acess permissions
-        self.failUnlessRaises(errors.InsufficientPermission, mirror.mirrorRepository,
+        self.assertRaises(errors.InsufficientPermission, mirror.mirrorRepository,
                               src1, dst, cfg)
-        self.failUnlessRaises(errors.InsufficientPermission, mirror.mirrorRepository,
+        self.assertRaises(errors.InsufficientPermission, mirror.mirrorRepository,
                               src, dst1, cfg)
         mirror.mirrorRepository(src, dst, cfg)
         self.compareRepositories(src, dst)
@@ -778,7 +778,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         self.createTroves(src, 10, 2, "myotherhost@src:2/2.0")
         s1 = src.getTroveVersionList("myhost", { None : None })
         s2 = src.getTroveVersionList("myotherhost", { None : None })
-        self.failUnlessEqual(s1.keys(), s2.keys())
+        self.assertEqual(s1.keys(), s2.keys())
         # add a group that includes troves from both repos
         trv = self.addCollection("group-test", "myhost@src:test/10", [
             ("test10", "myhost@src:1/1.0"),
@@ -792,8 +792,8 @@ class MirrorTest(rephelp.RepositoryHelper):
         cfg.host = "myhost"
         cfg.labels = [versions.Label("myhost@src:test")]
         cfg.recurseGroups = True
-        self.failUnlessEqual(dst.getTroveVersionList("myhost", {None:None}), {})
-        self.failUnlessEqual(dst.getTroveVersionList("myotherhost", {None:None}), {})
+        self.assertEqual(dst.getTroveVersionList("myhost", {None:None}), {})
+        self.assertEqual(dst.getTroveVersionList("myotherhost", {None:None}), {})
         def _getTroves(src, dst):
             # check if we mirrored everything in the target
             s1 = src.getTroveVersionList("myhost", {None:None})
@@ -806,10 +806,10 @@ class MirrorTest(rephelp.RepositoryHelper):
             return (s,d)
         self._runMirrorCfg(src,dst,cfg)
         s,d = _getTroves(src, dst)
-        self.failUnlessEqual(len(d), 5)
-        self.failUnlessEqual(len(s), 9)
+        self.assertEqual(len(d), 5)
+        self.assertEqual(len(s), 9)
         # test11 troves should not have made it over
-        self.failUnlessEqual(len([x for x in d if x[0].startswith("test11")]), 0)
+        self.assertEqual(len([x for x in d if x[0].startswith("test11")]), 0)
         # add a new set of troves and check that they're mirrored over
         self.createTroves(src, 10, 2, "myhost@src:1/1.1")
         self.createTroves(src, 10, 2, "myotherhost@src:2/2.1")
@@ -818,12 +818,12 @@ class MirrorTest(rephelp.RepositoryHelper):
             ("test10", "myotherhost@src:2/2.1")], repos=src)
         self._runMirrorCfg(src,dst,cfg)
         s,d = _getTroves(src, dst)
-        self.failUnlessEqual(len(s), 18)
-        self.failUnlessEqual(len(d), 10)
+        self.assertEqual(len(s), 18)
+        self.assertEqual(len(d), 10)
         # test11 troves should not have made it over
-        self.failUnlessEqual(len([x for x in d if x[0].startswith("test11")]), 0)
+        self.assertEqual(len([x for x in d if x[0].startswith("test11")]), 0)
         for x in d:
-            self.failUnless(x in s)
+            self.assertTrue(x in s)
 
     @skipproxy
     def testUnchangedConfigFileMirrorSingleRepos(self):

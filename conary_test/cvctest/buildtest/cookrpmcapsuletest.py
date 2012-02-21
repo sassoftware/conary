@@ -78,7 +78,7 @@ class TestCookWithRPMCapsule(CapsuleRecipe):
         r.addCapsule('brltty-3.7.2-1.fc6.1.i386.rpm')
         r.addCapsule('brltty-3.7.2-1.fc6.1.i386.rpm')
 """
-        self.failUnlessRaises(source.SourceError, self._cookAndInstall,
+        self.assertRaises(source.SourceError, self._cookAndInstall,
                               recipestr, 'brltty-3.7.2-1.fc6.1.i386.rpm',
                               'brltty')
 
@@ -1190,9 +1190,9 @@ class Test(CapsuleRecipe):
 """
         self.mock(source.addCapsule, '_doDownloadPublicKey',
             lambda slf, x: None)
-        e = self.failUnlessRaises(source.SourceError,
+        e = self.assertRaises(source.SourceError,
             self.buildRecipe, recipestr, 'Test')
-        self.failUnlessEqual(str(e), "Failed to retrieve PGP key aabbccdd")
+        self.assertEqual(str(e), "Failed to retrieve PGP key aabbccdd")
 
     def testCookRPMCapsuleSigVerifyWrongKey(self):
         recipestr = """
@@ -1210,9 +1210,9 @@ class Test(CapsuleRecipe):
 
         self.mock(source.addCapsule, '_doDownloadPublicKey',
             lambda slf, x: pgpKey1)
-        e = self.failUnlessRaises(source.SourceError,
+        e = self.assertRaises(source.SourceError,
             self.buildRecipe, recipestr, 'Test')
-        self.failUnlessEqual(str(e), "Signature generated with key "
+        self.assertEqual(str(e), "Signature generated with key "
         "A8A447DCE8562897 does not match valid keys EFA3924DAE07E378")
 
     def testCookRPMCapsuleSigVerify(self):

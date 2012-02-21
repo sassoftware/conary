@@ -971,17 +971,17 @@ Job 3 of 3:
         self.addDbComponent(db, 'test1:runtime', '/localhost@local:runtime/1.0-1-1')
         self.addDbComponent(db, 'test2:runtime', '/localhost@foo:runtime/1.0-1-1')
         rc, s = self.captureOutput(updatecmd.updateAll, self.cfg, showItems=True)
-        self.failUnlessEqual(s, 'test2:runtime\n')
+        self.assertEqual(s, 'test2:runtime\n')
         # same deal, but show labels too (CNY-3138)
         self.cfg.showLabels = True
         rc, s = self.captureOutput(updatecmd.updateAll, self.cfg, showItems=True)
-        self.failUnlessEqual(s, 'test2:runtime=localhost@foo:runtime/1.0-1-1\n')
+        self.assertEqual(s, 'test2:runtime=localhost@foo:runtime/1.0-1-1\n')
 
         self.cfg.fullVersions = True
         rc, s = self.captureOutput(updatecmd.updateAll, self.cfg, showItems=True)
-        self.failUnlessEqual(s, 'test2:runtime=/localhost@foo:runtime/1.0-1-1\n')
+        self.assertEqual(s, 'test2:runtime=/localhost@foo:runtime/1.0-1-1\n')
         self.cfg.fullFlavors = True
-        self.failUnlessEqual(s, 'test2:runtime=/localhost@foo:runtime/1.0-1-1\n')
+        self.assertEqual(s, 'test2:runtime=/localhost@foo:runtime/1.0-1-1\n')
 
     @context('sysmodel')
     def testUpdateAllPrintModel(self):
@@ -1160,7 +1160,7 @@ Job 4 of 4:
                                restartInfo=e.data)
         else:
             assert 0, 'did not get reexec request'
-        self.failIf(os.path.exists(myfile),
+        self.assertFalse(os.path.exists(myfile),
             "preupdate script got executed on install")
 
         rc, txt = self.captureOutput(self.updatePkg, 'group-dist=2',
@@ -1190,11 +1190,11 @@ Job 4 of 4:
                 self.discardOutput(self.updatePkg, 'group-dist=2', 
                                    raiseError=True)
             except errors.ReexecRequired, e:
-                self.failUnless(os.path.exists(myfile),
+                self.assertTrue(os.path.exists(myfile),
                     "preupdate script was not executed")
                 self.discardOutput(self.updatePkg, 'group-dist=2', 
                                    raiseError=True, restartInfo=e.data)
-                self.failUnless(os.path.exists(myfile),
+                self.assertTrue(os.path.exists(myfile),
                     "marker file mysteriously went away")
             else:
                 assert 0, 'did not get reexec request'
@@ -1215,14 +1215,14 @@ The following dependencies could not be resolved:
             self.discardOutput(self.updatePkg, 'group-dist=3', 
                                raiseError=True, info=True)
         except errors.ConaryError, e:
-            self.failUnlessEqual(str(e), groupDist3Error)
+            self.assertEqual(str(e), groupDist3Error)
 
         rc, txt = self.captureOutput(self.updatePkg, ['group-dist=3'],
                                      raiseError=True, info=True, 
                                      applyCriticalOnly=True)
         assert(txt == groupDist3Critical)
 
-        self.failIf(os.path.exists(myfile),
+        self.assertFalse(os.path.exists(myfile),
             "preupdate script executed before critical update")
         # Hmm, arguably the preupdate script should have run _before_ any
         # subtrove of group-dist=3
@@ -1232,10 +1232,10 @@ The following dependencies could not be resolved:
         file(myfile, "w")
         rc, txt = self.captureOutput(self.updatePkg, ['group-dist=3'],
                                      raiseError=True, applyCriticalOnly=True)
-        self.failUnless(os.path.exists(myfile),
+        self.assertTrue(os.path.exists(myfile),
             "marker file mysteriously went away")
 
-        self.failIf(txt == 'warning: Not running script for group-dist due to insufficient permissions for chroot()\n')
+        self.assertFalse(txt == 'warning: Not running script for group-dist due to insufficient permissions for chroot()\n')
         # Roll back the critical update
         self.rollback(self.rootDir, 4)
 
@@ -1353,7 +1353,7 @@ fi
         groups1 = [ 'group-dist=2', 'group-foo=2' ]
         rc, txt = self.captureOutput(self.updatePkg,
             groups0, raiseError=True, info=True)
-        self.failUnlessEqual(txt, '''\
+        self.assertEqual(txt, '''\
 Job 1 of 6:
     Install conary:data=1-1-1
     Install corecomp:runtime=1-1-1
@@ -1382,9 +1382,9 @@ Job 6 of 6:
                                restartInfo=e.data)
         else:
             assert 0, 'did not get reexec request'
-        self.failIf(os.path.exists(myfileFoo),
+        self.assertFalse(os.path.exists(myfileFoo),
             "preupdate script got executed on install")
-        self.failIf(os.path.exists(myfileDist),
+        self.assertFalse(os.path.exists(myfileDist),
             "preupdate script got executed on install")
 
         try:
@@ -1392,15 +1392,15 @@ Job 6 of 6:
             try:
                 self.discardOutput(self.updatePkg, groups1, raiseError=True)
             except errors.ReexecRequired, e:
-                self.failUnless(os.path.exists(myfileDist),
+                self.assertTrue(os.path.exists(myfileDist),
                     "preupdate script was not executed")
-                self.failIf(os.path.exists(myfileFoo),
+                self.assertFalse(os.path.exists(myfileFoo),
                     "preupdate script got executed for group-foo before critical updates")
                 self.discardOutput(self.updatePkg, groups1, 
                                    raiseError=True, restartInfo=e.data)
-                self.failUnless(os.path.exists(myfileDist),
+                self.assertTrue(os.path.exists(myfileDist),
                     "marker file mysteriously went away")
-                self.failUnless(os.path.exists(myfileFoo),
+                self.assertTrue(os.path.exists(myfileFoo),
                     "preupdate script for group-foo was not executed")
             else:
                 assert 0, 'did not get reexec request'
@@ -1559,8 +1559,8 @@ touch %(root)s/%(package)s;
             # Starting with Conary 1.1.29, the version file is also in the
             # restart directory
             nverfile = os.path.join(e.data, '__version__')
-            self.failUnless(os.path.exists(nverfile))
-            self.failUnlessEqual(vf.read(), open(nverfile).read())
+            self.assertTrue(os.path.exists(nverfile))
+            self.assertEqual(vf.read(), open(nverfile).read())
             vf.seek(0)
             # First line should be "version XXX")
             verline = vf.readline().strip()
@@ -1568,7 +1568,7 @@ touch %(root)s/%(package)s;
             arr = [ x.strip() for x in verline.split() ]
             # filter out empty strings
             arr = [ x for x in arr if x ]
-            self.failUnlessEqual(arr, ['version', constants.version])
+            self.assertEqual(arr, ['version', constants.version])
 
             # Add some extra files in the restart directory, make sure they
             # are ignored
@@ -1578,19 +1578,19 @@ touch %(root)s/%(package)s;
 
             # Do we have the invocation saved?
             jobInvocation = os.path.join(e.data, 'job-invocation')
-            self.failUnless(os.path.exists(jobInvocation))
+            self.assertTrue(os.path.exists(jobInvocation))
 
             updJob = client.newUpdateJob()
             drep = updJob.loadInvocationInfo(jobInvocation)
-            self.failUnless(updJob.getItemList())
-            self.failUnless(updJob.getKeywordArguments())
-            self.failUnless('conaryVersion' in drep)
+            self.assertTrue(updJob.getItemList())
+            self.assertTrue(updJob.getKeywordArguments())
+            self.assertTrue('conaryVersion' in drep)
 
             self.updatePkg(vtrove, raiseError=True, restartInfo=e.data)
             # Did we clean up the restart info dir?
-            self.failIf(os.path.isdir(e.data), "Did not clean up restart dir")
+            self.assertFalse(os.path.isdir(e.data), "Did not clean up restart dir")
             # Did we clean up the misc directory?
-            self.failIf(os.path.isdir(miscdir))
+            self.assertFalse(os.path.isdir(miscdir))
         else:
             self.fail('did not get reeexec request')
 
@@ -1705,7 +1705,7 @@ touch %(root)s/%(package)s;
                                migrate=True)
         except errors.ReexecRequired, e:
             # Should have changed from a migrate into a regular update
-            self.failUnlessEqual(e.execParams[1], 'update')
+            self.assertEqual(e.execParams[1], 'update')
             try:
                 self.discardOutput(self.updatePkg, grp, raiseError=True,
                                    migrate=False, restartInfo=e.data)
@@ -1807,7 +1807,7 @@ touch %(root)s/%(package)s;
 
             client = conaryclient.ConaryClient(self.cfg)
             client.setUpdateCallback(callback)
-            self.failUnlessRaises(changeset.PathIdsConflictError, 
+            self.assertRaises(changeset.PathIdsConflictError, 
                 client.applyUpdate, updJob)
         finally:
             changeset.ReadOnlyChangeSet.merge = changeset.ReadOnlyChangeSet._saved_merge
@@ -1855,7 +1855,7 @@ touch %(root)s/%(package)s;
             fromChangesets = csList, criticalUpdateInfo = updateInfo)
 
         restartInfo = client.applyUpdateJob(updJob)
-        self.failUnless(restartInfo)
+        self.assertTrue(restartInfo)
 
         # Make sure we have the fromChangesets references in the critical
         # update info
@@ -1863,7 +1863,7 @@ touch %(root)s/%(package)s;
         uj = client.newUpdateJob()
         uj.loadInvocationInfo(invocationInfoFile)
         fcs = uj.getFromChangesets()
-        self.failUnlessEqual(len(csList), len(fcs))
+        self.assertEqual(len(csList), len(fcs))
 
         os.chdir(self.workDir)
 
@@ -1891,7 +1891,7 @@ touch %(root)s/%(package)s;
         # No output, and no error
         ret, rets = self.captureOutput(self.updatePkg, self.rootDir,
             'conary=2', noRestart=True, raiseError=True)
-        self.failIf(rets)
+        self.assertFalse(rets)
 
     def testThreadingOutput(self):
 
@@ -1925,8 +1925,8 @@ touch %(root)s/%(package)s;
         cbThread.start()
         # Wait for thread to start - read first message
         val1, val2 = q.get(True, 1)
-        self.failUnlessEqual(val1, None)
-        self.failUnlessEqual(val2, None)
+        self.assertEqual(val1, None)
+        self.assertEqual(val2, None)
 
         # Modify cb.csText (csMsg will call the no-op update)
         othThread = Thread(None, cb.csMsg, args=("MODIFIED", ))
@@ -1935,7 +1935,7 @@ touch %(root)s/%(package)s;
         try:
             # Block for 3 seconds
             val1, val2 = q.get(True, 3)
-            self.failUnlessEqual(val1, val2)
+            self.assertEqual(val1, val2)
         finally:
             cbThread.join(5)
             if cbThread.isAlive():
@@ -1963,19 +1963,19 @@ touch %(root)s/%(package)s;
         self.mock(conaryclient.ConaryClient, 'applyUpdateJob',
                   mockApplyUpdateJob)
 
-        self.failUnlessRaises(errors.ReexecRequired,
+        self.assertRaises(errors.ReexecRequired,
             updatecmd.doUpdate, self.cfg, ["test:runtime"])
         cmdlinefile = os.path.join(restartDir, 'cmdline')
-        self.failUnless(os.path.exists(cmdlinefile))
+        self.assertTrue(os.path.exists(cmdlinefile))
         import xmlrpclib
         params, _ = xmlrpclib.loads(open(cmdlinefile).read())
-        self.failUnlessEqual(params[0], argv)
+        self.assertEqual(params[0], argv)
 
     def test_UpdateTroves(self):
         # CNY-2102
         kws = dict(replaceFiles = True,
                    callback = updatecmd.UpdateCallback(self.cfg))
-        self.failUnlessRaises(conaryclient.NoNewTrovesError, 
+        self.assertRaises(conaryclient.NoNewTrovesError, 
                               updatecmd._updateTroves, self.cfg, [], **kws)
 
     def testCallbackCreatingDatabaseTransaction(self):
@@ -2000,7 +2000,7 @@ touch %(root)s/%(package)s;
         callback = MyCallback(self.cfg)
         self.discardOutput(self.updatePkg, [ 'foo:run=2', 'bar:run=2' ],
             callback = callback)
-        self.failUnlessEqual(output, [(1, 2), (2, 2)])
+        self.assertEqual(output, [(1, 2), (2, 2)])
 
     def testUpdateAllReplaceFiles(self):
         self.addComponent('foo:runtime=1', 

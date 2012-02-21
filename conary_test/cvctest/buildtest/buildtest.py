@@ -357,21 +357,21 @@ class TestPutFiles(PackageRecipe):
         sl1 = util.joinPaths(self.workDir, '/dir1/foo5')
         sl2 = util.joinPaths(self.workDir, '/dir2/foo2')
         # Test modes
-        self.failIf(os.path.islink(sl755))
-        self.failUnlessEqual(0755, os.lstat(sl755)[stat.ST_MODE] & 0755)
-        self.failIf(os.path.islink(sl600))
-        self.failUnlessEqual(0600, os.lstat(sl600)[stat.ST_MODE] & 0600)
+        self.assertFalse(os.path.islink(sl755))
+        self.assertEqual(0755, os.lstat(sl755)[stat.ST_MODE] & 0755)
+        self.assertFalse(os.path.islink(sl600))
+        self.assertEqual(0600, os.lstat(sl600)[stat.ST_MODE] & 0600)
 
-        self.failUnless(os.path.islink(sl1))
-        self.failUnless(os.path.islink(sl2))
+        self.assertTrue(os.path.islink(sl1))
+        self.assertTrue(os.path.islink(sl2))
 
         sl3 = util.joinPaths(self.workDir, '/dir3/foo2')
         sl4 = util.joinPaths(self.workDir, '/dir4/foo4')
         sl5 = util.joinPaths(self.workDir, '/dir5/foo5')
 
-        self.failUnless(os.path.islink(sl3))
-        self.failUnless(os.path.islink(sl4))
-        self.failIf(os.path.islink(sl5))
+        self.assertTrue(os.path.islink(sl3))
+        self.assertTrue(os.path.islink(sl4))
+        self.assertFalse(os.path.islink(sl5))
 
     def testSymlinkGlobbing(self):
         recipestr = r"""
@@ -392,14 +392,14 @@ class TestSymlinkGlobbing(PackageRecipe):
         symlinksdir = os.path.join(self.rootDir, 'usr/symlinks')
         contents = os.listdir(symlinksdir)
         contents.sort()
-        self.failUnlessEqual(contents, ['file1', 'file2'])
+        self.assertEqual(contents, ['file1', 'file2'])
         for f in contents:
             lpath = os.path.join(symlinksdir, f)
             fpath = os.readlink(lpath)
             if fpath[0] != '/':
                 # Relative link
                 fpath = os.path.join(symlinksdir, fpath)
-            self.failUnlessEqual(open(fpath).read(), "Contents %s\n" % f)
+            self.assertEqual(open(fpath).read(), "Contents %s\n" % f)
 
     def testUnmatchedSymlinkGlobbing(self):
         recipestr = r"""
@@ -429,7 +429,7 @@ class TestSymlinkGlobbing(PackageRecipe):
         self.logFilter.add()
         (built, d) = self.buildRecipe(recipestr, "TestSymlinkGlobbing")
         self.logFilter.remove()
-        self.failIf("warning: Symlink: No files matched: '/usr/srcfiles/*'" \
+        self.assertFalse("warning: Symlink: No files matched: '/usr/srcfiles/*'" \
                 not in self.logFilter.records)
 
 
@@ -902,7 +902,7 @@ echo "$0: line 2000: foo: command not found"
         fileObj = fileDict['/usr/src/debug/buildlogs/test-0-log.bz2']
         b = bz2.BZ2Decompressor()
         buildLog = b.decompress(fileObj.read())
-        self.failIf( \
+        self.assertFalse( \
                 "warning: Suggested buildRequires additions: ['foo:runtime']" \
                 not in buildLog)
 
@@ -1044,7 +1044,7 @@ class TestRemove(PackageRecipe):
 
         dr = os.path.join(self.workDir, '../build/testr/_ROOT_',
             'usr/share/testr')
-        self.failUnlessEqual(os.listdir(dr), ["dir1"])
+        self.assertEqual(os.listdir(dr), ["dir1"])
 
     def testUnmatchedRemove(self):
         recipestr = """

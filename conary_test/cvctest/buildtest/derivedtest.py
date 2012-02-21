@@ -558,8 +558,8 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
         inode1 = os.stat(self.rootDir+'/bin/onefile')[stat.ST_INO]
         inode2 = os.stat(self.rootDir+'/bin/anotherfile')[stat.ST_INO]
         inode3 = os.stat(self.rootDir+'/bin/yetanother')[stat.ST_INO]
-        self.failUnlessEqual(inode1, inode2)
-        self.failUnlessEqual(inode1, inode3)
+        self.assertEqual(inode1, inode2)
+        self.assertEqual(inode1, inode3)
 
     def testSetUGid(self):
         srcVersion  = self.addCompAndPackage('foo:runtime', '1.0-1-1',
@@ -608,16 +608,16 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
         assert(len(list(trv.iterFileList())) == 6)
         fileInfo = self.getFiles(trv)
 
-        self.failUnlessEqual(fileInfo['/etc/cfg'].flags(),
+        self.assertEqual(fileInfo['/etc/cfg'].flags(),
                              files._FILE_FLAG_CONFIG)
-        self.failUnlessEqual(fileInfo['/etc/cfg.ic'].flags(),
+        self.assertEqual(fileInfo['/etc/cfg.ic'].flags(),
                              files._FILE_FLAG_INITIAL_CONTENTS)
-        self.failUnlessEqual(fileInfo['/etc/cfg.t'].flags(),
+        self.assertEqual(fileInfo['/etc/cfg.t'].flags(),
                              files._FILE_FLAG_TRANSIENT)
-        self.failUnlessEqual(fileInfo['/etc/alsoconfig'].flags(),
+        self.assertEqual(fileInfo['/etc/alsoconfig'].flags(),
                              files._FILE_FLAG_CONFIG)
-        self.failUnlessEqual(fileInfo['/etc/notaconfig'].flags(), 0)
-        self.failUnlessEqual(fileInfo['/usr/share/transient'].flags(),
+        self.assertEqual(fileInfo['/etc/notaconfig'].flags(), 0)
+        self.assertEqual(fileInfo['/usr/share/transient'].flags(),
                              files._FILE_FLAG_TRANSIENT)
 
 
@@ -639,17 +639,17 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
             "r.ByDefault(exceptions='foo:switchoff')",
             )
         #d = dict([(x[0][0], x[1]) for x in trv.iterTroveListInfo()])
-        #self.failUnlessEqual(d['foo:runtime'], True)
-        #self.failUnlessEqual(d['foo:debuginfo'], False)
+        #self.assertEqual(d['foo:runtime'], True)
+        #self.assertEqual(d['foo:debuginfo'], False)
         ver = trv.getVersion()
         flv = trv.getFlavor()
-        self.failUnlessEqual(
+        self.assertEqual(
             trv.includeTroveByDefault('foo:runtime', ver, flv), True)
-        self.failUnlessEqual(
+        self.assertEqual(
             trv.includeTroveByDefault('foo:debuginfo', ver, flv), False)
-        self.failUnlessEqual(
+        self.assertEqual(
             trv.includeTroveByDefault('foo:switchon', ver, flv), True)
-        self.failUnlessEqual(
+        self.assertEqual(
             trv.includeTroveByDefault('foo:switchoff', ver, flv), False)
 
 
@@ -668,7 +668,7 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
             "r.Create('/bin/newgroup', mode=0755)",
             "r.UtilizeGroup('newgroup', '/bin/newgroup')",
         )
-        self.failUnlessEqual(
+        self.assertEqual(
             trv.getRequires(),
             deps.parseDep('userinfo: foo userinfo: newuser'
                           ' groupinfo: bar groupinfo: newgroup'))
@@ -694,13 +694,13 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
 
         fileInfo = self.getFiles(runtimeTrv)
 
-        self.failUnlessEqual(list(fileInfo['/bin/foo'].tags), ['foo'])
-        self.failUnlessEqual(sorted(fileInfo['/bin/bar'].tags),
+        self.assertEqual(list(fileInfo['/bin/foo'].tags), ['foo'])
+        self.assertEqual(sorted(fileInfo['/bin/bar'].tags),
                              ['bar', 'foo'])
-        self.failUnlessEqual(list(fileInfo['/bin/baz'].tags), [])
-        self.failUnlessEqual(sorted(fileInfo['/bin/update'].tags),
+        self.assertEqual(list(fileInfo['/bin/baz'].tags), [])
+        self.assertEqual(sorted(fileInfo['/bin/update'].tags),
                              ['asdf', 'bar', 'foo'])
-        self.failUnlessEqual(list(fileInfo['/bin/new'].tags), ['asdf'])
+        self.assertEqual(list(fileInfo['/bin/new'].tags), ['asdf'])
 
 
     def testFixDirModes(self):
@@ -725,7 +725,7 @@ class DerivedPackageTest(rephelp.RepositoryHelper):
                "r.Make()",
                "r.MakeInstall('MANDIR=%(mandir)s', rootVar='PREFIX')",
         )
-        self.failUnlessEqual(
+        self.assertEqual(
             sorted([x[1] for x in runtimeTrv.iterFileList()]),
             ['/bin/foo', '/usr/sbin/logrotate'])
 
@@ -777,7 +777,7 @@ class TestMultiPackage(PackageRecipe):
         trvspec = [ (n, bver, flv) for n in [ pkgname, pkgname + ':runtime',
                     pkgname + '-secondary', pkgname + '-secondary:runtime' ] ]
         troves = repos.getTroves(trvspec, withFiles=False)
-        self.failUnlessEqual(len(troves), 4)
+        self.assertEqual(len(troves), 4)
 
         # Shadow
         self.mkbranch(self.defLabel, self.shadowLabel, pkgname + ":source",
@@ -816,7 +816,7 @@ class TestMultiPackage(DerivedPackageRecipe):
         trv = repos.getTrove(pkgname + ':runtime', bver, flv)
         filenames = set(x[1] for x in trv.iterFileList())
 
-        self.failUnlessEqual(sorted(list(filenames)),
+        self.assertEqual(sorted(list(filenames)),
                              ['/usr/baz', '/usr/foo', '/usr/migrate'])
 
 
@@ -839,10 +839,10 @@ class TestMultiPackage(DerivedPackageRecipe):
                r"r.Remove('/usr/share/togoaway/togoaway.txt')",
                r"r.MakeDirs('%s', component='runtime')" % inclDir,
                r"r.ExcludeDirectories(exceptions='%s')" % inclDir,)
-        self.failUnlessEqual(str(runtimeTrv.flavor()), '')
+        self.assertEqual(str(runtimeTrv.flavor()), '')
         fnames = set(x[1] for x in runtimeTrv.iterFileList())
         exp = set(['/usr/share/blip', '/usr/lib/python2.4/foo.py', inclDir])
-        self.failUnlessEqual(fnames, exp)
+        self.assertEqual(fnames, exp)
 
     def testDuplicateContentsAndLinks(self):
         srcVersion  = self.addCompAndPackage('foo:runtime', '1.0-1-1',
@@ -890,7 +890,7 @@ class TestMultiPackage(DerivedPackageRecipe):
 
         runtimeTrv = self.buildDerivation('foo:runtime', srcVersion, 'pass')
         self.updatePkg('foo:runtime=localhost@rpl:shadow')
-        assteq = self.failUnlessEqual
+        assteq = self.assertEqual
         assteq(os.stat(self.rootDir + '/bin/a1').st_size,
                os.stat(self.rootDir + '/bin/a2').st_size)
 
@@ -920,7 +920,7 @@ class TestMultiPackage(DerivedPackageRecipe):
                                rephelp.Symlink("../init.d/blah") ),
                       ])
         runtimeTrv = self.buildDerivation('foo:runtime', srcVersion, 'pass')
-        self.failUnlessEqual(2, len([ x for x in runtimeTrv.iterFileList() ]))
+        self.assertEqual(2, len([ x for x in runtimeTrv.iterFileList() ]))
 
     def testFlavorUnmodifiedFile(self):
         # CNY-1954
@@ -942,7 +942,7 @@ class TestMultiPackage(DerivedPackageRecipe):
         runtimeTrv = self.buildDerivation('foo:lib', srcVersion, 'pass')
         pathId, path, fileId, fver = runtimeTrv.iterFileList().next()
         fileObj = repos.getFileVersion(pathId, fileId, fver)
-        self.failUnlessEqual(str(fileObj.flavor()), '')
+        self.assertEqual(str(fileObj.flavor()), '')
 
     def testFindTroveToDerive(self):
         srcVersion = self.addCompAndPackage('foo:runtime', '1.0-1-1', 'is:x86')
@@ -1153,7 +1153,7 @@ class TestRecipe(CapsuleRecipe):
         self.addfile(pkgname + '.recipe')
         self.discardOutput(self.commit)
         trvs = self.cookFromRepository(pkgname)
-        self.failUnlessEqual(str(trvs),
+        self.assertEqual(str(trvs),
             "(('tmpwatch:rpm', '/localhost@rpl:linux/0.1-1-1', "
             "Flavor('is: x86')),)")
 
@@ -1181,6 +1181,6 @@ class TestRecipe(DerivedPackageRecipe):
 """
         self.writeFile(pkgname + '.recipe', recipe)
         self.commit()
-        self.failUnlessRaises(builderrors.RecipeFileError,
+        self.assertRaises(builderrors.RecipeFileError,
                                self.cookFromRepository, pkgname,
                                buildLabel=self.shadowLabel)

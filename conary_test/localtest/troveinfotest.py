@@ -62,7 +62,7 @@ class TroveInfoTest(testhelp.TestCase):
         tiTable.addInfo(cu, MockTrove(ti), 2)
         cu.execute('select count(*) from troveinfo where length(data)=0')
         count = cu.fetchall()[0][0]
-        self.failUnless(count == 0)
+        self.assertTrue(count == 0)
 
         # now store all of the trove info in a database (with nothing
         # unknown) and make sure it can be read using old objects

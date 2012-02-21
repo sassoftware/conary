@@ -60,26 +60,26 @@ class EntitlementTest(auth_helper.AuthHelper):
         rootRepos.setEntitlementClassesRoles('localhost',
                                                  { 'client' : [ 'user' ] } )
 
-        self.failUnlessRaises(errors.EntitlementKeyAlreadyExists,
+        self.assertRaises(errors.EntitlementKeyAlreadyExists,
                               ownerRepos.addEntitlementKeys,
                               'localhost', 'client', [ 'ENTITLEMENT' ])
-        self.failUnlessRaises(errors.InvalidEntitlement,
+        self.assertRaises(errors.InvalidEntitlement,
                               ownerRepos.addEntitlementKeys,
                               'localhost', 'client', [ '1' * (MAX_ENTITLEMENT_LENGTH+1) ])
-        self.failUnlessRaises(errors.InsufficientPermission,
+        self.assertRaises(errors.InsufficientPermission,
                               userRepos.addEntitlementKeys,
                               'localhost', 'client', [ 'ENTITLEMENT2' ])
-        self.failUnlessRaises(errors.InvalidEntitlement,
+        self.assertRaises(errors.InvalidEntitlement,
                               ownerRepos.deleteEntitlementKeys,
                               'localhost', 'client', [ 'ENTITLEMENTDNE' ])
-        self.failUnlessRaises(errors.InsufficientPermission,
+        self.assertRaises(errors.InsufficientPermission,
                               userRepos.listEntitlementKeys,
                               'localhost', 'client')
 
         ownerRepos.deleteEntitlementKeys('localhost', 'client', [ 'ENTITLEMENT' ])
         assert(ownerRepos.listEntitlementKeys('localhost', 'client') == [] )
 
-        self.failUnlessRaises(errors.InsufficientPermission,
+        self.assertRaises(errors.InsufficientPermission,
                               ownerRepos.deleteEntitlementClassOwner,
                               'localhost', 'owner', 'client')
 
@@ -88,26 +88,26 @@ class EntitlementTest(auth_helper.AuthHelper):
         assert(ownerRepos.listEntitlementClasses('localhost') == [ ])
 
         # try removing a ent group that never existed (CNY-692)
-        self.failUnlessRaises(errors.UnknownEntitlementClass,
+        self.assertRaises(errors.UnknownEntitlementClass,
                               rootRepos.deleteEntitlementClass,
                               'localhost', 'neverexisted')
 
         # and add an owner as a role that doesn't exist
-        self.failUnlessRaises(errors.RoleNotFound,
+        self.assertRaises(errors.RoleNotFound,
                               rootRepos.addEntitlementClassOwner,
                               'localhost', 'nouser', 'client')
 
         # and add an owner for a entclass that doesn't exist
-        self.failUnlessRaises(errors.UnknownEntitlementClass,
+        self.assertRaises(errors.UnknownEntitlementClass,
                               rootRepos.addEntitlementClassOwner,
                               'localhost', 'owner', 'noclass')
 
         # and delete an owner for a role that doesn't exist
-        self.failUnlessRaises(errors.RoleNotFound,
+        self.assertRaises(errors.RoleNotFound,
                               rootRepos.deleteEntitlementClassOwner,
                               'localhost', 'nouser', 'client')
 
         # and delete an owner for a entclass that doesn't exist
-        self.failUnlessRaises(errors.UnknownEntitlementClass,
+        self.assertRaises(errors.UnknownEntitlementClass,
                               rootRepos.deleteEntitlementClassOwner,
                               'localhost', 'owner', 'noclass')

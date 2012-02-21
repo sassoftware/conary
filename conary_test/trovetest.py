@@ -341,12 +341,12 @@ Some changes just are.
 
         removedCopy = removed.copy()
         removedCopy.applyChangeSet(diff)
-        self.failUnlessEqual(removedCopy.freeze(), newtrove.freeze())
+        self.assertEqual(removedCopy.freeze(), newtrove.freeze())
 
         newCopy = newtrove.copy()
         diff = removed.diff(newtrove)[0]
         newCopy.applyChangeSet(diff)
-        self.failUnlessEqual(newCopy.freeze(), removed.freeze())
+        self.assertEqual(newCopy.freeze(), removed.freeze())
 
     def testReferencedByDefault(self):
         old = ThawVersion("/conary.rpath.com@test:trunk/10:1.2-3")
@@ -1009,7 +1009,7 @@ Some changes just are.
         # new trove info)
         t.applyChangeSet(diff)
         # make sure that the new size is reflected
-        self.failUnlessEqual(t.troveInfo.size(), 100)
+        self.assertEqual(t.troveInfo.size(), 100)
 
         # now create a diff where the unknown troveinfo changes
         t = OtherTrove('trvName', v, f, None)
@@ -1032,7 +1032,7 @@ Some changes just are.
         # apply the diff to the origional OtherTrove object and make
         # sure the change is reflected
         t.applyChangeSet(diff)
-        self.failUnlessEqual(t.troveInfo.unknown(), '-----UNKNOWN 2-----')
+        self.assertEqual(t.troveInfo.unknown(), '-----UNKNOWN 2-----')
 
         # now create a diff where the unknown troveinfo changes and
         # we're diffing against two different versions of Trove
@@ -1051,8 +1051,8 @@ Some changes just are.
         diff = t2.diff(oldTrove)[0]
         # apply it and verify
         t.applyChangeSet(diff)
-        self.failUnlessEqual(t.troveInfo.unknown(), '')
-        self.failUnlessEqual(t.troveInfo.scripts.unknown2(), '')
+        self.assertEqual(t.troveInfo.unknown(), '')
+        self.assertEqual(t.troveInfo.scripts.unknown2(), '')
 
     def testMissingRawTroveInfo(self):
         v1 = ThawVersion("/conary.rpath.com@test:trunk/10:1.2-3")
@@ -1105,7 +1105,7 @@ Some changes just are.
         # check the frozen trove without metadata
         expected = '\x00\x00\x07trvname\x01\x00)/conary.rpath.com@test:trunk/10.000:1.2-3\x02\x80\x00\x00\x051#x86\x04\x80\x00\x00\x0b\r\x00\x04\x00\x00\x00\n\x0e\x00\x01\x00\t\x00\x01\x00'
         frozen = t.freeze()
-        self.failUnlessEqual(frozen, expected)
+        self.assertEqual(frozen, expected)
 
         mi = MetadataItem()
         mi.shortDesc.set('This is the short description of trvname')
@@ -1120,32 +1120,32 @@ Some changes just are.
         t.troveInfo.metadata.addItem(mi)
         t.computeDigests()
         for ver in trove._TROVESIG_VER_ALL:
-            self.failUnless(sha1s[ver] == t._sigString(ver))
+            self.assertTrue(sha1s[ver] == t._sigString(ver))
         # check the frozen form with metadata
         expected = "\x00\x00\x07trvname\x01\x00)/conary.rpath.com@test:trunk/10.000:1.2-3\x02\x80\x00\x00\x051#x86\x04\x80\x00\x01\x90\t\x80\x00\x00F\x00\x00\x14\x0c,!eT\x97\x85~\x81vF!\xf0$\xc4\xd3\xef\x8e\xad\x84\x02\x80\x00\x00*\x01\x00'\x00\x00\x01\x01\x01\x00 \xd4\xab\xdc\xf3\xcaU\xd2\x19`\xfe\xe6\x00\x86\xb5\xecC\x90\x18&\xb8\x90/\x18*\xa6\x8c4[P>\xe2\xa8\r\x00\x04\x00\x00\x00\n\x0e\x00\x01\x00\x11\x017\x01A4\x00\x00\x14'\x14\xc7\x97mBF\xd1B\x9e\xf6/\xc9\n\xb6w\x0f\x84F\xe8\x01\x00(This is the short description of trvname\x02\x00'This is the long description of trvname\x03\x00w:Copyright License :: OSI Approved :: Common Public License;Copyright License :: OSI Approved :: General Public License\x04\x00\x1e\x1dblowfish, symmetric, 512 bits\x08\x00*\x01\x00'\x00\x00\x01\x00\x01\x00 \x87\x9c\xa5ae\xa5\xd2w\x7f\xdc\xe7\xb4\xc0\xa4\xd9\xc8\xd7\x0c\xbc`\xcd\xa9\x14\xc3\x19\x0f\xe2\xa6^\xdfs\xa8\t\x00\x01\x00"
         frozen = t.freeze()
-        self.failUnlessEqual(frozen, expected)
+        self.assertEqual(frozen, expected)
 
         t.troveInfo.metadata.verifyDigitalSignatures()
         mi.shortDesc.set('tainted shortDesc')
         try:
             t.troveInfo.metadata.verifyDigitalSignatures()
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'metadata checksum does not match stored value')
+            self.assertEqual(str(e), 'metadata checksum does not match stored value')
         try:
             t.troveInfo.metadata.verifyDigests()
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'metadata checksum does not match stored value')
+            self.assertEqual(str(e), 'metadata checksum does not match stored value')
         try:
             t.verifyDigests()
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'metadata checksum does not match stored value')
+            self.assertEqual(str(e), 'metadata checksum does not match stored value')
 
         trvCs = t.diff(None, absolute = True)[0]
         try:
             trove.Trove(trvCs)
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'metadata checksum does not match stored value')
+            self.assertEqual(str(e), 'metadata checksum does not match stored value')
 
         mi.shortDesc.set('This is the short description of trvname')
         t.troveInfo.metadata.verifyDigitalSignatures()
@@ -1154,7 +1154,7 @@ Some changes just are.
         # first record the old frozen form and old metadata id
         frz1 = mi.freeze()
         id1 = mi.id()
-        self.failUnlessEqual(sha1ToString(id1),
+        self.assertEqual(sha1ToString(id1),
                              '2714c7976d4246d1429ef62fc90ab6770f8446e8')
         # add a signature
         keyCache = getKeyCache()
@@ -1168,17 +1168,17 @@ Some changes just are.
         # make sure that the frozen form now has something differet (the sig)
         # the sig will be different every time, so we can't check for the
         # exact value
-        self.failUnless(frz1 != frz2)
+        self.assertTrue(frz1 != frz2)
         digests = set()
         for signature in itertools.chain(mi.oldSignatures, mi.signatures):
             digests.add(
                 (signature.version(), sha256ToString(signature.digest())))
-        self.failUnlessEqual(digests,
+        self.assertEqual(digests,
                      set([(0, '879ca56165a5d2777fdce7b4c0a4d9c8'
                               'd70cbc60cda914c3190fe2a65edf73a8') ]))
         # make sure that the id did not change (since signatures should be
         # excluded from the id)
-        self.failUnlessEqual(id1, id2)
+        self.assertEqual(id1, id2)
         # test signature verification
         t.computeDigests()
         t.verifyDigitalSignatures()
@@ -1191,48 +1191,48 @@ Some changes just are.
         try:
             t.verifyDigitalSignatures(keyCache=keyCache)
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'Trove signatures made by the following keys are bad: F7440D78FE813C882212C2BF8AC2828190B1E477')
+            self.assertEqual(str(e), 'Trove signatures made by the following keys are bad: F7440D78FE813C882212C2BF8AC2828190B1E477')
         ds.signature.set(oldSig[:-1])
         try:
             t.verifyDigitalSignatures(keyCache=keyCache)
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'Trove signatures made by the following keys are bad: F7440D78FE813C882212C2BF8AC2828190B1E477')
+            self.assertEqual(str(e), 'Trove signatures made by the following keys are bad: F7440D78FE813C882212C2BF8AC2828190B1E477')
         ds.signature.set(oldSig)
         t.verifyDigitalSignatures(keyCache=keyCache)
         ds.timestamp.set(int(time.time() + 10000))
         try:
             t.verifyDigitalSignatures(keyCache=keyCache)
         except DigitalSignatureVerificationError, e:
-            self.failUnlessEqual(str(e), 'Trove signatures made by the following keys are bad: F7440D78FE813C882212C2BF8AC2828190B1E477')
+            self.assertEqual(str(e), 'Trove signatures made by the following keys are bad: F7440D78FE813C882212C2BF8AC2828190B1E477')
 
         # test the easy access methods
         shortDesc = t.getMetadata()['shortDesc']
-        self.failUnlessEqual(shortDesc,
+        self.assertEqual(shortDesc,
                              'This is the short description of trvname')
         # add another metadata item with update short description
         mi2 = MetadataItem()
         mi2.shortDesc.set('This is the updated short description of trvname')
         t.troveInfo.metadata.addItem(mi2)
         shortDesc = t.getMetadata()['shortDesc']
-        self.failUnlessEqual(shortDesc,
+        self.assertEqual(shortDesc,
                              'This is the updated short description of trvname')
         # add an empty mi
         mi3 = MetadataItem()
         t.troveInfo.metadata.addItem(mi3)
         # should not override the last value
         shortDesc = t.getMetadata()['shortDesc']
-        self.failUnlessEqual(shortDesc,
+        self.assertEqual(shortDesc,
                              'This is the updated short description of trvname')
         # now test a trove with no metadata
         v2 = ThawVersion("/conary.rpath.com@test:trunk/10:2.2-3")
         t2 = trove.Trove('trvname', v2, f, None)
         shortDesc = t2.getMetadata()['shortDesc']
-        self.failUnlessEqual(shortDesc, None)
+        self.assertEqual(shortDesc, None)
         # test relative diff
         diff = t.diff(t2)[0]
         t2.applyChangeSet(diff)
         shortDesc = t2.getMetadata()['shortDesc']
-        self.failUnlessEqual(shortDesc,
+        self.assertEqual(shortDesc,
                              'This is the updated short description of trvname')
 
     def testMetadataDigests(self):
@@ -1348,17 +1348,17 @@ Some changes just are.
         # expect v0, v2 sig
         expected = [(0, sha1FromString('4a96a173f304e408bb1925f78d2edf396975528d'), None),
                     (2, sha256FromString('ed7daba3caaffc4da0de41d5a90ba6d2f364daf205bbf7b00ed1c125abea2276'), None)]
-        self.failUnlessEqual(sigs, expected)
+        self.assertEqual(sigs, expected)
         frz = g.freeze()
         expected = '\x00\x00\x03foo\x01\x00)/conary.rpath.com@test:trunk/10.000:1.2-3\x02\x80\x00\x00\x051#x86\x04\x80\x00\x00\x7f\t\x80\x00\x00F\x00\x00\x14J\x96\xa1s\xf3\x04\xe4\x08\xbb\x19%\xf7\x8d.\xdf9iuR\x8d\x02\x80\x00\x00*\x01\x00\'\x00\x00\x01\x02\x01\x00 \xed}\xab\xa3\xca\xaf\xfcM\xa0\xdeA\xd5\xa9\x0b\xa6\xd2\xf3d\xda\xf2\x05\xbb\xf7\xb0\x0e\xd1\xc1%\xab\xea"v\r\x00\x04\x00\x00\x00\n\x0e\x00\x01\x00\x10\x00&\x02\x00#\x00\x00\x03foo\x02\x00\x1a\x01\x00\n\x00\x00\x02\x00\x01\x01\x00\x02\x00\x00\x01\x00\n\x00\x00\x02\x00\x02\x01\x00\x02\x00\x00\t\x00\x01\x00'
-        self.failUnlessEqual(frz, expected)
+        self.assertEqual(frz, expected)
 
         # make sure it passes digest check
-        self.failUnless(g.verifyDigests())
+        self.assertTrue(g.verifyDigests())
         # manipulate the trove object
         g.troveInfo.scripts.postUpdate.conversions.addList([(3, 0)])
         # it should no longer pass
-        self.failUnless(not g.verifyDigests())
+        self.assertTrue(not g.verifyDigests())
 
 
         # if only one toClass= is used, we can use the current versioned
@@ -1371,11 +1371,11 @@ Some changes just are.
         # expect v0, v1 sigs
         expected = [(0, sha1FromString('4a96a173f304e408bb1925f78d2edf396975528d'), None),
                     (1, sha256FromString('c7b964f5c17d81568a85adad73e2ac43496b9ff1fbe12971afbc218eceba294f'), None)]
-        self.failUnlessEqual(sigs, expected)
+        self.assertEqual(sigs, expected)
 
         frz = g.freeze()
         expected2 = "\x00\x00\x03foo\x01\x00)/conary.rpath.com@test:trunk/10.000:1.2-3\x02\x80\x00\x00\x051#x86\x04\x80\x00\x00r\t\x80\x00\x00F\x00\x00\x14J\x96\xa1s\xf3\x04\xe4\x08\xbb\x19%\xf7\x8d.\xdf9iuR\x8d\x02\x80\x00\x00*\x01\x00'\x00\x00\x01\x01\x01\x00 \xc7\xb9d\xf5\xc1}\x81V\x8a\x85\xad\xads\xe2\xacCIk\x9f\xf1\xfb\xe1)q\xaf\xbc!\x8e\xce\xba)O\r\x00\x04\x00\x00\x00\n\x0e\x00\x01\x00\x10\x00\x19\x02\x00\x16\x00\x00\x03foo\x02\x00\r\x01\x00\n\x00\x00\x02\x00\x02\x01\x00\x02\x00\x00\t\x00\x01\x00"
-        self.failUnlessEqual(frz, expected2)
+        self.assertEqual(frz, expected2)
 
         # this is an old trove changeset that has a vSig entry, and also
         # has more than one conversion on a script.  We need to ignore
@@ -1398,31 +1398,31 @@ Some changes just are.
 
     def testVerifyDigests(self):
         t = Trove('foo', NewVersion(), Flavor())
-        self.failUnlessEqual(t.verifyDigests(), True)
-        self.failUnlessEqual([x for x in t.troveInfo.sigs ], [])
+        self.assertEqual(t.verifyDigests(), True)
+        self.assertEqual([x for x in t.troveInfo.sigs ], [])
         t.computeDigests()
         sigs = [(x[0], x[1](), x[2]) for x in t.troveInfo.sigs ]
         expected = [
             (0, sha1FromString('7035ad238e9dba2597839cef74d0e12746c8e9bb'), None),
             (1, sha256FromString('195e1e413328c895e75c0d6decbde51c225f805f8e376031c6cbd8995eb120e2'), None) ]
-        self.failUnlessEqual(sigs, expected)
-        self.failUnlessEqual(t.verifyDigests(), True)
+        self.assertEqual(sigs, expected)
+        self.assertEqual(t.verifyDigests(), True)
         t.troveInfo.sigs.sha1.set(sha1String('blah'))
-        self.failUnlessEqual(t.verifyDigests(), False)
+        self.assertEqual(t.verifyDigests(), False)
         t.computeDigests()
         sigs = [(x[0], x[1](), x[2]) for x in t.troveInfo.sigs ]
-        self.failUnlessEqual(sigs, expected)
+        self.assertEqual(sigs, expected)
         # get the v1 vds
         vds = [ x for x in t.troveInfo.sigs.vSigs if x.version() == 1 ][0]
         # muck with the digest
         vds.digest.set(nonstandardSha256String('blah'))
-        self.failUnlessEqual(t.verifyDigests(), False)
+        self.assertEqual(t.verifyDigests(), False)
         t.computeDigests()
         sigs = [(x[0], x[1](), x[2]) for x in t.troveInfo.sigs ]
-        self.failUnlessEqual(sigs, expected)
+        self.assertEqual(sigs, expected)
         # add a bogus v1 sig
         t.troveInfo.sigs.vSigs.addDigest(nonstandardSha256String('blah'), 1)
-        self.failUnlessEqual(t.verifyDigests(), False)
+        self.assertEqual(t.verifyDigests(), False)
 
     def testTroveInfoSize(self):
         # troveinfo elements added after BUILD_FLAVOR must be DYNAMIC
@@ -1529,41 +1529,41 @@ class TroveTest2(rephelp.RepositoryHelper):
         # We want to make sure that only the last list of strings is visible
         m.addItems([mi1, mi2])
         licenses = m.get('lang')['licenses']
-        self.failUnlessEqual(licenses, ['l3'])
+        self.assertEqual(licenses, ['l3'])
 
         # Make sure after we flatten the metadata we still get the item on the
         # top of the stack
         items = m.flatten(filteredKeyValues = ['a'])
-        self.failUnlessEqual(len(items), 1)
-        self.failUnlessEqual(items[0].licenses, ['l3'])
-        self.failUnlessEqual(list(items[0].keyValue.iteritems()),
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].licenses, ['l3'])
+        self.assertEqual(list(items[0].keyValue.iteritems()),
             [('b', 'b')])
 
     def testKeyValueMetadata(self):
         vis = trove.KeyValueItemsStream()
         vis['a'] = 'A binary string\000'
         vis['b'] = 'Another string'
-        self.failUnlessEqual(vis['a'], 'A binary string\000')
-        self.failUnlessEqual(vis['b'], 'Another string')
+        self.assertEqual(vis['a'], 'A binary string\000')
+        self.assertEqual(vis['b'], 'Another string')
         frozen = vis.freeze()
         vis2 = trove.KeyValueItemsStream(frozen)
 
-        self.failUnlessEqual(vis2['a'], vis['a'])
-        self.failUnlessEqual(vis2['b'], vis['b'])
+        self.assertEqual(vis2['a'], vis['a'])
+        self.assertEqual(vis2['b'], vis['b'])
 
-        self.failUnlessEqual(sorted(vis2.keys()), ['a', 'b'])
-        self.failUnlessEqual(sorted(vis2.items()),
+        self.assertEqual(sorted(vis2.keys()), ['a', 'b'])
+        self.assertEqual(sorted(vis2.items()),
             [('a', 'A binary string\000'), ('b', 'Another string')])
-        self.failUnlessEqual(sorted(vis2.iteritems()),
+        self.assertEqual(sorted(vis2.iteritems()),
             [('a', 'A binary string\000'), ('b', 'Another string')])
 
         # An empty VIS
         vis = trove.KeyValueItemsStream()
-        self.failUnlessEqual(sorted(vis.keys()), [])
+        self.assertEqual(sorted(vis.keys()), [])
 
         frozen = vis.freeze()
         vis2 = trove.KeyValueItemsStream(frozen)
-        self.failUnlessEqual(sorted(vis2.keys()), [])
+        self.assertEqual(sorted(vis2.keys()), [])
 
         # make sure keyvalue metadata doesn't show up in t
 
@@ -1577,7 +1577,7 @@ class TroveTest2(rephelp.RepositoryHelper):
         frozen = mi.freeze()
 
         nmi = trove.MetadataItem(frozen)
-        self.failUnlessEqual(sorted(mi.keyValue.items()),
+        self.assertEqual(sorted(mi.keyValue.items()),
             sorted(ddata.iteritems()))
 
     def testExtendedMetadata(self):

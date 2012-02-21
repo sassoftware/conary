@@ -80,7 +80,7 @@ class GroupBase(GroupApplianceRecipe):
         for r in (
            self.importer.loadSuperClass('group-base', str(self.cfg.buildLabel)),
            self.importer.loadInstalled('group-base', str(self.cfg.buildLabel))):
-            self.failUnless(recipe.isGroupRecipe(r))
+            self.assertTrue(recipe.isGroupRecipe(r))
             self.assertEqual(r.__name__, 'GroupBase')
 
 
@@ -91,7 +91,7 @@ class GroupBase(GroupApplianceRecipe):
         for r in (
            self.importer.loadSuperClass('group-appliance', str(self.cfg.buildLabel)),
            self.importer.loadInstalled('group-appliance', str(self.cfg.buildLabel))):
-            self.failUnless(recipe.isGroupRecipe(r))
+            self.assertTrue(recipe.isGroupRecipe(r))
             self.assertEqual(r.__name__, 'GroupApplianceRecipe')
 
 class RecipeTest(rephelp.RepositoryHelper):
@@ -462,7 +462,7 @@ class Foo(PackageRecipe):
                 topModule = "<module>"
             else:
                 topModule = "?"
-            self.failUnlessEqual(str(err), '''\
+            self.assertEqual(str(err), '''\
 unable to load recipe file %s/testcase.recipe:
 Error in recipe file "testcase.recipe", line 1:
  unable to load recipe file %s/foo.recipe:
@@ -504,7 +504,7 @@ class TestRecipe1(PackageRecipe):
         loader = self._testSubload(repos, "loadInstalled('testcase')")
         # CNY-1711: in the context where the recipe was loaded, the arch was
         # multilib, so we expect Arch.x86_64 to be set
-        self.failUnlessEqual(loader.module.TestRecipe1.version, '2.0')
+        self.assertEqual(loader.module.TestRecipe1.version, '2.0')
 
     def testMultipleAvailable(self):
         self.addComponent('simple:source', '/localhost@rpl:branch//linux/1.0', 
@@ -586,14 +586,14 @@ Not using:
                                                        self.cfg, repos,
                                                        defaultToLatest=True)
         finalRecipe = loader.getRecipe()
-        self.failUnlessEqual(finalRecipe.__name__, 'R')
-        self.failUnlessEqual(finalRecipe.name, 'typed')
-        self.failUnlessEqual(finalRecipe.version, '2.0')
+        self.assertEqual(finalRecipe.__name__, 'R')
+        self.assertEqual(finalRecipe.name, 'typed')
+        self.assertEqual(finalRecipe.version, '2.0')
         x = loader.getLoadedTroves()[0]
-        self.failUnlessEqual(
+        self.assertEqual(
             (x[0], str(x[1]), str(x[2])),
             ('factory-simple:source', '/localhost@rpl:linux/1.0-1', ''))
-        self.failUnlessEqual(loader.getLoadedSpecs()['factory-simple'][0], x)
+        self.assertEqual(loader.getLoadedSpecs()['factory-simple'][0], x)
 
     def testBuiltInOverride(self):
         # Make sure we can override builtin recipes without destroying the
@@ -846,7 +846,7 @@ Not using:
 
         loader = self._testSubload(repos, "loadInstalled('test2')")
         FooLoaded = loader.getLoadedSpecs()
-        assertEq = self.failUnlessEqual
+        assertEq = self.assertEqual
         assertEq(FooLoaded['test2'][0], ('test2:source', v1, emptydep))
 
         Test2Loaded = FooLoaded['test2'][1]

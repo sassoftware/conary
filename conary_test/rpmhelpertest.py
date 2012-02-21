@@ -47,20 +47,20 @@ class RPMHelperTest(testhelp.TestCase):
             sio = StringIO.StringIO()
             rpmhelper.extractRpmPayload(fileobj, sio)
             sio.seek(0, 2)
-            self.failUnlessEqual(sio.tell(), expectedSize)
+            self.assertEqual(sio.tell(), expectedSize)
 
         # Test exception codepaths
         header = {rpmhelper.PAYLOADFORMAT: "super-payload format"}
         self.mock(rpmhelper, "readHeader", lambda x: header)
-        e = self.failUnlessRaises(rpmhelper.UnknownPayloadFormat,
+        e = self.assertRaises(rpmhelper.UnknownPayloadFormat,
             rpmhelper.extractRpmPayload, file("/dev/null"), None)
-        self.failUnlessEqual(e.args[0], "super-payload format")
+        self.assertEqual(e.args[0], "super-payload format")
 
         # No payload format, it should assume CPIO. Test compression
         header = {rpmhelper.PAYLOADCOMPRESSOR: "lame"}
-        e = self.failUnlessRaises(rpmhelper.UnknownCompressionType,
+        e = self.assertRaises(rpmhelper.UnknownCompressionType,
             rpmhelper.extractRpmPayload, file("/dev/null"), None)
-        self.failUnlessEqual(e.args[0], "lame")
+        self.assertEqual(e.args[0], "lame")
 
         # No payload compressor defined we should detect gzip or
         # assume uncompressed
@@ -72,12 +72,12 @@ class RPMHelperTest(testhelp.TestCase):
         def gzipFunc(*args, **kw):
             return 'Gzip File'
         self.mock(util, "GzipFile", gzipFunc)
-        self.failUnlessEqual(rpmhelper.UncompressedRpmPayload(fileIn),
+        self.assertEqual(rpmhelper.UncompressedRpmPayload(fileIn),
                              'Gzip File')
         fileIn = StringIO.StringIO()
         fileIn.write('This is just some uncompressed data')
         fileIn.seek(0)
-        self.failUnlessEqual(rpmhelper.UncompressedRpmPayload(fileIn),
+        self.assertEqual(rpmhelper.UncompressedRpmPayload(fileIn),
                              fileIn)
 
 
@@ -99,8 +99,8 @@ class RPMHelperTest(testhelp.TestCase):
         ]
         NEVRA = rpmhelper.NEVRA
         for filename, expected in tests:
-            self.failUnlessEqual(NEVRA.parse(filename), expected)
-            self.failUnlessEqual(NEVRA.parse(NEVRA.filename(*expected)),
+            self.assertEqual(NEVRA.parse(filename), expected)
+            self.assertEqual(NEVRA.parse(NEVRA.filename(*expected)),
                 expected)
 
     def testRpmHeader(self):
@@ -109,8 +109,8 @@ class RPMHelperTest(testhelp.TestCase):
         fileObj = file(rpmPath)
         header = rpmhelper.readHeader(fileObj)
         # both NAME and SIG_SIZE are 1000, but their value should be different
-        self.failUnlessEqual(header[rpmhelper.NAME], 'tmpwatch')
-        self.failUnlessEqual(header[rpmhelper.SIG_SIZE][0], 18624)
+        self.assertEqual(header[rpmhelper.NAME], 'tmpwatch')
+        self.assertEqual(header[rpmhelper.SIG_SIZE][0], 18624)
 
     def testRpmDeps(self):
         rpmName = 'depstest-0.1-1.x86_64.rpm'
@@ -201,9 +201,9 @@ class RPMHelperTest(testhelp.TestCase):
         fileObj.seek(0, 2)
         fileObj.write("\xff")
         fileObj.seek(0)
-        e = self.failUnlessRaises(rpmhelper.MD5SignatureError,
+        e = self.assertRaises(rpmhelper.MD5SignatureError,
             rpmhelper.verifySignatures, fileObj, [ k ])
-        self.failUnlessEqual(str(e), 'The MD5 digest fails to verify: '
+        self.assertEqual(str(e), 'The MD5 digest fails to verify: '
             'expected 6cc7c546c3a5de90bb272b11be2f3d67, got 744d88f4164ec2974b49839a69ea589d')
 
     def testExtractFilesFromCpio(self):
@@ -216,7 +216,7 @@ class RPMHelperTest(testhelp.TestCase):
             '/usr/lib/libpopt.so.0.0.0'
         ]
         ret = rpmhelper.extractFilesFromCpio(payload, fileList)
-        self.failUnlessEqual( [ self._fileSize(x) for x in ret ],
+        self.assertEqual( [ self._fileSize(x) for x in ret ],
             [ 5396, None, 20971 ])
 
     def testExtractFilesFromCpioHardlinks(self):
@@ -231,16 +231,16 @@ class RPMHelperTest(testhelp.TestCase):
             'nosuchfile',
         ]
         ret = rpmhelper.extractFilesFromCpio(payload, fileList)
-        self.failUnlessEqual( [ self._fileSize(x) for x in ret ],
+        self.assertEqual( [ self._fileSize(x) for x in ret ],
             [ 2, 2, 0, None, 2, None ])
-        self.failUnlessEqual( [ self._fileContents(x) for x in ret ],
+        self.assertEqual( [ self._fileContents(x) for x in ret ],
             [ '2\n', '2\n', '', None, '1\n', None ])
 
     def testExtractRpmPayloadFdLeak(self):
         fdCount0 = util.countOpenFileDescriptors()
         self.testExtractRpmPayload()
         fdCount1 = util.countOpenFileDescriptors()
-        self.failUnlessEqual(fdCount1 - fdCount0, 0)
+        self.assertEqual(fdCount1 - fdCount0, 0)
 
     @classmethod
     def _fileSize(cls, fileObj):

@@ -108,21 +108,21 @@ class WindowsAppTest(CapsuleRecipe):
             logBuild=True)
 
         msis = [ x for x in built if x[0].endswith(':msi') ]
-        self.failUnlessEqual(len(msis), 1)
+        self.assertEqual(len(msis), 1)
 
         msi = msis[0]
 
         repos = self.openRepository()
         spec = repos.findTrove(self.cfg.buildLabel, msi)
-        self.failUnlessEqual(len(spec), 1)
+        self.assertEqual(len(spec), 1)
 
         trv = repos.getTrove(*spec[0])
 
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.name(), 'WindowsAppTest')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.platform(), '')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.version(), '1.2.3.4')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.productCode(), 'FIXME')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.upgradeCode(), 'FIXME')
+        self.assertEqual(trv.troveInfo.capsule.msi.name(), 'WindowsAppTest')
+        self.assertEqual(trv.troveInfo.capsule.msi.platform(), '')
+        self.assertEqual(trv.troveInfo.capsule.msi.version(), '1.2.3.4')
+        self.assertEqual(trv.troveInfo.capsule.msi.productCode(), 'FIXME')
+        self.assertEqual(trv.troveInfo.capsule.msi.upgradeCode(), 'FIXME')
 
     def testGetUpgradeCode(self):
         def mockBuildMSI(version, upCode=None):
@@ -177,21 +177,21 @@ class WindowsAppTest(CapsuleRecipe):
         built = self.cookItem(repos, self.cfg, 'WindowsAppTest')[0]
 
         msis = [ x for x in built if x[0].endswith(':msi') ]
-        self.failUnlessEqual(len(msis), 1)
+        self.assertEqual(len(msis), 1)
 
         msi = msis[0]
 
         repos = self.openRepository()
         spec = repos.findTrove(self.cfg.buildLabel, msi)
-        self.failUnlessEqual(len(spec), 1)
+        self.assertEqual(len(spec), 1)
 
         trv = repos.getTrove(*spec[0])
 
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.name(), 'WindowsAppTest')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.platform(), '')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.version(), '1.2.3.5')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.productCode(), 'FIXME')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.upgradeCode(), '12345')
+        self.assertEqual(trv.troveInfo.capsule.msi.name(), 'WindowsAppTest')
+        self.assertEqual(trv.troveInfo.capsule.msi.platform(), '')
+        self.assertEqual(trv.troveInfo.capsule.msi.version(), '1.2.3.5')
+        self.assertEqual(trv.troveInfo.capsule.msi.productCode(), 'FIXME')
+        self.assertEqual(trv.troveInfo.capsule.msi.upgradeCode(), '12345')
 
     def testPersistingComponentInformation(self):
         def mockBuildMSI(version, components=None):
@@ -241,8 +241,8 @@ class WindowsAppTest(CapsuleRecipe):
         components = [ (x.uuid(), x.path())
             for _, x in trv.troveInfo.capsule.msi.components.iterAll() ]
 
-        self.failUnless(('uuid1', 'path1') in components)
-        self.failUnless(('uuid2', 'path2') in components)
+        self.assertTrue(('uuid1', 'path1') in components)
+        self.assertTrue(('uuid2', 'path2') in components)
 
         self.checkout('WindowsAppTest')
         os.chdir('WindowsAppTest')
@@ -263,9 +263,9 @@ class WindowsAppTest(CapsuleRecipe):
         components = [ (x.uuid(), x.path())
             for _, x in trv.troveInfo.capsule.msi.components.iterAll() ]
 
-        self.failUnless(('uuid1', 'path1') in components)
-        self.failUnless(('uuid2', 'path2') in components)
-        self.failUnless(('uuid3', 'path3') in components)
+        self.assertTrue(('uuid1', 'path1') in components)
+        self.assertTrue(('uuid2', 'path2') in components)
+        self.assertTrue(('uuid3', 'path3') in components)
 
     def testMsiArgs(self):
         def mockBuildMSI(version, msiArgs=None):
@@ -304,22 +304,22 @@ class WindowsAppTest(CapsuleRecipe):
         built, _ = self.cookItem(repos, self.cfg, 'WindowsAppTest')
 
         msis = [ x for x in built if x[0].endswith(':msi') ]
-        self.failUnlessEqual(len(msis), 1)
+        self.assertEqual(len(msis), 1)
 
         msi = msis[0]
 
         repos = self.openRepository()
         spec = repos.findTrove(self.cfg.buildLabel, msi)
-        self.failUnlessEqual(len(spec), 1)
+        self.assertEqual(len(spec), 1)
 
         trv = repos.getTrove(*spec[0])
 
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.name(), 'WindowsAppTest')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.platform(), '')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.version(), '1.2.3.4')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.productCode(), 'foo')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.upgradeCode(), 'bar')
-        self.failUnlessEqual(trv.troveInfo.capsule.msi.msiArgs(), '/q /l*v /i')
+        self.assertEqual(trv.troveInfo.capsule.msi.name(), 'WindowsAppTest')
+        self.assertEqual(trv.troveInfo.capsule.msi.platform(), '')
+        self.assertEqual(trv.troveInfo.capsule.msi.version(), '1.2.3.4')
+        self.assertEqual(trv.troveInfo.capsule.msi.productCode(), 'foo')
+        self.assertEqual(trv.troveInfo.capsule.msi.upgradeCode(), 'bar')
+        self.assertEqual(trv.troveInfo.capsule.msi.msiArgs(), '/q /l*v /i')
 
     def testBasics(self):
         raise testhelp.SkipTestException('need to mock out the windows build service')

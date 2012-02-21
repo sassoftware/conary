@@ -120,7 +120,7 @@ class EmptyPackage(PackageRecipe):
 
         trvcs = cs.iterNewTroveList().next()
         trv = trove.Trove(trvcs)
-        self.failUnless(str(trv.getBuildFlavor()))
+        self.assertTrue(str(trv.getBuildFlavor()))
 
     def testEmerge(self):
         d = tempfile.mkdtemp(dir=self.workDir)
@@ -194,7 +194,7 @@ class EmptyPackage(PackageRecipe):
         dataLine = [x for x in xmlLogData.splitlines() \
                 if 'gcc -O2 -g  -static  hello.c   -o hello' in x][0]
         desc = 'cook.build.doBuild'
-        self.failIf('<descriptor>%s</descriptor>' % desc not in dataLine,
+        self.assertFalse('<descriptor>%s</descriptor>' % desc not in dataLine,
                 "Expected descriptor to be present: %s" % desc)
 
 
@@ -998,7 +998,7 @@ class LotsOfFiles(PackageRecipe):
                 built, str = self.captureOutput(self.cookItem, repos, self.cfg,
                                                 'empty.recipe')
             except errors.ConaryError, e:
-                self.failUnlessEqual(e.args[0], expected)
+                self.assertEqual(e.args[0], expected)
         finally:
             self.cfg.buildPath = oldBuildPath
             os.chdir(origDir)
@@ -1028,7 +1028,7 @@ class TestRecipe(PackageRecipe):
         self.cfg.user.addServerGlob("*", "test", "bad pw")
 
         try:
-            self.failUnlessRaises(repoerrors.InsufficientPermission, self.commit)
+            self.assertRaises(repoerrors.InsufficientPermission, self.commit)
         finally:
             os.chdir(origDir)
             self.cfg.user.append(oldUser)
@@ -1484,7 +1484,7 @@ class TestClass(CPackageRecipe):
         self.makeSourceTrove('foo', recipes.unknownFlagRecipe)
         # make sure that the checkin code switched unknown use flag checking
         # back on after the commit
-        self.failUnlessRaises(use.NoSuchUseFlagError, getattr, use.Use, 'totallyUnknown')
+        self.assertRaises(use.NoSuchUseFlagError, getattr, use.Use, 'totallyUnknown')
         self.cfg.useDirs = self.cfg.useDirs[:-1]
         del use.Use['ffff']
         self.cfg.flavor = [deps.parseFlavor('')]
@@ -1557,17 +1557,17 @@ class %(cname)sPackage(PackageRecipe):
 
         ids = repos.getPackageBranchPathIds(pname + ':source', branch,
                                             filePrefixes)
-        self.failUnlessEqual(len(ids), filecount)
+        self.assertEqual(len(ids), filecount)
         # Simulate old client against new server
         ids = repos.getPackageBranchPathIds(pname + ':source', branch)
-        self.failUnlessEqual(len(ids), filecount * buildcount)
+        self.assertEqual(len(ids), filecount * buildcount)
 
         # Confirm new clients don't send the file prefix to old servers
         currentProtocolVersion = repos.c[branch].getProtocolVersion()
         repos.c[branch].setProtocolVersion(38)
         ids = repos.getPackageBranchPathIds(pname + ':source', branch,
                                             filePrefixes)
-        self.failUnlessEqual(len(ids), filecount * buildcount)
+        self.assertEqual(len(ids), filecount * buildcount)
         # Restore protocol
         repos.c[branch].setProtocolVersion(currentProtocolVersion)
 
@@ -1587,7 +1587,7 @@ class %(cname)sPackage(PackageRecipe):
             del netclient.CLIENT_VERSIONS[:]
             netclient.CLIENT_VERSIONS.extend(currentClientVersions)
 
-        self.failUnlessEqual(len(ids), filecount)
+        self.assertEqual(len(ids), filecount)
 
     def testPathIdDirnamesLookup(self):
         # CNY-2743
@@ -1612,12 +1612,12 @@ class %(cname)sPackage(PackageRecipe):
         allIds = repos.getPackageBranchPathIds("foo:source", branch)
         # /usr will match strictly now
         ret1 = repos.getPackageBranchPathIds("foo:source", branch, ["/usr"])
-        self.failUnlessEqual(set(ret1.keys()), set(["/usr/foo"]))
+        self.assertEqual(set(ret1.keys()), set(["/usr/foo"]))
         oldVer = repos.c[branch].getProtocolVersion()
         # now /usr will be treated as a prefix and all files will be returned
         repos.c[branch].setProtocolVersion(61)
         ret1 = repos.getPackageBranchPathIds("foo:source", branch, ["/usr"])
-        self.failUnlessEqual(ret1, allIds)
+        self.assertEqual(ret1, allIds)
         
         
     @protect
@@ -1671,9 +1671,9 @@ class TestCase(PackageRecipe):
         for fileId in fileIds:
             ids = repos.getPackageBranchPathIds('foo:source', branch,
                                                 filePrefixes, [fileId])
-            self.failUnlessEqual(len(ids), 1)
+            self.assertEqual(len(ids), 1)
             srvFileId = ids.values()[0][2]
-            self.failUnlessEqual(fileId, srvFileId)
+            self.assertEqual(fileId, srvFileId)
 
         # Build both flavors again
         fileIds2 = []
@@ -1691,8 +1691,8 @@ class TestCase(PackageRecipe):
             fileIds2.append(fileobj[2])
             fileVersions2.append(fileobj[3])
 
-        self.failUnlessEqual(fileIds, fileIds2)
-        self.failUnlessEqual(fileVersions, fileVersions2)
+        self.assertEqual(fileIds, fileIds2)
+        self.assertEqual(fileVersions, fileVersions2)
 
     @protect
     def testLookupPathIdLotsOfFiles(self):
@@ -1769,7 +1769,7 @@ class %(cname)sPackage(PackageRecipe):
                            sourceName = "foo:source")
         branch = versions.VersionFromString("/localhost@rpl:1")
         branchIds = repos.getPackageBranchPathIds("foo:source", branch)
-        self.failUnlessEqual(branchIds, {
+        self.assertEqual(branchIds, {
             '/usr/share/man/man1/foo.1':
             ('\x9f\x8a\x12\xb9/\x13`\xcbd\xab\x87\xe0Gu\x1b\x13',
              VFS('/localhost@rpl:1/1-1-1'),
@@ -1785,8 +1785,8 @@ class %(cname)sPackage(PackageRecipe):
         targetVersion = versions.VersionFromString('/localhost@rpl:1/3-1-1')
         ident = cook._getPathIdGen(repos, 'foo:source', targetVersion, None,
                                    ['foo'], fileIdsPathMap)
-        self.failUnlessEqual(ident.map, branchIds)
-        self.failUnlessEqual(fileIdsPathMap, { '/blah': '1' * 20 })
+        self.assertEqual(ident.map, branchIds)
+        self.assertEqual(fileIdsPathMap, { '/blah': '1' * 20 })
 
     def testRelativePackageCommit(self):
         def check(cs, *args, **kwargs):
@@ -1866,7 +1866,7 @@ class TestPackage(PackageRecipe):
             "040000 at %s" % rodir)
 
         # Fail if the read only directory is still around.
-        self.failIf(os.path.exists(rodir))
+        self.assertFalse(os.path.exists(rodir))
 
     def testCookMultipleGroupFlavorsWithLocalFlags(self):
         groupFoo = """
@@ -1901,7 +1901,7 @@ class GroupFoo(GroupRecipe):
         cs = changeset.ChangeSetFromFile(d)
         trvcs = cs.iterNewTroveList().next()
         trv = trove.Trove(trvcs)
-        self.failUnless(str(trv.getBuildFlavor()))
+        self.assertTrue(str(trv.getBuildFlavor()))
 
     def testCookMultiplePrefixesNonAsciiChars(self):
         # CNY-1932
@@ -2037,14 +2037,14 @@ class Test(PackageRecipe):
         log.setVerbosity(log.INFO)
         ret, s = self.captureOutput(cook.cookItem, repos, self.cfg,
                                     'test', prep=True)
-        self.failUnlessEqual('\n'.join(self.logFilter.records[:5]),"""\
+        self.assertEqual('\n'.join(self.logFilter.records[:5]),"""\
 + Methods called:
 
 + Building test=localhost@rpl:linux[]
 + adding source file test.recipe
 + found test.recipe in repository
 + test.recipe not yet cached, fetching...""")
-        self.failUnless(re.match('\+ copying [^\s]*? to [^\s]*?',
+        self.assertTrue(re.match('\+ copying [^\s]*? to [^\s]*?',
                 self.logFilter.records[-1]))
 
     def testSuperClassOverride(self):
@@ -2233,7 +2233,7 @@ class GroupFoo(GroupRecipe):
         built, str = self.captureOutput(cook.cookItem, None, self.cfg,
                                         'testcase.recipe')
         lines = str.split('\n')
-        self.failUnless('+ No repository available, not copying forward metadata.' in lines)
+        self.assertTrue('+ No repository available, not copying forward metadata.' in lines)
 
     def testCookPromotesMetadataMissingTrove(self):
         # CNY-2611
@@ -2316,7 +2316,7 @@ class TestRecipe(PackageRecipe):
 
         # Make sure the changeset was written to the requested filename in the
         # current working directory.
-        self.failUnless(os.path.exists('test.ccs'))
+        self.assertTrue(os.path.exists('test.ccs'))
 
         # Make sure the changeset was not committed to the repository.
-        self.failUnlessRaises(errors.TroveNotFound, repos.findTrove, self.cfg.buildLabel, ('test', None, None))
+        self.assertRaises(errors.TroveNotFound, repos.findTrove, self.cfg.buildLabel, ('test', None, None))

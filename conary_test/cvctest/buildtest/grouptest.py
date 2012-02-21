@@ -714,7 +714,7 @@ class GroupTest(rephelp.RepositoryHelper):
         try:
             self.build(recipeStr, recipeName)
         except cook.CookError, e:
-            self.failIf(str(e) != msg, "incorrect exception: %s" % str(e))
+            self.assertFalse(str(e) != msg, "incorrect exception: %s" % str(e))
         else:
             self.fail("exception expected")
 
@@ -747,7 +747,7 @@ class GroupTest(rephelp.RepositoryHelper):
         assert(set(group.iterTroveList(weakRefs=True, strongRefs=False))
                == set([('test:runtime', VFS(ver), self.emptyFlavor),
                        ('test:runtime', VFS(ver2), self.emptyFlavor)]))
-        self.failUnless(str(group.getBuildFlavor()))
+        self.assertTrue(str(group.getBuildFlavor()))
 
         primary = self.build(basicSplitGroup, "splitGroup", 
                              returnName='group-first')
@@ -1901,19 +1901,19 @@ class GroupAutoResolve(GroupRecipe):
         trv = self._get(repos, 'group-addcopy', 'localhost@rpl:branch')
         assert([x[0] for x in trv.iterTroveList(strongRefs=True
                                                     )][0] == 'group-os')
-        self.failUnlessEqual(trv.getTroveCopiedFrom(), [])
+        self.assertEqual(trv.getTroveCopiedFrom(), [])
 
         trv = self._get(repos, 'group-os', 'localhost@rpl:branch')
         labels = set(str(x[1].trailingLabel()) 
                      for x in trv.iterTroveList(strongRefs=True))
         assert(labels == set(['localhost@rpl:branch']))
         copiedFrom = [(n, str(v), str(f)) for (n, v, f) in trv.getTroveCopiedFrom()]
-        self.failUnlessEqual(copiedFrom,
+        self.assertEqual(copiedFrom,
                              [('group-os', '/localhost@rpl:linux/1-1-1', '')])
         # Check that subgroups have their copiedFrom properly set
         trv = self._get(repos, 'group-dist', 'localhost@rpl:branch')
         copiedFrom = [(n, str(v), str(f)) for (n, v, f) in trv.getTroveCopiedFrom()]
-        self.failUnlessEqual(copiedFrom,
+        self.assertEqual(copiedFrom,
                              [('group-dist', '/localhost@rpl:linux/1-1-1', '')])
 
     def testAddCopyNonDefaultGroup(self):
@@ -1927,11 +1927,11 @@ class GroupAutoResolve(GroupRecipe):
         trv = self.findAndGetTrove('group-foo')
         assert([x[0] for x in trv.iterTroveList(strongRefs=True
                                                     )][0] == 'group-os')
-        self.failUnlessEqual(trv.getTroveCopiedFrom(), [])
+        self.assertEqual(trv.getTroveCopiedFrom(), [])
 
         trv = self.findAndGetTrove('group-os')
         copiedFrom = [(n, str(v), str(f)) for (n, v, f) in trv.getTroveCopiedFrom()]
-        self.failUnlessEqual(copiedFrom,
+        self.assertEqual(copiedFrom,
                              [('group-os', '/localhost@rpl:linux/1-1-1', '')])
 
     def testSharedFiles(self):
@@ -2288,7 +2288,7 @@ class GroupConflicts(GroupRecipe):
             self.build(groupAddGroupConflicts, 'GroupConflicts')
             assert(0)
         except errors.GroupPathConflicts, err:
-            self.failUnlessEqual(str(err), '''\
+            self.assertEqual(str(err), '''\
 
 The following troves in the following groups have conflicts:
 
@@ -2305,7 +2305,7 @@ group-dist:
       /p
 ''')
             # CNY-3079
-            self.failUnless(isinstance(err.args, tuple), type(err.args))
+            self.assertTrue(isinstance(err.args, tuple), type(err.args))
 
 
     def testDepResolveCreatesConflict(self):
@@ -2834,7 +2834,7 @@ class basicGroup(GroupRecipe):
         assert(not d)
 
         copiedFrom = [(n, str(v), str(f)) for (n, v, f) in grp.getTroveCopiedFrom()]
-        self.failUnlessEqual(copiedFrom,
+        self.assertEqual(copiedFrom,
                              [('group-bar', '/localhost@rpl:linux/1-1-1', '')])
 
 
@@ -2900,7 +2900,7 @@ class basicGroup(GroupRecipe):
 
         copiedFrom = [(n, str(v), str(f))
                         for (n, v, f) in groupCore.getTroveCopiedFrom()]
-        self.failUnlessEqual(copiedFrom,
+        self.assertEqual(copiedFrom,
                              [('group-core', '/localhost@rpl:linux/1-1-1', '')])
 
     def testSearchTipFirst(self):
@@ -3434,7 +3434,7 @@ class replaceGroup(GroupRecipe):
         self.addComponent('group-test:source', '1.0', [('group-test.recipe',
                                                         replaceGroup)])
         troveTups = set(self._getSourcesForGroup('group-test'))
-        self.failUnlessEqual(troveTups, set([
+        self.assertEqual(troveTups, set([
             (trv1[0], trv1[1], None),
             (trv2[0], trv2[1], None),
           ]))
@@ -3526,8 +3526,8 @@ class basicGroup(GroupRecipe):
         self.addCollection('group-bar', [('bam:run=:branch/1-1-1'),
                                          ('bam:run=:branch/2-1-1')])
         troveTups = set(self._getSourcesForGroup('group-test'))
-        self.failUnlessEqual(len(troveTups), 1)
-        self.failUnlessEqual(str(list(troveTups)[0][1].trailingRevision()), '1-1')
+        self.assertEqual(len(troveTups), 1)
+        self.assertEqual(str(list(troveTups)[0][1].trailingRevision()), '1-1')
 
 
     def testAddAllRedirect(self):
@@ -4493,9 +4493,9 @@ class OldFlavor(GroupRecipe):
             self.build(recipeStr, 'OldFlavor')
         except errors.CookError, e:
             message = str(e)
-            self.failIf('foo' not in message,
+            self.assertFalse('foo' not in message,
                     "Error should have referenced foo")
-            self.failIf('bar' not in message,
+            self.assertFalse('bar' not in message,
                     "Error should have referenced bar")
         else:
             self.fail('Expected CookError to be raised')
@@ -4715,7 +4715,7 @@ class TestGroup(GroupRecipe):
 
         # autoResolve is unspecified but this is a image group
         grp = self.build(imageAutoResolveGroup1, "ImageAutoResolveGroup")
-        self.failIf('bar:info' not in [x[0] for x in \
+        self.assertFalse('bar:info' not in [x[0] for x in \
                 grp.iterTroveList(strongRefs = True, weakRefs = True)],
                 "expected bar:info to be present due to autoResolve")
 
@@ -4729,7 +4729,7 @@ class TestGroup(GroupRecipe):
 
         # autoResolve is unspecified but this is a image group
         grp = self.build(imageAutoResolveGroup2, "ImageAutoResolveGroup")
-        self.failIf('bar:info' in [x[0] for x in \
+        self.assertFalse('bar:info' in [x[0] for x in \
                 grp.iterTroveList(strongRefs = True, weakRefs = True)],
                 "expected bar:info to be absent due to autoResolve")
 
@@ -4743,7 +4743,7 @@ class TestGroup(GroupRecipe):
 
         # autoResolve is unspecified but this is a image group
         grp = self.build(imageAutoResolveGroup3, "ImageAutoResolveGroup")
-        self.failIf('bar:info' not in [x[0] for x in \
+        self.assertFalse('bar:info' not in [x[0] for x in \
                 grp.iterTroveList(strongRefs = True, weakRefs = True)],
                 "expected bar:info to be present due to autoResolve")
 
@@ -4757,7 +4757,7 @@ class TestGroup(GroupRecipe):
 
         # autoResolve is unspecified but this is a image group
         grp = self.build(imageAutoResolveGroup4, "ImageAutoResolveGroup")
-        self.failIf('bar:info' in [x[0] for x in \
+        self.assertFalse('bar:info' in [x[0] for x in \
                 grp.iterTroveList(strongRefs = True, weakRefs = True)],
                 "expected bar:info to be absent due to autoResolve")
 
@@ -4786,7 +4786,7 @@ class ImageAutoResolveGroup(GroupRecipe):
 
         # autoResolve is unspecified but this is a image group
         grp = self.build(imageGroup, "ImageAutoResolveGroup")
-        self.failIf('bar:info' not in [x[0] for x in \
+        self.assertFalse('bar:info' not in [x[0] for x in \
                 grp.iterTroveList(strongRefs = True, weakRefs = True)],
                 "expected bar:info to be present due to autoResolve")
 
@@ -4797,8 +4797,8 @@ class ImageAutoResolveGroup(GroupRecipe):
         grp = self.build(allowMissing1, 'AllowMissing', logLevel=log.INFO)
 
         trvs = [ x[0] for x in grp.iterTroveList(strongRefs=True) ]
-        self.failUnlessEqual(len(trvs), 1)
-        self.failUnless('foo' in trvs)
+        self.assertEqual(len(trvs), 1)
+        self.assertTrue('foo' in trvs)
 
     def testAllowMissingAddAll(self):
         self.addComponent('foo:runtime')
@@ -4808,8 +4808,8 @@ class ImageAutoResolveGroup(GroupRecipe):
         grp = self.build(allowMissing2, 'AllowMissing', logLevel=log.INFO)
 
         trvs = [ x[0] for x in grp.iterTroveList(strongRefs=True) ]
-        self.failUnlessEqual(len(trvs), 1)
-        self.failUnless('foo' in trvs)
+        self.assertEqual(len(trvs), 1)
+        self.assertTrue('foo' in trvs)
 
     def testAllowMissingReplace(self):
         self.addComponent('foo:runtime')
@@ -4818,5 +4818,5 @@ class ImageAutoResolveGroup(GroupRecipe):
         grp = self.build(allowMissing3, 'AllowMissing', logLevel=log.INFO)
 
         trvs = [ x[0] for x in grp.iterTroveList(strongRefs=True) ]
-        self.failUnlessEqual(len(trvs), 1)
-        self.failUnless('foo' in trvs)
+        self.assertEqual(len(trvs), 1)
+        self.assertTrue('foo' in trvs)

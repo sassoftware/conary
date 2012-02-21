@@ -64,15 +64,15 @@ class ChangeLogTest(testhelp.TestCase):
             if oldEditor:
                 os.environ['EDITOR'] = oldEditor
 
-        self.failUnless(ret)
-        self.failUnlessEqual(cl.message(), commitMsg)
+        self.assertTrue(ret)
+        self.assertEqual(cl.message(), commitMsg)
 
         expMsg = ("Error executing %s. Please set the EDITOR\n"
             "environment variable to a valid editor, or enter log message,\n"
             "terminated with single '.' (or CTRL+D to cancel)\n" % '/foo/bar')
 
         newStderr.seek(0)
-        self.failUnlessEqual(newStderr.read(), expMsg)
+        self.assertEqual(newStderr.read(), expMsg)
 
         # Now fail it - EOF instead of single dot
         newStdin.truncate(0)
@@ -97,7 +97,7 @@ class ChangeLogTest(testhelp.TestCase):
             if oldEditor:
                 os.environ['EDITOR'] = oldEditor
 
-        self.failIf(ret)
+        self.assertFalse(ret)
 
 
     def _invalidChangeLogEditor(self):

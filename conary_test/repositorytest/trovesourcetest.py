@@ -502,14 +502,14 @@ class ChangesetFilesTest(rephelp.RepositoryHelper):
             # No exception expected
             self.fail("Caught exception: %s" % e)
         # The implementation of stack says so...
-        self.failUnlessEqual(ts1, s1)
+        self.assertEqual(ts1, s1)
 
         ret = ts1.hasTroves([t[0][0], t[1][1], t[2][2]])
-        self.failUnlessEqual(ret, [True, False, False])
+        self.assertEqual(ret, [True, False, False])
 
         ts2 = stack(ts1)
         ret = ts1.hasTroves([t[0][2], t[1][0], t[2][1]])
-        self.failUnlessEqual(ret, [True, False, False])
+        self.assertEqual(ret, [True, False, False])
 
         ts3 = stack(s1, s3)
         ts4 = stack(s2, ts3)
@@ -517,28 +517,28 @@ class ChangesetFilesTest(rephelp.RepositoryHelper):
         ts5 = TroveSourceStack(s2, ts3)
 
         for s in [s1, s2, s3]:
-            self.failUnless(ts4.hasSource(s))
-            self.failUnless(ts5.hasSource(s))
+            self.assertTrue(ts4.hasSource(s))
+            self.assertTrue(ts5.hasSource(s))
 
         for (rs, es) in zip(ts4.iterSources(), [s2, s1, s3]):
-            self.failUnlessEqual(rs, es)
+            self.assertEqual(rs, es)
 
         for (rs, es) in zip(ts5.iterSources(), [s2, s1, s3]):
-            self.failUnlessEqual(rs, es)
+            self.assertEqual(rs, es)
 
         # same source specified twice - obtain a stack
         ts6 = stack(s1, s1)
-        self.failIfEqual(ts6, s1)
-        self.failUnless(isinstance(ts6, TroveSourceStack))
+        self.assertNotEqual(ts6, s1)
+        self.assertTrue(isinstance(ts6, TroveSourceStack))
 
         ts7 = stack(ts6, ts6)
-        self.failUnlessEqual(ts7, ts6)
+        self.assertEqual(ts7, ts6)
 
         ts8 = stack(ts3, ts4)
         # Old implementation was adding ts4 as a source for ts3, instead of
         # adding the subsources of ts4 to ts3
         for s in ts8.iterSources():
-            self.failIf(isinstance(s, TroveSourceStack))
+            self.assertFalse(isinstance(s, TroveSourceStack))
 
 
 class ChangeSetJobSourceTest(rephelp.RepositoryHelper):
@@ -546,7 +546,7 @@ class ChangeSetJobSourceTest(rephelp.RepositoryHelper):
         # Tests a bug in findTroves (referring to self.allTroves)
         db = database.Database(':memory:', ':memory:')
         csjs = ChangeSetJobSource(None, db)
-        self.failUnlessEqual(csjs.findTroves('a', []), {})
+        self.assertEqual(csjs.findTroves('a', []), {})
 
     def testBugMergeDepSuggestions(self):
         # Tests a bug in mergeDepSuggestions (referring to r)
@@ -555,7 +555,7 @@ class ChangeSetJobSourceTest(rephelp.RepositoryHelper):
         allSuggs = {'a' : [[]]}
         newSuggs = {'a' : [[2]]}
         csjs.mergeDepSuggestions(allSuggs, newSuggs)
-        self.failUnlessEqual(allSuggs, newSuggs)
+        self.assertEqual(allSuggs, newSuggs)
 
     def testTwoChangeSetsWithSameTroveAndDiffConfig(self):
         trv = self.addComponent('foo:run=1', [('/etc/config', 'v1\n')])

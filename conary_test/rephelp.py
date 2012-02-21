@@ -74,6 +74,7 @@ from conary.server  import server as cny_server
 from conary.server.server import SecureHTTPServer
 #test
 from testrunner import testhelp
+from testrunner.testcase import safe_repr
 from testutils import apache_server, base_server, os_utils, sock_utils
 from testutils import sqlharness
 from conary_test import recipes
@@ -3183,21 +3184,6 @@ class RepositoryHelper(testhelp.TestCase):
                                                 self.cfg.installLabelPath,
                                                 self.cfg.flavor)
 
-    def assertRaises(self, exceptionClass, fn, *args, **kwargs):
-        text = kwargs.pop('exceptionString', None)
-
-        try:
-            fn(*args, **kwargs)
-        except exceptionClass, e:
-            if text is not None and str(e) != text:
-                raise self.failureException(
-                        "%s had str value '%s' instead of expected '%s'" %
-                        (str(exceptionClass), str(e), text))
-        else:
-            raise self.failureException("%s not raised" % str(exceptionClass))
-
-        return e
-
     def checkCall(self, testFn, args, kw, fn, expectedArgs,
                     cfgValues={}, returnVal=None, ignoreKeywords=False,
                     checkCallback=None, **expectedKw):
@@ -3411,12 +3397,10 @@ class RepositoryHelper(testhelp.TestCase):
         else:
             raise testhelp.SkipTestException("Squid is not installed")
 
-    def failUnlessIn(self, val, target):
-        self.failUnless(val in target, "%s not in %s" % (repr(val), repr(target)))
-
-    def failUnlessSubstringIn(self, val, target):
+    def assertSubstringIn(self, val, target):
         matches = [val in x for x in target]
-        self.failUnless(matches, "%s not found in %s" % (repr(val), repr(target)))
+        self.assertTrue(matches, "%s not found in %s" % (
+            safe_repr(val), safe_repr(target)))
 
     @staticmethod
     def sleep(length):
