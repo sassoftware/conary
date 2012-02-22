@@ -231,7 +231,7 @@ class TransportTest(rephelp.RepositoryHelper):
     def _assertProxy(self, via, cProxy):
             via = networking.HostPort(via.strip().split(' ')[1])
             self.assertEqual(via.port, cProxy.port)
-            self.failUnlessIn(str(via.host), [
+            self.assertIn(str(via.host), [
                     '127.0.0.1',
                     '::ffff:127.0.0.1',
                     '::1',
@@ -253,15 +253,15 @@ class TransportTest(rephelp.RepositoryHelper):
             repos = conaryclient.ConaryClient(self.cfg).getRepos()
 
             pv = repos.c['localhost'].getProtocolVersion()
-            self.failUnlessEqual(pv, netserver.SERVER_VERSIONS[-1])
+            self.assertEqual(pv, netserver.SERVER_VERSIONS[-1])
             transport = repos.c['localhost']._transport
-            self.failUnless('via' in transport.responseHeaders)
+            self.assertTrue('via' in transport.responseHeaders)
             via = transport.responseHeaders['via']
             via = via.split(',')
             if os.environ.get('CONARY_HTTP_PROXY', None) and \
                               os.environ.get('CONARY_PROXY', None):
                 proxyCount += 1
-            self.failUnlessEqual(len(via), proxyCount)
+            self.assertEqual(len(via), proxyCount)
             self._assertProxy(via[-1], cProxy)
         finally:
             cProxy.stop()
@@ -297,16 +297,16 @@ class TransportTest(rephelp.RepositoryHelper):
 
             repos = conaryclient.ConaryClient(self.cfg).getRepos()
             pv = repos.c['localhost'].getProtocolVersion()
-            self.failUnlessEqual(pv, netserver.SERVER_VERSIONS[-1])
+            self.assertEqual(pv, netserver.SERVER_VERSIONS[-1])
             transport = repos.c['localhost']._transport
-            self.failUnless('via' in transport.responseHeaders)
+            self.assertTrue('via' in transport.responseHeaders)
             via = transport.responseHeaders['via']
             via = via.split(',')
 
             if os.environ.get('CONARY_HTTP_PROXY', None) and \
                               os.environ.get('CONARY_PROXY', None):
                 proxyCount += 1
-            self.failUnlessEqual(len(via), proxyCount)
+            self.assertEqual(len(via), proxyCount)
             self._assertProxy(via[-2], cProxy1)
             self._assertProxy(via[-1], cProxy2)
         finally:
@@ -341,10 +341,10 @@ class TransportTest(rephelp.RepositoryHelper):
             logsz0 = h.getAccessLogSize()
 
             srvVers = client.repos.c['localhost'].checkVersion()
-            self.failUnlessEqual(srvVers[-1], netserver.SERVER_VERSIONS[-1])
+            self.assertEqual(srvVers[-1], netserver.SERVER_VERSIONS[-1])
 
             logEntry = h.getAccessLogEntry(logsz0)
-            self.failUnless(logEntry)
+            self.assertTrue(logEntry)
 
         finally:
             cp.stop()
@@ -372,7 +372,7 @@ class TransportTest(rephelp.RepositoryHelper):
             # logEntry looks like:
             # ['1177451531.683', '115', '127.0.0.1', 'TCP_MISS/200', '18671', 'GET',
             # 'http://www.rb.rpath.com', '-', 'DIRECT/172.16.58.31', 'text/html']
-            self.failUnlessEqual(logEntry[5:7], ['GET', url])
+            self.assertEqual(logEntry[5:7], ['GET', url])
 
             logsz0 = h.getAccessLogSize()
             fd = opener.open(sslurl)
@@ -381,7 +381,7 @@ class TransportTest(rephelp.RepositoryHelper):
             opener.close()
 
             logEntry = h.getAccessLogEntry(logsz0)
-            self.failUnlessEqual(logEntry[5:7],
+            self.assertEqual(logEntry[5:7],
                                  ['CONNECT', 'localhost:%d' %sslport])
 
         proxies = {
@@ -433,9 +433,9 @@ class TransportTest(rephelp.RepositoryHelper):
             # Adding some timeout, otherwise we see a 503 Service Unavailable
             self.sleep(.1)
 
-            e = self.failUnlessRaises(socket.error, runTests, opener, port,
+            e = self.assertRaises(socket.error, runTests, opener, port,
                     sslport)
-            self.failUnlessEqual(e.args, (111,
+            self.assertEqual(e.args, (111,
                 "Connection refused (via HTTP proxy http://%s)" % proxyUri))
         finally:
             server.kill()
@@ -466,7 +466,7 @@ class TransportTest(rephelp.RepositoryHelper):
             try:
                 versions = repos.c['localhost'].checkVersion()
             except errors.OpenError, e:
-                self.failUnless('407 Proxy Authentication Required' in str(e),
+                self.assertTrue('407 Proxy Authentication Required' in str(e),
                                 str(e))
             else:
                 self.fail("Should have failed")
@@ -502,7 +502,7 @@ class TransportTest(rephelp.RepositoryHelper):
                 try:
                     versions = repos.c['localhost2'].checkVersion()
                 except errors.OpenError, e:
-                    self.failUnless('407 Proxy Authentication Required' in
+                    self.assertTrue('407 Proxy Authentication Required' in
                             str(e), str(e))
                 else:
                     self.fail("Should have failed")
@@ -548,15 +548,15 @@ class TransportTest(rephelp.RepositoryHelper):
                 logsz0 = h.getAccessLogSize()
                 versions = repos.c['localhost1'].checkVersion()
                 logEntry = h.getAccessLogEntry(logsz0)
-                self.failUnless(logEntry)
-                self.failUnless('CONNECT' in logEntry, "CONNECT not in %s" % logEntry)
+                self.assertTrue(logEntry)
+                self.assertTrue('CONNECT' in logEntry, "CONNECT not in %s" % logEntry)
 
                 logsz1 = h.getAccessLogSize()
                 versions = repos.c['localhost1'].checkVersion()
                 # Wait for a second, make sure the proxy's log file did increase
                 self.sleep(1)
                 logsz2 = h.getAccessLogSize()
-                self.failIf(logsz1 == logsz2)
+                self.assertFalse(logsz1 == logsz2)
             finally:
                 httputils.LocalHosts.add('127.0.0.1')
                 httputils.LocalHosts.add('localhost')
@@ -594,7 +594,7 @@ class TransportTest(rephelp.RepositoryHelper):
             logsz0 = h.getAccessLogSize()
             self.assertEqual(sp.ping(), ([True],))
             logEntry = h.getAccessLogEntry(logsz0)
-            self.failUnless(logEntry)
+            self.assertTrue(logEntry)
 
             # Now mangle localhosts. Proxy is 127.0.0.1, server is on
             # localhost.
@@ -609,7 +609,7 @@ class TransportTest(rephelp.RepositoryHelper):
             self.sleep(1)
             logsz1 = h.getAccessLogSize()
 
-            self.failUnlessEqual(logsz1, logsz0)
+            self.assertEqual(logsz1, logsz0)
         finally:
             httputils.LocalHosts = oldLocalHosts
             sc.kill()
@@ -657,7 +657,7 @@ class TransportTest(rephelp.RepositoryHelper):
             sp.ping()
             self.sleep(1)
             logsz1 = h.getAccessLogSize()
-            self.failUnlessEqual(logsz1, logsz0)
+            self.assertEqual(logsz1, logsz0)
 
             # Local proxy, remote host. Proxy
             localhosts.add('127.0.0.1')
@@ -667,7 +667,7 @@ class TransportTest(rephelp.RepositoryHelper):
             sp.ping()
             self.sleep(1)
             logsz1 = h.getAccessLogSize()
-            self.failUnless(logsz1 > logsz0, "Proxy should have been used")
+            self.assertTrue(logsz1 > logsz0, "Proxy should have been used")
 
             environ['no_proxy'] = '*'
             # Proxy should still be used, the environemnt variable should
@@ -676,7 +676,7 @@ class TransportTest(rephelp.RepositoryHelper):
             sp.ping()
             self.sleep(1)
             logsz1 = h.getAccessLogSize()
-            self.failUnless(logsz1 > logsz0, "Proxy should have been used")
+            self.assertTrue(logsz1 > logsz0, "Proxy should have been used")
         finally:
             httputils.LocalHosts = oldLocalHosts
             sc.kill()
@@ -697,30 +697,30 @@ class TransportTest(rephelp.RepositoryHelper):
         opener = opmod.URLOpener(proxyMap)
 
         # Normal hosts will proxy through
-        self.failUnlessEqual(opener._shouldBypass(url, proxyPlain), False)
-        self.failUnlessEqual(opener._shouldBypass(url, proxyConary), False)
+        self.assertEqual(opener._shouldBypass(url, proxyPlain), False)
+        self.assertEqual(opener._shouldBypass(url, proxyConary), False)
         for h in httputils.LocalHosts:
-            self.failUnlessEqual(opener._shouldBypass(
+            self.assertEqual(opener._shouldBypass(
                 request.URL("http://%s:33" % h), proxyPlain), True)
-            self.failUnlessEqual(opener._shouldBypass(
+            self.assertEqual(opener._shouldBypass(
                 request.URL("http://%s:33" % h), proxyConary), True)
 
         # Force direct for everything on HTTP proxies
         environ['no_proxy'] = "*"
-        self.failUnlessEqual(opener._shouldBypass(url, proxyPlain), True)
+        self.assertEqual(opener._shouldBypass(url, proxyPlain), True)
         # environment variable should not affect the selection of conary proxy
-        self.failUnlessEqual(opener._shouldBypass(url, proxyConary), False)
+        self.assertEqual(opener._shouldBypass(url, proxyConary), False)
 
         # Test that NO_PROXY is also used, not just no_proxy
         del environ['no_proxy']
-        self.failUnlessEqual(opener._shouldBypass(url, proxyPlain), False)
+        self.assertEqual(opener._shouldBypass(url, proxyPlain), False)
         environ['NO_PROXY'] = "*"
-        self.failUnlessEqual(opener._shouldBypass(url, proxyPlain), True)
-        self.failUnlessEqual(opener._shouldBypass(url, proxyConary), False)
+        self.assertEqual(opener._shouldBypass(url, proxyPlain), True)
+        self.assertEqual(opener._shouldBypass(url, proxyConary), False)
         # no_proxy takes precedence over NO_PROXY
         environ['no_proxy'] = "host.com"
-        self.failUnlessEqual(opener._shouldBypass(url, proxyPlain), False)
-        self.failUnlessEqual(opener._shouldBypass(
+        self.assertEqual(opener._shouldBypass(url, proxyPlain), False)
+        self.assertEqual(opener._shouldBypass(
             request.URL("http://host.com"), proxyPlain), True)
         # http://lynx.isc.org/lynx2.8.5/lynx2-8-5/lynx_help/keystrokes/environments.html - comma-separated list of domains (with a trailing, to force empty domain)
         environ['no_proxy'] = "host.domain.dom, domain1.dom, domain2, "
@@ -738,7 +738,7 @@ class TransportTest(rephelp.RepositoryHelper):
             ('www.domain2:80', True),
         ]
         for h, expected in tests:
-            self.failUnlessEqual(opener._shouldBypass(
+            self.assertEqual(opener._shouldBypass(
                 request.URL('http://' + h), proxyPlain), expected)
 
     def testGetIPAddress(self):
@@ -747,7 +747,7 @@ class TransportTest(rephelp.RepositoryHelper):
         httputils.IPCache.clear()
         httputils.IPCache._cache.set('somehost', '1.1.1.1')
         self.mock(socket, 'gethostbyname', gethostbyname)
-        self.failUnlessEqual(httputils.IPCache._cache.get('somehost'),
+        self.assertEqual(httputils.IPCache._cache.get('somehost'),
             '1.1.1.1')
         self.assertRaises(socket.gaierror,
             httputils.IPCache.get, 'someotherhost')
@@ -767,7 +767,7 @@ class TransportTest(rephelp.RepositoryHelper):
         self._testSSLCertCheck(('ssl-cert.crt', 'ssl-cert.key'))
 
         # Bad (self-signed)
-        self.failUnlessRaises(SSL.SSLError, self._testSSLCertCheck,
+        self.assertRaises(SSL.SSLError, self._testSSLCertCheck,
                 ('ssl-self-signed.pem', 'ssl-self-signed.pem'))
 
 

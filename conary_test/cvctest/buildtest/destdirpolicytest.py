@@ -495,7 +495,7 @@ class TestExecutableLibraries(PackageRecipe):
         self.logFilter.add()
         trove = self.build(recipestr1, "TestExecutableLibraries", logLevel=log.INFO)
         self.logFilter.remove()
-        self.failIf('+ SharedLibrary: /usr/foo/libfoo.so.0.0' \
+        self.assertFalse('+ SharedLibrary: /usr/foo/libfoo.so.0.0' \
                 in self.logFilter.records,
                 "Conary honored a non-managed file for AutoSharedLibrary")
 
@@ -989,7 +989,7 @@ class TestNormalizeInterpreterPaths(PackageRecipe):
         thisline = f.readline()
         f.close()
         os.chmod(workpath, mode)
-        self.failUnlessEqual(thisline, line)
+        self.assertEqual(thisline, line)
 
     def testNormalizeInterpreterPathsTest2(self):
         """
@@ -1051,8 +1051,8 @@ class TestNormalizePamConfig(PackageRecipe):
         f = file(path)
         line = f.readline()
         f.close()
-        self.failUnlessEqual(line.find('ISA'), -1)
-        self.failUnlessEqual(os.stat(path)[stat.ST_MODE] & 0777, 0400)
+        self.assertEqual(line.find('ISA'), -1)
+        self.assertEqual(os.stat(path)[stat.ST_MODE] & 0777, 0400)
 
         path = self.workDir+'/etc/pam.d/stack'
         f = file(path)
@@ -1560,8 +1560,8 @@ missing2>=1.2,<=1.3\"\"\")
         self.logFilter.add()
         (built, d) = self.buildRecipe(recipeStr, 'EggRequiresRecipe')
         self.logFilter.remove()
-        self.failIf('warning: Requires: Python egg-info for missing1 was not found' not in self.logFilter.records)
-        self.failIf('warning: Requires: Python egg-info for missing2 was not found' in self.logFilter.records)
+        self.assertFalse('warning: Requires: Python egg-info for missing1 was not found' not in self.logFilter.records)
+        self.assertFalse('warning: Requires: Python egg-info for missing2 was not found' in self.logFilter.records)
 
         repos = self.openRepository()
         name, ver, flv = built[0]
@@ -1593,7 +1593,7 @@ missing1>=0.3\"\"\")
         self.logFilter.add()
         (built, d) = self.buildRecipe(recipeStr, 'EggRequiresRecipe')
         self.logFilter.remove()
-        self.failIf('warning: Requires: Python egg-info for missing1 was not found' not in self.logFilter.records)
+        self.assertFalse('warning: Requires: Python egg-info for missing1 was not found' not in self.logFilter.records)
 
         repos = self.openRepository()
         name, ver, flv = built[0]
@@ -1723,7 +1723,7 @@ class PolicyOrder(PackageRecipe):
         nvf = nvf[0], versions.VersionFromString(nvf[1]), nvf[2]
         repos = self.openRepository()
         trv = repos.getTrove(*nvf)
-        self.failIf('/usr/share/man/man1/foo.bad~.gz' in \
+        self.assertFalse('/usr/share/man/man1/foo.bad~.gz' in \
                 [x[1] for x in trv.iterFileList()], "bad pathname was gzipped")
         nvf = 'splat:debuginfo', nvf[1], nvf[2]
 
@@ -1745,7 +1745,7 @@ class PolicyOrder(PackageRecipe):
         leadingNormalizingPolicies = [x for x in \
                 policies[:policies.index('RemoveNonPackageFiles')] \
                 if 'Normalize' in x and x not in whiteList]
-        self.failIf(leadingNormalizingPolicies,
+        self.assertFalse(leadingNormalizingPolicies,
                 "The following 'Normalize' policies ran before "
                 "RemoveNonPackageFiles: %s" % \
                         ', '.join(leadingNormalizingPolicies))
@@ -1769,7 +1769,7 @@ class InitTest(PackageRecipe):
         self.updatePkg('test:runtime')
         f = open(os.path.join(self.rootDir, 'etc', 'init.d', 'bar'))
         data = f.read()
-        self.failIf('rc.d' in data)
+        self.assertFalse('rc.d' in data)
 
     def testInitScriptFunctionsDep(self):
         'convert sourcing functions to dep'
@@ -1831,7 +1831,7 @@ class InitTest(PackageRecipe):
         self.updatePkg('test:runtime')
         f = open(os.path.join(self.rootDir, 'opt', 'bar'))
         data = f.read()
-        self.failIf('rc.d' in data)
+        self.assertFalse('rc.d' in data)
 
     def testInitScriptBadSymlink(self):
         # prove that NormalizeInitscriptContents doesn't break if the target
@@ -1874,7 +1874,7 @@ class InitTest(PackageRecipe):
         self.updatePkg('test:runtime')
         f = open(os.path.join(self.rootDir, 'etc', 'init.d', 'foo'))
         data = f.read()
-        self.failIf('rc.d' in data)
+        self.assertFalse('rc.d' in data)
 
     def testInitScriptDirSymlink1(self):
         # prove that NormalizeInitscriptContents does the right thing if
@@ -1897,7 +1897,7 @@ class InitTest(PackageRecipe):
         self.updatePkg('test:runtime')
         f = open(os.path.join(self.rootDir, 'opt', 'foo'))
         data = f.read()
-        self.failIf('rc.d' in data)
+        self.assertFalse('rc.d' in data)
 
     def testInitScriptDirSymlink2(self):
         # prove that NormalizeInitscriptContents does the right thing if
@@ -1920,4 +1920,4 @@ class InitTest(PackageRecipe):
         self.updatePkg('test:runtime')
         f = open(os.path.join(self.rootDir, 'opt', 'init.d', 'foo'))
         data = f.read()
-        self.failIf('rc.d' in data)
+        self.assertFalse('rc.d' in data)

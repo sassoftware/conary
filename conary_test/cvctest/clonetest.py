@@ -223,9 +223,9 @@ class CloneTest(rephelp.RepositoryHelper):
         self.clone('/localhost@rpl:sibling2',
                    'test:source=localhost@rpl:sibling')
         trv = _get(repos, 'test:source', 'localhost@rpl:sibling2', None)
-        self.failUnlessEqual(trv.troveInfo.clonedFrom().asString(),
+        self.assertEqual(trv.troveInfo.clonedFrom().asString(),
                              '/localhost@rpl:sibling/1.1-1')
-        self.failUnlessEqual([ str(x) for x in trv.troveInfo.clonedFromList ],
+        self.assertEqual([ str(x) for x in trv.troveInfo.clonedFromList ],
             [ '/localhost@rpl:linux/1.1-1', '/localhost@rpl:sibling/1.1-1' ])
 
     @context('clone')
@@ -354,10 +354,10 @@ class FooRecipe(LoadRecipe):
         self.clone('/localhost@rpl:target', 'group-a', 'group-a:source',
                    'foo:source', fullRecurse=True)
         trv = self._get(repos, 'group-a', 'localhost@rpl:target', None)
-        self.failUnlessEqual(set(x[1].asString() for x in trv.iterTroveList(strongRefs=True)),
+        self.assertEqual(set(x[1].asString() for x in trv.iterTroveList(strongRefs=True)),
                              set(['/localhost@rpl:target/2.0-1-1']))
         labelPath = trv.getLabelPath()
-        self.failUnlessEqual(list(labelPath), [Label('localhost@rpl:target')])
+        self.assertEqual(list(labelPath), [Label('localhost@rpl:target')])
         
     @context('clone')
     def testGroupClone2(self):
@@ -455,19 +455,19 @@ class FooRecipe(LoadRecipe):
                    'group-a:source', "group-inc:source",
                    fullRecurse=True)
         trv = self._get(repos, 'group-a', 'localhost@rpl:target', None)
-        self.failUnlessEqual(set(x[1].asString() for x in trv.iterTroveList(strongRefs=True)),
+        self.assertEqual(set(x[1].asString() for x in trv.iterTroveList(strongRefs=True)),
                              set(['/localhost@rpl:target/1.1-1-1',
                                   '/localhost@rpl:target/2.1-2-1',
                                   ] ))
         labelPath = trv.getLabelPath()
-        self.failUnlessEqual(list(labelPath), [Label('localhost@rpl:target')])
+        self.assertEqual(list(labelPath), [Label('localhost@rpl:target')])
         # check out that all the bar troves have made it in correctly.
         trvsrc = self._get(repos, 'bar:source', 'localhost@rpl:target', None)
         trvbin = self._get(repos, 'bar:runtime', 'localhost@rpl:target', None)
         trvbars = repos.getTrovesBySource(trvsrc.getName(), trvsrc.getVersion())
-        self.failUnlessEqual(set([v for n,v,f in trvbars]),
+        self.assertEqual(set([v for n,v,f in trvbars]),
                              set([trvbin.getVersion()]))
-        self.failUnlessEqual(set([n for n,v,f in trvbars]),
+        self.assertEqual(set([n for n,v,f in trvbars]),
                              set(["bar:runtime", "bar:lib", "bar:data",
                                   "bar:doc", "bar"]))
 
@@ -853,7 +853,7 @@ The following clones will be created:
         rc, output = self.captureOutput(self.clone, target, 
             cloneSources=True, updateBuildInfo=False, 
             ignoreConflicts=False, info=True, *tspecs)
-        self.failUnlessEqual(output, expOutput)
+        self.assertEqual(output, expOutput)
 
     def testSiblingCloneShadow(self):
         self.addComponent('foo:source', '/localhost@rpl:linux/1-1')
@@ -945,7 +945,7 @@ The following clones will be created:
                    'simple:source=/localhost@rpl:linux//v1//v2')
         trv = repos.findTrove(self.cfg.installLabelPath, 
             ('simple:source', '/localhost@rpl:linux', None))[0]
-        self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:linux/2-1')
+        self.assertEqual(trv[1].asString(), '/localhost@rpl:linux/2-1')
 
         self.logFilter.add()
         self.clone('/localhost@rpl:linux', 
@@ -955,7 +955,7 @@ The following clones will be created:
 
         trv = repos.findTrove(self.cfg.installLabelPath, 
             ('simple:source', '/localhost@rpl:linux', None))[0]
-        self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:linux/2-1')
+        self.assertEqual(trv[1].asString(), '/localhost@rpl:linux/2-1')
 
     def testMultiClone2(self):
         def _setupTest():
@@ -979,13 +979,13 @@ The following clones will be created:
                    'simple:source=/localhost@rpl:linux')
         trv = repos.findTrove(self.cfg.installLabelPath, 
             ('simple:source', '/localhost@rpl:v1', None))[0]
-        self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v1/1-1')
+        self.assertEqual(trv[1].asString(), '/localhost@rpl:v1/1-1')
 
         self.clone('/localhost@rpl:v2', 
                    'simple:source=/localhost@rpl:v1')
         trv = repos.findTrove(self.cfg.installLabelPath, 
             ('simple:source', '/localhost@rpl:v2', None))[0]
-        self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v2/1-1')
+        self.assertEqual(trv[1].asString(), '/localhost@rpl:v2/1-1')
 
         self.logFilter.add()
         self.clone('/localhost@rpl:v2', 
@@ -994,7 +994,7 @@ The following clones will be created:
         self.logFilter.remove()
         trv = repos.findTrove(self.cfg.installLabelPath, 
             ('simple:source', '/localhost@rpl:v2', None))[0]
-        self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v2/1-1')
+        self.assertEqual(trv[1].asString(), '/localhost@rpl:v2/1-1')
 
         self.logFilter.add()
         self.clone('/localhost@rpl:v2', 
@@ -1006,7 +1006,7 @@ The following clones will be created:
                 # Make sure the source is there
                 trv = repos.findTrove(self.cfg.installLabelPath, 
                     ('simple:source', '/localhost@rpl:v1', None))[0]
-                self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v1/1-1')
+                self.assertEqual(trv[1].asString(), '/localhost@rpl:v1/1-1')
 
             self.logFilter.add()
             self.clone('/localhost@rpl:v1', 
@@ -1014,20 +1014,20 @@ The following clones will be created:
                        cloneSources=cloneSources)
             trv = repos.findTrove(self.cfg.installLabelPath, 
                 ('simple', '/localhost@rpl:v1', None))[0]
-            self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v1/1-1-1')
+            self.assertEqual(trv[1].asString(), '/localhost@rpl:v1/1-1-1')
             self.logFilter.remove()
 
             if not cloneSources:
                 # Make sure the source is there
                 trv = repos.findTrove(self.cfg.installLabelPath, 
                     ('simple:source', '/localhost@rpl:v2', None))[0]
-                self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v2/1-1')
+                self.assertEqual(trv[1].asString(), '/localhost@rpl:v2/1-1')
 
             self.clone('/localhost@rpl:v2', 
                        'simple=/localhost@rpl:v1', cloneSources=cloneSources)
             trv = repos.findTrove(self.cfg.installLabelPath, 
                 ('simple', '/localhost@rpl:v2', None))[0]
-            self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v2/1-1-1')
+            self.assertEqual(trv[1].asString(), '/localhost@rpl:v2/1-1-1')
 
             self.logFilter.add()
             self.clone('/localhost@rpl:v2', 
@@ -1037,7 +1037,7 @@ The following clones will be created:
 
             trv = repos.findTrove(self.cfg.installLabelPath, 
                 ('simple', '/localhost@rpl:v2', None))[0]
-            self.failUnlessEqual(trv[1].asString(), '/localhost@rpl:v2/1-1-1')
+            self.assertEqual(trv[1].asString(), '/localhost@rpl:v2/1-1-1')
 
         _clone(cloneSources=False)
 
@@ -1076,15 +1076,15 @@ The following clones will be created:
             "foo:source=/localhost@rpl:linux//localhost1@rpl:l1")
 
         trv = _get(repos, ('foo:source', 'localhost1@rpl:l1', None))
-        self.failUnlessEqual(trv.getVersion().asString(),
+        self.assertEqual(trv.getVersion().asString(),
             '/localhost@rpl:linux//localhost1@rpl:l1/1.0-2')
-        self.failUnlessEqual(trv.troveInfo.clonedFrom().asString(),
+        self.assertEqual(trv.troveInfo.clonedFrom().asString(),
             '/localhost@rpl:linux//localhost1@rpl:l1//localhost2@rpl:l2/1.0-2')
 
         trv = _get(repos, ('foo:source', 'localhost@rpl:linux', None))
-        self.failUnlessEqual(trv.getVersion().asString(),
+        self.assertEqual(trv.getVersion().asString(),
             '/localhost@rpl:linux/1.0-2')
-        self.failUnlessEqual(trv.troveInfo.clonedFrom().asString(),
+        self.assertEqual(trv.troveInfo.clonedFrom().asString(),
             '/localhost@rpl:linux//localhost1@rpl:l1/1.0-2')
 
         # Now clone on the other tree
@@ -1098,9 +1098,9 @@ The following clones will be created:
             "foo:source=/localhost@rpl:linux//localhost3@rpl:l3")
 
         trv = _get(repos, ('foo:source', 'localhost@rpl:linux', None))
-        self.failUnlessEqual(trv.getVersion().asString(),
+        self.assertEqual(trv.getVersion().asString(),
             '/localhost@rpl:linux/1.0-3')
-        self.failUnlessEqual(trv.troveInfo.clonedFrom().asString(),
+        self.assertEqual(trv.troveInfo.clonedFrom().asString(),
             '/localhost@rpl:linux//localhost3@rpl:l3/1.0-2.1')
 
         # Re-clone from l4 directly to rpl:linux, should be a no-op
@@ -1109,7 +1109,7 @@ The following clones will be created:
         self.logFilter.compare("warning: Nothing to clone!")
         self.logFilter.remove()
         trv = _get(repos, ('foo:source', 'localhost@rpl:linux', None))
-        self.failUnlessEqual(trv.getVersion().asString(),
+        self.assertEqual(trv.getVersion().asString(),
             '/localhost@rpl:linux/1.0-3')
 
         self.stopRepository(4)

@@ -34,6 +34,7 @@ class Suite(suite.TestSuite):
         # that only gets filled in the first time you ask for the rpm
         # database lock. Thus you can't use more than one root directory
         # during any single execution of rpmlib code.
+        assert 'rpm._rpm' not in sys.modules
         from conary_test import norpmlock
         norpmlock.open(resources.get_path('conary_test', '_norpmlock.so'))
 

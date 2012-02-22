@@ -157,16 +157,16 @@ class ChangesetTest(rephelp.RepositoryHelper):
     def testGetNativeChangesetVersion(self):
         # When adding things here, make sure you update netclient's
         # FILE_CONTAINER_* constants too
-        self.failUnlessEqual(changeset.getNativeChangesetVersion(37),
+        self.assertEqual(changeset.getNativeChangesetVersion(37),
                              filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
-        self.failUnlessEqual(changeset.getNativeChangesetVersion(38),
+        self.assertEqual(changeset.getNativeChangesetVersion(38),
                              filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
-        self.failUnlessEqual(changeset.getNativeChangesetVersion(42),
+        self.assertEqual(changeset.getNativeChangesetVersion(42),
                              filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
-        self.failUnlessEqual(changeset.getNativeChangesetVersion(43),
+        self.assertEqual(changeset.getNativeChangesetVersion(43),
                              filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
         current = netclient.CLIENT_VERSIONS[-1]
-        self.failUnlessEqual(changeset.getNativeChangesetVersion(current),
+        self.assertEqual(changeset.getNativeChangesetVersion(current),
                              filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
 
     def testDictAsCsf(self):
@@ -183,10 +183,10 @@ class ChangesetTest(rephelp.RepositoryHelper):
 
         # this doesn't need to open any files
         fobj = testOne('short contents')
-        self.failUnlessEqual(fobj.getBackendType(), 'memory')
+        self.assertEqual(fobj.getBackendType(), 'memory')
 
         fobj = testOne('0123456789' * 20000)
-        self.failUnlessEqual(fobj.getBackendType(), 'file')
+        self.assertEqual(fobj.getBackendType(), 'file')
 
     def testChangeSetMerge(self):
         os.chdir(self.workDir)

@@ -406,9 +406,9 @@ class TestBadPassword(UserInfoRecipe):
         r.User('foo', 1000, group='bar', homedir='%(datadir)s/foo',
                saltedPassword='foo')
 """
-        e = self.failUnlessRaises(usergroup.UserGroupError,
+        e = self.assertRaises(usergroup.UserGroupError,
             self.buildRecipe, recipestr1, "TestBadPassword")
-        self.failUnlessEqual(str(e),
+        self.assertEqual(str(e),
             '"foo" is not a valid md5 salted password. Use md5pw (installed with conary) to  create a valid password.')
 
     def testSupplementalGroupInfoRecipeOrdering(self):
@@ -501,7 +501,7 @@ class TestUser(UserInfoRecipe):
 """
         err = self.assertRaises(cook.CookError, self.buildRecipe,
                 recipestr1, "TestUser", logBuild=True)
-        self.failIf("AttributeError: 'TestUser' object has no " \
+        self.assertFalse("AttributeError: 'TestUser' object has no " \
                 "attribute 'Create'" not in str(err))
 
     def testUserPolicyInvocation(self):

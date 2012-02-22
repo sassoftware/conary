@@ -58,10 +58,10 @@ class CallbacksTest(testhelp.TestCase):
         cb.fooBuriedErrorCallback1()
         cb.fooBuriedErrorCallback2()
 
-        self.failUnlessRaises(TestUncatchableError, cb.fooRaisedErrorCallback1)
-        self.failUnlessRaises(trove.DigitalSignatureVerificationError, 
+        self.assertRaises(TestUncatchableError, cb.fooRaisedErrorCallback1)
+        self.assertRaises(trove.DigitalSignatureVerificationError, 
                               cb.fooRaisedErrorCallback2)
-        self.failUnlessRaises(SystemExit, cb.fooRaisedErrorCallback3)
+        self.assertRaises(SystemExit, cb.fooRaisedErrorCallback3)
 
         log.logger.disabled = oldDisabled
 

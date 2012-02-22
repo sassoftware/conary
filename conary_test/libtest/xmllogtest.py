@@ -49,19 +49,19 @@ class XmlLogParseTest(testhelp.TestCase):
         return open(self.logfile).read()
 
     def assertSubstring(self, substr, data):
-        self.failIf(substr not in data,
+        self.assertFalse(substr not in data,
                 "Expected '%s' to be in '%s'" % (substr, data))
 
     def testBasicAttributes(self):
         self.logger.info('test')
         data = self.getLogData()
-        self.failIf('descriptor' in data,
+        self.assertFalse('descriptor' in data,
                 "undefined descriptor should be omitted")
         for messageId in (0, 1):
             self.assertSubstring('<messageId>%d</messageId>' % messageId, data)
         record = data.splitlines()[-1]
-        self.failIf(not record.startswith('<record>'))
-        self.failIf(not record.endswith('</record>'))
+        self.assertFalse(not record.startswith('<record>'))
+        self.assertFalse(not record.endswith('</record>'))
         for kw in ('level', 'message', 'messageId', 'pid', 'time'):
             self.assertSubstring("<%s>" % kw, record)
             self.assertSubstring("</%s>" % kw, record)
@@ -93,7 +93,7 @@ class XmlLogParseTest(testhelp.TestCase):
         self.hdlr.delRecordData('jobId')
         self.logger.info('test')
         data = self.getLogData().splitlines()
-        self.failIf('jobId' in data[-1], "expected jobId to be removed")
+        self.assertFalse('jobId' in data[-1], "expected jobId to be removed")
 
     def testTimeFormat(self):
         # check ISO8601 format
@@ -176,7 +176,7 @@ class XmlLogParseTest(testhelp.TestCase):
             log.fmtLogger.handlers.remove(hdlr)
             data = open(logPath).read().splitlines()
 
-            self.failIf('bad_descriptor' in data[-2],
+            self.assertFalse('bad_descriptor' in data[-2],
                     "descriptor stack wasn't cleared on log close.")
             self.assertEquals(data[-1], '</log>')
             self.assertEquals(len(data), 9)
@@ -225,7 +225,7 @@ class XmlLogParseTest(testhelp.TestCase):
             logData = open(logPath).read().splitlines()[:2]
             gzData = gzip.GzipFile(gzPath, 'r').read().splitlines()[:2]
             bzData = bz2.BZ2File(bz2Path, 'r').read().splitlines()[:2]
-            self.failIf(not logData, "expected log content")
+            self.assertFalse(not logData, "expected log content")
             self.assertEquals(logData, gzData)
             self.assertEquals(logData, bzData)
         finally:
@@ -240,12 +240,12 @@ class XmlLogParseTest(testhelp.TestCase):
         self.logger.addHandler(self.hdlr)
 
         self.assertSubstring('<message>end log</message>', data[-2])
-        self.failIf('<foo>bar</foo>' in data[-2],
+        self.assertFalse('<foo>bar</foo>' in data[-2],
                 "record data should not apply to close message")
 
     def testEscapedNewlines(self):
         self.logger.info('multi\nline\nmessage')
         data = self.getLogData()
         lastline = data.splitlines()[-1]
-        self.failIf(not lastline.startswith('<record>'),
+        self.assertFalse(not lastline.startswith('<record>'),
             "multi line log output was not escaped")

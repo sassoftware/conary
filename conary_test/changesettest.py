@@ -253,16 +253,16 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
         
         for path in bad_paths:
-            self.failUnlessRaises(errors.FilesystemError,
+            self.assertRaises(errors.FilesystemError,
                 repos.createChangeSetFile, jobList, path)
 
         # Test the exception arguments while we're at it
         try:
             repos.createChangeSetFile(jobList, rofile)
         except errors.FilesystemError, e:
-            self.failUnlessEqual(e.errorCode, 13)
-            self.failUnlessEqual(e.path, rofile)
-            self.failUnlessEqual(e.errorString, 'Permission denied')
+            self.assertEqual(e.errorCode, 13)
+            self.assertEqual(e.path, rofile)
+            self.assertEqual(e.errorString, 'Permission denied')
         except:
             self.fail()
         else:
@@ -322,10 +322,10 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         csname = os.path.join(self.workDir, "changeset-lazyFileCache.ccs")
         self.changeset(repos, 'foo', csname)
 
-        self.failUnless(os.path.exists(csname))
+        self.assertTrue(os.path.exists(csname))
         lfc = util.LazyFileCache()
         cs = changeset.ChangeSetFromFile(lfc.open(csname))
-        self.failUnlessEqual(cs.fileName, csname)
+        self.assertEqual(cs.fileName, csname)
 
     def testGitDiff(self):
         t1 = self.addComponent('foo:run=1', fileContents = [])

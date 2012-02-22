@@ -262,6 +262,6 @@ class RemoveTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
         self.markRemoved("group-removed=2.0[foo,bar]")
         ret = repos.getTrove(*grp1.getNameVersionFlavor())
-        self.failIf(ret.isRemoved())
+        self.assertFalse(ret.isRemoved())
         ret = repos.getTrove(*grp2.getNameVersionFlavor())
-        self.failUnless(ret.isRemoved())
+        self.assertTrue(ret.isRemoved())

@@ -478,7 +478,7 @@ class AclTest(AuthHelper):
         # check behavior for a trove-access-onoy repository
         d = taRepos.getTroveVersionList('localhost', {None:None})
         for i in taRepos.getTroveInfo(trove._TROVEINFO_TAG_SOURCENAME, list(self.asSet(d))):
-            self.failUnlessEqual(i(), "double:source")
+            self.assertEqual(i(), "double:source")
 
 
 
@@ -696,10 +696,10 @@ class AclTest(AuthHelper):
 
         # Test addRoleMember and getRoleMembers
         repos.addRoleMember(l, 'test1', 'test')
-        self.failUnlessEqual(repos.getRoles(l), ['test', 'test1'])
-        self.failUnlessEqual(repos.getRoleMembers(l, 'test1'), ['test'])
+        self.assertEqual(repos.getRoles(l), ['test', 'test1'])
+        self.assertEqual(repos.getRoleMembers(l, 'test1'), ['test'])
         repos.updateRoleMembers(l, 'test1', [])
-        self.failUnlessEqual(repos.getRoleMembers(l, 'test1'), [])
+        self.assertEqual(repos.getRoleMembers(l, 'test1'), [])
 
         #Now, delete the secondary group
         repos.updateRoleMembers(l, 'test1', ['test'])
@@ -1247,28 +1247,28 @@ class AclTest(AuthHelper):
         assert(userClient.hasTrove(*comp.getNameVersionFlavor()))
         assert(not userClient.hasTrove(*comp1.getNameVersionFlavor()))
 
-        self.failUnlessEqual(userClient.troveNames(self.cfg.buildLabel),
+        self.assertEqual(userClient.troveNames(self.cfg.buildLabel),
                              [ 'foo:runtime' ] )
 
         # test recursive adding
-        self.failUnlessEqual(userClient.hasTroves([
+        self.assertEqual(userClient.hasTroves([
             pkg.getNameVersionFlavor(), grp.getNameVersionFlavor() ] ).values(),
                              [ False, False ] )
         repos.addTroveAccess('user', [ grp.getNameVersionFlavor()])
         # this has a side effect of testing CNY-2758
         repos.addTroveAccess('mirror', [ grp.getNameVersionFlavor()])
 
-        self.failUnlessEqual(userClient.hasTroves([
+        self.assertEqual(userClient.hasTroves([
             pkg.getNameVersionFlavor(), grp.getNameVersionFlavor() ] ).values(),
                              [ True, True ] )
-        self.failUnlessEqual(userClient.hasTroves([
+        self.assertEqual(userClient.hasTroves([
             pkg1.getNameVersionFlavor(), grp1.getNameVersionFlavor(), grp2.getNameVersionFlavor(),
             ] ).values(), [ False, False, False ] )
 
-        self.failUnlessEqual(sorted(userClient.troveNames(self.cfg.buildLabel)),
+        self.assertEqual(sorted(userClient.troveNames(self.cfg.buildLabel)),
                         [ 'foo', 'foo:runtime', 'group-foo' ] )
 
-        self.failUnlessEqual(sorted(repos.listTroveAccess('localhost', 'user')),
+        self.assertEqual(sorted(repos.listTroveAccess('localhost', 'user')),
                         [ comp.getNameVersionFlavor(), grp.getNameVersionFlavor() ] )
 
         expectNewTroves = [
@@ -1281,10 +1281,10 @@ class AclTest(AuthHelper):
         # flag set and has access to group-foo recursively.
         newTroves = mirrorClient.getNewTroveList('localhost', 0)
         newTroves = [ (x[1][0], str(x[1][1])) for x in newTroves ]
-        self.failUnlessEqual(sorted(newTroves), sorted(expectNewTroves))
+        self.assertEqual(sorted(newTroves), sorted(expectNewTroves))
 
         repos.deleteTroveAccess('user', [ comp.getNameVersionFlavor() ] )
-        self.failUnlessEqual(sorted(repos.listTroveAccess('localhost', 'user')),
+        self.assertEqual(sorted(repos.listTroveAccess('localhost', 'user')),
                              [ grp.getNameVersionFlavor() ] )
 
         # the group should still give us access to the component (it's
@@ -1295,11 +1295,11 @@ class AclTest(AuthHelper):
         repos.deleteTroveAccess('user', [ pkg.getNameVersionFlavor() ] )
 
         repos.deleteTroveAccess('user', [ grp.getNameVersionFlavor() ] )
-        self.failUnlessEqual(repos.listTroveAccess('localhost', 'user'), [] )
-        self.failUnlessEqual(userClient.hasTroves([
+        self.assertEqual(repos.listTroveAccess('localhost', 'user'), [] )
+        self.assertEqual(userClient.hasTroves([
             pkg.getNameVersionFlavor(), grp.getNameVersionFlavor() ] ).values(),
                              [ False, False ] )
-        self.failUnlessEqual(userClient.troveNames(self.cfg.buildLabel), [])
+        self.assertEqual(userClient.troveNames(self.cfg.buildLabel), [])
 
     def testSimpleCommitsWithFiles(self):
         bl = self.cfg.buildLabel
@@ -1316,8 +1316,8 @@ class AclTest(AuthHelper):
         trv1 = repos.getTrove(*trv.getNameVersionFlavor())
         ret2 = userClient.getTroveVersionList("localhost", {"foo:run":None})
         trv2 = userClient.getTrove(*trv.getNameVersionFlavor())
-        self.failUnlessEqual(ret1, ret2)
-        self.failUnlessEqual(trv1, trv2)
+        self.assertEqual(ret1, ret2)
+        self.assertEqual(trv1, trv2)
         
     def testTroveAccessSimple(self):
         repos = self.openRepository()
@@ -1445,7 +1445,7 @@ class AclTest(AuthHelper):
             repos.addTroveAccess('user', [
                 ('not-there', version, deps.parseFlavor('yummy')) ])
         except errors.TroveMissing, e:
-            self.failUnlessEqual(e.version, version)
+            self.assertEqual(e.version, version)
         else:
             self.fail('TroveMissing was not raised')
 
@@ -1495,26 +1495,26 @@ class AclTest(AuthHelper):
                 
         repos.addRole(bl, "special")
         repos.addRole(bl, "special1")
-        self.failUnless("special" in repos.listRoles(bl))
-        self.failUnless("special1" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
+        self.assertTrue("special1" in repos.listRoles(bl))
         repos.addUser(bl, "special", "pass")
         specialClient = self.getRepositoryClient(user = "special", password = "pass")
         # a user with no groups raises InsufficientPermission
         self.assertRaises(errors.InsufficientPermission, specialClient.getRoles, bl)
         repos.updateRoleMembers(bl, "special1", ["special"])
-        self.failUnlessEqual(specialClient.getRoles(bl), ["special1"])
+        self.assertEqual(specialClient.getRoles(bl), ["special1"])
         repos.updateRoleMembers(bl, "special", ["special"])
-        self.failUnlessEqual(set(specialClient.getRoles(bl)), set(["special", "special1"]))
+        self.assertEqual(set(specialClient.getRoles(bl)), set(["special", "special1"]))
         repos.deleteUserByName(bl, "special")
-        self.failUnless("special1" in repos.listRoles(bl))
-        self.failIf("special" in repos.listRoles(bl))
+        self.assertTrue("special1" in repos.listRoles(bl))
+        self.assertFalse("special" in repos.listRoles(bl))
 
         # a role with nothing special will not survive
         repos.addRole(bl, "special")
         repos.addUser(bl, "special", "pass")
         repos.updateRoleMembers(bl, "special", ["special"])
         repos.deleteUserByName(bl, "special")
-        self.failIf("special" in repos.listRoles(bl))
+        self.assertFalse("special" in repos.listRoles(bl))
 
         # a role with mirror bits should survive
         repos.addRole(bl, "special")
@@ -1522,7 +1522,7 @@ class AclTest(AuthHelper):
         repos.updateRoleMembers(bl, "special", ["special"])
         repos.setRoleCanMirror(bl, "special", True)
         repos.deleteUserByName(bl, "special")
-        self.failUnless("special" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
         repos.deleteRole(bl, "special")
         
         # a role with admin bits should survive
@@ -1531,7 +1531,7 @@ class AclTest(AuthHelper):
         repos.updateRoleMembers(bl, "special", ["special"])
         repos.setRoleIsAdmin(bl, "special", True)
         repos.deleteUserByName(bl, "special")
-        self.failUnless("special" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
         repos.deleteRole(bl, "special")
 
         # a role with more than one user should survive
@@ -1540,9 +1540,9 @@ class AclTest(AuthHelper):
         repos.addUser(bl, "special1", "pass1")
         repos.updateRoleMembers(bl, "special", ["special", "special1"])
         repos.deleteUserByName(bl, "special")
-        self.failUnless("special" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
         repos.deleteUserByName(bl, "special1")
-        self.failUnless("special" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
         repos.deleteRole(bl, "special")
         
         # a role with acls should survive
@@ -1551,7 +1551,7 @@ class AclTest(AuthHelper):
         repos.updateRoleMembers(bl, "special", ["special"])
         repos.addAcl(bl, "special", "ALL", "ALL")
         repos.deleteUserByName(bl, "special")
-        self.failUnless("special" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
         repos.deleteRole(bl, "special")
 
         # a role with trove permissions should survive
@@ -1561,7 +1561,7 @@ class AclTest(AuthHelper):
         repos.updateRoleMembers(bl, "special", ["special"])
         repos.addTroveAccess("special", [trv.getNameVersionFlavor()])
         repos.deleteUserByName(bl, "special")
-        self.failUnless("special" in repos.listRoles(bl))
+        self.assertTrue("special" in repos.listRoles(bl))
         repos.deleteRole(bl, "special")
 
         
@@ -1579,8 +1579,8 @@ class AclTest(AuthHelper):
         trv1 = self.addComponent("readstuff:runtime", "1", repos=repos)
         trv2 = self.addComponent("writestuff:runtime", "1", repos=repos)
 
-        self.failUnless(repos.commitCheck([trv1.getNameVersionFlavor(), trv2.getNameVersionFlavor()]))
-        self.failUnless(userRepos.commitCheck([trv2.getNameVersionFlavor()]))
+        self.assertTrue(repos.commitCheck([trv1.getNameVersionFlavor(), trv2.getNameVersionFlavor()]))
+        self.assertTrue(userRepos.commitCheck([trv2.getNameVersionFlavor()]))
         self.assertRaises(errors.TroveAccessError, userRepos.commitCheck, [trv1.getNameVersionFlavor()])
         self.assertRaises(errors.TroveAccessError, badRepos.commitCheck, [trv1.getNameVersionFlavor()])
         self.assertRaises(errors.TroveAccessError, badRepos.commitCheck, [trv2.getNameVersionFlavor()])
@@ -1607,20 +1607,20 @@ class AclTest(AuthHelper):
 
         # regular repos should have access to all
         ret = repos.getTroveVersionList(bl.getHost(), { None : None })
-        self.failUnlessEqual(set(ret.keys()), set(["foo", "foo:lib", "foo:devel", "foo:runtime"]))
+        self.assertEqual(set(ret.keys()), set(["foo", "foo:lib", "foo:devel", "foo:runtime"]))
 
         # limited has access to all foo:* components
         limRepos = self.getRepositoryClient(user = "limited", password = "limited")
         ret = limRepos.getTroveVersionList(bl.getHost(), { None : None })
-        self.failUnlessEqual(set(ret.keys()), set(["foo:devel", "foo:runtime", "foo:lib"]))
+        self.assertEqual(set(ret.keys()), set(["foo:devel", "foo:runtime", "foo:lib"]))
         self.assertRaises(errors.TroveAccessError, limRepos.commitCheck, [t1.getNameVersionFlavor(), t2.getNameVersionFlavor()])
         self.assertRaises(errors.TroveAccessError, limRepos.commitCheck, [t2.getNameVersionFlavor(), t3.getNameVersionFlavor()])
 
         # the other has access only to :devel and :runtime (and can commit those too)
         otherRepos = self.getRepositoryClient(user = "other", password = "other")
         ret = otherRepos.getTroveVersionList(bl.getHost(), { None : None })
-        self.failUnlessEqual(set(ret.keys()), set(["foo:devel", "foo:runtime"]))
-        self.failUnless(otherRepos.commitCheck([t2.getNameVersionFlavor(), t3.getNameVersionFlavor()]))
+        self.assertEqual(set(ret.keys()), set(["foo:devel", "foo:runtime"]))
+        self.assertTrue(otherRepos.commitCheck([t2.getNameVersionFlavor(), t3.getNameVersionFlavor()]))
         # can't commit to foo:lib
         self.assertRaises(errors.TroveAccessError, otherRepos.commitCheck,
                           [t1.getNameVersionFlavor(), t2.getNameVersionFlavor(), t3.getNameVersionFlavor()])

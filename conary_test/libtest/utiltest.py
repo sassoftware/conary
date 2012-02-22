@@ -89,13 +89,13 @@ class UtilTest(testhelp.TestCase):
             (r'{a\b}', ['{ab}']),
         ]
         for inString, expected in data:
-            self.failUnlessEqual(util.braceExpand(inString), expected)
+            self.assertEqual(util.braceExpand(inString), expected)
 
         # This is so we have coverage for __repr__
         l = util.BraceExpander.Alternative(['a', 'b'])
-        self.failUnlessEqual(repr(l), "Alternative['a', 'b']")
+        self.assertEqual(repr(l), "Alternative['a', 'b']")
         l = util.BraceExpander.Product(['a', 'b'])
-        self.failUnlessEqual(repr(l), "Product['a', 'b']")
+        self.assertEqual(repr(l), "Product['a', 'b']")
 
     def testRmtree(self):
         # test that rmtree on a directory that doesn't exist fails
@@ -281,19 +281,19 @@ class UtilTest(testhelp.TestCase):
         # Start from the second byte, make sure pread works
         f1 = util.SeekableNestedFile(f, 9, 1)
         first = f1.pread(1, 0)
-        self.failUnlessEqual(first, '1')
+        self.assertEqual(first, '1')
 
         # Create nested files within the first nested file
         f21 = util.SeekableNestedFile(f1, 5, 1)
 
         # Make sure pread, read, tell all work as expected
         first = f21.pread(1, 0)
-        self.failUnlessEqual(first, '2')
-        self.failUnlessEqual(f21.read(), '23456')
-        self.failUnlessEqual(f21.tell(), 5)
+        self.assertEqual(first, '2')
+        self.assertEqual(f21.read(), '23456')
+        self.assertEqual(f21.tell(), 5)
 
         f31 = util.SeekableNestedFile(f21, 3, 4)
-        self.failUnlessEqual(f31.read(), '6')
+        self.assertEqual(f31.read(), '6')
 
     def testPushIterator(self):
         p = util.PushIterator(x for x in xrange(3))
@@ -349,29 +349,29 @@ class UtilTest(testhelp.TestCase):
         cache = util.ObjectCache()
         obj1 = TestObject(1)
         cache[obj1] = obj1
-        self.failIf(cache[obj1] != obj1)
+        self.assertFalse(cache[obj1] != obj1)
 
         obj1copy = TestObject(1)
         cached = cache.setdefault(obj1copy, obj1copy)
-        self.failIf(repr(cached) != repr(obj1))
+        self.assertFalse(repr(cached) != repr(obj1))
         del cached
 
-        self.failUnless(obj1 in cache)
-        self.failUnless(cache.has_key(obj1))
+        self.assertTrue(obj1 in cache)
+        self.assertTrue(cache.has_key(obj1))
         del obj1
-        self.failIf(cache.keys() != [])
+        self.assertFalse(cache.keys() != [])
 
         obj2 = TestObject(2)
         cache[obj2] = obj2
         del cache[obj2]
-        self.failIf(obj2 in cache)
+        self.assertFalse(obj2 in cache)
 
         obj3 = TestObject(3)
         cached = cache.setdefault(obj3, obj3)
-        self.failUnless(cached == obj3)
+        self.assertTrue(cached == obj3)
         del cached
         del obj3
-        self.failIf(cache.keys() != [])
+        self.assertFalse(cache.keys() != [])
 
     def testRecurseDirectoryList(self):
         dirstruct = [
@@ -407,7 +407,7 @@ class UtilTest(testhelp.TestCase):
         expected = [ os.path.join(topdir, f) for f in expected ]
 
         actual = [ f for f in util.recurseDirectoryList(topdir) ]
-        self.failUnlessEqual(actual, expected)
+        self.assertEqual(actual, expected)
 
         expected = ['a1', 'd1', 'd1/f11', 'd1/f12', 'd1/f13', 'd1/f14', 'd12',
             'd2', 'd2/d21', 'd2/d21/d31', 'f3']
@@ -415,7 +415,7 @@ class UtilTest(testhelp.TestCase):
         expected[0:0] = [ topdir ]
 
         actual = [ f for f in util.recurseDirectoryList(topdir, withDirs=True) ]
-        self.failUnlessEqual(actual, expected)
+        self.assertEqual(actual, expected)
 
         # Cleanup
         util.rmtree(topdir)
@@ -429,7 +429,7 @@ class UtilTest(testhelp.TestCase):
                 ('https://conary-commits.rpath.com:443//conary/?tmpuAq85R.ccs',
                  'https://conary-commits.rpath.com:443/conary/?tmpuAq85R.ccs'))
         for input, expected in urls:
-            self.failUnlessEqual(util.normurl(input), expected)
+            self.assertEqual(util.normurl(input), expected)
 
     def testLineReader(self):
         p = os.pipe()
@@ -463,7 +463,7 @@ class UtilTest(testhelp.TestCase):
         procdir = "/proc/self/fd"
 
         # Opening file that doesn't exist fails
-        self.failUnlessRaises(IOError, lfc.open, "/dev/null/bar")
+        self.assertRaises(IOError, lfc.open, "/dev/null/bar")
 
         def getOpenFiles():
             fdlist = os.listdir(procdir)
@@ -485,12 +485,12 @@ class UtilTest(testhelp.TestCase):
 
             lf = lfc.open(fn)
             lf.read(10000)
-            self.failUnlessEqual(fdCount + 1, len(getOpenFiles()))
-            self.failUnlessEqual(fdCount + 1, lfc._getFdCount())
-            self.failUnlessEqual(lf.tell(), 10000)
+            self.assertEqual(fdCount + 1, len(getOpenFiles()))
+            self.assertEqual(fdCount + 1, lfc._getFdCount())
+            self.assertEqual(lf.tell(), 10000)
             lf.close()
-            self.failUnlessEqual(fdCount, len(getOpenFiles()))
-            self.failUnlessEqual(fdCount, lfc._getFdCount())
+            self.assertEqual(fdCount, len(getOpenFiles()))
+            self.assertEqual(fdCount, lfc._getFdCount())
 
             # Open a bunch of files
             fdlist = getOpenFiles()
@@ -500,25 +500,25 @@ class UtilTest(testhelp.TestCase):
             for i in range(count):
                 arr.append(lfc.open(fn))
             fdlist2 = getOpenFiles()
-            self.failUnless(len(set(fdlist2) - set(fdlist)) <= lfc.threshold)
+            self.assertTrue(len(set(fdlist2) - set(fdlist)) <= lfc.threshold)
 
             for i, fd in enumerate(arr):
                 fd.read(i + 1)
-                self.failUnlessEqual(fd.tell(), i + 1)
+                self.assertEqual(fd.tell(), i + 1)
             # Some should have been closed
             openedFds = len(getOpenFiles()) - origFdCount
-            self.failIf(lfc.threshold < openedFds)
+            self.assertFalse(lfc.threshold < openedFds)
 
             for i, fd in enumerate(arr):
-                self.failUnlessEqual(fd.tell(), i + 1)
+                self.assertEqual(fd.tell(), i + 1)
             lfc.close()
             del lfc
 
-            self.failIf(origFdCount < len(getOpenFiles()))
+            self.assertFalse(origFdCount < len(getOpenFiles()))
             # All the files in the array should be closed
             for fd in arr:
-                self.failUnlessEqual(None, fd._realFd)
-                self.failUnlessEqual(None, fd._cache)
+                self.assertEqual(None, fd._realFd)
+                self.assertEqual(None, fd._cache)
         finally:
             os.unlink(fn)
 
@@ -526,21 +526,21 @@ class UtilTest(testhelp.TestCase):
         # CNY-2571
 
         lfc = util.LazyFileCache(1000)
-        self.failUnless(lfc._getFdCount() > 0)
+        self.assertTrue(lfc._getFdCount() > 0)
 
         def _dummyCountOpenFileDescriptors():
             raise OSError(util.errno.EINVAL, "Invalid argument")
 
         self.mock(util, 'countOpenFileDescriptors',
             _dummyCountOpenFileDescriptors)
-        self.failUnlessEqual(lfc._getFdCount(), 0)
+        self.assertEqual(lfc._getFdCount(), 0)
 
     def testLazyFileDoubleRelease(self):
         lfc = util.LazyFileCache(1000)
         f = lfc.open("/etc/passwd")
         f._release()
         f._release()
-        self.failUnlessEqual(f._realFd, None)
+        self.assertEqual(f._realFd, None)
 
     def testpread(self):
         fd, fn = tempfile.mkstemp()
@@ -552,13 +552,13 @@ class UtilTest(testhelp.TestCase):
             # seek the file back to the start
             os.lseek(f.fileno(), 0, 0)
             s = util.pread(f.fileno(), 6, 3)
-            self.failUnlessEqual(s, 'lo, wo')
+            self.assertEqual(s, 'lo, wo')
 
             s = util.pread(f.fileno(), long(6), long(3))
-            self.failUnlessEqual(s, 'lo, wo')
+            self.assertEqual(s, 'lo, wo')
 
             # make sure that pread doesn't affect the current file pos
-            self.failUnlessEqual(os.lseek(f.fileno(), 0, 1), 0)
+            self.assertEqual(os.lseek(f.fileno(), 0, 1), 0)
 
             tmp = open('/dev/null')
             badf = tmp.fileno()
@@ -566,14 +566,14 @@ class UtilTest(testhelp.TestCase):
             try:
                 s = util.pread(badf, 1, 0)
             except OSError, e:
-                self.failUnlessEqual(str(e), '[Errno 9] Bad file descriptor')
+                self.assertEqual(str(e), '[Errno 9] Bad file descriptor')
 
             f.seek(0x80000001, 0)
             f.write('1')
             f.flush()
             os.lseek(f.fileno(), 0, 0)
             s = util.pread(f.fileno(), 1, 0x80000001)
-            self.failUnlessEqual(s, '1')
+            self.assertEqual(s, '1')
 
             s = util.pread(f.fileno(), 1, 2**32 + 1024)
 
@@ -628,24 +628,24 @@ class UtilTest(testhelp.TestCase):
         try:
             rc, s = self.captureOutput(util.execute, 'exit 1')
         except RuntimeError, e:
-            self.failUnlessEqual('Shell command "exit 1" exited with exit code 1',
+            self.assertEqual('Shell command "exit 1" exited with exit code 1',
                                  str(e))
         else:
             self.fail('expected exception')
         try:
             rc, s = self.captureOutput(util.execute, 'kill -9 $$')
         except RuntimeError, e:
-            self.failUnlessEqual('Shell command "kill -9 $$" killed with signal 9',
+            self.assertEqual('Shell command "kill -9 $$" killed with signal 9',
                                  str(e))
         else:
             self.fail('expected exception')
 
 
     def testStripUserPassFromUrl(self):
-        self.failUnlessEqual(util.stripUserPassFromUrl(
+        self.assertEqual(util.stripUserPassFromUrl(
             'http://user:pass@host:port/path?query'),
             'http://host:port/path?query')
-        self.failUnlessEqual(util.stripUserPassFromUrl(
+        self.assertEqual(util.stripUserPassFromUrl(
             'http://host:port/path?query'),
             'http://host:port/path?query')
 
@@ -658,35 +658,35 @@ class UtilTest(testhelp.TestCase):
 
     def testBoundedStringIO(self):
         x = util.BoundedStringIO(maxMemorySize=256)
-        self.failUnlessEqual(x.getBackendType(), 'memory')
-        self.failUnless(isinstance(x._backend, StringIO.StringIO))
+        self.assertEqual(x.getBackendType(), 'memory')
+        self.assertTrue(isinstance(x._backend, StringIO.StringIO))
 
         x.write("0123456789" * 30)
-        self.failUnlessEqual(x.getBackendType(), 'file')
-        self.failUnless(isinstance(x._backend, file))
+        self.assertEqual(x.getBackendType(), 'file')
+        self.assertTrue(isinstance(x._backend, file))
 
         # Test truncate
         x.truncate(298)
-        self.failUnlessEqual(x.getBackendType(), 'file')
-        self.failUnless(isinstance(x._backend, file))
+        self.assertEqual(x.getBackendType(), 'file')
+        self.assertTrue(isinstance(x._backend, file))
 
         # Truncate some more
         x.truncate(255)
 
-        self.failUnlessEqual(x.getBackendType(), 'memory')
-        self.failUnless(isinstance(x._backend, StringIO.StringIO))
+        self.assertEqual(x.getBackendType(), 'memory')
+        self.assertTrue(isinstance(x._backend, StringIO.StringIO))
 
     def testProtectedTemplate(self):
         t = util.ProtectedTemplate("$foo is the new $bar", foo='a', bar='b')
-        self.failUnlessEqual(t, "a is the new b")
-        self.failUnlessEqual(str(t), "a is the new b")
-        self.failUnlessEqual(t.__safe_str__(), "a is the new b")
+        self.assertEqual(t, "a is the new b")
+        self.assertEqual(str(t), "a is the new b")
+        self.assertEqual(t.__safe_str__(), "a is the new b")
 
         t = util.ProtectedTemplate("$foo is the new $bar", foo='a', 
             bar=util.ProtectedString('b'))
-        self.failUnlessEqual(t, "a is the new b")
-        self.failUnlessEqual(str(t), "a is the new b")
-        self.failUnlessEqual(t.__safe_str__(), "a is the new <BAR>")
+        self.assertEqual(t, "a is the new b")
+        self.assertEqual(str(t), "a is the new b")
+        self.assertEqual(t.__safe_str__(), "a is the new <BAR>")
 
     def testXMLRPCbinary(self):
         # CNY-1932
@@ -695,12 +695,12 @@ class UtilTest(testhelp.TestCase):
         marshaller = util.XMLRPCMarshaller("utf-8", allow_none=False)
         srcdata = "abc\x80"
         data = marshaller.dumps((srcdata, ))
-        self.failUnlessEqual(data,
+        self.assertEqual(data,
             "<params>\n<param>\n<value><base64>\nYWJjgA==\n</base64></value>\n"
             "</param>\n</params>\n")
 
         data = util.xmlrpcDump((srcdata, ), methodresponse = True)
-        self.failUnlessEqual(data,
+        self.assertEqual(data,
             "<?xml version='1.0'?>\n"
             "<methodResponse>\n"
             "<params>\n<param>\n<value><base64>\nYWJjgA==\n</base64></value>\n"
@@ -712,8 +712,8 @@ class UtilTest(testhelp.TestCase):
 
         sio = StringIO.StringIO(data)
         params, methodname = util.xmlrpcLoad(sio)
-        self.failUnlessEqual(params, (srcdata, ))
-        self.failUnlessEqual(methodname, None)
+        self.assertEqual(params, (srcdata, ))
+        self.assertEqual(methodname, None)
 
         # Produce a very large string representation
         srcdata = [ "abc\x80" ] * 4096
@@ -721,25 +721,25 @@ class UtilTest(testhelp.TestCase):
         util.xmlrpcDump((srcdata, ), methodname = "somemethod", stream = sio)
         sio.seek(0)
         params, methodname = util.xmlrpcLoad(sio)
-        self.failUnlessEqual(params, (srcdata, ))
-        self.failUnlessEqual(methodname, 'somemethod')
+        self.assertEqual(params, (srcdata, ))
+        self.assertEqual(methodname, 'somemethod')
 
         sio.seek(0)
         params, methodname = util.xmlrpcLoad(sio.read())
-        self.failUnlessEqual(params, (srcdata, ))
-        self.failUnlessEqual(methodname, 'somemethod')
+        self.assertEqual(params, (srcdata, ))
+        self.assertEqual(methodname, 'somemethod')
 
         # Test a Fault too
         x = util.xmlrpclib.Fault(1001, "blah")
         repr1 = util.xmlrpclib.dumps(x)
         repr2 = util.xmlrpcDump(x)
-        self.failUnlessEqual(repr1, repr2)
+        self.assertEqual(repr1, repr2)
 
         try:
             util.xmlrpcLoad(repr1)
         except util.xmlrpclib.Fault, x2:
-            self.failUnlessEqual(x.faultCode, x2.faultCode)
-            self.failUnlessEqual(x.faultString, x2.faultString)
+            self.assertEqual(x.faultCode, x2.faultCode)
+            self.assertEqual(x.faultString, x2.faultString)
         except:
             self.fail()
         else:
@@ -763,7 +763,7 @@ class UtilTest(testhelp.TestCase):
         dstr = util.decompressStream(cstr)
         dstr.seek(0)
         sio.seek(0)
-        self.failUnlessEqual(sio.read(), dstr.read())
+        self.assertEqual(sio.read(), dstr.read())
 
     def testDecompressStream(self):
         data = os.urandom(16 * 1024)
@@ -771,11 +771,11 @@ class UtilTest(testhelp.TestCase):
         fp = StringIO.StringIO(compressed)
         dfo = util.decompressStream(fp)
         check = dfo.read()
-        self.failUnlessEqual(check, data)
+        self.assertEqual(check, data)
         fp = StringIO.StringIO(compressed)
         dfo = util.decompressStream(fp)
         chunk = dfo.read(333)
-        self.failUnlessEqual(chunk,  data[:333])
+        self.assertEqual(chunk,  data[:333])
 
         # test readline
         data = 'hello world\nhello world line 2\n'
@@ -783,18 +783,18 @@ class UtilTest(testhelp.TestCase):
         fp = StringIO.StringIO(compressed)
         dfo = util.decompressStream(fp)
         line = dfo.readline()
-        self.failUnlessEqual(line, 'hello world\n')
+        self.assertEqual(line, 'hello world\n')
         line = dfo.readline()
-        self.failUnlessEqual(line, 'hello world line 2\n')
+        self.assertEqual(line, 'hello world line 2\n')
 
         fp = StringIO.StringIO(compressed)
         dfo = util.decompressStream(fp)
         line = dfo.readline(5)
-        self.failUnlessEqual(line, 'hello')
+        self.assertEqual(line, 'hello')
         line = dfo.readline(5)
-        self.failUnlessEqual(line, ' worl')
+        self.assertEqual(line, ' worl')
         line = dfo.readline()
-        self.failUnlessEqual(line, 'd\n')
+        self.assertEqual(line, 'd\n')
 
 
     def testMassCloseFileDescriptors(self):
@@ -815,7 +815,7 @@ class UtilTest(testhelp.TestCase):
         openFDs()
         util.massCloseFileDescriptors(start, 4)
         # 17 should be closed
-        self.failUnlessRaises(OSError, os.read, start + 17, 1)
+        self.assertRaises(OSError, os.read, start + 17, 1)
         # 27 should still be open
         os.read(start + 27, 1)
         os.close(start + 27)
@@ -823,7 +823,7 @@ class UtilTest(testhelp.TestCase):
         openFDs()
         util.massCloseFileDescriptors(start, 10)
         # 27 should be closed now
-        self.failUnlessRaises(OSError, os.read, start + 27, 1)
+        self.assertRaises(OSError, os.read, start + 27, 1)
 
         # Test for low-level misc function
         openFDs()
@@ -832,7 +832,7 @@ class UtilTest(testhelp.TestCase):
         os.read(start + 27, 1)
         file_utils.massCloseFileDescriptors(start, 0, start + 30)
         # 27 should be closed now
-        self.failUnlessRaises(OSError, os.read, start + 27, 1)
+        self.assertRaises(OSError, os.read, start + 27, 1)
 
     def testNullifyFileDescriptor(self):
         # CNY-2143
@@ -848,12 +848,12 @@ class UtilTest(testhelp.TestCase):
         # /dev/null exists, it will (most likely) open directly on top of
         # ofd1
         util.nullifyFileDescriptor(ofd1)
-        self.failUnlessEqual(os.read(ofd1, 10), '')
+        self.assertEqual(os.read(ofd1, 10), '')
         os.close(ofd1)
 
         # ofd1 is empty and smaller than ofd2, the function should dup() it
         util.nullifyFileDescriptor(ofd2)
-        self.failUnlessEqual(os.read(ofd2, 10), '')
+        self.assertEqual(os.read(ofd2, 10), '')
         os.close(ofd2)
 
         oldMkstemp = tempfile.mkstemp
@@ -875,14 +875,14 @@ class UtilTest(testhelp.TestCase):
         util.nullifyFileDescriptor(ofd2)
         self.unmock()
 
-        self.failUnlessEqual(os.read(ofd2, 10), '')
-        self.failUnlessEqual(len(ofds), 1)
+        self.assertEqual(os.read(ofd2, 10), '')
+        self.assertEqual(len(ofds), 1)
 
         # Anything open by mkstemp should be closed
         try:
             os.close(ofds[0])
         except OSError, e:
-            self.failUnlessEqual(e.errno, 9)
+            self.assertEqual(e.errno, 9)
         else:
             self.fail("File descriptor open by mkstemp should have been closed")
         os.close(ofd2)
@@ -913,11 +913,11 @@ class UtilTest(testhelp.TestCase):
         startCount = util.countOpenFileDescriptors()
         fdarr = [ open('/dev/null') for x in range(200) ]
         endCount = util.countOpenFileDescriptors()
-        self.failUnlessEqual(startCount + len(fdarr), endCount)
+        self.assertEqual(startCount + len(fdarr), endCount)
 
         fdarr = None
         endCount = util.countOpenFileDescriptors()
-        self.failUnlessEqual(startCount, endCount)
+        self.assertEqual(startCount, endCount)
 
     def testConvertPackageNameToClassName(self):
         data = {'foo': 'Foo',
@@ -931,18 +931,18 @@ class UtilTest(testhelp.TestCase):
 
     def testBadXmlrpcData(self):
         string = "<Blah"
-        e = self.failUnlessRaises(util.xmlrpclib.ResponseError,
+        e = self.assertRaises(util.xmlrpclib.ResponseError,
             util.xmlrpcLoad, string)
 
         # Simulate sgmlop missing
         self.mock(util.xmlrpclib, "SgmlopParser", None)
-        e = self.failUnlessRaises(util.xmlrpclib.ResponseError,
+        e = self.assertRaises(util.xmlrpclib.ResponseError,
             util.xmlrpcLoad, string)
 
     def testServerProxyHidingPassword(self):
         sp = util.ServerProxy("http://user:sikrit_pass@host:1234/XMLRPD", None)
-        self.failUnlessEqual(repr(sp), '<ServerProxy for http://user:<PASSWD>@host:1234/XMLRPD>')
-        self.failUnlessEqual(str(sp), '<ServerProxy for http://user:<PASSWD>@host:1234/XMLRPD>')
+        self.assertEqual(repr(sp), '<ServerProxy for http://user:<PASSWD>@host:1234/XMLRPD>')
+        self.assertEqual(str(sp), '<ServerProxy for http://user:<PASSWD>@host:1234/XMLRPD>')
 
     def testPreferXZoverUNLZMA(self):
         # CNY-3231
@@ -963,16 +963,16 @@ class UtilTest(testhelp.TestCase):
         try:
             os.environ['PATH'] = workDir
             decompressor = util.LZMAFile(file(dumbFilePath))
-            self.failUnlessEqual(decompressor.read(), data)
+            self.assertEqual(decompressor.read(), data)
             decompressor.close()
             # Make sure we prefer xz over unlzma
-            self.failUnlessEqual(decompressor.executable, xzPath)
+            self.assertEqual(decompressor.executable, xzPath)
             # But if xz is not available, we can use unlzma
             os.unlink(xzPath)
             decompressor = util.LZMAFile(file(dumbFilePath))
-            self.failUnlessEqual(decompressor.read(), data)
+            self.assertEqual(decompressor.read(), data)
             decompressor.close()
-            self.failUnlessEqual(decompressor.executable, unlzmaPath)
+            self.assertEqual(decompressor.executable, unlzmaPath)
         finally:
             os.environ['PATH'] = oldPath
             util.rmtree(workDir)
@@ -984,7 +984,7 @@ class UtilTest(testhelp.TestCase):
             ('foo?bar', r'foo.bar'),
         ]
         for teststr, exp in tests:
-            self.failUnlessEqual(util.fnmatchTranslate(teststr), exp)
+            self.assertEqual(util.fnmatchTranslate(teststr), exp)
 
     def testLockedFile(self):
         # pipe1 is used by the parent to unblock the child
@@ -1003,7 +1003,7 @@ class UtilTest(testhelp.TestCase):
                 os.close(pipe2[0])
                 # Block the child until the parent send something on pipe1
                 ret = os.read(pipe1[0], 1)
-                self.failUnlessEqual(ret, "g")
+                self.assertEqual(ret, "g")
                 os.write(pipe2[1], "START")
                 fileobj = lf.open()
                 os.write(pipe2[1], "UNLCK")
@@ -1011,27 +1011,27 @@ class UtilTest(testhelp.TestCase):
                 lf.close()
                 os.write(pipe2[1], "CLOSD")
                 ret = os.read(pipe1[0], 1)
-                self.failUnlessEqual(ret, "o")
+                self.assertEqual(ret, "o")
 
                 # Try to acquire lock
                 os.write(pipe2[1], "GETLK")
                 fileobj = lf.open()
-                self.failIfEqual(fileobj, None)
+                self.assertNotEqual(fileobj, None)
 
                 ret = os.read(pipe1[0], 1)
-                self.failUnlessEqual(ret, "g")
+                self.assertEqual(ret, "g")
                 # We shouldn't lock
                 fileobj = lf.open()
-                self.failIfEqual(fileobj, None)
-                self.failUnlessEqual(fileobj.read(), "Blah")
+                self.assertNotEqual(fileobj, None)
+                self.assertEqual(fileobj.read(), "Blah")
                 os.write(pipe2[1], "NOLCK")
 
                 ret = os.read(pipe1[0], 1)
-                self.failUnlessEqual(ret, "o")
+                self.assertEqual(ret, "o")
 
                 # We shouldn't lock
                 fileobj = lf.open(shouldLock = False)
-                self.failUnlessEqual(fileobj, None)
+                self.assertEqual(fileobj, None)
 
                 os.write(pipe2[1], "ByBye")
                 
@@ -1042,61 +1042,61 @@ class UtilTest(testhelp.TestCase):
             os.close(pipe1[0])
             os.close(pipe2[1])
             fileobj = lf.open()
-            self.failUnlessEqual(fileobj, None)
+            self.assertEqual(fileobj, None)
             # We now hold the lock
             # Launch child process
             os.write(pipe1[1], "g")
             # Wait for client to write START
             ret = os.read(pipe2[0], 5)
-            self.failUnlessEqual(ret, "START")
+            self.assertEqual(ret, "START")
             # Make sure the client didn't send anything else
             import select
             p = select.poll()
             p.register(pipe2[0], select.POLLIN)
             ret = p.poll(0.1)
-            self.failUnlessEqual(ret, [])
+            self.assertEqual(ret, [])
             # Unlock the child, no data is created
             lf.unlock()
             ret = os.read(pipe2[0], 5)
-            self.failUnlessEqual(ret, "UNLCK")
+            self.assertEqual(ret, "UNLCK")
             # Wait for child to close locked file
             ret = os.read(pipe2[0], 5)
-            self.failUnlessEqual(ret, "CLOSD")
+            self.assertEqual(ret, "CLOSD")
             # The lock file should be still present
-            self.failUnless(os.path.exists(fileName + '.lck'))
+            self.assertTrue(os.path.exists(fileName + '.lck'))
 
             # Lock again
             fileobj = lf.open()
-            self.failUnlessEqual(fileobj, None)
+            self.assertEqual(fileobj, None)
             lf.write("Blah")
             os.write(pipe1[1], "o")
 
             ret = os.read(pipe2[0], 5)
-            self.failUnlessEqual(ret, "GETLK")
+            self.assertEqual(ret, "GETLK")
             # Unlock the client
             lf.commit()
 
             # We should not lock anymore, we have the data file
             fileobj = lf.open()
-            self.failIfEqual(fileobj, None)
+            self.assertNotEqual(fileobj, None)
 
             # Let the child run, it should return immediately
             os.write(pipe1[1], "g")
 
             ret = os.read(pipe2[0], 5)
-            self.failUnlessEqual(ret, "NOLCK")
-            self.failUnlessEqual(fileobj.read(), "Blah")
+            self.assertEqual(ret, "NOLCK")
+            self.assertEqual(fileobj.read(), "Blah")
 
             # Get rid of the data file
             os.unlink(fileName)
             fileobj = lf.open()
 
             fileobj = lf.open(shouldLock = False)
-            self.failUnlessEqual(fileobj, None)
+            self.assertEqual(fileobj, None)
             os.write(pipe1[1], 'o')
 
             ret = os.read(pipe2[0], 5)
-            self.failUnlessEqual(ret, "ByBye")
+            self.assertEqual(ret, "ByBye")
 
             lf.close()
         finally:
@@ -1118,28 +1118,28 @@ class UtilTest(testhelp.TestCase):
         tsmap.set(key, val)
         now2 = time.time()
         v = tsmap.get(key)
-        self.failUnlessEqual(val, v)
+        self.assertEqual(val, v)
         # Reach inside, make sure timestamp is set right
         v, ts = tsmap._map.get(key)
-        self.failUnlessEqual(val, v)
-        self.failUnless(ts >= now + delta)
-        self.failUnless(ts <= now2 + delta)
+        self.assertEqual(val, v)
+        self.assertTrue(ts >= now + delta)
+        self.assertTrue(ts <= now2 + delta)
 
         # Make the entry stale
         tsmap._map[key] = (val, now - delta - 1)
         missing = object()
 
         v = tsmap.get(key, default = missing)
-        self.failUnless(v is missing)
+        self.assertTrue(v is missing)
 
         # Fetch stale object
         v = tsmap.get(key, default = missing, stale = True)
-        self.failUnlessEqual(val, v)
+        self.assertEqual(val, v)
 
         # Clear object
         tsmap.clear()
         v = tsmap.get(key, default = missing, stale = True)
-        self.failUnless(v is missing)
+        self.assertTrue(v is missing)
 
 
     def testBz2File(self):
@@ -1148,16 +1148,16 @@ class UtilTest(testhelp.TestCase):
         b = util.BZ2File(fobj)
         s = 'distcc-2.9'
         out = b.read(len(s))
-        self.failUnlessEqual(out,s)
+        self.assertEqual(out,s)
 
         out = b.read(100000)
-        self.failUnlessEqual(len(out),100000)
+        self.assertEqual(len(out),100000)
 
         out = b.read(10000000)
-        self.failUnlessEqual(len(out),1169750)
+        self.assertEqual(len(out),1169750)
 
         out = b.read(1)
-        self.failUnlessEqual(out,None)
+        self.assertEqual(out,None)
 
     def testLZMAFile(self):
         # CNY-3564 - test for short reads
@@ -1176,15 +1176,15 @@ class UtilTest(testhelp.TestCase):
         fobj.flush()
 
         # Make sure something did get written
-        self.failUnless(fobj.tell() > 0)
+        self.assertTrue(fobj.tell() > 0)
         fobj.seek(0)
 
         b = util.LZMAFile(fobj)
         # Read a large amount of data, hopefully larger than the pipe buffer
         limit = 128000
         buf = b.read(limit)
-        self.failUnlessEqual(len(buf), limit)
-        self.failUnlessEqual(list(set(buf)), ["0"])
+        self.assertEqual(len(buf), limit)
+        self.assertEqual(list(set(buf)), ["0"])
 
 
 class UrlTests(testhelp.TestCase):
@@ -1213,8 +1213,8 @@ class UrlTests(testhelp.TestCase):
     def testUrlSplitUnsplit(self):
         for tup, url in self.Tests:
             nurl = util.urlUnsplit(tup)
-            self.failUnlessEqual(nurl, url)
-            self.failUnlessEqual(util.urlSplit(url), tup)
+            self.assertEqual(nurl, url)
+            self.assertEqual(util.urlSplit(url), tup)
 
         # One-way tests
         tests = [
@@ -1225,4 +1225,4 @@ class UrlTests(testhelp.TestCase):
         ]
         for tup, url in tests:
             nurl = util.urlUnsplit(tup)
-            self.failUnlessEqual(nurl, url)
+            self.assertEqual(nurl, url)

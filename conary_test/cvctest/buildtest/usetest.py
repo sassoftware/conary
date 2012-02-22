@@ -206,7 +206,7 @@ class TestUse(rephelp.RepositoryHelper):
         Flavor = deps.parseFlavor
         use.setBuildFlagsFromFlavor(None, Flavor('is: ppc'))
         assert(use.Arch.ppc)
-        self.failUnlessRaises(RuntimeError, use.setBuildFlagsFromFlavor,
+        self.assertRaises(RuntimeError, use.setBuildFlagsFromFlavor,
             None, Flavor('is: x86 ppc'))
         use.setBuildFlagsFromFlavor(None, Flavor('is: x86'))
         assert(use.Arch.x86)
@@ -226,7 +226,7 @@ class TestUse(rephelp.RepositoryHelper):
         # which file defined the Use flag. (CNY-1179)
         Use = use.Use
         for name, value in Use.iteritems():
-            self.failUnless(value._path == '%s/%s' % (self.cfg.useDirs[0], name))
+            self.assertTrue(value._path == '%s/%s' % (self.cfg.useDirs[0], name))
 
     def testPackageFlags(self):
         assert(not use.PackageFlags.kernel.pae)
@@ -257,5 +257,5 @@ class TestUse(rephelp.RepositoryHelper):
         depSet = deps.DependencySet()
         depSet.addDeps(deps.InstructionSetDependency, arch.flags_x86_64()[0])
         use.setBuildFlagsFromFlavor(None, depSet)
-        self.failUnless(use.Arch.x86_64)
-        self.failIf(use.Arch.x86)
+        self.assertTrue(use.Arch.x86_64)
+        self.assertFalse(use.Arch.x86)

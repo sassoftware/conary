@@ -172,7 +172,7 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
                 ret = origChangesetCache.get(slf, key, shouldLock=shouldLock)
                 if shouldLock and ret is None:
                     slf.llf.write("Lock acquired for %s\n" % csPath)
-                    self.failUnless(os.path.exists(csPath + '.lck'))
+                    self.assertTrue(os.path.exists(csPath + '.lck'))
                 return ret
 
             def set(slf, key, value):
@@ -250,17 +250,17 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
         sortedFP = sorted(fingerprints)
 
         logEntries1 = contents[:len(fingerprints)]
-        self.failUnlessEqual(logEntries1,
+        self.assertEqual(logEntries1,
             [ 'Lock acquired for %s/%s/%s-2007022001' %
                 (cfg.changesetCacheDir, fp[:2], fp[2:])
               for fp in sortedFP ])
         logEntries2 = contents[len(fingerprints):2 * len(fingerprints)]
-        self.failUnlessEqual(logEntries2,
+        self.assertEqual(logEntries2,
             [ 'Releasing lock for %s/%s/%s-2007022001' %
                 (cfg.changesetCacheDir, fp[:2], fp[2:])
               for fp in fingerprints ])
         # We're not releasing locks we didn't close
-        self.failUnlessEqual(len(contents), 2 * len(fingerprints))
+        self.assertEqual(len(contents), 2 * len(fingerprints))
 
 class ProxyTest(rephelp.RepositoryHelper):
     def tearDown(self):
@@ -371,7 +371,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             open(path, 'w').write('hahaha')
 
             # At this point, fetching a changeset through the proxy should fail.
-            err = self.failUnlessRaises(errors.RepositoryError,
+            err = self.assertRaises(errors.RepositoryError,
                     proxyRepos.createChangeSet, jobList, **kwargs)
             if 'Changeset was truncated in transit' not in str(err):
                 self.fail("Unexpected error when fetching truncated "
@@ -424,7 +424,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             contType, cont = cs.getFileContents(pathId, fileId)
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
         rpmContents = file(rpmFile0).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('foo:runtime', (None, ''),
                 (ver0, ''), True),
               'cft-file', os.path.basename(rpmFile0), rpmContents),
@@ -451,7 +451,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             contType, cont = cs.getFileContents(pathId, fileId)
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
         rpmContents = file(rpmFile0).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('foo:runtime', (ver0, ''), (ver1, ''), False),
               'cft-file', os.path.basename(rpmFile0), rpmContents),
             (('foo:runtime', (ver0, ''), (ver1, ''), False),
@@ -472,7 +472,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
 
         rpmContents = file(rpmFile2).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('foo:runtime', (ver1, ''), (ver2, ''), False),
               'cft-file', os.path.basename(rpmFile2), rpmContents),
             (('foo:runtime', (ver1, ''), (ver2, ''), False),
@@ -512,7 +512,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
         data.sort()
         rpmContents = file(rpmFile0).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('foo:data', (None, ''), (ver0, ''), True),
               'cft-file', '/contents1', 'hello, world!\n'),
             (('foo:runtime', (None, ''), (ver0, ''), True),
@@ -536,7 +536,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
         data.sort()
         rpmContents = file(rpmFile2).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('foo:runtime', (ver0, ''), (ver2, ''), False),
               'cft-file', '/etc/with-config-special.2.cfg', 'second config file\n'),
             (('foo:runtime', (ver0, ''), (ver2, ''), False),
@@ -631,8 +631,8 @@ class TestPackage(DerivedCapsuleRecipe):
             contType, cont = cs.getFileContents(pathId, fileId)
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
 
-        self.failUnlessEqual([x[:3] for x in data], expFiles)
-        self.failUnlessEqual([ x[3] for x in data[1:] ], expFileContents)
+        self.assertEqual([x[:3] for x in data], expFiles)
+        self.assertEqual([ x[3] for x in data[1:] ], expFileContents)
 
         # Now fetch the changeset through an injecting proxy
         cs = proxyRepos.createChangeSet(joblist, withFiles = True,
@@ -642,8 +642,8 @@ class TestPackage(DerivedCapsuleRecipe):
         for (pathId, path, fileId, fileVer, trvspec) in csFiles:
             contType, cont = cs.getFileContents(pathId, fileId)
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
-        self.failUnlessEqual([x[:3] for x in data], expFiles)
-        self.failUnlessEqual([ x[3] for x in data[1:] ], expFileContents)
+        self.assertEqual([x[:3] for x in data], expFiles)
+        self.assertEqual([ x[3] for x in data[1:] ], expFileContents)
 
     def _processAbsoluteChangeset(self, cs):
         csFiles = []
@@ -758,7 +758,7 @@ class TestPackage(DerivedCapsuleRecipe):
         actual = [ (x[0], x[1], sha1helper.sha1ToString(x[2]), x[3],
                 sha1helper.sha1ToString(x[4]))
             for x in [data[0], data[2]] ]
-        self.failUnlessEqual([ actual[0], None, actual[1], None],
+        self.assertEqual([ actual[0], None, actual[1], None],
             expected)
 
         # Drop the extra file id
@@ -767,7 +767,7 @@ class TestPackage(DerivedCapsuleRecipe):
         logFile = os.path.join(self.workDir, "capsuleContentServer.log")
         logCount = len([x for x in file(logFile)])
         ret = proxyRepos.getFileContents(fileList)
-        self.failUnlessEqual(len([x for x in file(logFile)]) - logCount, 2)
+        self.assertEqual(len([x for x in file(logFile)]) - logCount, 2)
 
     @runproxy(withCapsuleContentServer = True)
     def testReassembleChangesetsMixedServers(self, proxyRepos):
@@ -806,11 +806,11 @@ class TestPackage(DerivedCapsuleRecipe):
             os.unlink(logFile)
         cs = proxyRepos.createChangeSet(joblist, withFiles = True,
             withFileContents = True)
-        self.failUnlessEqual(len([x for x in file(logFile)]), 2)
+        self.assertEqual(len([x for x in file(logFile)]), 2)
         # Also, make sure we only requested stuff for foo
         expected = '/toplevel/%s' % os.path.basename(rpmFile0)
         for row in file(logFile):
-            self.failUnless(row.startswith(expected), row.rstrip())
+            self.assertTrue(row.startswith(expected), row.rstrip())
 
         csFiles, trvCsMap = self._processAbsoluteChangeset(cs)
         data = []
@@ -820,7 +820,7 @@ class TestPackage(DerivedCapsuleRecipe):
         data.sort()
         rpmContents0 = file(rpmFile0).read()
         rpmContents1 = file(rpmFile1).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('bar:data', (None, ''), (ver1, ''), True),
               'cft-file', '/contents2', 'hello, world!\n'),
             (('bar:runtime', (None, ''), (ver1, ''), True),
@@ -862,7 +862,7 @@ class TestPackage(DerivedCapsuleRecipe):
             data.append((self._strJob(trvspec), contType, path, cont.get().read()))
         data.sort()
         rpmContents = file(rpmFile0).read()
-        self.failUnlessEqual(data, [
+        self.assertEqual(data, [
             (('foo:data', (None, ''), (ver0, ''), True),
               'cft-file', '/contents1', 'hello, world!\n'),
             (('foo:runtime', (None, ''), (ver0, ''), True),
@@ -902,7 +902,7 @@ class TestPackage(DerivedCapsuleRecipe):
         fileList = [ (x[2], x[3]) for x in csFiles
             if x[1] in interestingFiles ]
         ret = proxyRepos.getFileContents(fileList)
-        self.failUnlessEqual(ret[0].f.read(), '')
+        self.assertEqual(ret[0].f.read(), '')
 
 
     def testGetFileContentsCheckAuth(self):

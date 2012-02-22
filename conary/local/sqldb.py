@@ -23,6 +23,7 @@ from conary import deps, errors, files, streams, trove, versions
 from conary.dbstore import idtable, sqlerrors
 from conary.local import deptable, troveinfo, versiontable, schema
 from conary.lib import api
+from conary.trovetup import TroveTuple
 
 OldDatabaseSchema = schema.OldDatabaseSchema
 
@@ -2030,15 +2031,20 @@ order by
     def getAllTroveInfo(self, troveInfoTag):
         cu = self.db.cursor()
         cu.execute("""
-            SELECT troveName, version, flavor, data FROM TroveInfo
+            SELECT troveName, version, timeStamps, flavor, data FROM TroveInfo
                 JOIN Instances USING (instanceId)
                 JOIN Flavors USING (flavorId)
                 JOIN Versions ON Instances.versionId = Versions.versionId
                 WHERE infoType = ?
         """, troveInfoTag)
 
-        return [ ( (x[0], versions.VersionFromString(x[1]),
-                    deps.deps.ThawFlavor(x[2])), x[3]) for x in cu ]
+        versionCache = VersionCache()
+        flavorCache = FlavorCache()
+        return [ (
+                TroveTuple(name=x[0],
+                    version=versionCache.get(x[1], x[2]),
+                    flavor=flavorCache.get(x[3])),
+                x[4]) for x in cu ]
 
     def _getTroveInfo(self, troveList, troveInfoTag):
         # returns a list parallel to troveList, None for troveinfo not present

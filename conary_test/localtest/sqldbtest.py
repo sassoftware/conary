@@ -358,34 +358,34 @@ class SqlDB(rephelp.RepositoryHelper):
         cu.execute("SELECT value FROM DatabaseAttributes WHERE name = ?",
             field)
         row = cu.next()
-        self.failUnlessEqual(row[0], '0')
+        self.assertEqual(row[0], '0')
 
         updateq = "UPDATE DatabaseAttributes SET value = ? WHERE name = ?"
         # Update it manually
         cu.execute(updateq, '10', field)
         db.db.commit()
 
-        self.failUnlessEqual(db.getTransactionCounter(), 10)
+        self.assertEqual(db.getTransactionCounter(), 10)
 
         # Increment it
-        self.failUnlessEqual(db.incrementTransactionCounter(), 11)
-        self.failUnlessEqual(db.getTransactionCounter(), 11)
+        self.assertEqual(db.incrementTransactionCounter(), 11)
+        self.assertEqual(db.getTransactionCounter(), 11)
 
         # Delete entry, should reset the counter
         cu.execute("DELETE from DatabaseAttributes WHERE name = ?", field)
         db.db.commit()
-        self.failUnlessEqual(db.getTransactionCounter(), 0)
-        self.failUnlessEqual(db.incrementTransactionCounter(), 1)
-        self.failUnlessEqual(db.getTransactionCounter(), 1)
+        self.assertEqual(db.getTransactionCounter(), 0)
+        self.assertEqual(db.incrementTransactionCounter(), 1)
+        self.assertEqual(db.getTransactionCounter(), 1)
 
-        self.failUnlessEqual(db.incrementTransactionCounter(), 2)
-        self.failUnlessEqual(db.getTransactionCounter(), 2)
+        self.assertEqual(db.incrementTransactionCounter(), 2)
+        self.assertEqual(db.getTransactionCounter(), 2)
 
         # Mess it up
         cu.execute(updateq, 'not an integer', field)
-        self.failUnlessEqual(db.getTransactionCounter(), 0)
-        self.failUnlessEqual(db.incrementTransactionCounter(), 1)
-        self.failUnlessEqual(db.getTransactionCounter(), 1)
+        self.assertEqual(db.getTransactionCounter(), 0)
+        self.assertEqual(db.incrementTransactionCounter(), 1)
+        self.assertEqual(db.getTransactionCounter(), 1)
 
     def testDatabaseTroveInfoCleanup(self):
         # remove a trove but leave a reference - its troveInfo data 
@@ -437,14 +437,14 @@ class SqlDB(rephelp.RepositoryHelper):
         cu.execute('select count(*) from Versions')
         count = cu.fetchall()[0][0]
         # should have only 0|NULL
-        self.failUnlessEqual(count, 4)
+        self.assertEqual(count, 4)
         # now erase
         db.eraseTrove('testcomp:runtime', v10, flavor1)
         db.commit()
         cu.execute('select count(*) from Versions')
         count = cu.fetchall()[0][0]
         # should have only 0|NULL
-        self.failUnlessEqual(count, 1)
+        self.assertEqual(count, 1)
 
         # test trove version cleanup
         trv1 = trove.Trove('testcomp:runtime', v10, flavor1, None)
@@ -456,14 +456,14 @@ class SqlDB(rephelp.RepositoryHelper):
         db.commit()
         cu.execute('select count(*) from Versions')
         count = cu.fetchall()[0][0]
-        self.failUnlessEqual(count, 3)
+        self.assertEqual(count, 3)
 
         db.eraseTrove('group-test', v20, flavor1)
         db.commit()
         cu.execute('select count(*) from Versions')
         count = cu.fetchall()[0][0]
         # should have only 0|NULL
-        self.failUnlessEqual(count, 1)
+        self.assertEqual(count, 1)
 
     def testMultipleFlavorsInstalled(self):
         """
@@ -603,7 +603,7 @@ class SqlDB(rephelp.RepositoryHelper):
         tableCounts2 = dict.fromkeys(db2.tables.keys())
         for table in tableCounts2.keys():
             tableCounts2[table] = cu.execute('select count(*) from %s' %table).fetchall()[0][0]
-        self.failUnlessEqual(tableCounts, tableCounts2)
+        self.assertEqual(tableCounts, tableCounts2)
 
         # check to make sure that we fixed our broken deps and troveinfo
         cu.execute("select count(*) from troveinfo where infoType=3 "
@@ -635,14 +635,14 @@ class SqlDB(rephelp.RepositoryHelper):
         # make sure the addition of DatabaseAttributes happens correctly
         db = dbstore.connect(fn, driver='sqlite')
         db.loadSchema()
-        self.failUnless('DatabaseAttributes' in db.tables)
+        self.assertTrue('DatabaseAttributes' in db.tables)
         cu = db.cursor()
         cu.execute("DROP TABLE DatabaseAttributes")
         db.commit()
         db.close()
 
         sdb = sqldb.Database(fn)
-        self.failUnless('DatabaseAttributes' in sdb.db.tables)
+        self.assertTrue('DatabaseAttributes' in sdb.db.tables)
         del sdb
         
         os.unlink(fn)
@@ -657,7 +657,7 @@ class SqlDB(rephelp.RepositoryHelper):
         cu = db.db.cursor()
         cu.execute('select count(*) from sqlite_stat1')
         count = cu.fetchall()[0][0]
-        self.failUnlessEqual(count, 0)
+        self.assertEqual(count, 0)
 
     def testMigrationReadOnly(self):
         dbfile = os.path.join(resources.get_archive(), 'conarydbs',

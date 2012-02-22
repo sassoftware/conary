@@ -95,11 +95,11 @@ class FilesTest(testhelp.TestCase):
         # the ls -l format, so these three tests could really be just one
         # Additionally, the extra argument to timeString is ignored now
         t = 1083768516
-        self.failUnlessEqual(i.timeString(t), "2004-05-05 14:34:53 UTC")
+        self.assertEqual(i.timeString(t), "2004-05-05 14:34:53 UTC")
         i.mtime.set(1067697293)
-        self.failUnlessEqual(i.timeString(t), "2003-11-01 14:34:53 UTC")
+        self.assertEqual(i.timeString(t), "2003-11-01 14:34:53 UTC")
         i.mtime.set(1099751693)
-        self.failUnlessEqual(i.timeString(t), "2004-11-06 14:34:53 UTC")
+        self.assertEqual(i.timeString(t), "2004-11-06 14:34:53 UTC")
 
     def testDevice(self):
         d = DeviceStream()
@@ -403,16 +403,16 @@ class FilesTest(testhelp.TestCase):
                 s = s[:4] + (uid, gid) + s[6:]
                 # Convert to stat_result
                 s = posix.stat_result(s)
-                self.failUnlessEqual(s.st_uid, uid)
-                self.failUnlessEqual(s.st_gid, gid)
+                self.assertEqual(s.st_uid, uid)
+                self.assertEqual(s.st_gid, gid)
             return s
 
         try:
             os.lstat = myLstat
             # No failure here
             f = files.FileFromFilesystem(fpath, None)
-            self.failUnlessEqual(f.inode.owner(), "+" + str(uid))
-            self.failUnlessEqual(f.inode.group(), "+" + str(gid))
+            self.assertEqual(f.inode.owner(), "+" + str(uid))
+            self.assertEqual(f.inode.group(), "+" + str(gid))
         finally:
             os.lstat = origLstat
 
@@ -426,21 +426,21 @@ class FilesTest(testhelp.TestCase):
             mygroup = files.groupCache.lookupId('/', mygid)
 
             # Look myself up
-            self.failUnlessEqual(myuid, files.userCache.lookupName('/', myuser))
-            self.failUnlessEqual(mygid, files.groupCache.lookupName('/', mygroup))
+            self.assertEqual(myuid, files.userCache.lookupName('/', myuser))
+            self.assertEqual(mygid, files.groupCache.lookupName('/', mygroup))
 
             # Plus
             strid = '+%d' % myuid
-            self.failUnlessEqual(myuid, files.userCache.lookupName('/', strid))
+            self.assertEqual(myuid, files.userCache.lookupName('/', strid))
             strid = '+%d' % mygid
-            self.failUnlessEqual(mygid, files.groupCache.lookupName('/', strid))
+            self.assertEqual(mygid, files.groupCache.lookupName('/', strid))
 
             # Plus, non-existent user
             uid, gid = self.findUnknownIds()
             strid = '+%d' % uid
-            self.failUnlessEqual(uid, files.userCache.lookupName('/', strid))
+            self.assertEqual(uid, files.userCache.lookupName('/', strid))
             strid = '+%d' % gid
-            self.failUnlessEqual(gid, files.groupCache.lookupName('/', strid))
+            self.assertEqual(gid, files.groupCache.lookupName('/', strid))
         finally:
             files.userCache.nameCache = {'root': 0}
             files.userCache.idCache = {0: 'root'}

@@ -219,7 +219,7 @@ class FooRecipe(FactoryRecipeClass):
         fileInfo, fileObj = ccs.getFileContents(fileId, pathId)
         decomp = bz2.BZ2Decompressor()
         data = decomp.decompress(fileObj.f.read())
-        self.failIf("+ Processing" not in data,
+        self.assertFalse("+ Processing" not in data,
                 "build log data appears to be incomplete")
 
     def testCookFromNewPackage(self):
@@ -416,9 +416,9 @@ class FactoryTest(Factory):
                     for x in trvSpec ]
         trvs = repos.getTroves(trvSpec)
         trv = trvs[0]
-        self.failUnlessEqual(trv.getName(),'factory-test:recipe')
+        self.assertEqual(trv.getName(),'factory-test:recipe')
         paths = sorted([ x[1] for x in trv.iterFileList() ])
-        self.failUnlessEqual(paths, ['/usr/share/some-random-file'])
+        self.assertEqual(paths, ['/usr/share/some-random-file'])
 
     def factoryBuildReqs(self):
         db = self.openDatabase()

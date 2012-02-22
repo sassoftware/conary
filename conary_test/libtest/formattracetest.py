@@ -42,14 +42,14 @@ class ReprTest(testhelp.TestCase):
         for line in sio:
             varName, varVal = [ x.strip() for x in line.split(':', 2) ]
             if varName == 'stringobj1':
-                self.failUnlessEqual(varVal, repr(stringobj1))
+                self.assertEqual(varVal, repr(stringobj1))
             elif varName == 'unocodeobj1':
-                self.failUnlessEqual(varVal, repr(unicodeobj1))
+                self.assertEqual(varVal, repr(unicodeobj1))
             elif varName == 'listobj1':
-                self.failUnlessEqual(varVal, repr(listobj1))
+                self.assertEqual(varVal, repr(listobj1))
             elif varName == 'stringobj2':
-                self.failIfEqual(varVal, repr(stringobj2))
+                self.assertNotEqual(varVal, repr(stringobj2))
             elif varName == 'unocodeobj2':
-                self.failIfEqual(varVal, repr(unicodeobj2))
+                self.assertNotEqual(varVal, repr(unicodeobj2))
             elif varName == 'listobj2':
-                self.failIfEqual(varVal, repr(listobj2))
+                self.assertNotEqual(varVal, repr(listobj2))

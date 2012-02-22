@@ -223,7 +223,7 @@ class ConaryClientTest(rephelp.RepositoryHelper):
         # Get the last 3 rollbacks
         rblist = itertools.islice(cl.iterRollbacksList(), 3)
         names = [ x[0] for x in rblist ]
-        self.failUnlessEqual(names, ['r.6', 'r.5', 'r.4'])
+        self.assertEqual(names, ['r.6', 'r.5', 'r.4'])
 
     def testFormerlyOverlapping(self):
         self.addQuickTestComponent("test:runtime", "1.0-1-1")
@@ -626,19 +626,19 @@ The following dependencies would not be met after this update:
         cs = client.createChangeSet(troveSpec)
 
         client.disconnectRepos()
-        self.failUnlessRaises(conaryclient.errors.RepositoryError,
+        self.assertRaises(conaryclient.errors.RepositoryError,
             client.createChangeSet, troveSpec)
 
     def testChangeSetFromFileAPI(self):
         # CNY-1578
         # Test that ChangeSetFromFile is accessible through conaryclient
-        self.failUnless(hasattr(conaryclient, 'ChangeSetFromFile'))
+        self.assertTrue(hasattr(conaryclient, 'ChangeSetFromFile'))
 
     def testFlavorPreferencesOverride(self):
         # CNY-1710
         self.cfg.flavorPreferences = [parseFlavor('a'), parseFlavor('b')]
         client = conaryclient.ConaryClient(self.cfg)
-        self.failUnlessEqual([ str(x) for x in client.repos._flavorPreferences],
+        self.assertEqual([ str(x) for x in client.repos._flavorPreferences],
             ['a', 'b'])
 
     def testGetClient(self):
@@ -667,7 +667,7 @@ The following dependencies would not be met after this update:
         # CNY-2316
         client = conaryclient.ConaryClient(self.cfg)
         db = client.getDatabase()
-        self.failUnlessEqual(db, client.db)
+        self.assertEqual(db, client.db)
 
     def testreposOverride(self):
         client = conaryclient.ConaryClient(self.cfg, repos = 1234)

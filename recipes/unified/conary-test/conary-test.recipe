@@ -1,0 +1,318 @@
+#
+# Copyright (c) rPath, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+class ConaryTest(CPackageRecipe):
+    name = 'conary-test'
+    version = '2'
+
+    plat = 'centos'
+    platver = '6'
+    embedded = False
+    encapsulated = True
+
+    Flags.coverage = True
+    Flags.test = True
+
+    # DB (default sqlite)
+    Flags.db_pgsql = False
+
+    # Server (default standalone)
+    Flags.srv_apache = False
+    Flags.srv_apache_cached = False
+
+    # Proxy (default none)
+    Flags.proxy_apache = False
+    Flags.proxy_standalone = False
+
+    # HTTP Proxy (default off)
+    Flags.http_proxy = False
+
+    # RPM tests
+    Flags.rpm = False
+
+    # Split tests
+    Flags.split1 = False
+    Flags.split2 = False
+    Flags.split3 = False
+    Flags.split4 = False
+
+    if plat == 'rpath':
+        buildRequires = [
+            'diffutils:runtime',
+            'testutils:python',
+            'testutils:runtime',
+
+            'bzr:runtime',
+            'cmake:runtime',
+            'conary-build:python',
+            'conary-policy:lib',
+            'conary:python',
+            'conary-repository:python',
+            'conary-testenv',
+            'cvs:runtime',
+            'desktop-file-utils:runtime',
+            'elfutils:devel',
+            'elfutils:runtime',
+            'epdb:python',
+            'gcc-c++:runtime',
+            'gcc-java:devel',
+            'git:runtime',
+            'gnupg:runtime',
+            'httpd:runtime',
+            'info-bin:user',
+            'info-daemon:user',
+            'info-rmake-chroot:user',
+            'libelf:devel',
+            'libxml2:runtime',
+            'm2crypto:python',
+            'mercurial:runtime',
+            'mkisofs:runtime',
+            'mod_python:runtime',
+            'mod_ssl:runtime',
+            'net-tools:runtime',
+            'popt:devel',
+            'postgresql:runtime',
+            'postgresql-server:runtime',
+            'python:devel',
+            'python-ctypes:python',
+            'python-pgsql:python',
+            'python:runtime',
+            'python-setuptools:python',
+            'sqlite:devel',
+            'squid:runtime',
+            'subversion:runtime',
+            'tmpwatch:runtime',
+            'unzip:runtime',
+            'util-linux:runtime',
+            'webunit:python',
+            'xz:runtime',
+            ]
+        if Flags.rpm:
+            buildRequires += [
+                'rpm-rhel-6:runtime',
+                ]
+
+    elif plat == 'centos' and encapsulated:
+        buildRequires = [
+            'conary-build:python',
+            'conary-policy:lib',
+            'conary:python',
+            'conary-repository:python',
+            'conary-testenv',
+            'info-bin:user',
+            'info-daemon:user',
+            'info-rmake-chroot:user',
+            'testutils:python',
+            'testutils:runtime',
+
+            # CentOS
+            'bzr:rpm',
+            'cmake:rpm',
+            'cvs:rpm',
+            'desktop-file-utils:rpm',
+            'diffutils:rpm',
+            'elfutils-devel:rpm',
+            'elfutils-libelf-devel:rpm',
+            'gcc-c++:rpm',
+            'gcc-java:rpm',
+            'genisoimage:rpm',
+            'git:rpm',
+            'glibc-static:rpm',
+            'gnupg2:rpm',
+            'httpd:rpm',
+            'libxml2:rpm',
+            'mercurial:rpm',
+            'mod_ssl:rpm',
+            'net-tools:rpm',
+            'patch:rpm',
+            'popt-devel:rpm',
+            'postgresql:rpm',
+            'postgresql-server:rpm',
+            'sqlite-devel:rpm',
+            'squid:rpm',
+            'subversion:rpm',
+            'tmpwatch:rpm',
+            'unzip:rpm',
+            'util-linux-ng:rpm',
+            'xz:rpm',
+
+            # Non-CentOS
+            'mod_python:runtime',
+            'python-webunit:python',
+            ]
+
+        if embedded:
+            buildRequires.extend([
+                'm2crypto-conary:python',
+                'python-conary:devel',
+                'python-setuptools-conary:python',
+                ])
+        else:
+            buildRequires.extend([
+                'm2crypto:rpm',
+                'python-devel:rpm',
+                'python-setuptools:rpm',
+                ])
+
+
+    def setup(r):
+        r.setupSource()
+        if Flags.test:
+            r.test()
+        r.install()
+
+    def setupSource(r):
+        r.addMercurialSnapshot()
+        r.Make(dir='conary_test')
+
+        # Make sure the testsuite uses the installed software.
+        r.MakeDirs('../discard')
+        for name in ['commands', 'conary', 'doc', 'man']:
+            r.Move(name, '../discard/' + name)
+
+    def setupEnvironment(r):
+        environ = ''
+        config = {}
+
+        # Repos DB
+        config['repos_db'] = \
+            Flags.db_pgsql and 'postgresql' \
+            or 'sqlite'
+        environ += 'CONARY_REPOS_DB=%s ' % config['repos_db']
+
+        # Server
+        config['server'] = \
+            Flags.srv_apache and 'apache' \
+            or Flags.srv_apache_cached and 'apachecached' \
+            or 'builtin'
+        if config['server'] != 'builtin':
+            environ += 'CONARY_SERVER=%s ' % config['server']
+
+        # Proxy
+        config['proxy'] = \
+            Flags.proxy_apache and 'apache' \
+            or Flags.proxy_standalone and 'standalone' \
+            or 'none'
+        if config['proxy'] != 'none':
+            environ += 'CONARY_PROXY=%s ' % config['proxy']
+
+        # HTTP Proxy
+        if Flags.http_proxy:
+            environ += 'CONARY_HTTP_PROXY=1 '
+            config['http_proxy'] = 'yes'
+        else:
+            config['http_proxy'] = 'no'
+
+        pythonPath = []
+        if Flags.rpm:
+            pythonPath.append('/opt/rpm-rhel-6/%(lib)s/python%(pyver)s/site-packages')
+            environ += 'PATH=/opt/rpm-rhel-6/bin:$PATH '
+
+        # Split tests
+        if Flags.split1:
+            r.macros.test_subset = ' --split=1/4'
+        elif Flags.split2:
+            r.macros.test_subset = ' --split=2/4'
+        elif Flags.split3:
+            r.macros.test_subset = ' --split=3/4'
+        elif Flags.split4:
+            r.macros.test_subset = ' --split=4/4'
+
+        # Use /usr/bin/python so that the special setcap-chroot python is used.
+        if r.embedded:
+            r.macros.pyroot = '/usr/conary'
+        else:
+            r.macros.pyroot = '/usr'
+        r.macros.bindir = '%(pyroot)s/bin'
+        r.macros.oldbindir = '/usr/bin'
+        r.macros.pylib = '%(pyroot)s/%(lib)s'
+        r.macros.pyinc = '%(pyroot)s/include/python%(pyver)s'
+        r.macros.python = '%(bindir)s/python' # not pyver! use the setcap one from conary-testenv
+        r.macros.sitepkgs = '%(pylib)s/python%(pyver)s/site-packages'
+        r.Environment('PATH', '%(bindir)s:/bin:/sbin:/usr/bin:/usr/sbin')
+
+        r.config.update(config)
+        if pythonPath:
+            environ += 'PYTHONPATH=%s ' % (':'.join(pythonPath),)
+        return environ
+
+    def install(r):
+        if r.embedded:
+            r.macros.sitepkgs = '/usr/conary/%(lib)s/python%(pyver)s/site-packages'
+        else:
+            r.macros.sitepkgs = '%(libdir)s/python%(pyver)s/site-packages'
+        # Install the testsuite so that other testsuites can consume it
+        r.MakeDirs('%(sitepkgs)s')
+        r.Run('cp -a conary_test %(destdir)s%(sitepkgs)s/conary_test')
+
+        # These archives are there for the testsuite, of course they'll cause
+        # problems when actually being packaged.
+        r.NormalizeCompression(exceptions='.*')
+        # EnforceJavaBuildRequirements is not useful here, if we got pass the
+        # Java provides/requires extraction we have the build requirements
+        # already met.
+        r.macros.archive = '%(sitepkgs)s/conary_test/archive'
+        #r.EnforceJavaBuildRequirements(exceptions='.*')
+        r.Requires(exceptions='%(archive)s/.*')
+        r.Provides(exceptions='%(archive)s/.*')
+        r.Flavor(exceptions='%(archive)s/.*')
+        r.Strip(exceptions='%(archive)s/.*')
+
+        # Soft deps
+        r.Requires(exceptDeps='python: webunit.*')
+        r.Requires(exceptDeps='python: rpm.*')
+
+    def test(r):
+        r.config = {}
+        environ = r.setupEnvironment()
+        r.macros.pydir = '%(libdir)s/python%(pyver)s/site-packages'
+
+        if 'arch' not in r.config:
+            r.config['arch'] = Arch.getCurrentArch()._name
+
+        r.macros.testinfodir = '%(datadir)s/testinfo/%(name)s-%(version)s'
+        r.macros.testoutputdir = '%(testinfodir)s/tests'
+        r.macros.coverdir = '%(testinfodir)s/coverage'
+        r.MakeDirs(r.macros.testoutputdir, r.macros.coverdir)
+
+        if not r.macros.get('python'):
+            r.macros.python = 'python%(pyver)s'
+        r.macros.coverage = Flags.coverage and '--coverage' or ''
+        r.macros.extra_environ = environ
+        r.macros.args = r.macros.get('test_subset', '')
+
+        # tests
+        r.Run('%(extra_environ)s '
+            '%(python)s testsuite.py -v '
+            '--xml-dir="%(destdir)s%(testoutputdir)s" '
+            '--always-succeed '
+            '%(coverage)s %(args)s',
+            )
+
+        # coverage
+        if Flags.coverage:
+            r.Run('coverage_dump -o %(destdir)s%(coverdir)s/coverage.dat '
+                '-t %(testsuite)s %(testsuitedir)s .')
+
+        # configuration
+        r.Create('%(testinfodir)s/configuration.txt',
+            contents='%r\n' % r.config)
+
+        # policy
+        r.ComponentSpec('testinfo', '%(testinfodir)s/.*')
+        r.ByDefault(exceptions=[':testinfo'])
+

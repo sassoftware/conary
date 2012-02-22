@@ -162,7 +162,7 @@ class MetadataTest(rephelp.RepositoryHelper):
             m = metadata_mod.fetchFreshmeat('tora', xmlDocStream=f)
         except socket.gaierror:
             raise testhelp.SkipTestException('requires network access')
-        self.failUnlessEqual(m.getShortDesc(), "A tool for administrating or developing for Oracle databases.")
+        self.assertEqual(m.getShortDesc(), "A tool for administrating or developing for Oracle databases.")
 
     def setUp(self):
         rephelp.RepositoryHelper.setUp(self)

@@ -33,13 +33,13 @@ class PasswordTest(rephelp.RepositoryHelper):
         # CNY-2497
 
         userName, ret = password.getPassword('foo')
-        self.failUnlessEqual(userName, None)
-        self.failUnlessEqual(ret, None)
+        self.assertEqual(userName, None)
+        self.assertEqual(ret, None)
 
         def mockedGetpass(prompt):
             return prompt
 
         self.mock(getpass, 'getpass', mockedGetpass)
         userName, ret = password.getPassword("server.com", userName="Johnny")
-        self.failUnlessEqual(userName, "Johnny")
-        self.failUnlessEqual(ret, "Enter the password for Johnny on server.com:")
+        self.assertEqual(userName, "Johnny")
+        self.assertEqual(ret, "Enter the password for Johnny on server.com:")

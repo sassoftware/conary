@@ -984,7 +984,7 @@ class CmdLineTest(rephelp.RepositoryHelper):
             c.runCommand(None, argSet, ['cvc', 'commit'],
                 callback=None, repos=None)
         except errors.ConaryError, e:
-            self.failUnlessEqual(e.args[0],
+            self.assertEqual(e.args[0],
                 "options --message and --log-file are "
                 "mutually exclusive")
         else:
@@ -1003,7 +1003,7 @@ class CmdLineTest(rephelp.RepositoryHelper):
             c.runCommand(None, argSet, ['cvc', 'commit'],
                 callback=None, repos=None)
         except errors.ConaryError, e:
-            self.failUnlessEqual(e.args[0],
+            self.assertEqual(e.args[0],
                 "While opening %s: %s" % (tmpf, "No such file or directory"))
         else:
             self.fail("ConaryError not raised")
@@ -1178,7 +1178,7 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          ['cvc', 'stat', 'foo'])
         except TypeError:
             self.fail("Passing extra argument fails")
-        self.failUnlessEqual(ret, usageRetval)
+        self.assertEqual(ret, usageRetval)
 
     def testCvcBasic(self):
         #make updateCmdsure we can specify options before the command
@@ -1302,15 +1302,15 @@ class CmdLineTest(rephelp.RepositoryHelper):
         # this might should be in options help
         rc, s = self.captureOutput(self.conaryMod.main,
                                    ['conary', 'help', 'update'])
-        self.failUnless('--root' not in s)
+        self.assertTrue('--root' not in s)
         rc, s = self.captureOutput(self.conaryMod.main,
                                    ['conary', 'help', 'update', '--verbose'])
-        self.failUnless('--root' in s)
+        self.assertTrue('--root' in s)
 
     def testEraseHelp(self):
         rc, s = self.captureOutput(self.conaryMod.main,
                                    ['conary', 'help', 'erase'])
-        self.failUnless('Erase Options' in s)
+        self.assertTrue('Erase Options' in s)
 
     def testInstallLabel(self):
         class Foo:
@@ -1320,14 +1320,14 @@ class CmdLineTest(rephelp.RepositoryHelper):
 
         self.mock(options.MainHandler, "runCommand", mockRunCommand)
         self.conaryMod.main(["conary", "rblist", "--skip-default-config"])
-        self.failUnless(hasattr(Foo.cfgobj, 'installLabel'))
-        self.failUnless(hasattr(Foo.cfgobj, 'buildLabel'))
+        self.assertTrue(hasattr(Foo.cfgobj, 'installLabel'))
+        self.assertTrue(hasattr(Foo.cfgobj, 'buildLabel'))
 
         del Foo.cfgobj
 
         self.cvcMod.main(["cvc", "cook", "--skip-default-config"])
-        self.failUnless(hasattr(Foo.cfgobj, 'installLabel'))
-        self.failUnless(hasattr(Foo.cfgobj, 'buildLabel'))
+        self.assertTrue(hasattr(Foo.cfgobj, 'installLabel'))
+        self.assertTrue(hasattr(Foo.cfgobj, 'buildLabel'))
 
     def testUpdateReplaceFiles(self):
         def _test(managed, unmanaged, modified, config, basic):
@@ -1488,8 +1488,8 @@ class CmdLineTest(rephelp.RepositoryHelper):
         p = subprocess.Popen(cmd, stdout = subprocess.PIPE,
             stderr = subprocess.PIPE)
         stdout, stderr = p.communicate()
-        self.failUnlessEqual(stdout, '')
-        self.failUnlessEqual(stderr, '')
+        self.assertEqual(stdout, '')
+        self.assertEqual(stderr, '')
 
     def testMissingCommand(self):
         # CNY-3364
@@ -1514,6 +1514,6 @@ class CmdLineTest(rephelp.RepositoryHelper):
         # verify failure for network operations
         rc, txt = self.captureOutput(self.assertRaises,
                                      AssertionError, self.testRepQuery)
-        self.failUnlessEqual(txt, "error: conaryrc:2: when processing "
+        self.assertEqual(txt, "error: conaryrc:2: when processing "
                 "includeConfigFile: Error reading config file "
                 "http://does-not-exist/: Name or service not known\n")

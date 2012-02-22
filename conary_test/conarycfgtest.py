@@ -121,7 +121,7 @@ flavor use:ssl,krb,readline,\
         out.close()
         out = StringIO()
         cfg.displayKey('proxyMap', out)
-        self.failUnlessEqual(out.getvalue(),
+        self.assertEqual(out.getvalue(),
             "proxyMap                  host.somewhere.com "
             "http://someotherhost.com:123/loc\n")
         out.close()
@@ -270,8 +270,8 @@ flavor use:ssl,krb,readline,\
         self.mock(util, 'braceGlob', mockBraceGlob)
 
         c.read(cfg)
-        self.failUnlessEqual(len(c.installLabelPath), 1)
-        self.failUnlessEqual(str(c.installLabelPath[0]), "A@B:C")
+        self.assertEqual(len(c.installLabelPath), 1)
+        self.assertEqual(str(c.installLabelPath[0]), "A@B:C")
 
     def testIncludeConfigFileNoLoop(self):
         # CNY-914: including the same file in two contexts
@@ -315,15 +315,15 @@ flavor use:ssl,krb,readline,\
             }
         }
         for sectName in cfg.iterSectionNames():
-            self.failUnless(sectName in expected)
+            self.assertTrue(sectName in expected)
             sect = cfg.getSection(sectName)
             expSect = expected[sectName]
             for k in ['buildLabel', 'lookaside']:
-                self.failUnlessEqual(sect[k], expSect[k])
+                self.assertEqual(sect[k], expSect[k])
             del expected[sectName]
 
         # More sections?
-        self.failIf(expected)
+        self.assertFalse(expected)
 
         for cf in [configfile, configfile1, configfile2, configfile3]:
             os.unlink(cf)
@@ -360,7 +360,7 @@ flavor use:ssl,krb,readline,\
             connection.Connection.connectTimeout = oldTimeout
             stderr.close()
         # Make sure we cleaned up the timeout
-        self.failUnlessEqual(socket.getdefaulttimeout(), None)
+        self.assertEqual(socket.getdefaulttimeout(), None)
 
     def testBraceGlobSorted(self):
         confDir = util.joinPaths(self.workDir, "config-dir")
@@ -383,7 +383,7 @@ flavor use:ssl,krb,readline,\
         self.mock(util, 'braceExpand', mockBraceExpand)
         cfg.read(topCfg)
         self.unmock()
-        self.failUnlessEqual(cfg.name, "Name2")
+        self.assertEqual(cfg.name, "Name2")
 
     def testUnreadableEntitlementsDirectory(self):
         configFile = util.joinPaths(self.workDir, "config-unreadable-ent")
@@ -418,7 +418,7 @@ entitlementDirectory %s
         # it twice, it won't work, so that's another test.
         srvThread, port, queue = startServer()
         val = queue.get(block=True)
-        self.failUnlessEqual(val, "started")
+        self.assertEqual(val, "started")
         serverUrl = "http://127.0.0.1:%s/" % port
 
         configFile = self.workDir + '/foo'
@@ -445,7 +445,7 @@ proxy http http://%s
             conarycfg.ConaryConfiguration.readFiles = readFiles
             cfg = conarycfg.ConaryConfiguration(readConfigFiles=True)
             logEntry = h.getAccessLogEntry(logsz0)
-            self.failUnlessEqual(logEntry[5:7], ['GET', serverUrl])
+            self.assertEqual(logEntry[5:7], ['GET', serverUrl])
         finally:
             conarycfg.ConaryConfiguration.readFiles = oldReadFiles
 
@@ -457,13 +457,13 @@ proxy http http://%s
         noHomeDirKeyrings = [ '/etc/conary/pubring.gpg']
 
         pks = conarycfg._getDefaultPublicKeyrings()
-        self.failUnlessEqual(pks, nonRootKeyrings)
+        self.assertEqual(pks, nonRootKeyrings)
 
         # CNY-2630, CNY-2722
         mockGetuid = lambda: 0
         self.mock(os, "getuid", mockGetuid)
         pks = conarycfg._getDefaultPublicKeyrings()
-        self.failUnlessEqual(pks, rootKeyrings)
+        self.assertEqual(pks, rootKeyrings)
         self.unmock()
 
         nenv = os.environ.copy()
@@ -475,7 +475,7 @@ proxy http http://%s
         mockGetpwuid = lambda x: (None, None, None, None, None, '/h2')
         self.mock(pwd, "getpwuid", mockGetpwuid)
         pks = conarycfg._getDefaultPublicKeyrings()
-        self.failUnlessEqual(pks, noHomeDirKeyrings)
+        self.assertEqual(pks, noHomeDirKeyrings)
 
         self.unmock()
 
@@ -483,7 +483,7 @@ proxy http http://%s
             raise KeyError(x)
         self.mock(pwd, "getpwuid", mockGetpwuid)
         pks = conarycfg._getDefaultPublicKeyrings()
-        self.failUnlessEqual(pks, noHomeDirKeyrings)
+        self.assertEqual(pks, noHomeDirKeyrings)
 
 class ConaryTypesTest(rephelp.RepositoryHelper):
     def testUserInfo(self):
@@ -511,11 +511,11 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         try:
             cfg.configLine('user conary.rpath.com "Michael Jordon" a')
         except conarycfg.ParseError, e:
-            self.failUnlessEqual(str(e), "override:<No line>: expected <hostglob> <user> [<password>] for configuration item 'user'")
+            self.assertEqual(str(e), "override:<No line>: expected <hostglob> <user> [<password>] for configuration item 'user'")
 
         # test iterator
         l = [ x for x in cfg.user ]
-        self.failUnlessEqual(l, [('nameone', 'user1', 'passwd1'),
+        self.assertEqual(l, [('nameone', 'user1', 'passwd1'),
                                  ('name*', 'user', 'passwd'),
                                  ('foobar', 'a', None)])
 
@@ -532,7 +532,7 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
 
         # CNY-1586
         cfg = _test('proxy https http://foo.com/', 'proxy http://bar.com/')
-        self.failUnlessEqual(cfg.proxy,
+        self.assertEqual(cfg.proxy,
             {'http' : 'http://bar.com/', 'https' : 'https://bar.com/'})
 
         cfg = _test('proxy http http://foo.com/',
@@ -542,10 +542,10 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
 
         # CNY-1378 - None should override the proxy settings
         cfg = _test('proxy http://a/', 'proxy None')
-        self.failUnlessEqual(cfg.proxy, {})
+        self.assertEqual(cfg.proxy, {})
 
         cfg = _test('proxy http://a/', 'proxy http None')
-        self.failUnlessEqual(cfg.proxy, {'https' : 'https://a/'})
+        self.assertEqual(cfg.proxy, {'https' : 'https://a/'})
 
     def testRepositoryMap(self):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
@@ -589,10 +589,10 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
             'proxyMap repo3.example.com rus1.example.com rus4.example.com')
         cfg.configLine(
             'proxyMap repo5.example.com rus3.example.com rus6.example.com')
-        self.failUnlessEqual(len(cfg.proxyMap.filterList), 3)
+        self.assertEqual(len(cfg.proxyMap.filterList), 3)
 
         cfg.configLine('proxyMap []')
-        self.failUnlessEqual(cfg.proxyMap.filterList, [])
+        self.assertEqual(cfg.proxyMap.filterList, [])
 
         # Matching a hostname
         cfg.configLine('proxyMap []')
@@ -650,7 +650,7 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         pm = cfg.getProxyMap()
         # getProxyMap() does not return proxyMap in this case - it's a new
         # proxyMap object
-        self.failIf(pm is cfg.proxyMap)
+        self.assertFalse(pm is cfg.proxyMap)
         got = dict((x[0].protocol, (x[0].address, x[1])) for x in pm.filterList)
         self.assertEquals(got, {
             'http': (networking.HostPort('*'),
@@ -672,10 +672,10 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
                 cfg.configLine("proxyMap %s %s" % (host, proxy))
         pm1 = cfg1.getProxyMap()
         pm2 = cfg2.getProxyMap()
-        self.failUnlessEqual(pm1, pm2)
+        self.assertEqual(pm1, pm2)
 
         del pm1.filterList[0]
-        self.failIf(pm1 == pm2)
+        self.assertFalse(pm1 == pm2)
 
     def testDependencyClassList(self):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
@@ -722,7 +722,7 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
                 ('*-commits', ('c', 'pass')),
             ]
 
-        self.failUnlessEqual(cfg.user, target)
+        self.assertEqual(cfg.user, target)
 
         # Now verify that addServerGlob does the same thing
         del cfg.user[:]
@@ -731,7 +731,7 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         # process l in reverse order too
         for item in reversed(l):
             cfg.user.addServerGlob(*item)
-        self.failUnlessEqual(cfg.user, target)
+        self.assertEqual(cfg.user, target)
 
 
 class EntitlementTest(testhelp.TestCase):
@@ -800,7 +800,7 @@ class EntitlementTest(testhelp.TestCase):
 
         rc, s = self.captureOutput(conarycfg.loadEntitlementFromString,
                                    withoutClass, 'localhost', '<foo>')
-        self.failUnless('The serverName argument to loadEntitlementFromString has been deprecated' in s)
+        self.assertTrue('The serverName argument to loadEntitlementFromString has been deprecated' in s)
 
     @testhelp.context('entitlements')
     def testFailedEntitlements(self):
@@ -854,7 +854,7 @@ os.kill(os.getpid(), 9)
         cfg.storeKey('entitlement', sio)
         # Drop extra white spaces
         line = ' '.join(x for x in sio.getvalue().strip().split() if x)
-        self.failUnlessEqual(line, 'entitlement a b')
+        self.assertEqual(line, 'entitlement a b')
 
     def testSetEntitlementWithClass(self):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
@@ -862,7 +862,7 @@ os.kill(os.getpid(), 9)
         sio = StringIO()
         cfg.storeKey('entitlement', sio)
         line = ' '.join(x for x in sio.getvalue().strip().split() if x)
-        self.failUnlessEqual(line, 'entitlement a b c')
+        self.assertEqual(line, 'entitlement a b c')
 
     def testEntitlemntCfgObject(self):
         cfg = conarycfg.EntitlementList
@@ -993,15 +993,15 @@ class ProxyConfigtest(testhelp.TestCase):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
         cfg.configLine('proxy http http://foo:123')
         proxy = conarycfg.getProxyFromConfig(cfg)
-        self.failUnlessEqual(proxy, {'http' : 'http://foo:123'})
+        self.assertEqual(proxy, {'http' : 'http://foo:123'})
 
         cfg.configLine('conaryProxy https https://bar')
         proxy = conarycfg.getProxyFromConfig(cfg)
-        self.failUnlessEqual(proxy, {'https' : 'conarys://bar'})
+        self.assertEqual(proxy, {'https' : 'conarys://bar'})
 
         cfg.configLine('proxy https https://foo:123')
         proxy = conarycfg.getProxyFromConfig(cfg)
-        self.failUnlessEqual(proxy, {'https' : 'conarys://bar'})
+        self.assertEqual(proxy, {'https' : 'conarys://bar'})
 
 
 class ExtraHeadersTest(testhelp.TestCase):
@@ -1010,7 +1010,7 @@ class ExtraHeadersTest(testhelp.TestCase):
 
         srvThread, port, queue = startServer()
         val = queue.get(block=True)
-        self.failUnlessEqual(val, "started")
+        self.assertEqual(val, "started")
 
         cfg.readUrl("http://127.0.0.1:%s/" % port)
         srvThread.join()
@@ -1018,8 +1018,8 @@ class ExtraHeadersTest(testhelp.TestCase):
         while not queue.empty():
             ent = queue.get(block=True)
             headers[ent[0].lower()] = ent[1]
-        self.failUnless('x-conary-version' in headers)
-        self.failUnless('x-conary-config-version' in headers)
+        self.assertTrue('x-conary-version' in headers)
+        self.assertTrue('x-conary-config-version' in headers)
 
 def startServer():
     def startFunc(port, queue):

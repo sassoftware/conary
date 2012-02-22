@@ -33,7 +33,7 @@ class CallLogTest(rephelp.RepositoryHelper):
         file(logPath, "w+")
 
         log = reposlog.RepositoryCallLogger(logPath, None, readOnly = True)
-        self.failUnlessEqual(len([ x for x in log ]), 0)
+        self.assertEqual(len([ x for x in log ]), 0)
 
     def testReposcallLoggerNoSpace(self):
         # CNY-2739
@@ -46,7 +46,7 @@ class CallLogTest(rephelp.RepositoryHelper):
         log.fobj = MockFile()
         # this should not result in a blowup because of no space left on device...
         rc, s = self.captureOutput(log.log, "0", ("user", "pass", []), "someMethod", [1,2], {"a":"a"}, "testing", 1)
-        self.failUnlessEqual(s, "warning: '[Errno 28] No space left on file' while logging call from (0,user) to someMethod\n\n")
+        self.assertEqual(s, "warning: '[Errno 28] No space left on file' while logging call from (0,user) to someMethod\n\n")
 
     def testCallLoggerSimple(self):
         logPath = os.path.join(self.workDir, "logfile")
@@ -76,22 +76,22 @@ class CallLogTest(rephelp.RepositoryHelper):
 
         log = reposlog.RepositoryCallLogger(logPath, None, readOnly = True)
         ents = [ x for x in log ]
-        self.failUnlessEqual(len(ents), len(infos))
+        self.assertEqual(len(ents), len(infos))
 
         for entry, info in zip(ents, infos):
-            self.failUnlessEqual(entry.revision, info[0])
-            self.failUnlessEqual(entry.serverName, info[1])
-            self.failUnlessEqual(entry.timeStamp, info[2])
-            self.failUnlessEqual(entry.remoteIp, info[3])
-            self.failUnlessEqual(entry.methodName, info[5])
-            self.failUnlessEqual(entry.args, info[6])
+            self.assertEqual(entry.revision, info[0])
+            self.assertEqual(entry.serverName, info[1])
+            self.assertEqual(entry.timeStamp, info[2])
+            self.assertEqual(entry.remoteIp, info[3])
+            self.assertEqual(entry.methodName, info[5])
+            self.assertEqual(entry.args, info[6])
             if entry.revision < 4:
-                self.failUnlessEqual(entry.exceptionStr, info[7])
+                self.assertEqual(entry.exceptionStr, info[7])
             else:
-                self.failUnlessEqual(entry.kwArgs, info[7])
-                self.failUnlessEqual(entry.exceptionStr, info[8])
+                self.assertEqual(entry.kwArgs, info[7])
+                self.assertEqual(entry.exceptionStr, info[8])
                 if entry.revision == 5:
-                    self.failUnlessEqual(entry.latency, info[9])
+                    self.assertEqual(entry.latency, info[9])
 
             if entry.revision == 1:
                 x = (entry.user, entry.entClass)
@@ -101,7 +101,7 @@ class CallLogTest(rephelp.RepositoryHelper):
                 x = (entry.user, entry.entitlements)
             else:
                 assert(0)
-            self.failUnlessEqual(x, info[4])
+            self.assertEqual(x, info[4])
 
 
 
@@ -122,17 +122,17 @@ class CallLogTest(rephelp.RepositoryHelper):
 
         log = reposlog.RepositoryCallLogger(logPath, None, readOnly = True)
         ents = [ x for x in log ]
-        self.failUnlessEqual(len(ents), len(infos) + 1)
+        self.assertEqual(len(ents), len(infos) + 1)
 
         entry = ents[-1]
-        self.failUnlessEqual(entry.revision, 5)
-        self.failUnlessEqual(entry.serverName, serverNameList)
-        self.failUnlessEqual(entry.remoteIp, remoteIp)
-        self.failUnlessEqual(entry.methodName, methodName)
-        self.failUnlessEqual(entry.args, args)
-        self.failUnlessEqual(entry.kwArgs, kwargs)
-        self.failUnlessEqual(entry.exceptionStr, exception)
-        self.failUnlessEqual(entry.exceptionStr, exception)
-        self.failUnlessEqual(entry.latency, latency)
-        self.failUnlessEqual(entry.user, authToken[0])
-        self.failUnlessEqual(entry.entitlements, authToken[2])
+        self.assertEqual(entry.revision, 5)
+        self.assertEqual(entry.serverName, serverNameList)
+        self.assertEqual(entry.remoteIp, remoteIp)
+        self.assertEqual(entry.methodName, methodName)
+        self.assertEqual(entry.args, args)
+        self.assertEqual(entry.kwArgs, kwargs)
+        self.assertEqual(entry.exceptionStr, exception)
+        self.assertEqual(entry.exceptionStr, exception)
+        self.assertEqual(entry.latency, latency)
+        self.assertEqual(entry.user, authToken[0])
+        self.assertEqual(entry.entitlements, authToken[2])

@@ -47,13 +47,13 @@ class CpioStreamTest(testcase.TestCaseWithWorkDir):
                 f.write(buf)
             f.close()
             nsha1sum = digestlib.sha1(file(resultFilePath).read()).hexdigest()
-            self.failUnlessEqual(nsha1sum, sha1sum)
+            self.assertEqual(nsha1sum, sha1sum)
 
     def testIterate(self):
         cpioPath = self._createCpio()
         src = cpiostream.CpioStream(file(cpioPath))
         fileNames = [ x.filename for x in src ]
-        self.failUnlessEqual(fileNames,
+        self.assertEqual(fileNames,
             [
                 './usr/bin/ptar',
                 './usr/bin/ptardiff',
@@ -100,7 +100,7 @@ class CpioStreamTest(testcase.TestCaseWithWorkDir):
         # Advance to the next entry, the first one should no longer be able to
         # read
         src.next()
-        self.failUnlessRaises(cpiostream.OutOfOrderRead, ent.payload.read)
+        self.assertRaises(cpiostream.OutOfOrderRead, ent.payload.read)
 
     def testOutOfOrderRead2(self):
         cpioPath = self._createCpio()
@@ -109,7 +109,7 @@ class CpioStreamTest(testcase.TestCaseWithWorkDir):
         # The cpio stream advances one byte. This should be enough to kill the
         # reads for the entry
         src.read(1)
-        self.failUnlessRaises(cpiostream.OutOfOrderRead, ent.payload.read)
+        self.assertRaises(cpiostream.OutOfOrderRead, ent.payload.read)
 
     def _createCpio(self, rpmName = None):
         if rpmName is None:

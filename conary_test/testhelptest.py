@@ -25,17 +25,17 @@ class MockTest(testhelp.TestCase):
         fakever = "9.99"
         import sys
 
-        self.failIf(sys.version == fakever)
+        self.assertFalse(sys.version == fakever)
         self.mock(sys, "version", fakever)
-        self.failUnlessEqual(sys.version, fakever)
+        self.assertEqual(sys.version, fakever)
 
-        self.failIf(hasattr(sys, 'blah'))
+        self.assertFalse(hasattr(sys, 'blah'))
         self.mock(sys, "blah", 100)
-        self.failUnlessEqual(sys.blah, 100)
+        self.assertEqual(sys.blah, 100)
 
-        self.failIf(hasattr(self, 'goo'))
+        self.assertFalse(hasattr(self, 'goo'))
         self.mock(self, "goo", lambda x: x + 1)
-        self.failUnlessEqual(self.goo(1), 2)
+        self.assertEqual(self.goo(1), 2)
 
     test2 = test1
 
@@ -57,30 +57,30 @@ class MockTest(testhelp.TestCase):
         # BaseClass2 and ChildClass2 make sure old-style classes work too
         # (and we don't mistakenly interpret two equal values as the same,
         # inadvertently removing the object in ChildClass2)
-        self.failUnlessEqual(self.BaseClass1.foo, "A")
-        self.failUnlessEqual(self.ChildClass1.foo, "A")
-        self.failUnlessEqual(self.BaseClass2.foo, "A")
-        self.failUnlessEqual(self.ChildClass2.foo, "A")
+        self.assertEqual(self.BaseClass1.foo, "A")
+        self.assertEqual(self.ChildClass1.foo, "A")
+        self.assertEqual(self.BaseClass2.foo, "A")
+        self.assertEqual(self.ChildClass2.foo, "A")
 
         self.BaseClass1.foo = 'AA'
-        self.failUnlessEqual(self.ChildClass1.foo, "AA")
+        self.assertEqual(self.ChildClass1.foo, "AA")
         self.BaseClass1.foo = 'A'
 
         self.BaseClass2.foo = 'AA'
-        self.failUnlessEqual(self.ChildClass2.foo, "A")
+        self.assertEqual(self.ChildClass2.foo, "A")
         self.BaseClass2.foo = 'A'
 
         self.mock(self.ChildClass1, 'foo', 'B')
         c = self.ChildClass1()
-        self.failUnlessEqual(c.foo, "B")
+        self.assertEqual(c.foo, "B")
 
         self.mock(self.ChildClass2, 'foo', 'B')
         c = self.ChildClass2()
-        self.failUnlessEqual(c.foo, "B")
+        self.assertEqual(c.foo, "B")
 
         self.mock(self.BaseClass2, 'foo', 'BB')
         c = self.BaseClass2()
-        self.failUnlessEqual(c.foo, "BB")
+        self.assertEqual(c.foo, "BB")
 
     test4 = test3
 
@@ -90,15 +90,15 @@ class MockTest(testhelp.TestCase):
             return 1
 
     def testStaticMethods1(self):
-        self.failUnlessEqual(self.BaseClassStatic1.foo(), 1)
-        self.failUnlessEqual(self.BaseClassStatic1().foo(), 1)
+        self.assertEqual(self.BaseClassStatic1.foo(), 1)
+        self.assertEqual(self.BaseClassStatic1().foo(), 1)
 
         def mockFoo():
             return 2
 
         self.mock(self.BaseClassStatic1, 'foo', mockFoo)
-        self.failUnlessEqual(self.BaseClassStatic1.foo(), 2)
-        self.failUnlessEqual(self.BaseClassStatic1().foo(), 2)
+        self.assertEqual(self.BaseClassStatic1.foo(), 2)
+        self.assertEqual(self.BaseClassStatic1().foo(), 2)
 
     testStaticMethods2 = testStaticMethods1
 
@@ -108,14 +108,14 @@ class MockTest(testhelp.TestCase):
             return 1
 
     def testClassMethods1(self):
-        self.failUnlessEqual(self.BaseClassMethod1.foo(), 1)
-        self.failUnlessEqual(self.BaseClassMethod1().foo(), 1)
+        self.assertEqual(self.BaseClassMethod1.foo(), 1)
+        self.assertEqual(self.BaseClassMethod1().foo(), 1)
 
         def mockFoo(cls):
             return 2
 
         self.mock(self.BaseClassMethod1, 'foo', mockFoo)
-        self.failUnlessEqual(self.BaseClassMethod1.foo(), 2)
-        self.failUnlessEqual(self.BaseClassMethod1().foo(), 2)
+        self.assertEqual(self.BaseClassMethod1.foo(), 2)
+        self.assertEqual(self.BaseClassMethod1().foo(), 2)
 
     testClassMethods2 = testClassMethods1

@@ -167,8 +167,8 @@ class ManifestTest(rephelp.RepositoryHelper):
             regexp = man.load()
         finally:
             util.rmtree(man.manifestsDir)
-        self.failIf(regexp.match('/foo'))
-        self.failIf(not regexp.match('/bar'))
+        self.assertFalse(regexp.match('/foo'))
+        self.assertFalse(not regexp.match('/bar'))
 
     def testTranslatePath(self):
         r = self.getRecipe()
@@ -376,7 +376,7 @@ class SymlinkFileRemap(PackageRecipe):
         fileNames = [x[1] for x in trv.iterFileList()]
 
         # prove the name was changed
-        self.failIf('/foo/symlink-1' not in fileNames)
+        self.assertFalse('/foo/symlink-1' not in fileNames)
 
     def testLinkFileRemap(self):
         recipestr1 = """
@@ -406,7 +406,7 @@ class LinkFileRemap(PackageRecipe):
         fileNames = [x[1] for x in trv.iterFileList()]
 
         # prove the name was changed
-        self.failIf('/foo/link-1' not in fileNames)
+        self.assertFalse('/foo/link-1' not in fileNames)
 
     def testXInetdServiceRemap(self):
         recipestr1 = """
@@ -465,8 +465,8 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput(r._policyMap['FixupManpagePaths'].doProcess, r)
 
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that the move wasn't recorded
         self.assertEquals(r._pathTranslations, [])
@@ -484,8 +484,8 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput(r._policyMap['FixObsoletePaths'].doProcess, r)
 
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that the move wasn't recorded
         self.assertEquals(r._pathTranslations, [])
@@ -515,10 +515,10 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput(r._policyMap['FixupMultilibPaths'].doProcess, r)
 
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
-        self.failIf(os.path.exists(util.joinPaths(self.destdir, symlinkPath)))
-        self.failIf(not os.path.exists(util.joinPaths(self.destdir,
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
+        self.assertFalse(os.path.exists(util.joinPaths(self.destdir, symlinkPath)))
+        self.assertFalse(not os.path.exists(util.joinPaths(self.destdir,
             'libXX', 'symlink.so')))
 
         # we expect that the move wasn't recorded
@@ -549,10 +549,10 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput(r._policyMap['FixupMultilibPaths'].doProcess, r)
 
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
-        self.failIf(os.path.exists(util.joinPaths(self.destdir, symlinkPath)))
-        self.failIf(not os.path.exists(util.joinPaths(self.destdir,
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
+        self.assertFalse(os.path.exists(util.joinPaths(self.destdir, symlinkPath)))
+        self.assertFalse(not os.path.exists(util.joinPaths(self.destdir,
             'libXX', 'symlink.so')))
 
         # we expect that the move was recorded
@@ -572,8 +572,8 @@ class TestFilesInMandir(PackageRecipe):
         r.NormalizePkgConfig()
         self.captureOutput(r._policyMap['NormalizePkgConfig'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that no move was recorded
         self.assertEquals(r._pathTranslations, [])
@@ -588,8 +588,8 @@ class TestFilesInMandir(PackageRecipe):
         r.NormalizePkgConfig()
         self.captureOutput(r._policyMap['NormalizePkgConfig'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that no move was recorded
         self.assertEquals(r._pathTranslations,
@@ -612,9 +612,9 @@ class TestFilesInMandir(PackageRecipe):
         r.NormalizeManPages()
         self.captureOutput(r._policyMap['NormalizeManPages'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(filePath))
-        self.failIf(not os.path.exists(filePath2[:-4] + '.gz'))
-        self.failIf(os.path.exists(filePath2))
+        self.assertFalse(not os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(filePath2[:-4] + '.gz'))
+        self.assertFalse(os.path.exists(filePath2))
 
         # we expect that moves were recorded
         # the order foo/bar get evaluated isn't stable. we'll just sort for
@@ -645,9 +645,9 @@ class TestFilesInMandir(PackageRecipe):
         r.NormalizeManPages()
         self.captureOutput(r._policyMap['NormalizeManPages'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(filePath))
-        self.failIf(not os.path.exists(filePath2[:-4] + '.gz'))
-        self.failIf(os.path.exists(filePath2))
+        self.assertFalse(not os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(filePath2[:-4] + '.gz'))
+        self.assertFalse(os.path.exists(filePath2))
 
         # we expect that no moves were recorded
         self.assertEquals(r._pathTranslations, [])
@@ -671,8 +671,8 @@ class TestFilesInMandir(PackageRecipe):
         r._policyMap['NormalizeInfoPages'].doProcess(r)
         #self.captureOutput(r._policyMap['NormalizeInfoPages'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(os.path.exists(filePath))
-        self.failIf(not os.path.exists(util.joinPaths(self.destdir, newPath)))
+        self.assertFalse(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(util.joinPaths(self.destdir, newPath)))
 
         # we expect that no moves were recorded
         self.assertEquals(r._pathTranslations, [])
@@ -696,8 +696,8 @@ class TestFilesInMandir(PackageRecipe):
         r._policyMap['NormalizeInfoPages'].doProcess(r)
         #self.captureOutput(r._policyMap['NormalizeInfoPages'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(os.path.exists(filePath))
-        self.failIf(not os.path.exists(util.joinPaths(self.destdir, newPath)))
+        self.assertFalse(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(util.joinPaths(self.destdir, newPath)))
 
         # we expect that moves were recorded
         self.assertEquals(r._pathTranslations,
@@ -722,8 +722,8 @@ class TestFilesInMandir(PackageRecipe):
         r._policyMap['NormalizeInfoPages'].doProcess(r)
         #self.captureOutput(r._policyMap['NormalizeInfoPages'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(os.path.exists(filePath))
-        self.failIf(not os.path.exists(util.joinPaths(self.destdir, newPath)))
+        self.assertFalse(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(util.joinPaths(self.destdir, newPath)))
 
         # we expect that moves were recorded
         self.assertEquals(r._pathTranslations,
@@ -743,8 +743,8 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput( \
                 r._policyMap['NormalizeInitscriptLocation'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that no move was recorded
         self.assertEquals(r._pathTranslations, [])
@@ -760,8 +760,8 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput( \
                 r._policyMap['NormalizeInitscriptLocation'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that no move was recorded
         self.assertEquals(r._pathTranslations,
@@ -777,8 +777,8 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput( \
                 r._policyMap['NormalizeAppDefaults'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that no move was recorded
         self.assertEquals(r._pathTranslations, [])
@@ -793,8 +793,8 @@ class TestFilesInMandir(PackageRecipe):
         self.captureOutput( \
                 r._policyMap['NormalizeAppDefaults'].doProcess, r)
         # prove the policy did move the file
-        self.failIf(not os.path.exists(newPath))
-        self.failIf(os.path.exists(filePath))
+        self.assertFalse(not os.path.exists(newPath))
+        self.assertFalse(os.path.exists(filePath))
 
         # we expect that no move was recorded
         self.assertEquals(r._pathTranslations,

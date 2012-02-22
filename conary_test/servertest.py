@@ -117,10 +117,10 @@ class ServerTest(rephelp.RepositoryHelper):
 
                 if useSSL:
                     ctx = server.createSSLContext(cfg)
-                    httpServer = server.SecureHTTPServer(("localhost", cfg.port),
+                    httpServer = server.SecureHTTPServer(("", cfg.port),
                                                          HttpRequestsSubclass, ctx)
                 else:
-                    httpServer = server.HTTPServer(("localhost", cfg.port),
+                    httpServer = server.HTTPServer(("", cfg.port),
                                                    HttpRequestsSubclass)
                 self.captureOutput(server.serve, httpServer)
             finally:
@@ -187,7 +187,7 @@ class ServerTest(rephelp.RepositoryHelper):
             sock_utils.tryConnect("127.0.0.1", cfg.port)
 
             srvVers = client.repos.c['localhost2'].checkVersion()
-            self.failUnless(srvVers)
+            self.assertTrue(srvVers)
         finally:
             self.servers.stopServer(serverIdx=2)
             os.kill(pid, signal.SIGTERM)
@@ -279,7 +279,7 @@ class ServerTest(rephelp.RepositoryHelper):
             try:
                 cs = self.changeset(repos, [ "foo=--1", ], fname)
             except errors.RepositoryError, e:
-                self.failUnless(e[0].endswith('File not found'), e[0])
+                self.assertTrue(e[0].endswith('File not found'), e[0])
 
         finally:
             os.kill(pid, signal.SIGTERM)

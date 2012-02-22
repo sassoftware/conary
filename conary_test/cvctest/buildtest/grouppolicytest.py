@@ -309,9 +309,9 @@ class GroupConflict(GroupRecipe):
         try:
             self.build(groupRecipe, 'GroupConflict')
         except policy.PolicyError, e:
-            self.failIf("foo:runtime" in str(e))
-            self.failIf("bar" in str(e))
-            self.failIf("group-2" in str(e))
+            self.assertFalse("foo:runtime" in str(e))
+            self.assertFalse("bar" in str(e))
+            self.assertFalse("group-2" in str(e))
         else:
             self.fail("expected policy error")
         self.assertRaises(policy.PolicyError, self.build,
@@ -358,12 +358,12 @@ class GroupConflict(GroupRecipe):
         try:
             self.build(groupRecipe, 'GroupConflict')
         except policy.PolicyError, e:
-            self.failIf("foo" in str(e))
-            self.failIf("bar" not in str(e))
-            self.failIf("bar:runtime" not in str(e))
-            self.failIf("bar:doc" not in str(e))
-            self.failIf("group-1" not in str(e))
-            self.failIf("group-2" not in str(e))
+            self.assertFalse("foo" in str(e))
+            self.assertFalse("bar" not in str(e))
+            self.assertFalse("bar:runtime" not in str(e))
+            self.assertFalse("bar:doc" not in str(e))
+            self.assertFalse("group-1" not in str(e))
+            self.assertFalse("group-2" not in str(e))
         else:
             self.fail("expected policy error")
         self.assertRaises(policy.PolicyError, self.build,
@@ -410,12 +410,12 @@ class GroupConflict(GroupRecipe):
         try:
             self.build(groupRecipe, 'GroupConflict')
         except policy.PolicyError, e:
-            self.failIf("foo" not in str(e))
-            self.failIf("foo:runtime" not in str(e))
-            self.failIf("foo:doc" not in str(e))
-            self.failIf("bar" in str(e))
-            self.failIf("group-1" not in str(e))
-            self.failIf("group-2" in str(e))
+            self.assertFalse("foo" not in str(e))
+            self.assertFalse("foo:runtime" not in str(e))
+            self.assertFalse("foo:doc" not in str(e))
+            self.assertFalse("bar" in str(e))
+            self.assertFalse("group-1" not in str(e))
+            self.assertFalse("group-2" in str(e))
         else:
             self.fail("expected policy error")
         self.assertRaises(policy.PolicyError, self.build,
@@ -843,7 +843,7 @@ class RecordPolicy(policy.ImageGroupEnforcementPolicy):
             self.registerPolicy(tmpDir, policyStr % outputFile)
             grp = self.build(recipeStr, "GroupUncooked")
             data = open(outputFile).read()
-            self.failIf("group-foo" in data,
+            self.assertFalse("group-foo" in data,
                     "this trove should not have been mentioned")
         finally:
             util.rmtree(tmpDir)

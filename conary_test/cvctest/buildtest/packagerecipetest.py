@@ -227,9 +227,9 @@ class PackageRecipeTest(rephelp.RepositoryHelper):
 
             recipeObj = recipeClass(self.cfg, None, None,
                 extraMacros={'thing': 'wrong'})
-            self.failUnlessEqual(recipeObj.macros.name, 'test1')
-            self.failUnlessEqual(recipeObj.macros.version, '1.0')
-            self.failUnlessEqual(recipeObj.macros.bindir, '/binaries')
+            self.assertEqual(recipeObj.macros.name, 'test1')
+            self.assertEqual(recipeObj.macros.version, '1.0')
+            self.assertEqual(recipeObj.macros.bindir, '/binaries')
         finally:
             os.environ['PATH'] = oldPath
 
@@ -257,7 +257,7 @@ class PackageRecipeTest(rephelp.RepositoryHelper):
         recipeObj = recipeClass(self.cfg, None, None)
         recipeObj.loadPolicy()
         recipeObj.setup()
-        self.failIf('' in recipeObj.packages)
+        self.assertFalse('' in recipeObj.packages)
 
     def testBaseRequiresRecipeDeps(self):
         baseReqRecipe = """class BaseRequiresRecipe(AbstractPackageRecipe):

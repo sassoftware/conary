@@ -110,24 +110,24 @@ class NetServerTest(rephelp.RepositoryHelper):
             # If you want to bypass these heuristics, add your check before
             # the defaults.
             if startswithany(fname, ['get', 'list', 'has', 'check']):
-                self.failUnlessEqual(meth._accessType, 'readOnly', fname)
+                self.assertEqual(meth._accessType, 'readOnly', fname)
             elif fname in ['troveNames', 'prepareChangeSet', 'commitCheck']:
-                self.failUnlessEqual(meth._accessType, 'readOnly', fname)
+                self.assertEqual(meth._accessType, 'readOnly', fname)
             elif startswithany(fname, ['add', 'change', 'commit', 'delete',
                     'edit', 'set', 'update', 'presentHidden']):
-                self.failUnlessEqual(meth._accessType, 'readWrite', fname)
+                self.assertEqual(meth._accessType, 'readWrite', fname)
             else:
                 self.fail("Please describe the access method for %s in the test"
                     % fname)
 
         ns = self.getServer()
         for fname in ns.publicCalls:
-            self.failUnless(hasattr(ns, fname))
+            self.assertTrue(hasattr(ns, fname))
             meth = getattr(ns, fname)
-            self.failUnless(meth)
-            self.failUnless(hasattr(meth, '__call__'))
+            self.assertTrue(meth)
+            self.assertTrue(hasattr(meth, '__call__'))
             # Decorated?
-            self.failUnless(hasattr(meth, '_accessType'))
+            self.assertTrue(hasattr(meth, '_accessType'))
             checkAccess(fname, meth)
 
     def testReadOnlyRepositoryServerSide(self):
@@ -137,14 +137,14 @@ class NetServerTest(rephelp.RepositoryHelper):
         r = errors.ReadOnlyRepositoryError( ns.callWrapper,
             'fake-protocol', 8080, 'addUser', 'fake-auth-token', [])
         # Fail unless we got an exception
-        self.failUnless(r[1])
+        self.assertTrue(r[1])
 
     def testReadOnlyRepositoryClientSide(self):
         # Make sure we don't have a read-write server cached
         self.stopRepository()
         repos = self.openRepository(readOnlyRepository=True)
         try:
-            self.failUnlessRaises(errors.ReadOnlyRepositoryError,
+            self.assertRaises(errors.ReadOnlyRepositoryError,
                 self.addCollection, 'foo', '1', [':run'])
         finally:
             # Make sure we don't cache the read-only server
@@ -287,7 +287,7 @@ class NetServerTest(rephelp.RepositoryHelper):
 
         netsrv = repos.c[self.defLabel]
         netsrv.setProtocolVersion(37)
-        self.failUnlessRaises(errors.TroveMissing, netsrv.getChangeSet,
+        self.assertRaises(errors.TroveMissing, netsrv.getChangeSet,
             [csspec], *callargs)
 
         # Request the removed trove
@@ -307,9 +307,9 @@ class NetServerTest(rephelp.RepositoryHelper):
             netsrv.setProtocolVersion(clientVersion)
             ret = netsrv.getChangeSet([csspec], *callargs)
             if clientVersion == 37:
-                self.failUnlessEqual(len(ret), 4)
+                self.assertEqual(len(ret), 4)
             else:
-                self.failUnlessEqual(len(ret), 5)
+                self.assertEqual(len(ret), 5)
             url = ret[0]
 
             fname = _dump(url)
@@ -327,19 +327,19 @@ class NetServerTest(rephelp.RepositoryHelper):
             tis.append(ti)
 
         # Same client version should issue same result
-        self.failUnlessEqual(tcss[0].troveInfoDiff.freeze(),
+        self.assertEqual(tcss[0].troveInfoDiff.freeze(),
                              tcss[2].troveInfoDiff.freeze())
-        self.failUnlessEqual(tcss[1].troveInfoDiff.freeze(),
+        self.assertEqual(tcss[1].troveInfoDiff.freeze(),
                              tcss[3].troveInfoDiff.freeze())
         # This should be where the difference between old clients and new
         # clients is
-        self.failIf(tcss[0].troveInfoDiff.freeze() ==
+        self.assertFalse(tcss[0].troveInfoDiff.freeze() ==
                     tcss[1].troveInfoDiff.freeze())
 
         # For old clients, we've synthesized a real trove instead of a trove
         # that is missing
-        self.failIf(tis[0].flags.isMissing())
-        self.failUnless(tis[1].flags.isMissing())
+        self.assertFalse(tis[0].flags.isMissing())
+        self.assertTrue(tis[1].flags.isMissing())
 
         # Request the removed trove
         item = (trv5.getName(),
@@ -362,9 +362,9 @@ class NetServerTest(rephelp.RepositoryHelper):
             netsrv.setProtocolVersion(clientVersion)
             ret = netsrv.getChangeSet([csspec], *callargs)
             if clientVersion == 37:
-                self.failUnlessEqual(len(ret), 4)
+                self.assertEqual(len(ret), 4)
             else:
-                self.failUnlessEqual(len(ret), 5)
+                self.assertEqual(len(ret), 5)
             url = ret[0]
 
             fname = _dump(url)
@@ -377,16 +377,16 @@ class NetServerTest(rephelp.RepositoryHelper):
             fconts.append(fcont)
 
         # No caching across versions
-        self.failIf(fnames[0] == fnames[1])
-        self.failIf(fnames[1] == fnames[2])
-        self.failIf(fnames[0] == fnames[2])
+        self.assertFalse(fnames[0] == fnames[1])
+        self.assertFalse(fnames[1] == fnames[2])
+        self.assertFalse(fnames[0] == fnames[2])
 
-        self.failUnlessEqual(list(css[0].iterNewTroveList()), [])
-        self.failUnlessEqual(list(css[1].iterNewTroveList()), [])
-        self.failUnlessEqual(list(css[2].iterNewTroveList()), [])
-        self.failUnlessEqual(list(css[0].getOldTroveList()), [])
-        self.failUnlessEqual(list(css[1].getOldTroveList()), [])
-        self.failUnlessEqual(list(css[2].getOldTroveList()), [])
+        self.assertEqual(list(css[0].iterNewTroveList()), [])
+        self.assertEqual(list(css[1].iterNewTroveList()), [])
+        self.assertEqual(list(css[2].iterNewTroveList()), [])
+        self.assertEqual(list(css[0].getOldTroveList()), [])
+        self.assertEqual(list(css[1].getOldTroveList()), [])
+        self.assertEqual(list(css[2].getOldTroveList()), [])
 
         assert(fconts[0].version == filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
         assert(fconts[1].version == filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
@@ -404,7 +404,7 @@ class NetServerTest(rephelp.RepositoryHelper):
             # Explicitly request a changeset version
             cargs = callargs + [csVer]
             ret = netsrv.getChangeSet([csspec], *cargs)
-            self.failUnlessEqual(len(ret), 5)
+            self.assertEqual(len(ret), 5)
             url = ret[0]
 
             fname = _dump(url)
@@ -439,7 +439,7 @@ class NetServerTest(rephelp.RepositoryHelper):
         # now put the file
         rc = netclient.httpPutFile(url, open(huge), sb.st_size,
                                    chunked=True)
-        self.failUnlessEqual(rc, (200, 'OK'))
+        self.assertEqual(rc, (200, 'OK'))
         # compare the results, just to be sure
         f1 = open(tmpDir + '/huge-in', 'r')
         f2 = open(huge)
@@ -447,7 +447,7 @@ class NetServerTest(rephelp.RepositoryHelper):
         while 1:
             buf1 = f1.read(bufSize)
             buf2 = f2.read(bufSize)
-            self.failUnlessEqual(buf1, buf2)
+            self.assertEqual(buf1, buf2)
             if not buf1 and not buf2:
                 break
 
@@ -532,7 +532,7 @@ class NetServerTest(rephelp.RepositoryHelper):
         trv1 = self.addComponent('foo:runtime', '1')
         mark = mirrorRepos.getNewTroveList('localhost', 0)[0][0]
         info = mirrorRepos.getNewTroveInfo('localhost', mark - 1)
-        self.failUnlessEqual(info, [])
+        self.assertEqual(info, [])
 
         # sleep for a second so we're sure to get a different changed
         # column
@@ -547,54 +547,54 @@ class NetServerTest(rephelp.RepositoryHelper):
         # get the new stuff -- this should include everything from
         # the trove
         info = mirrorRepos.getNewTroveInfo('localhost', mark, thaw=True)
-        self.failUnlessEqual(len(info), 1)
-        self.failUnlessEqual(info[0][1], tup)
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0][1], tup)
         # check to see that the troveInfo matches
         i2 = info[0][2]
-        self.failUnless(isinstance(i2, trove.TroveInfo))
+        self.assertTrue(isinstance(i2, trove.TroveInfo))
         t = repos.getTrove(trv1.getName(), trv1.getVersion(), trv1.getFlavor())
-        self.failUnlessEqual(i2, t.troveInfo)
+        self.assertEqual(i2, t.troveInfo)
 
         # get the new stuff as of one second past the mark -- this
         # should only be the new sig
         info = mirrorRepos.getNewTroveInfo('localhost', mark + 1, thaw=False)
-        self.failUnlessEqual(len(info), 1)
-        self.failUnlessEqual(info[0][1], tup)
-        self.failUnless(isinstance(info[0][2], str))
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0][1], tup)
+        self.assertTrue(isinstance(info[0][2], str))
         # check to see that the troveInfo only as the signature
         i1 = trove.TroveInfo()
         i1.sigs = t.troveInfo.sigs
         i2 = trove.TroveInfo(base64.b64decode(info[0][2]))
         # sort the sigs to avoid hash differences
-        self.failUnlessEqual(sorted(i1.sigs), sorted(i2.sigs))
+        self.assertEqual(sorted(i1.sigs), sorted(i2.sigs))
         i1.sigs = i1.sigs.__class__()
         i2.sigs = i2.sigs.__class__()
-        self.failUnlessEqual(i1.freeze(), i2.freeze())
+        self.assertEqual(i1.freeze(), i2.freeze())
 
         # make sure normal users see nothing
         info = repos.getNewTroveInfo('localhost', mark)
-        self.failUnlessEqual(info, [])
+        self.assertEqual(info, [])
 
         # and same for anonymous
         info = anonRepos.getNewTroveInfo('localhost', mark)
-        self.failUnlessEqual(info, [])
+        self.assertEqual(info, [])
 
         # now check limiting the troveInfo type
         info = mirrorRepos.getNewTroveInfo('localhost', mark, thaw=True,
                                            infoTypes=[trove._TROVEINFO_TAG_SIZE])
-        self.failUnlessEqual(len(info), 1)
-        self.failUnlessEqual(info[0][1], tup)
+        self.assertEqual(len(info), 1)
+        self.assertEqual(info[0][1], tup)
         # check to see that the troveInfo matches
         i1 = trove.TroveInfo()
         i1.size = t.troveInfo.size
-        self.failUnlessEqual(i1, info[0][2])
+        self.assertEqual(i1, info[0][2])
 
         # add another test component
         info1 = mirrorRepos.getNewTroveInfo('localhost', mark)
         trv1 = self.addComponent('bar:runtime', '1')
         trv2 = self.addComponent('baz:runtime', '/localhost@excluded:branch/1-1-1')
         info2 = mirrorRepos.getNewTroveInfo('localhost', mark)
-        self.failUnlessEqual(info1, info2)
+        self.assertEqual(info1, info2)
         mark = max([x[0] for x in mirrorRepos.getNewTroveList('localhost', mark)])
 
         # sign with a different key
@@ -615,24 +615,24 @@ class NetServerTest(rephelp.RepositoryHelper):
         info = mirrorRepos.getNewTroveInfo('localhost', mark + 1,
                                            labels=[self.cfg.buildLabel.asString()],
                                            thaw=False)
-        self.failUnlessEqual(len(info), 2)
-        self.failUnless(tup in [x[1] for x in info])
+        self.assertEqual(len(info), 2)
+        self.assertTrue(tup in [x[1] for x in info])
         bartup = ('bar:runtime', tup[1], tup[2])
-        self.failUnless(bartup in [x[1] for x in info])
+        self.assertTrue(bartup in [x[1] for x in info])
         # now include all labels
         info = mirrorRepos.getNewTroveInfo('localhost', mark + 1,
                                            thaw=False)
-        self.failUnlessEqual(len(info), 3)
-        self.failUnless(tup in [x[1] for x in info])
-        self.failUnless(bartup in [x[1] for x in info])
+        self.assertEqual(len(info), 3)
+        self.assertTrue(tup in [x[1] for x in info])
+        self.assertTrue(bartup in [x[1] for x in info])
         newtup = (trv2.getName(), trv2.getVersion(), trv2.getFlavor())
-        self.failUnless(newtup in [x[1] for x in info])
+        self.assertTrue(newtup in [x[1] for x in info])
 
         # check empty short circuit
         info = mirrorRepos.getNewTroveInfo('localhost', mark + 1,
                                            labels=['garblygook@rpl:1'],
                                            thaw=False)
-        self.failUnlessEqual(len(info), 0)
+        self.assertEqual(len(info), 0)
 
         # check for badly formed label
         self.assertRaises(errors.InsufficientPermission,
@@ -656,14 +656,14 @@ class NetServerTest(rephelp.RepositoryHelper):
         repos.addAcl(label, "normal", None, None, write=True)
         normRepos = self.getRepositoryClient(user = 'normal', password = 'n')
         # make sure a normal user can't access the method
-        self.failUnlessRaises(errors.InsufficientPermission,
+        self.assertRaises(errors.InsufficientPermission,
                               normRepos.setTroveInfo, info, freeze=False)
         # set a metadata troveinfo item for one that did not exist before
         rc = repos.setTroveInfo(info, freeze=False)
-        self.failUnlessEqual(rc, 1)
+        self.assertEqual(rc, 1)
         t = repos.getTrove(trv1.getName(), trv1.getVersion(), trv1.getFlavor())
         description = [ x for x in t.troveInfo.metadata ][0].shortDesc()
-        self.failUnlessEqual(description, 'This is the short description')
+        self.assertEqual(description, 'This is the short description')
 
         # now update the metadata troveinfo item
         mi.shortDesc.set('This is the updated short description')
@@ -671,10 +671,10 @@ class NetServerTest(rephelp.RepositoryHelper):
         info = [ ((trv1.getName(), trv1.getVersion(), trv1.getFlavor()),
                   base64.b64encode(i.freeze())) ]
         rc = repos.setTroveInfo(info, freeze=False)
-        self.failUnlessEqual(rc, 1)
+        self.assertEqual(rc, 1)
         t = repos.getTrove(trv1.getName(), trv1.getVersion(), trv1.getFlavor())
         description = [ x for x in t.troveInfo.metadata ][0].shortDesc()
-        self.failUnlessEqual(description, 'This is the updated short description')
+        self.assertEqual(description, 'This is the updated short description')
 
         # now lets do more than one troveInfo element for one instance.
         self.cfg.signatureKey = '95B457D16843B21EA3FC73BBC7C32FC1F94E405E'
@@ -696,10 +696,10 @@ class NetServerTest(rephelp.RepositoryHelper):
             self.fail('expected exception')
         # set the signature and new description in one go
         rc = repos.setTroveInfo(info, freeze=False)
-        self.failUnlessEqual(rc, 2)
+        self.assertEqual(rc, 2)
         t = repos.getTrove(trv1.getName(), trv1.getVersion(), trv1.getFlavor())
         description = [ x for x in t.troveInfo.metadata ][0].shortDesc()
-        self.failUnlessEqual(description, 'This is the updated again short description')
+        self.assertEqual(description, 'This is the updated again short description')
         t.troveInfo.sigs.digitalSigs.getSignature('95B457D16843B21EA3FC73BBC7C32FC1F94E405E')
 
         # now we'll work on two instances at once
@@ -717,12 +717,12 @@ class NetServerTest(rephelp.RepositoryHelper):
         info = [ ((trv1.getName(), trv1.getVersion(), trv1.getFlavor()), i1),
                  ((trv2.getName(), trv2.getVersion(), trv1.getFlavor()), i2) ]
         rc = repos.setTroveInfo(info)
-        self.failUnlessEqual(rc, 2)
+        self.assertEqual(rc, 2)
         for trv, mi in ((trv1, mi1), (trv2, mi2)):
             t = repos.getTrove(trv.getName(), trv.getVersion(), trv.getFlavor())
             description = [ x for x in t.troveInfo.metadata ][0].shortDesc()
-            self.failUnlessEqual(description, mi.shortDesc())
-        self.failUnless(t.troveInfo.size() != 123)
+            self.assertEqual(description, mi.shortDesc())
+        self.assertTrue(t.troveInfo.size() != 123)
 
     def testSetTroveInfoOnOldRepositories(self):
         # setTroveInfo must not store new metadata information in 
@@ -761,10 +761,10 @@ class NetServerTest(rephelp.RepositoryHelper):
         trv1 = self.addComponent('foo:runtime', '1')
         info = _getinfo(trv1)
         rc = repos.setTroveInfo(info, freeze=False)
-        self.failUnlessEqual(rc, 1)
+        self.assertEqual(rc, 1)
         # now transform this trove in a "not present" one
         self.markRemoved(trv1.getName())
-        self.failUnlessRaises(errors.TroveMissing, repos.setTroveInfo, info, freeze=False)
+        self.assertRaises(errors.TroveMissing, repos.setTroveInfo, info, freeze=False)
         # try updating for a trove that has isPresent=0
         trv2 = self.addComponent("bar:lib", "2")
         info = _getinfo(trv2)
@@ -774,10 +774,10 @@ class NetServerTest(rephelp.RepositoryHelper):
             ("bar:runtime", trv2.getVersion(), trv2.getFlavor())
             ])
         # setting troveinfo on bar:lib should work
-        self.failUnlessEqual(repos.setTroveInfo(info, freeze=False), 1)
+        self.assertEqual(repos.setTroveInfo(info, freeze=False), 1)
         # setting troveinfo on bar:runtime should fail
         info1 = [ (("bar:runtime", trv2.getVersion(), trv2.getFlavor()), info[0][1]) ]
-        self.failUnlessRaises(errors.InsufficientPermission, repos.setTroveInfo, info1, freeze=False)
+        self.assertRaises(errors.InsufficientPermission, repos.setTroveInfo, info1, freeze=False)
 
     def testAddMetadataItems(self):
         repos = self.openRepository()
@@ -787,7 +787,7 @@ class NetServerTest(rephelp.RepositoryHelper):
         repos.addMetadataItems([((trv1.getName(), trv1.getVersion(),
                                  trv1.getFlavor()), mi)])
         t = repos.getTrove(*trv1.getNameVersionFlavor())
-        self.failUnlessEqual(t.getMetadata()['shortDesc'],
+        self.assertEqual(t.getMetadata()['shortDesc'],
                              'This is the short description')
         # now test adding some more...
         mi = trove.MetadataItem()
@@ -796,10 +796,10 @@ class NetServerTest(rephelp.RepositoryHelper):
         repos.addMetadataItems([((trv1.getName(), trv1.getVersion(),
                                  trv1.getFlavor()), mi)])
         t = repos.getTrove(*trv1.getNameVersionFlavor())
-        self.failUnlessEqual(t.getMetadata()['url'],
+        self.assertEqual(t.getMetadata()['url'],
                              'http://localhost/')
-        self.failUnless(t.getMetadata()['longDesc'])
-        self.failUnless(t.getMetadata()['shortDesc'])
+        self.assertTrue(t.getMetadata()['longDesc'])
+        self.assertTrue(t.getMetadata()['shortDesc'])
 
         # now test adding some stuff to more than one trove at once
         trv2 = self.addComponent('bar:runtime', '2')
@@ -813,13 +813,13 @@ class NetServerTest(rephelp.RepositoryHelper):
                                 ((trv2.getName(), trv2.getVersion(),
                                   trv2.getFlavor()), mi2)])
         t = repos.getTrove(*trv1.getNameVersionFlavor())
-        self.failUnlessEqual(t.getMetadata()['url'], 'http://localhost2/')
+        self.assertEqual(t.getMetadata()['url'], 'http://localhost2/')
         t = repos.getTrove(*trv2.getNameVersionFlavor())
-        self.failUnlessEqual(t.getMetadata()['url'], 'http://localhost3/')
-        self.failUnlessEqual(t.getMetadata()['keyValue']['key'], 'lock')
+        self.assertEqual(t.getMetadata()['url'], 'http://localhost3/')
+        self.assertEqual(t.getMetadata()['keyValue']['key'], 'lock')
         # test adding to a non-existing trove
         tup = (trv1.getName(), trv2.getVersion(), trv1.getFlavor())
-        self.failUnlessRaises(errors.TroveMissing, repos.addMetadataItems,
+        self.assertRaises(errors.TroveMissing, repos.addMetadataItems,
                               [ (tup, mi) ])
 
     def testCreateChangesetOptimizations(self):
@@ -1059,7 +1059,7 @@ class NetServerTest(rephelp.RepositoryHelper):
             try:
                 repos.troveNames(label)
             except errors.OpenError, e:
-                self.failUnless(msg in str(e), "%s not in %s" % (msg, str(e)))
+                self.assertTrue(msg in str(e), "%s not in %s" % (msg, str(e)))
             else:
                 self.fail('OpenError not raised')
 
@@ -1071,7 +1071,7 @@ class NetServerTest(rephelp.RepositoryHelper):
             # conveniently available)
             f = urllib2.urlopen(url)
             data = f.read()
-            self.failUnlessIn(keyId, data)
+            self.assertIn(keyId, data)
 
         finally:
             self.stopRepository(1)
@@ -1175,16 +1175,16 @@ foo:runtime
                        (str(comp.getVersion()), str(comp.getFlavor())), False) ],
                     False, False, False, False)
 
-            self.failIf(rc[0].startswith('/'), "Not a full URL: %s" % rc[0])
+            self.assertFalse(rc[0].startswith('/'), "Not a full URL: %s" % rc[0])
 
             rc = repos.c['localhost'].prepareChangeSet(
                     [ (comp.getName(), (0, 0),
                        (str(comp.getVersion()), str(comp.getFlavor())), False) ] )
 
-            self.failIf(rc[0].startswith('/'), "Not a full URL: %s" % rc)
+            self.assertFalse(rc[0].startswith('/'), "Not a full URL: %s" % rc)
 
             rc = repos.c['localhost'].getFileContents([])
-            self.failIf(rc[0].startswith('/'), "Not a full URL: %s" % rc[0])
+            self.assertFalse(rc[0].startswith('/'), "Not a full URL: %s" % rc[0])
         finally:
             h.stop()
 
@@ -1263,7 +1263,7 @@ foo:runtime
         for source in searchSource.iterSources():
             res = source.findTroves([ (None, None, None) ],
                     allowMissing = True, acrossLabels = True)
-            self.failUnlessEqual([ (k, sorted([ (j[0], str(j[1]), str(j[2])) for j in v]))
+            self.assertEqual([ (k, sorted([ (j[0], str(j[1]), str(j[2])) for j in v]))
                                     for k, v in res.items()],
                 [((None, None, None), [
                     ('foo:runtime', '/localhost@test:label1/1-1-1', ''),
@@ -1277,7 +1277,7 @@ foo:runtime
         ]
         res = repos.getTroveLatestByLabel(troveSpecs, bestFlavor = True,
             troveTypes = 1)
-        self.failUnlessEqual([[sorted([ (j[0], str(j[1]), str(j[2])) for j in v ])
+        self.assertEqual([[sorted([ (j[0], str(j[1]), str(j[2])) for j in v ])
                                 for v in x ] for x in res ],
             [[
               [('foo:runtime', '/localhost@test:label1/1-1-1', '')],

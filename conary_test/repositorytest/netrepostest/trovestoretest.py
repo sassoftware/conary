@@ -139,7 +139,7 @@ Some changes just are.
         cu = store.db.cursor()
         cu.execute("SELECT count(*) FROM Dependencies WHERE "
                    "name = 'libtest.so.1'")
-        self.failUnlessEqual(cu.next(), (1,))
+        self.assertEqual(cu.next(), (1,))
 
         # make sure the sha1s were stored
         cu.execute("""
@@ -152,7 +152,7 @@ Some changes just are.
         ORDER BY dirname,basename""")
         items = [(os.path.join(cu.frombinary(x[0]), cu.frombinary(x[1])),
             cu.frombinary(x[2])) for x in cu.fetchall()]
-        self.failUnlessEqual(items,
+        self.assertEqual(items,
                              [ ("/bin/1", f1.contents.sha1()),
                                ("/bin/2", f2.contents.sha1()),
                                ("/bin/3", f3.contents.sha1()),
@@ -161,19 +161,19 @@ Some changes just are.
         cl = changelog.ChangeLog("test", "test@foo.bar", "another log\n")
 
         fromRepos = store.getTrove("testcomp", v10, flavor, cl)
-        self.failUnlessEqual(fromRepos, trv)
-        self.failUnlessEqual(fromRepos.getVersion().timeStamps(),
+        self.assertEqual(fromRepos, trv)
+        self.assertEqual(fromRepos.getVersion().timeStamps(),
                              trv.getVersion().timeStamps())
-        self.failUnlessEqual(fromRepos.getChangeLog(), trv.getChangeLog())
+        self.assertEqual(fromRepos.getChangeLog(), trv.getChangeLog())
 
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.getTrove("testcomp", v10, flavor,
                                         withFiles = False).iterFileList() ],
             [] )
 
         l = store.iterFilesInTrove("testcomp", v10, flavor, sortByPath = True)
         l = [ x for x in l ]
-        self.failUnlessEqual(l,
+        self.assertEqual(l,
                              [ (f1.pathId(), "/bin/1", f1.fileId(), v10),
                                (f2.pathId(), "/bin/2", f2.fileId(), v10),
                                (f3.pathId(), "/bin/3", f3.fileId(), v10),
@@ -188,32 +188,32 @@ Some changes just are.
         troveInfo = store.addTrove(trv2, trv2.diff(None)[0])
         store.addTroveDone(troveInfo)
         store.addTroveSetDone()
-        self.failUnlessEqual(store.getTrove("testpkg", v10, flavor), trv2)
+        self.assertEqual(store.getTrove("testpkg", v10, flavor), trv2)
       
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("testcomp", v10, flavor),
                                             ("testpkg", v10, flavor ) ]) ],
             [trv, trv2] )
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("testpkg", v10, flavor ),
                                             ("testcomp", v10, flavor) ]) ],
             [trv2, trv] )
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("testpkg", v10, flavor),
                                             ("testpkg", v10, flavor) ]) ],
             [trv2, trv2] )
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("testpkg", v10, flavor ),
                                             ("blah", v10, flavor) ]) ],
             [trv2, None] )
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("blah", v10, flavor ),
                                             ("testpkg", v10, flavor) ]) ],
             [None, trv2] )
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("blah", v10, flavor ) ]) ],
             [None] )
-        self.failUnlessEqual(
+        self.assertEqual(
             [ x for x in store.iterTroves([ ("testcomp", v10, flavor),
                                             ("blah", v10, flavor ),
                                             ("testpkg", v10, flavor ) ]) ],
@@ -222,7 +222,7 @@ Some changes just are.
         # erasing doesn't work
         #store.eraseTrove("testcomp", v10, None)
         #store.commit()
-        self.failUnlessEqual(store.getTrove("testpkg", v10, flavor), trv2)
+        self.assertEqual(store.getTrove("testpkg", v10, flavor), trv2)
         
         map = { 'testpkg': [ v10 ]}
         flavors = store.getTroveFlavors(map)
@@ -230,17 +230,17 @@ Some changes just are.
             flavorStr = flavor.freeze()
         else:
             flavorStr = ''
-        self.failUnlessEqual(flavors, { 'testpkg': {v10: [flavorStr]}})
+        self.assertEqual(flavors, { 'testpkg': {v10: [flavorStr]}})
 
         map = { 'testpkg3': [ v10 ]}
         flavors = store.getTroveFlavors(map)
-        self.failUnlessEqual(flavors, { 'testpkg3': {v10: []}})
+        self.assertEqual(flavors, { 'testpkg3': {v10: []}})
 
         # test getFiles
         fileObjs = store.getFiles([(f1.pathId(), f1.fileId()),
                                    (f2.pathId(), f2.fileId())])
-        self.failUnlessEqual(fileObjs[(f1.pathId(), f1.fileId())], f1)
-        self.failUnlessEqual(fileObjs[(f2.pathId(), f2.fileId())], f2)
+        self.assertEqual(fileObjs[(f1.pathId(), f1.fileId())], f1)
+        self.assertEqual(fileObjs[(f2.pathId(), f2.fileId())], f2)
 
         # test that asking for an invalid fileid/pathid pair results
         # in no entry for the (pathid, fileid) in the returned dict
@@ -254,7 +254,7 @@ Some changes just are.
         # a different repository works - we should get None
         # back
         fileObjs = store.getFiles([(self.id4, self.fid4)])
-        self.failUnlessEqual(fileObjs, {(self.id4, self.fid4): None})
+        self.assertEqual(fileObjs, {(self.id4, self.fid4): None})
 
     def testMetadata(self):
         store = self._connect()
@@ -309,8 +309,8 @@ Some changes just are.
         md_v1 = store.getMetadata("testpkg3", branch)
         md_v1_fr = store.getMetadata("testpkg3", branch, language="fr")
 
-        self.failUnlessEqual(md_v1.freeze(), md_v1_l)
-        self.failUnlessEqual(md_v1_fr.freeze(), md_v1_fr_l)
+        self.assertEqual(md_v1.freeze(), md_v1_l)
+        self.assertEqual(md_v1_fr.freeze(), md_v1_fr_l)
 
 
         v2 = ThawVersion("/conary.rpath.com@test:trunk/1:1-2")
@@ -328,9 +328,9 @@ Some changes just are.
         md_v1 = store.getMetadata("testpkg3", branch, version=v1)
         md_v1_fr = store.getMetadata("testpkg3", branch, version=v1, language="fr")
 
-        self.failUnlessEqual(md_v2.freeze(), md_v2_l)
-        self.failUnlessEqual(md_v1.freeze(), md_v1_l)
-        self.failUnlessEqual(md_v1_fr.freeze(), md_v1_fr_l)
+        self.assertEqual(md_v2.freeze(), md_v2_l)
+        self.assertEqual(md_v1.freeze(), md_v1_l)
+        self.assertEqual(md_v1_fr.freeze(), md_v1_fr_l)
 
     def testTroveFlavor(self):
         flavor = deps.Flavor()
@@ -383,11 +383,11 @@ Some changes just are.
         store.addTroveSetDone()
 
         for trv in troves:
-            self.failUnlessEqual(trv, 
+            self.assertEqual(trv, 
                 store.getTrove(trv.getName(), trv.getVersion(), trv.getFlavor()))
 
         troveFlavors = store.getTroveFlavors({ 'test': [ v10 ] })
-        self.failUnlessEqual(troveFlavors['test'][v10], [union.freeze()])
+        self.assertEqual(troveFlavors['test'][v10], [union.freeze()])
 
     def testRemoved(self):
         store = self._connect()
@@ -966,16 +966,16 @@ class TroveStoreTest2(rephelp.RepositoryHelper):
         branch = versions.VersionFromString("/" + str(self.defLabel))
         # get everything we know
         allIds = repos.getPackageBranchPathIds("foo:source", branch)
-        self.failUnlessEqual(set(allIds.keys()), set([
+        self.assertEqual(set(allIds.keys()), set([
             "/usr/share/foo/bar/baz/file1", "/usr/share/foo/bar/baz/file2",
             "/usr/share/foo/file3"]))
         ret = repos.getPackageBranchPathIds("foo:source", branch, ["/usr/share/foo"])
         # since protocol 62, dirnames are strictly honored, so ret should only have file3
-        self.failUnlessEqual(ret.keys(), ["/usr/share/foo/file3"])
+        self.assertEqual(ret.keys(), ["/usr/share/foo/file3"])
         # protocol 61 will treat the dirlist as prefixes, which should return all files back
         repos.c[branch].setProtocolVersion(61)
         ret61 = repos.getPackageBranchPathIds("foo:source", branch, ["/usr/share/foo"])
-        self.failUnlessEqual(ret61, allIds)
+        self.assertEqual(ret61, allIds)
 
     def testDuplicateFileIds(self):
         # This test sets up a relative changeset that specifies two different

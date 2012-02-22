@@ -241,10 +241,10 @@ class StreamsTest(testhelp.TestCase):
         s.append('hello')
         s.append('world\0!')
         frz = s.freeze()
-        self.failUnlessEqual(frz, '\x05hello\x07world\x00!')
+        self.assertEqual(frz, '\x05hello\x07world\x00!')
 
         s2 = OrderedBinaryStringsStream(frz)
-        self.failUnlessEqual(s, s2)
+        self.assertEqual(s, s2)
 
         s = OrderedBinaryStringsStream()
         for x in ((1 << 5), (1 << 6), (1 << 7),
@@ -253,7 +253,7 @@ class StreamsTest(testhelp.TestCase):
             s.append('1' * x)
         frz = s.freeze()
         s2 = OrderedBinaryStringsStream(frz)
-        self.failUnlessEqual(s, s2)
+        self.assertEqual(s, s2)
 
     def testInfoStream(self):
          i = InfoStream()
@@ -379,7 +379,7 @@ class StreamsTest(testhelp.TestCase):
 
         frz = stream2.freeze()
         split = splitFrozenStreamSet(frz)
-        self.failUnlessEqual(split, [(1, 'thename'), (2, '\x00\x00z\xe4')])
+        self.assertEqual(split, [(1, 'thename'), (2, '\x00\x00z\xe4')])
 
         # test ignoreUnknown for thawing
         self.assertRaises(ValueError, Rigid, frz)
@@ -477,7 +477,7 @@ class StreamsTest(testhelp.TestCase):
             f = cls()
             f.x.set('hello')
             f2 = cls(f.freeze())
-            self.failUnless(f2.x(), 'hello')
+            self.assertTrue(f2.x(), 'hello')
 
         class Foo3(StreamSet):
             streamDict = { 256 : ( DYNAMIC, StringStream, 'x' ) }
@@ -487,7 +487,7 @@ class StreamsTest(testhelp.TestCase):
         try:
             f2 = Foo3(f.freeze())
         except TypeError, e:
-            self.failUnlessEqual(str(e), 'tag number overflow. max value is uchar')
+            self.assertEqual(str(e), 'tag number overflow. max value is uchar')
 
     def testStreamCollection(self):
 
@@ -525,7 +525,7 @@ class StreamsTest(testhelp.TestCase):
         # test overflow
         c2 = Collection()
         c2.addStream(1, StringStream(' ' * 65536))
-        self.failUnlessRaises(OverflowError, c2.freeze)
+        self.assertRaises(OverflowError, c2.freeze)
 
     def testAbsoluteStreamCollection(self):
         class Collection(AbsoluteStreamCollection):
@@ -564,19 +564,19 @@ class StreamsTest(testhelp.TestCase):
         s = ' ' * (1 << 17)
         c.addStream(1, StringStream(s))
         frz = c.freeze()
-        self.failUnlessEqual(frz, '\x01\x80\x02\x00\x00' + s)
+        self.assertEqual(frz, '\x01\x80\x02\x00\x00' + s)
 
         c = Collection()
         # make sure we can store smaller stuff
         s = ' ' * 63
         c.addStream(1, StringStream(s))
         frz = c.freeze()
-        self.failUnlessEqual(frz, '\x01?' + s)
+        self.assertEqual(frz, '\x01?' + s)
 
         s2 = ' ' * 64
         c.addStream(1, StringStream(s2))
         frz = c.freeze()
-        self.failUnlessEqual(frz, '\x01?' + s + '\x01@@' + s2)
+        self.assertEqual(frz, '\x01?' + s + '\x01@@' + s2)
 
         # test add via diff
         c1 = Collection()
@@ -587,7 +587,7 @@ class StreamsTest(testhelp.TestCase):
         c2.addStream(1, StringStream('four'))
         diff = c2.diff(c1)
         c1.twm(diff, c1)
-        self.failUnlessEqual(c1, c2)
+        self.assertEqual(c1, c2)
 
         # test del via diff
         c1 = Collection()
@@ -597,8 +597,8 @@ class StreamsTest(testhelp.TestCase):
         c1.addStream(1, StringStream('three'))
         diff = c2.diff(c1)
         c1.twm(diff, c1)
-        self.failUnlessEqual(c1, c2)
-        self.failUnlessEqual([ x() for x in c1.getStreams(1) ],
+        self.assertEqual(c1, c2)
+        self.assertEqual([ x() for x in c1.getStreams(1) ],
                              ['one', 'two'])
 
     def testSha1Stream(self):
@@ -795,7 +795,7 @@ class StreamsTest(testhelp.TestCase):
         frz = new.freeze()
         split = splitFrozenStreamSet(frz)
 
-        self.failUnlessEqual(split, [(1, 'world'),
+        self.assertEqual(split, [(1, 'world'),
                                      (2, '\x00\x00\x00\n'),
                                      (3, '\x00\x00\x00\x14')])
 
@@ -823,4 +823,4 @@ class StreamsTest(testhelp.TestCase):
         b = Blah()
         b.blah.set('blah')
         frz = b.freeze()
-        self.failUnlessEqual(Blah2.find(1, frz)(), 'blah')
+        self.assertEqual(Blah2.find(1, frz)(), 'blah')

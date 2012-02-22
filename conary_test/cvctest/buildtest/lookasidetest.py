@@ -244,7 +244,7 @@ class RefreshTest(PackageRecipe):
                 [ '. Trying http://localhost:[0-9]*/1\.\.\.',
                   '. Downloading http://localhost:[0-9]*/1\.\.\.', ],
                 regExp = True)
-            self.failIf(os.path.exists(negativePath))
+            self.assertFalse(os.path.exists(negativePath))
         finally:
             contentServer.kill()
 
@@ -257,7 +257,7 @@ class RefreshTest(PackageRecipe):
             url = contentURL + '/' + name
             cached = lookaside.fetchURL(self.cfg, url, name)
             f = open(cached, 'r')
-            self.failUnlessEqual(f.read(), 'Hello, world!\n')
+            self.assertEqual(f.read(), 'Hello, world!\n')
         finally:
             contentServer.kill()
 
@@ -273,7 +273,7 @@ class RefreshTest(PackageRecipe):
             url = contentURL + '/' + name
             cached = lookaside.fetchURL(self.cfg, url, name)
             f = open(cached, 'r')
-            self.failUnlessEqual(f.read(), 'Hello, world!\n')
+            self.assertEqual(f.read(), 'Hello, world!\n')
 
             # test with no password given
             contentURL = 'http://user@%s' % httplib.urlsplit(baseUrl)[1]
@@ -281,7 +281,7 @@ class RefreshTest(PackageRecipe):
             url = contentURL + '/' + name
             cached = lookaside.fetchURL(self.cfg, url, name)
             f = open(cached, 'r')
-            self.failUnlessEqual(f.read(), 'Hello, world 2!\n')
+            self.assertEqual(f.read(), 'Hello, world 2!\n')
 
             # test with no password at all
             name = 'foo3.tar.gz'
@@ -289,7 +289,7 @@ class RefreshTest(PackageRecipe):
             cached = self.logCheck(lookaside.fetchURL, (self.cfg, url, name),
                                    ['error: error downloading http://localhost:[0-9]*//foo3.tar.gz: HTTP Error 401: Unauthorized'],
                                    regExp=True)
-            self.failUnlessEqual(cached, None)
+            self.assertEqual(cached, None)
 
             # test ftp with user:pass
             def fakeOpen(od, req, *args, **kw):
@@ -305,8 +305,8 @@ class RefreshTest(PackageRecipe):
             url = 'ftp://user:pass@foo.com/bar/baz.tgz'
             name = 'baz.tgz'
             cached = lookaside.fetchURL(self.cfg, url, name)
-            self.failUnlessEqual(url, self.req.get_full_url())
-            self.failUnlessEqual(open(cached).read(), 'baz file contents')
+            self.assertEqual(url, self.req.get_full_url())
+            self.assertEqual(open(cached).read(), 'baz file contents')
 
         finally:
             contentServer.kill()
@@ -410,7 +410,7 @@ class SourceGoesAwayTest(PackageRecipe):
                 '+ Downloading %s1...' % curl,
             ]
             ret, out = self.captureOutput(self.commit)
-            self.failUnlessEqual(out, '\n'.join(expected) + '\n')
+            self.assertEqual(out, '\n'.join(expected) + '\n')
 
             expected.append('warning: somefile.txt is not autosourced and '
                             'cannot be refreshed') 
@@ -434,7 +434,7 @@ class SourceGoesAwayTest(PackageRecipe):
         cmd = ["tar", "zcf", archiveFile, "-C", self.workDir, "file1"]
         p = rephelp.subprocess.Popen(cmd)
         p.communicate()
-        self.failUnless(os.path.exists(archiveFile))
+        self.assertTrue(os.path.exists(archiveFile))
 
         class TarGzRequestor(SimpleHTTPRequestHandler):
             requestLog = os.path.join(self.workDir, "request.log")
@@ -483,10 +483,10 @@ class ArchiveTest(PackageRecipe):
                 '+ Downloading %s/archive-1.tar.gz...' % contentUrl,
             ]
             ret, out = self.captureOutput(self.commit)
-            self.failUnlessEqual(out, '\n'.join(expected) + '\n')
+            self.assertEqual(out, '\n'.join(expected) + '\n')
 
             # Make sure we have the proper files in the request log
-            self.failUnlessEqual(
+            self.assertEqual(
                 [ x.strip() for x in file(TarGzRequestor.requestLog) ],
                 [ '//archive-1.tar.bz2', '//archive-1.tar.gz', ])
 
@@ -497,10 +497,10 @@ class ArchiveTest(PackageRecipe):
             # server again
             ret = self.cookFromRepository('archive')
             # Make sure we did build something
-            self.failUnlessEqual(ret[0][1], '/localhost@rpl:linux/1-1-1')
+            self.assertEqual(ret[0][1], '/localhost@rpl:linux/1-1-1')
 
             # Request log should be empty
-            self.failUnlessEqual(
+            self.assertEqual(
                 [ x.strip() for x in file(TarGzRequestor.requestLog) ],
                 [])
 
@@ -606,18 +606,18 @@ class ArchiveTest(PackageRecipe):
             url1 = 'http://localhost:%d/noAuthProxy.txt' \
                 % (server.port)
             path = lookaside.fetchURL(self.cfg, url1,'recipename')
-            self.failUnless(path)
+            self.assertTrue(path)
             self.cfg.proxy = { 'http' : 'http://rpath:rpath@localhost:%d/'
                                % proxy.authPort }
             url2 = 'http://localhost:%d/authProxy.txt' \
                 % (server.port)
             path = lookaside.fetchURL(self.cfg, url2,'recipename')
-            self.failUnless(path)
+            self.assertTrue(path)
 
             proxy.stop()
             l = open(proxy.accessLog).read()
-            self.failUnless(url1 in l)
-            self.failUnless(url2 in l)
+            self.assertTrue(url1 in l)
+            self.assertTrue(url2 in l)
 
         finally:
             proxy.stop()
@@ -626,23 +626,23 @@ class ArchiveTest(PackageRecipe):
     def testURLArguments(self):
         # standard url
         url1 = lookaside.laUrl('http://foo.example.com/bar.tar')
-        self.failUnlessEqual(url1.filePath(), '/foo.example.com/bar.tar')
+        self.assertEqual(url1.filePath(), '/foo.example.com/bar.tar')
 
         # url with arguments
         url2 = lookaside.laUrl('http://foo.example.com/bar.tar?arg=value')
-        self.failUnlessEqual(url2.filePath(),
+        self.assertEqual(url2.filePath(),
                              '/foo.example.com/bar.tar?arg=value')
 
         # mirror url with arguments
         mirrorUrl = lookaside.laUrl('mirror://testmirror.com/baz.tar?arg=bif')
         url3 = lookaside.laUrl('http://foo.example.com/bar.tar?arg=value',
                                parent=mirrorUrl)
-        self.failUnlessEqual(url3.filePath(),
+        self.assertEqual(url3.filePath(),
                              '/testmirror.com/baz.tar?arg=bif')
 
         # url with arguments and no filename
         url4 = lookaside.laUrl('http://foo.example.com/?arg=value')
-        self.failUnlessEqual(url4.filePath(), '/foo.example.com/?arg=value')
+        self.assertEqual(url4.filePath(), '/foo.example.com/?arg=value')
 
         # CNY-3674
         url5 = lookaside.laUrl('lookaside://lp:lightdm/lp:lightdm--466.tar.bz2')

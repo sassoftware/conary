@@ -83,15 +83,15 @@ class MiscTest(rephelp.RepositoryHelper):
                                        target)
             # make sure the sha matches what we expect
             expected = sha1helper.sha1String(teststr)
-            self.failUnlessEqual(sha, expected)
-            self.failUnlessEqual(sha2, expected)
+            self.assertEqual(sha, expected)
+            self.assertEqual(sha2, expected)
             # make sure that the copied file matches the gzip compressed
             # string
             f = open(path + '-copy')
-            self.failUnlessEqual(f.read(), s)
+            self.assertEqual(f.read(), s)
             # and that it also is correctly uncompressed
             f = open(path + '-uncompressed')
-            self.failUnlessEqual(f.read(), teststr)
+            self.assertEqual(f.read(), teststr)
         finally:
             if infd > 0:
                 os.close(infd)
