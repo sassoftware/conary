@@ -65,7 +65,10 @@ dist:
 archive:
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
-	hg archive -t tbz2 -r conary-$(VERSION) conary-$(VERSION).tar.bz2
+	hg archive -t tbz2 \
+		-r conary-$(VERSION) \
+		-X conary_test \
+		conary-$(VERSION).tar.bz2
 
 version:
 	sed -i 's/@NEW@/$(VERSION)/g' NEWS
