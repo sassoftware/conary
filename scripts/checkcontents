@@ -74,7 +74,7 @@ def main(argv):
     except options.OptionError, s:
         print s
         sys.exit(1)
-    
+
     repair = argSet.has_key('repair')
 
     dbPath = os.sep.join((cfg.root, cfg.dbPath, 'conarydb'))

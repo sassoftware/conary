@@ -1020,6 +1020,7 @@ class Properties(policy.Policy):
     supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
     bucket = policy.PACKAGE_CREATION
     processUnmodified = True
+    _supports_file_properties = True
     requires = (
         # We need to know what component files have been assigned to
         ('PackageSpec', policy.REQUIRED_PRIOR),
