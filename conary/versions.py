@@ -578,14 +578,6 @@ class CookLabel(StaticLabel):
 
     name = "local@local:COOK"
 
-class PhantomLabel(StaticLabel):
-    """
-    Label for phantom capsule troves.
-
-    Phantom troves are proxies for unknown packages in an encapsulated system.
-    """
-    name = 'local@local:PHANTOM'
-
 class NewLabel(StaticLabel):
 
     """
@@ -597,7 +589,6 @@ class NewLabel(StaticLabel):
 staticLabelTable[LocalLabel.name] = LocalLabel
 staticLabelTable[EmergeLabel.name] = EmergeLabel
 staticLabelTable[CookLabel.name] = CookLabel
-staticLabelTable[PhantomLabel.name] = PhantomLabel
 staticLabelTable[RollbackLabel.name] = RollbackLabel
 
 class AbstractVersion(object):
@@ -885,9 +876,6 @@ class NewVersion(AbstractVersion):
     def onLocalCookLabel(self):
         return False
 
-    def onPhantomLabel(self):
-        return False
-
     def onRollbackLabel(self):
         return False
 
@@ -1145,14 +1133,6 @@ class Version(VersionSequence):
         """
         return isinstance(self.versions[-2], LocalLabel)
 
-    def onPhantomLabel(self):
-        """
-        Tests whether this version belongs to a phantom package.
-
-        @rtype: boolean
-        """
-        return isinstance(self.versions[-2], PhantomLabel)
-
     def onRollbackLabel(self):
         """
         Tests whether this is the rollback branch, or is a version on
@@ -1188,12 +1168,8 @@ class Version(VersionSequence):
 
         @rtype: boolean
         """
-        return ( self.onLocalCookLabel()
-                or self.onEmergeLabel()
-                or self.onLocalLabel()
-                or self.onPhantomLabel()
-                or self.onRollbackLabel()
-                )
+        return (self.onLocalCookLabel() or self.onEmergeLabel()
+                or self.onLocalLabel() or self.onRollbackLabel())
 
     def isInLocalNamespace(self):
         if self.trailingLabel().getNamespace() == 'local':

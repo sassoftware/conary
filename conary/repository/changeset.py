@@ -471,20 +471,10 @@ class ChangeSet(streams.StreamSet):
 
         for troveCs in self.iterNewTroveList():
             if not troveCs.getOldVersion():
-                # This was a new trove, and the inverse of a new trove is an
-                # old trove, unless it's a phantom trove in which case don't
-                # roll it back since we didn't install the underlying capsule
-                # in the first place.
-                if not troveCs.getNewVersion().onPhantomLabel():
-                    rollback.oldTrove(troveCs.getName(),
-                            troveCs.getNewVersion(), troveCs.getNewFlavor())
-                continue
-
-            if troveCs.getOldVersion().onPhantomLabel():
-                # Also don't roll back updates from a phantom trove since we
-                # have no way to put the original capsule back. Instead we'll
-                # just leave the managed capsule trove alone and hope it's
-                # close enough.
+                # this was a new trove, and the inverse of a new
+                # trove is an old trove
+                rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(),
+                                    troveCs.getNewFlavor())
                 continue
 
             # if redirectionRollbacks are requested, create one for troves
@@ -707,10 +697,6 @@ class ChangeSet(streams.StreamSet):
             rollback.newTrove(invertedTrove)
 
         for (name, version, flavor) in self.getOldTroveList():
-            if version.onPhantomLabel():
-                # Can't roll back erase of a phantom trove because we never had
-                # the underlying capsule, so just skip it.
-                continue
             if not version.isOnLocalHost() and redirectionRollbacks:
                 oldTrove = trove.Trove(name, version, flavor, None,
                                        type = trove.TROVE_TYPE_REDIRECT)

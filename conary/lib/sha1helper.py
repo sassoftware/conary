@@ -57,9 +57,6 @@ def sha1FromString(val):
                         int(val[ 8:16], 16), int(val[16:24], 16),
                         int(val[24:32], 16), int(val[32:40], 16))
 
-sha1Empty = '\xda9\xa3\xee^kK\r2U\xbf\xef\x95`\x18\x90\xaf\xd8\x07\t'
-
-
 def nonstandardSha256String(buf):
     return digestlib.sha256_nonstandard(buf)
 
