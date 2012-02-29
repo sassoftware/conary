@@ -25,8 +25,11 @@ import os
 import re
 import stat
 import sys
+from StringIO import StringIO
 
 from testutils import mock
+
+from smartform import descriptor
 
 from conary.lib import digestlib, log, util
 from conary_test import rephelp
@@ -7806,53 +7809,66 @@ class TestProperties(PackageRecipe):
     clearBuildReqs()
     def setup(r):
         r.Create('%(prefix)s/lib/iconfig/properties/username.iprop',
-                 contents='''<field>
-<name>username</name>
-
-<descriptions>
-<desc>User Name</desc>
-</descriptions>
-<type>str</type>
-
-<constraints>
-<descriptions>
-<desc>Field must contain between 1 and 32 characters</desc>
-</descriptions>
-<length>32</length>
-</constraints>
-<required>true</required>
-</field>
+                 contents='''<descriptor>
+<metadata>
+    <displayName>stuff</displayName>
+</metadata>
+<dataFields>
+    <field>
+        <name>username</name>
+        <descriptions>
+            <desc>User Name</desc>
+        </descriptions>
+        <type>str</type>
+        <constraints>
+            <descriptions>
+                <desc>Field must contain between 1 and 32 characters</desc>
+            </descriptions>
+            <length>32</length>
+        </constraints>
+        <required>true</required>
+    </field>
+</dataFields>
+</descriptor>
 ''')
         r.Create('%(prefix)s/lib/iconfig/properties/proxy.iprop',
-                 contents='''<field>
-<name>proxy</name>
+                 contents='''<descriptor>
+<metadata>
+    <displayName>stuff2</displayName>
+</metadata>
+<dataFields>
+    <field>
+        <name>proxy</name>
 
-<descriptions>
-<desc>Proxy</desc>
-</descriptions>
-<type>str</type>
-<default>foo.example.com</default>
-
-<constraints>
-<descriptions>
-<desc>Field must contain between 1 and 32 characters</desc>
-</descriptions>
-<length>32</length>
-</constraints>
-<required>true</required>
-</field>
+        <descriptions>
+            <desc>Proxy</desc>
+        </descriptions>
+        <type>str</type>
+        <default>foo.example.com</default>
+        <constraints>
+            <descriptions>
+                <desc>Field must contain between 1 and 32 characters</desc>
+            </descriptions>
+            <length>32</length>
+        </constraints>
+        <required>true</required>
+    </field>
+</dataFields>
+</descriptor>
 ''')
 """
         trv = self.build(recipestr, "TestProperties")
-        props = dict([(x.name(), (x.type(), x.default(), x.definition()))
-                      for x in trv.troveInfo.properties.iter()])
+
+        props = {}
+        for prop in trv.troveInfo.properties.iter():
+            desc = descriptor.BaseDescriptor()
+            desc.parseStream(StringIO(prop.definition()))
+            props.update([ (x.get_name(), x) for x in desc.getDataFields() ])
+
         self.assertEquals(sorted(props.keys()), ['proxy', 'username'])
-        self.assertEquals(set(x[0] for x in props.values()), set(('sf',)))
-        self.assertEquals(props['proxy'][1], 'foo.example.com')
-        self.assertEquals(props['username'][1], '')
-        # at least check that the defintion is the xml fragment...
-        self.assertEquals(set(x[2][0:7] for x in props.values()),
-                          set(('<field>',)))
+        self.assertEquals(props['proxy'].get_default(), ['foo.example.com', ])
+        self.assertEquals(props['username'].get_default(), [])
+
         # now make sure that it got into the repository
         repos = self.openRepository()
         trv2 = repos.getTrove(trv.getName(), trv.getVersion(), trv.getFlavor())
@@ -7868,18 +7884,36 @@ class TestProperties(PackageRecipe):
     clearBuildReqs()
     def setup(r):
         r.Create('%(prefix)s/bin/foo', mode=755)
-        r.Properties(contents='<field><name>username</name>'
-                              '<type>str</type></field>', package='%(name)s:runtime')
+        r.Properties(contents='''\
+<descriptor>
+<dataFields>
+<field>
+    <name>username</name>
+    <type>str</type>
+</field>
+<field>
+    <name>george</name>
+    <type>str</type>
+    <default>monkey</default>
+</field>
+</dataFields>
+</descriptor>
+''', package='%(name)s:runtime')
 """
         trv = self.build(recipeStr, "TestProperties")
-        props = dict([(x.name(), (x.type(), x.default(), x.definition()))
-                      for x in trv.troveInfo.properties.iter()])
-        self.assertEquals(sorted(props.keys()), ['username'])
-        self.assertEquals(set(x[0] for x in props.values()), set(('sf',)))
-        self.assertEquals(props['username'][1], '')
-        # at least check that the defintion is the xml fragment...
-        self.assertEquals(set(x[2][0:7] for x in props.values()),
-                          set(('<field>',)))
+
+        props = {}
+        for prop in trv.troveInfo.properties.iter():
+            self.failUnlessEqual(prop.type(), 'sf')
+
+            desc = descriptor.BaseDescriptor()
+            desc.parseStream(StringIO(prop.definition()))
+            props.update([ (x.get_name(), x) for x in desc.getDataFields() ])
+
+        self.assertEquals(sorted(props.keys()), ['george', 'username'])
+        self.assertEquals(props['username'].get_default(), [])
+        self.assertEquals(props['george'].get_default(), ['monkey', ])
+
         # now make sure that it got into the repository
         repos = self.openRepository()
         trv2 = repos.getTrove(trv.getName(), trv.getVersion(), trv.getFlavor())

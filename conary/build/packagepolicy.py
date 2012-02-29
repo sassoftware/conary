@@ -1103,11 +1103,8 @@ class Properties(policy.Policy):
             return
 
         pkgSet.add((pkgName, compName))
-
-        xmldata = smartform.SmartFormFieldParser(xml)
-
-        self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM,
-            pkgName, compName, xmldata.name, xml, xmldata.default)
+        self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM, pkgName,
+            compName, xml)
 
 
 class MakeDevices(policy.Policy):
