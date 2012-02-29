@@ -7929,23 +7929,31 @@ class TestProperties(PackageRecipe):
     clearBuildReqs()
     def setup(r):
         r.Create('%(prefix)s/bin/foo', mode=755)
-        r.Properties('%(bindir)s/.*', contents='<field><name>username</name>'
-                              '<type>str</type></field>')
+        r.Properties('%(bindir)s/.*', contents='''\
+<descriptor>
+<dataFields>
+    <field><name>username</name>
+        <type>str</type>
+    </field>
+</dataFields>
+</descriptor>''')
 """
         trv = self.build(recipeStr, "TestProperties")
-        props = dict([(x.name(), (x.type(), x.default(), x.definition()))
-                      for x in trv.troveInfo.properties.iter()])
+
+        props = {}
+        for prop in trv.troveInfo.properties.iter():
+            self.failUnlessEqual(prop.type(), 'sf')
+
+            desc = descriptor.BaseDescriptor()
+            desc.parseStream(StringIO(prop.definition()))
+            props.update([ (x.get_name(), x) for x in desc.getDataFields() ])
+
         self.assertEquals(sorted(props.keys()), ['username'])
-        self.assertEquals(set(x[0] for x in props.values()), set(('sf',)))
-        self.assertEquals(props['username'][1], '')
-        # at least check that the defintion is the xml fragment...
-        self.assertEquals(set(x[2][0:7] for x in props.values()),
-                          set(('<field>',)))
+        self.assertEquals(props['username'].get_default(), [])
+
         # now make sure that it got into the repository
         repos = self.openRepository()
         trv2 = repos.getTrove(trv.getName(), trv.getVersion(), trv.getFlavor())
         self.assertEquals(
             trv2.troveInfo.properties.freeze(),
             trv.troveInfo.properties.freeze())
-
-
