@@ -28,7 +28,10 @@ import sys
 
 from testutils import mock
 
-from xml.etree import ElementTree as etree
+try:
+    from xml.etree import ElementTree as etree
+except ImportError:
+    from elementtree import ElementTree as etree
 
 from conary.lib import digestlib, log, util
 from conary_test import rephelp
