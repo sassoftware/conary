@@ -342,40 +342,40 @@ class RepQueryTest(rephelp.RepositoryHelper):
                 self.addCollection("trv%s" % x, ver, [":lib", ":runtime"])
         repos = self.openRepository()
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret),
+        self.assertEqual(set(ret),
                              set(['trv1:lib', 'trv1:runtime', 'trv1',
                                   'trv2:lib', 'trv2:runtime', 'trv2']))
         self.markRemoved("trv1=1") 
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret),
+        self.assertEqual(set(ret),
                              set(['trv1:lib', 'trv1:runtime', 'trv1',
                                   'trv2:lib', 'trv2:runtime', 'trv2']))
         self.markRemoved("trv1=2") 
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret), set(['trv2:lib', 'trv2:runtime', 'trv2']))
+        self.assertEqual(set(ret), set(['trv2:lib', 'trv2:runtime', 'trv2']))
 
         self.addCollection("group-trv", [("trv2:runtime", "2"), ("trv3:runtime", "0")])
         ret = repos.troveNamesOnServer("localhost")
         # trv3:runtime is not present thus it shouldn't appear in the list
-        self.failUnlessEqual(set(ret), set(['trv2:lib', 'trv2:runtime', 'trv2', "group-trv"]))
+        self.assertEqual(set(ret), set(['trv2:lib', 'trv2:runtime', 'trv2', "group-trv"]))
         self.markRemoved("trv2=1")
         ret = repos.troveNamesOnServer("localhost")
         # trv2=2 is still there
-        self.failUnlessEqual(set(ret), set(['trv2:lib', 'trv2:runtime', 'trv2', "group-trv"]))
+        self.assertEqual(set(ret), set(['trv2:lib', 'trv2:runtime', 'trv2', "group-trv"]))
         self.markRemoved("trv2=2")
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret), set(["group-trv"]))
+        self.assertEqual(set(ret), set(["group-trv"]))
         self.markRemoved("group-trv")
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret), set())
+        self.assertEqual(set(ret), set())
 
         self.addCollection("group-other", ["foo:runtime", "foo:lib"])
         self.addComponent("foo:lib", "999")
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret), set(["foo:lib", "group-other"]))
+        self.assertEqual(set(ret), set(["foo:lib", "group-other"]))
         self.markRemoved("foo:lib=999")
         ret = repos.troveNamesOnServer("localhost")
-        self.failUnlessEqual(set(ret), set(["group-other"]))
+        self.assertEqual(set(ret), set(["group-other"]))
 
     def testAffinity(self):
         self.addComponent('foo:r', '/localhost@rpl:branch/1.0-1-1', '!readline',
@@ -550,7 +550,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
 
         output = self.captureOutput(queryrep.displayTroves, self.cfg, ['foo'], [], [], 
                             queryrep.VERSION_FILTER_LATEST, queryrep.FLAVOR_FILTER_BEST, showBuildLog = True)
-        self.failUnlessEqual(output[1], buildlog)
+        self.assertEqual(output[1], buildlog)
         
     def testShowFile(self):
         contents1 = 'This is test content';
@@ -562,7 +562,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
 
         output = self.captureOutput(queryrep.displayTroves, self.cfg, ['foo'], [], [], 
                             queryrep.VERSION_FILTER_LATEST, queryrep.FLAVOR_FILTER_BEST, filesToShow = ['/usr/bin/barfile'])
-        self.failUnlessEqual(output[1], contents2)
+        self.assertEqual(output[1], contents2)
 
     def testRdiff1(self):
         req1 = 'soname: ELF32/libfoo1(blah)'
@@ -616,34 +616,34 @@ class RepQueryTest(rephelp.RepositoryHelper):
         troveSpec = 'foo=1[is:x86]--2[is:x86_64]'
 
         ret, outs = self._rdiff(troveSpec)
-        self.failUnlessEqual(outs, expOutput1noargs)
+        self.assertEqual(outs, expOutput1noargs)
 
         self.cfg.fullFlavors = True
         ret, outs = self._rdiff(troveSpec)
-        self.failUnlessEqual(outs, expOutput1fullFlavors)
+        self.assertEqual(outs, expOutput1fullFlavors)
         self.cfg.fullFlavors = False
 
         self.cfg.fullVersions = True
         ret, outs = self._rdiff(troveSpec)
-        self.failUnlessEqual(outs, expOutput1fullVersions)
+        self.assertEqual(outs, expOutput1fullVersions)
         self.cfg.fullVersions = False
 
         ret, outs = self._rdiff(troveSpec, ls = True)
-        self.failUnlessEqual(outs, expOutput1withFiles)
+        self.assertEqual(outs, expOutput1withFiles)
 
         ret, outs = self._rdiff(troveSpec, fileVersions = True)
-        self.failUnlessEqual(outs, expOutput1withFileVersions)
+        self.assertEqual(outs, expOutput1withFileVersions)
 
         ret, outs = self._rdiff(troveSpec, lsl = True)
-        self.failUnlessEqual(outs, expOutput1withFilesStat)
+        self.assertEqual(outs, expOutput1withFilesStat)
 
         ret, outs = self._rdiff(troveSpec, tags = True)
-        self.failUnlessEqual(outs, expOutput1withFileTags)
+        self.assertEqual(outs, expOutput1withFileTags)
 
         # Diffing against ourselves
         troveSpec = 'foo=1[is:x86]--1[is:x86]'
         ret, outs = self._rdiff(troveSpec, tags = True)
-        self.failUnlessEqual(outs, 'Identical troves\n')
+        self.assertEqual(outs, 'Identical troves\n')
 
     def testRdiff2(self):
         # Test showing of troves with no changes
@@ -680,7 +680,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
         troveSpec = 'group-foo=1--2'
 
         ret, outs = self._rdiff(troveSpec)
-        self.failUnlessEqual(outs, expOutput2)
+        self.assertEqual(outs, expOutput2)
 
     def testRdiff3(self):
         # Have a file change from regular file to symbolic link
@@ -698,7 +698,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
         ret, outs = self._rdiff('foo=1--2', lsl = True)
         #re.sub("Symbolic", "<TIMESTRING> (Symbolic", outs)
         outs = re.sub(" [0-9]*-[0-9]*-[0-9]* [0-9]*:[0-9]*:[0-9]* ", " <TIMESTRING  TIMESTAMP> ", outs)
-        self.failUnlessEqual(outs, expOutput3)
+        self.assertEqual(outs, expOutput3)
 
     def testRdiff4(self):
         # test trove dependencies
@@ -721,10 +721,10 @@ class RepQueryTest(rephelp.RepositoryHelper):
         self.addCollection('foo', '2', [':run'])
 
         ret, outs = self._rdiff('foo=1--2')
-        self.failUnlessEqual(outs, expOutput4)
+        self.assertEqual(outs, expOutput4)
 
         ret, outs = self._rdiff('foo:run=1--2', deps = True)
-        self.failUnlessEqual(outs, expOutput4withTroveDeps)
+        self.assertEqual(outs, expOutput4withTroveDeps)
 
     def testRdiff5(self):
         # CNY-1605
@@ -762,7 +762,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
         self.cfg.fullFlavors = True
         ret, outs = self._rdiff(troveSpec)
         self.cfg.fullFlavors = False
-        self.failUnlessEqual(outs, expOutput5)
+        self.assertEqual(outs, expOutput5)
 
     def testRdiff6(self):
         # Test that added and removed troves show up properly
@@ -784,7 +784,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
         troveSpec = 'group-foo=1--2'
 
         ret, outs = self._rdiff(troveSpec)
-        self.failUnlessEqual(outs, expOutput6)
+        self.assertEqual(outs, expOutput6)
 
     def testRdiff8(self):
         # CNY-1753
@@ -813,7 +813,7 @@ class RepQueryTest(rephelp.RepositoryHelper):
         troveSpec = cmdline.parseChangeList('foo=%s--%s' % (v1, v2))[0]
         ret, outs = self.captureOutput(queryrep.diffTroves,
             self.cfg, troveSpec)
-        self.failUnlessEqual(outs, '')
+        self.assertEqual(outs, '')
 
 expOutput1noargs = """\
 Update  foo(:run) (1-1-1[is: x86] -> 2-1-1[is: x86_64])
@@ -939,7 +939,7 @@ class MultiRepQueryTest(rephelp.RepositoryHelper):
 
         ret, outs = self._rdiff(
             'group-foo=localhost@foo:bar/1--localhost@foo:bar/2')
-        self.failUnlessEqual(outs, expOutput7)
+        self.assertEqual(outs, expOutput7)
         
 
 expOutput7 = """\

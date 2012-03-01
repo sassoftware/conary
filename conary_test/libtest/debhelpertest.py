@@ -54,7 +54,7 @@ class DebHelperTest(testhelp.TestCase):
         sio.seek(0)
 
         ret = parser.parse(sio)
-        self.failUnlessEqual(sorted(ret), [
+        self.assertEqual(sorted(ret), [
             ('architecture', ['i886']),
             ('description', [ 'Line1', 'Line2', 'Line3', '', 'Line4' ]),
             ('package', ['foo']),
@@ -88,4 +88,4 @@ Ian Macdonald.'''),
 
         h = debhelper.DebianPackageHeader(fobj)
         ret = dict((k, h[k]) for k in fields)
-        self.failUnlessEqual(ret, expected)
+        self.assertEqual(ret, expected)

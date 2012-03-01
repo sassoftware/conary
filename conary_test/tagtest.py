@@ -371,7 +371,7 @@ EOF
             self.updatePkg('stdin:runtime', callback = cb)
             self.verifyFile(self.rootDir + "/tag-output",
                             'ARGS: files update\n/etc/test-tagged\n')
-            self.failUnlessEqual(cb.msgs, [ ('testtag', '/etc/test-tagged\n', False) ])
+            self.assertEqual(cb.msgs, [ ('testtag', '/etc/test-tagged\n', False) ])
 
             self.resetRoot()
             cb = Callback()
@@ -380,14 +380,14 @@ EOF
             self.updatePkg('args:runtime', callback = cb)
             self.verifyFile(self.rootDir + "/tag-output",
                             'ARGS: files update /etc/test-tagged\n')
-            self.failUnlessEqual(cb.msgs, [])
+            self.assertEqual(cb.msgs, [])
 
             self.resetRoot()
             cb = Callback()
             self.updatePkg('multi:runtime', callback = cb, test=True)
             assert(not os.path.exists(self.rootDir + "tag-output"))
             self.updatePkg('multi:runtime', callback = cb)
-            self.failUnlessEqual(cb.msgs, [ ('testtag', 'testtag\n', False),
+            self.assertEqual(cb.msgs, [ ('testtag', 'testtag\n', False),
                                 ('testtag', '/etc/test-tagged\n', False) ])
             self.verifyFile(self.rootDir + "/tag-output",
                             'ARGS: files update\ntesttag\n/etc/test-tagged\n')
@@ -405,10 +405,10 @@ EOF
             cb = Callback()
             self.mock(select, 'poll', fakePoll)
             self.updatePkg('chatty:runtime', callback = cb)
-            self.failUnlessEqual([ x[0:2] for x in cb.msgs if x[2] == False ],
+            self.assertEqual([ x[0:2] for x in cb.msgs if x[2] == False ],
                       [ ('testtag', 'first\n'), ('testtag', 'second\n'),
                         ('testtag', 'partial\n') ] )
-            self.failUnlessEqual([ x[0:2] for x in cb.msgs if x[2] == True ],
+            self.assertEqual([ x[0:2] for x in cb.msgs if x[2] == True ],
                       [ ('testtag', 'error\n') ] )
 
             # make sure the default callbacks display messages. losing
@@ -426,7 +426,7 @@ EOF
             self.resetRoot()
             cb = Callback()
             self.updatePkg('multi2:runtime', callback = cb)
-            self.failUnlessEqual(cb.msgs,
+            self.assertEqual(cb.msgs,
                 [('testtag1 testtag2', 'testtag1 testtag2\n', False),
                  ('testtag1 testtag2', '/etc/test-multi-tagged\n', False)]
             )

@@ -149,7 +149,7 @@ class Empty(PackageRecipe):
                 self.cookItem(repos, self.cfg, 'empty.recipe')
                 self.fail("CookError not raised")
             except CookError, e:
-                self.failUnlessEqual(str(e), "unable to load recipe file "
+                self.assertEqual(str(e), "unable to load recipe file "
                     "%s/empty.recipe:\nempty release string" % os.getcwd())
         finally:
             os.chdir(origDir)

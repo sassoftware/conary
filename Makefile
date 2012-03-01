@@ -19,7 +19,7 @@
 all: subdirs
 
 export TOPDIR = $(shell pwd)
-export VERSION = 2.3.10
+export VERSION = 2.3.11
 export CHANGESET = $(shell ./scripts/hg-version.sh)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -65,7 +65,10 @@ dist:
 archive:
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
-	hg archive -t tbz2 -r conary-$(VERSION) conary-$(VERSION).tar.bz2
+	hg archive -t tbz2 \
+		-r conary-$(VERSION) \
+		-X conary_test \
+		conary-$(VERSION).tar.bz2
 
 version:
 	sed -i 's/@NEW@/$(VERSION)/g' NEWS

@@ -400,7 +400,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         l = trv.getVersion().trailingLabel()
         f = deps.parseFlavor('is:x86_64 x86')
         d = repos.getTroveLeavesByLabel({n: {l : [f]}}, bestFlavor = True)
-        self.failUnlessEqual(_getFlavors(d, n), ['is: x86_64'])
+        self.assertEqual(_getFlavors(d, n), ['is: x86_64'])
 
         self.resetRepository()
         repos = self.openRepository()
@@ -408,7 +408,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         self.addComponent('foo:run', '1-1-1', 'is:x86_64 x86')
         trv = self.addComponent('foo:run', '1-1-2', 'is:x86')
         d = repos.getTroveLeavesByLabel({n: {l : [f]}}, bestFlavor = True)
-        self.failUnlessEqual(_getFlavors(d, n), ['is: x86 x86_64'])
+        self.assertEqual(_getFlavors(d, n), ['is: x86 x86_64'])
 
     def testFindNegativeFlavor(self):
         self.addComponent('foo:runtime', '1', '!readline')
@@ -433,11 +433,11 @@ class NetclientTest(rephelp.RepositoryHelper):
                                    recurse=True, withFileContents=False)
         for tcs in cs.iterNewTroveList():
             if tcs.getName() == 'foo':
-                self.failUnless(tcs.troveType() == trove.TROVE_TYPE_NORMAL)
+                self.assertTrue(tcs.troveType() == trove.TROVE_TYPE_NORMAL)
             elif tcs.getName() == 'foo:run':
-                self.failUnless(tcs.troveType() == trove.TROVE_TYPE_REMOVED)
+                self.assertTrue(tcs.troveType() == trove.TROVE_TYPE_REMOVED)
                 ti = trove.TroveInfo(tcs.troveInfoDiff.freeze())
-                self.failUnless(ti.flags.isMissing())
+                self.assertTrue(ti.flags.isMissing())
             else:
                 self.fail('unexpected trove changeset')
 
@@ -520,7 +520,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         try:
             (updJob, suggMap) = client.updateChangeSet(applyList)
         except Exception, e:
-            self.failUnlessEqual(str(e), "Except me")
+            self.assertEqual(str(e), "Except me")
         else:
             self.fail("Exception not raised")
 
@@ -568,7 +568,7 @@ class NetclientTest(rephelp.RepositoryHelper):
             pass
         self.logFilter.regexpCompare('warning: Unhandled exception occurred when invoking callback:\n.*netclienttest\.py:[0-9]+\n CancelOperationException: Except me')
 
-        self.failUnlessRaises(errors.RepositoryError,
+        self.assertRaises(errors.RepositoryError,
             client.applyUpdate, updJob)
 
     def testCommitChangesetConversion(self):
@@ -638,7 +638,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         try:
             netclient.httpPutFile = errorHttpPutFile
 
-            self.failUnlessRaises(errors.CommitError, repos.commitChangeSet, cs)
+            self.assertRaises(errors.CommitError, repos.commitChangeSet, cs)
         finally:
             netclient.httpPutFile = old
 
@@ -676,28 +676,28 @@ class NetclientTest(rephelp.RepositoryHelper):
             v = versions.VersionFromString(vStr)
             # test alluser
             ret = allrepo.getTroveReferences("localhost", [("alpha", v, noF)])
-            self.failUnlessEqual(ret, [[("alpha%d" %i, v, noF)]] )
+            self.assertEqual(ret, [[("alpha%d" %i, v, noF)]] )
             ret = allrepo.getTroveReferences("localhost", [("alpha:runtime", v, noF)])
-            self.failUnlessEqual(set(ret[0]), set([("alpha", v, noF), ("alpha%d" %i, v, noF)]))
+            self.assertEqual(set(ret[0]), set([("alpha", v, noF), ("alpha%d" %i, v, noF)]))
             ret = allrepo.getTroveReferences("localhost", [("alpha:data", v, noF)])
-            self.failUnlessEqual(set(ret[0]),
+            self.assertEqual(set(ret[0]),
                                  set([("alpha",v,noF),("alpha%d"%i,v,noF),("beta%d"%i,v,noF)]) )
            
             # test qauser
             ret = qarepo.getTroveReferences("localhost", [("beta:runtime",v,noF), ("beta:data",v,noF)])
             if v.branch().label().asString() == "localhost@rpl:qa":
-                self.failUnlessEqual(set(ret[0]),
+                self.assertEqual(set(ret[0]),
                                      set([("beta",v,noF), ("beta%d"%i,v,noF)]))
-                self.failUnlessEqual(ret[1],[("beta", v, noF)])
+                self.assertEqual(ret[1],[("beta", v, noF)])
             else:
-                self.failUnlessEqual(ret, [[],[]])
+                self.assertEqual(ret, [[],[]])
         # getTroveDescendants
         ret = allrepo.getTroveDescendants("localhost", [
             ("alpha", versions.VersionFromString("/localhost@rpl:linux//prod"), noF)])
-        self.failUnlessEqual(ret, [[]])
+        self.assertEqual(ret, [[]])
         ret = allrepo.getTroveDescendants("localhost", [
             ("alpha", versions.VersionFromString("/localhost@rpl:linux"), noF)])
-        self.failUnlessEqual(set(ret[0]),
+        self.assertEqual(set(ret[0]),
                              set([(versions.VersionFromString(x), noF) for x in verlist]) )
         # limited user
         qaset = set([
@@ -707,8 +707,8 @@ class NetclientTest(rephelp.RepositoryHelper):
         ret = qarepo.getTroveDescendants("localhost", [
             ("alpha", versions.VersionFromString("/localhost@rpl:linux"), noF),
             ("beta", versions.VersionFromString("/localhost@rpl:linux"), noF)])
-        self.failUnlessEqual(ret[0], [])
-        self.failUnlessEqual(set(ret[1]), qaset)
+        self.assertEqual(ret[0], [])
+        self.assertEqual(set(ret[1]), qaset)
         # test deep branching
         branch = "/localhost@rpl:linux"
         retset = set()
@@ -720,7 +720,7 @@ class NetclientTest(rephelp.RepositoryHelper):
             retset.add((versions.VersionFromString(verStr), noF))
         ret = allrepo.getTroveDescendants("localhost", [
             ("gamma", versions.VersionFromString("/localhost@rpl:linux"), noF)])
-        self.failUnlessEqual(set(ret[0]), retset)
+        self.assertEqual(set(ret[0]), retset)
         
     def testFlavoredReferences(self):
         repos = self.openRepository()
@@ -745,7 +745,7 @@ class NetclientTest(rephelp.RepositoryHelper):
             ("trove", versions.VersionFromString(v1), f1),
             ("trove", versions.VersionFromString(v1), f2)])
         # get a match for the first trove, no match for the second
-        self.failUnlessEqual(ret, [[('group-dist', versions.VersionFromString(v2), f1)], [] ] )
+        self.assertEqual(ret, [[('group-dist', versions.VersionFromString(v2), f1)], [] ] )
 
         # add a new collection for the second flavor
         self.addCollection("group-dist", v2, [("trove", v1, f2)], defaultFlavor = f2)
@@ -754,7 +754,7 @@ class NetclientTest(rephelp.RepositoryHelper):
             ("trove", versions.VersionFromString(v1), f1),
             ("trove", versions.VersionFromString(v1), f2)])
         # this time get results for both
-        self.failUnlessEqual(ret, [
+        self.assertEqual(ret, [
             [('group-dist', versions.VersionFromString(v2), f1)],
             [('group-dist', versions.VersionFromString(v2), f2)],
             ])
@@ -814,7 +814,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         try:
             repos.c['localhost'].getProtocolVersion()
         except errors.OpenError, e:
-            self.failUnlessEqual(str(e),
+            self.assertEqual(str(e),
                     "Error opening http://test:<PASSWD>@localhost/conary/ via "
                     "conary proxy localhost:%d: 501 Unsupported method ('POST')"
                     % httpServer.port)
@@ -840,7 +840,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         try:
             repos.troveNamesOnServer('localhost')
         except errors.OpenError, e:
-            self.failUnlessEqual(str(e),
+            self.assertEqual(str(e),
                                  'Error occurred opening repository '
                                  'httsp://test:<PASSWD>@localhost:80/: '
                                  "ParameterError: Unknown URL scheme 'httsp'")
@@ -872,7 +872,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
                                      dest, changesetVersion = csVersion)
         fcont = filecontainer.FileContainer(util.ExtendedFile(
             dest, buffering = False))
-        self.failUnlessEqual(fcont.version, csVersion)
+        self.assertEqual(fcont.version, csVersion)
 
     def testOldClient(self):
         t = self.addComponent('foo:run', '1')
@@ -890,7 +890,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         fcont = filecontainer.FileContainer(util.ExtendedFile(
             dest, buffering = False))
         csVersion = changeset.getNativeChangesetVersion(42)
-        self.failUnlessEqual(fcont.version, csVersion)
+        self.assertEqual(fcont.version, csVersion)
 
     def testEntitlementParameter(self):
         nc = netclient.NetworkRepositoryClient({}, {},
@@ -947,7 +947,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
     def testServerProxyMethods(self):
         sp = netclient.ServerProxy('http://localhost:7', 'localhost', None,
                 None, None)
-        self.failIf(hasattr(sp, '__asdf'))
+        self.assertFalse(hasattr(sp, '__asdf'))
 
     def testPathIdPermissions(self):
         self.addComponent('foo:source', '1.0-1')
@@ -1018,11 +1018,11 @@ class ServerProxyTest(rephelp.RepositoryHelper):
     def testUnderUnderMethodName(self):
         # CNY-2289
         repos = self.openRepository()
-        self.failUnlessRaises(AttributeError,
+        self.assertRaises(AttributeError,
                 lambda: repos.c['localhost'].__foo.bar)
-        self.failUnlessRaises(AttributeError,
+        self.assertRaises(AttributeError,
                 lambda: repos.c['localhost'].foo.__bar)
-        self.failUnlessRaises(AttributeError,
+        self.assertRaises(AttributeError,
                 lambda: repos.c['localhost'].getTroveLeavesByLabel.__safe_str__)
 
     def testPermissionFallbackCode(self):
@@ -1071,7 +1071,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
             args = ('localhost',) + ([],) * (f.func_code.co_argcount - 2)
             f(*args)
             # make sure that the old method would have been called
-            self.failUnlessEqual(server.methodCalled, serverMethod)
+            self.assertEqual(server.methodCalled, serverMethod)
 
     def testFakeProtocolVersion(self):
         '''
@@ -1096,9 +1096,9 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         oldCacheHostLookups = repos._cacheHostLookups
         def checkCacheHostLookups(self, hosts):
             ipcache.clear()
-            self.failUnlessEqual(set(hosts), set(['localhost', 'localhost1']))
+            self.assertEqual(set(hosts), set(['localhost', 'localhost1']))
             rv = oldCacheHostLookups(hosts)
-            self.failUnlessEqual(ipcache._cache._map.keys(), [] )
+            self.assertEqual(ipcache._cache._map.keys(), [] )
             return rv
         self.mock(netclient.NetworkRepositoryClient, 
                   '_cacheHostLookups', checkCacheHostLookups)
@@ -1117,13 +1117,13 @@ class ServerProxyTest(rephelp.RepositoryHelper):
             repos = self.openRepository(1)
             self.addComponent('foo:run')
             self.addComponent('bar:run=localhost1@rpl:1', filePrimer=1)
-            self.failUnlessEqual(ipcache._cache._map.keys(), [ 'localhost' ] )
+            self.assertEqual(ipcache._cache._map.keys(), [ 'localhost' ] )
             oldCacheHostLookups = repos._cacheHostLookups
             def checkCacheHostLookups(self, hosts):
                 ipcache.clear()
-                self.failUnlessEqual(set(hosts), set(['localhost', 'localhost1']))
+                self.assertEqual(set(hosts), set(['localhost', 'localhost1']))
                 rv = oldCacheHostLookups(hosts)
-                self.failUnlessEqual(ipcache._cache._map.keys(), [ 'localhost' ] )
+                self.assertEqual(ipcache._cache._map.keys(), [ 'localhost' ] )
                 return rv
             self.mock(netclient.NetworkRepositoryClient, 
                       '_cacheHostLookups', checkCacheHostLookups)
@@ -1214,7 +1214,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
                 print "  got:", csf
                 print "  expected: ", expected
                 failed = True
-            #self.failUnlessEqual(csf, expected)
+            #self.assertEqual(csf, expected)
         if failed:
             self.fail("Fingerprints do not match")
 

@@ -66,7 +66,7 @@ class DepTest(rephelp.RepositoryHelper):
                                        "libhello:user", version,
                                        tagScript = '/dev/null')
 
-        self.failUnlessEqual(str,
+        self.assertEqual(str,
                  "1 additional trove is needed:\n"
                  "    libhello:runtime=/localhost@rpl:linux/0-1-1[%(is)s]"
                  " is required by:\n"
@@ -658,25 +658,25 @@ The following dependencies would not be met after this update:
         # test a match
         dep = deps.parseDep('trove:test:runtime')
         sugg = repos.resolveDependenciesByGroups([grp1], [ dep ])
-        self.failUnlessEqual(sugg[dep], [[test1r.getNameVersionFlavor()]])
+        self.assertEqual(sugg[dep], [[test1r.getNameVersionFlavor()]])
         sugg = repos.resolveDependenciesByGroups([grp2], [ dep ])
-        self.failUnlessEqual(sugg[dep], [[test2r.getNameVersionFlavor()]])
+        self.assertEqual(sugg[dep], [[test2r.getNameVersionFlavor()]])
         
         # test misses
         dep = deps.parseDep('trove:foo:runtime')
         sugg = repos.resolveDependenciesByGroups([grp1], [ dep ])
-        self.failUnlessEqual(sugg[dep], [ [] ])
+        self.assertEqual(sugg[dep], [ [] ])
         dep = deps.parseDep('trove:foo:runtime trove:bar:runtime')
         sugg = repos.resolveDependenciesByGroups([grp1], [ dep ])
-        self.failUnlessEqual(sugg[dep], [ [], [] ])
+        self.assertEqual(sugg[dep], [ [], [] ])
 
         # test hits and misses
         dep = deps.parseDep('trove:foo:runtime trove:test:runtime')
         sugg = repos.resolveDependenciesByGroups([grp1], [ dep ])
-        self.failUnlessEqual(sugg[dep], [ [], [test1r.getNameVersionFlavor()] ])
+        self.assertEqual(sugg[dep], [ [], [test1r.getNameVersionFlavor()] ])
         dep = deps.parseDep('trove:foo:runtime trove:test:runtime trove:bar:runtime')
         sugg = repos.resolveDependenciesByGroups([grp2], [ dep ])
-        self.failUnlessEqual(sugg[dep], [ [], [], [test2r.getNameVersionFlavor()] ])
+        self.assertEqual(sugg[dep], [ [], [], [test2r.getNameVersionFlavor()] ])
 
         # test a more complex case
         dep1 = deps.parseDep('trove:test:runtime')
@@ -684,9 +684,9 @@ The following dependencies would not be met after this update:
         dep3 = deps.parseDep('trove:foo:runtime trove:test:runtime')
         sugg = repos.resolveDependenciesByGroups([grp1, grp2], [ dep1, dep2, dep3 ])
         # tehse should return the latest deps from grp2
-        self.failUnlessEqual(sugg[dep1], [[test2r.getNameVersionFlavor()]])
-        self.failUnlessEqual(sugg[dep2], [ [] ])
-        self.failUnlessEqual(sugg[dep3], [ [], [test2r.getNameVersionFlavor()] ])
+        self.assertEqual(sugg[dep1], [[test2r.getNameVersionFlavor()]])
+        self.assertEqual(sugg[dep2], [ [] ])
+        self.assertEqual(sugg[dep3], [ [], [test2r.getNameVersionFlavor()] ])
     def testDepResolutionResultFormat2(self):
         #CNY-2254
         self.addComponent('foo:python', '1', provides='python: foo(2.4)')
@@ -724,7 +724,7 @@ The following dependencies would not be met after this update:
         sugg = repos.resolveDependenciesByGroups([trv],
                                       [deps.parseDep('trove:foo:runtime trove:bar:runtime')])
         resultList,  = sugg.values()
-        self.failUnlessEqual(resultList, [[], []])
+        self.assertEqual(resultList, [[], []])
 
     def testResolveAgainstTipFirst(self):
         self.addComponent('foo:run', '1', filePrimer=0,

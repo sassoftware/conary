@@ -169,22 +169,22 @@ class VersionsTest(unittest.TestCase):
         # CNY-2020
         v1 = VersionSequence([Label('foo@bar:baz')])
         v2 = VersionSequence([Label('foo@bar:beep')])
-        self.failUnlessEqual(v1, v1)
-        self.failUnless(cmp(v1, v2) in [-1, 1])
-        self.failUnless(cmp(v2, v1) in [-1, 1])
-        self.failUnlessEqual(cmp(v1, v2) + cmp(v2, v1), 0)
+        self.assertEqual(v1, v1)
+        self.assertTrue(cmp(v1, v2) in [-1, 1])
+        self.assertTrue(cmp(v2, v1) in [-1, 1])
+        self.assertEqual(cmp(v1, v2) + cmp(v2, v1), 0)
 
         # This should work, even if we return NotImplemented
         v3 = VersionSequence([Revision('1-1-1')])
-        self.failUnless(cmp(v1, v3) in [-1, 1])
-        self.failUnless(cmp(v3, v1) in [-1, 1])
-        self.failUnlessEqual(cmp(v1, v3) + cmp(v3, v1), 0)
+        self.assertTrue(cmp(v1, v3) in [-1, 1])
+        self.assertTrue(cmp(v3, v1) in [-1, 1])
+        self.assertEqual(cmp(v1, v3) + cmp(v3, v1), 0)
 
         # Compare with a random string, and make sure it's stable too
         v3 = 'abc'
-        self.failUnless(cmp(v1, v3) in [-1, 1])
-        self.failUnless(cmp(v3, v1) in [-1, 1])
-        self.failUnlessEqual(cmp(v1, v3) + cmp(v3, v1), 0)
+        self.assertTrue(cmp(v1, v3) in [-1, 1])
+        self.assertTrue(cmp(v3, v1) in [-1, 1])
+        self.assertEqual(cmp(v1, v3) + cmp(v3, v1), 0)
 
     def testLocalLabel(self):
         l = LocalLabel()
@@ -649,7 +649,7 @@ class VersionsTest(unittest.TestCase):
     def testVersionFromStringOnRollbackLabel(self):
         v = '/localhost@rpl:linux//local@local:ROLLBACK/2-1-1'
         v = VersionFromString(v)
-        self.failUnless(v.onRollbackLabel())
+        self.assertTrue(v.onRollbackLabel())
 
     def testUnmodifiedShadowParent(self):
         '''
@@ -660,18 +660,18 @@ class VersionsTest(unittest.TestCase):
         # Shadow of an unmodified shadow
         x = VersionFromString(
             '/c.r.com@rpl:devel//1//p.r.com@rpath:widgets/yarr-1.0.2')
-        self.failUnless(x.hasParentVersion())
-        self.failUnlessEqual(x.parentVersion(), VersionFromString(
+        self.assertTrue(x.hasParentVersion())
+        self.assertEqual(x.parentVersion(), VersionFromString(
             '/c.r.com@rpl:devel//1/yarr-1'))
 
         # Shadow of a shadow that changed upstream version
         y = VersionFromString(
             '/c.r.com@rpl:devel//1//p.r.com@rpath:widgets/yarr-0.1.2')
-        self.failUnless(y.hasParentVersion())
-        self.failUnlessEqual(y.parentVersion(), VersionFromString(
+        self.assertTrue(y.hasParentVersion())
+        self.assertEqual(y.parentVersion(), VersionFromString(
             '/c.r.com@rpl:devel//1/yarr-0.1'))
 
         # Shadow that changed upstream version (no parent)
         z = VersionFromString(
             '/c.r.com@rpl:devel//1//p.r.com@rpath:widgets/yarr-0.0.1')
-        self.failIf(z.hasParentVersion())
+        self.assertFalse(z.hasParentVersion())

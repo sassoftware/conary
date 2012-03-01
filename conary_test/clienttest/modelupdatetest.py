@@ -519,10 +519,9 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
                     '        r.addRedirect("redirect","localhost@rpl:linux")' ])
         built, d = self.buildRecipe(redirectRecipe, "testRedirect")
 
-        self.assertRaises(conaryclient.UpdateError,
-                          self._applyModel, [ 'install redirect=2.0' ],
-              exceptionString = 'Redirect loop found which includes troves '
-                                'redirect, foo')
+        self.assertRaisesRegexp(conaryclient.UpdateError,
+                '^Redirect loop found which includes troves redirect, foo$',
+                self._applyModel, [ 'install redirect=2.0' ])
 
     @testhelp.context('sysmodel')
     def testReferences(self):

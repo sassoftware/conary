@@ -66,4 +66,4 @@ class ClientCmdlineTest(rephelp.RepositoryHelper):
         for (specStr, allowEmptyName, withFrozenFlavor), exp in tests:
             ret = cmdline.parseTroveSpec(specStr, allowEmptyName =
                 allowEmptyName, withFrozenFlavor = withFrozenFlavor)
-            self.failUnlessEqual(ret, exp)
+            self.assertEqual(ret, exp)

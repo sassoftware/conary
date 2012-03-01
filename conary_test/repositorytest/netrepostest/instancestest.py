@@ -45,19 +45,19 @@ class InstancesTest(dbstoretest.DBStoreTestBase):
 
         idb = instances.InstanceTable(cx)
         idb.addId(item, version, flavor, clonedFromId = None, troveType = 0)
-        self.failUnlessEqual(idb[(item, version, flavor)], 1)
-        self.failUnlessEqual(idb.getId(1), (item, version, flavor, 1) )
+        self.assertEqual(idb[(item, version, flavor)], 1)
+        self.assertEqual(idb.getId(1), (item, version, flavor, 1) )
         del idb
 
         idb = instances.InstanceTable(cx)
-        self.failUnlessEqual(idb[(item, version, flavor)], 1)
+        self.assertEqual(idb[(item, version, flavor)], 1)
         cu = cx.cursor()
         cu.execute("select isPresent, clonedFromId from instances where instanceid = 1")
         row = cu.fetchall()[0]
-        self.failUnlessEqual(row[0], 1)
-        self.failUnlessEqual(row[1], None)
+        self.assertEqual(row[0], 1)
+        self.assertEqual(row[1], None)
         idb.update(1, isPresent = 0, clonedFromId = 1)
         cu.execute("select isPresent, clonedFromId from instances where instanceid = 1")
         row = cu.fetchall()[0]
-        self.failUnlessEqual(row[0], 0)
-        self.failUnlessEqual(row[1], 1)
+        self.assertEqual(row[0], 0)
+        self.assertEqual(row[1], 1)

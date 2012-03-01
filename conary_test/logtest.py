@@ -101,10 +101,10 @@ class LogTest(testhelp.TestCase):
 
             expected = ' '.join(["version %s:" % log.constants.version,
                 sys.argv[1], sys.argv[2]])
-            self.failUnlessEqual(line, expected)
+            self.assertEqual(line, expected)
         finally:
             sys.argv = oldArgv
             os.unlink(tempf)
 
         # Make sure syslog has closed the file
-        self.failUnlessEqual(syslog.f, None)
+        self.assertEqual(syslog.f, None)

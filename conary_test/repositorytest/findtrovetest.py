@@ -613,7 +613,7 @@ class FindTroveTest(rephelp.RepositoryHelper):
         t2 = self.addComponent('foo:run', '1', 'is:x86 x86_64')
         repos = self.openRepository()
         results = repos.findTrove(self.cfg.buildLabel, ('foo:run', None, deps.parseFlavor('is:x86 target:x86_64')))
-        self.failUnlessEqual(results[0], t1.getNameVersionFlavor())
+        self.assertEqual(results[0], t1.getNameVersionFlavor())
 
     def testFindTrovesWithFlavorPreferences(self):
         Flavor = deps.parseFlavor
@@ -755,17 +755,17 @@ class FindTroveTest(rephelp.RepositoryHelper):
         trv1 = self.addComponent('foo:run', "1")
         ret = repos.findTrove(self.cfg.installLabelPath, ('foo:run', None, None),
                               troveTypes=repos.TROVE_QUERY_NORMAL)
-        self.failUnlessEqual(trv1.getNameVersionFlavor(), ret[0])
+        self.assertEqual(trv1.getNameVersionFlavor(), ret[0])
         
         trv2 = self.addComponent('foo:run', "2")
         ret = repos.findTrove(self.cfg.installLabelPath, ('foo:run', None, None),
                               troveTypes=repos.TROVE_QUERY_NORMAL)
-        self.failUnlessEqual(trv2.getNameVersionFlavor(), ret[0])
+        self.assertEqual(trv2.getNameVersionFlavor(), ret[0])
         
         trv3 = self.addComponent('foo:run', "0", redirect=['bar:run'])
         ret = repos.findTrove(self.cfg.installLabelPath, ('foo:run', None, None),
                               troveTypes=repos.TROVE_QUERY_PRESENT)
-        self.failUnlessEqual(trv3.getNameVersionFlavor(), ret[0])
+        self.assertEqual(trv3.getNameVersionFlavor(), ret[0])
         self.assertRaises(errors.TroveNotFound, repos.findTrove,
                           self.cfg.installLabelPath, ('foo:run', None, None),
                           troveTypes=repos.TROVE_QUERY_NORMAL)
@@ -779,7 +779,7 @@ class FindTroveTest(rephelp.RepositoryHelper):
         db.commit()
         ret = repos.findTrove(self.cfg.installLabelPath, ('foo:run', None, None),
                               troveTypes=repos.TROVE_QUERY_PRESENT)
-        self.failUnlessEqual(trv3.getNameVersionFlavor(), ret[0])
+        self.assertEqual(trv3.getNameVersionFlavor(), ret[0])
         self.assertRaises(errors.TroveNotFound, repos.findTrove,
                           self.cfg.installLabelPath, ('foo:run', None, None),
                           troveTypes=repos.TROVE_QUERY_NORMAL)

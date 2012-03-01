@@ -68,11 +68,11 @@ class WebFieldsTest(rephelp.RepositoryHelper):
         self.assertEqual(self.decoratedFuncInt(thing1 = 100, thing2 = 50, thing3 = 25), 175)
         
         # test for exception if a non-integer is passed in
-        self.failUnlessRaises(BadParameterError, self.decoratedFuncInt,
+        self.assertRaises(BadParameterError, self.decoratedFuncInt,
                 thing1 = 'fofdjk', thing2 = 2, thing3 = 3)
 
         # test for exception if an expected parameter is missing
-        self.failUnlessRaises(MissingParameterError, self.decoratedFuncInt,
+        self.assertRaises(MissingParameterError, self.decoratedFuncInt,
                 thing1 = 3, thing2 = 1)
 
     def testBoolFields(self):
@@ -87,11 +87,11 @@ class WebFieldsTest(rephelp.RepositoryHelper):
         self.assertEqual(self.decoratedFuncBool(alpha = 20, beta = 1, gamma = 1), 200)
 
         # test for exception if a non-integer is passed in
-        self.failUnlessRaises(BadParameterError, self.decoratedFuncBool,
+        self.assertRaises(BadParameterError, self.decoratedFuncBool,
                 beta = 'f', gamma = 1)
 
         # test for exception if an expected parameter is missing
-        self.failUnlessRaises(MissingParameterError, self.decoratedFuncBool)
+        self.assertRaises(MissingParameterError, self.decoratedFuncBool)
 
     def testStrFields(self):
 
@@ -103,7 +103,7 @@ class WebFieldsTest(rephelp.RepositoryHelper):
         self.assertEqual(self.decoratedFuncStr(back = '', forth = 'da'), "da")
 
         # test missing parameter
-        self.failUnlessRaises(MissingParameterError, self.decoratedFuncStr,
+        self.assertRaises(MissingParameterError, self.decoratedFuncStr,
                 forth = 'da')
 
     def testListStrFields(self):
@@ -114,7 +114,7 @@ class WebFieldsTest(rephelp.RepositoryHelper):
         self.assertEqual(self.decoratedFuncListStr(shoppingList = [ 'milk' ], thingsToTake = []), False)
 
         # test missing parameter
-        self.failUnlessRaises(MissingParameterError, self.decoratedFuncListStr,
+        self.assertRaises(MissingParameterError, self.decoratedFuncListStr,
                 shoppingList = [ 'beer' ])
 
 

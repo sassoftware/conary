@@ -318,5 +318,5 @@ class DepTableTestWithHelper(rephelp.RepositoryHelper):
                                   provides=ds,
                                   requires=ds)
         bam2 = db.getTrove(bam.name(), bam.version(), bam.flavor())
-        self.failUnlessEqual(bam.requires.freeze(), bam2.requires.freeze())
-        self.failUnlessEqual(bam.provides.freeze(), bam2.provides.freeze())
+        self.assertEqual(bam.requires.freeze(), bam2.requires.freeze())
+        self.assertEqual(bam.provides.freeze(), bam2.provides.freeze())

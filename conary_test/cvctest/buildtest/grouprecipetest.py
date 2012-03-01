@@ -50,7 +50,7 @@ class GroupRecipeTest(rephelp.RepositoryHelper):
         recipeClass = self._loadRecipe()
         dummy = recipeClass(None, self.cfg, None, None, None,
             lightInstance=True)
-        self.failUnlessEqual(dummy.macros.dummyMacro, 'right')
+        self.assertEqual(dummy.macros.dummyMacro, 'right')
 
     def testBasicMacros(self):
         recipeClass = self._loadRecipe()
@@ -62,10 +62,10 @@ class GroupRecipeTest(rephelp.RepositoryHelper):
 
         recipeObj = recipeClass(None, self.cfg, None, None, None,
             extraMacros={'thing': 'wrong'}, lightInstance=True)
-        self.failUnlessEqual(recipeObj.macros.name, 'group-test')
-        self.failUnlessEqual(recipeObj.macros.version, '1.0')
-        self.failUnlessEqual(recipeObj.macros.bindir, '/binaries')
-        self.failUnlessEqual(recipeObj.macros.thing, 'value')
+        self.assertEqual(recipeObj.macros.name, 'group-test')
+        self.assertEqual(recipeObj.macros.version, '1.0')
+        self.assertEqual(recipeObj.macros.bindir, '/binaries')
+        self.assertEqual(recipeObj.macros.thing, 'value')
 
     def testGroupFlags(self):
         recipeClass = self._loadRecipe(recipe=recipes.testGroup3)
@@ -73,9 +73,9 @@ class GroupRecipeTest(rephelp.RepositoryHelper):
             lightInstance=True)
         recipeObj.setup()
 
-        self.failUnlessEqual(True,
+        self.assertEqual(True,
             recipeObj.groups['group-test'].checkPathConflicts)
-        self.failUnlessEqual(False,
+        self.assertEqual(False,
             recipeObj.groups['group-test2'].checkPathConflicts)
-        self.failUnlessEqual(True,
+        self.assertEqual(True,
             recipeObj.groups['group-test3'].checkPathConflicts)

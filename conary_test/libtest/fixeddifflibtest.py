@@ -7469,7 +7469,7 @@ diff.next()
         cmd = ["/usr/bin/python", script]
         devnull = open(os.devnull, "w")
         retcode = subprocess.call(cmd, env=env, stderr=devnull)
-        self.failUnlessEqual(retcode, 1)
+        self.assertEqual(retcode, 1)
 
         # Now text fixeddifflib
         f = open(script, "w+")
@@ -7483,7 +7483,7 @@ diff.next()
 """)
         f.close()
         retcode = subprocess.call(cmd, env=env, stderr=devnull)
-        self.failUnlessEqual(retcode, 0)
+        self.assertEqual(retcode, 0)
 
     def testSequenceMatcher(self):
-        self.failUnless(hasattr(fixeddifflib, 'SequenceMatcher'))
+        self.assertTrue(hasattr(fixeddifflib, 'SequenceMatcher'))

@@ -107,53 +107,53 @@ class ExplainTest(rephelp.RepositoryHelper):
         rc, output = self.captureOutput(explain._formatDoc, 'NoDocs', NoDocs)
         expected = ('Conary API Documentation: \x1b[1mNoDocs.NoDocs\x1b[21m\n'
                     'No documentation available.')
-        self.failUnlessEqual(output, expected)
+        self.assertEqual(output, expected)
         os.environ['PAGER'] = 'more'
         rc, output = self.captureOutput(explain._formatDoc, 'NoDocs', NoDocs)
         expected = ('Conary API Documentation: NoDocs.NoDocs\n'
                     'No documentation available.')
         os.environ['PAGER'] = oldPager
-        self.failUnlessEqual(output, expected)
+        self.assertEqual(output, expected)
 
     def testExplainRecipe(self):
         def mockFormatDoc(className, obj):
-            self.failIf(not 'r.Move' in obj.__doc__)
+            self.assertFalse(not 'r.Move' in obj.__doc__)
             self.assertEquals(obj.__module__, 'conary.build.build')
         self.mock(explain, '_formatDoc', mockFormatDoc)
         explain.docObject(self.cfg, 'Move')
 
     def testCvcExplainSource(self):
         def mockFormatDoc(className, obj):
-            self.failIf(not 'r.addSource' in obj.__doc__)
+            self.assertFalse(not 'r.addSource' in obj.__doc__)
             self.assertEquals(obj.__module__, 'conary.build.source')
         self.mock(explain, '_formatDoc', mockFormatDoc)
         res = self.captureOutput(explain.docObject, self.cfg, 'addSource')
-        self.failIf('Ambiguous recipe method "addSource"' in res[1])
+        self.assertFalse('Ambiguous recipe method "addSource"' in res[1])
 
     def testCvcExplainPolicy(self):
         def mockFormatDoc(className, obj):
-            self.failIf(not 'r.Config' in obj.__doc__)
+            self.assertFalse(not 'r.Config' in obj.__doc__)
             self.assertEquals(obj.__module__, 'conary.build.packagepolicy')
         self.mock(explain, '_formatDoc', mockFormatDoc)
         explain.docObject(self.cfg, 'Config')
 
     def testCvcExplainGroup(self):
         def mockFormatDoc(className, obj):
-            self.failIf(not 'r.addCopy' in obj.__doc__)
+            self.assertFalse(not 'r.addCopy' in obj.__doc__)
             self.assertEquals(obj.__module__, 'conary.build.grouprecipe')
         self.mock(explain, '_formatDoc', mockFormatDoc)
         explain.docObject(self.cfg, 'addCopy')
 
     def testCvcExplainGroupPolicy(self):
         def mockFormatDoc(className, obj):
-            self.failIf(not 'r.VersionConflicts' in obj.__doc__)
+            self.assertFalse(not 'r.VersionConflicts' in obj.__doc__)
             self.assertEquals(obj.__module__, 'group_versionconflicts')
         self.mock(explain, '_formatDoc', mockFormatDoc)
         explain.docObject(self.cfg, 'VersionConflicts')
 
     def testCvcExplainInfo(self):
         def mockFormatDoc(className, obj):
-            self.failIf(not 'r.User' in obj.__doc__)
+            self.assertFalse(not 'r.User' in obj.__doc__)
             self.assertEquals(obj.__module__, 'conary.build.build')
         self.mock(explain, '_formatDoc', mockFormatDoc)
         explain.docObject(self.cfg, 'UserInfoRecipe.User')
@@ -161,12 +161,12 @@ class ExplainTest(rephelp.RepositoryHelper):
     def testCvcExplainFailure(self):
         #rc, txt = self.captureOutput(explain.docObject, self.cfg,
                                      #'AClassNotImplemented')
-        #self.failUnlessEqual(txt,
+        #self.assertEqual(txt,
                 #'Unknown recipe method "AClassNotImplemented"\n')
 
         rc, txt = self.captureOutput(explain.docObject, self.cfg,
                                      'Requires')
-        self.failUnlessEqual(txt,
+        self.assertEqual(txt,
                      'Ambiguous recipe method "Requires" is defined by the '
                      'following classes:\n'
                      '    GroupRecipe, PackageRecipe\n'
@@ -175,40 +175,40 @@ class ExplainTest(rephelp.RepositoryHelper):
 
         rc, txt = self.captureOutput(explain.docObject, self.cfg,
                                      'User.foo.bar')
-        self.failUnlessEqual(txt,
+        self.assertEqual(txt,
                              'Too may "." specified in "User.foo.bar"\n')
 
     def testExplainAll(self):
         def mockPageDoc(className, obj):
             self.assertEquals('All Classes', className)
-            self.failIf('Available Classes' not in obj)
+            self.assertFalse('Available Classes' not in obj)
         self.mock(explain, '_pageDoc', mockPageDoc)
         explain.docAll(self.cfg)
 
     def testExplainPkgRecipe(self):
         def mockPageDoc(className, obj):
             self.assertEquals('PackageRecipe', className)
-            self.failIf('PackageRecipe' not in obj)
+            self.assertFalse('PackageRecipe' not in obj)
         self.mock(explain, '_pageDoc', mockPageDoc)
         explain.docObject(self.cfg, 'PackageRecipe')
 
     def testExplainGroupRecipe(self):
         def mockPageDoc(className, obj):
             self.assertEquals('GroupRecipe', className)
-            self.failIf('GroupRecipe' not in obj)
+            self.assertFalse('GroupRecipe' not in obj)
         self.mock(explain, '_pageDoc', mockPageDoc)
         explain.docObject(self.cfg, 'GroupRecipe')
 
     def testExplainUserInfoRecipe(self):
         def mockPageDoc(className, obj):
             self.assertEquals('UserInfoRecipe', className)
-            self.failIf('Build Actions' not in obj)
+            self.assertFalse('Build Actions' not in obj)
         self.mock(explain, '_pageDoc', mockPageDoc)
         explain.docObject(self.cfg, 'UserInfoRecipe')
 
     def testExplainGroupInfoRecipe(self):
         def mockPageDoc(className, obj):
             self.assertEquals('GroupInfoRecipe', className)
-            self.failIf('Build Actions' not in obj)
+            self.assertFalse('Build Actions' not in obj)
         self.mock(explain, '_pageDoc', mockPageDoc)
         explain.docObject(self.cfg, 'GroupInfoRecipe')

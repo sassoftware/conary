@@ -295,7 +295,7 @@ class Foo(PackageRecipe):
                                preEraseScript = 'preerase',
                                postEraseScript = 'posterase',)
 
-            assertEq = self.failUnlessEqual
+            assertEq = self.assertEqual
 
             self.updatePkg(['group-foo', 'group-bar'])
             assertEq(len(runInfo), 4)
@@ -500,7 +500,7 @@ class Foo(PackageRecipe):
             try:
                 self.rollback(self.rootDir, 1)
             except database.RollbackDoesNotExist, e:
-                self.failUnlessEqual(str(e), 'rollback r.1 does not exist')
+                self.assertEqual(str(e), 'rollback r.1 does not exist')
                 self.logFilter.compare("error: rollback 'r.1' not present")
             else:
                 self.fail("Expected exception")
@@ -647,12 +647,12 @@ class Foo(PackageRecipe):
         self.mock(update, 'runTroveScript', runTroveScript)
 
         self.rollback(self.rootDir, 3)
-        self.failIf(runInfo)
+        self.assertFalse(runInfo)
 
         self.rollback(self.rootDir, 2)
-        self.failUnlessEqual([(x['scriptId'], x['script']) for x in runInfo],
+        self.assertEqual([(x['scriptId'], x['script']) for x in runInfo],
                              [('group-foo postrollback', 'postrollback')])
-        self.failUnlessEqual([(x['oldCompatClass'], x['newCompatClass'])
+        self.assertEqual([(x['oldCompatClass'], x['newCompatClass'])
                                 for x in runInfo],
                              [(1, 0)])
 
@@ -670,7 +670,7 @@ class Foo(PackageRecipe):
         # We should have the post-rollback script stored in the last rollback
         fpath = os.path.join(self.rootDir,
                              "var/lib/conarydb/rollbacks/3/post-scripts.meta")
-        self.failUnless(os.path.exists(fpath), fpath)
+        self.assertTrue(os.path.exists(fpath), fpath)
 
     @testhelp.context('trovescripts')
     def testGroupScriptsPostRollbackInstall(self):
@@ -693,7 +693,7 @@ class Foo(PackageRecipe):
         self.rollback(self.rootDir, 0)
 
         # XXX we should _not_ run the script to roll back an install
-        self.failUnlessEqual(len(runInfo), 0)
+        self.assertEqual(len(runInfo), 0)
 
 
     @testhelp.context('trovescripts')
@@ -865,45 +865,45 @@ class Foo(PackageRecipe):
         goodScript = "#!/bin/sh\ntouch %s/RAN; echo RAN" % self.workDir
         badScript = "#!/bin/sh\nexit 1"
         brokenScript = "#!/bin/doesnotexist\n"
-        self.failUnlessEqual(cb.started, False)
-        self.failUnlessEqual(cb.finished, False)
+        self.assertEqual(cb.started, False)
+        self.assertEqual(cb.finished, False)
         rc = update.runTroveScript(absJob, goodScript, None, self.cfg.tmpDir,
                                    '/', cb, isPre = False, scriptId = 'sn')
         self.verifyFile(self.workDir + '/RAN', '')
         os.unlink(self.workDir + '/RAN')
-        self.failUnlessEqual(cb.output, [('sn', 'RAN\n')])
-        self.failUnlessEqual(cb.errcode, None)
-        self.failUnlessEqual(cb.started, ('sn', True))
-        self.failUnlessEqual(cb.finished, ('sn', True))
+        self.assertEqual(cb.output, [('sn', 'RAN\n')])
+        self.assertEqual(cb.errcode, None)
+        self.assertEqual(cb.started, ('sn', True))
+        self.assertEqual(cb.finished, ('sn', True))
         scriptOut = [ x.strip()[23:] for x in file(conaryLog).readlines() ]
-        self.failUnlessEqual(scriptOut, ['running script sn',
+        self.assertEqual(scriptOut, ['running script sn',
             '[sn] RAN', 'script sn finished'])
         file(conaryLog, 'w') # truncate
         assert(rc == 0)
         cb.reset()
 
         # Make sure we did reset the callback
-        self.failUnlessEqual(cb.started, False)
-        self.failUnlessEqual(cb.finished, False)
+        self.assertEqual(cb.started, False)
+        self.assertEqual(cb.finished, False)
 
         rc = update.runTroveScript(absJob, badScript, None, self.cfg.tmpDir,
                                    '/', cb, isPre = False, scriptId = 'sn2')
         assert(rc == 1)
-        self.failUnlessEqual(cb.errcode, ('sn2', 1))
-        self.failUnlessEqual(cb.started, ('sn2', True))
+        self.assertEqual(cb.errcode, ('sn2', 1))
+        self.assertEqual(cb.started, ('sn2', True))
         scriptOut = [ x.strip()[23:] for x in file(conaryLog).readlines() ]
-        self.failUnlessEqual(scriptOut, ['running script sn2',
+        self.assertEqual(scriptOut, ['running script sn2',
             'script sn2 failed with exit code 1'])
         file(conaryLog, 'w') # truncate
         # Finished script should not have been executed here,
-        self.failUnlessEqual(cb.finished, False)
+        self.assertEqual(cb.finished, False)
         cb.reset()
 
         rc = update.runTroveScript(absJob, brokenScript, None, self.cfg.tmpDir,
                                    '/', cb, isPre = False, scriptId = 'sn2')
-        self.failUnlessEqual(cb.errcode, ('sn2', 1))
+        self.assertEqual(cb.errcode, ('sn2', 1))
         scriptOut = [ x.strip()[23:] for x in file(conaryLog).readlines() ]
-        self.failUnlessEqual(scriptOut, ['running script sn2',
+        self.assertEqual(scriptOut, ['running script sn2',
             '[sn2] [Errno 2] No such file or directory',
             'script sn2 failed with exit code 1'])
         file(conaryLog, 'w') # truncate
@@ -929,12 +929,12 @@ class Foo(PackageRecipe):
                                        self.cfg.tmpDir, self.rootDir, cb,
                                        isPre = False, scriptId = 'sn')
             assert(rc == 0)
-            self.failUnlessEqual(cb.output,
+            self.assertEqual(cb.output,
                 [ ('sn', 'ROOT=%s\n' % self.rootDir), ('sn', 'GOOD\n') ])
             assert(cb.errcode is None)
             cb.reset()
             scriptOut = [ x.strip()[23:] for x in file(conaryLog).readlines() ]
-            self.failUnlessEqual(scriptOut, ['running script sn',
+            self.assertEqual(scriptOut, ['running script sn',
                 '[sn] ROOT=%s' %self.rootDir,
                 '[sn] GOOD',
                 'script sn finished'])
@@ -945,10 +945,10 @@ class Foo(PackageRecipe):
                                        self.cfg.tmpDir, rootDir, cb,
                                        isPre = False, scriptId = 'sn2')
             assert(rc == 0)
-            self.failUnlessEqual(cb.output,
+            self.assertEqual(cb.output,
                 [ ('sn2', 'ROOT=%s\n' % rootDir), ('sn2', 'GOOD\n') ])
             scriptOut = [ x.strip()[23:] for x in file(conaryLog).readlines() ]
-            self.failUnlessEqual(scriptOut, ['running script sn2',
+            self.assertEqual(scriptOut, ['running script sn2',
                 '[sn2] ROOT=%s/' %self.rootDir,
                 '[sn2] GOOD',
                 'script sn2 finished'])
@@ -963,7 +963,7 @@ class Foo(PackageRecipe):
             assert(rc == 1)
             assert(cb.errcode == ('sn3', 1))
             scriptOut = [ x.strip()[23:] for x in file(conaryLog).readlines() ]
-            self.failUnlessEqual(scriptOut, ['running script sn3',
+            self.assertEqual(scriptOut, ['running script sn3',
                 'script sn3 failed with exit code 1'])
             file(conaryLog, 'w') # truncate
         finally:
@@ -1002,7 +1002,7 @@ class Foo(PackageRecipe):
         for bucket in ['preinstall', 'postinstall']:
             trvNames = [ x['job'][0] for x in runInfo
                          if x['scriptId'].endswith(bucket) ]
-            self.failUnlessEqual(trvNames, ['foo', 'bar'])
+            self.assertEqual(trvNames, ['foo', 'bar'])
 
         self.addComponent('foo:runtime', '2', fileContents =
                           [("/usr/share/foo", "contents foo 2", None,
@@ -1028,9 +1028,9 @@ class Foo(PackageRecipe):
             trvNames = [ x['job'][0] for x in runInfo
                          if x['scriptId'].endswith(bucket) ]
             if bucket in ['preerase', 'posterase']:
-                self.failUnlessEqual(trvNames, [])
+                self.assertEqual(trvNames, [])
             else:
-                self.failUnlessEqual(trvNames, ['foo', 'bar'])
+                self.assertEqual(trvNames, ['foo', 'bar'])
 
         raise testhelp.SkipTestException("Erasure script ordering not working yet")
 
@@ -1039,7 +1039,7 @@ class Foo(PackageRecipe):
         for bucket in ['preerase', 'posterase']:
             trvNames = [ x['job'][0] for x in runInfo
                          if x['scriptId'].endswith(bucket) ]
-            self.failUnlessEqual(trvNames, ['foo', 'bar'])
+            self.assertEqual(trvNames, ['foo', 'bar'])
 
 
     def testTagScriptRelativePath(self):
@@ -1054,7 +1054,7 @@ class Foo(PackageRecipe):
             isPre = False)
         lines = file(tagScript).readlines()
         for line in lines:
-            self.failIf(self.rootDir in line, "%s in %s" % (self.rootDir,
+            self.assertFalse(self.rootDir in line, "%s in %s" % (self.rootDir,
                 repr(line)))
 
     def testLinksWithSharedShas(self):
@@ -1160,7 +1160,7 @@ class Test(CapsuleRecipe):
         finally:
             os.chdir(origDir)
             self.unmock()
-        self.failUnlessEqual(self.callCount, 0)
+        self.assertEqual(self.callCount, 0)
 
     def testSignals(self):
         # make sure signals (SIGTERM here) doesn't interrupt w/o cleaning
@@ -1235,7 +1235,7 @@ class Test(CapsuleRecipe):
 
         self.updatePkg('foo:runtime')
         # Make sure we didn't leave temp files around
-        self.failUnlessEqual(sorted(os.listdir(self.rootDir)),
+        self.assertEqual(sorted(os.listdir(self.rootDir)),
             ['1', 'var'])
 
     def testUpdateDoesNotWriteToExistingFiles(self):
@@ -1352,7 +1352,7 @@ implements files remove
             "/foobar files update /etc/testfirst.2",
             "/foobar files remove /etc/testsecond.1",
         ]
-        self.failUnlessEqual([ x.rstrip() for x in file(tagResultFile) ],
+        self.assertEqual([ x.rstrip() for x in file(tagResultFile) ],
             expected)
 
     def testSingleLeadingSlashArgs(self):
@@ -1426,7 +1426,7 @@ implements files remove
         from conary import files
         origFileFromFilesystem = files.FileFromFilesystem
         def FakeFileFromFilesystem(path, *args, **kwargs):
-            self.failIf(path.startswith('//'), path)
+            self.assertFalse(path.startswith('//'), path)
             return origFileFromFilesystem(self.rootDir + path, *args, **kwargs)
         self.mock(files, 'FileFromFilesystem', FakeFileFromFilesystem)
 
@@ -1447,17 +1447,17 @@ implements files remove
             "/foobar files update /etc/testfirst.1 /etc/testfirst.2",
             "/foobar files remove /etc/testsecond.1",
         ]
-        self.failUnlessEqual([ x.rstrip() for x in file(tagResultFile) ],
+        self.assertEqual([ x.rstrip() for x in file(tagResultFile) ],
             expected)
 
         for fileNames in fsJob.tagUpdates.values():
             for fileName in fileNames:
-                self.failIf(fileName.startswith("//"), fileName)
+                self.assertFalse(fileName.startswith("//"), fileName)
         for fileNames in fsJob.tagRemoves.values():
             for fileName in fileNames:
-                self.failIf(fileName.startswith("//"), fileName)
+                self.assertFalse(fileName.startswith("//"), fileName)
         for fileName in fsJob.restores:
-            self.failIf(fileName.startswith("//"), fileName)
+            self.assertFalse(fileName.startswith("//"), fileName)
 
     def _testTroveScriptExecutionOrderInit(self, prefix=''):
         # CNY-2705
@@ -1507,7 +1507,7 @@ implements files remove
 
         del runInfo[:]
         self.updatePkg(['group-bar', 'group-foo'])
-        self.failUnlessEqual([ x['scriptId'] for x in runInfo ],
+        self.assertEqual([ x['scriptId'] for x in runInfo ],
             ['group-bar preinstall',
             ('jobs', [('bar:runtime', (None, None),
                 ('/localhost@rpl:linux/1-1-1', ''), False)]),
@@ -1530,7 +1530,7 @@ implements files remove
 
         del runInfo[:]
         self.updatePkg(['group-bar', 'group-foo'])
-        self.failUnlessEqual([ x['scriptId'] for x in runInfo ],
+        self.assertEqual([ x['scriptId'] for x in runInfo ],
             ['group-bar preinstall',
             'group-foo preinstall',
             ('jobs', [('bar:runtime', (None, None),
@@ -1558,7 +1558,7 @@ implements files remove
         # We'd have to force the installation and execution of pre/post
         # scripts for foo _after_ installation of bar, which works fine for
         # groups
-        self.failUnlessEqual([ x['scriptId'] for x in runInfo ],
+        self.assertEqual([ x['scriptId'] for x in runInfo ],
             ['bar preinstall',
             'foo preinstall',
             ('jobs', [
@@ -1600,7 +1600,7 @@ implements files remove
             return orig_restore(*args, **kwargs)
         self.mock(update.FilesystemJob, '_restore', mockedRestore)
         self.updatePkg('foo:runtime=localhost@linux:2')
-        self.failIf(self._restoreFile)
+        self.assertFalse(self._restoreFile)
 
     def testPtrFileChangesContent(self):
         self.addComponent('foo:runtime', fileContents = [
@@ -1621,7 +1621,7 @@ implements files remove
         self.updatePkg('foo:runtime')
         # Make sure we didn't leave any junk around. Note that file3 is a
         # character device and did not get restored due to lack of permissions.
-        self.failUnlessEqual(sorted(os.listdir("%s/usr" % self.rootDir)),
+        self.assertEqual(sorted(os.listdir("%s/usr" % self.rootDir)),
             ['file1', 'file2'])
 
     def testVerifyCircularDependency(self):
@@ -1648,4 +1648,4 @@ implements files remove
                 DelCounter.counter += 1
         fsJob._counter = DelCounter()
         del fsJob
-        self.failUnlessEqual(DelCounter.counter, 1)
+        self.assertEqual(DelCounter.counter, 1)

@@ -117,8 +117,8 @@ class DBStoreCodeTest(unittest.TestCase):
         d = sqllib.CaselessDict({"TEST": "value0"})
         __testCD(d)
         d = sqllib.CaselessDict({"TEST0": "value0", "TEST1": "value1"})
-        self.failUnlessEqual(d["test0"], "value0")
-        self.failUnlessEqual(d["test1"], "value1")
+        self.assertEqual(d["test0"], "value0")
+        self.assertEqual(d["test1"], "value1")
         assert (d.has_key("test1"))
         del d["test1"]
         assert (not d.has_key("test1") )
@@ -352,8 +352,8 @@ class DBStoreTest(DBStoreTestBase):
         db.createTrigger("Testing", "changed", "UPDATE")
         db.commit()
         db.loadSchema()
-        self.failUnless("testing_insert" in db.triggers)
-        self.failUnless("testing_update" in db.triggers)
+        self.assertTrue("testing_insert" in db.triggers)
+        self.assertTrue("testing_update" in db.triggers)
 
         def __insert(val):
             cu = db.transaction()
@@ -383,13 +383,13 @@ class DBStoreTest(DBStoreTestBase):
         # test trigger re-creation
         db.dropTrigger("Testing", "insert")
         db.loadSchema()
-        self.failIf("testing_insert" in db.triggers)
+        self.assertFalse("testing_insert" in db.triggers)
         db.dropTrigger("Testing", "update")
         db.loadSchema()
-        self.failIf("testing_update" in db.triggers)
+        self.assertFalse("testing_update" in db.triggers)
         db.createTrigger("Testing", "changed", "UPDATE")
         db.loadSchema()
-        self.failUnless("testing_update" in db.triggers)
+        self.assertTrue("testing_update" in db.triggers)
 
     def testReturnValues(self):
         db = self.getDB()
@@ -430,9 +430,9 @@ class DBStoreTest(DBStoreTestBase):
         # Mysql is the weird one; it caches and preserves the
         # temporary tables as we use() from one to another and back
         if db1.driver == "mysql":
-            self.failUnlessEqual(db1.tempTables, {'Testing': True})
+            self.assertEqual(db1.tempTables, {'Testing': True})
         else:
-            self.failUnlessEqual(db1.tempTables, {})
+            self.assertEqual(db1.tempTables, {})
         
     def testPrecompiling(self):
         db = self.getDB()
@@ -469,7 +469,7 @@ class DBStoreSQLTest(DBStoreTestBase):
         cu.execute("insert into foo (id, name) values (?, 'four')", (4,))
         db.commit()
         cu.execute("select id, name from foo where id between ? and ?", (2,2))
-        self.failUnlessEqual(cu.fetchall(), [(2,"two")])
+        self.assertEqual(cu.fetchall(), [(2,"two")])
 
         # test handling of the :id syntax
         cu.execute("insert into foo (id, name) values (:id, :name)", id=10, name=":source")
@@ -478,23 +478,23 @@ class DBStoreSQLTest(DBStoreTestBase):
                    {"id":12, "name":":runtime", "junk":0})
         db.commit()
         cu.execute("select id from foo where name = :val", val = ":test")
-        self.failUnlessEqual(cu.fetchall(), [(11,)])
+        self.assertEqual(cu.fetchall(), [(11,)])
         cu.execute("select id from foo where name = ':source'")
-        self.failUnlessEqual(cu.fetchall(), [(10,)])
+        self.assertEqual(cu.fetchall(), [(10,)])
         cu.execute("""select id
         from foo where name like
         '%%:%%' and name like :like and
         id between :id1 and :id2 and
         id in (:id1,11,:id2) LIMIT :lim""", extra_var = "blah",
                    like = "%:test", id1 = 10, id2=12, lim=2)
-        self.failUnlessEqual(cu.fetchall(), [(11,)])
+        self.assertEqual(cu.fetchall(), [(11,)])
 
     def testTransaction(self):
         hdb = self.harness.getDB()
         db = hdb.connect()
         db2 = dbstore.connect(hdb.path, hdb.driver)
         db2.transaction()
-        self.failUnless(sqlerrors.DatabaseLocked, db.transaction)
+        self.assertTrue(sqlerrors.DatabaseLocked, db.transaction)
         db2.commit()
         db.transaction()
 
@@ -677,10 +677,10 @@ class DBStoreSchemaTest(DBStoreTestBase):
         db.bulkload("foo", itertools.izip(xrange(100,200), xrange(500,600)), ["id", "no"])
         cu.execute("select id, no from foo order by id")
         for x, y in itertools.izip (cu, itertools.izip(xrange(100,200), xrange(500,600))):
-            self.failUnlessEqual(x, y)
+            self.assertEqual(x, y)
         db.bulkload("foo", itertools.izip(xrange(200,300), xrange(500,600)), ["id", "no"])
         cu.execute("select count(*) from foo")
-        self.failUnlessEqual(cu.fetchone()[0], 200)
+        self.assertEqual(cu.fetchone()[0], 200)
 
         # test blobs with bulkload
         testData = []
@@ -697,16 +697,16 @@ class DBStoreSchemaTest(DBStoreTestBase):
         db.bulkload("bar", _iterBlobs(cu, testData, 100), ["id", "data"])
         cu.execute("select data from bar")
         for a,b in itertools.izip(cu, testData):
-            self.failUnlessEqual(cu.frombinary(a[0]), b)
+            self.assertEqual(cu.frombinary(a[0]), b)
         # test bulkload rollback-ability
         cu.execute("select count(*) from foo")
-        self.failUnlessEqual(cu.fetchone()[0], 200)
+        self.assertEqual(cu.fetchone()[0], 200)
         cu.execute("select count(*) from bar")
-        self.failUnlessEqual(cu.fetchone()[0], 100)
+        self.assertEqual(cu.fetchone()[0], 100)
         db.rollback()
         # bar should be all rolled back since we didn't have a commit or DDL since
         cu.execute("select count(*) from bar")
-        self.failUnlessEqual(cu.fetchone()[0], 0)
+        self.assertEqual(cu.fetchone()[0], 0)
         
     def testExecuteArgs(self):
         db = self.getDB()
@@ -751,7 +751,7 @@ class DBStoreSchemaTest(DBStoreTestBase):
             val INTEGER )""" % db.keywords)
         db.setAutoIncrement("foo", "id")
         cu.execute("insert into foo(name) values (?)", "first")
-        self.failUnlessEqual(cu.lastrowid, 1)
+        self.assertEqual(cu.lastrowid, 1)
         db.commit()
         if db.driver == "sqlite":
             # for some reason sqlite wants the database CLOSED and REOPEN
@@ -761,22 +761,22 @@ class DBStoreSchemaTest(DBStoreTestBase):
         cu = db.cursor()
         db.setAutoIncrement("foo", "id", 19)
         cu.execute("insert into foo(name) values (?)", "twenty")
-        self.failUnlessEqual(cu.lastrowid, 20)
+        self.assertEqual(cu.lastrowid, 20)
         cu.execute("select id from foo where name = ?", "twenty")
         ret = cu.fetchone()[0]
-        self.failUnlessEqual(ret, 20)
+        self.assertEqual(ret, 20)
         
         cu.execute("insert into foo(name) values (?)", "twentyone")
-        self.failUnlessEqual(cu.lastrowid, 21)
+        self.assertEqual(cu.lastrowid, 21)
         cu.execute("select id from foo where name = ?", "twentyone")
         ret = cu.fetchone()[0]
-        self.failUnlessEqual(ret, 21)
+        self.assertEqual(ret, 21)
 
         # test auto(re)setting
         db.setAutoIncrement("foo", "id", 10)
         db.setAutoIncrement("foo", "id")
         cu.execute("insert into foo(name) values(?)", "22")
-        self.failUnlessEqual(cu.lastrowid, 22)
+        self.assertEqual(cu.lastrowid, 22)
         
     def testIntegerStrings(self):
         "tests that the db backend does not convert strings to ints when least expected"
@@ -811,7 +811,7 @@ class DbShellTestCase(testhelp.TestCase):
                 self.fail("do__show still doesn't call loadSchema")
             raise
 
-        self.failUnlessEqual(output[1], '\n')
+        self.assertEqual(output[1], '\n')
 
         # Create some tables
         db.cu.execute("create table foo (id int, val int)")
@@ -819,13 +819,13 @@ class DbShellTestCase(testhelp.TestCase):
         db.db.commit()
 
         output = self.captureOutput(db.do__show, 'tables')
-        self.failUnlessEqual(output[1], 'bar\nfoo\n')
+        self.assertEqual(output[1], 'bar\nfoo\n')
 
         # Make sure it's persistent
         del db
         db = shell.DbShell(path=sqlitePath, driver='sqlite')
 
         output = self.captureOutput(db.do__show, 'tables')
-        self.failUnlessEqual(output[1], 'bar\nfoo\n')
+        self.assertEqual(output[1], 'bar\nfoo\n')
 
         os.unlink(sqlitePath)

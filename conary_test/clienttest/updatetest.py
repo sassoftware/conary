@@ -3395,7 +3395,7 @@ conary erase 'test:runtime=/localhost@rpl:linux/2.0-1-1[]'
             self.updatePkg([ 'foo:run', 'bar:run' ],
                        callback = FailureUpdateCallback('restoreFiles'))
         except Exception, e:
-            self.failUnlessEqual(e.args[0], 'restoreFiles')
+            self.assertEqual(e.args[0], 'restoreFiles')
         else:
             self.fail("Exception expected but not raised")
         self.logFilter.compare('error: a critical error occured -- '
@@ -3413,7 +3413,7 @@ conary erase 'test:runtime=/localhost@rpl:linux/2.0-1-1[]'
             self.updatePkg([ 'foo:run', 'bar:run' ],
                        callback = FailureUpdateCallback('downloadingChangeSet'))
         except Exception, e:
-            self.failUnlessEqual(e.args[0], 'downloadingChangeSet')
+            self.assertEqual(e.args[0], 'downloadingChangeSet')
         else:
             self.fail("Exception expected but not raised")
 
@@ -3437,7 +3437,7 @@ conary erase 'test:runtime=/localhost@rpl:linux/2.0-1-1[]'
             try:
                 self.updatePkg('bar:run', raiseError=True)
             except errors.ConaryError, e:
-                self.failUnlessEqual(str(e), "Database error: database is locked")
+                self.assertEqual(str(e), "Database error: database is locked")
             else:
                 self.fail("ConaryError not raised")
         finally:
@@ -3634,34 +3634,34 @@ conary erase 'test:runtime=/localhost@rpl:linux/2.0-1-1[]'
         file(vFilePath, "w").write("version 1001.1plus\n")
 
         updJob = database.UpdateJob(client.db)
-        self.failUnlessEqual(updJob.getPreviousVersion(), None)
+        self.assertEqual(updJob.getPreviousVersion(), None)
         update._loadRestartInfo(restartDir, updJob)
-        self.failUnlessEqual(updJob.getPreviousVersion(), "1001.1plus")
+        self.assertEqual(updJob.getPreviousVersion(), "1001.1plus")
 
         # Unreadable file
         os.chmod(vFilePath, 0)
         updJob = database.UpdateJob(client.db)
         update._loadRestartInfo(restartDir, updJob)
-        self.failUnlessEqual(updJob.getPreviousVersion(), None)
+        self.assertEqual(updJob.getPreviousVersion(), None)
 
         # Readable file, junk at the beginning
         os.chmod(vFilePath, 0644)
         file(vFilePath, "w").write("junk 1\nversion -1\n")
         updJob = database.UpdateJob(client.db)
         update._loadRestartInfo(restartDir, updJob)
-        self.failUnlessEqual(updJob.getPreviousVersion(), '-1')
+        self.assertEqual(updJob.getPreviousVersion(), '-1')
 
         # Just junk
         file(vFilePath, "w").write("junk 1")
         updJob = database.UpdateJob(client.db)
         update._loadRestartInfo(restartDir, updJob)
-        self.failUnlessEqual(updJob.getPreviousVersion(), None)
+        self.assertEqual(updJob.getPreviousVersion(), None)
 
         # Empty file
         file(vFilePath, "w").write("")
         updJob = database.UpdateJob(client.db)
         update._loadRestartInfo(restartDir, updJob)
-        self.failUnlessEqual(updJob.getPreviousVersion(), None)
+        self.assertEqual(updJob.getPreviousVersion(), None)
 
         util.rmtree(restartDir)
 
@@ -3694,7 +3694,7 @@ conary erase 'test:runtime=/localhost@rpl:linux/2.0-1-1[]'
         def _cvtJob(job):
             return (job[0], (versions.ThawVersion(job[1][0]), job[1][1]),
                 (versions.ThawVersion(job[2][0]), job[2][1]))
-        self.failUnlessEqual([ (sname, _cvtJob(job)) for (sname, job) in ret ],
+        self.assertEqual([ (sname, _cvtJob(job)) for (sname, job) in ret ],
             preScripts)
 
 # NOTE Don't put your tests here if there's some section they could go into

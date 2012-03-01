@@ -63,13 +63,13 @@ class TestCookWithWIMCapsule(CapsuleRecipe):
 
         ti = [ tcs.getTroveInfo() for tcs in cs.iterNewTroveList()
                if tcs.name() == 'Super-Foo:wim'][0]
-        self.failUnlessEqual(ti.capsule.wim.name(),
+        self.assertEqual(ti.capsule.wim.name(),
                              'Super Foo')
-        self.failUnlessEqual(ti.capsule.wim.version(),
+        self.assertEqual(ti.capsule.wim.version(),
                              '1.2.3.4')
-        self.failUnlessEqual(ti.capsule.wim.volumeIndex(),
+        self.assertEqual(ti.capsule.wim.volumeIndex(),
                              5)
-        self.failUnlessEqual(ti.capsule.wim.infoXml(),
+        self.assertEqual(ti.capsule.wim.infoXml(),
                              'some XML doc')
 
         self.assertEquals(pkgNames, [pkgName, pkgName +':wim'])

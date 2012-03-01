@@ -391,13 +391,13 @@ class User(UserInfoRecipe):
         if self.cfg.fullFlavors:
             expected = '[%(is)s]' % self.buildIs
         expectedMsg = [ x % {'flavor' : expected} for x in rollbackListOutput ]
-        self.failUnlessEqual(rblist, expectedMsg)
+        self.assertEqual(rblist, expectedMsg)
 
         self.logFilter.add()
         try:
             self.rollback(root1, 7)
         except database.RollbackDoesNotExist, e:
-            self.failUnlessEqual(str(e), "rollback r.7 does not exist")
+            self.assertEqual(str(e), "rollback r.7 does not exist")
             self.logFilter.compare("error: rollback 'r.7' not present")
         else:
             self.fail("Expected an exception")
@@ -2986,8 +2986,8 @@ class FooRecipe(PackageRecipe):
                 s = s[:4] + (uid, gid) + s[6:]
                 # Convert to stat_result
                 s = posix.stat_result(s)
-                self.failUnlessEqual(s.st_uid, uid)
-                self.failUnlessEqual(s.st_gid, gid)
+                self.assertEqual(s.st_uid, uid)
+                self.assertEqual(s.st_gid, gid)
             return s
 
         try:
@@ -3011,7 +3011,7 @@ class FooRecipe(PackageRecipe):
                 ['warning: No primary troves in changeset, listing all troves']
             )
             # Make sure we don't display the plus sign
-            self.failUnlessEqual(out[:33], "-rw-r--r--    1 %-8s %-8s" %
+            self.assertEqual(out[:33], "-rw-r--r--    1 %-8s %-8s" %
                                  (uid, gid))
 
             # No errors here either
@@ -3036,7 +3036,7 @@ class FooRecipe(PackageRecipe):
             self.checkUpdate('foo',
                              ['foo', 'foo:lib' ])
         except errors.MissingTrovesError, e:
-            self.failUnlessEqual(str(e), 'The following troves are missing from the repository and cannot be installed: foo:lib=/localhost@rpl:linux/1-1-1[]')
+            self.assertEqual(str(e), 'The following troves are missing from the repository and cannot be installed: foo:lib=/localhost@rpl:linux/1-1-1[]')
         else:
             self.fail('expected MissingTrovesError')
 
@@ -3089,8 +3089,8 @@ class FooRecipe(PackageRecipe):
         client.applyUpdate(updJob)
 
         ccinst = client.db.getTroveVersionList('corecomp:runtime')
-        self.failUnlessEqual(len(ccinst), 1)
-        self.failUnlessEqual(ccinst[0].asString(), '/localhost@rpl:linux/1-1-1')
+        self.assertEqual(len(ccinst), 1)
+        self.assertEqual(ccinst[0].asString(), '/localhost@rpl:linux/1-1-1')
 
         # Update to version 2
         csList = cmdline.parseChangeList(f + '=2' for f in trvl)
@@ -3101,14 +3101,14 @@ class FooRecipe(PackageRecipe):
         client.applyUpdate(updJob)
 
         ccinst = client.db.getTroveVersionList('corecomp:runtime')
-        self.failUnlessEqual(len(ccinst), 1)
-        self.failUnlessEqual(ccinst[0].asString(), '/localhost@rpl:linux/2-1-1')
+        self.assertEqual(len(ccinst), 1)
+        self.assertEqual(ccinst[0].asString(), '/localhost@rpl:linux/2-1-1')
 
         # Dep error
         csList = [ f + '=3' for f in trvl ]
         csList[0] = trvl[0] + '=1'
         csList = cmdline.parseChangeList(csList)
-        self.failUnlessRaises(conaryclient.DepResolutionFailure,
+        self.assertRaises(conaryclient.DepResolutionFailure,
             client.updateChangeSet, csList, fromChangesets=changesets,
             resolveSource=resolveSource)
 
@@ -3132,8 +3132,8 @@ class FooRecipe(PackageRecipe):
         client.applyUpdate(updJob)
 
         ccinst = client.db.getTroveVersionList('corecomp:runtime')
-        self.failUnlessEqual(len(ccinst), 1)
-        self.failUnlessEqual(ccinst[0].asString(), '/localhost@rpl:linux/3-1-1')
+        self.assertEqual(len(ccinst), 1)
+        self.assertEqual(ccinst[0].asString(), '/localhost@rpl:linux/3-1-1')
 
     def testDiskBasedGroupUpdate1(self):
         repos = self.openRepository()
@@ -3201,37 +3201,37 @@ class FooRecipe(PackageRecipe):
 
         csList = [('foo', (None, None), ('1.0', None), True)]
 
-        self.failUnlessEqual(client.db.getTransactionCounter(), 0)
+        self.assertEqual(client.db.getTransactionCounter(), 0)
         updJob, suggMap = client.updateChangeSet(csList)
-        self.failUnlessEqual(updJob.getTransactionCounter(), 0)
+        self.assertEqual(updJob.getTransactionCounter(), 0)
 
         client.applyUpdate(updJob)
-        self.failUnlessEqual(client.db.getTransactionCounter(), 1)
+        self.assertEqual(client.db.getTransactionCounter(), 1)
 
         # Build the update job for updating to 2.0
         csList = [('foo', (None, None), ('2.0', None), True)]
         updJob, suggMap = client.updateChangeSet(csList)
-        self.failUnlessEqual(client.db.getTransactionCounter(), 1)
-        self.failUnlessEqual(updJob.getTransactionCounter(), 1)
+        self.assertEqual(client.db.getTransactionCounter(), 1)
+        self.assertEqual(updJob.getTransactionCounter(), 1)
 
         # But instead, remove a trove
         csList = [('-foo:walk', (None, None), (None, None), False)]
         updJob2, suggMap2 = client.updateChangeSet(csList)
-        self.failUnlessEqual(client.db.getTransactionCounter(), 1)
-        self.failUnlessEqual(updJob2.getTransactionCounter(), 1)
+        self.assertEqual(client.db.getTransactionCounter(), 1)
+        self.assertEqual(updJob2.getTransactionCounter(), 1)
 
         client.applyUpdate(updJob2)
-        self.failUnlessEqual(client.db.getTransactionCounter(), 2)
+        self.assertEqual(client.db.getTransactionCounter(), 2)
 
         # We should no longer be able to apply updJob
         try:
             client.applyUpdate(updJob)
             self.fail("InternalConaryError not raised")
         except errors.InternalConaryError, e:
-            self.failUnlessEqual(str(e), "Stale update job")
+            self.assertEqual(str(e), "Stale update job")
 
         # Database state shouldn't have changed
-        self.failUnlessEqual(client.db.getTransactionCounter(), 2)
+        self.assertEqual(client.db.getTransactionCounter(), 2)
 
         # Simulate legacy RAA
         csList = [('foo:walk', (None, None), ('2.0', None), True)]
@@ -3248,7 +3248,7 @@ class FooRecipe(PackageRecipe):
         stderr.seek(0)
         msg = "UserWarning: Update jobs without a transaction counter have been deprecated, use setTransactionCounter()\n"
         actual = stderr.read()
-        self.failUnless(msg in actual, "`%s' not in `%s'" % (msg, actual))
+        self.assertTrue(msg in actual, "`%s' not in `%s'" % (msg, actual))
 
     def testJobFreezeThaw(self):
         # CNY-1300
@@ -3276,7 +3276,7 @@ class FooRecipe(PackageRecipe):
         for name in trvNames:
             for trvn in [name, name + ':run', name + ':walk']:
                 trv = client.db.trovesByName(trvn)[0]
-                self.failUnlessEqual(trv[1].asString(),
+                self.assertEqual(trv[1].asString(),
                                     '/localhost@rpl:linux/1.0-1-1')
         trvList = []
         for name in [ 'corecomp', 'foo' ]:
@@ -3321,25 +3321,25 @@ class FooRecipe(PackageRecipe):
         util.mkdirChain(frzdir)
         updJob.freeze(frzdir)
         # Make sure we have a features file
-        self.failUnless(os.path.exists(os.path.join(frzdir, 'features')))
+        self.assertTrue(os.path.exists(os.path.join(frzdir, 'features')))
 
         ud = client.newUpdateJob()
         ud.thaw(frzdir)
 
-        self.failUnlessEqual(ud.primaries, updJob.primaries)
-        self.failUnlessEqual(ud.jobs, updJob.jobs)
-        self.failUnlessEqual(ud.transactionCounter, updJob.transactionCounter)
-        self.failUnlessEqual(ud.updateInvalidatesRollbacks(),
+        self.assertEqual(ud.primaries, updJob.primaries)
+        self.assertEqual(ud.jobs, updJob.jobs)
+        self.assertEqual(ud.transactionCounter, updJob.transactionCounter)
+        self.assertEqual(ud.updateInvalidatesRollbacks(),
                              updJob.updateInvalidatesRollbacks())
         # We need to strip out the trove, it's not returned by the iterator
-        self.failUnlessEqual(list(ud.iterJobPreScripts()),
+        self.assertEqual(list(ud.iterJobPreScripts()),
             [ x[:-1] for x in preScripts])
-        self.failUnlessEqual(list(ud.iterJobPostRollbackScripts()),
+        self.assertEqual(list(ud.iterJobPostRollbackScripts()),
                              postRBScripts)
 
         # Check the trove source
         # Length is the same (cheap test)
-        self.failUnlessEqual(len(ud.troveSource.csList),
+        self.assertEqual(len(ud.troveSource.csList),
                              len(updJob.troveSource.csList))
 
         # Changesets have the same troves
@@ -3349,31 +3349,31 @@ class FooRecipe(PackageRecipe):
                                t.getNewVersion(), t.getNewFlavor())
                                 for t in cs.iterNewTroveList()])
 
-        self.failUnlessEqual(
+        self.assertEqual(
             list(_getTrovesFromChangesetList(ud.troveSource.csList)),
             list(_getTrovesFromChangesetList(updJob.troveSource.csList)))
 
-        self.failUnlessEqual(
+        self.assertEqual(
             sorted(ud.troveSource.idMap.values()),
             sorted(updJob.troveSource.idMap.values()))
 
         # troveCsMap and erasuresMap map back to changesets, so it's too hard
         # to verify the values
-        self.failUnlessEqual(sorted(ud.troveSource.troveCsMap.keys()),
+        self.assertEqual(sorted(ud.troveSource.troveCsMap.keys()),
                              sorted(updJob.troveSource.troveCsMap.keys()))
-        self.failUnlessEqual(sorted(ud.troveSource.erasuresMap.keys()),
+        self.assertEqual(sorted(ud.troveSource.erasuresMap.keys()),
                              sorted(updJob.troveSource.erasuresMap.keys()))
 
-        self.failUnlessEqual(ud.troveSource.providesMap,
+        self.assertEqual(ud.troveSource.providesMap,
                              updJob.troveSource.providesMap)
 
-        self.failUnlessEqual(updJob.getJobsChangesetList(),
+        self.assertEqual(updJob.getJobsChangesetList(),
                              ud.getJobsChangesetList())
-        self.failUnlessEqual(updJob.getJobsChangesetList(),
+        self.assertEqual(updJob.getJobsChangesetList(),
                              [])
 
-        self.failUnlessEqual(updJob.getItemList(), ud.getItemList())
-        self.failUnlessEqual(updJob.getKeywordArguments(),
+        self.assertEqual(updJob.getItemList(), ud.getItemList())
+        self.assertEqual(updJob.getKeywordArguments(),
                              ud.getKeywordArguments())
 
         # Test downloads
@@ -3385,7 +3385,7 @@ class FooRecipe(PackageRecipe):
         util.mkdirChain(downloadDir)
         client.downloadUpdate(updJob, downloadDir)
 
-        self.failUnlessEqual(len(os.listdir(downloadDir)),
+        self.assertEqual(len(os.listdir(downloadDir)),
                              len(updJob.getJobs()))
 
         # Test the rollback invalidation flag
@@ -3398,10 +3398,10 @@ class FooRecipe(PackageRecipe):
         ud = client.newUpdateJob()
         ud.thaw(frzdir)
 
-        self.failUnlessEqual(updJob.getJobsChangesetList(),
+        self.assertEqual(updJob.getJobsChangesetList(),
                              ud.getJobsChangesetList())
-        self.failIf(updJob.getJobsChangesetList() == [])
-        self.failUnlessEqual(updJob.updateInvalidatesRollbacks(),
+        self.assertFalse(updJob.getJobsChangesetList() == [])
+        self.assertEqual(updJob.updateInvalidatesRollbacks(),
                              ud.updateInvalidatesRollbacks())
 
     def testJobFreezeThaw2(self):
@@ -3442,7 +3442,7 @@ class FooRecipe(PackageRecipe):
         client = conaryclient.ConaryClient(self.cfg)
 
         self.updatePkg(installs)
-        self.failUnlessEqual(len(list(client.db.iterAllTroveNames())),
+        self.assertEqual(len(list(client.db.iterAllTroveNames())),
                              2 * trvcount)
 
         # Cut access to upstream repo
@@ -3602,10 +3602,10 @@ True)])
         trv = self.addComponent('foo:runtime', '2', filePrimer=2)
         self.updatePkg(['foo:runtime=1'])
         # Make sure we have no conary databases left open
-        self.failUnlessEqual(0, len([x for x in self._getOpenFiles()
+        self.assertEqual(0, len([x for x in self._getOpenFiles()
                                     if x.endswith('/conarydb')]))
         # No lock files either
-        self.failUnlessEqual(0, len([x for x in self._getOpenFiles()
+        self.assertEqual(0, len([x for x in self._getOpenFiles()
                                     if x.endswith('/syslock')]))
 
         client = conaryclient.ConaryClient(self.cfg)
@@ -3622,37 +3622,37 @@ True)])
         ud = client.newUpdateJob()
         ud.thaw(frzdir)
 
-        self.failUnlessEqual(updJob.getItemList(), ud.getItemList())
+        self.assertEqual(updJob.getItemList(), ud.getItemList())
         # we have one open conary database at this point...
-        self.failUnlessEqual(1, len([x for x in self._getOpenFiles()
+        self.assertEqual(1, len([x for x in self._getOpenFiles()
                                     if x.endswith('/conarydb')]))
         # and exactly one open changeset file
-        self.failUnlessEqual(1, len([x for x in self._getOpenFiles()
+        self.assertEqual(1, len([x for x in self._getOpenFiles()
                                     if x.endswith('.ccs')]))
 
         # When ud goes out of scope it should close the open changeset files
         del ud
-        self.failUnlessEqual(0, len([x for x in self._getOpenFiles()
+        self.assertEqual(0, len([x for x in self._getOpenFiles()
                                     if x.endswith('.ccs')]))
-        self.failUnlessEqual(0, len([x for x in self._getOpenFiles()
+        self.assertEqual(0, len([x for x in self._getOpenFiles()
                                     if x.endswith('/conarydb')]))
 
         # Reopen the database
         client.db.writeAccess()
-        self.failUnlessEqual(1, len([x for x in self._getOpenFiles()
+        self.assertEqual(1, len([x for x in self._getOpenFiles()
                                     if x.endswith('/conarydb')]))
 
         # Log something, make sure the fd to the log is open
         log.syslog("test logger")
-        self.failUnlessEqual(1, len([x for x in self._getOpenFiles()
+        self.assertEqual(1, len([x for x in self._getOpenFiles()
                                     if x.endswith('/var/log/conary')]))
 
         # Closing the client should close the database too
         client.close()
-        self.failUnlessEqual(0, len([x for x in self._getOpenFiles()
+        self.assertEqual(0, len([x for x in self._getOpenFiles()
                                     if x.endswith('/conarydb')]))
         # ... and the log
-        self.failUnlessEqual(0, len([x for x in self._getOpenFiles()
+        self.assertEqual(0, len([x for x in self._getOpenFiles()
                                     if x.endswith('/var/log/conary')]))
         # ... but make sure we can still log
         log.syslog("test logger")
@@ -3717,11 +3717,11 @@ True)])
         # Thaw update job
         updJob = client.newUpdateJob()
         updJob.thaw(frzdir)
-        self.failUnless(updJob.getChangesetsDownloaded())
+        self.assertTrue(updJob.getChangesetsDownloaded())
 
         # Apply critical updates
         restartDir = client.applyUpdateJob(updJob)
-        self.failUnless(restartDir, "No critical updates found")
+        self.assertTrue(restartDir, "No critical updates found")
 
         # This is where we would restart
         updJob = client.newUpdateJob()
@@ -3739,7 +3739,7 @@ True)])
             for comp in ['walk', 'run']:
                 expected.add(("%s:%s" % (trvname, comp), expver))
             expected.add((trvname, expver))
-        self.failUnlessEqual(currtrv, expected)
+        self.assertEqual(currtrv, expected)
 
     def testGroupByDefault(self):
         # CNY-1476
@@ -3761,7 +3761,7 @@ True)])
         # Install group-dist
         self.updatePkg('group-dist=1')
         # group-foo should not be installed since it's byDefault=False
-        self.failIf(fooVer())
+        self.assertFalse(fooVer())
 
         # Install group-foo
         self.updatePkg('group-foo=1')
@@ -3773,7 +3773,7 @@ True)])
 
         # bar should be installed
         try:
-            self.failUnless(client.db.getTroveVersionList('bar'))
+            self.assertTrue(client.db.getTroveVersionList('bar'))
         except AssertionError:
             raise testhelp.SkipTestException('CNY-1476 has to be fixed')
         else:
@@ -3867,19 +3867,19 @@ True)])
         self.mock(client, "_applyUpdate", func)
         client.cfg.localRollbacks = False
         client.applyUpdateJob(uJob)
-        self.failUnlessEqual(funcargs['commitFlags'].localRollbacks, False)
-        self.failUnlessEqual(funcargs['autoPinList'], [])
+        self.assertEqual(funcargs['commitFlags'].localRollbacks, False)
+        self.assertEqual(funcargs['autoPinList'], [])
 
         client.cfg.localRollbacks = True
         client.cfg.pinTroves.append("kernel")
         client.applyUpdateJob(uJob)
-        self.failUnlessEqual(funcargs['commitFlags'].localRollbacks, True)
-        self.failUnlessEqual(funcargs['autoPinList'], ['kernel'])
+        self.assertEqual(funcargs['commitFlags'].localRollbacks, True)
+        self.assertEqual(funcargs['autoPinList'], ['kernel'])
 
         client.applyUpdateJob(uJob, localRollbacks = False,
                               autoPinList = ["a", "b"])
-        self.failUnlessEqual(funcargs['commitFlags'].localRollbacks, False)
-        self.failUnlessEqual(funcargs['autoPinList'], ['a', 'b'])
+        self.assertEqual(funcargs['commitFlags'].localRollbacks, False)
+        self.assertEqual(funcargs['autoPinList'], ['a', 'b'])
 
     def testOldConaryCachingProxy(self):
         self.addComponent('foo:run', '1')
@@ -4005,7 +4005,7 @@ True)])
         fres = [(fCont2c[0][0], "3\n4\n5\nSixth line\n")] + fCont2[1:]
         for fname, expcont in fres:
             f = open(util.joinPaths(self.rootDir, fname))
-            self.failUnlessEqual(f.read(), expcont)
+            self.assertEqual(f.read(), expcont)
 
     def testRestartAfterMigrateReplacesFiles(self):
         # CNY-2513
@@ -4038,20 +4038,20 @@ True)])
         updJob = client.newUpdateJob()
         client.prepareUpdateJob(updJob, itemsList, migrate=True,
             criticalUpdateInfo = criticalUpdateInfo)
-        self.failUnlessEqual(updJob.getKeywordArguments()['migrate'], True)
+        self.assertEqual(updJob.getKeywordArguments()['migrate'], True)
 
         assert(updJob.getCriticalJobs() != [])
 
         restartDir = client.applyUpdateJob(updJob)
-        self.failUnless(restartDir, "No critical updates found")
+        self.assertTrue(restartDir, "No critical updates found")
 
         updJob = client.newUpdateJob()
         client.prepareUpdateJob(updJob, None,
             restartInfo=restartDir, criticalUpdateInfo = criticalUpdateInfo)
-        self.failUnlessEqual(updJob.getKeywordArguments()['migrate'], True)
+        self.assertEqual(updJob.getKeywordArguments()['migrate'], True)
 
         client.applyUpdateJob(updJob)
-        self.failUnlessEqual(file(fPath).read(), 'Managed Content')
+        self.assertEqual(file(fPath).read(), 'Managed Content')
 
         # Roll back, produce some bogus XML for the job invocation
         self.rollback(self.rootDir, 1)
@@ -4066,7 +4066,7 @@ True)])
         assert(updJob.getCriticalJobs() != [])
 
         restartDir = client.applyUpdateJob(updJob)
-        self.failUnless(restartDir, "No critical updates found")
+        self.assertTrue(restartDir, "No critical updates found")
 
         file(util.joinPaths(restartDir, "job-invocation"), "w+").write("<Junk")
 
@@ -4074,7 +4074,7 @@ True)])
         client.prepareUpdateJob(updJob, None,
             restartInfo=restartDir, criticalUpdateInfo = criticalUpdateInfo)
         # Job invocation unavailable, so migrate should be false (default)
-        self.failUnlessEqual(updJob.getKeywordArguments().get('migrate', False),
+        self.assertEqual(updJob.getKeywordArguments().get('migrate', False),
                              False)
 
 

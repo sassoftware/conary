@@ -32,23 +32,23 @@ class HarnessTest(rephelp.RepositoryHelper):
 
         ret = repos.getTroveVersionList("localhost", { None : None })
         ret1 = repos.getTroveVersionList("localhost1", { None : None })
-        self.failUnlessEqual(ret, {foo.getName():{foo.getVersion():[foo.getFlavor()]}})
-        self.failUnlessEqual(ret1, {bar.getName():{bar.getVersion():[bar.getFlavor()]}})
+        self.assertEqual(ret, {foo.getName():{foo.getVersion():[foo.getFlavor()]}})
+        self.assertEqual(ret1, {bar.getName():{bar.getVersion():[bar.getFlavor()]}})
 
     def testOpenRepository2(self):
         # this test is meant to check that repository databases get
         # correctly reset when we do not call stopRepository()
         repos = self.getRepositoryClient()
         # make sure both servers are still running
-        self.failUnlessEqual(set(repos.getUserMap()),
+        self.assertEqual(set(repos.getUserMap()),
                              set([('localhost', 'test', 'foo'),
                                   ('localhost1', 'test', 'foo')]))
         ret = repos.getTroveVersionList("localhost", { None : None })
         ret1 = repos.getTroveVersionList("localhost1", { None : None })
         # databases should have been emptied, though
-        self.failUnlessEqual(ret.keys(), [])
-        self.failUnlessEqual(ret1.keys(), [])
+        self.assertEqual(ret.keys(), [])
+        self.assertEqual(ret1.keys(), [])
         self.stopRepository(1)
         self.stopRepository()
         repos = self.getRepositoryClient()
-        self.failUnlessEqual(repos.getUserMap(), [])
+        self.assertEqual(repos.getUserMap(), [])

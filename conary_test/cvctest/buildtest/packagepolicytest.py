@@ -381,9 +381,9 @@ class TestSymlinkTarget(PackageRecipe):
         d = bz2.BZ2Decompressor()
         logData = d.decompress( \
                 fileDict['/usr/src/debug/buildlogs/test-0-log.bz2'].read())
-        self.failUnless("warning: Suggested buildRequires additions: ['bar:runtime', 'foo:runtime']" in logData)
-        self.failUnless("warning: Requires: 'foo:runtime' does not provide 'file: /opt/foo', so a requirement on the trove itself was used to satisfy dangling symlink: /foo" in logData)
-        self.failUnless("warning: Requires: 'bar:runtime' does not provide 'file: /opt/bar++', so a requirement on the trove itself was used to satisfy dangling symlink: /bar++" in logData)
+        self.assertTrue("warning: Suggested buildRequires additions: ['bar:runtime', 'foo:runtime']" in logData)
+        self.assertTrue("warning: Requires: 'foo:runtime' does not provide 'file: /opt/foo', so a requirement on the trove itself was used to satisfy dangling symlink: /foo" in logData)
+        self.assertTrue("warning: Requires: 'bar:runtime' does not provide 'file: /opt/bar++', so a requirement on the trove itself was used to satisfy dangling symlink: /bar++" in logData)
 
     def testSymlinkLocalTroveConflictingFile(self):
         recipestr = r"""
@@ -1062,11 +1062,11 @@ class BadConfig(PackageRecipe):
         self.assertRaises(policy.PolicyError,
                 self.buildRecipe, recipestr, "BadConfig")
         self.logFilter.remove()
-        self.failUnlessIn("warning: Config: /etc/baz: file contains NULL byte",
+        self.assertIn("warning: Config: /etc/baz: file contains NULL byte",
             self.logFilter.records)
-        self.failUnlessSubstringIn("warning: Config: /etc/bar: 'utf8' codec can't decode byte 0x81",
+        self.assertSubstringIn("warning: Config: /etc/bar: 'utf8' codec can't decode byte 0x81",
             self.logFilter.records)
-        self.failUnlessSubstringIn("warning: Config: /etc/bar: 'charmap' codec can't decode byte 0x81",
+        self.assertSubstringIn("warning: Config: /etc/bar: 'charmap' codec can't decode byte 0x81",
             self.logFilter.records)
 
     def testBinaryConfigFFFF(self):
@@ -1084,11 +1084,11 @@ class BadConfig(PackageRecipe):
         self.assertRaises(policy.PolicyError,
                 self.buildRecipe, recipestr, "BadConfig")
         self.logFilter.remove()
-        self.failUnlessIn("error: Config: /etc/bar: found 0xFF without newline",
+        self.assertIn("error: Config: /etc/bar: found 0xFF without newline",
             self.logFilter.records)
-        self.failUnlessIn("warning: Config: /etc/baz: file contains 0xFFFF sequence",
+        self.assertIn("warning: Config: /etc/baz: file contains 0xFFFF sequence",
             self.logFilter.records)
-        self.failUnlessSubstringIn(
+        self.assertSubstringIn(
             "warning: Config: /etc/baz: 'utf8' codec can't decode byte 0xff",
             self.logFilter.records)
 
@@ -1107,7 +1107,7 @@ class WinConfig(PackageRecipe):
         self.buildRecipe(recipestr, "WinConfig")
         self.logFilter.remove()
         self.assertEquals(len(self.logFilter.records), 1)
-        self.failUnlessSubstringIn(
+        self.assertSubstringIn(
             "warning: Config: /etc/baz: 'utf8' codec can't decode byte 0x93",
             self.logFilter.records)
 
@@ -1136,8 +1136,8 @@ class TestInitialContents(PackageRecipe):
         fileList = list(trv.iterFileList())
         fileObjs = repos.getFileVersions([(x[0], x[2], x[3]) for x in fileList])
         for fileInfo, fileObj in zip(fileList, fileObjs):
-            self.failIf(fileObj.flags.isConfig(), "Expected config to be unset for %s" % fileInfo[1])
-            self.failUnless(fileObj.flags.isInitialContents(), "Expected initialContents for %s" % fileInfo[1])
+            self.assertFalse(fileObj.flags.isConfig(), "Expected config to be unset for %s" % fileInfo[1])
+            self.assertTrue(fileObj.flags.isInitialContents(), "Expected initialContents for %s" % fileInfo[1])
 
     @testhelp.context('initialcontents', 'CNY-2578')
     def testInitialContentsTest2(self):
@@ -1160,8 +1160,8 @@ class TestInitialContents(PackageRecipe):
         fileList = list(trv.iterFileList())
         fileObjs = repos.getFileVersions([(x[0], x[2], x[3]) for x in fileList])
         for fileInfo, fileObj in zip(fileList, fileObjs):
-            self.failIf(fileObj.flags.isConfig(), "Expected config to be unset for %s" % fileInfo[1])
-            self.failUnless(fileObj.flags.isInitialContents(), "Expected initialContents for %s" % fileInfo[1])
+            self.assertFalse(fileObj.flags.isConfig(), "Expected config to be unset for %s" % fileInfo[1])
+            self.assertTrue(fileObj.flags.isInitialContents(), "Expected initialContents for %s" % fileInfo[1])
 
 
 class TagsTest(rephelp.RepositoryHelper):
@@ -2406,8 +2406,8 @@ class TestRequires(PackageRecipe):
         self.resetRepository()
         trv = self.build(recipestr, 'TestRequires')
 
-        self.failUnlessEqual(trv.getName(), 'foo:runtime')
-        self.failUnlessEqual(trv.requires(),
+        self.assertEqual(trv.getName(), 'foo:runtime')
+        self.assertEqual(trv.requires(),
                 deps.ThawDependencySet('4#bar::runtime'))
 
     def testRequiresTrove2(self):
@@ -2423,8 +2423,8 @@ class TestRequires(PackageRecipe):
         self.resetRepository()
         trv = self.build(recipestr, 'TestRequires')
 
-        self.failUnlessEqual(trv.getName(), 'foo:runtime')
-        self.failUnlessEqual(trv.requires(),
+        self.assertEqual(trv.getName(), 'foo:runtime')
+        self.assertEqual(trv.requires(),
                 deps.ThawDependencySet('4#bar::runtime'))
 
     def testRequiresTestRequiresProvides(self):
@@ -2641,13 +2641,12 @@ class TestRequires(PackageRecipe):
         # meaning.
         #assert([x for x in self.logFilter.records
         #        if 'The following dependencies' in x])
-        self.failUnlessIn('warning: EnforceJavaBuildRequirements: buildRequires [\'fake-jre:runtime\'] needed to satisfy "java: javax.servlet.Filter" for files: /foo/SetCharacterEncodingFilter.class',
+        self.assertIn('warning: EnforceJavaBuildRequirements: buildRequires [\'fake-jre:runtime\'] needed to satisfy "java: javax.servlet.Filter" for files: /foo/SetCharacterEncodingFilter.class',
             self.logFilter.records)
-        self.failUnlessIn("warning: Provides: Provides and requirements for file /foo/SunJCE_e.class are disabled because of unsatisfied dependencies. To re-enable them, add to the recipe's buildRequires the packages that provide the following requirements: com.sun.crypto.provider.SunJCE_f com.sun.crypto.provider.SunJCE_g",
+        self.assertIn("warning: Provides: Provides and requirements for file /foo/SunJCE_e.class are disabled because of unsatisfied dependencies. To re-enable them, add to the recipe's buildRequires the packages that provide the following requirements: com.sun.crypto.provider.SunJCE_f com.sun.crypto.provider.SunJCE_g",
             self.logFilter.records)
         troveName = trv.getName().split(':')[0]+':runtime'
         repos = self.openRepository()
-        failUnlessIn = self.failUnlessIn
         for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
             troveName, trv.getVersion(), trv.getFlavor(),
             withFiles=True):
@@ -2656,26 +2655,26 @@ class TestRequires(PackageRecipe):
             if path == '/foo/SunJCE_e.class':
                 # This class has incomplete dependencies (SUNJCE_f and
                 # SUNJCE_g), its provides and requires are dropped
-                self.failIf(req)
-                self.failIf(prov)
+                self.assertFalse(req)
+                self.assertFalse(prov)
                 continue
             # CNY-2177 mandates that files should not require self provides
             if path == '/foo/Expr.class':
-                self.failUnlessEqual(prov, 'java: gnu.xml.xpath.Expr')
-                self.failIf('java: gnu.xml.xpath.Expr' in req)
+                self.assertEqual(prov, 'java: gnu.xml.xpath.Expr')
+                self.assertFalse('java: gnu.xml.xpath.Expr' in req)
                 continue
             if path != '/foo/SetCharacterEncodingFilter.class':
                 self.fail("Unexpected path %s" % path)
-            self.failIf('java: filters.SetCharacterEncodingFilter' in req)
-            failUnlessIn('java: java.io.IOException', req)
-            failUnlessIn('java: java.lang.Object', req)
-            failUnlessIn('java: java.lang.String', req)
-            failUnlessIn('java: javax.servlet.Filter', req)
-            failUnlessIn('java: javax.servlet.FilterChain', req)
-            failUnlessIn('java: javax.servlet.FilterConfig', req)
-            failUnlessIn('java: javax.servlet.ServletException', req)
-            failUnlessIn('java: javax.servlet.ServletRequest', req)
-            failUnlessIn('java: javax.servlet.ServletResponse', req)
+            self.assertFalse('java: filters.SetCharacterEncodingFilter' in req)
+            self.assertIn('java: java.io.IOException', req)
+            self.assertIn('java: java.lang.Object', req)
+            self.assertIn('java: java.lang.String', req)
+            self.assertIn('java: javax.servlet.Filter', req)
+            self.assertIn('java: javax.servlet.FilterChain', req)
+            self.assertIn('java: javax.servlet.FilterConfig', req)
+            self.assertIn('java: javax.servlet.ServletException', req)
+            self.assertIn('java: javax.servlet.ServletRequest', req)
+            self.assertIn('java: javax.servlet.ServletResponse', req)
             # let's do provides and requires in the same place, it's cheaper...
             assert('java: filters.SetCharacterEncodingFilter' in prov)
         self.resetRepository()
@@ -2709,8 +2708,8 @@ class TestRequires(PackageRecipe):
             req = str(fileObj.requires())
             prov = str(fileObj.provides())
             if path == '/bar/broken.jar':
-                self.failUnlessEqual(req, '')
-                self.failUnlessEqual(prov, '')
+                self.assertEqual(req, '')
+                self.assertEqual(prov, '')
                 continue
             if path != '/foo/servlet-api.jar':
                 self.fail("Unexpected path %s" % path)
@@ -2718,11 +2717,11 @@ class TestRequires(PackageRecipe):
             # CNY-2177 mandates that files should not require self provides
             sreq = '\n'.join('java: ' + x
                 for x in sorted(self.servletApiRequires))
-            self.failUnlessEqual(req, sreq)
+            self.assertEqual(req, sreq)
 
             sprv = '\n'.join('java: ' + x
                 for x in sorted(self.servletApiProvides))
-            self.failUnlessEqual(prov, sprv)
+            self.assertEqual(prov, sprv)
         self.resetRepository()
 
     def testFilterOutJavaReqs(self):
@@ -2750,11 +2749,11 @@ class TestRequires(PackageRecipe):
 
         troveReq = set(str(x[1]) for x in trv.requires().iterDeps())
         # org.test.A should not be required by the trove
-        self.failIf('org.test.A' in troveReq)
+        self.assertFalse('org.test.A' in troveReq)
 
         troveProv = set(str(x[1]) for x in trv.provides().iterDeps())
-        self.failIf('org.test.A' in troveProv)
-        self.failUnlessIn('org.test.B', troveProv)
+        self.assertFalse('org.test.A' in troveProv)
+        self.assertIn('org.test.B', troveProv)
 
     def testExceptJavaProvides(self):
         """
@@ -2789,7 +2788,7 @@ class TestRequires(PackageRecipe):
             sprv = [ x for x in sorted(self.servletApiProvides)
                 if '.http.' not in x ]
             sprv = '\n'.join('java: ' + x for x in sprv)
-            self.failUnlessEqual(prov, sprv)
+            self.assertEqual(prov, sprv)
 
     def testExceptJavaRequires(self):
         """
@@ -2824,7 +2823,7 @@ class TestRequires(PackageRecipe):
 
             sprv = sorted(self.servletApiProvides)
             sprv = '\n'.join('java: ' + x for x in sprv)
-            self.failUnlessEqual(prov, sprv)
+            self.assertEqual(prov, sprv)
 
     def testExceptAllJavaProvides(self):
         # CNY-2594
@@ -2853,7 +2852,7 @@ class TestRequires(PackageRecipe):
                 continue
             prov = str(fileObj.provides())
 
-            self.failUnlessEqual(prov, '')
+            self.assertEqual(prov, '')
 
     def testJavaNullReqsOnFile(self):
         # CNY-3379
@@ -2892,12 +2891,12 @@ class TestRequires(PackageRecipe):
 
         troveReq = set(str(x[1]) for x in trv.requires().iterDeps())
         # org.test.A should not be required by the trove
-        self.failIf('org.test.A' in troveReq)
+        self.assertFalse('org.test.A' in troveReq)
 
         troveProv = set(str(x[1]) for x in trv.provides().iterDeps())
-        self.failUnlessEqual(troveProv, set([ 'org.test.A', 'test-deps:java' ]))
+        self.assertEqual(troveProv, set([ 'org.test.A', 'test-deps:java' ]))
         troveReqs = set(str(x[1]) for x in trv.requires().iterDeps())
-        self.failUnlessEqual(troveReqs, set(['java.lang.Object']))
+        self.assertEqual(troveReqs, set(['java.lang.Object']))
 
     def testRequiresRuby(self):
         """
@@ -3037,15 +3036,15 @@ import os
         try:
             finderModule.load_file(file2)
             deps = finderModule.getDepsForPath(file2)
-            self.failUnlessEqual(deps, [ os.path.join(pythonPath, 'os.py') ])
+            self.assertEqual(deps, [ os.path.join(pythonPath, 'os.py') ])
 
             finderModule.load_file(file1)
             deps = finderModule.getDepsForPath(file1)
-            self.failUnlessEqual(deps, [ '///invalid' ])
+            self.assertEqual(deps, [ '///invalid' ])
 
             finderModule.load_file(file2)
             deps = finderModule.getDepsForPath(file2)
-            self.failUnlessEqual(deps, [ os.path.join(pythonPath, 'os.py') ])
+            self.assertEqual(deps, [ os.path.join(pythonPath, 'os.py') ])
         finally:
             finderModule.close()
 
@@ -3093,10 +3092,10 @@ class TestRequires(PackageRecipe):
             withFiles=True):
             if path == '/usr/bin/boot':
                 req = str(fileObj.requires())
-                self.failUnlessContains('python: logging(%s lib)' % pythonVer, req)
-                self.failUnlessContains('python: logging.handlers(%s lib)' % pythonVer, req)
-                self.failUnlessContains('python: xml.sax(%s lib)' % pythonVer, req)
-                self.failUnlessContains('python: xml(%s lib)' % pythonVer, req)
+                self.assertIn('python: logging(%s lib)' % pythonVer, req)
+                self.assertIn('python: logging.handlers(%s lib)' % pythonVer, req)
+                self.assertIn('python: xml.sax(%s lib)' % pythonVer, req)
+                self.assertIn('python: xml(%s lib)' % pythonVer, req)
         self.resetRepository()
 
 
@@ -3190,10 +3189,10 @@ class TestRequires(PackageRecipe):
             trv.getName(), trv.getVersion(), trv.getFlavor(),
             withFiles=True):
             req = str(fileObj.requires())
-            self.failUnlessContains('python: logging(%s lib)' % pythonVer, req)
-            self.failUnlessContains('python: xml.sax(%s lib)' % pythonVer, req)
+            self.assertIn('python: logging(%s lib)' % pythonVer, req)
+            self.assertIn('python: xml.sax(%s lib)' % pythonVer, req)
             # parent must be required
-            self.failUnlessContains('python: xml(%s lib)' % pythonVer, req)
+            self.assertIn('python: xml(%s lib)' % pythonVer, req)
         self.resetRepository()
 
         # Now kill the flags even if they exist and test the old way
@@ -3315,25 +3314,25 @@ class TestRequires(PackageRecipe):
                 str(fileObj.provides()),
                 str(fileObj.requires()))
 
-        self.failUnlessContains(
+        self.assertIn(
             'python: xml.sax(conary:%s conary:lib' % pythonVer,
             depMap['sax.py'][0])
 
-        self.failUnlessContains(
+        self.assertIn(
             'python: logging.handlers(conary:%s conary:lib' % pythonVer,
             depMap['handlers.py'][0])
 
 
-        self.failUnlessContains(
+        self.assertIn(
             'python: logging(conary:%s conary:lib' % pythonVer,
             depMap['boot'][1])
-        self.failUnlessContains(
+        self.assertIn(
             'python: logging.handlers(conary:%s conary:lib' % pythonVer,
             depMap['boot'][1])
-        self.failUnlessContains(
+        self.assertIn(
             'python: xml.sax(conary:%s conary:lib' % pythonVer,
             depMap['boot'][1])
-        self.failUnlessContains(
+        self.assertIn(
             'python: xml(conary:%s conary:lib' % pythonVer,
             depMap['boot'][1])
 
@@ -3400,7 +3399,7 @@ class TestRequires(PackageRecipe):
         util.mkdirChain(sourceDir)
 
         # python 2.6 has switched to itertools
-        if pythonVer == "2.6":
+        if sys.version_info >= (2, 6):
             itertoolsModuleName = "itertools"
         else:
             itertoolsModuleName = "itertoolsmodule"
@@ -3443,22 +3442,22 @@ class Blah(PackageRecipe):
             lib = 'lib'
         dep = "python: blah.elf(%s %s)" % (pythonVer, lib)
         provides = str(trv.getProvides())
-        self.failUnless(dep in provides, "%s not in %s" %
+        self.assertTrue(dep in provides, "%s not in %s" %
                 (dep, provides))
         dep = "python: blah.elf(%s %s)" % (pythonVer, lib)
-        self.failUnless(dep in provides, "%s not in %s" %
+        self.assertTrue(dep in provides, "%s not in %s" %
                 (dep, provides))
         dep = "python: streams(%s %s)" % (pythonVer, lib)
         provides = str(trv.getProvides())
-        self.failUnless(dep in provides, "%s not in %s" %
+        self.assertTrue(dep in provides, "%s not in %s" %
                 (dep, provides))
         dep = "python: streams(%s %s)" % (pythonVer, lib)
-        self.failUnless(dep in provides, "%s not in %s" %
+        self.assertTrue(dep in provides, "%s not in %s" %
                 (dep, provides))
 
         requires = str(trv.getRequires())
         dep = "python: %s" % itertoolsModuleName
-        self.failUnless(dep in requires, "%s not in %s" %
+        self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
         # Install the trove, so it gets picked up by the next build
@@ -3500,7 +3499,7 @@ class Bloop(PackageRecipe):
         # Make sure we got the shorter requirement
         requires = str(trv2.getRequires())
         dep = "python: blah.elf\n"
-        self.failUnless(dep in requires, "%s not in %s" %
+        self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
         # Test that we pick the right dep when only the old dep is available
@@ -3524,7 +3523,7 @@ class Bloop(PackageRecipe):
 
         requires = str(trv3.getRequires())
         dep = "python: blah.elf"
-        self.failUnless(dep in requires, "%s not in %s" %
+        self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
         # More mocking, make sure we provide some system flags
@@ -3563,7 +3562,7 @@ class Bloop(PackageRecipe):
 
         requires = str(trv4.getRequires())
         dep = "python: %s(%s %s)" % (itertoolsModuleName, pythonVer, lib)
-        self.failUnless(dep in requires, "%s not in %s" %
+        self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
     def testPythonNoarchDeps(self):
@@ -3638,15 +3637,15 @@ class Blah(PackageRecipe):
             targetFlv = deps.parseFlavor("is: x86_64")
 
         # This trove has to be arch flavored
-        self.failUnlessEqual(trv.getFlavor(), targetFlv)
+        self.assertEqual(trv.getFlavor(), targetFlv)
 
         dep = "python: blah.foo(%s %s)" % (pythonVer, lib)
         provides = str(trv.getProvides())
-        self.failUnlessIn(dep, provides)
+        self.assertIn(dep, provides)
 
         requires = str(trv.getRequires())
         dep = "python: logging(%s %s)" % (pythonVer, lib)
-        self.failUnless(dep in requires, "%s not in %s" %
+        self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
     def testRequiresPerlNoBootstrapPerl(self):
@@ -3743,8 +3742,8 @@ class TestRequires(PackageRecipe):
             trv.getName(), trv.getVersion(), trv.getFlavor(),
             withFiles=True):
             req = str(fileObj.requires())
-            self.failIf('perl: CGI::Apache' not in req)
-            self.failIf('perl: DFSJFSD::FDSJFK' in req)
+            self.assertFalse('perl: CGI::Apache' not in req)
+            self.assertFalse('perl: DFSJFSD::FDSJFK' in req)
 
     def testRequiresPerlWithPerl(self):
         """
@@ -3927,9 +3926,9 @@ class TestRequires(PackageRecipe):
             if 'foo.pl' in path:
                 req = str(fileObj.requires())
                 assert('perl: foo::deptest' in req)
-                self.failIf('perl: deptest' in req)
+                self.assertFalse('perl: deptest' in req)
                 # CGI::Apache was dropped because it wasn't in the conary db
-                self.failIf('perl: CGI::Apache' in req)
+                self.assertFalse('perl: CGI::Apache' in req)
         self.resetRepository()
 
     def testInternalRpathWithMultipleFlags(self):
@@ -3957,11 +3956,11 @@ class TestProvidesMap(PackageRecipe):
             withFiles=True):
             if 'libjava' in path:
                 req = str(fileObj.requires())
-                self.failUnlessContains(verifySoname, req)
+                self.assertIn(verifySoname, req)
                 found += 1
             elif 'libverify' in path:
                 prov = str(fileObj.provides())
-                self.failUnlessContains(verifySoname, prov)
+                self.assertIn(verifySoname, prov)
                 found += 1
         assert(found == 2)
         self.resetRepository()
@@ -4246,7 +4245,7 @@ class TestRequires(PackageRecipe):
                 withFiles=True):
             if 'req.pc' in path:
                 req = str(fileObj.requires())
-                self.failUnlessEqual(req, '')
+                self.assertEqual(req, '')
                 break
         assert(req is not None)
 
@@ -4264,7 +4263,7 @@ class TestRequires(PackageRecipe):
                 withFiles=True):
             if 'req.pc' in path:
                 req = str(fileObj.requires())
-                self.failUnlessEqual(req, '')
+                self.assertEqual(req, '')
                 break
         assert(req is not None)
 
@@ -4347,10 +4346,10 @@ class TextHttpdConf(PackageRecipe):
                 withFiles=True):
             if path == '/etc/httpd/conf.d/test.conf':
                 req = str(fileObj.requires())
-                self.failUnlessEqual(req, '')
+                self.assertEqual(req, '')
             elif path == '/etc/httpd/conf.d/test.foo':
                 req = str(fileObj.requires())
-                self.failUnlessEqual(req, '')
+                self.assertEqual(req, '')
             else:
                 self.fail('Path %s should not exist' %path)
         trv = self.build(recipestr, "TextHttpdConf")
@@ -4359,10 +4358,10 @@ class TextHttpdConf(PackageRecipe):
                 withFiles=True):
             if path == '/etc/httpd/conf.d/test.conf':
                 req = str(fileObj.requires())
-                self.failUnlessEqual(req, 'file: /usr/sbin/httpd')
+                self.assertEqual(req, 'file: /usr/sbin/httpd')
             elif path == '/etc/httpd/conf.d/test.foo':
                 req = str(fileObj.requires())
-                self.failUnlessEqual(req, '')
+                self.assertEqual(req, '')
             else:
                 self.fail('Path %s should not exist' %path)
 
@@ -4393,17 +4392,17 @@ class TextXinetd(PackageRecipe):
         for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
                 'test:config', trv.getVersion(), trv.getFlavor(),
                 withFiles=True):
-            self.failUnlessEqual(path, '/etc/xinetd.d/test')
+            self.assertEqual(path, '/etc/xinetd.d/test')
             req = str(fileObj.requires())
-            self.failUnlessEqual(req, 'file: /usr/sbin/xinetd')
+            self.assertEqual(req, 'file: /usr/sbin/xinetd')
 
         trv = self.build(recipestr.replace("EXPANDME", "yes"), "TextXinetd")
         for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
                 'test:config', trv.getVersion(), trv.getFlavor(),
                 withFiles=True):
-            self.failUnlessEqual(path, '/etc/xinetd.d/test')
+            self.assertEqual(path, '/etc/xinetd.d/test')
             req = str(fileObj.requires())
-            self.failUnlessEqual(req, '')
+            self.assertEqual(req, '')
 
     def testPkgConfigRequiresExceptions(self):
         recipeStr = """
@@ -4600,7 +4599,7 @@ EOF
             elif 'libfdsa2.so' in path:
                 assert(sonameDoubleSymlinkRE.search(prov))
                 found += 1
-        self.failUnlessEqual(found, 14)
+        self.assertEqual(found, 14)
         found == 0
         for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
             'foo:test', trv.getVersion(), trv.getFlavor(),
@@ -4826,8 +4825,8 @@ class TestProvides(PackageRecipe):
             macros = dict(pyver = pythonVer))
         self.logFilter.remove()
         prov = str(trv.getProvides())
-        self.failUnlessContains('python: foo', prov)
-        self.failUnlessContains('python: bar', prov)
+        self.assertIn('python: foo', prov)
+        self.assertIn('python: bar', prov)
 
 
     def testPythonProvidesWithPthFile(self):
@@ -4925,7 +4924,7 @@ class TestProvides(PackageRecipe):
 """
         trv = self.build(recipestr1, "TestProvides")
         prov = str(trv.getProvides())
-        assert(prov.find('perl: foo::blah') != -1)
+        self.assertIn('perl: foo::blah', prov)
 
     def testEL5PathProvideRegexp(self):
         recipestr = """
@@ -6047,7 +6046,7 @@ int main(void) {return printf("Hello, world."); }
         r.Requires('bar:runtime(target-%(target)s)', '/asdf/foo')
 """
         thisArch = [x[0] for x in use.Arch.items() if x[1]]
-        self.failUnlessEqual(len(thisArch), 1)
+        self.assertEqual(len(thisArch), 1)
         thisArch = thisArch[0]
         archMap = dict(x86=('x86', 'x86_64', '32'), x86_64=('x86 x86_64', 'x86', '64'))
         majorArch, otherArch, bits = archMap[thisArch]
@@ -6060,10 +6059,10 @@ int main(void) {return printf("Hello, world."); }
         (built, d) = self.buildRecipe(recipestr, "Test")
 
         runtime = self.findAndGetTrove('test:runtime[%s]' % flv)
-        self.failUnlessEqual(str(runtime.getFlavor()), flv)
+        self.assertEqual(str(runtime.getFlavor()), flv)
         abi = "ELF%s(SysV %s)" % (bits, thisArch)
         kwdict = dict(abi = abi, target = target)
-        self.failUnlessEqual(str(runtime.getRequires()), """\
+        self.assertEqual(str(runtime.getRequires()), """\
 abi: %(abi)s
 trove: bar:runtime(target-%(target)s-unknown-linux)
 trove: foo:runtime(foo)
@@ -6317,11 +6316,11 @@ class TroveScriptsRecipe(PackageRecipe):
         for trv in retTroves[:3]:
             for scriptType in scriptTypes:
                 scriptCont = getattr(trv.troveInfo.scripts, scriptType).script()
-                self.failUnlessEqual(scriptCont, scriptType.lower())
+                self.assertEqual(scriptCont, scriptType.lower())
         for trv in retTroves[3:]:
             for scriptType in scriptTypes:
                 scriptCont = getattr(trv.troveInfo.scripts, scriptType).script()
-                self.failUnlessEqual(scriptCont, '')
+                self.assertEqual(scriptCont, '')
 
 
 class ExcessBuildRequiresTest(rephelp.RepositoryHelper):
@@ -6504,9 +6503,9 @@ class SetupBuildReq(PackageRecipe):
         data = bz2.BZ2Decompressor().decompress(bz)
         lines = [x for x in data.splitlines() \
                 if 'Possible excessive buildRequires' in x]
-        self.failIf(not lines, "Expected bogus:devel to be excessive")
+        self.assertFalse(not lines, "Expected bogus:devel to be excessive")
         line = lines[0]
-        self.failIf('python-setuptools:python' not in self.savedArgs)
+        self.assertFalse('python-setuptools:python' not in self.savedArgs)
 
         self.assertEquals(line, \
                 "info: Possible excessive buildRequires: ['bogus:devel']")
@@ -6565,18 +6564,18 @@ class TestRecipe(PackageRecipe):
             for j in range(2):
                 comp = troves[3*i + j + 1]
                 files = [ x[1] for x in comp.iterFileList() ]
-                self.failUnlessEqual(files, [ "/usr/share/filesub%scmp%s" %
+                self.assertEqual(files, [ "/usr/share/filesub%scmp%s" %
                     (i + 1, j + 1)])
                 metadata = comp.troveInfo.metadata
                 # Default language should be present
-                self.failUnlessEqual(len(metadata.getItems()), 1)
-                self.failUnlessEqual(metadata.getItems().values()[0], [])
+                self.assertEqual(len(metadata.getItems()), 1)
+                self.assertEqual(metadata.getItems().values()[0], [])
             metadata = mainTrv.troveInfo.metadata
-            self.failUnlessEqual(len(metadata.getItems()), 1)
+            self.assertEqual(len(metadata.getItems()), 1)
             mi = metadata.get(language)
-            self.failUnlessEqual(mi['shortDesc'], shortDesc)
-            self.failUnlessEqual(mi['longDesc'], longDesc)
-            self.failUnlessEqual(mi['licenses'], licenses)
+            self.assertEqual(mi['shortDesc'], shortDesc)
+            self.assertEqual(mi['longDesc'], longDesc)
+            self.assertEqual(mi['licenses'], licenses)
 
         # Similar deal, but only set the description on some troves
         longDesc2= "Oh hai, this is the second description, with %(name)s in it."
@@ -6598,26 +6597,26 @@ class TestRecipe(PackageRecipe):
             for j in range(2):
                 comp = troves[3*i + j + 1]
                 metadata = comp.troveInfo.metadata
-                self.failUnlessEqual(len(metadata.getItems()), 1)
+                self.assertEqual(len(metadata.getItems()), 1)
                 if comp.name().endswith(':comp2'):
                     mi = metadata.get(language)
-                    self.failUnlessEqual(mi['shortDesc'], shortDesc)
-                    self.failUnlessEqual(mi['longDesc'], longDesc2)
-                    self.failUnlessEqual(mi['licenses'], licenses2)
+                    self.assertEqual(mi['shortDesc'], shortDesc)
+                    self.assertEqual(mi['longDesc'], longDesc2)
+                    self.assertEqual(mi['licenses'], licenses2)
                 else:
-                    self.failUnlessEqual(metadata.getItems().values()[0], [])
+                    self.assertEqual(metadata.getItems().values()[0], [])
             metadata = mainTrv.troveInfo.metadata
-            self.failUnlessEqual(len(metadata.getItems()), 1)
+            self.assertEqual(len(metadata.getItems()), 1)
             mi = metadata.get(language)
-            self.failUnlessEqual(mi['shortDesc'], shortDesc)
+            self.assertEqual(mi['shortDesc'], shortDesc)
             # Both main troves have the same short desc. Even though we
             # haven't set the description in subtest2, it gets copied forward.
             if mainTrv.name() == 'subtest1':
-                self.failUnlessEqual(mi['longDesc'], longDesc2)
-                self.failUnlessEqual(mi['licenses'], licenses2)
+                self.assertEqual(mi['longDesc'], longDesc2)
+                self.assertEqual(mi['licenses'], licenses2)
             else:
-                self.failUnlessEqual(mi['longDesc'], longDesc)
-                self.failUnlessEqual(mi['licenses'], licenses)
+                self.assertEqual(mi['longDesc'], longDesc)
+                self.assertEqual(mi['licenses'], licenses)
 
     def testKeyValueMetadata(self):
         mi = trove.MetadataItem()
@@ -6633,7 +6632,7 @@ class TestRecipe(PackageRecipe):
         cs = repos.createChangeSet(jobList)
         trvCs = [ x for x in cs.iterNewTroveList() if x.getName() == 'foo' ][0]
         trv = trove.Trove(trvCs)
-        self.failUnlessEqual(
+        self.assertEqual(
             sorted(trv.troveInfo.metadata.get()['keyValue'].items()),
             [('a', '1'), ('b', '2')])
 
@@ -6649,7 +6648,7 @@ class FooRecipe(PackageRecipe):
         r.ResetKeyValueMetadata('a')
 """
         trv = self.build(recipestr, "FooRecipe", returnTrove='foo')
-        self.failUnlessEqual(
+        self.assertEqual(
             sorted(trv.troveInfo.metadata.get()['keyValue'].items()),
             [('b', '2')])
 
@@ -6665,7 +6664,7 @@ class FooRecipe(PackageRecipe):
         r.Create("/usr/share/foo", contents="11")
 """
         trv = self.build(recipestr, "FooRecipe", returnTrove='foo')
-        self.failUnlessEqual(
+        self.assertEqual(
             sorted(trv.troveInfo.metadata.get()['keyValue'].items()),
             [('b', '2')])
 
@@ -6677,7 +6676,7 @@ class FooRecipe(PackageRecipe):
 
         trvMetaList = repos.getTroveInfo(trove._TROVEINFO_TAG_METADATA, [ nvf ])
         trvMeta = trvMetaList[0]
-        self.failUnlessEqual(sorted(trvMeta.get()['keyValue'].items()),
+        self.assertEqual(sorted(trvMeta.get()['keyValue'].items()),
             [('a', '11'), ('b', '22')])
 
 class UserGroupInfoTest(rephelp.RepositoryHelper):
@@ -6701,7 +6700,7 @@ class TestAutoUser(PackageRecipe):
         self.assertEquals(built[0][0], 'info-apache:user')
         for p in built:
             self.updatePkg(self.workDir, p[0], p[1])
-        self.failIf(not os.path.exists(os.path.join(self.workDir,
+        self.assertFalse(not os.path.exists(os.path.join(self.workDir,
                                                     'etc', 'passwd')))
 
     def testGroupFile(self):
@@ -6719,7 +6718,7 @@ class TestAutoGroup(PackageRecipe):
         self.assertEquals(built[0][0], 'info-wheel:group')
         for p in built:
             self.updatePkg(self.workDir, p[0], p[1])
-        self.failIf(not os.path.exists(os.path.join(self.workDir,
+        self.assertFalse(not os.path.exists(os.path.join(self.workDir,
                                                     'etc', 'group')))
 
     def testInfoPackageIsolation(self):
@@ -7330,7 +7329,7 @@ class PHPRequiresRecipe(PackageRecipe):
         msg = "warning: Requires: '/var/www/splat.php' requires PHP, " \
                 "which is not provided by any troves. Please add a trove " \
                 "that provides the PHP interpreter to your buildRequires."
-        self.failIf(msg not in buildLog,
+        self.assertFalse(msg not in buildLog,
                 'Expected "%s" to be in buildLog' % msg)
         recipeStr += "        r.Requires(exceptions = '.*')\n"
         (built, d) = self.buildRecipe(recipeStr, 'PHPRequiresRecipe', logBuild = True)
@@ -7342,7 +7341,7 @@ class PHPRequiresRecipe(PackageRecipe):
         bzip = bz2.BZ2Decompressor()
         buildLog = bzip.decompress(pathDict[ \
                 '/usr/src/debug/buildlogs/php-requires-1-log.bz2'].read())
-        self.failIf(msg in buildLog,
+        self.assertFalse(msg in buildLog,
                 'Expected "%s" to be omitted from buildLog' % msg)
 
     def testLocalPHPRequires(self):
@@ -7562,7 +7561,7 @@ class PHPRequiresRecipe(PackageRecipe):
                 "which is provided by multiple troves. Add one of the " \
                 "following troves to the recipe's buildRequires to satisfy " \
                 "this dependency: ('php:runtime', 'php5:devel')"
-        self.failIf(msg not in buildLog,
+        self.assertFalse(msg not in buildLog,
                 'Expected "%s" to be in buildLog' % msg)
 
         # Make sure message is only presented once, thus implying that the
@@ -7571,7 +7570,7 @@ class PHPRequiresRecipe(PackageRecipe):
                 "which is provided by multiple troves. Add one of the " \
                 "following troves to the recipe's buildRequires to satisfy " \
                 "this dependency: ('php:runtime', 'php5:devel')"
-        self.failIf(buildLog.count(msg2) != 0,
+        self.assertFalse(buildLog.count(msg2) != 0,
             'Warning should only occure once in build log: %s' % msg)
 
         recipeStr += "        r.Requires(exceptions = '.*')\n"
@@ -7584,7 +7583,7 @@ class PHPRequiresRecipe(PackageRecipe):
         bzip = bz2.BZ2Decompressor()
         buildLog = bzip.decompress(pathDict[ \
                 '/usr/src/debug/buildlogs/php-requires-1-log.bz2'].read())
-        self.failIf(msg in buildLog,
+        self.assertFalse(msg in buildLog,
                 'Expected "%s" to be omitted from buildLog' % msg)
 
     def testNonPHPRequires(self):
@@ -7672,7 +7671,7 @@ class TestNPIV(PackageRecipe):
             self.updatePkg(self.workDir, p[0], p[1], depCheck=False)
         for f in ('/usr/bin/foo', '/usr/share/bar'):
             header = file(self.workDir+f).readlines()[0].strip()
-            self.failUnless(('#!/usr/bin/python%s' % pythonVer) in header)
+            self.assertTrue(('#!/usr/bin/python%s' % pythonVer) in header)
 
 
 class ResolveFileDependenciesTest(rephelp.RepositoryHelper):

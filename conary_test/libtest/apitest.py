@@ -28,6 +28,6 @@ class ApiTest(rephelp.RepositoryHelper):
             def b(self):
                 "function test b"
         foo = A()
-        self.failIf(foo.a.__doc__.endswith("(PUBLIC API)"))
+        self.assertFalse(foo.a.__doc__.endswith("(PUBLIC API)"))
         if not foo.b.__doc__.endswith("(PUBLIC API)"):
             raise RuntimeError('foo.b.__doc__ == %r' % foo.b.__doc__)

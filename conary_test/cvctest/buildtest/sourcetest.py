@@ -253,7 +253,7 @@ class TestSource(PackageRecipe):
         util.mkdirChain(destdir)
         rpmfile = os.path.join(self.cfg.sourceSearchDir, 'popt-1.5-4x.i386.rpm')
         source._extractFilesFromRPM(rpmfile, directory = destdir)
-        self.failUnless(os.path.exists(util.joinPaths(destdir,
+        self.assertTrue(os.path.exists(util.joinPaths(destdir,
             '/usr/include/popt.h')))
 
     def testUnpackRPMWithUnsupportedTag(self):
@@ -440,7 +440,7 @@ class TestSig1(PackageRecipe):
         self.logFilter.add()
         (built, d) = self.buildRecipe(recipestr1, "TestSig1", prep=True)
         self.logFilter.remove()
-        self.failUnlessEqual(len(listcounter), 7)
+        self.assertEqual(len(listcounter), 7)
 
     def testDontCheckKeyOfCommitedSource(self):
         # We choose not to check the public key for sources already committed,
@@ -738,8 +738,7 @@ class PatchTest(PackageRecipe):
         expected = """+ attempting to apply /unrelated.patch to /test/tmpwatch-2.9.0/ with patch level(s) 1, 0, 2, 3
 + patch did not apply with --dry-run, trying level 1 directly
 + patch level 1 FAILED
-+ missing header for unified diff at line 3 of patch
-can't find file to patch at input line 3
++ can't find file to patch at input line 3
 Perhaps you used the wrong -p or --strip option?
 The text leading up to this was:
 --------------------------
@@ -763,8 +762,7 @@ Skip this patch? [y]
 Skipping patch.
 1 out of 1 hunk ignored
 + patch level 2 FAILED
-+ missing header for unified diff at line 3 of patch
-can't find file to patch at input line 3
++ can't find file to patch at input line 3
 Perhaps you used the wrong -p or --strip option?
 The text leading up to this was:
 --------------------------
@@ -776,8 +774,7 @@ Skip this patch? [y]
 Skipping patch.
 1 out of 1 hunk ignored
 + patch level 3 FAILED
-+ missing header for unified diff at line 3 of patch
-can't find file to patch at input line 3
++ can't find file to patch at input line 3
 Perhaps you used the wrong -p or --strip option?
 The text leading up to this was:
 --------------------------
@@ -792,7 +789,10 @@ error: could not apply patch /unrelated.patch in directory /test/tmpwatch-2.9.0/
         # normalize variable paths in the message
         msg = msg.replace(self.buildDir, '')
         msg = msg.replace(self.sourceSearchDir, '')
-        self.failUnlessEqual(msg, expected)
+        # centos behavioral differences
+        msg = msg.replace(
+                'missing header for unified diff at line 3 of patch\n', '')
+        self.assertEqual(msg, expected)
         if rc[0].__class__ != source.SourceError:
             self.fail('expected SourceError exception not raised')
         # make sure no stdout/stderr output was produced
@@ -821,7 +821,7 @@ class PatchTest(PackageRecipe):
         # normalize variable paths in the message
         msg = msg.replace(self.buildDir, '')
         msg = msg.replace(self.sourceSearchDir, '')
-        self.failUnlessEqual(msg, expected)
+        self.assertEqual(msg, expected)
         # make sure no stdout/stderr output was produced
         if rc[1]:
             self.fail('unexpected output: %s' %rc[1])
@@ -849,7 +849,7 @@ class PatchTest(PackageRecipe):
         # normalize variable paths in the message
         msg = msg.replace(self.buildDir, '')
         msg = msg.replace(self.sourceSearchDir, '')
-        self.failUnlessEqual(msg, expected)
+        self.assertEqual(msg, expected)
         # make sure no stdout/stderr output was produced
         if rc[1]:
             self.fail('unexpected output: %s' %rc[1])
@@ -883,7 +883,7 @@ error: could not apply patch /tmpwatch.fakebug.rej.patch in directory /test/tmpw
         # normalize variable paths in the message
         msg = msg.replace(self.buildDir, '')
         msg = msg.replace(self.sourceSearchDir, '')
-        self.failUnlessEqual(msg, expected)
+        self.assertEqual(msg, expected)
         # make sure no stdout/stderr output was produced
         if rc[1]:
             self.fail('unexpected output: %s' %rc[1])
@@ -991,8 +991,8 @@ class PatchTest(PackageRecipe):
         # add an archive that has a file with group write permissions
         a = source.Archive(r, 'bash.deb', dir='/')
         a.doAction()
-        self.failUnless(os.path.isfile(r.macros.destdir + '/bin/bash'))
-        self.failUnless(os.path.islink(r.macros.destdir + '/bin/sh'))
+        self.assertTrue(os.path.isfile(r.macros.destdir + '/bin/bash'))
+        self.assertTrue(os.path.islink(r.macros.destdir + '/bin/sh'))
 
     def testBzipDeb(self):
         r = policytest.DummyRecipe(self.cfg)
@@ -1000,7 +1000,7 @@ class PatchTest(PackageRecipe):
         # add an archive that has a file with group write permissions
         a = source.Archive(r, 'test.deb', dir='/')
         a.doAction()
-        self.failUnless(os.path.isfile(r.macros.destdir + '/testme'))
+        self.assertTrue(os.path.isfile(r.macros.destdir + '/testme'))
 
     @decorators.requireBinary("xz")
     def testLZMADeb(self):
@@ -1008,7 +1008,7 @@ class PatchTest(PackageRecipe):
         os.mkdir('/'.join((r.macros.builddir, r.theMainDir)))
         a = source.Archive(r, 'testlzma.deb', dir='/')
         a.doAction()
-        self.failUnless(os.path.isfile(r.macros.destdir + '/testme'))
+        self.assertTrue(os.path.isfile(r.macros.destdir + '/testme'))
 
     def testBzipDebControl(self):
         r = policytest.DummyRecipe(self.cfg)
@@ -1016,7 +1016,7 @@ class PatchTest(PackageRecipe):
         # add an archive that has a file with group write permissions
         a = source.Archive(r, 'test.deb', debArchive='control.tar', dir='/')
         a.doAction()
-        self.failUnless(os.path.isfile(r.macros.destdir + '/controlData'))
+        self.assertTrue(os.path.isfile(r.macros.destdir + '/controlData'))
 
     def testEmptyDeb(self):
         r = policytest.DummyRecipe(self.cfg)
@@ -1342,7 +1342,7 @@ class FooSrc(PackageRecipe):
         hs = self._getHTTPServer(logFile)
         try:
             trv = self.build(recipestr % dict(port = hs.port), "Foo")
-            self.failUnlessEqual(sorted([ x[1] for x in trv.iterFileList() ]),
+            self.assertEqual(sorted([ x[1] for x in trv.iterFileList() ]),
                                  sorted(['/usr/share/foo/blah/b',
                                          '/usr/share/foo/bam',
                                          '/usr/share/foo/foo-1.0/a']))
@@ -1353,19 +1353,19 @@ class FooSrc(PackageRecipe):
 
             # Conflicting archive names
             recipestr3 = recipestr2.replace("bad/", "bad/blam-1.1.tar.gz")
-            err = self.failUnlessRaises(errors.CookError,
+            err = self.assertRaises(errors.CookError,
                         self.build, recipestr3 % dict(port = hs.port), "Foo")
             # White out the first part of the error
             strerr = str(err)
             strerr = strerr[strerr.find('SourceError: '):]
-            self.failUnlessEqual(strerr,
+            self.assertEqual(strerr,
                 "SourceError: Inconsistent archive names: 'blam-1.1.tar.gz' and 'foo-1.1.tar.gz'")
 
             recipeData = recipestrSrc % dict(port = hs.port)
 
             # Now test addSource
             trv = self.build(recipeData, "FooSrc")
-            self.failUnlessEqual([ x[1] for x in trv.iterFileList() ],
+            self.assertEqual([ x[1] for x in trv.iterFileList() ],
                                  ['/usr/share/foo/foo-1.99.tar.gz'])
 
             # RDST-2848
@@ -1433,16 +1433,16 @@ class Foo(PackageRecipe):
         self.cfg.mirrorDirs = [ mirrorsDir ]
         try:
             trv = self.build(recipestr % dict(rest = ''), "Foo")
-            self.failUnlessEqual(sorted([ x[1] for x in trv.iterFileList() ]),
+            self.assertEqual(sorted([ x[1] for x in trv.iterFileList() ]),
                                  sorted(['/usr/share/foo/blah/b',
                                          '/usr/share/foo/bam',
                                          '/usr/share/foo/foo-1.0/a']))
             lines = [ x.strip() for x in open(logFile) ]
-            self.failUnlessEqual(lines[-1], '/good/foo-1.0.tar.gz')
+            self.assertEqual(lines[-1], '/good/foo-1.0.tar.gz')
             # Make sure we hit all URLs
             badUrls = set('/'.join(x.split('/')[:3]) for x in lines
                           if x.startswith('/bad/'))
-            self.failUnlessEqual(badUrls,
+            self.assertEqual(badUrls,
                                  set(['/bad/b1', '/bad/b2', '/bad/worst']))
 
             # CNY-2778
@@ -1454,11 +1454,11 @@ class Foo(PackageRecipe):
             trv = self.build(recipestr %
                 dict(rest = '%(name)s-%(version)s.tar.gz'), "Foo")
             lines = [ x.strip() for x in open(logFile) ]
-            self.failUnlessEqual(lines[-1], '/good/foo-1.0.tar.gz')
+            self.assertEqual(lines[-1], '/good/foo-1.0.tar.gz')
             # Make sure we hit all URLs
             badUrls = set('/'.join(x.split('/')[:3]) for x in lines
                           if x.startswith('/bad/'))
-            self.failUnlessEqual(badUrls,
+            self.assertEqual(badUrls,
                                  set(['/bad/b1', '/bad/b2', '/bad/worst']))
         finally:
             hs.close()
@@ -1488,17 +1488,17 @@ class Foo(PackageRecipe):
         self.cfg.mirrorDirs = [ mirrorsDir ]
         try:
             trv = self.build(recipestr, "Foo")
-            self.failUnlessEqual(sorted([ x[1] for x in trv.iterFileList() ]),
+            self.assertEqual(sorted([ x[1] for x in trv.iterFileList() ]),
                                  sorted(['/usr/share/foo/blah/b',
                                          '/usr/share/foo/bam',
                                          '/usr/share/foo/foo-1.0/a']))
             lines = [ x.strip() for x in open(logFile) ]
             goodLines = [ x for x in lines if x.startswith('/good/')
                                               and x.endswith('.tar.gz') ]
-            self.failUnlessEqual(goodLines,
+            self.assertEqual(goodLines,
                 [ '/good/b2/blah/foo-1.0.tar.gz' ])
             goodLines = [ x for x in lines if x.endswith('.tar.gz.sig') ]
-            self.failUnlessEqual(goodLines,
+            self.assertEqual(goodLines,
                 [ '/bad/b1/blah/foo-1.0.tar.gz.sig',
                   '/good/b2/blah/foo-1.0.tar.gz.sig' ])
         finally:
@@ -1537,7 +1537,7 @@ class Foo(PackageRecipe):
                 '=RPM_CONTENTS=', 'foo', 'foo-1.0-1.src.rpm', 'foo')).read()
         self.assertEquals(rpmLookaside, '')
         fooLookasidePath = os.path.join(self.cfg.lookaside,'foo', 'foo')
-        self.failIf(os.path.exists(fooLookasidePath),
+        self.assertFalse(os.path.exists(fooLookasidePath),
                 "foo file from sourcedir should not have been referenced.")
 
     @testhelp.context('CNY-2627')
@@ -1609,8 +1609,8 @@ class Foo(PackageRecipe):
         nvf = repos.findTrove(None, nvf)[0]
         fileDict = client.getFilesFromTrove(*nvf)
         # prove each specfile has distinct contents.
-        self.failUnless('Release: 1' in fileDict['/1/foo.spec'].read())
-        self.failUnless('Release: 2' in fileDict['/2/foo.spec'].read())
+        self.assertTrue('Release: 1' in fileDict['/1/foo.spec'].read())
+        self.assertTrue('Release: 2' in fileDict['/2/foo.spec'].read())
         self.assertEquals(set(fileDict.keys()),
                 set(['/1/foo.spec', '/2/foo.spec']))
 
@@ -1665,7 +1665,7 @@ class Foo(PackageRecipe):
             self.addfile("foo.recipe")
             self.discardOutput(self.commit)
 
-            self.failUnlessEqual([x.strip() for x in file(logFile)],
+            self.assertEqual([x.strip() for x in file(logFile)],
                 ['/good/foo-1.0.tar.bz2', '/good/foo-1.0.tar.gz'])
 
             # Get rid of the lookaside cache
@@ -1673,7 +1673,7 @@ class Foo(PackageRecipe):
             # Cook. Make sure we didn't hit the server again
             self.cookItem(repos, self.cfg, 'foo')
 
-            self.failUnlessEqual([x.strip() for x in file(logFile)],
+            self.assertEqual([x.strip() for x in file(logFile)],
                 ['/good/foo-1.0.tar.bz2', '/good/foo-1.0.tar.gz'])
         finally:
             hs.close()
@@ -1697,6 +1697,6 @@ class XzRpmPackage(PackageRecipe):
         trvs = [ (x[0], VFS(x[1]), x[2]) for x in trvs ]
         repos = self.openRepository()
         trv = repos.getTroves(trvs)[0]
-        self.failUnlessEqual(
+        self.assertEqual(
             sorted(os.path.basename(p[1]) for p in trv.iterFileList()),
             ['libpopt.so.0', 'libpopt.so.0.0.0'])

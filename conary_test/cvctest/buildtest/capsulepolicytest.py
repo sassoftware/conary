@@ -181,13 +181,13 @@ class TestRecipe(CapsuleRecipe):
 
         r1trv = self.build(recipe1, 'TestRecipe')
         r1provides = getPerlProvides(r1trv)
-        self.failUnlessEqual(len(r1provides), 5)
+        self.assertEqual(len(r1provides), 5)
 
         r2trv = self.build(recipe2, 'TestRecipe')
         r2provides = getPerlProvides(r2trv)
-        self.failUnlessEqual(len(r2provides), 0)
+        self.assertEqual(len(r2provides), 0)
 
-        self.failUnless([ x for x in str(r2trv.provides()) ])
+        self.assertTrue([ x for x in str(r2trv.provides()) ])
 
 
     @conary_test.rpm
@@ -404,11 +404,11 @@ class TestGhost(CapsuleRecipe):
         fileObjs = repos.getFileVersions([(x[0], x[2], x[3]) for x in fileList
                                           if x[1] == '/foo/ghost'])
         for fileInfo, fileObj in zip(fileList, fileObjs):
-            self.failIf(fileObj.flags.isConfig(),
+            self.assertFalse(fileObj.flags.isConfig(),
                         "Expected config to be unset for %s" % fileInfo[1])
-            self.failIf(fileObj.flags.isTransient(),
+            self.assertFalse(fileObj.flags.isTransient(),
                         "Expected transient to be unset for %s" % fileInfo[1])
-            self.failUnless(fileObj.flags.isInitialContents(),
+            self.assertTrue(fileObj.flags.isInitialContents(),
                             "Expected initialContents for %s" % fileInfo[1])
 
     @conary_test.rpm
@@ -587,12 +587,12 @@ class TestRecipe(CapsuleRecipe):
 
         trv = self.build(recipe1, 'TestRecipe')
         files1 = [ x[1] for x in trv.iterFileList() ]
-        self.failUnless('/usr/bin/script' in files1)
+        self.assertTrue('/usr/bin/script' in files1)
         assert(trv.provides.getDepClasses()[deps.DEP_CLASS_FILES].hasDep('/usr/bin/script'))
 
         trv2 = self.build(recipe2, 'TestRecipe')
         files2 = [ x[1] for x in trv2.iterFileList() ]
-        self.failUnless('/usr/bin/script' not in files2)
+        self.assertTrue('/usr/bin/script' not in files2)
         assert(deps.DEP_CLASS_FILES not in trv2.provides.getDepClasses())
 
         recipe3 = (recipe1 + "\n        "

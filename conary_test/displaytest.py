@@ -162,7 +162,7 @@ Description:
                                    info=True)
         s = re.sub('Build time: .*', 'Build time: <TIME>', s)
 
-        self.failUnlessEqual(s, noSourceInfo)
+        self.assertEqual(s, noSourceInfo)
 
     def testTroveDisplayDeps(self):
         self.addComponent('foo:runtime', '1.0', requires='trove:bar:runtime')
@@ -540,12 +540,12 @@ localfile {config}    1.0-1
                 ('foo', (None, None), (v2, f), False)]
         formatter.prepareJobs(jobs)
         result = ''.join(x for x in formatter.formatJobTups(jobs))
-        self.failUnlessEqual(result, 'Install foo=1.0-1-1Install foo=1.0-1-2')
+        self.assertEqual(result, 'Install foo=1.0-1-1Install foo=1.0-1-2')
 
         formatter = display.JobFormatter(dcfg)
         (rc, txt) = self.captureOutput(display.displayJobs, dcfg,
                                        formatter, jobs)
-        self.failUnlessEqual(txt, 'Install foo=1.0-1-1\nInstall foo=1.0-1-2\n')
+        self.assertEqual(txt, 'Install foo=1.0-1-1\nInstall foo=1.0-1-2\n')
 
     def testTroveDisplayInfoWithZeroSize(self):
         self.addComponent('test1:source=1.0-1')

@@ -304,27 +304,27 @@ class ConfigTest(testhelp.TestCase):
             foo = (TestCfgEnum(), 'BAR')
 
         cfg = TestCfgFile()
-        self.failIf(cfg.foo != 'BAR',
+        self.assertFalse(cfg.foo != 'BAR',
                     'Initial value not set to default')
 
         cfg.configLine('foo baz')
-        self.failIf(cfg.foo != 'BAZ',
+        self.assertFalse(cfg.foo != 'BAZ',
                     'Enum value not translated to validValue')
 
         tCfg = TestCfgEnum()
-        self.failIf(tCfg.format('FOO', {}) != 'FOO',
+        self.assertFalse(tCfg.format('FOO', {}) != 'FOO',
                     "validValue not translated to origValue")
 
         self.assertRaises(ParseError, tCfg.parseString, 'splart')
         self.assertRaises(ParseError, tCfg.format, 'foo', {})
 
-        self.failIf(tCfg.parseString('bar') != 'BAR',
+        self.assertFalse(tCfg.parseString('bar') != 'BAR',
                     "Enum value translating not case insensitive")
 
-        self.failIf(tCfg.validValues != \
+        self.assertFalse(tCfg.validValues != \
                     {'baz': 'BAZ', 'foo': 'FOO', 'bar': 'BAR'},
                     "validValues Dict incorrect")
-        self.failIf(tCfg.origName != \
+        self.assertFalse(tCfg.origName != \
                     {'BAZ': 'BAZ', 'FOO': 'FOO', 'BAR': 'BAR'},
                     "origValues Dict incorrect")
 
@@ -337,17 +337,17 @@ class ConfigTest(testhelp.TestCase):
             foo = (TestCfgEnum(), 2)
 
         testEnum = TestCfgEnum()
-        self.failIf(testEnum.parseString('foo') != 1,
+        self.assertFalse(testEnum.parseString('foo') != 1,
                     "string not parsed correctly")
 
-        self.failIf(testEnum.format(1, {}) != 'FOO',
+        self.assertFalse(testEnum.format(1, {}) != 'FOO',
                     "Enumerated value was not translated to original value")
 
         tCfg = TestCfgEnum()
-        self.failIf(tCfg.validValues != \
+        self.assertFalse(tCfg.validValues != \
                     {'baz': 3, 'foo': 1, 'bar': 2},
                     "validValues Dict incorrect")
-        self.failIf(tCfg.origName != \
+        self.assertFalse(tCfg.origName != \
                     {3: 'BAZ', 1: 'FOO', 2: 'BAR'},
                     "origValues Dict incorrect")
 

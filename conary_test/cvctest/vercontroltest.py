@@ -149,7 +149,7 @@ class _VersionControlTestClass:
             self.cookFromRepository('test')
             self.logFilter.remove()
             for es in ['tar', 'bzip2']:
-                self.failUnlessIn('warning: Failed to find possible build '
+                self.assertIn('warning: Failed to find possible build '
                     'requirement for path "%s"' % es,
                     self.logFilter.records)
         finally:

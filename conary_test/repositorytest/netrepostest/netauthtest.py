@@ -181,28 +181,28 @@ class NetAuthTest(dbstoretest.DBStoreTestBase):
         na.addRoleMember("delgroup2", "deluser1")
         na.addRoleMember("delgroup2", "deluser2")
 
-        self.failUnlessEqual(na.getRoles('deluser1'),
+        self.assertEqual(na.getRoles('deluser1'),
                              ['deluser1', 'deluser2', 'delgroup1', 'delgroup2'])
-        self.failUnlessEqual(na.getRoles('deluser2'),
+        self.assertEqual(na.getRoles('deluser2'),
                              ['deluser2', 'delgroup2'])
 
         # Delete user2 and see if group2 still lists user2
         na.deleteUserByName('deluser2')
-        self.failUnlessEqual(list(na.getRoleMembers('delgroup2')),
+        self.assertEqual(list(na.getRoleMembers('delgroup2')),
                              ['deluser1'] )
-        self.failUnlessEqual(list(na.userAuth.getRolesByUser('deluser1')),
+        self.assertEqual(list(na.userAuth.getRolesByUser('deluser1')),
                              [ 'deluser1', 'deluser2', 'delgroup1', 'delgroup2' ])
         na.deleteRole('delgroup1')
 
-        self.failUnlessEqual(list(na.userAuth.getRolesByUser('deluser1')),
+        self.assertEqual(list(na.userAuth.getRolesByUser('deluser1')),
                              [ 'deluser1', 'deluser2', 'delgroup2' ])
         # because deluser1 will have no acl, it should go too
         na.deleteAcl("deluser1", None, None)
         na.deleteUserByName('deluser1')
-        self.failUnlessEqual(list(na.getRoleMembers('delgroup2')), [])
+        self.assertEqual(list(na.getRoleMembers('delgroup2')), [])
         na.deleteRole('delgroup2')
 
-        self.failUnlessEqual(na.getRoleList(), ['deluser2'] )
+        self.assertEqual(na.getRoleList(), ['deluser2'] )
         na.deleteRole('deluser2')
 
         try:
@@ -216,8 +216,8 @@ class NetAuthTest(dbstoretest.DBStoreTestBase):
         self._addUserRole(na, 'user1afterdel', 'testpass')
         #delete the group, but not the user
         na.deleteRole('user1afterdel')
-        self.failUnlessEqual(na.getRoleList(), [] )
-        self.failUnlessEqual(list(na.userAuth.getUserList()),
+        self.assertEqual(na.getRoleList(), [] )
+        self.assertEqual(list(na.userAuth.getUserList()),
                              [('user1afterdel')])
         self._addUserRole(na, 'user2afterdel', 'testpass')
         na.addAcl("user2afterdel", None, None)
@@ -425,38 +425,38 @@ class NetAuthTest(dbstoretest.DBStoreTestBase):
         assert(not na.check(gu, label=v3.branch().label(), trove="foo:test", write=True))
         assert(not na.check(gu, label=v1.branch().label(), trove="foo:runtime", write=True))
 
-        self.failUnlessEqual(na.commitCheck(gu, [("foo:devel",v1),("bar:devel",v2),("baz:devel",v3)]),
+        self.assertEqual(na.commitCheck(gu, [("foo:devel",v1),("bar:devel",v2),("baz:devel",v3)]),
                              [True]*3)
-        self.failUnlessEqual(na.commitCheck(gu, [("foo:test",v1),("bar:test",v1),("baz:test",v1)]),
+        self.assertEqual(na.commitCheck(gu, [("foo:test",v1),("bar:test",v1),("baz:test",v1)]),
                              [True]*3)
-        self.failUnlessEqual(na.commitCheck(gu, [("foo:junk",v2),("bar:test",v2),("baz:lib",v2)]),
+        self.assertEqual(na.commitCheck(gu, [("foo:junk",v2),("bar:test",v2),("baz:lib",v2)]),
                              [True]*3)
-        self.failUnlessEqual(na.commitCheck(gu, [("foo:test",v1),("bar:test",v1),("baz:lib",v1)]),
+        self.assertEqual(na.commitCheck(gu, [("foo:test",v1),("bar:test",v1),("baz:lib",v1)]),
                              [True,True,False])
         self._addUserRole(na, "zerouser", "zeropass")
         zu = ("zerouser", "zeropass", [ (None, None) ], None )
         assert(not na.check(zu, label=v1.branch().label(), trove="foo"))
         assert(not na.check(zu, label=v2.branch().label(), trove="ALL"))
         assert(not na.check(zu, label=v3.branch().label(), trove="foo:runtime"))
-        self.failUnlessEqual(na.commitCheck(zu, [("foo", v1)]), [False])
+        self.assertEqual(na.commitCheck(zu, [("foo", v1)]), [False])
 
         # Try the shim bypass token
         bypass = ("gooduser", netauth.ValidPasswordToken,
             [ (None, None) ],None )
-        self.failUnless(na.check(bypass,
+        self.assertTrue(na.check(bypass,
             label=v1.branch().label(), trove="foo"))
-        self.failUnless(na.check(bypass,
+        self.assertTrue(na.check(bypass,
             label=v2.branch().label(), trove="foo:devel", write=True))
-        self.failUnless(na.check(bypass,
+        self.assertTrue(na.check(bypass,
             label=v3.branch().label(), trove="foo:runtime"))
 
         bypass_zero = ("zerouser", netauth.ValidPasswordToken,
             [ (None, None) ],None )
-        self.failIf(na.check(bypass_zero,
+        self.assertFalse(na.check(bypass_zero,
             label=v1.branch().label(), trove="foo"))
-        self.failIf(na.check(bypass_zero,
+        self.assertFalse(na.check(bypass_zero,
             label=v2.branch().label(), trove="foo:devel", write=True))
-        self.failIf(na.check(bypass_zero,
+        self.assertFalse(na.check(bypass_zero,
             label=v3.branch().label(), trove="foo:runtime"))
 
     def testInvalidNames(self):
@@ -467,12 +467,12 @@ class NetAuthTest(dbstoretest.DBStoreTestBase):
         try:
             na.addUser("test user", "testpass")
         except errors.InvalidName, e:
-            self.failUnlessEqual(str(e), 'InvalidName: test user')
+            self.assertEqual(str(e), 'InvalidName: test user')
 
         try:
             na.addRole("test group")
         except errors.InvalidName, e:
-            self.failUnlessEqual(str(e), 'InvalidName: test group')
+            self.assertEqual(str(e), 'InvalidName: test group')
 
     def testInvalidEntitlementClass(self):
         db = self.getDB()
@@ -522,9 +522,9 @@ class NetAuthTest2(rephelp.RepositoryHelper):
         fd = self.addComponent("foo:devel")
         troveList = [ (fr.getName(), fr.getVersion().asString(), fr.getFlavor().freeze()),
                       (fd.getName(), fd.getVersion().asString(), fd.getFlavor().freeze())]
-        self.failUnlessEqual(na.batchCheck(ro, troveList), [True,True])
-        self.failUnlessEqual(na.batchCheck(ro, troveList, write=True), [False,False])
-        self.failUnlessEqual(na.batchCheck(rw, troveList), [True,True])
-        self.failUnlessEqual(na.batchCheck(rw, troveList, write=True), [True,True])
-        self.failUnlessEqual(na.batchCheck(mixed, troveList), [True,True])
-        self.failUnlessEqual(na.batchCheck(mixed, troveList, write=True), [True,False])
+        self.assertEqual(na.batchCheck(ro, troveList), [True,True])
+        self.assertEqual(na.batchCheck(ro, troveList, write=True), [False,False])
+        self.assertEqual(na.batchCheck(rw, troveList), [True,True])
+        self.assertEqual(na.batchCheck(rw, troveList, write=True), [True,True])
+        self.assertEqual(na.batchCheck(mixed, troveList), [True,True])
+        self.assertEqual(na.batchCheck(mixed, troveList, write=True), [True,False])

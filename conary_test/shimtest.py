@@ -65,12 +65,12 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
         shim, cfg = self._setupShim()
 
         label = t.getVersion().branch().label()
-        self.failUnlessEqual(shim.troveNames(label), ['test:runtime'])
+        self.assertEqual(shim.troveNames(label), ['test:runtime'])
 
         n, v, f = t.getName(), t.getVersion(), t.getFlavor()
 
         trove = shim.getTroves([(n, v, f)])[0]
-        self.failUnlessEqual(trove.getName(), n)
+        self.assertEqual(trove.getName(), n)
 
         # test 3-member auth token
         server = shimclient.NetworkRepositoryServer(cfg,
@@ -79,7 +79,7 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
             ('anonymous', 'anonymous', []), {},
              conarycfg.UserInformation())
         trove = shim.getTroves([(n, v, f)])[0]
-        self.failUnlessEqual(trove.getName(), n)
+        self.assertEqual(trove.getName(), n)
 
         # test exceptions
         self.assertRaises(errors.InsufficientPermission,
@@ -93,12 +93,12 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
                                        fileContents = [ ( '/path', 'hello' ) ] )
 
         label = t.getVersion().branch().label()
-        self.failUnlessEqual(shim.troveNames(label), ['test:runtime'])
+        self.assertEqual(shim.troveNames(label), ['test:runtime'])
 
         n, v, f = t.getName(), t.getVersion(), t.getFlavor()
 
         trove = shim.getTroves([(n, v, f)])[0]
-        self.failUnlessEqual(trove.getName(), n)
+        self.assertEqual(trove.getName(), n)
 
         fileObj = shim.getFileContents([(fileId, version)
                 for pathId, path, fileId, version in trove.iterFileList()])[0]

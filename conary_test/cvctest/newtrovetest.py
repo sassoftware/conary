@@ -346,6 +346,6 @@ class ClientNewTroveTest(rephelp.RepositoryHelper):
         from conary import trove
         trv = trove.Trove(trvCs)
 
-        self.failUnlessEqual(
+        self.assertEqual(
             dict(trv.troveInfo.metadata.flatten()[0].keyValue),
             metadata)

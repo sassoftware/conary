@@ -51,7 +51,7 @@ class TestMultiPackage(CapsuleRecipe):
         self.addfile(pkgname + '.recipe')
         self.discardOutput(self.commit)
         built = self.cookFromRepository(pkgname)
-        self.failUnlessEqual(str(built),
+        self.assertEqual(str(built),
             "(('tmpwatch:rpm', '/localhost@rpl:linux/0.1-1-1', "
             "Flavor('is: x86')),)")
         nvf = repos.findTrove(None, built[0])
@@ -219,7 +219,7 @@ class TestMultiPackage(CapsuleRecipe):
         self.addfile(pkgname + '.recipe')
         self.discardOutput(self.commit)
         built = self.cookFromRepository(pkgname)
-        self.failUnlessEqual(str(built),
+        self.assertEqual(str(built),
             "(('ghost:rpm', '/localhost@rpl:linux/0.1-1-1', "
             "Flavor('')),)")
         nvf = repos.findTrove(None, built[0])
@@ -305,7 +305,7 @@ class TestMultiPackage(CapsuleRecipe):
         self.addfile(pkgname + '.recipe')
         self.discardOutput(self.commit)
         built = self.cookFromRepository(pkgname)
-        self.failUnlessEqual(set([ x[0] for x in built ]),
+        self.assertEqual(set([ x[0] for x in built ]),
             set(['shareddirs:rpm', 'shareddirs:rpm2']))
 
         # create a derived package
@@ -329,7 +329,7 @@ class TestMultiPackage(DerivedCapsuleRecipe):
         self.writeFile(pkgname + '.recipe', derivedRecipe)
         self.discardOutput(self.commit)
         dbuilt = self.cookFromRepository(pkgname, buildLabel=self.shadowLabel)
-        self.failUnlessEqual(set([ x[0] for x in dbuilt ]),
+        self.assertEqual(set([ x[0] for x in dbuilt ]),
             set(['shareddirs:rpm', 'shareddirs:rpm2']))
 
     @conary_test.rpm
