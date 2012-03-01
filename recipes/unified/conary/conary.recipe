@@ -61,13 +61,12 @@ class Conary(CPackageRecipe):
             r.macros.pyroot = '/usr/conary'
         else:
             r.macros.pyroot = '/usr'
-        r.macros.bindir = '%(pyroot)s/bin'
-        r.macros.oldbindir = '/usr/bin'
+        r.macros.pybin = '%(pyroot)s/bin'
         r.macros.pylib = '%(pyroot)s/%(lib)s'
         r.macros.pyinc = '%(pyroot)s/include/python%(pyver)s'
-        r.macros.python = '%(bindir)s/python%(pyver)s'
+        r.macros.python = '%(pybin)s/python%(pyver)s'
         r.macros.sitepkgs = '%(pylib)s/python%(pyver)s/site-packages'
-        r.Environment('PATH', '%(bindir)s:/bin:/sbin:/usr/bin:/usr/sbin')
+        r.Environment('PATH', '%(pybin)s:/bin:/sbin:/usr/bin:/usr/sbin')
 
         #r.addArchive('ftp://download.rpath.com/conary/')
         r.addMercurialSnapshot('http://hg.rpath.com/conary')
@@ -99,7 +98,7 @@ class Conary(CPackageRecipe):
         ####  Finally, actually build Conary
         mkargs = (
             'LDFLAGS="%(ldflags)s -L%(pylib)s -Wl,-rpath,%(pylib)s" '
-            'prefix=%(pyroot)s '
+            'libdir=%(pylib)s '
             'PYINCLUDE=%(pyinc)s '
             'PYTHON=%(python)s '
             'PYVER=%(pyver)s '
@@ -150,7 +149,7 @@ class Conary(CPackageRecipe):
                       '%(datadir)s/conary/migration/',
                       '%(datadir)s/conary/logcat')
         r.PackageSpec('conary-build',
-                      '%(oldbindir)s/cvc(|desc)',
+                      '%(bindir)s/cvc(|desc)',
                       r'%(sitepkgs)s/conary/cvc(|desc)\.py.*',
                       r'%(sitepkgs)s/conary/cmds/(cvccmd|clone|branch)\.py.*',
                       '%(mandir)s/.*/cvc.*',
@@ -168,6 +167,8 @@ class Conary(CPackageRecipe):
         ### Dependencies
         r.Requires('conary-policy:lib',
                    '%(sitepkgs)s/conary/build/packagepolicy.py')
+        if r.embedded:
+            r.Requires(pythonFlagNamespace='conary')
         # Conary pieces need to work together with the same version
         r.ComponentProvides('%(version)s')
         r.ComponentProvides('group-scripts')
@@ -205,5 +206,5 @@ class Conary(CPackageRecipe):
         r.AutoDoc('EULA_Conary_Dual_License.txt')
 
         if r.encapsulated:
-            r.Remove('%(oldbindir)s/rpm2cpio') # conflict with the platform
-            r.Remove('%(oldbindir)s/dbsh') # might conflict, not needed in package
+            r.Remove('%(bindir)s/rpm2cpio') # conflict with the platform
+            r.Remove('%(bindir)s/dbsh') # might conflict, not needed in package
