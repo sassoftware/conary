@@ -1,3 +1,8 @@
+Changes in 2.3.12:
+  o New Features:
+    * Switched r.Properties to taking a full config descriptor rather
+      than field snippets. (CNY-3730)
+
 Changes in 2.3.11:
   o New Features:
     * Added a --to-file option to "cvc cook" to write the result of a
