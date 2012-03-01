@@ -31,7 +31,7 @@ from testutils import mock
 try:
     from xml.etree import ElementTree as etree
 except ImportError:
-    from elementtree import ElementTree as etree
+    from elementtree import ElementTree as etree  # pyflakes=ignore
 
 from conary.lib import digestlib, log, util
 from conary_test import rephelp
