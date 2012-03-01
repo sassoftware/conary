@@ -92,7 +92,6 @@ class ConaryTest(CPackageRecipe):
             'python-pgsql:python',
             'python:runtime',
             'python-setuptools:python',
-            'smartform:python',
             'sqlite:devel',
             'squid:runtime',
             'subversion:runtime',

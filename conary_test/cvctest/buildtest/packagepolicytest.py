@@ -25,11 +25,10 @@ import os
 import re
 import stat
 import sys
-from StringIO import StringIO
 
 from testutils import mock
 
-from smartform import descriptor
+from xml.etree import ElementTree as etree
 
 from conary.lib import digestlib, log, util
 from conary_test import rephelp
@@ -7860,13 +7859,13 @@ class TestProperties(PackageRecipe):
 
         props = {}
         for prop in trv.troveInfo.properties.iter():
-            desc = descriptor.BaseDescriptor()
-            desc.parseStream(StringIO(prop.definition()))
-            props.update([ (x.get_name(), x) for x in desc.getDataFields() ])
+            et = etree.fromstring(prop.definition())
+            props.update([ (x.find('name').text, x)
+                for x in et.find('dataFields').findall('field') ])
 
         self.assertEquals(sorted(props.keys()), ['proxy', 'username'])
-        self.assertEquals(props['proxy'].get_default(), ['foo.example.com', ])
-        self.assertEquals(props['username'].get_default(), [])
+        self.assertEquals(props['proxy'].find('default').text, 'foo.example.com')
+        self.assertEquals(props['username'].find('default'), None)
 
         # now make sure that it got into the repository
         repos = self.openRepository()
@@ -7905,13 +7904,13 @@ class TestProperties(PackageRecipe):
         for prop in trv.troveInfo.properties.iter():
             self.failUnlessEqual(prop.type(), 'sf')
 
-            desc = descriptor.BaseDescriptor()
-            desc.parseStream(StringIO(prop.definition()))
-            props.update([ (x.get_name(), x) for x in desc.getDataFields() ])
+            et = etree.fromstring(prop.definition())
+            props.update([ (x.find('name').text, x)
+                for x in et.find('dataFields').findall('field') ])
 
         self.assertEquals(sorted(props.keys()), ['george', 'username'])
-        self.assertEquals(props['username'].get_default(), [])
-        self.assertEquals(props['george'].get_default(), ['monkey', ])
+        self.assertEquals(props['username'].find('default'), None)
+        self.assertEquals(props['george'].find('default').text, 'monkey')
 
         # now make sure that it got into the repository
         repos = self.openRepository()
@@ -7943,12 +7942,12 @@ class TestProperties(PackageRecipe):
         for prop in trv.troveInfo.properties.iter():
             self.failUnlessEqual(prop.type(), 'sf')
 
-            desc = descriptor.BaseDescriptor()
-            desc.parseStream(StringIO(prop.definition()))
-            props.update([ (x.get_name(), x) for x in desc.getDataFields() ])
+            et = etree.fromstring(prop.definition())
+            props.update([ (x.find('name').text, x)
+                for x in et.find('dataFields').findall('field') ])
 
         self.assertEquals(sorted(props.keys()), ['username'])
-        self.assertEquals(props['username'].get_default(), [])
+        self.assertEquals(props['username'].find('default'), None)
 
         # now make sure that it got into the repository
         repos = self.openRepository()
