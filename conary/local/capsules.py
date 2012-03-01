@@ -252,6 +252,11 @@ class MetaCapsuleOperations(CapsuleOperation):
         if self.skipCapsuleOps:
             return True
 
+        if troveCs.getNewVersion().onPhantomLabel():
+            # "Installing" a phantom trove is simply taking over an existing
+            # installed capsule.
+            return True
+
         capsule = self.getCapsule(capsuleInfo.type())
         capsule.install(flags, troveCs)
 
@@ -275,3 +280,122 @@ class MetaCapsuleOperations(CapsuleOperation):
             e += capsule.getErrors()
 
         return e
+
+
+class MetaCapsuleDatabase(object):
+    """
+    Top-level object for operations on different types of capsules at the
+    whole-system level.
+    """
+    availablePlugins = {
+            'rpm': ('conary.local.rpmcapsule', 'RpmCapsulePlugin',
+                '/var/lib/rpm'),
+            }
+
+    def __init__(self, db):
+        self.db = db
+        self._loadedPlugins = {}
+
+    def loadPlugins(self):
+        """
+        Determine which capsule plugins are relevant to this system, and load
+        them.
+
+        This uses a simple test such as the existence of a directory to
+        determine whether each plugin is useful. At some point the contents of
+        the conary database should also be factored in, so that deleting the
+        capsule target database and running a sync should erase all of those
+        capsule troves.
+        """
+        for kind, (module, className, checkFunc
+                ) in self.availablePlugins.iteritems():
+            if kind in self._loadedPlugins:
+                continue
+            if isinstance(checkFunc, basestring):
+                checkFunc = lambda _path=checkFunc: os.path.isdir(
+                        util.joinPaths(self.db.root, _path))
+            elif not callable(checkFunc):
+                raise TypeError("Third element of plugin tuple must be a "
+                        "string or a callable")
+            if not checkFunc():
+                continue
+            __import__(module)
+            cls = getattr(sys.modules[module], className)
+            self._loadedPlugins[kind] = cls(self.db)
+
+    def getChangeSetForCapsuleChanges(self):
+        self.loadPlugins()
+        changeSet = changeset.ChangeSet()
+        for plugin in self._loadedPlugins.itervalues():
+            plugin.addCapsuleChangesToChangeSet(changeSet)
+        return changeSet
+
+
+class BaseCapsulePlugin(object):
+    kind = None
+
+    def __init__(self, db):
+        self.db = db
+        self.root = db.root
+        assert self.kind
+
+    def getCapsuleKeysFromLocal(self):
+        """
+        Return a mapping of capsule keys to NVF tuples for all capsules of this
+        type presently in the Conary database.
+        """
+        tupsByKey = {}
+        for tup, data in self.db.db.getAllTroveInfo(
+                trove._TROVEINFO_TAG_CAPSULE):
+            capsuleInfo = trove.TroveCapsule(data)
+            if capsuleInfo.type() != self.kind:
+                continue
+            key = self._getCapsuleKeyFromInfo(capsuleInfo)
+            tupsByKey[key] = tup
+        return tupsByKey
+
+    def _getCapsuleKeyFromInfo(self, capsuleStream):
+        """
+        Convert a capsule troveinfo stream to a simple tuple that uniquely
+        identifies the capsule.
+        """
+        raise NotImplementedError
+
+    def getCapsuleKeysFromTarget(self):
+        """
+        Return a mapping of capsule keys to packages (opaque, target-specific
+        objects) for all packages in the target capsule database.
+        """
+        raise NotImplementedError
+
+    def getCapsuleChanges(self):
+        """
+        Return the rest of removed and added packages in the Conary database
+        relative to the target database.
+        """
+        local = self.getCapsuleKeysFromLocal()
+        localSet = set(local)
+        target = self.getCapsuleKeysFromTarget()
+        targetSet = set(target)
+        removedTups = set(local[x] for x in localSet - targetSet)
+        addedPkgs = set(target[x] for x in targetSet - localSet)
+        return removedTups, addedPkgs
+
+    def _addPhantomTrove(self, changeSet, package):
+        """
+        Given an opauque, target-specific package object, create a phantom
+        trove representing that package for the Conary database and add it to
+        the given changeset.
+        """
+        raise NotImplementedError
+
+    def addCapsuleChangesToChangeSet(self, changeSet):
+        """
+        Find added or removed packages in the target capusle database and place
+        the equivalent Conary operations into the given changeset.
+        """
+        removedTups, addedPkgs = self.getCapsuleChanges()
+        for name, version, flavor in removedTups:
+            changeSet.oldTrove(name, version, flavor)
+        for pkg in addedPkgs:
+            self._addPhantomTrove(changeSet, pkg)

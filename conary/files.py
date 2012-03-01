@@ -675,7 +675,7 @@ class RegularFile(File):
         File.__init__(self, *args, **kargs)
 
 def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
-                       assumeRoot = False, statBuf = None):
+        assumeRoot=False, statBuf=None, sha1FailOk=False):
     if statBuf:
         s = statBuf
     else:
@@ -686,6 +686,11 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
     if assumeRoot:
         owner = 'root'
         group = 'root'
+    elif isinstance(s.st_uid, basestring):
+        # Already stringified -- some capsule code will fabricate a stat result
+        # from e.g. a RPM header
+        owner = s.st_uid
+        group = s.st_gid
     else:
         # + is not a valid char in user/group names; if the uid is not mapped
         # to a user, prepend it with + and store it as a string
@@ -777,7 +782,13 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
             f.contents.size.set(size)
             sha1 = d.digest()
         else:
-            sha1 = sha1helper.sha1FileBin(path)
+            try:
+                sha1 = sha1helper.sha1FileBin(path)
+            except OSError:
+                if sha1FailOk:
+                    sha1 = sha1helper.sha1Empty
+                else:
+                    raise
             f.contents.size.set(s.st_size)
 
         f.contents.sha1.set(sha1)

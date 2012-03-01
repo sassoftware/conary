@@ -1360,8 +1360,16 @@ class Flags(object):
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__,
-                "".join( flag for flag in self.__slots__
-                            if getattr(self, flag) ) )
+                ", ".join( "%s=%r" % (flag, getattr(self, flag))
+                    for flag in self.__slots__ if getattr(self, flag) ) )
+
+    def copy(self):
+        new = type(self)()
+        for flag in self.__slots__:
+            value = getattr(self, flag)
+            object.__setattr__(new, flag, value)
+        return new
+
 
 def stripUserPassFromUrl(url):
     arr = list(urlparse.urlparse(url))
