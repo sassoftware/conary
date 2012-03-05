@@ -683,7 +683,7 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         cfg.configLine("proxyMap 1.1.1.1 direct")
         pm = cfg.getProxyMap()
         from conary.lib.http import proxy_map
-        self.failUnlessEqual([ x for x in pm.getProxyIter('1.1.1.1') ],
+        self.assertEquals([ x for x in pm.getProxyIter('1.1.1.1') ],
             [ proxy_map.DirectConnection ])
 
     def testDependencyClassList(self):
