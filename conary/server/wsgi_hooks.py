@@ -106,13 +106,7 @@ class ConaryRouter(object):
             cfg = netserver.ServerConfig()
             cfg.read(cfgPath)
         handler = ConaryHandler(cfg)
-        try:
-            response = handler.handleRequest(request)
-            iterator = response(request.environ, start_response)
-        except:
-            handler.close()
-            raise
-        return ClosableResponseWrapper(iterator, handler.close)
+        return handler.handleRequest(request.environ)
 
     def handleError(self, request, exc_info, start_response):
         trace, tracePath = self._formatErrorLarge(request, exc_info)
@@ -293,6 +287,16 @@ class ConaryHandler(object):
                 )
 
     def handleRequest(self, request):
+        try:
+            return self._handleRequest(request)
+        finally:
+            # This closes the repository server immediately after the initial
+            # request handling phase, meaning that 'generator' responses will
+            # not have access to it. Currently the only generator is
+            # _produceChangeset() which does not need a repository server.
+            self.close()
+
+    def _handleRequest(self, request):
         self.request = request
         self._loadCfg()
         self._loadAuth()
@@ -526,25 +530,13 @@ class ConaryHandler(object):
         # Make sure any pooler database connections are released.
         if self.repositoryServer:
             self.repositoryServer.close()
+        self.request = None
+        self.auth = None
+        self.isSecure = None
+        self.repositoryServer = None
+        self.proxyServer = None
+        self.restHandler = None
 
 
 class ConfigurationError(RuntimeError):
     pass
-
-
-class ClosableResponseWrapper(object):
-
-    def __init__(self, iterator, closeFunc):
-        self.iterator = iterator
-        self.closeFunc = closeFunc
-
-    def __len__(self): return len(self.iterator)
-    def __iter__(self): return iter(self.iterator)
-    def __getitem__(self, key): return self.iterator[key]
-
-    def close(self):
-        self.closeFunc()
-        try:
-            self.iterator.close()
-        except AttributeError:
-            pass
