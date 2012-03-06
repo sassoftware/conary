@@ -644,15 +644,14 @@ class Recipe(object):
     def _getOldMetadata(self):
         return self._oldMetadataMap
 
-    def _addProperty(self, ptype, main, comp, name, xml, default):
+    def _addProperty(self, ptype, main, comp, xml):
         l = self._propertyMap.setdefault((main, comp), [])
-        l.append((ptype, name, xml, default))
+        l.append((ptype, xml))
 
     def _setProperties(self, trv, main, comp):
         key = (main, comp)
-        for ptype, name, xml, default in self._propertyMap.get(key, []):
-            trv.troveInfo.properties.add(ptype, name, xml,
-                                         defaultValue = default)
+        for ptype, xml in self._propertyMap.get(key, []):
+            trv.troveInfo.properties.add(ptype, xml)
 
     def needsCrossFlags(self):
         return self._isCrossCompileTool or self._isCrossCompiling

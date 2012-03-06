@@ -45,7 +45,9 @@ class CommitChangeSetFlags(util.Flags):
     __slots__ = [ 'replaceManagedFiles', 'replaceUnmanagedFiles',
                   'replaceModifiedFiles', 'justDatabase', 'localRollbacks',
                   'test', 'keepJournal', 'replaceModifiedConfigFiles',
-                  'skipCapsuleOps', 'noScripts' ]
+                  'skipCapsuleOps', 'noScripts',
+                  'ignoreMissingFiles',
+                  ]
 
 class Rollback:
 
@@ -2073,7 +2075,9 @@ class Database(SqlDbRepository):
             replaceModifiedFiles = commitFlags.replaceModifiedFiles,
             replaceModifiedConfigFiles = commitFlags.replaceModifiedConfigFiles,
             skipCapsuleOps = commitFlags.skipCapsuleOps,
-            replaceManagedSet = uJob.getAllowedPathConflicts() )
+            replaceManagedSet = uJob.getAllowedPathConflicts(),
+            ignoreMissingFiles=commitFlags.ignoreMissingFiles,
+            )
 
         if rollbackPhase:
             flags.missingFilesOkay = True
@@ -2113,8 +2117,9 @@ class Database(SqlDbRepository):
             origTrove = dbCache.getTrove(name, version, flavor,
                                          pristine = True)
             assert(trv)
-            troveList.append((trv, origTrove, rollbackVersion,
-                              update.UpdateFlags(missingFilesOkay = True)))
+            eraseFlags = flags.copy()
+            eraseFlags.missingFilesOkay = True
+            troveList.append((trv, origTrove, rollbackVersion, eraseFlags))
 
         callback.creatingRollback()
 

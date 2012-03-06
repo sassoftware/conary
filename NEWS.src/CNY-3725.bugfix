@@ -1,1 +1,0 @@
-The recipe loader now resolves autoLoadRecipe entries using the searchFlavor rather than buildFlavor.

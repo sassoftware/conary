@@ -59,6 +59,7 @@ class ConaryTest(CPackageRecipe):
         'conary-testenv',
         'cvs:runtime',
         'desktop-file-utils:runtime',
+        'elementtree:python',
         'elfutils:devel',
         'elfutils:runtime',
         'epdb:python',

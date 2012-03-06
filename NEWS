@@ -1,3 +1,21 @@
+Changes in 2.3.12:
+  o New Features:
+    * Switched r.Properties to taking a full config descriptor rather
+      than field snippets. (CNY-3730)
+
+Changes in 2.3.11:
+  o New Features:
+    * Added a --to-file option to "cvc cook" to write the result of a
+      repository cook to file instead of committing.
+    * Added support for specifying config properties that are attached
+      to files rather than specific components.
+
+  o Bug Fixes:
+    * Fixed refreshing of autosourced URLs that contain a question mark.
+      (CNY-3722)
+    * The recipe loader now resolves autoLoadRecipe entries using the
+      search flavor rather than buildFlavor. (CNY-3725)
+
 Changes in 2.3.10:
   o New Features:
     * Added support for caching repository passwords with keyutils

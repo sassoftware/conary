@@ -1106,6 +1106,11 @@ class TroveRpmCapsule(streams.StreamSet):
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
 
+    def getNevra(self):
+        return rpmhelper.NEVRA(self.name(), self.epoch(), self.version(),
+                self.release(), self.arch())
+
+
 class MsiComponent(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
@@ -1282,13 +1287,10 @@ class PropertySet(streams.StreamCollection):
     streamDict = { 1 : Property }
     ignoreSkipSet = True
 
-    def add(self, propertyType, name, dataDefinition, defaultValue = None):
+    def add(self, propertyType, dataDefinition):
         assert(propertyType == _PROPERTY_TYPE_SMARTFORM)
         prop = Property()
-        prop.name.set(name)
         prop.type.set(propertyType)
-        if defaultValue is not None:
-            prop.default.set(defaultValue)
         prop.definition.set(dataDefinition)
         self.addStream(1, prop)
 

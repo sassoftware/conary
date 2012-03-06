@@ -1020,6 +1020,7 @@ class Properties(policy.Policy):
     supported_targets = (TARGET_LINUX, TARGET_WINDOWS)
     bucket = policy.PACKAGE_CREATION
     processUnmodified = True
+    _supports_file_properties = True
     requires = (
         # We need to know what component files have been assigned to
         ('PackageSpec', policy.REQUIRED_PRIOR),
@@ -1103,11 +1104,8 @@ class Properties(policy.Policy):
             return
 
         pkgSet.add((pkgName, compName))
-
-        xmldata = smartform.SmartFormFieldParser(xml)
-
-        self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM,
-            pkgName, compName, xmldata.name, xml, xmldata.default)
+        self.recipe._addProperty(trove._PROPERTY_TYPE_SMARTFORM, pkgName,
+            compName, xml)
 
 
 class MakeDevices(policy.Policy):
