@@ -2119,7 +2119,7 @@ class Database(SqlDbRepository):
             assert(trv)
             eraseFlags = flags.copy()
             eraseFlags.missingFilesOkay = True
-            troveList.append((trv, origTrove, rollbackVersion, flags))
+            troveList.append((trv, origTrove, rollbackVersion, eraseFlags))
 
         callback.creatingRollback()
 
