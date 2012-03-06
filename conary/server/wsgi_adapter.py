@@ -35,18 +35,23 @@ def modpython_to_webob(mpreq, handler):
     environ['wsgi.multithread'] = False
     environ['wsgi.multiprocess'] = True
     environ['wsgi.run_once'] = False
+    for key, value in mpreq.headers_in.items():
+        key = 'HTTP_' + key.upper().replace('-', '_')
+        environ[key] = value
 
     request = webob.Request(environ)
     response = handler(request)
 
     mpreq.status = response.status_int
-    for key, value in response.headerlist:
-        if key.lower() == 'content-length':
-            mpreq.set_content_length(int(value))
-        elif key.lower() == 'content-type':
-            mpreq.content_type = value
-        else:
-            mpreq.headers_out.add(key, value)
-    for chunk in response.app_iter:
+    def start_response(status, headers, exc_info=None):
+        for key, value in response.headerlist:
+            if key.lower() == 'content-length':
+                mpreq.set_content_length(int(value))
+            elif key.lower() == 'content-type':
+                mpreq.content_type = value
+            else:
+                mpreq.headers_out.add(key, value)
+        return mpreq
+    for chunk in response(environ, start_response):
         mpreq.write(chunk)
     return apache.OK
