@@ -56,7 +56,7 @@ class ProxyMap(object):
                     target = DirectConnection
                 else:
                     target = req_mod.URL.parse(target)
-            if (replaceScheme and target is not DirectConnection and
+            if (replaceScheme and target != DirectConnection and
                     target.scheme.startswith('http')):
                 # https -> conarys, etc.
                 target = target._replace(
@@ -109,7 +109,7 @@ class ProxyMap(object):
             targets = targets[:]
             random.shuffle(targets)
             for target in targets:
-                if target is not DirectConnection:
+                if target != DirectConnection:
                     if target.scheme not in protocolFilter:
                         # Target isn't usable for whatever request is being
                         # made.
@@ -165,8 +165,21 @@ class FilterSpec(networking.namedtuple('FilterSpec', 'protocol address')):
         return self.address.match(url.hostport)
 
 
-class DirectConnection(object):
+class DirectConnectionType(object):
+    """
+    This singleton is used instead of a URL for strategies that connect
+    directly to the target, instead of through a proxy.
+    """
     __slots__ = ()
+
+    def __new__(cls):
+        # This is necessary to prevent various things from creating more than
+        # one instance. It's still possible that some things might
+        # double-instantiate though, so the recommended way to test against
+        # this singleton is to check for equality.
+        if not hasattr(cls, '_instance'):
+            cls._instance = object.__new__(cls)
+        return cls._instance
 
     def __str__(self):
         return 'DIRECT'
@@ -174,4 +187,15 @@ class DirectConnection(object):
     def __repr__(self):
         return 'DirectConnection'
 
-DirectConnection = DirectConnection()
+    def __eq__(self, other):
+        return isinstance(other, type(self))
+
+    def __ne__(self, other):
+        return not isinstance(other, type(self))
+
+    def __reduce__(self):
+        # Pickle v1 will bypass __new__ for some reason unless this is here.
+        return (type(self), ())
+
+
+DirectConnection = DirectConnectionType()

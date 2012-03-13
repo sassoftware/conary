@@ -2389,6 +2389,9 @@ class TimestampedMap(object):
             if stale or now <= v[1] ]
         return ret
 
+    def __reduce__(self):
+        return (type(self), (self.delta,))
+
 
 def statFile(pathOrFile, missingOk=False, inodeOnly=False):
     """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
