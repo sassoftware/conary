@@ -147,7 +147,7 @@ class URLOpener(object):
 
             for proxySpec in connIterator:
                 totalAttempts += 1
-                if proxySpec is proxy_map.DirectConnection:
+                if proxySpec == proxy_map.DirectConnection:
                     proxySpec = None
                 elif not forceProxy and self._shouldBypass(req.url, proxySpec):
                     proxySpec = None
