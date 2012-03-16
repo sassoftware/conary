@@ -585,6 +585,7 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
         return headersByKey
 
     def _getPhantomNVF(self, header):
+        """Choose a NVF for a new phantom package"""
         binCount = 1
         while True:
             name, _, version, release, arch = header.getNevra()
@@ -603,6 +604,7 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
             binCount += 1
 
     def _addPhantomContents(self, changeSet, trv, header):
+        """Fabricate files for the given RPM header"""
         for (path, owner, group, mode, size, rdev, flags, vflags, linkto,
                 mtime) in itertools.izip(
                         header[rpmhelper.OLDFILENAMES],
@@ -677,8 +679,10 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
                         cfgFile=fileStream.flags.isConfig(),
                         )
 
-    def _addPhantomTrove(self, changeSet, rpmlibHeader):
+    def _addPhantomTrove(self, changeSet, rpmlibHeader, callback, num, total):
         header = rpmhelper.headerFromBlob(rpmlibHeader.unload())
+        callback.capsuleSyncCreate(self.kind, str(header.getNevra()), num,
+                total)
         name, version, flavor = self._getPhantomNVF(header)
         # Fake trove
         trv = trove.Trove(name, version, flavor)

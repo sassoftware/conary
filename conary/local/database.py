@@ -32,6 +32,7 @@ from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, sha1helper, sigprotect, util, api
+from conary.local import capsules as capsulesmod
 from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
 from conary.local.journal import JobJournal, NoopJobJournal
@@ -2060,12 +2061,14 @@ class Database(SqlDbRepository):
                         rollbackPhase = None, updateDatabase = True,
                         tagScript = None,
                         journal = None,
-                        callback = UpdateCallback(),
+                        callback = None,
                         removeHints = {}, autoPinList = RegularExpressionList(),
                         deferredScripts = None, commitFlags = None,
                         repair = False, capsuleChangeSet = None):
         assert(not cs.isAbsolute())
 
+        if callback is None:
+            callback = UpdateCallback()
         if commitFlags is None:
             commitFlags = CommitChangeSetFlags()
 
@@ -2566,7 +2569,7 @@ class Database(SqlDbRepository):
             self.close()
 
     def _applyRollbackList(self, repos, names, replaceFiles = False,
-                          callback = UpdateCallback(), tagScript = None,
+                          callback = None, tagScript = None,
                           justDatabase = False, transactionCounter = None,
                           lazyCache = None, abortOnError = False,
                           noScripts = False, capsuleChangeSet = None):
@@ -2575,6 +2578,8 @@ class Database(SqlDbRepository):
         if transactionCounter != self.getTransactionCounter():
             raise RollbackError(names, "Database state has changed, please "
                 "run the rollback command again")
+        if callback is None:
+            callback = UpdateCallback()
 
         last = self.rollbackStack.last
         for name in names:
@@ -2890,6 +2895,28 @@ class Database(SqlDbRepository):
         j.revert()
         os.unlink(opJournalPath)
 
+    def syncCapsuleDatabase(self, callback=None):
+        if callback is None:
+            callback = UpdateCallback()
+        changeSet = self.capsuleDb.getChangeSetForCapsuleChanges(callback)
+        if changeSet.isEmpty():
+            return 0
+        added = len(changeSet.newTroves)
+        removed = len(changeSet.oldTroves)
+        callback.capsuleSyncApply(added, removed)
+        commitFlags = CommitChangeSetFlags(
+                justDatabase=True,
+                replaceManagedFiles=True,
+                skipCapsuleOps=True,
+                )
+        updateJob = UpdateJob(self, closeDatabase=False)
+        self.commitChangeSet(changeSet, updateJob,
+                callback=callback,
+                commitFlags=commitFlags,
+                repair=True,
+                )
+        return added + removed
+
     def _initDb(self):
         SqlDbRepository._initDb(self)
         if (self.opJournalPath and os.path.exists(self.opJournalPath)
@@ -2897,6 +2924,10 @@ class Database(SqlDbRepository):
             raise ExistingJournalError(os.path.dirname(self.opJournalPath),
                     'journal file exists. use revert command to '
                     'undo the previous (failed) operation')
+
+    @util.cachedProperty
+    def capsuleDb(self):
+        return capsulesmod.MetaCapsuleDatabase(self)
 
     def __init__(self, root, path, modelPath=None, timeout=None, modelFile=None):
         """

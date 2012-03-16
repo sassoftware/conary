@@ -3822,6 +3822,10 @@ conary erase '%s=%s[%s]'
                 # 'threaded False' to your conary config.
                 pass
 
+    @api.publicApi
+    def syncCapsuleDatabase(self, callback=None):
+        return self.db.syncCapsuleDatabase(callback)
+
 
 class UpdateError(ClientError):
     """Base class for update errors"""

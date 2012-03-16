@@ -16,9 +16,14 @@
 #
 
 
-import os, tempfile, sys
+import os
+import sys
+import tempfile
+import weakref
 
-from conary import errors, files, trove
+from conary import errors
+from conary import files
+from conary import trove
 from conary.lib import digestlib, util
 from conary.local import journal
 from conary.repository import changeset
@@ -293,7 +298,7 @@ class MetaCapsuleDatabase(object):
             }
 
     def __init__(self, db):
-        self.db = db
+        self._db = weakref.ref(db)
         self._loadedPlugins = {}
 
     def loadPlugins(self):
@@ -307,27 +312,26 @@ class MetaCapsuleDatabase(object):
         capsule target database and running a sync should erase all of those
         capsule troves.
         """
+        db = self._db()
         for kind, (module, className, checkFunc
                 ) in self.availablePlugins.iteritems():
             if kind in self._loadedPlugins:
                 continue
             if isinstance(checkFunc, basestring):
                 checkFunc = lambda _path=checkFunc: os.path.isdir(
-                        util.joinPaths(self.db.root, _path))
-            elif not callable(checkFunc):
-                raise TypeError("Third element of plugin tuple must be a "
-                        "string or a callable")
+                        util.joinPaths(db.root, _path))
             if not checkFunc():
                 continue
             __import__(module)
             cls = getattr(sys.modules[module], className)
-            self._loadedPlugins[kind] = cls(self.db)
+            self._loadedPlugins[kind] = cls(db)
 
-    def getChangeSetForCapsuleChanges(self):
+    def getChangeSetForCapsuleChanges(self, callback):
         self.loadPlugins()
         changeSet = changeset.ChangeSet()
         for plugin in self._loadedPlugins.itervalues():
-            plugin.addCapsuleChangesToChangeSet(changeSet)
+            callback.capsuleSyncScan(plugin.kind)
+            plugin.addCapsuleChangesToChangeSet(changeSet, callback)
         return changeSet
 
 
@@ -335,9 +339,13 @@ class BaseCapsulePlugin(object):
     kind = None
 
     def __init__(self, db):
-        self.db = db
         self.root = db.root
+        self._db = weakref.ref(db)
         assert self.kind
+
+    @property
+    def db(self):
+        return self._db()
 
     def getCapsuleKeysFromLocal(self):
         """
@@ -377,19 +385,21 @@ class BaseCapsulePlugin(object):
         localSet = set(local)
         target = self.getCapsuleKeysFromTarget()
         targetSet = set(target)
-        removedTups = set(local[x] for x in localSet - targetSet)
-        addedPkgs = set(target[x] for x in targetSet - localSet)
+        removedTups = [x[1] for x in sorted(
+            (y, local[y]) for y in localSet - targetSet)]
+        addedPkgs = [x[1] for x in sorted(
+            (y, target[y]) for y in targetSet - localSet)]
         return removedTups, addedPkgs
 
-    def _addPhantomTrove(self, changeSet, package):
+    def _addPhantomTrove(self, changeSet, package, callback, n, total):
         """
-        Given an opauque, target-specific package object, create a phantom
+        Given an opaque, target-specific package object, create a phantom
         trove representing that package for the Conary database and add it to
         the given changeset.
         """
         raise NotImplementedError
 
-    def addCapsuleChangesToChangeSet(self, changeSet):
+    def addCapsuleChangesToChangeSet(self, changeSet, callback):
         """
         Find added or removed packages in the target capusle database and place
         the equivalent Conary operations into the given changeset.
@@ -397,5 +407,5 @@ class BaseCapsulePlugin(object):
         removedTups, addedPkgs = self.getCapsuleChanges()
         for name, version, flavor in removedTups:
             changeSet.oldTrove(name, version, flavor)
-        for pkg in addedPkgs:
-            self._addPhantomTrove(changeSet, pkg)
+        for n, pkg in enumerate(addedPkgs):
+            self._addPhantomTrove(changeSet, pkg, callback, n, len(addedPkgs))
