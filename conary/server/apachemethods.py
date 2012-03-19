@@ -105,7 +105,11 @@ def post(port, isSecure, repos, req, authToken=None):
                 # we want to use 4.5.6.7
                 clients = req.headers_in['X-Forwarded-For']
                 remoteIp = clients.split(',')[-1].strip()
-            request = xmlshims.RequestArgs.fromWire(params)
+            try:
+                request = xmlshims.RequestArgs.fromWire(params)
+            except (TypeError, ValueError, IndexError):
+                req.log_error('error parsing XMLRPC arguments')
+                return apache.HTTP_BAD_REQUEST
             try:
                 response, extraInfo = repos.callWrapper(
                         protocol=protocol,

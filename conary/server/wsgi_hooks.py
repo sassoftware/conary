@@ -308,7 +308,11 @@ class ConaryHandler(object):
 
         localAddr = '%s:%s' % (self.request.server_name,
                 self.request.server_port)
-        request = self.requestFilter.fromWire(params)
+        try:
+            request = self.requestFilter.fromWire(params)
+        except (TypeError, ValueError, IndexError):
+            return self._makeError('400 Bad Request',
+                    "Malformed XMLRPC arguments")
 
         # Execution phase -- locate and call the target method
         try:
