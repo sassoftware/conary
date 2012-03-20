@@ -107,7 +107,7 @@ class ConaryRouter(object):
             cfg = netserver.ServerConfig()
             cfg.read(cfgPath)
         handler = ConaryHandler(cfg)
-        return handler.handleRequest(request.environ)
+        return handler.handleRequest(request)
 
     def handleError(self, request, exc_info, start_response):
         trace, tracePath = self._formatErrorLarge(request, exc_info)
