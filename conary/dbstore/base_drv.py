@@ -17,20 +17,12 @@
 
 
 import sys
-import traceback
 import re
 
 import sqlerrors, sqllib
 
 
 DEFAULT_ENCODING = 'UTF-8'
-
-(DEBUG_OFF,
-        DEBUG_WARN, # Print stack on invalid txn ops
-        DEBUG_WARN_ALL, # Print stack on all txn ops
-        DEBUG_ERROR, # Enter debugger on invalid txn ops
-    ) = range(4)
-DEBUG_TRANSACTIONS = DEBUG_OFF
 
 
 # class for encapsulating binary strings for dumb drivers
@@ -379,35 +371,8 @@ class BaseDatabase:
         pass
 
     # transaction support
-    def _logTransaction(self, command):
-        """
-        Check for txn sanity, when configured to do so.
-        """
-        # pylint: disable-msg=W0212
-        #  * _getframe needed to make a nicer stack dump.
-        assert command in ('BEGIN', 'ROLLBACK', 'COMMIT')
-        if DEBUG_TRANSACTIONS == DEBUG_OFF:
-            return
-        shouldBeInTrans = (command != 'BEGIN')
-        inTrans = self.inTransaction(default=shouldBeInTrans)
-        if inTrans == shouldBeInTrans:
-            if DEBUG_TRANSACTIONS == DEBUG_WARN_ALL:
-                print >> sys.stderr, 'Transaction: %s at' % (command,)
-                traceback.print_stack(sys._getframe(2))
-            return
-
-        where = (inTrans and 'inside' or 'outside')
-        if DEBUG_TRANSACTIONS == DEBUG_ERROR:
-            print >> sys.stderr, 'Transaction bug: %s %s of transaction' % (command, where)
-            from conary.lib import debugger
-            debugger.st()
-        else:
-            print >> sys.stderr, 'Transaction bug: %s %s of transaction at:' % (command, where)
-            traceback.print_stack(sys._getframe(2))
-
     def commit(self):
         assert(self.dbh)
-        self._logTransaction('COMMIT')
         return self.dbh.commit()
 
     def transaction(self, name = None):
@@ -415,7 +380,6 @@ class BaseDatabase:
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
-        self._logTransaction('BEGIN')
         c = self.cursor()
         c.execute(self.basic_transaction)
         return c
@@ -425,7 +389,6 @@ class BaseDatabase:
         # basic class does not support savepoints
         assert(not name)
         assert(self.dbh)
-        self._logTransaction('ROLLBACK')
         return self.dbh.rollback()
 
     @staticmethod

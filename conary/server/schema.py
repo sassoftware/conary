@@ -1340,9 +1340,6 @@ def resetTable(cu, name):
 
 # create the (permanent) server repository schema
 def createSchema(db, commit=True):
-    if commit:
-        db.transaction()
-
     if not hasattr(db, "tables"):
         db.loadSchema()
 
