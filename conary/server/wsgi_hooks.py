@@ -68,7 +68,8 @@ class ConaryRouter(object):
         environ.update(self.envOverrides)
         request = self.requestFactory(environ)
         try:
-            return self.handleRequest(request, start_response)
+            response = self.handleRequest(request, start_response)
+            return response(environ, start_response)
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
