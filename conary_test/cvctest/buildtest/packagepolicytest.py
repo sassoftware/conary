@@ -3401,11 +3401,11 @@ class TestRequires(PackageRecipe):
         self.cfg.sourceSearchDir = sourceDir
         util.mkdirChain(sourceDir)
 
-        # python 2.6 has switched to itertools
-        if sys.version_info >= (2, 6):
-            itertoolsModuleName = "itertools"
-        else:
-            itertoolsModuleName = "itertoolsmodule"
+        # Python < 2.5 uses "foomodule.so", but Red Hat seems to keep this
+        # behavior even with newer versions. So just import the module to
+        # figure it out.
+        itertoolsModuleName = os.path.basename(
+                itertools.__file__).split('.')[0]
 
         libPath = os.path.dirname(elf.__file__)
         util.copyfile(util.joinPaths(libPath, 'elf.so'),
