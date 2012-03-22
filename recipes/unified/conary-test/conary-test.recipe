@@ -139,6 +139,8 @@ class ConaryTest(CPackageRecipe):
             'mod_ssl:rpm',
             'net-tools:rpm',
             'patch:rpm',
+            'perl:rpm',
+            'perl-CGI:rpm',
             'popt-devel:rpm',
             'postgresql:rpm',
             'postgresql-server:rpm',
