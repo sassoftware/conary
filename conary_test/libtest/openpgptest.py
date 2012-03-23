@@ -26,7 +26,7 @@ import time
 try:
     from collections import namedtuple
 except ImportError:
-    from conary.lib.compat import namedtuple
+    from conary.lib.compat import namedtuple  # pyflakes=ignore
 
 SEEK_SET = 0
 SEEK_CUR = 1
