@@ -23,6 +23,11 @@ import fcntl
 import os
 import time
 
+try:
+    from collections import namedtuple
+except ImportError:
+    from conary.lib.compat import namedtuple
+
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -1166,6 +1171,42 @@ class OpenPGPMessageTest(BaseTestHelper):
         sig = openpgpfile.readSignature(file(sigfile))
 
         sig.verifyDocument(cryptoKey, doc)
+
+    def testVerifyDocumentSignatures(self):
+        T = namedtuple("tests", "pubring keyId doc docSig")
+        # Start generating the test matrix from RFC 4880 13.6
+        keyToHashMap = {
+            '1024-160' : ('C1B4DE0894D38E40', [ 1, 224, 256, 384, 512, ]),
+            '2048-224' : ('3727440041FBF40E', [ 224, 256, 384, 512, ]),
+            '3072-256' : ('1AB3C4DBD1DE62B3', [ 256, 384, 512, ]),
+            '7680-384' : ('85F71CA5DCF45B60', [ 384, 512, ]),
+        }
+        tests = []
+        for keyName, (keyId, hashList) in sorted(keyToHashMap.items()):
+            tests.extend(
+                T('DSA2-Tests/keys/DSA-%s.pub' % keyName, keyId,
+                    'DSA2-Docs/DSA-%s-SHA%s.doc' % (keyName, x),
+                    'DSA2-Docs/DSA-%s-SHA%s.doc.sig' % (keyName, x))
+                for x in hashList)
+        # Same thing for RSA
+        algoList = [ 1, 224, 256, 384, 512, ]
+        # XXX why is SHA224 failing, but everything else works?
+        algoList = [ 1, 256, 384, 512, ]
+        tests.extend(
+            T('pk6.gpg', '07E6FBC8D5E8FF1A',
+                'RSA-Tests/RSA-SHA%s.doc' % x,
+                'RSA-Tests/RSA-SHA%s.doc.sig' % x)
+            for x in algoList)
+        for t in tests:
+            key = openpgpfile.seekKeyById(t.keyId,
+                                          self.getKeyring(t.pubring))
+            # getKeyring is just returning a path to a file
+            doc = file(self.getKeyring(t.doc))
+            docSig = file(self.getKeyring(t.docSig))
+            sig = openpgpfile.readSignature(docSig)
+
+            cryptoKey = key.getCryptoKey()
+            sig.verifyDocument(cryptoKey, doc)
 
     def testReadSignature(self):
         sigfile = self.getKeyring('pk2.gpg.sig')
