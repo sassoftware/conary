@@ -1,0 +1,1 @@
+Fixed a bug in the system model dependency solver cache that caused surprising behavior when more than one trove in the search path provided the same dependency.

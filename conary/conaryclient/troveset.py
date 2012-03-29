@@ -103,15 +103,20 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         for dep in depList:
             cachedResult = self.troveCache.getDepSolution(self.troveTupSig,
                                                           dep)
-            if cachedResult:
-                cachedSuggMap[dep] = cachedResult
-            elif cachedResult is None:
+            if cachedResult is None:
+                # Cache miss
                 reqNames.update(_depClassAndName(dep))
                 finalDepList.append(dep)
+            else:
+                # Cache hit ...
+                if cachedResult:
+                    # ... and a trove matched
+                    cachedSuggMap[dep] = cachedResult
 
         if not finalDepList:
             return cachedSuggMap
 
+        # Retrieve provides for all troves in the set
         emptyDep = deps.DependencySet()
         troveDeps = self.troveCache.getDepsForTroveList(self.troveTupList,
                                                         provides = True,
@@ -130,8 +135,9 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                     else:
                         val.append(i)
 
+        # For each requirement to be resolved, load any matching provides into
+        # the resolver DB
         depLoader = self.depDb.bulkLoader()
-
         for classAndName in reqNames:
             val = self.providesIndex.get(classAndName)
             if val is None:
@@ -149,6 +155,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         self.depDb.commit()
 
         if not self.depTroveIdMap:
+            # No requirements were matched by troves in this set, so add
+            # negative cache entries for all of the requirements checked.
             for depSet in depList:
                 self.troveCache.addDepSolution(self.troveTupSig, depSet, [])
             return cachedSuggMap
@@ -156,6 +164,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         suggMap = self.depDb.resolve(label, finalDepList, leavesOnly=leavesOnly,
                                      troveIdList = self.depTroveIdMap.keys())
 
+        # Convert resolver results back to trove tuples and insert into the
+        # suggestion map
         for depSet, solListList in suggMap.iteritems():
             newSolListList = []
             for solList in solListList:
@@ -168,6 +178,8 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
                 self.troveCache.addDepSolution(self.troveTupSig, depSet,
                                                newSolListList)
 
+        # Add negative cache entries for any remaining requirements that
+        # weren't solved
         for depSet in finalDepList:
             if depSet not in suggMap:
                 self.troveCache.addDepSolution(self.troveTupSig, depSet, [])
