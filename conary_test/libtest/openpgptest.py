@@ -1173,6 +1173,7 @@ class OpenPGPMessageTest(BaseTestHelper):
         sig.verifyDocument(cryptoKey, doc)
 
     def testVerifyDocumentSignatures(self):
+        digestlib = openpgpfile.digestlib
         T = namedtuple("tests", "pubring keyId doc docSig")
         # Start generating the test matrix from RFC 4880 13.6
         keyToHashMap = {
@@ -1183,6 +1184,10 @@ class OpenPGPMessageTest(BaseTestHelper):
         }
         tests = []
         for keyName, (keyId, hashList) in sorted(keyToHashMap.items()):
+            # Filter hash algorithms missing from our supporting libs
+            hashList = [ x for x in hashList
+                if getattr(digestlib, "sha%d" % x) is not None ]
+
             tests.extend(
                 T('DSA2-Tests/keys/DSA-%s.pub' % keyName, keyId,
                     'DSA2-Docs/DSA-%s-SHA%s.doc' % (keyName, x),
@@ -1192,6 +1197,10 @@ class OpenPGPMessageTest(BaseTestHelper):
         algoList = [ 1, 224, 256, 384, 512, ]
         # XXX why is SHA224 failing, but everything else works?
         algoList = [ 1, 256, 384, 512, ]
+
+        # Filter hash algorithms missing from our supporting libs
+        algoList = [ x for x in algoList
+            if getattr(digestlib, "sha%d" % x) is not None ]
         tests.extend(
             T('pk6.gpg', '07E6FBC8D5E8FF1A',
                 'RSA-Tests/RSA-SHA%s.doc' % x,
