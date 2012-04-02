@@ -90,6 +90,8 @@ def _convertLabelOrBranch(lblStr, template):
             # Some day we could lift this restriction if its useful.
             raise errors.ParseError('Cannot specify version to promote'
                                     ' - must specify branch or label')
+        if not template:
+            return versions.Label(lblStr)
 
 
         hostName = template.getHost()
