@@ -22,6 +22,7 @@ from conary.deps import deps
 from conary.local import database
 from conary_test import rephelp
 from conary.repository import changeset
+from conary.repository import errors
 from conary.repository.trovesource import (
         ChangesetFilesTroveSource,
         ChangeSetJobSource,
@@ -539,6 +540,24 @@ class ChangesetFilesTest(rephelp.RepositoryHelper):
         # adding the subsources of ts4 to ts3
         for s in ts8.iterSources():
             self.assertFalse(isinstance(s, TroveSourceStack))
+
+    def testUnreachableSource(self):
+        """createChangeSet must not mask network errors without a good reason
+
+        @tests: CNY-3732
+        """
+        repos_alive = self.openRepository(0)
+        repos_dead = self.openRepository(1)
+        trv = self.addComponent('foo:runtime', 'localhost1@rpl:linux',
+                repos=repos_dead)
+        grp = self.addCollection('group-foo', [trv], repos=repos_alive)
+        self.stopRepository(1)
+
+        n, v, f = grp.getNameVersionFlavor()
+        s = stack(repos_alive, repos_dead)
+        self.assertRaises(errors.OpenError, s.createChangeSet,
+                [(n, (None, None), (v, f), True)],
+                recurse=True, withFiles=False)
 
 
 class ChangeSetJobSourceTest(rephelp.RepositoryHelper):
