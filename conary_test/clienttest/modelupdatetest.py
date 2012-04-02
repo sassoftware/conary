@@ -681,3 +681,10 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
                            'install bar',
                            'install group-foobar',
                            ])
+
+    @testhelp.context('sysmodel')
+    def testBranchUpdate(self):
+        "CNY-3645"
+        self.addComponent('foo:runtime', '1.0-1-1')
+        self.addCollection('foo', '1.0-1-1', [':runtime'])
+        self._applyModel([ 'install foo=/localhost@rpl:linux' ])

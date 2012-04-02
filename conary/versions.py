@@ -1407,6 +1407,12 @@ class Branch(VersionSequence):
     def isAncestor(self, other):
         return self.versions == other.versions[:len(self.versions)]
 
+    def isInLocalNamespace(self):
+        if self.label().getNamespace() == 'local':
+            return True
+        else:
+            return False
+
 
 def _parseVersionString(ver, frozen):
     """
