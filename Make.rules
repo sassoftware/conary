@@ -20,6 +20,7 @@ PYVER=$(shell python -c 'import sys; print(sys.version[0:3])')
 PYTHON = /usr/bin/python${PYVER}
 PYINCLUDE = /usr/include/python${PYVER}
 CYTHON = $(PYTHON) /usr/bin/cython
+SED = sed
 
 PYFLAKES = /usr/bin/pyflakes
 
@@ -51,22 +52,22 @@ default-test:
 	$(TESTSUITE) *.py
 
 default-subdirs:
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d || exit 1; done
+	for d in $(SUBDIRS); do $(MAKE) -C $$d DIR=$$d || exit 1; done
 
 check-subdirs:
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d TOPDIR=$(TOPDIR) check || exit 1; done
+	for d in $(SUBDIRS); do $(MAKE) -C $$d DIR=$$d TOPDIR=$(TOPDIR) check || exit 1; done
 
 clean-subdirs:
 ifdef SUBDIRS
-	for d in $(SUBDIRS); do make -C $$d DIR=$(DIR)/$$d clean || exit 1; done
+	for d in $(SUBDIRS); do $(MAKE) -C $$d DIR=$(DIR)/$$d clean || exit 1; done
 endif
 
 install-subdirs:
 ifdef SUBDIRS
-	for d in $(SUBDIRS); do make -C $$d DIR=$(DIR)/$$d install || exit 1; done
+	for d in $(SUBDIRS); do $(MAKE) -C $$d DIR=$(DIR)/$$d install || exit 1; done
 endif
 
 dist-subdirs:
 ifdef SUBDIRS
-	for d in $(SUBDIRS); do make -C $$d DIR=$(DIR)/$$d dist || exit 1; done
+	for d in $(SUBDIRS); do $(MAKE) -C $$d DIR=$(DIR)/$$d dist || exit 1; done
 endif

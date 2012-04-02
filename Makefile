@@ -23,7 +23,7 @@ export VERSION = 2.3.12
 export CHANGESET = $(shell ./scripts/hg-version.sh)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
-export lib = $(shell uname -m | sed -r '/x86_64|ppc64|s390x|sparc64/{s/.*/lib64/;q};s/.*/lib/')
+export lib = $(shell uname -m | $(SED) -r '/x86_64|ppc64|s390x|sparc64/{s/.*/lib64/;q};s/.*/lib/')
 export bindir = $(prefix)/bin
 export libdir = $(prefix)/$(lib)
 export libexecdir = $(prefix)/libexec
@@ -71,8 +71,8 @@ archive:
 		conary-$(VERSION).tar.bz2
 
 version:
-	sed -i 's/@NEW@/$(VERSION)/g' NEWS
-	sed -i 's/@NEW@/$(VERSION)/g' ./doc/PROTOCOL.versions
+	$(SED) -i 's/@NEW@/$(VERSION)/g' NEWS
+	$(SED) -i 's/@NEW@/$(VERSION)/g' ./doc/PROTOCOL.versions
 
 show-version:
 	@echo $(VERSION)
@@ -113,16 +113,16 @@ ext-clean:
 
 ccs: dist
 	cvc co --dir conary-$(VERSION) conary=conary.rpath.com@rpl:devel
-	sed -i 's,version = ".*",version = "$(VERSION)",' \
+	$(SED) -i 's,version = ".*",version = "$(VERSION)",' \
                                         conary-$(VERSION)/conary.recipe;
-	sed -i 's,version = '.*',version = "$(VERSION)",' \
+	$(SED) -i 's,version = '.*',version = "$(VERSION)",' \
                                         conary-$(VERSION)/conary.recipe;
-	sed -i 's,r.addArchive(.*),r.addArchive("conary-$(VERSION).tar.bz2"),' \
+	$(SED) -i 's,r.addArchive(.*),r.addArchive("conary-$(VERSION).tar.bz2"),' \
                                         conary-$(VERSION)/conary.recipe;
 	# Assume conary tip always has the patches required to build from the
 	# recipe: filter out non-sqlite patches (the sqlite patch spans across
 	# two lines)
-	sed -i 's,r.addPatch(.*),,' conary-$(VERSION)/conary.recipe;
+	$(SED) -i 's,r.addPatch(.*),,' conary-$(VERSION)/conary.recipe;
 	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
 	# This is just to prime the cache for the cook from a recipe
 	bin/cvc cook --build-label conary.rpath.com@rpl:devel --prep conary=conary.rpath.com@rpl:devel
