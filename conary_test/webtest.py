@@ -58,6 +58,11 @@ class WebRepositoryHelper(rephelp.RepositoryHelper, WebTestCase):
         if not os.environ.get('CONARY_SERVER', '').startswith('apache'):
             raise testhelp.SkipTestException('web tests only run in apache '
                                               'mode')
+        try:
+            __import__('webob')
+        except ImportError:
+            raise testhelp.SkipTestException(
+                   "Web tests require the 'webob' package")
         WebTestCase.setUp(self)
         rephelp.RepositoryHelper.setUp(self)
 

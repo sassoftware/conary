@@ -1063,6 +1063,11 @@ class NetServerTest(rephelp.RepositoryHelper):
             else:
                 self.fail('OpenError not raised')
 
+            try:
+                __import__('webob')
+            except ImportError:
+                raise testhelp.SkipTestException("webob required for this test")
+
             # CNY-2229
             keyId = 'B12DC19B'
             url = 'http://localhost:%s/getOpenPGPKey?search=%s' % (
