@@ -74,8 +74,9 @@ class RepositoryCallLogger(calllog.AbstractCallLogger):
                                 methodName, args, kwArgs, exception,
                                 latency))
         try:
-            os.write(self.logFd, struct.pack("!I", len(logStr)) + logStr)
-        except OSError, e:
+            self.fobj.write(struct.pack("!I", len(logStr)) + logStr)
+            self.fobj.flush()
+        except IOError, e:
             log.warning("'%s' while logging call from (%s,%s) to %s\n",
                         str(e), remoteIp, user, methodName)
 
@@ -93,17 +94,3 @@ class RepositoryCallLogger(calllog.AbstractCallLogger):
             i += length
 
         os.close(fd)
-
-    def getEntry(self):
-        size = struct.unpack("!I", os.read(self.logFd, 4))[0]
-        return self.EntryClass(cPickle.loads(os.read(self.logFd, size)))
-
-    def follow(self):
-        where = os.lseek(self.logFd, 0, 2)
-        while True:
-            size = os.fstat(self.logFd).st_size
-            while where < size:
-                yield self.getEntry()
-                where = os.lseek(self.logFd, 0, 1)
-
-            time.sleep(1)
