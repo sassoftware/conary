@@ -1849,8 +1849,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             fileObjs = self.getFileVersions(need, lookInLocal = True,
                                             allowMissingFiles = bool(callback))
             fileDict = {}
-            for ((pathId, fileId, fileVersion), fileObj) in zip(need, fileObjs):
-                fileDict[(pathId, fileId)] = fileObj
+            for ((pathId, fileId, fileVersion), fileObj, error) in zip(
+                    need, fileObjs, fileObjs.errors):
+                fileDict[(pathId, fileId)] = fileObj, error
             del fileObj, fileObjs, need, fileId
 
             contentsNeeded = []
@@ -1861,15 +1862,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     (newTroveVersion, newTroveF, newFileId, newFileVersion)) \
                                 in filesNeeded:
                 if oldFileVersion:
-                    oldFileObj = fileDict[(pathId, oldFileId)]
+                    oldFileObj, _ = fileDict[(pathId, oldFileId)]
                 else:
                     oldFileObj = None
 
-                newFileObj = fileDict[(pathId, newFileId)]
+                newFileObj, newFileError = fileDict[(pathId, newFileId)]
                 if newFileObj is None:
                     # File missing from server
                     missingFiles.append((troveName, newTroveVersion, newTroveF,
-                                         pathId, newFileId, newFileVersion))
+                        newFileError, pathId, newFileId, newFileVersion))
                     continue
 
                 if mirrorMode:
@@ -1959,17 +1960,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if missingFiles:
             mfs = []
             for mf in missingFiles:
-                trvName, trvVersion, trvFlavor = mf[:3]
+                trvName, trvVersion, trvFlavor, error = mf[:4]
                 trv = cs.getNewTroveVersion(trvName, trvVersion, trvFlavor)
                 # Find the file path associated with this missing file
                 for pathId, path, fileId, version in trv.getNewFileList():
-                    if (pathId, fileId, version) == mf[3:]:
+                    if (pathId, fileId, version) == mf[4:]:
                         break
                 else: # for
                     # Unable to find this file
                     raise Exception("Cannot find file in changeset")
                 mfs.append((trvName, trvVersion, trvFlavor,
-                            pathId, path, fileId, version))
+                            pathId, path, fileId, version, error))
 
             # The test for the presence of the callback is redundant, if we
             # have missing files we should have a callback, otherwise
@@ -1987,7 +1988,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if not ret:
                 # Grab just the first file
                 mf = mfs[0]
-                raise errors.FileStreamMissing(mf[5])
+                fileId, error = mf[5], mf[7]
+                if error:
+                    error.throw()
+                else:
+                    raise errors.FileStreamMissing(fileId)
 
         if target and cs:
             if cs.oldTroves or cs.newTroves:
@@ -2141,6 +2146,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         raise
                     # No sense in trying the rest of the files, the server is
                     # dead. It's a stiff. Bereft of life.
+                    error = util.SavedException()
+                    for idx in idxL:
+                        result.errors[idx] = error
                     return result
 
                 # Call succeded
@@ -2155,6 +2163,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             result = [ x for x in self.localRep.getFileVersions(fullList) ]
         else:
             result = [ None ] * len(fullList)
+        result = FileResultSet(result)
 
         byServer = {}
         for i, (pathId, fileId, version) in enumerate(fullList):
@@ -2967,6 +2976,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 server.commitChangeSet(url)
         finally:
             server.setAbortCheck(None)
+
+
+class FileResultSet(list):
+    """
+    Container for the result of a getFileVersions call. Behaves like a list of
+    results, but also stores additional information about the result.
+    """
+    def __init__(self, results, errors=None):
+        if errors is None:
+            errors = [None] * len(results)
+        assert len(results) == len(errors)
+        list.__init__(self, results)
+        self.errors = errors
+
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, list.__repr__(self))
+
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
         proxies=None, proxyMap=None, chunked=False, headers=()):
