@@ -182,6 +182,7 @@ class ConaryHandler(object):
         self.repositoryServer = None
         self.proxyServer = None
         self.restHandler = None
+        self.contentsStore = None
 
     def _getEnvBool(self, key, default=None):
         value = self.request.environ.get(key)
@@ -247,6 +248,7 @@ class ConaryHandler(object):
         if self.repositoryServer:
             self.proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase,
                     self.repositoryServer)
+            self.contentsStore = self.repositoryServer.repos.contentsStore
 
     def _loadAuth(self):
         """Extract authentication info from the request."""
@@ -468,7 +470,7 @@ class ConaryHandler(object):
                 csFile = util.ExtendedFile(path, 'rb', buffering=False)
                 changeSet = filecontainer.FileContainer(csFile)
                 for data in changeSet.dumpIter(readNestedFile,
-                        args=(self.proxyServer.repos.repos.contentsStore,)):
+                        args=(self.contentsStore,)):
                     yield data
                 del changeSet
             else:
@@ -541,6 +543,7 @@ class ConaryHandler(object):
         self.repositoryServer = None
         self.proxyServer = None
         self.restHandler = None
+        # Leave the contentsStore around in case produceChangeset needs it
 
 
 class ConfigurationError(RuntimeError):
