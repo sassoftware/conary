@@ -1,3 +1,35 @@
+Changes in 2.4.0:
+  o New Features:
+    * Conary 2.4 includes a new WSGI-based repository stack. Forward-
+      and backward-compatibility with clients is maintained. However,
+      Python 2.6 is now the minimum version for repositories that wish
+      to run on WSGI or that have a web interface, and these also
+      require the WebOb library ( http://www.webob.org/ )
+    * Conary can now automatically reconcile its own database with
+      external capsule databases. If a package is installed in the RPM
+      database without using Conary, the next Conary update operation
+      will first fabricate a "phantom" trove as a placeholder. That
+      trove can then be erased, updated to a regular encapsulated trove,
+      or left as-is. Similarly, if a Conary-managed package is erased
+      from the RPM database, the next update operation will also erase
+      the corresponding Conary trove. This feature can be disabled by
+      setting the 'syncCapsuleDatabase' configuration option to False.
+
+  o Bug Fixes:
+    * Fixed a bug in the system model dependency solver cache that
+      caused surprising behavior when more than one trove in the search
+      path provided the same dependency. (CNY-3735)
+    * Fixed use of branch specs with system model (CNY-3645)
+    * Fixed "cvc promote" when buildLabel is not set (CNY-3660)
+    * Previously, updates could fail with an unhelpful 'TroveNotFound'
+      error that named the top-level trove when in fact a network
+      configuration problem had prevented fetching a sub-component of
+      that trove. This has been corrected so that the original network
+      error is displayed instead. (CNY-3732)
+    * Similarly, "File Stream Missing" errors will no longer mask
+      network problems that prevent reaching a file sourced from another
+      repository. (CNY-3680)
+
 Changes in 2.3.12:
   o New Features:
     * Switched r.Properties to taking a full config descriptor rather
