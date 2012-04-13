@@ -352,7 +352,7 @@ class ConaryHandler(object):
 
         try:
             params, method = util.xmlrpcLoad(stream)
-        except (xmlrpclib.ResponseError, ValueError, UnicodeDecodeError):
+        except:
             return self._makeError('400 Bad Request',
                     "Malformed XMLRPC request")
 

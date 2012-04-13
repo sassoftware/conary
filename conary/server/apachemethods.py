@@ -82,7 +82,7 @@ def post(port, isSecure, repos, req, authToken=None, repServer=None):
             sio.seek(0)
             try:
                 (params, method) = util.xmlrpcLoad(sio)
-            except (xmlrpclib.ResponseError, ValueError, UnicodeDecodeError):
+            except:
                 req.log_error('error parsing XMLRPC request')
                 return apache.HTTP_BAD_REQUEST
             repos.log(3, "decoding=%s" % method, authToken[0],
