@@ -39,7 +39,7 @@ from conary.repository.netrepos import instances, trovestore, netauth
 from conary.lib.sha1helper import md5FromString, sha1FromString
 from conary.server import schema
 from conary.versions import ThawVersion
-from conary import versions
+
 
 class TroveStoreTest(dbstoretest.DBStoreTestBase):
 
@@ -425,92 +425,6 @@ Some changes just are.
         store.addTroveSetDone()
 
         assert(store.getTrove("trvname", old, x86) == redir)
-
-    def testResolve(self):
-        prov1 = deps.DependencySet()
-        prov1.addDep(deps.FileDependencies, deps.Dependency("/bin/testcomp1"))
-        prov2 = deps.DependencySet()
-        prov2.addDep(deps.FileDependencies, deps.Dependency("/bin/testcomp2"))
-        prov3 = deps.DependencySet()
-        prov3.addDep(deps.FileDependencies, deps.Dependency("/bin/testcomp3"))
-        prov4 = deps.DependencySet()
-        prov4.addDep(deps.FileDependencies, deps.Dependency("/bin/testcomp4"))
-
-        dirNames = set(['/bin'])
-        baseNames = set(['testcomp1', 'testcomp2', 'testcomp3', 'testcomp4'])
-
-        prov1_2 = prov1.copy()
-        prov1_2.union(prov2)
-        prov3_4 = prov3.copy()
-        prov3_4.union(prov4)
-
-        store = self._connect()
-
-        v10str = "/conary.rpath.com@test:trunk/10.123:1.2-10"
-        v10 = ThawVersion(v10str)
-
-        store.db.transaction()
-
-        branch = v10.branch()
-        store.createTroveBranch("testtrove", branch)
-        cl = changelog.ChangeLog("test", "test@foo.bar", "")
-
-        store.addTroveSetStart([], dirNames, baseNames)
-        troves = [('testcomp1', prov1), ('testcomp2', prov2),
-                  ('testcomp3', prov3), ('testcomp4', prov4)]
-        for (name, prov) in troves:
-            trv = trove.Trove(name, v10, deps.Flavor(), cl)
-            trv.setProvides(prov)
-            trv.computeDigests()
-            troveInfo = store.addTrove(trv, trv.diff(None)[0])
-            store.addTroveDone(troveInfo)
-
-        store.addTroveSetDone()
-        store.db.commit()
-
-        sugg = store.depTables.resolve(v10.branch().label(),
-                            [prov1_2, prov3_4, prov2, prov1, prov3, prov4])
-        assert(sugg[prov1] == [[('testcomp1', v10str, '')]])
-        assert(sugg[prov2] == [[('testcomp2', v10str, '')]])
-        assert(sugg[prov3] == [[('testcomp3', v10str, '')]])
-        assert(sugg[prov4] == [[('testcomp4', v10str, '')]])
-        assert(sorted(sugg[prov1_2]) == [[('testcomp1', v10str, '')],
-                                         [('testcomp2', v10str, '')]])
-        assert(sorted(sugg[prov3_4]) == [[('testcomp3', v10str, '')],
-                                         [('testcomp4', v10str, '')]])
-
-    def testResolve2(self):
-        dep1 = deps.parseDep('trove:foo')
-        dep2 = deps.parseDep('trove:bar')
-        dep1_2 = deps.parseDep('trove:bar trove:foo')
-
-        v10str = "/conary.rpath.com@test:trunk/10.123:1.2-10"
-        v10 = ThawVersion(v10str)
-        store = self._connect()
-
-        store.db.transaction()
-
-        branch = v10.branch()
-        store.createTroveBranch("testtrove", branch)
-        cl = changelog.ChangeLog("test", "test@foo.bar", "")
-
-        store.addTroveSetStart([], [], [])
-        troves = [('foo', dep1)]
-        for (name, prov) in troves:
-            trv = trove.Trove(name, v10, deps.Flavor(), cl)
-            trv.setProvides(prov)
-            trv.computeDigests()
-            troveInfo = store.addTrove(trv, trv.diff(None)[0])
-            store.addTroveDone(troveInfo)
-
-        store.addTroveSetDone()
-        store.db.commit()
-
-        sugg = store.depTables.resolve(v10.branch().label(),
-                                       [dep1_2, dep2])
-        assert(sugg == {dep2   : [[]],
-                        dep1_2 : [[], [('foo', v10str, '')]]})
-
 
     def testBrokenPackage(self):
         store = self._connect()
