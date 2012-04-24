@@ -686,7 +686,9 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
         name, version, flavor = self._getPhantomNVF(header)
         # Fake trove
         trv = trove.Trove(name, version, flavor)
-        trv.setProvides(header.getProvides())
+        provides = header.getProvides()
+        provides.addDep(deps.TroveDependencies, deps.Dependency(name))
+        trv.setProvides(provides)
         trv.setRequires(header.getRequires())
         # Fake capsule file
         path = str(header.getNevra()) + '.rpm'
@@ -698,6 +700,17 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
         self._addPhantomContents(changeSet, trv, header)
         trv.computeDigests()
         changeSet.newTrove(trv.diff(None)[0])
+
+        # Make a fake package to contain the fake component
+        pkgName = name.split(':')[0]
+        pkg = trove.Trove(pkgName, version, flavor)
+        provides = deps.DependencySet()
+        provides.addDep(deps.TroveDependencies, deps.Dependency(pkgName))
+        pkg.setProvides(provides)
+        pkg.setIsCollection(True)
+        pkg.addTrove(name, version, flavor, byDefault=True)
+        pkg.computeDigests()
+        changeSet.newTrove(pkg.diff(None)[0])
 
 
 def rpmExpandMacro(val):
