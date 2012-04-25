@@ -420,5 +420,6 @@ class Database(BaseDatabase):
 
     def use(self, dbName, **kwargs):
         self.close()
+        dbName = os.path.join(os.path.dirname(self.database), dbName)
         self.database = dbName
         return self.connect(**kwargs)
