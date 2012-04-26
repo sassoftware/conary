@@ -38,7 +38,7 @@ from conary.local import schema as depSchema
 from conary.repository.netrepos import instances, trovestore, netauth
 from conary.lib.sha1helper import md5FromString, sha1FromString
 from conary.server import schema
-from conary.versions import ThawVersion
+from conary.versions import ThawVersion, VersionFromString
 
 
 class TroveStoreTest(dbstoretest.DBStoreTestBase):
@@ -877,7 +877,7 @@ class TroveStoreTest2(rephelp.RepositoryHelper):
                           [("/usr/share/foo/file3", "file3")])
         self.addCollection("foo", "1.0", [":runtime", ":lib"], sourceName = "foo:source")
         repos = self.openRepository()
-        branch = versions.VersionFromString("/" + str(self.defLabel))
+        branch = VersionFromString("/" + str(self.defLabel))
         # get everything we know
         allIds = repos.getPackageBranchPathIds("foo:source", branch)
         self.assertEqual(set(allIds.keys()), set([
