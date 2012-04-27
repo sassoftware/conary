@@ -25,7 +25,9 @@ class Conary(CPackageRecipe):
             'pycrypto:python',
             'python:devel',
             'zlib:devel',
-            ]  
+            ]
+        if platver == '2-py26':
+            buildRequires.append('python:bin')
     elif plat == 'centos' and encapsulated:
         buildRequires = [
             'openssl-devel:rpm',
@@ -201,6 +203,11 @@ class Conary(CPackageRecipe):
         r.Requires(exceptDeps=r'python\:\ rpm')
         if r.plat != 'rpath':
             r.Requires('rpm:python', '%(sitepkgs)s/conary/local/rpmcapsule.py')
+        if r.plat == 'rpath':
+            # Ensure that we get the right version of python when migrating
+            # from rPL1-based to rPL2-based systems; this is critical when
+            # any part of the update uses SSL. (RPL-3043)
+            r.Requires('python:lib(%(targetarch)s)', '%(bindir)s/conary')
         r.ComponentRequires({'python': set(('runtime',))})
 
         r.AutoDoc('EULA_Conary_Dual_License.txt')
