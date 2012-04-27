@@ -172,7 +172,9 @@ class Conary(CPackageRecipe):
                       '%(libdir)s/conary/',
                       '%(libexecdir)s/conary/perlreqs.pl',
                       '%(localstatedir)s/conary/emerge', #/var/conary for emerge
+                      '%(sysconfdir)s/conary/recipeTemplates/',
                       '%(sysconfdir)s/conary/mirrors/',
+                      '%(pylib)s/conary/',
                       )
         # keyrings are binary, and we are providing the initial version only
         r.InitialContents('%(sysconfdir)s/conary/.*gpg')
