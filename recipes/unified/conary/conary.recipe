@@ -50,6 +50,18 @@ class Conary(CPackageRecipe):
                 'm2crypto-conary:python',
                 ])
             have_kid = False
+    elif plat == 'sles' and encapsulated:
+        assert embedded
+        buildRequires = [
+            'openssl-devel:rpm',
+            'zlib-devel:rpm',
+
+            # python-conary
+            'python-conary:devel',
+            'libelf-lgpl:devel',
+            'm2crypto-conary:python',
+            ]
+        have_kid = False
     else:
         raise RuntimeError("Wrong value for 'plat' class variable")
 
