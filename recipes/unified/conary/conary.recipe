@@ -28,6 +28,21 @@ class Conary(CPackageRecipe):
             ]
         if platver == '2-py26':
             buildRequires.append('python:bin')
+        if platver == '1':
+            patchName = None
+        else:
+            patchName = 'rpl2-build-flags.patch'
+    elif plat == 'centos' and not encapsulated:
+        buildRequires = [
+            'libelf-lgpl:devel',
+            'openssl:devel',
+            'pycrypto:python',
+            'python:devel',
+            'python-elementtree:python',
+            'python:lib',
+            'zlib:devel',
+            ]
+        patchName = 'rpl2-build-flags.patch'
     elif plat == 'centos' and encapsulated:
         buildRequires = [
             'openssl-devel:rpm',
@@ -52,6 +67,7 @@ class Conary(CPackageRecipe):
                 'm2crypto-conary:python',
                 ])
             have_kid = False
+        patchName = 'el5-build-flags.patch'
     elif plat == 'sles' and encapsulated:
         assert embedded
         buildRequires = [
@@ -73,6 +89,7 @@ class Conary(CPackageRecipe):
                 'libopenssl-devel:rpm',
                 ])
         have_kid = False
+        patchName = 'sles10-build-flags.patch'
     else:
         raise RuntimeError("Wrong value for 'plat' class variable")
 
@@ -93,8 +110,12 @@ class Conary(CPackageRecipe):
 
         #r.addArchive('ftp://download.rpath.com/conary/')
         r.addMercurialSnapshot('http://hg.rpath.com/conary')
-        r.addPatch('el5-build-flags.patch', use=(r.plat == 'centos'))
-        r.addPatch('rpl2-build-flags.patch', use=(r.plat == 'rpath' and r.platver != '1'))
+        for patchName in [
+                'el5-build-flags.patch',
+                'rpl2-build-flags.patch',
+                'sles10-build-flags.patch',
+                ]:
+            r.addPatch(patchName, use=(patchName == r.patchName))
 
         ### Build internal sqlite library for Conary to use
         r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
