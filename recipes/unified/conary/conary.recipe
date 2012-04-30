@@ -42,6 +42,7 @@ class Conary(CPackageRecipe):
             'python:lib',
             'zlib:devel',
             ]
+        have_kid = False
         patchName = 'rpl2-build-flags.patch'
     elif plat == 'centos' and encapsulated:
         buildRequires = [
@@ -78,7 +79,7 @@ class Conary(CPackageRecipe):
             'libelf-lgpl:devel',
             'm2crypto-conary:python',
             ]
-        if version.startswith('10'):
+        if platver.startswith('10'):
             buildRequires.extend([
                 # bzip2-devel is missing, it seems
                 'openssl-devel:rpm',
@@ -259,3 +260,5 @@ class Conary(CPackageRecipe):
         if r.encapsulated:
             r.Remove('%(bindir)s/rpm2cpio') # conflict with the platform
             r.Remove('%(bindir)s/dbsh') # might conflict, not needed in package
+        elif r.plat != 'rpath':
+            r.Move('%(bindir)s/rpm2cpio', '%(bindir)s/rpm2cpio-conary')
