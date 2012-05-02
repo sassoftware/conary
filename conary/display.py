@@ -700,6 +700,9 @@ class TroveFormatter(TroveTupFormatter):
                                                             [ (n, v, f) ])[0]
 
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
+        if trove.getInstallTime():
+            yield 'Installed : %s' % (time.strftime("%c",
+                time.localtime(trove.getInstallTime())))
 
         imageGroup = trove.troveInfo.imageGroup()
         if imageGroup is not None:
