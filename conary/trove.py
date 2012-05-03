@@ -1333,7 +1333,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
         _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
         _TROVEINFO_TAG_PATHCONFLICTS : (DYNAMIC, StringOrderedStreamCollection, "pathConflicts" ),
-        _TROVEINFO_TAG_INSTALLTIME   : (SMALL, streams.LongLongStream, 'installTime'),
+        _TROVEINFO_TAG_INSTALLTIME   : (DYNAMIC, streams.LongLongStream, 'installTime'),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
