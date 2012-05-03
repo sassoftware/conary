@@ -4245,9 +4245,9 @@ foo:run
         self.updatePkg('bar:runtime', replaceFiles = True)
 
         db = self.openDatabase()
-        assert(db.iterTrovesByPath('/a') == [bar])
+        self.assertEqual(db.iterTrovesByPath('/a'), [bar])
         self.rollback(1)
-        assert(db.iterTrovesByPath('/a') == [foo])
+        self.assertEqual(db.iterTrovesByPath('/a'), [foo])
 
     def testSwapFileAndSymlink(self):
         # conary <= 2.0.50 hits "OSError: Too many levels of symbolic links"

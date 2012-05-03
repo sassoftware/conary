@@ -1343,9 +1343,19 @@ class TroveInfo(streams.StreamSet):
     _newMetadataItems = dict([ (x[1][2], True) for x in
                                MetadataItem.streamDict.items() if
                                x[0] > _METADATA_ITEM_ORIG_ITEMS ])
+    _eqSkipSet = { 'installTime': True }
 
     def diff(self, other):
         return streams.StreamSet.diff(self, other, ignoreUnknown=True)
+
+    def __eq__(self, other, skipSet=None):
+        if skipSet:
+            skipSet = dict(skipSet)
+        else:
+            skipSet = {}
+        skipSet.update(self._eqSkipSet)
+        return streams.StreamSet.__eq__(self, other, skipSet)
+
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
