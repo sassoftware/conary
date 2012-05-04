@@ -2389,6 +2389,7 @@ class _InfoFile(dict):
             # don't leave an empty list item
             l = [item]
         self[name][self._listfield] = ','.join(l)
+        self._modified = True
 
     def cmpLine(self, a, b):
         # sort numerically on id

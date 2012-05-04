@@ -3763,7 +3763,7 @@ class User(_UserGroupBuildAction):
         self.infoname = self.name % macros
         if not hasattr(self.recipe, 'provideGroup'):
             self.recipe._provideGroup = {}
-        self.recipe._provideGroup[self.infoname] = self.provideGroup
+        self.recipe._provideGroup[self.infoname] = False
 
         d = '%(destdir)s%(userinfodir)s/' % macros
         util.mkdirChain(d)
@@ -3804,6 +3804,12 @@ class User(_UserGroupBuildAction):
                                      % self.saltedPassword)
             f.write('PASSWORD=%s\n' % self.saltedPassword)
         f.close()
+
+        if self.provideGroup:
+            group = self.group or self.name
+            gid = self.groupid or self.preferred_uid
+            self.recipe.Group(group, gid)
+
 
 class Group(_UserGroupBuildAction):
     """
@@ -3868,7 +3874,10 @@ class Group(_UserGroupBuildAction):
         if self.recipe.name.startswith('info-'):
             if os.path.exists(self.realfilename):
                 raise UserGroupError, 'Only one instance of Group per recipe'
-            if self.recipe.name[5:] != self.infoname:
+            # If this group wasn't created as a side effect of the User action
+            # and the package name doesn't match the user name, raise an error.
+            if (self.recipe.name[5:] not in self.recipe._provideGroup and
+                self.recipe.name[5:] != self.infoname):
                 raise UserGroupError, \
                     'Group name must be the same as package name'
 
