@@ -25,6 +25,7 @@ from conary.build import loadrecipe, use, errors, defaultrecipes
 from conary import changelog
 from conary.conaryclient import filetypes
 from conary.lib import util
+from conary.deps import deps
 
 #test
 from conary_test import rephelp
@@ -522,3 +523,104 @@ class GroupInfoRecipe(UserGroupInfoRecipe, BaseRequiresRecipe):
         repos.commitChangeSet(cs)
         res = self.cookFromRepository('groupinfo:source', buildLabel = self.cfg.buildLabel, repos = repos, logBuild = True)
         self.assertEquals(res[0][0], 'groupinfo:recipe')
+
+    def testUserInfoGroupInfoSplitting(self):
+        """
+        We need to create users and groups sepparately to handle dependency
+        loops in group memebership. For instance on CentOS 6 the daemon user is
+        in the bin, lp, and daemon groups. The lp user is in the daemon and lp
+        groups. This means that neither of these users can be installed due to
+        the depency loop. The install code does put all of the uesrs into the
+        same install job, but then can't deal with the loop. (CNY-3731)
+        """
+
+        daemonInfoRecipe = """
+class InfoDaemon(UserInfoRecipe):
+    name = 'info-daemon'
+    version = '1'
+    clearBuildReqs()
+    def setup(r):
+        r.User('daemon', 2, supplemental=['lp', 'bin'])
+"""
+
+        lpInfoRecipe = """
+class InfoLp(UserInfoRecipe):
+    name = 'info-lp'
+    version = '1'
+    clearBuildReqs()
+    def setup(r):
+        r.User('lp', 3, supplemental=['daemon', ])
+"""
+
+        binInfoRecipe = """
+class InfoBin(UserInfoRecipe):
+    name = 'info-bin'
+    version = '1'
+    clearBuildReqs()
+    def setup(r):
+        r.User('bin', 4, supplemental=['daemon', ])
+"""
+
+        comps1, r1 = self.buildRecipe(daemonInfoRecipe, 'InfoDaemon')
+        comps2, r2 = self.buildRecipe(lpInfoRecipe, 'InfoLp')
+        comps3, r3 = self.buildRecipe(binInfoRecipe, 'InfoBin')
+
+        # Make sure there is a :user and :group component for each package.
+        for comps in (comps1, comps2, comps3):
+            self.failUnlessEqual(len([ x for x in comps
+                if x[0].endswith(':user') or x[0].endswith(':group') ]), 2)
+
+        group1, user1 = sorted(comps1)
+        group2, user2 = sorted(comps2)
+        group3, user3 = sorted(comps3)
+
+        repos = self.openRepository()
+        user1nvf = repos.findTrove(None, user1)
+        user2nvf = repos.findTrove(None, user2)
+        user3nvf = repos.findTrove(None, user3)
+
+        user1trv = repos.getTrove(*user1nvf[0])
+        user2trv = repos.getTrove(*user2nvf[0])
+        user3trv = repos.getTrove(*user3nvf[0])
+
+        group1nvf = repos.findTrove(None, group1)
+        group2nvf = repos.findTrove(None, group2)
+        group3nvf = repos.findTrove(None, group3)
+
+        group1trv = repos.getTrove(*group1nvf[0])
+        group2trv = repos.getTrove(*group2nvf[0])
+        group3trv = repos.getTrove(*group3nvf[0])
+
+        # info-daemon:user should require info-bin:group, info-daemon:group,
+        # and info-lp:group.
+        self.failUnlessEqual(user1trv.requires,
+            deps.ThawDependencySet('8#bin|8#daemon|8#lp'))
+        # info-lp:user should require info-daemon:group and info-lp:group.
+        self.failUnlessEqual(user2trv.requires,
+            deps.ThawDependencySet('8#daemon|8#lp'))
+        # info-bin:user should require info-bin:group and info-dameon:group.
+        self.failUnlessEqual(user3trv.requires,
+            deps.ThawDependencySet('8#bin|8#daemon'))
+
+        # Make sure the user components don't provide groups.
+        self.failUnlessEqual(user1trv.provides,
+            deps.ThawDependencySet('4#info-daemon::user|7#daemon'))
+        self.failUnlessEqual(user2trv.provides,
+            deps.ThawDependencySet('4#info-lp::user|7#lp'))
+        self.failUnlessEqual(user3trv.provides,
+            deps.ThawDependencySet('4#info-bin::user|7#bin'))
+
+        # Make sure the group components provide the groups
+        self.failUnlessEqual(group1trv.provides,
+            deps.ThawDependencySet('4#info-daemon::group|8#daemon'))
+        self.failUnlessEqual(group2trv.provides,
+            deps.ThawDependencySet('4#info-lp::group|8#lp'))
+        self.failUnlessEqual(group3trv.provides,
+            deps.ThawDependencySet('4#info-bin::group|8#bin'))
+
+        # And that the groups don't require anything
+        self.failUnlessEqual(group1trv.requires, deps.ThawDependencySet(''))
+        self.failUnlessEqual(group2trv.requires, deps.ThawDependencySet(''))
+        self.failUnlessEqual(group3trv.requires, deps.ThawDependencySet(''))
+
+        self.updatePkg('info-daemon:user', resolve=True)
