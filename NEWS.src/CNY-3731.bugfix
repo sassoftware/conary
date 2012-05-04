@@ -1,0 +1,1 @@
+Users and groups are now broken down into their own components rather than having users have the side effect of creating groups. This allows for handling circular depenedencies in user group membership.
