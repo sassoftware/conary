@@ -245,9 +245,9 @@ class User(UserInfoRecipe):
         r.User('%(owner)s', 1000, group='%(group)s')
 """ % {'owner': owner, 'group': group}
             (userbuilt, d) = self.buildRecipe(userrecipe, "User")
-            for p in userbuilt:
-                self.updatePkg(root1, p[0], p[1])
-                self.updatePkg(root2, p[0], p[1])
+            userbuilt = ['%s=%s' % x[:2] for x in userbuilt]
+            self.updatePkg(root1, userbuilt)
+            self.updatePkg(root2, userbuilt)
             rbbase = 1
         else:
             rbbase = 0
@@ -309,9 +309,8 @@ class User(UserInfoRecipe):
         shutil.rmtree(root1)
         shutil.rmtree(root2)
         if owner != 'root':
-            for p in userbuilt:
-                self.updatePkg(root1, p[0], p[1])
-                self.updatePkg(root2, p[0], p[1])
+            self.updatePkg(root1, userbuilt)
+            self.updatePkg(root2, userbuilt)
 
 
         self.updatePkg(root1, pkgname, vers[0])
