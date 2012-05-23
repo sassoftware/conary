@@ -17,6 +17,7 @@
 
 
 import itertools
+import time
 
 from conary import dbstore
 from conary import deps, errors, files, streams, trove, versions
@@ -782,6 +783,7 @@ order by
 
         cu.execute("DROP TABLE IncludedTroves")
 
+        trove.troveInfo.installTime.set(time.time())
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 

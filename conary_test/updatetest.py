@@ -27,6 +27,7 @@ import stat
 import tempfile
 import StringIO
 import sys
+import time
 
 from conary_test import recipes
 from conary_test import rephelp
@@ -244,9 +245,9 @@ class User(UserInfoRecipe):
         r.User('%(owner)s', 1000, group='%(group)s')
 """ % {'owner': owner, 'group': group}
             (userbuilt, d) = self.buildRecipe(userrecipe, "User")
-            for p in userbuilt:
-                self.updatePkg(root1, p[0], p[1])
-                self.updatePkg(root2, p[0], p[1])
+            userbuilt = ['%s=%s' % x[:2] for x in userbuilt]
+            self.updatePkg(root1, userbuilt)
+            self.updatePkg(root2, userbuilt)
             rbbase = 1
         else:
             rbbase = 0
@@ -255,8 +256,13 @@ class User(UserInfoRecipe):
         vers = [ x[1] for x in built ]
         pkgname = built[0][0]
 
-        self.updatePkg(root1, pkgname, vers[0])
-        self.updatePkg(root2, pkgname, vers[0])
+        _time = time.time
+        try:
+            time.time = lambda: 1111111111.0
+            self.updatePkg(root1, pkgname, vers[0])
+            self.updatePkg(root2, pkgname, vers[0])
+        finally:
+            time.time = _time
 
         for n in ( 'changed', 'unchanged' ):
             self.verifyFile(root1 + "/etc/" + n + "config",
@@ -271,8 +277,14 @@ class User(UserInfoRecipe):
             self.fail('installing the same package in two different roots '
                       'did not result in identical permissions')
 
-        os.chmod(os.path.join(root2, 'etc/changedconfig'), 0777)
+        self.mock(time, 'localtime', time.gmtime)
+        db = database.Database(root1, self.cfg.dbPath)
+        (rc, s) = self.captureOutput(query.displayTroves, db, self.cfg,
+                [pkgname], info=True)
+        db.close()
+        self.assertIn('Installed : Fri Mar 18 01:58:31 2005\n', s)
 
+        os.chmod(os.path.join(root2, 'etc/changedconfig'), 0777)
         self.updatePkg(root1, pkgname, vers[1])
         self.updatePkg(root2, pkgname, vers[1])
 
@@ -297,9 +309,8 @@ class User(UserInfoRecipe):
         shutil.rmtree(root1)
         shutil.rmtree(root2)
         if owner != 'root':
-            for p in userbuilt:
-                self.updatePkg(root1, p[0], p[1])
-                self.updatePkg(root2, p[0], p[1])
+            self.updatePkg(root1, userbuilt)
+            self.updatePkg(root2, userbuilt)
 
 
         self.updatePkg(root1, pkgname, vers[0])
@@ -4233,9 +4244,9 @@ foo:run
         self.updatePkg('bar:runtime', replaceFiles = True)
 
         db = self.openDatabase()
-        assert(db.iterTrovesByPath('/a') == [bar])
+        self.assertEqual(db.iterTrovesByPath('/a'), [bar])
         self.rollback(1)
-        assert(db.iterTrovesByPath('/a') == [foo])
+        self.assertEqual(db.iterTrovesByPath('/a'), [foo])
 
     def testSwapFileAndSymlink(self):
         # conary <= 2.0.50 hits "OSError: Too many levels of symbolic links"

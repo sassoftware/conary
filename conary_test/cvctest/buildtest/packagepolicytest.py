@@ -6875,7 +6875,7 @@ class TestUser(PackageRecipe):
 """
         built, d = self.buildRecipe(recipestr1, "TestUser")
         self.assertEquals(sorted([x[0] for x in built]),
-                ['info-user:user', 'test:runtime'])
+                ['info-group:group', 'info-user:user', 'test:runtime'])
         client = self.getConaryClient()
         nvf = [x for x in built if x[0] == 'info-user:user'][0]
         nvf = nvf[0], versions.VersionFromString(nvf[1]), nvf[2]
@@ -6891,7 +6891,16 @@ class TestUser(PackageRecipe):
         repos = self.openRepository()
         trv = repos.getTrove(*nvf)
         self.assertEquals(trv.provides(),
-                deps.ThawDependencySet('4#info-user::user|7#user|8#group'))
+                deps.ThawDependencySet('4#info-user::user|7#user'))
+        self.failUnlessEqual(trv.requires,
+                deps.ThawDependencySet('8#group'))
+
+        specs = [ x for x in built if x[0] == 'info-group:group' ]
+        self.failUnless(specs)
+        nvf = repos.findTrove(None, specs[0])[0]
+        trv = repos.getTrove(*nvf)
+        self.failUnlessEqual(trv.provides,
+            deps.ThawDependencySet('4#info-group::group|8#group'))
 
         self.assertEquals(trv.requires(), deps.ThawDependencySet(''))
 
@@ -6911,6 +6920,8 @@ class TestUserRequires(PackageRecipe):
                 recipestr1, "TestUserRequires")
         self.assertEquals(str(err),
                 "Package Policy errors found:\n"
+                "ProcessGroupInfoPackage: Illegal requirement on "
+                "'info-group:group': 'trove: foo:runtime'\n"
                 "ProcessUserInfoPackage: Illegal requirement on "
                 "'info-splat:user': 'trove: foo:runtime'")
 
@@ -6948,6 +6959,8 @@ class TestUserProvides(PackageRecipe):
                 recipestr1, "TestUserProvides")
         self.assertEquals(str(err),
                 "Package Policy errors found:\n"
+                "ProcessGroupInfoPackage: Illegal provision for "
+                "'info-crunchy:group': 'abi: (crunchy)'\n"
                 "ProcessUserInfoPackage: Illegal provision for "
                 "'info-crunchy:user': 'abi: (crunchy)'")
 
@@ -7235,7 +7248,8 @@ class TestMultiUser(PackageRecipe):
 """
         built, d = self.buildRecipe(recipestr1, "TestMultiUser")
         self.assertEquals(sorted([x[0] for x in built]),
-                ['info-bar:user', 'info-foo:user'])
+                ['info-bar:group', 'info-bar:user', 'info-foo:group',
+                 'info-foo:user'])
 
     def testInfoExceptions(self):
         for parent in (packagepolicy.ProcessUserInfoPackage,
@@ -7289,8 +7303,8 @@ class InfoUser(PackageRecipe):
 """
         built, d = self.buildRecipe(recipeStr, 'InfoUser')
         self.assertEquals(sorted([x[0] for x in built]),
-                ['info-random:group', 'info-rocky:group', 'info-rocky:user',
-                    'info-squirrel:group', 'info-user:user'])
+                ['info-group:group', 'info-random:group', 'info-rocky:group',
+                    'info-rocky:user', 'info-squirrel:group', 'info-user:user'])
 
     def testBadUserInfoFiletype(self):
         recipeStr = """
