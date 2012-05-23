@@ -50,6 +50,14 @@ class CommitChangeSetFlags(util.Flags):
                   'ignoreMissingFiles',
                   ]
 
+    def shouldRunScripts(self, tagScriptsFile):
+        if self.justDatabase or self.test:
+            return False
+        if self.noScripts and not tagScriptsFile:
+            return False
+        return True
+
+
 class Rollback:
 
     reposName = "%s/repos.%d"
@@ -1768,8 +1776,7 @@ class Database(SqlDbRepository):
                   updateDatabase, callback, tagScript, dbCache,
                   autoPinList, flags, journal, directoryCandidates,
                   storeRollback = True, capsuleChangeSet = None):
-        if not (commitFlags.justDatabase or commitFlags.test or
-                (commitFlags.noScripts and not tagScript)):
+        if commitFlags.shouldRunScripts(tagScript):
             # run preremove scripts before updating the database, otherwise
             # the file lists which get sent to them are incorrect. skipping
             # this makes --test a little inaccurate, but life goes on
@@ -2227,8 +2234,7 @@ class Database(SqlDbRepository):
 
         #del opJournal
 
-        if not (commitFlags.justDatabase or commitFlags.test or 
-                (commitFlags.noScripts and not tagScript)):
+        if commitFlags.shouldRunScripts(tagScript):
             fsJob.runPostTagScripts(tagSet, tagScript)
 
         if rollbackPhase is None and updateDatabase and invalidateRollbacks:
@@ -2237,8 +2243,7 @@ class Database(SqlDbRepository):
         if rollbackPhase is not None:
             return fsJob
 
-        if not (commitFlags.justDatabase or 
-                (commitFlags.noScripts and not tagScript)):
+        if commitFlags.shouldRunScripts(tagScript):
             fsJob.orderPostScripts(uJob)
             fsJob.runPostScripts(tagScript)
 
@@ -2662,7 +2667,7 @@ class Database(SqlDbRepository):
                         justDatabase = justDatabase,
                         noScripts = noScripts)
 
-                    if not (justDatabase or (noScripts and not tagScript)):
+                    if commitFlags.shouldRunScripts(tagScript):
                         self.runPreScripts(updJob, callback = callback,
                                            tagScript = tagScript,
                                            justDatabase = justDatabase,
@@ -2702,7 +2707,7 @@ class Database(SqlDbRepository):
                         # Because of the two phase update for rollbacks, we
                         # run postscripts by hand instead of commitChangeSet
                         # doing it automatically
-                        if (tagScript or not commitFlags.noScripts):
+                        if commitFlags.shouldRunScripts(tagScript):
                             fsJob.orderPostScripts(updJob)
                             fsJob.runPostScripts(tagScript)
                     fsUpdateJob.close()
@@ -2717,14 +2722,13 @@ class Database(SqlDbRepository):
 
             # Run post-rollback scripts at the very end of the rollback, when
             # all other operations have been performed
-            if lastFsJob:
-                if (postRollbackScripts and
-                    (tagScript or not commitFlags.noScripts)):
-                    lastFsJob.clearPostScripts()
-                    # Add the post-rollback scripts
-                    for scriptData in postRollbackScripts:
-                        lastFsJob.addPostRollbackScript(*scriptData)
-                    lastFsJob.runPostScripts(tagScript)
+            if (lastFsJob and postRollbackScripts and
+                    commitFlags.shouldRunScripts(tagScript)):
+                lastFsJob.clearPostScripts()
+                # Add the post-rollback scripts
+                for scriptData in postRollbackScripts:
+                    lastFsJob.addPostRollbackScript(*scriptData)
+                lastFsJob.runPostScripts(tagScript)
 
             self.rollbackStack.restoreSystemModel()
             self.rollbackStack.removeLast()
