@@ -95,7 +95,7 @@ class Conary(CPackageRecipe):
         raise RuntimeError("Wrong value for 'plat' class variable")
 
     def setup(r):
-        r.macros.sqlitever = '3070800'
+        r.macros.sqlitever = '3071201'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
         if r.embedded:
