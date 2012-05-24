@@ -1,3 +1,18 @@
+Changes in 2.4.1:
+  o New Features:
+    * Phantom components are now created with a parent phantom package
+      for easier querying.
+    * The date and time at which a trove was installed is now recorded
+      in the Conary database. This information is visible through
+      "conary q --info". (CNY-3740)
+    * Users and groups are now broken down into their own components
+      rather than having users have the side effect of creating groups.
+      This allows for handling circular depenedencies in user group
+      membership. (CNY-3731)
+
+  o Bug Fixes:
+    * Tag and trove scripts no longer run when --test is in effect
+
 Changes in 2.4.0:
   o New Features:
     * Conary 2.4 includes a new WSGI-based repository stack. Forward-
