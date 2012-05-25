@@ -1186,6 +1186,23 @@ class UtilTest(testhelp.TestCase):
         self.assertEqual(len(buf), limit)
         self.assertEqual(list(set(buf)), ["0"])
 
+    def testSplitExact(self):
+        pad = object()
+        Tests = [
+            # Degenerate case, splitting None returns all None
+            ((None, ' ', 1, None), [None, None]),
+            (('a b', ' ', 1, None), ['a', 'b']),
+            # Classic split resulting in a string too short
+            (('a', ' ', 1, None), ['a', None]),
+            ((' b', ' ', 1, None), ['', 'b']),
+            (('  c', ' ', 2, None), ['', '', 'c']),
+            # Last split has extra seps in it
+            ((' b c d', ' ', 1, None), ['', 'b c d']),
+            # Different padding
+            (('a', ' ', 1, pad), ['a', pad]),
+        ]
+        for (string, sep, split, pad), tup in Tests:
+            self.assertEqual(util.splitExact(string, sep, split, pad), tup)
 
 class UrlTests(testhelp.TestCase):
     Tests = [
