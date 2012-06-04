@@ -24,6 +24,7 @@ import itertools
 import os
 import re
 import stat
+import subprocess
 import sys
 
 from testutils import mock
@@ -3400,11 +3401,11 @@ class TestRequires(PackageRecipe):
         self.cfg.sourceSearchDir = sourceDir
         util.mkdirChain(sourceDir)
 
-        # python 2.6 has switched to itertools
-        if sys.version_info >= (2, 6):
-            itertoolsModuleName = "itertools"
-        else:
-            itertoolsModuleName = "itertoolsmodule"
+        # Python < 2.5 uses "foomodule.so", but Red Hat seems to keep this
+        # behavior even with newer versions. So just import the module to
+        # figure it out.
+        itertoolsModuleName = os.path.basename(
+                itertools.__file__).split('.')[0]
 
         libPath = os.path.dirname(elf.__file__)
         util.copyfile(util.joinPaths(libPath, 'elf.so'),
@@ -3662,7 +3663,7 @@ class TestRequires(PackageRecipe):
     def setup(r):
         # all perl modules must be provided by package or present on system
         # (CNY-2180)
-        r.Create('/usr/lib/perl5/vendor_perl/CGI/Apache.pl', contents='\n'.join((
+        r.Create('VENDOR_PERL/CGI/Apache.pl', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
             'package CGI::Apache;',
@@ -3674,7 +3675,7 @@ class TestRequires(PackageRecipe):
             'use CGI::Apache;',
             '',
         )), mode=0755)
-"""
+""".replace('VENDOR_PERL', _findVendorPerl())
         self.resetRepository()
         self.logFilter.add()
         trv = self.build(recipestr, "TestRequires")
@@ -3699,13 +3700,13 @@ class TestRequires(PackageRecipe):
     version = '1'
     clearBuildReqs()
     def setup(r):
-        r.Create('/usr/lib/perl5/vendor_perl/CGI/Apache.pl', contents='\n'.join((
+        r.Create('VENDOR_PERL/CGI/Apache.pl', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
             'package CGI::Apache;',
             '',
         )), mode=0755)
-"""
+""".replace('VENDOR_PERL', _findVendorPerl())
         realAccess = os.access
         def access_perl(*args):
             if args[0] == '/usr/bin/perl':
@@ -3723,7 +3724,7 @@ class TestRequires(PackageRecipe):
     def setup(r):
         # all perl modules must be provided by package or present on system
         # (CNY-2180)
-        r.Create('/usr/lib/perl5/vendor_perl/CGI/Apache.pl', contents='\n'.join((
+        r.Create('VENDOR_PERL/CGI/Apache.pl', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
             'package CGI::Apache;',
@@ -3737,7 +3738,7 @@ class TestRequires(PackageRecipe):
             'use DFSJFSD::FDSJFK;',
             '',
         )), mode=0755)
-"""
+""".replace('VENDOR_PERL', _findVendorPerl())
         repos = self.openRepository()
         trv = self.build(recipestr, "TestRequires")
         for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
@@ -4921,9 +4922,9 @@ class TestProvides(PackageRecipe):
     clearBuildReqs()
     def setup(r):
         # not %(libdir)s
-        r.Create('/usr/lib/perl5/vendor_perl/foo/blah.pm')
+        r.Create('VENDOR_PERL/foo/blah.pm')
         r.ComponentSpec('runtime', '.*')
-"""
+""".replace('VENDOR_PERL', _findVendorPerl())
         trv = self.build(recipestr1, "TestProvides")
         prov = str(trv.getProvides())
         self.assertIn('perl: foo::blah', prov)
@@ -7972,3 +7973,29 @@ class TestProperties(PackageRecipe):
         self.assertEquals(
             trv2.troveInfo.properties.freeze(),
             trv.troveInfo.properties.freeze())
+
+
+def _findVendorPerl(_cached=[]):
+    """Return the first vendor_perl directory for the system interpreter"""
+    if not _cached:
+        try:
+            proc = subprocess.Popen("perl -le 'print foreach @INC'",
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    )
+        except OSError:
+            raise testhelp.SkipTestException(
+                    "System perl not found or not operable")
+        stdout, stderr = proc.communicate()
+        if proc.returncode:
+            raise testhelp.SkipTestException(
+                    "System perl not found or not operable\n%s" % stderr)
+
+        for path in stdout.splitlines():
+            if path.endswith('/vendor_perl'):
+                _cached[:] = [path]
+                break
+    if not _cached:
+        raise RuntimeError("could not find vendor_perl")
+    return _cached[0]

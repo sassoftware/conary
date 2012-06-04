@@ -18,7 +18,7 @@
 
 .PHONY: all dist clean install
 
-sqlite_dir = sqlite-*
+sqlite_dir = $(wildcard sqlite-*)
 sqlite_lib = $(sqlite_dir)/.libs/libsqlite3.a
 sqlite_inc = $(sqlite_dir)/sqlite3*.h
 

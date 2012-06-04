@@ -1,3 +1,57 @@
+Changes in 2.4.2:
+  o Bug Fixes:
+    * The 'package' option of addCapsule now properly handles package
+      names only. (CNY-3743)
+    * Fixed updates on encapsulated SLES 10 systems always crashing
+      since 2.4.0 due to a difference in the rpm-python API. (CNY-3745)
+
+Changes in 2.4.1:
+  o New Features:
+    * Phantom components are now created with a parent phantom package
+      for easier querying.
+    * The date and time at which a trove was installed is now recorded
+      in the Conary database. This information is visible through
+      "conary q --info". (CNY-3740)
+    * Users and groups are now broken down into their own components
+      rather than having users have the side effect of creating groups.
+      This allows for handling circular depenedencies in user group
+      membership. (CNY-3731)
+
+  o Bug Fixes:
+    * Tag and trove scripts no longer run when --test is in effect
+
+Changes in 2.4.0:
+  o New Features:
+    * Conary 2.4 includes a new WSGI-based repository stack. Forward-
+      and backward-compatibility with clients is maintained. However,
+      Python 2.6 is now the minimum version for repositories that wish
+      to run on WSGI or that have a web interface, and these also
+      require the WebOb library ( http://www.webob.org/ )
+    * Conary can now automatically reconcile its own database with
+      external capsule databases. If a package is installed in the RPM
+      database without using Conary, the next Conary update operation
+      will first fabricate a "phantom" trove as a placeholder. That
+      trove can then be erased, updated to a regular encapsulated trove,
+      or left as-is. Similarly, if a Conary-managed package is erased
+      from the RPM database, the next update operation will also erase
+      the corresponding Conary trove. This feature can be disabled by
+      setting the 'syncCapsuleDatabase' configuration option to False.
+
+  o Bug Fixes:
+    * Fixed a bug in the system model dependency solver cache that
+      caused surprising behavior when more than one trove in the search
+      path provided the same dependency. (CNY-3735)
+    * Fixed use of branch specs with system model (CNY-3645)
+    * Fixed "cvc promote" when buildLabel is not set (CNY-3660)
+    * Previously, updates could fail with an unhelpful 'TroveNotFound'
+      error that named the top-level trove when in fact a network
+      configuration problem had prevented fetching a sub-component of
+      that trove. This has been corrected so that the original network
+      error is displayed instead. (CNY-3732)
+    * Similarly, "File Stream Missing" errors will no longer mask
+      network problems that prevent reaching a file sourced from another
+      repository. (CNY-3680)
+
 Changes in 2.3.12:
   o New Features:
     * Switched r.Properties to taking a full config descriptor rather

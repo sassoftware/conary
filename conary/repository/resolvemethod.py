@@ -234,9 +234,11 @@ class DepResolutionMethod(object):
         scoredList = sorted(trovesByNL.itervalues())
         if not scoredList:
             return None
-        else:
-            # highest score, then latest timestamp, then name.
-            return scoredList[-1][-1]
+        if len(scoredList) > 1 and [x for x in scoredList if x[1] == 0]:
+            log.warning("Dependency tie-breaking may not be deterministic "
+                    "because some versions are missing timestamps")
+        # highest score, then latest timestamp, then name.
+        return scoredList[-1][-1]
 
     def filterResolutionsPostUpdate(self, db, jobSet, troveSource):
         # Now that we know how conary would line up these dependencies

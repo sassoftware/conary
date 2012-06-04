@@ -601,3 +601,22 @@ class TestRecipe(CapsuleRecipe):
         self.assertEquals(str(e),
                   'Package Policy errors found:\n'
                   'RemoveCapsuleFiles: Component test:foo does not exist')
+
+    @conary_test.rpm
+    def testRPMCapsulePackageNoComponent(self):
+        '''
+        CNY-3743: make sure just the package name can be specified to
+        addCapsule's package arg
+        '''
+        recipestr1 = r"""
+class TestSharedDep(CapsuleRecipe):
+    name = 'sharedfiledep'
+    version = '1.0'
+    clearBuildReqs()
+
+    def setup(r):
+        # test dep provides
+        r.addCapsule('sharedfiledep-1.0-1.i386.rpm',
+                     package='sharedfiledep')
+"""
+        built, d = self.buildRecipe(recipestr1, "TestSharedDep")

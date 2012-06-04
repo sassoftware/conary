@@ -34,8 +34,15 @@ class Endpoint(object):
         return False
 
     def __deepcopy__(self, memo=None):
+        # All subclasses are immutable, so copy is a no-op
         return self
     __copy__ = __deepcopy__
+
+    def __reduce__(self):
+        # All subclasses have a complete string representation, and will accept
+        # that string as an argument to the constructor, so pickle everything
+        # that way.
+        return (type(self), (str(self),))
 
 
 class HostPort(namedtuple('HostPort', 'host port'), Endpoint):
@@ -44,7 +51,7 @@ class HostPort(namedtuple('HostPort', 'host port'), Endpoint):
     __slots__ = ()
 
     def __new__(cls, host, port=None):
-        if port is None:
+        if isinstance(host, basestring) and port is None:
             host, port = splitHostPort(host, rawPort=True)
 
         if port == '*':

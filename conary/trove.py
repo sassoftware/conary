@@ -1010,7 +1010,8 @@ _TROVEINFO_TAG_BUILD_REFS     = 31  # group set recipes track troves which
                                     # were named during a build but did not
                                     # make it into the final groups
 _TROVEINFO_TAG_PATHCONFLICTS  = 32
-_TROVEINFO_TAG_LAST           = 32
+_TROVEINFO_TAG_INSTALLTIME    = 33  # client only: when trove was installed
+_TROVEINFO_TAG_LAST           = 33
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1105,6 +1106,11 @@ class TroveRpmCapsule(streams.StreamSet):
         self.epoch.set(None)
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
+
+    def getNevra(self):
+        return rpmhelper.NEVRA(self.name(), self.epoch(), self.version(),
+                self.release(), self.arch())
+
 
 class MsiComponent(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
@@ -1327,6 +1333,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_PROPERTIES    : (DYNAMIC, PropertySet,         'properties' ),
         _TROVEINFO_TAG_BUILD_REFS    : (DYNAMIC, LoadedTroves,         'buildRefs' ),
         _TROVEINFO_TAG_PATHCONFLICTS : (DYNAMIC, StringOrderedStreamCollection, "pathConflicts" ),
+        _TROVEINFO_TAG_INSTALLTIME   : (DYNAMIC, streams.LongLongStream, 'installTime'),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -1336,9 +1343,19 @@ class TroveInfo(streams.StreamSet):
     _newMetadataItems = dict([ (x[1][2], True) for x in
                                MetadataItem.streamDict.items() if
                                x[0] > _METADATA_ITEM_ORIG_ITEMS ])
+    _eqSkipSet = { 'installTime': True }
 
     def diff(self, other):
         return streams.StreamSet.diff(self, other, ignoreUnknown=True)
+
+    def __eq__(self, other, skipSet=None):
+        if skipSet:
+            skipSet = dict(skipSet)
+        else:
+            skipSet = {}
+        skipSet.update(self._eqSkipSet)
+        return streams.StreamSet.__eq__(self, other, skipSet)
+
 
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
@@ -1505,6 +1522,7 @@ class Trove(streams.StreamSet):
                   'incomplete' : True,
                   'metadata': True,
                   'completeFixup' : True,
+                  'installTime' : True,
                   }
 
     _mergeTroveInfoSigExclusions(v0SkipSet, streamDict)
@@ -3232,6 +3250,9 @@ class Trove(streams.StreamSet):
         """
         return [ (x[1].name(), x[1].version(), x[1].flavor())
                  for x in self.troveInfo.troveCopiedFrom.iterAll() ]
+
+    def getInstallTime(self):
+        return self.troveInfo.installTime()
 
     def __init__(self, name, version = None, flavor = None, changeLog = None,
                  type = TROVE_TYPE_NORMAL, skipIntegrityChecks = False,

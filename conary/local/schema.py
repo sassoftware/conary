@@ -35,7 +35,7 @@ def resetTable(cu, name):
     except Exception, e:
         return False
 
-def createVersions(db, cu = None):
+def _createVersions(db, cu = None):
     if "Versions" in db.tables:
         return
     if cu is None:
@@ -46,7 +46,7 @@ def createVersions(db, cu = None):
         db.loadSchema()
 
 # Schema creation functions
-def createFlavors(db):
+def _createFlavors(db):
     if "Flavors" in db.tables:
         return
     cu = db.cursor()
@@ -63,7 +63,7 @@ def createDBTroveFiles(db):
     if "DBTroveFiles" in db.tables:
         return
     cu = db.cursor()
-    createVersions(db, cu)
+    _createVersions(db, cu)
     cu.execute("""
     CREATE TABLE DBTroveFiles(
         streamId            %(PRIMARYKEY)s,
@@ -93,7 +93,7 @@ def createInstances(db):
     if "Instances" in db.tables:
         return
     cu = db.cursor()
-    createVersions(db, cu)
+    _createVersions(db, cu)
     cu.execute("""
     CREATE TABLE Instances(
         instanceId      %(PRIMARYKEY)s,
@@ -110,7 +110,7 @@ def createInstances(db):
     db.commit()
     db.loadSchema()
 
-def createTroveTroves(db):
+def _createTroveTroves(db):
     if "TroveTroves" in db.tables:
         return
     cu = db.cursor()
@@ -149,7 +149,7 @@ def createTroveInfo(db):
 def createMetadata(db):
     commit = False
     cu = db.cursor()
-    createVersions(db, cu)
+    _createVersions(db, cu)
     if 'Metadata' not in db.tables:
         cu.execute("""
         CREATE TABLE Metadata(
@@ -206,7 +206,7 @@ def createDatabaseAttributes(db):
     db.commit()
     db.loadSchema()
 
-def createDepTable(db, cu, name, isTemp, skipCommit=False):
+def _createDepTable(db, cu, name, isTemp):
     d =  {"tmp" : "", "name" : name}
     startTrans = not isTemp
     if isTemp:
@@ -226,11 +226,8 @@ def createDepTable(db, cu, name, isTemp, skipCommit=False):
                (name, name), start_transaction = startTrans)
     if isTemp:
         db.tempTables[name] = True
-    if not skipCommit:
-        db.commit()
-    return True
 
-def createRequiresTable(db, cu, name, isTemp, skipCommit=False):
+def _createRequiresTable(db, cu, name, isTemp):
     d = { "tmp" : "",
           "name" : name,
           "constraint" : "",
@@ -270,11 +267,10 @@ def createRequiresTable(db, cu, name, isTemp, skipCommit=False):
                start_transaction = startTrans)
     if isTemp:
         db.tempTables[name] = True
-    if not skipCommit:
-        db.commit()
     return True
 
-def createProvidesTable(db, cu, name, isTemp, skipCommit=False):
+
+def _createProvidesTable(db, cu, name, isTemp):
     d = { "tmp" : "",
           "name" : name,
           "constraint" : "" }
@@ -306,11 +302,8 @@ def createProvidesTable(db, cu, name, isTemp, skipCommit=False):
     if isTemp:
         db.tempTables[name] = True
 
-    if not skipCommit:
-        db.commit()
-    return True
 
-def createDepWorkTable(db, cu, name, skipCommit=False):
+def _createDepWorkTable(db, cu, name):
     if name in db.tempTables:
         return False
     cu.execute("""
@@ -329,21 +322,15 @@ def createDepWorkTable(db, cu, name, skipCommit=False):
     CREATE INDEX %sIdx ON %s(troveId, class, name, flag)
     """ % (name, name), start_transaction = False)
     db.tempTables[name] = True
-    if not skipCommit:
-        db.commit()
-    return True
 
 # This should be called only once per establishing a db connection
-def setupTempDepTables(db, cu=None, skipCommit=False):
+def setupTempDepTables(db, cu=None):
     if cu is None:
-        db.transaction()
         cu = db.cursor()
-    else:
-        skipCommit = True
-    createRequiresTable(db, cu, "TmpRequires", isTemp=True, skipCommit=True)
-    createProvidesTable(db, cu, "TmpProvides", isTemp=True, skipCommit=True)
-    createDepTable(db, cu, 'TmpDependencies', isTemp=True, skipCommit=True)
-    createDepWorkTable(db, cu, "DepCheck", skipCommit=True)
+    _createRequiresTable(db, cu, "TmpRequires", isTemp=True)
+    _createProvidesTable(db, cu, "TmpProvides", isTemp=True)
+    _createDepTable(db, cu, 'TmpDependencies', isTemp=True)
+    _createDepWorkTable(db, cu, "DepCheck")
 
     if "suspectDepsOrig" not in db.tempTables:
         cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)",
@@ -376,22 +363,21 @@ def setupTempDepTables(db, cu=None, skipCommit=False):
                 nodeId      INTEGER
             )""" % db.keywords, start_transaction = False)
         db.tempTables["RemovedTroves"] = True
+    db.commit()
 
-    if not skipCommit:
-        db.commit()
 
 def createDependencies(db, skipCommit=False):
     commit = False
     cu = db.cursor()
 
     if "Dependencies" not in db.tables:
-        createDepTable(db, cu, "Dependencies", False, skipCommit=True)
+        _createDepTable(db, cu, "Dependencies", isTemp=False)
         commit = True
     if "Requires" not in db.tables:
-        createRequiresTable(db, cu, "Requires", False, skipCommit=True)
+        _createRequiresTable(db, cu, "Requires", isTemp=False)
         commit = True
     if "Provides" not in db.tables:
-        createProvidesTable(db, cu, "Provides", False, skipCommit=True)
+        _createProvidesTable(db, cu, "Provides", isTemp=False)
         commit = True
     if commit:
         if not skipCommit:
@@ -414,11 +400,11 @@ def setupTempTables(db, cu=None, skipCommit=False):
         db.commit()
 
 def createSchema(db):
-    createVersions(db)
+    _createVersions(db)
     createInstances(db)
-    createTroveTroves(db)
+    _createTroveTroves(db)
     createDBTroveFiles(db)
-    createFlavors(db)
+    _createFlavors(db)
     createDependencies(db)
     createTroveInfo(db)
     createDataStore(db)
@@ -527,7 +513,7 @@ class MigrateTo_8(SchemaMigration):
                            SELECT instanceId, troveName, versionId, flavorId,
                                   timeStamps, isPresent, 0 FROM DBInstances
                         """)
-        createFlavors(self.db)
+        _createFlavors(self.db)
         self.cu.execute('INSERT INTO Flavors SELECT * FROM DBFlavors '
                         'WHERE flavor IS NOT NULL')
         self.cu.execute('DROP TABLE DBFlavors')

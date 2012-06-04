@@ -27,6 +27,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import math
 
 try:
     from Crypto.Hash import RIPEMD
@@ -47,6 +48,8 @@ import warnings
 warnings.filterwarnings("ignore", r"the sha module is deprecated",
     DeprecationWarning, "^.*Crypto\.Hash\.SHA.*$")
 from Crypto.PublicKey import DSA
+
+from Crypto.PublicKey import pubkey
 
 from conary import constants
 from conary.lib import util, digestlib
@@ -867,6 +870,10 @@ class PGP_PacketFromStream(object):
             newStyle = False
             self._oldHeader(first)
 
+        if self.bodyLength is None:
+            # Indeterminate length; assume end of file
+            fileobj.seek(0, 2)
+            self.bodyLength = fileobj.tell() - (self._f.start + self.headerLength)
         _bodyStream = util.SeekableNestedFile(self._f.file,
                      self.bodyLength, self._f.start + self.headerLength)
         if self.bodyLength:
@@ -895,9 +902,11 @@ class PGP_PacketFromStream(object):
             self._f.__init__(self._f.file, headerLength, self._f.start)
             self._f.seek(1)
         else:
-            headerLength = 1
-            blLen = None
-            raise NotImplementedError("Indeterminate length not supported")
+            if self.tag != PKT_COMPRESSED_DATA:
+                raise NotImplementedError("Indeterminate length not supported")
+            self.headerLength = 1
+            self.bodyLength = None
+            return
 
         self.headerLength = headerLength
         bbytes = PGP_BasePacket._readBin(self._f, blLen)
@@ -1346,6 +1355,35 @@ class PGP_Signature(PGP_BaseKeySig):
 
     _parentPacketTypes = set(PKT_ALL_KEYS).union(PKT_ALL_USER)
 
+    HashAlgList = {
+        1: digestlib.md5,
+        2: digestlib.sha1,
+        8: digestlib.sha256,
+        9: digestlib.sha384,
+        10: digestlib.sha512,
+        11: digestlib.sha224,
+    }
+    # hashPads from RFC2440 section 5.2.2
+    HashAlgPads = {
+        1:  "\x30\x20\x30\x0C\x06\x08\x2A\x86"
+            "\x48\x86\xF7\x0D\x02\x05\x05\x00"
+            "\x04\x10",
+        2:  "\x30\x21\x30\x09\x06\x05\x2b\x0E"
+            "\x03\x02\x1A\x05\x00\x04\x14",
+        8:  "\x30\x31\x30\x0d\x06\x09\x60\x86"
+            "\x48\x01\x65\x03\x04\x02\x01\x05"
+            "\x00\x04\x20",
+        9:  "\x30\x41\x30\x0d\x06\x09\x60\x86"
+            "\x48\x01\x65\x03\x04\x02\x02\x05"
+            "\x00\x04\x30",
+        10: "\x30\x51\x30\x0d\x06\x09\x60\x86"
+            "\x48\x01\x65\x03\x04\x02\x03\x05"
+            "\x00\x04\x40",
+        11: "\x30\x31\x30\x0d\x06\x09\x60\x86"
+            "\x48\x01\x65\x03\x04\x02\x04\x05"
+            "\x00\x04\x1C",
+    }
+
     def initialize(self):
         self.version = self.sigType = self.pubKeyAlg = self.hashAlg = None
         self.hashSig = self.mpiFile = self.signerKeyId = None
@@ -1774,10 +1812,9 @@ class PGP_Signature(PGP_BaseKeySig):
         key serialized in dataFile"""
         self.parse()
 
-        if not (0 < self.hashAlg <= 2):
+        hashFunc = self.HashAlgList.get(self.hashAlg)
+        if hashFunc is None:
             raise UnsupportedHashAlgorithm(self.hashAlg)
-        hashAlgList = [ None, digestlib.md5, digestlib.sha1]
-        hashFunc = hashAlgList[self.hashAlg]
         hashObj = hashFunc()
 
         dataFile.seek(0, SEEK_SET)
@@ -1798,10 +1835,10 @@ class PGP_Signature(PGP_BaseKeySig):
         # if this is an RSA signature, it needs to properly padded
         # RFC 2440 5.2.2 and RFC 2313 10.1.2
         if pubKeyAlg in PK_ALGO_ALL_RSA:
-            # hashPads from RFC2440 section 5.2.2
-            hashPads = [ '', '\x000 0\x0c\x06\x08*\x86H\x86\xf7\r\x02\x05\x05\x00\x04\x10', '\x000!0\t\x06\x05+\x0e\x03\x02\x1a\x05\x00\x04\x14' ]
-            padLen = (len(hex(cryptoKey.n)) - 5 - 2 * (len(sigString) + len(hashPads[hashAlg]))) // 2 -1
-            sigString = chr(1) + chr(0xFF) * padLen + hashPads[hashAlg] + sigString
+            hashPad = PGP_Signature.HashAlgPads[hashAlg]
+            padLen = (len(hex(cryptoKey.n)) - 5 -
+                2 * (len(sigString) + len(hashPad) + 1)) // 2 - 1
+            sigString = chr(1) + chr(0xFF) * padLen + chr(0) + hashPad + sigString
 
         return sigString
 
@@ -1827,6 +1864,18 @@ class PGP_Signature(PGP_BaseKeySig):
         """
         digest = self.getDocumentHash(stream)
         keyId = self.getSignerKeyId()
+
+        # Per FIPS-180-3 DSA keys require the following digest truncation
+        # A succinct description http://tools.ietf.org/html/rfc4880#section-13.6
+        if self.pubKeyAlg == PK_ALGO_DSA:
+            # get q bit length
+            qLen = int(math.ceil(math.log(cryptoKey.q, 2)))
+            # 384 is not required by the standard, but we add it since
+            # our testsuite has this case
+            assert qLen in [ 160, 224, 256, 384 ]
+            if int(math.ceil(math.log(pubkey.bytes_to_long(digest), 2))) > qLen:
+                digest = digest[:(qLen/8)]
+
         # Validate it against the short digest
         if digest[:2] != self.hashSig:
             raise SignatureError(keyId)
@@ -2662,12 +2711,14 @@ class PGP_MainKey(PGP_Key):
             yield sig
 
 class PGP_PublicAnyKey(PGP_Key):
+    __slots__ = []
     pubTag = None
     def toPublicKey(self, minHeaderLen = 2):
         return self._msgClass.newPacket(self.pubTag, self._bodyStream,
                                            minHeaderLen = minHeaderLen)
 
 class PGP_PublicKey(PGP_PublicAnyKey, PGP_MainKey):
+    __slots__ = []
     tag = PKT_PUBLIC_KEY
     pubTag = PKT_PUBLIC_KEY
 
@@ -3018,6 +3069,7 @@ class PGP_SecretAnyKey(PGP_Key):
         return sigp
 
 class PGP_SecretKey(PGP_SecretAnyKey, PGP_MainKey):
+    __slots__ = []
     tag = PKT_SECRET_KEY
     pubTag = PKT_PUBLIC_KEY
 
@@ -3229,8 +3281,14 @@ for klass in [PGP_PublicKey, PGP_SecretKey, PGP_PublicSubKey, PGP_SecretSubKey]:
     PacketTypeDispatcher.addPacketType(klass)
 
 class PGP_Trust(PGP_BasePacket):
+    __slots__ = []
     tag = PKT_TRUST
 PacketTypeDispatcher.addPacketType(PGP_Trust)
+
+class PGP_CompressedData(PGP_BasePacket):
+    __slots__ = []
+    tag = PKT_COMPRESSED_DATA
+PacketTypeDispatcher.addPacketType(PGP_CompressedData)
 
 def newKeyFromString(data):
     """Create a new (main) key from the data

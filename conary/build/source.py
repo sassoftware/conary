@@ -1628,7 +1628,7 @@ class addCapsule(_Source):
         if self.package is None:
             self.package = pname + ':' + self.capsuleType
         else:
-            p,c = self.package.split(':')
+            p,c = util.splitExact(self.package, ':', 1)
             if not p:
                 p = pname
             if not c:

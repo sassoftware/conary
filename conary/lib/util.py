@@ -1360,8 +1360,16 @@ class Flags(object):
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__,
-                "".join( flag for flag in self.__slots__
-                            if getattr(self, flag) ) )
+                ", ".join( "%s=%r" % (flag, getattr(self, flag))
+                    for flag in self.__slots__ if getattr(self, flag) ) )
+
+    def copy(self):
+        new = type(self)()
+        for flag in self.__slots__:
+            value = getattr(self, flag)
+            object.__setattr__(new, flag, value)
+        return new
+
 
 def stripUserPassFromUrl(url):
     arr = list(urlparse.urlparse(url))
@@ -1575,6 +1583,20 @@ def urlUnsplit(urlTuple):
         return urlTempl
     return ProtectedTemplate(urlTempl, passwd = ProtectedString(urllib.quote(passwd)))
 
+def splitExact(s, sep, maxsplit, pad=None):
+    """
+    Split string using the specified separator, just like string.split()
+    Return a list of exactly maxsplit+1 elements.
+    If the normal split returns fewer than maxsplit elements, pad the rest of
+    the list with the specified pad (defaulting to None)
+    """
+    if s is None:
+        arr = []
+    else:
+        arr = s.split(sep, maxsplit)
+    arrLen = len(arr)
+    arr.extend(pad for x in range(maxsplit + 1 - arrLen))
+    return arr
 
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
     """Marshaller for XMLRPC data"""
@@ -2381,6 +2403,9 @@ class TimestampedMap(object):
             if stale or now <= v[1] ]
         return ret
 
+    def __reduce__(self):
+        return (type(self), (self.delta,))
+
 
 def statFile(pathOrFile, missingOk=False, inodeOnly=False):
     """Return a (dev, inode, size, mtime, ctime) tuple of the given file.
@@ -2421,3 +2446,29 @@ def iterFileChunks(fobj):
         if not data:
             break
         yield data
+
+
+class cachedProperty(object):
+    """A decorator that creates a memoized property. The first time the
+    property is accessed, the decorated function is called and the return value
+    is used as the value of the property. It is also stored so that future
+    accesses bypass the function.
+
+    The memoized value is stored into the instance dictionary. Because __set__
+    is not implemented, this is a "non-data descriptor" and thus the instance
+    dictionary overrides the descriptor.
+    """
+
+    def __init__(propself, func):
+        propself.func = func
+        try:
+            propself.__doc__ = func.__doc__
+        except AttributeError:
+            pass
+
+    def __get__(propself, ownself, owncls):
+        if ownself is None:
+            return propself
+        ret = propself.func(ownself)
+        setattr(ownself, propself.func.func_name, ret)
+        return ret

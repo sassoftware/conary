@@ -14,3 +14,4 @@ NEWS.html
 # epydoc:
 ^html/
 ^venv/
+^\.coverage/

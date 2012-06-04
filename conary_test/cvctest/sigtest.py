@@ -421,8 +421,9 @@ class SigTest(rephelp.RepositoryHelper):
         cs.addPrimaryTrove('test:test', v, flavor)
 
         # sign the changeset
+        csPath = os.path.join(self.workDir, 'test-1.0-1.ccs')
         cs = cook.signAbsoluteChangeset(cs, fingerprint)
-        cs.writeToFile('test-1.0-1.ccs')
+        cs.writeToFile(csPath)
 
         tmpPath = mkdtemp()
 
@@ -438,7 +439,7 @@ class SigTest(rephelp.RepositoryHelper):
         openpgpkey.setKeyCache(newKeyCache)
 
         try:
-            self.updatePkg(self.rootDir, 'test-1.0-1.ccs')
+            self.updatePkg(self.rootDir, csPath)
         finally:
             self.cfg.pubRing = pubRing
             openpgpkey.setKeyCache(keyCache)

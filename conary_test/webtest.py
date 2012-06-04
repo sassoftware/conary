@@ -58,6 +58,11 @@ class WebRepositoryHelper(rephelp.RepositoryHelper, WebTestCase):
         if not os.environ.get('CONARY_SERVER', '').startswith('apache'):
             raise testhelp.SkipTestException('web tests only run in apache '
                                               'mode')
+        try:
+            __import__('webob')
+        except ImportError:
+            raise testhelp.SkipTestException(
+                   "Web tests require the 'webob' package")
         WebTestCase.setUp(self)
         rephelp.RepositoryHelper.setUp(self)
 
@@ -96,7 +101,7 @@ class WebFrontEndTest(WebRepositoryHelper):
 
         # Login is explicitly done via login link
         page = self.assertContent('/login', code=[401],
-                                  content='Authorization Required')
+                                  content='Unauthorized')
 
         # Login as test user; redirect should happen if successful
         # (back to browse)
@@ -186,17 +191,17 @@ class WebFrontEndTest(WebRepositoryHelper):
 
     def testUserlist(self):
         page = self.assertContent('/userlist', code=[401],
-                                  content = 'Authorization Required')
+                                  content = 'Unauthorized')
         self.setBasicAuth('test', 'foo')
         page = self.assertContent('/userlist', code=[200],
                                   content = 'Member Of')
 
     def testUserStrangePass(self):
         page = self.assertContent('/userlist', code=[401],
-                                  content = 'Authorization Required')
+                                  content = 'Unauthorized')
         self.setBasicAuth('test', 'foo:bar')
         page = self.assertContent('/userlist', code=[401],
-                                  content = "Authorization Required")
+                                  content = "Unauthorized")
         self.setBasicAuth('test', 'foo')
         page = self.assertContent('/userlist', code=[200],
                                   content = 'Member Of')
@@ -204,7 +209,7 @@ class WebFrontEndTest(WebRepositoryHelper):
     def testAddUser(self):
         # make sure that authentication is required
         page = self.assertContent('/addUserForm', code=[401],
-                                  content = "Authorization Required")
+                                  content = "Unauthorized")
 
         self.setBasicAuth('test', 'foo')
         page = self.assertContent('/addUserForm', code=[200],
@@ -221,7 +226,7 @@ class WebFrontEndTest(WebRepositoryHelper):
     def testAddRole(self):
         # make sure that authenticaion is required
         page = self.assertContent('/addRoleForm', code=[401],
-                                  content = 'Authorization Required')
+                                  content = 'Unauthorized')
 
         self.setBasicAuth('test', 'foo')
 
@@ -257,7 +262,7 @@ class WebFrontEndTest(WebRepositoryHelper):
         # not have been a bad request, but a Forbidden
         self.authinfo = base64.encodestring('foo:bar:baz').strip()
         page = self.assertContent('/userlist', code=[401],
-                                  content = 'Authorization Required')
+                                  content = 'Unauthorized')
 
     @testhelp.context('entitlements')
     def testGetLog(self):
@@ -306,9 +311,9 @@ class WebFrontEndTest(WebRepositoryHelper):
         # make sure that authentication is required
         # FIXME! no auth required
         #page = self.assertContent('/manageEntitlements', code=[401],
-        #                          content = "Authorization Required")
+        #                          content = "Unauthorized")
         #page = self.assertContent('/addEntClassForm', code=[401],
-        #                          content = "Authorization Required")
+        #                          content = "Unauthorized")
 
         self.setBasicAuth('test', 'foo')
         page = self.assertContent('/manageEntitlements', code=[200],

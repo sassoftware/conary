@@ -27,6 +27,7 @@ import stat
 import tempfile
 import StringIO
 import sys
+import time
 
 from conary_test import recipes
 from conary_test import rephelp
@@ -255,8 +256,13 @@ class User(UserInfoRecipe):
         vers = [ x[1] for x in built ]
         pkgname = built[0][0]
 
-        self.updatePkg(root1, pkgname, vers[0])
-        self.updatePkg(root2, pkgname, vers[0])
+        _time = time.time
+        try:
+            time.time = lambda: 1111111111.0
+            self.updatePkg(root1, pkgname, vers[0])
+            self.updatePkg(root2, pkgname, vers[0])
+        finally:
+            time.time = _time
 
         for n in ( 'changed', 'unchanged' ):
             self.verifyFile(root1 + "/etc/" + n + "config",
@@ -271,8 +277,14 @@ class User(UserInfoRecipe):
             self.fail('installing the same package in two different roots '
                       'did not result in identical permissions')
 
-        os.chmod(os.path.join(root2, 'etc/changedconfig'), 0777)
+        self.mock(time, 'localtime', time.gmtime)
+        db = database.Database(root1, self.cfg.dbPath)
+        (rc, s) = self.captureOutput(query.displayTroves, db, self.cfg,
+                [pkgname], info=True)
+        db.close()
+        self.assertIn('Installed : Fri Mar 18 01:58:31 2005\n', s)
 
+        os.chmod(os.path.join(root2, 'etc/changedconfig'), 0777)
         self.updatePkg(root1, pkgname, vers[1])
         self.updatePkg(root2, pkgname, vers[1])
 
@@ -763,7 +775,7 @@ class User(UserInfoRecipe):
         (rc, str) = self.captureOutput(self.updatePkg,
                                        [ '-test:old', '+test:new' ])
         self.verifyFile(path, "blah\n")
-        assert(str ==
+        self.assertEquals(str,
                 'warning: cannot remove /foo: No such file or directory\n')
 
     def testNewTransients(self):
@@ -1742,7 +1754,7 @@ class User(UserInfoRecipe):
         self.verifyNoFile(self.rootDir + '/usr/share/unchanged')
         (rc, str) = self.captureOutput(
                 self.erasePkg, self.rootDir, 'testcase', justDatabase=True)
-        assert(str == """\
+        self.assertEquals(str, """\
 warning: cannot remove /usr/share/changed: No such file or directory
 warning: cannot remove /usr/share/unchanged: No such file or directory
 warning: cannot remove /usr/bin/hello: No such file or directory
@@ -2865,7 +2877,7 @@ class FooRecipe(PackageRecipe):
                            ('/contents2', 'bar\n')])
         (rc, str) = self.captureOutput(self.updatePkg,
                                        ['-foo:runtime', 'bar:runtime'])
-        assert(str ==
+        self.assertEquals(str,
             "warning: cannot remove /contents0: No such file or directory\n")
         assert(not os.path.exists('%s/contents0' % self.cfg.root))
         self.verifyFile('%s/contents1' % self.cfg.root, 'bar\n')
@@ -4232,9 +4244,9 @@ foo:run
         self.updatePkg('bar:runtime', replaceFiles = True)
 
         db = self.openDatabase()
-        assert(db.iterTrovesByPath('/a') == [bar])
+        self.assertEqual(db.iterTrovesByPath('/a'), [bar])
         self.rollback(1)
-        assert(db.iterTrovesByPath('/a') == [foo])
+        self.assertEqual(db.iterTrovesByPath('/a'), [foo])
 
     def testSwapFileAndSymlink(self):
         # conary <= 2.0.50 hits "OSError: Too many levels of symbolic links"

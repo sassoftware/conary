@@ -193,7 +193,8 @@ class ChangesetCallback(Callback):
         """This callback gets called if missing files were detected in the
         upstream server
         @param missingFiles: a list of tuples:
-          (troveName, troveVersion, troveFlavor, pathId, path, fileId, version)
+          (troveName, troveVersion, troveFlavor, pathId, path, fileId, version,
+          savedError, ...)
         """
         return False
 
@@ -428,6 +429,35 @@ class UpdateCallback(ChangesetCallback):
          - the info option is passed in and after the job set is determined
          - extra troves are resolved in after the job set is determined
          - after restarting an update that contains critical troves
+        """
+        pass
+
+    def capsuleSyncScan(self, capsuleType):
+        """
+        Called before scanning for changes for the named type of capsule.
+
+        @param capsuleType: capsule type, e.g. 'rpm'
+        @type  capsuleType: str
+        """
+        pass
+
+    def capsuleSyncCreate(self, capsuleType, name, num, total):
+        """
+        Called when fabricating a trove for a capsule.
+
+        @param capsuleType: capsule type, e.g. 'rpm'
+        @param name: string identifier for the capsule
+        @param num: number of capsule being created (1-indexed)
+        @param total: total number of capsules to create
+        """
+        pass
+
+    def capsuleSyncApply(self, added, removed):
+        """
+        Called before applying a capsule sync job.
+
+        @param added: number of troves being added
+        @param removed: number of troves being removed
         """
         pass
 

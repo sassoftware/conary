@@ -874,9 +874,7 @@ cannot shadow earlier trove
 
         self.stopRepository(0)
         # This should fail period. (no callback)
-        # Note that we silently convert the OpenError exception into a
-        # FileStreamMissing.
-        self.assertRaises(repository.errors.FileStreamMissing,
+        self.assertRaises(repository.errors.OpenError,
                               self.checkout, "testcase",
                               versionStr=shadow)
 

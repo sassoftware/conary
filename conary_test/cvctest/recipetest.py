@@ -141,6 +141,7 @@ class Empty(PackageRecipe):
         repos = self.openRepository()
         origDir = os.getcwd()
         try:
+            os.chdir(self.workDir)
             self.newpkg('empty')
             os.chdir('empty')
             self.writeFile('empty.recipe', recipe)

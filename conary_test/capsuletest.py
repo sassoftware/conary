@@ -349,10 +349,16 @@ class CapsuleTest(rephelp.RepositoryHelper):
         assert(not os.path.exists(self.rootDir + '/normal'))
         str = os.popen('rpm --root %s -qa' % self.rootDir).readlines()
         self.assertEquals(str, [ ])
-        rc, str = self.captureOutput(self.erasePkg, self.rootDir,
+        # syncCapsuleDatabase would helpfully erase the trove before we get a
+        # chance to do the same thing, so turn it off for this test
+        self.cfg.syncCapsuleDatabase = False
+        try:
+            rc, str = self.captureOutput(self.erasePkg, self.rootDir,
                                      'simple:rpm',
                                      justDatabase = True,
                                      skipCapsuleOps = True)
+        finally:
+            self.cfg.resetToDefault('syncCapsuleDatabase')
         self.assertEquals(str,
             'warning: cannot remove /normal: No such file or directory\n'
             'warning: cannot remove /config: No such file or directory\n'

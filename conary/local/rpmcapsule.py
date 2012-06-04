@@ -21,9 +21,16 @@ import inspect, itertools, re, rpm, os, pwd, stat, tempfile
 from ctypes import c_void_p, c_long, c_int
 
 from conary import files, trove
+from conary import rpmhelper
+from conary import versions
+from conary.conaryclient import filetypes
+from conary.deps import deps
 from conary.lib import elf, util, log
-from conary.local.capsules import SingleCapsuleOperation
+from conary.lib import sha1helper
+from conary.lib.compat import namedtuple
+from conary.local.capsules import SingleCapsuleOperation, BaseCapsulePlugin
 from conary.local import errors
+from conary.repository import changeset
 from conary.repository import filecontents
 
 def rpmkey(hdr):
@@ -547,6 +554,166 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                    'removing rpm owned file %s',
                                    ignoreMissing = True)
 
+
+class RpmCapsulePlugin(BaseCapsulePlugin):
+    kind = 'rpm'
+
+    @staticmethod
+    def _digest(rpmlibHeader):
+        if rpmhelper.SIG_SHA1 in rpmlibHeader.keys():
+            return sha1helper.sha1FromString(
+                    rpmlibHeader[rpmhelper.SIG_SHA1])
+        else:
+            return None
+
+    @staticmethod
+    def _getCapsuleKeyFromInfo(capsuleStream):
+        nevra = capsuleStream.rpm.getNevra()
+        digest = capsuleStream.rpm.sha1header()
+        return (nevra, digest)
+
+    def getCapsuleKeysFromTarget(self):
+        txnSet = rpm.TransactionSet(self.root)
+        matchIter = txnSet.dbMatch()
+        headersByKey = {}
+        for rpmlibHeader in matchIter:
+            nevra = rpmhelper.NEVRA.fromHeader(rpmlibHeader)
+            if nevra.name.startswith('gpg-pubkey') and not nevra.arch:
+                # Skip fake packages that RPM/yum uses to hold PGP keys
+                continue
+            digest = self._digest(rpmlibHeader)
+            headersByKey[(nevra, digest)] = rpmlibHeader
+        return headersByKey
+
+    def _getPhantomNVF(self, header):
+        """Choose a NVF for a new phantom package"""
+        binCount = 1
+        while True:
+            name, _, version, release, arch = header.getNevra()
+            name += ':rpm'
+            verstr = '%s_%s' % (version, release)
+            if arch != 'noarch':
+                # This is simpler than trying to conver RPM arch to Conary iset
+                verstr += '_' + arch
+            verstr += '-1-%d' % binCount
+            revision = versions.Revision(verstr)
+            revision.resetTimeStamp()
+            version = versions.Version([versions.PhantomLabel(), revision])
+            flavor = deps.Flavor()
+            if not self.db.hasTrove(name, version, flavor):
+                return name, version, flavor
+            binCount += 1
+
+    def _addPhantomContents(self, changeSet, trv, header):
+        """Fabricate files for the given RPM header"""
+        for (path, owner, group, mode, size, rdev, flags, vflags, linkto,
+                mtime) in itertools.izip(
+                        header[rpmhelper.OLDFILENAMES],
+                        header[rpmhelper.FILEUSERNAME],
+                        header[rpmhelper.FILEGROUPNAME],
+                        header[rpmhelper.FILEMODES],
+                        header[rpmhelper.FILESIZES],
+                        header[rpmhelper.FILERDEVS],
+                        header[rpmhelper.FILEFLAGS],
+                        header[rpmhelper.FILEVERIFYFLAGS],
+                        header[rpmhelper.FILELINKTOS],
+                        header[rpmhelper.FILEMTIMES],
+                        ):
+            fullPath = util.joinPaths(self.root, path)
+            fakestat = FakeStat(mode, 0, None, 1, owner, group, size,
+                    mtime, mtime, mtime, st_rdev=rdev)
+            pathId = os.urandom(16)
+
+            # Adapted from conary.build.source.addCapsule.doRPM
+            kind = 'regular'
+            if flags & rpmhelper.RPMFILE_GHOST:
+                kind = 'initial'
+            elif flags & (rpmhelper.RPMFILE_CONFIG
+                    | rpmhelper.RPMFILE_MISSINGOK
+                    | rpmhelper.RPMFILE_NOREPLACE):
+                if size:
+                    kind = 'config'
+                else:
+                    kind = 'initial'
+            elif vflags:
+                if (stat.S_ISREG(mode)
+                        and not (vflags & rpmhelper.RPMVERIFY_FILEDIGEST)
+                    or (stat.S_ISLNK(mode)
+                        and not (vflags & rpmhelper.RPMVERIFY_LINKTO))):
+                    kind = 'initial'
+            # Ignore failures trying to sha1 missing/inaccessible files as long
+            # as those files are flagged initial contents (ghost)
+            fileStream = files.FileFromFilesystem(fullPath, pathId,
+                    statBuf=fakestat, sha1FailOk=True)
+            if kind == 'config':
+                fileStream.flags.isConfig(set=True)
+            elif kind == 'initial':
+                fileStream.flags.isInitialContents(set=True)
+            else:
+                assert kind == 'regular'
+
+            # From conary.build.capsulepolicy.Payload
+            if (isinstance(fileStream, files.RegularFile)
+                    and not fileStream.flags.isConfig()
+                    and not (fileStream.flags.isInitialContents()
+                        and not fileStream.contents.size())):
+                fileStream.flags.isEncapsulatedContent(set=True)
+
+            fileId = fileStream.fileId()
+            trv.addFile(pathId, path, trv.getVersion(), fileId)
+            changeSet.addFile(None, fileId, fileStream.freeze())
+            # Config file contents have to go into the database, so snag the
+            # contents from the filesystem and put them in the changeset.
+            if (fileStream.hasContents
+                    and not fileStream.flags.isEncapsulatedContent()):
+                if fileStream.contents.sha1() == sha1helper.sha1Empty:
+                    # Missing/ghost config file. Hopefully it is supposed to be
+                    # empty, but even if not then the fake SHA-1 will be the
+                    # SHA-1 of the empty string since there's no hint of what
+                    # it was supposed to be.
+                    contents = filecontents.FromString('')
+                else:
+                    contents = filecontents.FromFilesystem(fullPath)
+                changeSet.addFileContents(pathId, fileId,
+                        contType=changeset.ChangedFileTypes.file,
+                        contents=contents,
+                        cfgFile=fileStream.flags.isConfig(),
+                        )
+
+    def _addPhantomTrove(self, changeSet, rpmlibHeader, callback, num, total):
+        header = rpmhelper.headerFromBlob(rpmlibHeader.unload())
+        callback.capsuleSyncCreate(self.kind, str(header.getNevra()), num,
+                total)
+        name, version, flavor = self._getPhantomNVF(header)
+        # Fake trove
+        trv = trove.Trove(name, version, flavor)
+        provides = header.getProvides()
+        provides.addDep(deps.TroveDependencies, deps.Dependency(name))
+        trv.setProvides(provides)
+        trv.setRequires(header.getRequires())
+        # Fake capsule file
+        path = str(header.getNevra()) + '.rpm'
+        fileHelper = filetypes.RegularFile(contents='')
+        fileStream = fileHelper.get(pathId=trove.CAPSULE_PATHID)
+        trv.addRpmCapsule(path, version, fileStream.fileId(), header)
+        changeSet.addFile(None, fileStream.fileId(), fileStream.freeze())
+        # Fake encapsulated files
+        self._addPhantomContents(changeSet, trv, header)
+        trv.computeDigests()
+        changeSet.newTrove(trv.diff(None)[0])
+
+        # Make a fake package to contain the fake component
+        pkgName = name.split(':')[0]
+        pkg = trove.Trove(pkgName, version, flavor)
+        provides = deps.DependencySet()
+        provides.addDep(deps.TroveDependencies, deps.Dependency(pkgName))
+        pkg.setProvides(provides)
+        pkg.setIsCollection(True)
+        pkg.addTrove(name, version, flavor, byDefault=True)
+        pkg.computeDigests()
+        changeSet.newTrove(pkg.diff(None)[0])
+
+
 def rpmExpandMacro(val):
     if getattr(rpm, '_rpm', ''):
         rawRpmModulePath = rpm._rpm.__file__
@@ -565,3 +732,22 @@ def rpmExpandMacro(val):
     if rc != 0:
         raise RuntimeError("failed to expand RPM macro %r" % (val,))
     return buf.value
+
+
+# os.stat_result doesn't seem to be usable if you need to populate the fields
+# after st_ctime, e.g. rdev
+class FakeStat(namedtuple('FakeStat', 'st_mode st_ino st_dev st_nlink st_uid '
+        'st_gid st_size st_atime st_mtime st_ctime st_blksize st_blocks '
+        'st_rdev')):
+    __slots__ = ()
+
+    def __new__(cls, *args, **kwargs):
+        out = [None] * len(cls._fields)
+        names = set(cls._fields)
+        for n, arg in enumerate(args):
+            out[n] = arg
+            names.remove(cls._fields[n])
+        for key, arg in kwargs.items():
+            out[cls._fields.index(key)] = arg
+            names.remove(key)
+        return tuple.__new__(cls, out)

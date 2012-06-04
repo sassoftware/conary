@@ -45,25 +45,15 @@ class CacheDict(dict):
 
 class TroveCache(trovesource.AbstractTroveSource):
 
-    VERSION = (1, 0)                    # (major, minor)
+    VERSION = (2, 0)                    # (major, minor)
 
-    troveCacheVersionFileId = 'TROVE-CACHE-FILE-VERSION--------'
-    troveCacheVersionPathId = '\0' * 40
-
-    depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
-    depCacheFileId = '\0' * 40
-
-    depSolutionsPathId = 'SYSTEM-MODEL-DEPENDENCY-SOLUTION'
-    depSolutionsFileId = '\0' * 40
-
-    findCachePathId = 'SYSTEM-MODEL-FIND-CACHE---------'
-    findCacheFileId = '\0' * 40
-
-    timeStampsPathId = 'SYSTEM-MODEL-TIMESTAMP-CACHE----'
-    timeStampsFileId = '\0' * 40
-
-    includeFilePathId = 'SYSTEM-MODEL-INCLUDE-FILE-CACHE-'
-    includeFileFileId = '\0' * 40
+    _fileId = '\0' * 40
+    _troveCacheVersionPathId = 'TROVE-CACHE-FILE-VERSION--------'
+    _depCachePathId = 'SYSTEM-MODEL-DEPENDENCY-CACHE---'
+    _depSolutionsPathId = 'SYSTEM-MODEL-DEPENDENCY-SOLUTION'
+    _findCachePathId = 'SYSTEM-MODEL-FIND-CACHE---------'
+    _timeStampsPathId = 'SYSTEM-MODEL-TIMESTAMP-CACHE----'
+    _includeFilePathId = 'SYSTEM-MODEL-INCLUDE-FILE-CACHE-'
 
     def __init__(self, troveSource):
         self.troveInfoCache = {}
@@ -76,6 +66,7 @@ class TroveCache(trovesource.AbstractTroveSource):
         self.fileCache = {}
         self.callback = None
         self._startingSizes = self._getSizeTuple()
+        self._cs = None
 
     def _addToCache(self, troveTupList, troves, _cached = None,
                     withFiles = False):
@@ -327,12 +318,12 @@ class TroveCache(trovesource.AbstractTroveSource):
         self._cached(self.cache.keys(), [ x[1] for x in self.cache.values() ])
 
         try:
+            # NB: "fileid" and pathid got reversed here by mistake, try not to
+            # think too hard about it.
             contType, depContents = cs.getFileContents(
-                               self.troveCacheVersionPathId,
-                               self.troveCacheVersionFileId)
+                    self._fileId, self._troveCacheVersionPathId)
         except KeyError:
             self.version = (0, 0)
-            cs.reset()
         else:
             versionList = depContents.get().read().split(' ')
             self.version = (int(versionList[0]), int(versionList[1]))
@@ -341,50 +332,98 @@ class TroveCache(trovesource.AbstractTroveSource):
             # major number is too big for us; we can't load this
             return
 
-        contType, depContents = cs.getFileContents(
-                           self.depCachePathId, self.depCacheFileId)
-        pickled = depContents.get().read()
-        depList = cPickle.loads(pickled)
-        for (name, frzVersion, frzFlavor, prov, req) in depList:
-            self.depCache[ (name, versions.VersionFromString(frzVersion),
-                            deps.ThawFlavor(frzFlavor)) ] = (prov, req)
+        # Timestamps must come first because some other caches use it to
+        # construct versions.
+        self._cs = cs
+        self._loadTimestamps()
+        self._loadDeps()
+        self._loadDepSolutions()
+        self._loadFileCache()
+        self._startingSizes = self._getSizeTuple()
+        self._cs = None
 
-        contType, depSolutions = cs.getFileContents(
-                           self.depSolutionsPathId, self.depSolutionsFileId)
-        pickled = depSolutions.get().read()
-        depSolutionsList = cPickle.loads(pickled)
+    def _loadPickle(self, pathId):
+        self._cs.reset()
+        contType, contents = self._cs.getFileContents(pathId, self._fileId)
+        pickled = contents.get().read()
+        return cPickle.loads(pickled)
 
-        for (sig, depSet, aResult) in depSolutionsList:
-            depSet = deps.ThawDependencySet(depSet)
-            allResults = []
-            for resultList in aResult:
-                allResults.append( [ (x[0], versions.VersionFromString(x[1]),
-                                     deps.ThawFlavor(x[2]) )
-                                    for x in resultList ] )
+    def _savePickle(self, pathId, data):
+        pickled = cPickle.dumps(data, 2)
+        self._cs.addFileContents(pathId, self._fileId,
+                changeset.ChangedFileTypes.file,
+                filecontents.FromString(pickled), False)
 
-            self.addDepSolution(sig, depSet, allResults)
-
-        contType, fileCache = cs.getFileContents(
-                           self.findCachePathId, self.findCacheFileId)
-        self.findCache = cPickle.loads(fileCache.get().read())
-
-        if self.version[0] >= 1:
-            contType, includeFileContents = cs.getFileContents(
-                               self.includeFilePathId, self.includeFileFileId)
-            pickled = includeFileContents.get().read()
-            self.fileCache = cPickle.loads(pickled)
-
-        contType, versionTimeStamps = cs.getFileContents(
-                           self.timeStampsPathId, self.timeStampsFileId)
-
-        pickled = versionTimeStamps.get().read()
-        timeStampList = cPickle.loads(pickled)
-
+    def _loadTimestamps(self):
+        timeStampList = self._loadPickle(self._timeStampsPathId)
         for (name, frozenVersion) in timeStampList:
             thawed = versions.ThawVersion(frozenVersion)
             self.timeStampCache[(name, thawed)] = thawed
 
-        self._startingSizes = self._getSizeTuple()
+    def _saveTimestamps(self):
+        timeStamps = []
+        for (name, baseVersion), version in self.timeStampCache.items():
+            timeStamps.append( (timeStamps, version.freeze()) )
+        self._savePickle(self._timeStampsPathId, timeStamps)
+
+    def _loadDeps(self):
+        depList = self._loadPickle(self._depCachePathId)
+        for (name, thawedVersion, frzFlavor, prov, req) in depList:
+            version = versions.VersionFromString(thawedVersion)
+            flavor = deps.ThawFlavor(frzFlavor)
+            self.depCache[ (name, version, flavor) ] = (prov, req)
+
+    def _saveDeps(self):
+        depList = []
+        for troveTup, (prov, req) in self.depCache.iteritems():
+            if type(prov) is not str and prov is not None:
+                prov = prov.freeze()
+            if type(req) is not str and req is not None:
+                req = req.freeze()
+
+            depList.append((troveTup[0], troveTup[1].asString(),
+                            troveTup[2].freeze(), prov, req))
+        self._savePickle(self._depCachePathId, depList)
+
+    def _loadDepSolutions(self):
+        if self.version < (2, 0):
+            # Earlier versions were missing timestamps, which interferes with
+            # dep solver tie-breaking.
+            return
+        depSolutionsList = self._loadPickle(self._depSolutionsPathId)
+        for (sig, depSet, aResult) in depSolutionsList:
+            depSet = deps.ThawDependencySet(depSet)
+            allResults = []
+            for resultList in aResult:
+                allResults.append([
+                    (x[0], versions.ThawVersion(x[1]), deps.ThawFlavor(x[2]))
+                    for x in resultList])
+            self.addDepSolution(sig, depSet, allResults)
+
+    def _saveDepSolutions(self):
+        depSolutions = []
+        for (sig, depSet), aResult in self.depSolutionCache.iteritems():
+            allResults = []
+            for resultList in aResult:
+                allResults.append([ (x[0], x[1].freeze(), x[2].freeze()) for
+                                     x in resultList ])
+
+            depSolutions.append( (sig, depSet.freeze(), allResults) )
+        self._savePickle(self._depSolutionsPathId, depSolutions)
+
+    def _loadFindCache(self):
+        self.findCache = self._loadPickle(self._findCachePathId)
+
+    def _saveFindCache(self):
+        self._savePickle(self._findCachePathId, self.findCache)
+
+    def _loadFileCache(self):
+        if self.version < (1, 0):
+            return
+        self.fileCache = self._loadPickle(self._includeFilePathId)
+
+    def _saveFileCache(self):
+        self._savePickle(self._includeFilePathId, self.fileCache)
 
     def save(self, path):
         # return early if we aren't going to have permission to save
@@ -404,63 +443,20 @@ class TroveCache(trovesource.AbstractTroveSource):
             # anywhere else
             cs.newTrove(trv.diff(None, absolute = True)[0])
 
-        cs.addFileContents(self.troveCacheVersionPathId,
-                           self.troveCacheVersionFileId,
+        # NB: "fileid" and pathid got reversed here by mistake, try not to
+        # think too hard about it.
+        cs.addFileContents(
+                           self._fileId,
+                           self._troveCacheVersionPathId,
                            changeset.ChangedFileTypes.file,
                            filecontents.FromString("%d %d" % self.VERSION),
                            False)
-
-        depList = []
-        for troveTup, (prov, req) in self.depCache.iteritems():
-            if type(prov) is not str and prov is not None:
-                prov = prov.freeze()
-            if type(req) is not str and req is not None:
-                req = req.freeze()
-
-            depList.append((troveTup[0], troveTup[1].asString(),
-                            troveTup[2].freeze(), prov, req))
-
-        depStr = cPickle.dumps(depList)
-
-        cs.addFileContents(self.depCachePathId, self.depCacheFileId,
-                           changeset.ChangedFileTypes.file,
-                           filecontents.FromString(depStr), False)
-
-        depSolutions = []
-        for (sig, depSet), aResult in self.depSolutionCache.iteritems():
-            allResults = []
-
-            for resultList in aResult:
-                allResults.append([ (x[0], x[1].asString(), x[2].freeze()) for
-                                     x in resultList ])
-
-            depSolutions.append( (sig, depSet.freeze(), allResults) )
-        depSolutionsStr = cPickle.dumps(depSolutions)
-
-        cs.addFileContents(self.depSolutionsPathId, self.depSolutionsFileId,
-                           changeset.ChangedFileTypes.file,
-                           filecontents.FromString(depSolutionsStr), False)
-
-        cs.addFileContents(self.findCachePathId, self.findCacheFileId,
-                           changeset.ChangedFileTypes.file,
-                           filecontents.FromString(
-                                cPickle.dumps(self.findCache)),
-                           False)
-
-        timeStamps = []
-        for (name, baseVersion), version in self.timeStampCache.items():
-            timeStamps.append( (timeStamps, version.freeze()) )
-        timeStampsStr = cPickle.dumps(timeStamps)
-
-        cs.addFileContents(self.timeStampsPathId, self.timeStampsFileId,
-                           changeset.ChangedFileTypes.file,
-                           filecontents.FromString(timeStampsStr), False)
-
-        cs.addFileContents(self.includeFilePathId, self.includeFileFileId,
-                           changeset.ChangedFileTypes.file,
-                           filecontents.FromString(
-                                cPickle.dumps(self.fileCache)),
-                           False)
+        self._cs = cs
+        self._saveTimestamps()
+        self._saveDeps()
+        self._saveDepSolutions()
+        self._saveFileCache()
+        self._cs = None
 
         try:
             try:

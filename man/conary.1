@@ -1131,6 +1131,15 @@ The list of paths that cvc searches for files to add to the \fCCONFIG_SITE\fP
 environment variable when cross-compiling.  The defaults are packaged with
 cvc.
 .TP
+.B syncCapsuleDatabase
+By default, if a foreign package database (e.g. RPM) is present then Conary
+will attempt to create and maintain representations of the packages installed
+there on a local "phantom" label.  These phantom troves can then be erased or
+replaced by managed packages using Conary.  Setting syncCapsuleDatabase to
+"False" will prevent this synchronization from ocurring.  When disabled, some
+capsule operations might fail due to discrepencies between the operations
+Conary attempts and the reality of what packages are in the foreign database.
+.TP
 .B updateThreshold
 Defines the upper limit on the number of unrelated troves that will be
 downloaded at one time from the repository.  Setting updateThreshold to a 

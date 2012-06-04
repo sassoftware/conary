@@ -16,28 +16,7 @@
 #
 
 
-kid_files =     add_ent_class.kid       \
-                add_ent_key.kid         \
-                add_role.kid		\
-		add_user.kid 		\
-		browse.kid		\
-		change_password.kid	\
-		choose_branch.kid	\
-		entlist.kid		\
-		error.kid		\
-		files.kid		\
-		group_contents.kid	\
-		library.kid		\
-                manage_ents.kid         \
-		metadata.kid		\
-		notice.kid		\
-		permission.kid		\
-                pgp_admin.kid           \
-                pgp_submit_key.kid      \
-		pick_trove.kid		\
-		trove_info.kid		\
-		user_admin.kid		\
-		pgp_get_key.kid
+kid_files = $(wildcard *.kid)
 
 extra_dist = Makefile
 

@@ -677,6 +677,15 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         del pm1.filterList[0]
         self.assertFalse(pm1 == pm2)
 
+    def testProxyMapDirect(self):
+        cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
+        cfg.configLine("proxyMap []")
+        cfg.configLine("proxyMap 1.1.1.1 direct")
+        pm = cfg.getProxyMap()
+        from conary.lib.http import proxy_map
+        self.assertEquals([ x for x in pm.getProxyIter('1.1.1.1') ],
+            [ proxy_map.DirectConnection ])
+
     def testDependencyClassList(self):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
         cfg.configLine('ignoreDependencies perl php')

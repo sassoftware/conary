@@ -23,7 +23,10 @@ try:
     import hashlib
     sha1 = hashlib.sha1
     md5 = hashlib.md5
+    sha224 = hashlib.sha224
     sha256 = hashlib.sha256
+    sha384 = hashlib.sha384
+    sha512 = hashlib.sha512
 except ImportError:
     import sha
     import md5
@@ -31,6 +34,7 @@ except ImportError:
     sha1 = sha.new
     md5 = md5.new
     sha256 = SHA256.new
+    sha224 = sha384 = sha512 = None
 
 
 

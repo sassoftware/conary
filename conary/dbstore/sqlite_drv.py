@@ -386,7 +386,6 @@ class Database(BaseDatabase):
     # sqlite is more peculiar when it comes to firing off transactions
     def transaction(self, name = None):
         assert(self.dbh)
-        self._logTransaction('BEGIN')
         cu = self.cursor()
         if self.dbh.inTransaction:
             return cu
@@ -421,5 +420,6 @@ class Database(BaseDatabase):
 
     def use(self, dbName, **kwargs):
         self.close()
+        dbName = os.path.join(os.path.dirname(self.database), dbName)
         self.database = dbName
         return self.connect(**kwargs)

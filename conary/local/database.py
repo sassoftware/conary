@@ -32,6 +32,7 @@ from conary.callbacks import UpdateCallback
 from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, sha1helper, sigprotect, util, api
+from conary.local import capsules as capsulesmod
 from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
 from conary.local.journal import JobJournal, NoopJobJournal
@@ -45,7 +46,17 @@ class CommitChangeSetFlags(util.Flags):
     __slots__ = [ 'replaceManagedFiles', 'replaceUnmanagedFiles',
                   'replaceModifiedFiles', 'justDatabase', 'localRollbacks',
                   'test', 'keepJournal', 'replaceModifiedConfigFiles',
-                  'skipCapsuleOps', 'noScripts' ]
+                  'skipCapsuleOps', 'noScripts',
+                  'ignoreMissingFiles',
+                  ]
+
+    def shouldRunScripts(self, tagScriptsFile):
+        if self.justDatabase or self.test:
+            return False
+        if self.noScripts and not tagScriptsFile:
+            return False
+        return True
+
 
 class Rollback:
 
@@ -1765,8 +1776,7 @@ class Database(SqlDbRepository):
                   updateDatabase, callback, tagScript, dbCache,
                   autoPinList, flags, journal, directoryCandidates,
                   storeRollback = True, capsuleChangeSet = None):
-        if not (commitFlags.justDatabase or commitFlags.test or
-                (commitFlags.noScripts and not tagScript)):
+        if commitFlags.shouldRunScripts(tagScript):
             # run preremove scripts before updating the database, otherwise
             # the file lists which get sent to them are incorrect. skipping
             # this makes --test a little inaccurate, but life goes on
@@ -2058,12 +2068,14 @@ class Database(SqlDbRepository):
                         rollbackPhase = None, updateDatabase = True,
                         tagScript = None,
                         journal = None,
-                        callback = UpdateCallback(),
+                        callback = None,
                         removeHints = {}, autoPinList = RegularExpressionList(),
                         deferredScripts = None, commitFlags = None,
                         repair = False, capsuleChangeSet = None):
         assert(not cs.isAbsolute())
 
+        if callback is None:
+            callback = UpdateCallback()
         if commitFlags is None:
             commitFlags = CommitChangeSetFlags()
 
@@ -2073,7 +2085,9 @@ class Database(SqlDbRepository):
             replaceModifiedFiles = commitFlags.replaceModifiedFiles,
             replaceModifiedConfigFiles = commitFlags.replaceModifiedConfigFiles,
             skipCapsuleOps = commitFlags.skipCapsuleOps,
-            replaceManagedSet = uJob.getAllowedPathConflicts() )
+            replaceManagedSet = uJob.getAllowedPathConflicts(),
+            ignoreMissingFiles=commitFlags.ignoreMissingFiles,
+            )
 
         if rollbackPhase:
             flags.missingFilesOkay = True
@@ -2113,8 +2127,9 @@ class Database(SqlDbRepository):
             origTrove = dbCache.getTrove(name, version, flavor,
                                          pristine = True)
             assert(trv)
-            troveList.append((trv, origTrove, rollbackVersion,
-                              update.UpdateFlags(missingFilesOkay = True)))
+            eraseFlags = flags.copy()
+            eraseFlags.missingFilesOkay = True
+            troveList.append((trv, origTrove, rollbackVersion, eraseFlags))
 
         callback.creatingRollback()
 
@@ -2219,8 +2234,7 @@ class Database(SqlDbRepository):
 
         #del opJournal
 
-        if not (commitFlags.justDatabase or commitFlags.test or 
-                (commitFlags.noScripts and not tagScript)):
+        if commitFlags.shouldRunScripts(tagScript):
             fsJob.runPostTagScripts(tagSet, tagScript)
 
         if rollbackPhase is None and updateDatabase and invalidateRollbacks:
@@ -2229,8 +2243,7 @@ class Database(SqlDbRepository):
         if rollbackPhase is not None:
             return fsJob
 
-        if not (commitFlags.justDatabase or 
-                (commitFlags.noScripts and not tagScript)):
+        if commitFlags.shouldRunScripts(tagScript):
             fsJob.orderPostScripts(uJob)
             fsJob.runPostScripts(tagScript)
 
@@ -2561,7 +2574,7 @@ class Database(SqlDbRepository):
             self.close()
 
     def _applyRollbackList(self, repos, names, replaceFiles = False,
-                          callback = UpdateCallback(), tagScript = None,
+                          callback = None, tagScript = None,
                           justDatabase = False, transactionCounter = None,
                           lazyCache = None, abortOnError = False,
                           noScripts = False, capsuleChangeSet = None):
@@ -2570,6 +2583,8 @@ class Database(SqlDbRepository):
         if transactionCounter != self.getTransactionCounter():
             raise RollbackError(names, "Database state has changed, please "
                 "run the rollback command again")
+        if callback is None:
+            callback = UpdateCallback()
 
         last = self.rollbackStack.last
         for name in names:
@@ -2652,7 +2667,7 @@ class Database(SqlDbRepository):
                         justDatabase = justDatabase,
                         noScripts = noScripts)
 
-                    if not (justDatabase or (noScripts and not tagScript)):
+                    if commitFlags.shouldRunScripts(tagScript):
                         self.runPreScripts(updJob, callback = callback,
                                            tagScript = tagScript,
                                            justDatabase = justDatabase,
@@ -2692,7 +2707,7 @@ class Database(SqlDbRepository):
                         # Because of the two phase update for rollbacks, we
                         # run postscripts by hand instead of commitChangeSet
                         # doing it automatically
-                        if (tagScript or not commitFlags.noScripts):
+                        if commitFlags.shouldRunScripts(tagScript):
                             fsJob.orderPostScripts(updJob)
                             fsJob.runPostScripts(tagScript)
                     fsUpdateJob.close()
@@ -2707,14 +2722,13 @@ class Database(SqlDbRepository):
 
             # Run post-rollback scripts at the very end of the rollback, when
             # all other operations have been performed
-            if lastFsJob:
-                if (postRollbackScripts and
-                    (tagScript or not commitFlags.noScripts)):
-                    lastFsJob.clearPostScripts()
-                    # Add the post-rollback scripts
-                    for scriptData in postRollbackScripts:
-                        lastFsJob.addPostRollbackScript(*scriptData)
-                    lastFsJob.runPostScripts(tagScript)
+            if (lastFsJob and postRollbackScripts and
+                    commitFlags.shouldRunScripts(tagScript)):
+                lastFsJob.clearPostScripts()
+                # Add the post-rollback scripts
+                for scriptData in postRollbackScripts:
+                    lastFsJob.addPostRollbackScript(*scriptData)
+                lastFsJob.runPostScripts(tagScript)
 
             self.rollbackStack.restoreSystemModel()
             self.rollbackStack.removeLast()
@@ -2885,6 +2899,28 @@ class Database(SqlDbRepository):
         j.revert()
         os.unlink(opJournalPath)
 
+    def syncCapsuleDatabase(self, callback=None):
+        if callback is None:
+            callback = UpdateCallback()
+        changeSet = self.capsuleDb.getChangeSetForCapsuleChanges(callback)
+        if changeSet.isEmpty():
+            return 0
+        added = len(changeSet.newTroves)
+        removed = len(changeSet.oldTroves)
+        callback.capsuleSyncApply(added, removed)
+        commitFlags = CommitChangeSetFlags(
+                justDatabase=True,
+                replaceManagedFiles=True,
+                skipCapsuleOps=True,
+                )
+        updateJob = UpdateJob(self, closeDatabase=False)
+        self.commitChangeSet(changeSet, updateJob,
+                callback=callback,
+                commitFlags=commitFlags,
+                repair=True,
+                )
+        return added + removed
+
     def _initDb(self):
         SqlDbRepository._initDb(self)
         if (self.opJournalPath and os.path.exists(self.opJournalPath)
@@ -2892,6 +2928,10 @@ class Database(SqlDbRepository):
             raise ExistingJournalError(os.path.dirname(self.opJournalPath),
                     'journal file exists. use revert command to '
                     'undo the previous (failed) operation')
+
+    @util.cachedProperty
+    def capsuleDb(self):
+        return capsulesmod.MetaCapsuleDatabase(self)
 
     def __init__(self, root, path, modelPath=None, timeout=None, modelFile=None):
         """
