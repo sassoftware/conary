@@ -1,3 +1,10 @@
+Changes in 2.4.2:
+  o Bug Fixes:
+    * The 'package' option of addCapsule now properly handles package
+      names only. (CNY-3743)
+    * Fixed updates on encapsulated SLES 10 systems always crashing
+      since 2.4.0 due to a difference in the rpm-python API. (CNY-3745)
+
 Changes in 2.4.1:
   o New Features:
     * Phantom components are now created with a parent phantom package
