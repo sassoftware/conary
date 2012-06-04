@@ -185,6 +185,9 @@ class _RpmHeader(object):
             tag in self._tagListValues
     __contains__ = has_key
 
+    def keys(self):
+        return self.entries.keys()
+
     def paths(self):
         if OLDFILENAMES in self:
             for path in self[OLDFILENAMES]:
@@ -745,7 +748,7 @@ class NEVRA(namedtuple('NEVRA', 'name epoch version release arch')):
     def fromHeader(cls, header):
         args = []
         for tag in [NAME, EPOCH, VERSION, RELEASE, ARCH]:
-            if tag in header:
+            if tag in header.keys():
                 args.append(header[tag])
             else:
                 args.append(None)

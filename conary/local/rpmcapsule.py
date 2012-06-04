@@ -27,6 +27,7 @@ from conary.conaryclient import filetypes
 from conary.deps import deps
 from conary.lib import elf, util, log
 from conary.lib import sha1helper
+from conary.lib.compat import namedtuple
 from conary.local.capsules import SingleCapsuleOperation, BaseCapsulePlugin
 from conary.local import errors
 from conary.repository import changeset
@@ -559,7 +560,7 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
 
     @staticmethod
     def _digest(rpmlibHeader):
-        if rpmhelper.SIG_SHA1 in rpmlibHeader:
+        if rpmhelper.SIG_SHA1 in rpmlibHeader.keys():
             return sha1helper.sha1FromString(
                     rpmlibHeader[rpmhelper.SIG_SHA1])
         else:
@@ -619,8 +620,8 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
                         header[rpmhelper.FILEMTIMES],
                         ):
             fullPath = util.joinPaths(self.root, path)
-            fakestat = os.stat_result((mode, 0, rdev, 1, owner, group, size,
-                mtime, mtime, mtime))
+            fakestat = FakeStat(mode, 0, None, 1, owner, group, size,
+                    mtime, mtime, mtime, st_rdev=rdev)
             pathId = os.urandom(16)
 
             # Adapted from conary.build.source.addCapsule.doRPM
@@ -731,3 +732,22 @@ def rpmExpandMacro(val):
     if rc != 0:
         raise RuntimeError("failed to expand RPM macro %r" % (val,))
     return buf.value
+
+
+# os.stat_result doesn't seem to be usable if you need to populate the fields
+# after st_ctime, e.g. rdev
+class FakeStat(namedtuple('FakeStat', 'st_mode st_ino st_dev st_nlink st_uid '
+        'st_gid st_size st_atime st_mtime st_ctime st_blksize st_blocks '
+        'st_rdev')):
+    __slots__ = ()
+
+    def __new__(cls, *args, **kwargs):
+        out = [None] * len(cls._fields)
+        names = set(cls._fields)
+        for n, arg in enumerate(args):
+            out[n] = arg
+            names.remove(cls._fields[n])
+        for key, arg in kwargs.items():
+            out[cls._fields.index(key)] = arg
+            names.remove(key)
+        return tuple.__new__(cls, out)

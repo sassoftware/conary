@@ -1,0 +1,1 @@
+Fixed updates on encapsulated SLES 10 systems always crashing since 2.4.0 due to a difference in the rpm-python API.
