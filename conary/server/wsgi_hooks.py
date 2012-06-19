@@ -47,8 +47,9 @@ def makeApp(settings):
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
-    pathPrefix = settings.get('mount_point', 'conary')
-    app = ConaryRouter(envOverrides, pathPrefix)
+    if 'mount_point' in settings:
+        envOverrides['conary.netrepos.mount_point'] = settings['mount_point']
+    app = ConaryRouter(envOverrides)
     return app
 
 
@@ -68,15 +69,15 @@ class ConaryRouter(object):
     requestFactory = webob.Request
     responseFactory = webob.Response
 
-    def __init__(self, envOverrides=(), pathPrefix=''):
+    def __init__(self, envOverrides=()):
         self.envOverrides = envOverrides
-        self.pathPrefix = pathPrefix.split('/')
         self.configCache = {}
 
     def __call__(self, environ, start_response):
         environ.update(self.envOverrides)
+        mountPoint = environ.get('conary.netrepos.mount_point', 'conary')
         request = self.requestFactory(environ)
-        for elem in self.pathPrefix:
+        for elem in mountPoint.split('/'):
             if not elem:
                 continue
             if request.path_info_pop() != elem:
