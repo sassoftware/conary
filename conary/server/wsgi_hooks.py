@@ -19,14 +19,15 @@
 import errno
 import logging
 import os
+import smtplib
 import socket
 import StringIO
 import sys
 import tempfile
 import time
 import webob
-import xmlrpclib
 import zlib
+from email import MIMEText
 
 from conary.lib import log as cny_log
 from conary.lib import util
@@ -84,7 +85,12 @@ class ConaryRouter(object):
                 return self.notFound(environ, start_response)
         try:
             response = self.handleRequest(request, start_response)
-            return response(environ, start_response)
+            if callable(response):
+                # Looks like a webob response
+                return response(environ, start_response)
+            else:
+                # Looks like a vanilla WSGI iterable
+                return response
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
@@ -108,13 +114,23 @@ class ConaryRouter(object):
             cfg = netserver.ServerConfig()
             cfg.read(cfgPath)
         handler = ConaryHandler(cfg)
-        return handler.handleRequest(request)
+        try:
+            return handler.handleRequest(request)
+        except:
+            exc_info = sys.exc_info()
+            return self.handleError(request, exc_info, start_response, cfg)
 
-    def handleError(self, request, exc_info, start_response):
+    def handleError(self, request, exc_info, start_response, cfg=None):
         trace, tracePath = self._formatErrorLarge(request, exc_info)
         short = self._formatErrorSmall(request, exc_info)
         short += 'Extended traceback at ' + tracePath
         log.error(short)
+
+        if cfg and cfg.bugsFromEmail and cfg.bugsToEmail:
+            try:
+                self._sendMail(cfg, exc_info, trace, request)
+            except:
+                log.exception("Failed to send traceback mail:")
 
         response = self.responseFactory(
                 "<h1>500 Internal Server Error</h1>\n"
@@ -167,6 +183,24 @@ class ConaryRouter(object):
         print >> tb, "Unhandled exception from Conary repository", request.host
         formatTrace(e_class, e_value, e_tb, stream=tb, withLocals=False)
         return tb.getvalue()
+
+    def _sendMail(self, cfg, exc_info, trace, request):
+        firstLine = '%s: %s' % (exc_info[0].__name__, str(exc_info[1]))
+        firstLine = firstLine.splitlines()[0]
+        crashVars = dict(
+                hostname=socket.gethostname(),
+                firstLine=firstLine,
+                )
+        msg = MIMEText.MIMEText(trace)
+        msg['Subject'] = cfg.bugsEmailSubject % crashVars
+        msg['From'] = fromEmail = '"%s" <%s>' % (cfg.bugsEmailName,
+                cfg.bugsFromEmail)
+        msg['To'] = toEmail = '<%s>' % (cfg.bugsToEmail,)
+
+        smtp = smtplib.SMTP()
+        smtp.connect()
+        smtp.sendmail(fromEmail, [toEmail], msg.as_string())
+        smtp.close()
 
 
 class ConaryHandler(object):
