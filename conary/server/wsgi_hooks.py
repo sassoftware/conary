@@ -34,6 +34,7 @@ from conary.lib import util
 from conary.lib.formattrace import formatTrace
 from conary.repository import errors
 from conary.repository import filecontainer
+from conary.repository import shimclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
@@ -276,14 +277,18 @@ class ConaryHandler(object):
         if cfg.closed:
             # Closed repository -- returns an exception for all requests
             self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
+            self.shimServer = self.repositoryServer
         elif cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
+            self.shimServer = None
             self.proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
         else:
             # Full repository with optional changeset cache
             self.repositoryServer = netserver.NetworkRepositoryServer(cfg,
                     urlBase)
+            self.shimServer = shimclient.NetworkRepositoryServer(cfg, urlBase,
+                    db=self.repositoryServer.db)
 
         if self.repositoryServer:
             self.proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase,
@@ -374,7 +379,7 @@ class ConaryHandler(object):
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
                     "Supported methods: GET POST PUT")
-        web = repos_web.ReposWeb(self.cfg, self.repositoryServer)
+        web = repos_web.ReposWeb(self.cfg, self.shimServer)
         return web._handleRequest(request)
 
     def postRpc(self):
