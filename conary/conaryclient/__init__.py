@@ -118,7 +118,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
 
         @rtype: bool
         """
-        return os.path.exists(self.cfg.modelPath)
+        modelPath = util.joinPaths(self.cfg.root, self.cfg.modelPath)
+        return os.path.exists(modelPath)
 
 
     def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
