@@ -672,3 +672,11 @@ The following dependencies would not be met after this update:
     def testreposOverride(self):
         client = conaryclient.ConaryClient(self.cfg, repos = 1234)
         assert(client.repos == 1234)
+
+    def testHasSystemModel(self):
+        self.cfg.modelPath = os.path.join(self.workDir, 'system-model')
+        client = conaryclient.ConaryClient(self.cfg)
+        self.assertEquals(client.hasSystemModel(), False)
+
+        file(self.cfg.modelPath , "w")
+        self.assertEquals(client.hasSystemModel(), True)
