@@ -679,8 +679,10 @@ The following dependencies would not be met after this update:
         util.removeIfExists(modelPath)
         client = conaryclient.ConaryClient(self.cfg)
         self.assertEquals(client.hasSystemModel(), False)
+        self.assertEquals(client.getSystemModel(), None)
 
         # Create file now
         util.mkdirChain(os.path.dirname(modelPath))
-        file(modelPath, "w")
+        file(modelPath, "w").write("install group-me\n")
         self.assertEquals(client.hasSystemModel(), True)
+        self.assertEquals(client.getSystemModel(), "install group-me\n")
