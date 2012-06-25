@@ -869,6 +869,9 @@ class TestPackage(CapsuleRecipe):
             self.writeFile(self.workDir + '/other', 'some file')
             self.rollback(1, capsuleChangesets = [ self.workDir ] )
             f.write("rollback check")
+
+            self.erasePkg(self.rootDir, 'simple:rpm')
+            self.rollback(1, capsuleChangesets = [ self.workDir ] )
         finally:
             self.cfg.localRollbacks = False
 
