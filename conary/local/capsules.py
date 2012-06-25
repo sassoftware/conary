@@ -173,6 +173,10 @@ class MetaCapsuleOperations(CapsuleOperation):
 
     def apply(self, justDatabase = False, noScripts = False,
               capsuleChangeSet = None):
+        if capsuleChangeSet:
+            # Previous jobs will have moved the pointer in the auxilliary
+            # changeset, so reset it at the start of each job.
+            capsuleChangeSet.reset()
         tmpDir = os.path.join(self.root, 'var/tmp')
         if not os.path.isdir(tmpDir):
             # For empty roots or roots that are not systems (e.g. source
