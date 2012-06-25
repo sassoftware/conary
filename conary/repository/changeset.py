@@ -724,7 +724,8 @@ class ChangeSet(streams.StreamSet):
             # everything in the rollback is considered primary
             rollback.addPrimaryTrove(name, version, flavor)
 
-            for (pathId, path, fileId, fileVersion) in trv.iterFileList():
+            for (pathId, path, fileId, fileVersion) in trv.iterFileList(
+                    members=True, capsules=True):
                 fileObj = db.getFileVersion(pathId, fileId, fileVersion)
                 rollback.addFile(None, fileId, fileObj.freeze())
                 if fileObj.hasContents:
