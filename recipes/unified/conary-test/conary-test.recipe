@@ -87,6 +87,7 @@ class ConaryTest(CPackageRecipe):
             'popt:devel',
             'postgresql:runtime',
             'postgresql-server:runtime',
+            'psycopg2:python',
             'python:devel',
             'python-ctypes:python',
             'python-pgsql:python',
@@ -144,6 +145,7 @@ class ConaryTest(CPackageRecipe):
             'popt-devel:rpm',
             'postgresql:rpm',
             'postgresql-server:rpm',
+            'python-psycopg2:rpm',
             'sqlite-devel:rpm',
             'squid:rpm',
             'subversion:rpm',
@@ -192,7 +194,7 @@ class ConaryTest(CPackageRecipe):
 
         # Repos DB
         config['repos_db'] = \
-            Flags.db_pgsql and 'postgresql' \
+            Flags.db_pgsql and 'psycopg2' \
             or 'sqlite'
         environ += 'CONARY_REPOS_DB=%s ' % config['repos_db']
 

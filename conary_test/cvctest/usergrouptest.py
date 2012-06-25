@@ -61,7 +61,7 @@ class TestUser(UserInfoRecipe):
         # do one test with logBuild because this code path is important
         # and has broken more than once
         (built, d) = self.buildRecipe(recipestr1, "TestUser", logBuild=True)
-        self.assertEquals(len(built), 1)
+        self.assertEquals(len(built), 2)
 
         for p in built:
             self.updatePkg(self.workDir, p[0], p[1])
@@ -87,22 +87,24 @@ class TestUser(UserInfoRecipe):
         f.close()
 
         # test that the right dependencies are attached
-        repos = self.openRepository()
-        (name, version, flavor) = built[0]
-        version = versions.VersionFromString(version)
-        trove = repos.getTrove(name, version, flavor)
         pathsFound = []
-        for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
-                trove.getName(), trove.getVersion(), trove.getFlavor(),
-                withFiles=True):
-            prov = str(fileObj.provides())
-            req = str(fileObj.requires())
-            pathsFound.append(path)
-            if path == '/etc/conary/userinfo/foo':
-                assert prov.find('userinfo: foo') != -1, prov
-                assert prov.find('groupinfo: bar') != -1, prov
-                assert req.find('groupinfo: bar') == -1, req
-        assert '/etc/conary/userinfo/foo' in pathsFound, pathsFound
+        repos = self.openRepository()
+        for name, version, flavor in built:
+            version = versions.VersionFromString(version)
+            trove = repos.getTrove(name, version, flavor)
+            for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
+                    trove.getName(), trove.getVersion(), trove.getFlavor(),
+                    withFiles=True):
+                prov = str(fileObj.provides())
+                req = str(fileObj.requires())
+                pathsFound.append(path)
+                if path == '/etc/conary/userinfo/foo':
+                    self.failUnless(prov.find('userinfo: foo') != -1)
+                    self.failUnless(req.find('groupinfo: bar') != -1)
+                elif path == '/etc/conary/groupinfo/bar':
+                    self.failUnless(prov.find('groupinfo: bar') != -1)
+        self.failUnless('/etc/conary/userinfo/foo' in pathsFound)
+        self.failUnless('/etc/conary/groupinfo/bar' in pathsFound)
 
 
         # now test installing the info-foo package along with a package
@@ -119,15 +121,13 @@ class FooRecipe(PackageRecipe):
 """
         (built, d) = self.buildRecipe(foorecipe, "FooRecipe", logBuild=True)
         csPath = self.workDir + '/test.ccs'
-        repos = self.openRepository()
-        self.changeset(repos, ['foo', 'info-foo'], csPath)
         self.resetRoot()
         # this makes sure that the /etc/passwd is correct before we try and
         # lookup foo in the user database. what a hack.
         self.resetRoot()
         c = PwClass(self.rootDir)
         self.mimicRoot()
-        self.updatePkg(self.rootDir, [csPath])
+        self.updatePkg(self.rootDir, 'foo', resolve=True)
         c.restore()
         self.realRoot()
         f = file(self.rootDir + '/etc/passwd')
@@ -178,8 +178,7 @@ class TestUser(UserInfoRecipe):
 """
         self.reset()
         (built, d) = self.buildRecipe(recipestr1, "TestUser")
-        for p in built:
-            self.updatePkg(self.workDir, p[0], p[1])
+        self.updatePkg(self.workDir, 'info-foo', resolve=True)
         f = file(self.workDir + '/etc/conary/userinfo/foo')
         assert (f.readlines() == [
             'PREFERRED_UID=1000\n',
@@ -245,11 +244,11 @@ class TestUser(UserInfoRecipe):
         for recipestr in [recipestr0, recipestr1]:
             built, d = self.buildRecipe(recipestr, "TestSupplementalGroupUser")
             for p in built:
-                self.updatePkg(self.workDir, p[0], p[1])
+                self.updatePkg(self.workDir, p[0], p[1], resolve=True)
         for recipestr in [recipestr2, recipestr3]:
             built, d = self.buildRecipe(recipestr, "TestUser")
             for p in built:
-                self.updatePkg(self.workDir, p[0], p[1])
+                self.updatePkg(self.workDir, p[0], p[1], resolve=True)
         f = file(self.workDir + '/etc/conary/userinfo/foo')
         assert (f.readlines() == [
             'PREFERRED_UID=1000\n',
@@ -518,7 +517,8 @@ class TestUserInfo(UserInfoRecipe):
         r.PackageSpec('manpage', '.*')
 """
         built, d = self.buildRecipe(recipestr1, "TestUserInfo")
-        self.assertEquals(built[0][0], 'info-foo:user')
+        self.assertEquals(built[0][0], 'info-foo:group')
+        self.assertEquals(built[1][0], 'info-foo:user')
 
     def testUserPolicyInvocation2(self):
         recipestr1 = r"""
@@ -535,7 +535,8 @@ class TestUserInfo(UserInfoRecipe):
 """
 
         built, d = self.buildRecipe(recipestr1, "TestUserInfo")
-        self.assertEquals(built[0][0], 'info-foo:user')
+        self.assertEquals(built[0][0], 'info-foo:group')
+        self.assertEquals(built[1][0], 'info-foo:user')
 
     def testUserMissingParams(self):
         recipestr1 = r"""

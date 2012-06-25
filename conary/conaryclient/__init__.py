@@ -111,6 +111,32 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
                                                        cfg)
         keyCache.setCallback(keyCacheCallback)
 
+    @api.publicApi
+    def hasSystemModel(self):
+        """
+        Returns True if the system is modeled using a System Model
+
+        @rtype: bool
+        """
+        modelPath = util.joinPaths(self.cfg.root, self.cfg.modelPath)
+        return os.path.exists(modelPath)
+
+    @api.publicApi
+    def getSystemModel(self):
+        """
+        Returns the Conary system model, or None if the system is not modeled
+
+        @rtype: str or None
+        """
+        modelPath = util.joinPaths(self.cfg.root, self.cfg.modelPath)
+        if not os.path.exists(modelPath):
+            return None
+        try:
+            return file(modelPath).read()
+        except IOError, e:
+            if e.errno not in [2, 13]:
+                raise
+        return None
 
     def createRepos(self, db, cfg, passwordPrompter=None, userMap=None):
         if self.repos:

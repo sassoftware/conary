@@ -345,6 +345,7 @@ class Test(CapsuleRecipe):
     def setup(r):
         r.addCapsule('with-config-0.1-1.noarch.rpm')
 """
+        os.chdir(self.workDir)
         self.makeSourceTrove(pkgname, recipe, buildLabel=self.defLabel)
         built = self.cookFromRepository(pkgname, buildLabel=self.defLabel)
 

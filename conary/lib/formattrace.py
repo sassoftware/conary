@@ -210,10 +210,11 @@ def stackToList(stack):
 
 
 def formatTrace(excType, excValue, excTB, stream=sys.stderr, withLocals=True):
-    stream.write(str(excType))
-    stream.write(": ")
-    stream.write(str(excValue))
-    stream.write("\n\n")
+    stream.write('%s.%s: %s\n\n' % (
+        excType.__module__,
+        excType.__name__,
+        str(excValue),
+        ))
 
     tbStack = stackToList(excTB)
     if withLocals:

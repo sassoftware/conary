@@ -19,23 +19,26 @@
 import errno
 import logging
 import os
+import smtplib
 import socket
 import StringIO
 import sys
 import tempfile
 import time
 import webob
-import xmlrpclib
 import zlib
+from email import MIMEText
 
 from conary.lib import log as cny_log
 from conary.lib import util
 from conary.lib.formattrace import formatTrace
 from conary.repository import errors
 from conary.repository import filecontainer
+from conary.repository import shimclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
+from conary.web import repos_web
 from conary.web import webauth
 
 log = logging.getLogger('wsgi_hooks')
@@ -46,6 +49,8 @@ def makeApp(settings):
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
+    if 'mount_point' in settings:
+        envOverrides['conary.netrepos.mount_point'] = settings['mount_point']
     app = ConaryRouter(envOverrides)
     return app
 
@@ -56,9 +61,15 @@ def paster_main(global_config, **settings):
     return makeApp(settings)
 
 
+def application(environ, start_response):
+    """Trivial app entry point"""
+    return makeApp({})(environ, start_response)
+
+
 class ConaryRouter(object):
 
     requestFactory = webob.Request
+    responseFactory = webob.Response
 
     def __init__(self, envOverrides=()):
         self.envOverrides = envOverrides
@@ -66,13 +77,32 @@ class ConaryRouter(object):
 
     def __call__(self, environ, start_response):
         environ.update(self.envOverrides)
+        mountPoint = environ.get('conary.netrepos.mount_point', 'conary')
         request = self.requestFactory(environ)
+        for elem in mountPoint.split('/'):
+            if not elem:
+                continue
+            if request.path_info_pop() != elem:
+                return self.notFound(environ, start_response)
         try:
             response = self.handleRequest(request, start_response)
-            return response(environ, start_response)
+            if callable(response):
+                # Looks like a webob response
+                return response(environ, start_response)
+            else:
+                # Looks like a vanilla WSGI iterable
+                return response
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
+
+    def notFound(self, environ, start_response):
+        response = self.responseFactory(
+                "<h1>404 Not Found</h1>\n"
+                "<p>No application was found at the given location\n",
+            status='404 Not Found',
+            content_type='text/html')
+        return response(environ, start_response)
 
     def handleRequest(self, request, start_response):
         if 'conary.netrepos.config_file' in request.environ:
@@ -86,20 +116,24 @@ class ConaryRouter(object):
             cfg.read(cfgPath)
         handler = ConaryHandler(cfg)
         try:
-            response = handler.handleRequest(request)
-            iterator = response(request.environ, start_response)
+            return handler.handleRequest(request)
         except:
-            handler.close()
-            raise
-        return ClosableResponseWrapper(iterator, handler.close)
+            exc_info = sys.exc_info()
+            return self.handleError(request, exc_info, start_response, cfg)
 
-    def handleError(self, request, exc_info, start_response):
+    def handleError(self, request, exc_info, start_response, cfg=None):
         trace, tracePath = self._formatErrorLarge(request, exc_info)
         short = self._formatErrorSmall(request, exc_info)
         short += 'Extended traceback at ' + tracePath
         log.error(short)
 
-        response = webob.Response(
+        if cfg and cfg.bugsFromEmail and cfg.bugsToEmail:
+            try:
+                self._sendMail(cfg, exc_info, trace, request)
+            except:
+                log.exception("Failed to send traceback mail:")
+
+        response = self.responseFactory(
                 "<h1>500 Internal Server Error</h1>\n"
                 "<p>An unexpected error occurred on the server. Consult the "
                 "server error logs for details.",
@@ -151,6 +185,24 @@ class ConaryRouter(object):
         formatTrace(e_class, e_value, e_tb, stream=tb, withLocals=False)
         return tb.getvalue()
 
+    def _sendMail(self, cfg, exc_info, trace, request):
+        firstLine = '%s: %s' % (exc_info[0].__name__, str(exc_info[1]))
+        firstLine = firstLine.splitlines()[0]
+        crashVars = dict(
+                hostname=socket.gethostname(),
+                firstLine=firstLine,
+                )
+        msg = MIMEText.MIMEText(trace)
+        msg['Subject'] = cfg.bugsEmailSubject % crashVars
+        msg['From'] = fromEmail = '"%s" <%s>' % (cfg.bugsEmailName,
+                cfg.bugsFromEmail)
+        msg['To'] = toEmail = '<%s>' % (cfg.bugsToEmail,)
+
+        smtp = smtplib.SMTP()
+        smtp.connect()
+        smtp.sendmail(fromEmail, [toEmail], msg.as_string())
+        smtp.close()
+
 
 class ConaryHandler(object):
 
@@ -163,10 +215,26 @@ class ConaryHandler(object):
         self.request = None
         self.auth = None
         self.isSecure = None
-        self.urlBase = None
         self.repositoryServer = None
         self.proxyServer = None
         self.restHandler = None
+        self.contentsStore = None
+
+    def _getEnvBool(self, key, default=None):
+        value = self.request.environ.get(key)
+        if value is None:
+            if default is None:
+                raise KeyError("Environment variable %r must be set" % (key,))
+            else:
+                return default
+        if value.lower() in ('yes', 'y', 'true', 't', '1', 'on'):
+            return True
+        elif value.lower() in ('no', 'n', 'false', 'f', '0', 'off'):
+            return False
+        else:
+            raise ValueError(
+                    "Environment variable %r must be a boolean, not %r" % (key,
+                        value))
 
     def _loadCfg(self):
         """Load configuration and construct repository objects."""
@@ -187,45 +255,56 @@ class ConaryHandler(object):
         if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
             raise ConfigurationError("tmpDir must not contain symbolic links.")
 
-        if req.environ.get('HTTPS') == 'on':
-            req.scheme = 'https'
+        self._useForwardedHeaders = self._getEnvBool(
+                'use_forwarded_headers', False)
+        if self._useForwardedHeaders:
+            for key in ('x-forwarded-scheme', 'x-forwarded-proto'):
+                if req.headers.get(key):
+                    req.scheme = req.headers[key]
+                    break
+            for key in ('x-forwarded-host', 'x-forwarded-server'):
+                if req.headers.get(key):
+                    req.host = req.headers[key]
+                    break
         self.isSecure = req.scheme == 'https'
 
+        if req.environ.get('PYTHONPATH'):
+            # Allow SetEnv to propagate, so that commit hooks can have the
+            # proper environment
+            os.environ['PYTHONPATH'] = req.environ['PYTHONPATH']
+
+        urlBase = req.application_url
         if cfg.closed:
             # Closed repository -- returns an exception for all requests
             self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
-            self.restHandler = None
+            self.shimServer = self.repositoryServer
         elif cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
-            self.proxyServer = proxy.ProxyRepositoryServer(cfg, self.urlBase)
-            self.restHandler = None
+            self.shimServer = None
+            self.proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)
         else:
             # Full repository with optional changeset cache
             self.repositoryServer = netserver.NetworkRepositoryServer(cfg,
-                    self.urlBase)
-            # TODO: need restlib and crest work to support WSGI
-            #if cresthooks and cfg.baseUri:
-            #    restUri = cfg.baseUri + '/api'
-            #    self.restHandler = cresthooks.ApacheHandler(restUri,
-            #            self.repositoryServer)
+                    urlBase)
+            self.shimServer = shimclient.NetworkRepositoryServer(cfg, urlBase,
+                    db=self.repositoryServer.db)
 
         if self.repositoryServer:
-            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, self.urlBase,
+            self.proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase,
                     self.repositoryServer)
+            self.contentsStore = self.repositoryServer.repos.contentsStore
 
     def _loadAuth(self):
         """Extract authentication info from the request."""
         self.auth = netserver.AuthToken()
         self._loadAuthPassword()
         self._loadAuthEntitlement()
-        # XXX: it's sort of insecure to just take the client's word for it.
-        # Maybe have a configuration directive when behind a reverse proxy?
-        forward = self.request.headers.get('X-Forwarded-For')
-        if forward:
-            self.auth.remote_ip = forward.split(',')[-1].strip()
-        else:
-            self.auth.remote_ip = self.request.remote_addr
+        self.auth.remote_ip = self.request.remote_addr
+        if self._useForwardedHeaders:
+            forward = self.request.headers.get('X-Forwarded-For')
+            if forward:
+                self.auth.remote_ip = forward.split(',')[-1].strip()
 
     def _loadAuthPassword(self):
         """Extract HTTP Basic Authorization from the request."""
@@ -256,6 +335,16 @@ class ConaryHandler(object):
                 )
 
     def handleRequest(self, request):
+        try:
+            return self._handleRequest(request)
+        finally:
+            # This closes the repository server immediately after the initial
+            # request handling phase, meaning that 'generator' responses will
+            # not have access to it. Currently the only generator is
+            # _produceChangeset() which does not need a repository server.
+            self.close()
+
+    def _handleRequest(self, request):
         self.request = request
         self._loadCfg()
         self._loadAuth()
@@ -273,10 +362,15 @@ class ConaryHandler(object):
             self.repositoryServer.reopen()
 
         if self.request.method == 'GET':
-            if self.request.path_info_peek() == 'changeset':
+            path = self.request.path_info_peek()
+            if path == 'changeset':
                 return self.getChangeset()
+            elif path == 'api':
+                self.request.path_info_pop()
+                return self.getApi()
         elif self.request.method == 'POST':
-            if self.request.path_info_peek() == '':
+            path = self.request.path_info_peek()
+            if path == '':
                 return self.postRpc()
         elif self.request.method == 'PUT':
             if self.request.path_info_peek() == '':
@@ -285,8 +379,8 @@ class ConaryHandler(object):
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
                     "Supported methods: GET POST PUT")
-        return self._makeError('404 Not Found',
-                "No resource was found at the given location")
+        web = repos_web.ReposWeb(self.cfg, self.shimServer)
+        return web._handleRequest(request)
 
     def postRpc(self):
         if self.request.content_type != 'text/xml':
@@ -303,7 +397,7 @@ class ConaryHandler(object):
 
         try:
             params, method = util.xmlrpcLoad(stream)
-        except (xmlrpclib.ResponseError, ValueError, UnicodeDecodeError):
+        except:
             return self._makeError('400 Bad Request',
                     "Malformed XMLRPC request")
 
@@ -421,7 +515,7 @@ class ConaryHandler(object):
                 csFile = util.ExtendedFile(path, 'rb', buffering=False)
                 changeSet = filecontainer.FileContainer(csFile)
                 for data in changeSet.dumpIter(readNestedFile,
-                        args=(self.proxyServer.repos.repos.contentsStore,)):
+                        args=(self.contentsStore,)):
                     yield data
                 del changeSet
             else:
@@ -471,29 +565,31 @@ class ConaryHandler(object):
                 return open(path, 'wb+')
         return None
 
+    def getApi(self):
+        if not self.repositoryServer:
+            return self._makeError('404 Not Found',
+                    "Standalone Conary proxies cannot forward API requests")
+        try:
+            from crest import webhooks
+        except ImportError:
+            return self._makeError('404 Not Found',
+                    "Conary web API is not enabled on this repository")
+        prefix = self.request.script_name
+        restHandler = webhooks.WSGIHandler(prefix, self.repositoryServer)
+        return restHandler.handle(self.request, path=None)
+
     def close(self):
         # Make sure any pooler database connections are released.
         if self.repositoryServer:
-            self.repositoryServer.reset()
+            self.repositoryServer.close()
+        self.request = None
+        self.auth = None
+        self.isSecure = None
+        self.repositoryServer = None
+        self.proxyServer = None
+        self.restHandler = None
+        # Leave the contentsStore around in case produceChangeset needs it
 
 
 class ConfigurationError(RuntimeError):
     pass
-
-
-class ClosableResponseWrapper(object):
-
-    def __init__(self, iterator, closeFunc):
-        self.iterator = iterator
-        self.closeFunc = closeFunc
-
-    def __len__(self): return len(self.iterator)
-    def __iter__(self): return iter(self.iterator)
-    def __getitem__(self, key): return self.iterator[key]
-
-    def close(self):
-        self.closeFunc()
-        try:
-            self.iterator.close()
-        except AttributeError:
-            pass

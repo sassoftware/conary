@@ -1128,7 +1128,6 @@ class ChangesetFilter(BaseProxy):
         for trvCs in newCs.iterNewTroveList():
             job = trvCs.getJob()
             sjob = self.toJob(job)
-            fileList = trvCs.getNewFileList()
             if not trvCs.getTroveInfo().capsule.type():
                 # This is a non-capsule trove changeset. Merge the
                 # corresponding changeset we previously retrieved withContents
@@ -1138,7 +1137,6 @@ class ChangesetFilter(BaseProxy):
                 continue
 
             # This trove changeset is a capsule
-            contType = changeset.ChangedFileTypes.file
             if not trvCs.getNewVersion():
                 # we don't care about deletes
                 continue
@@ -1161,6 +1159,8 @@ class ChangesetFilter(BaseProxy):
 
             ccs = changeset.ChangeSet()
             capsuleSha1 = None
+            neededFileKeys = []
+            contentsToAdd = []
             # Sorting the files by path id will ensure we always get the
             # capsule first.
             for pathId, path, fileId, fileVersion in sorted(itertools.chain(
@@ -1203,9 +1203,7 @@ class ChangesetFilter(BaseProxy):
                     # fabricate the contents.
 
                     emptyContents = filecontents.FromString('')
-                    ccs.addFileContents(pathId, fileId,
-                            changeset.ChangedFileTypes.file, emptyContents,
-                            cfgFile=False)
+                    contentsToAdd.append((pathId, fileId, emptyContents, False))
                     continue
 
                 # derivedcapsulepolicy will set
@@ -1225,14 +1223,22 @@ class ChangesetFilter(BaseProxy):
                 # config file
                 assert capsuleSha1 is not None
 
+                neededFileKeys.append((pathId, fileId, path, configFileSha1))
+
+            if neededFileKeys:
                 dl = self.CapsuleDownloader(self.cfg.capsuleServerUrl)
                 rpmKey = self._getCapsuleKey(trvCs.getTroveInfo().capsule.rpm)
-                rpmContents = dl.downloadCapsuleFile(rpmKey, capsuleSha1,
-                    path, configFileSha1)
+                fileInfoList = [x[2:4] for x in neededFileKeys]
+                fileObjs = dl.downloadCapsuleFiles(rpmKey, capsuleSha1,
+                        fileInfoList)
+                for (pathId, fileId, path, _), fileObj in zip(
+                        neededFileKeys, fileObjs):
+                    contentsToAdd.append((pathId, fileId, fileObj, True))
 
-                contType = changeset.ChangedFileTypes.file
-                ccs.addFileContents(pathId, fileId, contType,
-                                    rpmContents, cfgFile = True)
+            for pathId, fileId, fileObj, isConfig in sorted(contentsToAdd):
+                ccs.addFileContents(pathId, fileId,
+                        changeset.ChangedFileTypes.file, fileObj,
+                        cfgFile=isConfig)
 
             newCs.merge(ccs)
         # All this merging messed up the primary trove list

@@ -18,10 +18,7 @@
 
 SUBDIRS=
 
-python_files = __init__.py\
-	       webauth.py\
-               webhandler.py\
-               fields.py
+python_files = $(wildcard *.py)
 
 extra_dist = Makefile
 

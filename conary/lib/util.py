@@ -1583,6 +1583,20 @@ def urlUnsplit(urlTuple):
         return urlTempl
     return ProtectedTemplate(urlTempl, passwd = ProtectedString(urllib.quote(passwd)))
 
+def splitExact(s, sep, maxsplit, pad=None):
+    """
+    Split string using the specified separator, just like string.split()
+    Return a list of exactly maxsplit+1 elements.
+    If the normal split returns fewer than maxsplit elements, pad the rest of
+    the list with the specified pad (defaulting to None)
+    """
+    if s is None:
+        arr = []
+    else:
+        arr = s.split(sep, maxsplit)
+    arrLen = len(arr)
+    arr.extend(pad for x in range(maxsplit + 1 - arrLen))
+    return arr
 
 class XMLRPCMarshaller(xmlrpclib.Marshaller):
     """Marshaller for XMLRPC data"""

@@ -25,7 +25,25 @@ class Conary(CPackageRecipe):
             'pycrypto:python',
             'python:devel',
             'zlib:devel',
-            ]  
+            ]
+        if platver == '2-py26':
+            buildRequires.append('python:bin')
+        if platver == '1':
+            patchName = None
+        else:
+            patchName = 'rpl2-build-flags.patch'
+    elif plat == 'centos' and not encapsulated:
+        buildRequires = [
+            'libelf-lgpl:devel',
+            'openssl:devel',
+            'pycrypto:python',
+            'python:devel',
+            'python-elementtree:python',
+            'python:lib',
+            'zlib:devel',
+            ]
+        have_kid = False
+        patchName = 'rpl2-build-flags.patch'
     elif plat == 'centos' and encapsulated:
         buildRequires = [
             'openssl-devel:rpm',
@@ -50,11 +68,34 @@ class Conary(CPackageRecipe):
                 'm2crypto-conary:python',
                 ])
             have_kid = False
+        patchName = 'el5-build-flags.patch'
+    elif plat == 'sles' and encapsulated:
+        assert embedded
+        buildRequires = [
+            'zlib-devel:rpm',
+
+            # python-conary
+            'python-conary:devel',
+            'libelf-lgpl:devel',
+            'm2crypto-conary:python',
+            ]
+        if platver.startswith('10'):
+            buildRequires.extend([
+                # bzip2-devel is missing, it seems
+                'openssl-devel:rpm',
+                ])
+        else:
+            buildRequires.extend([
+                'libbz2-devel:rpm',
+                'libopenssl-devel:rpm',
+                ])
+        have_kid = False
+        patchName = 'sles10-build-flags.patch'
     else:
         raise RuntimeError("Wrong value for 'plat' class variable")
 
     def setup(r):
-        r.macros.sqlitever = '3070800'
+        r.macros.sqlitever = '3071201'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
         if r.embedded:
@@ -70,8 +111,12 @@ class Conary(CPackageRecipe):
 
         #r.addArchive('ftp://download.rpath.com/conary/')
         r.addMercurialSnapshot('http://hg.rpath.com/conary')
-        r.addPatch('el5-build-flags.patch', use=(r.plat == 'centos'))
-        r.addPatch('rpl2-build-flags.patch', use=(r.plat == 'rpath' and r.platver != '1'))
+        for patchName in [
+                'el5-build-flags.patch',
+                'rpl2-build-flags.patch',
+                'sles10-build-flags.patch',
+                ]:
+            r.addPatch(patchName, use=(patchName == r.patchName))
 
         ### Build internal sqlite library for Conary to use
         r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
@@ -158,7 +203,9 @@ class Conary(CPackageRecipe):
                       '%(libdir)s/conary/',
                       '%(libexecdir)s/conary/perlreqs.pl',
                       '%(localstatedir)s/conary/emerge', #/var/conary for emerge
+                      '%(sysconfdir)s/conary/recipeTemplates/',
                       '%(sysconfdir)s/conary/mirrors/',
+                      '%(pylib)s/conary/',
                       )
         # keyrings are binary, and we are providing the initial version only
         r.InitialContents('%(sysconfdir)s/conary/.*gpg')
@@ -201,6 +248,11 @@ class Conary(CPackageRecipe):
         r.Requires(exceptDeps=r'python\:\ rpm')
         if r.plat != 'rpath':
             r.Requires('rpm:python', '%(sitepkgs)s/conary/local/rpmcapsule.py')
+        if r.plat == 'rpath':
+            # Ensure that we get the right version of python when migrating
+            # from rPL1-based to rPL2-based systems; this is critical when
+            # any part of the update uses SSL. (RPL-3043)
+            r.Requires('python:lib(%(targetarch)s)', '%(bindir)s/conary')
         r.ComponentRequires({'python': set(('runtime',))})
 
         r.AutoDoc('EULA_Conary_Dual_License.txt')
@@ -208,3 +260,5 @@ class Conary(CPackageRecipe):
         if r.encapsulated:
             r.Remove('%(bindir)s/rpm2cpio') # conflict with the platform
             r.Remove('%(bindir)s/dbsh') # might conflict, not needed in package
+        elif r.plat != 'rpath':
+            r.Move('%(bindir)s/rpm2cpio', '%(bindir)s/rpm2cpio-conary')

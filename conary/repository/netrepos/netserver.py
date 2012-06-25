@@ -215,6 +215,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if self.db.poolmode:
             self.db.close()
 
+    def close(self):
+        self.db.close()
+        self.log.close()
+        if self.callLog:
+            self.callLog.close()
+
     # does the actual method calling and the retry when hitting deadlocks
     def _callWrapper(self, method, authToken, orderedArgs, kwArgs):
         methodname = method.im_func.__name__
@@ -1393,10 +1399,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getFileContents(clientVersion, fileList, rawStreams)
 
     def _getFileContents(self, clientVersion, fileList, rawStreams):
+        fd, path = tempfile.mkstemp(dir=self.tmpPath, suffix='.cf-out')
         try:
-            (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
-                                          suffix = '.cf-out')
-
             sizeList = []
             exception = None
 
@@ -3719,7 +3723,7 @@ class ServerConfig(ConfigFile):
     repositoryMap           = CfgRepoMap
     requireSigs             = CfgBool
     serverName              = CfgLineList(CfgString, listType = GlobListType)
-    staticPath              = (CfgPath, '/conary-static')
+    staticPath              = (CfgString, '/conary-static')
     serializeCommits        = (CfgBool, False)
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog

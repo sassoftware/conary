@@ -1,1 +1,0 @@
-Previously, updates could fail with an unhelpful 'TroveNotFound' error that named the top-level trove when in fact a network configuration problem had prevented fetching a sub-component of that trove. This has been corrected so that the original network error is displayed instead.

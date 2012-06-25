@@ -56,7 +56,7 @@ import time
         <tr class="even"><td>Build time:</td><td>${buildTime} using Conary ${trove.getConaryVersion()}</td></tr>
         <tr class="odd"><td>Provides:</td>
             <td class="top">
-                <div py:for="dep in str(trove.provides.deps).split('\n')">${dep}</div>
+                <div py:for="dep in str(trove.provides.deps).split('\n')">${dep.decode('utf8', 'replace')}</div>
                 <div py:if="not trove.provides.deps">
                     Trove satisfies no dependencies.
                 </div>
@@ -64,7 +64,7 @@ import time
         </tr>
         <tr class="even"><td>Requires:</td>
             <td>
-                <div py:for="dep in str(trove.requires.deps).split('\n')">${dep}</div>
+                <div py:for="dep in str(trove.requires.deps).split('\n')">${dep.decode('utf8', 'replace')}</div>
                 <div py:if="not trove.requires.deps">
                     Trove has no requirements.
                 </div>

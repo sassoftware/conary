@@ -32,6 +32,7 @@ from conary.conaryclient import cmdline
 from conary import conarycfg, repository, trove, versions
 from conary.deps.deps import parseDep
 from conary.deps.deps import parseFlavor
+from conary.lib import util
 from conary.local import database
 from conary.repository import changeset
 from conary.versions import VersionFromString
@@ -672,3 +673,16 @@ The following dependencies would not be met after this update:
     def testreposOverride(self):
         client = conaryclient.ConaryClient(self.cfg, repos = 1234)
         assert(client.repos == 1234)
+
+    def testHasSystemModel(self):
+        modelPath = util.joinPaths(self.cfg.root, self.cfg.modelPath)
+        util.removeIfExists(modelPath)
+        client = conaryclient.ConaryClient(self.cfg)
+        self.assertEquals(client.hasSystemModel(), False)
+        self.assertEquals(client.getSystemModel(), None)
+
+        # Create file now
+        util.mkdirChain(os.path.dirname(modelPath))
+        file(modelPath, "w").write("install group-me\n")
+        self.assertEquals(client.hasSystemModel(), True)
+        self.assertEquals(client.getSystemModel(), "install group-me\n")

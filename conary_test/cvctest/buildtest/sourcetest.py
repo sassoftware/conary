@@ -1370,9 +1370,10 @@ class FooSrc(PackageRecipe):
 
             # RDST-2848
             # Try to commit the multi-URL recipe
+            os.chdir(self.workDir)
             self.newpkg('foosrc')
             os.chdir('foosrc')
-            file("foosrc.recipe", "w").write(recipeData)
+            open("foosrc.recipe", "w").write(recipeData)
             self.commit()
         finally:
             hs.close()
