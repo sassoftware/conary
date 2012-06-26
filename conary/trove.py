@@ -1106,6 +1106,11 @@ class TroveRpmCapsule(streams.StreamSet):
         self.obsoletes = RpmObsoletes()
         self.sha1header = streams.AbsoluteSha1Stream()
 
+    def getNevra(self):
+        return rpmhelper.NEVRA(self.name(), self.epoch(), self.version(),
+                self.release(), self.arch())
+
+
 class MsiComponent(streams.StreamSet):
     ignoreUnknown = streams.PRESERVE_UNKNOWN
     streamDict = {
