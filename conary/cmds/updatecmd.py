@@ -345,17 +345,6 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
         self.out.write("[%s] %s" % (typ, errcode))
 
-    def capsuleSyncScan(self, capsuleType):
-        self.updateMsg("Scanning for %s capsule changes" % capsuleType)
-
-    def capsuleSyncCreate(self, capsuleType, name, num, total):
-        self.updateMsg("Collecting modifications to %s database (%d of %d)" %
-                (capsuleType, num, total))
-
-    def capsuleSyncApply(self, added, removed):
-        self._message('')
-        self.out.write('Synchronizing database with capsule changes\n')
-
     def __init__(self, cfg=None, modelFile=None):
         """
         Initialize this callback object.
@@ -690,14 +679,6 @@ def _updateTroves(cfg, applyList, **kwargs):
 
     if not info:
         client.checkWriteableRoot()
-
-    if cfg.syncCapsuleDatabase:
-        # Unfortunately there's no easy way to make 'test' or 'info' mode work
-        # with capsule sync, doubly so because it influences the decisions made
-        # later on about what troves to update. So this will always really
-        # apply, but the good news is that it never modifies the system outside
-        # of the Conary DB.
-        client.syncCapsuleDatabase(callback)
 
     updJob = client.newUpdateJob()
 

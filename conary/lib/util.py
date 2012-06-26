@@ -1360,16 +1360,8 @@ class Flags(object):
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__,
-                ", ".join( "%s=%r" % (flag, getattr(self, flag))
-                    for flag in self.__slots__ if getattr(self, flag) ) )
-
-    def copy(self):
-        new = type(self)()
-        for flag in self.__slots__:
-            value = getattr(self, flag)
-            object.__setattr__(new, flag, value)
-        return new
-
+                "".join( flag for flag in self.__slots__
+                            if getattr(self, flag) ) )
 
 def stripUserPassFromUrl(url):
     arr = list(urlparse.urlparse(url))
@@ -2432,29 +2424,3 @@ def iterFileChunks(fobj):
         if not data:
             break
         yield data
-
-
-class cachedProperty(object):
-    """A decorator that creates a memoized property. The first time the
-    property is accessed, the decorated function is called and the return value
-    is used as the value of the property. It is also stored so that future
-    accesses bypass the function.
-
-    The memoized value is stored into the instance dictionary. Because __set__
-    is not implemented, this is a "non-data descriptor" and thus the instance
-    dictionary overrides the descriptor.
-    """
-
-    def __init__(propself, func):
-        propself.func = func
-        try:
-            propself.__doc__ = func.__doc__
-        except AttributeError:
-            pass
-
-    def __get__(propself, ownself, owncls):
-        if ownself is None:
-            return propself
-        ret = propself.func(ownself)
-        setattr(ownself, propself.func.func_name, ret)
-        return ret

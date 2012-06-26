@@ -432,35 +432,6 @@ class UpdateCallback(ChangesetCallback):
         """
         pass
 
-    def capsuleSyncScan(self, capsuleType):
-        """
-        Called before scanning for changes for the named type of capsule.
-
-        @param capsuleType: capsule type, e.g. 'rpm'
-        @type  capsuleType: str
-        """
-        pass
-
-    def capsuleSyncCreate(self, capsuleType, name, num, total):
-        """
-        Called when fabricating a trove for a capsule.
-
-        @param capsuleType: capsule type, e.g. 'rpm'
-        @param name: string identifier for the capsule
-        @param num: number of capsule being created (1-indexed)
-        @param total: total number of capsules to create
-        """
-        pass
-
-    def capsuleSyncApply(self, added, removed):
-        """
-        Called before applying a capsule sync job.
-
-        @param added: number of troves being added
-        @param removed: number of troves being removed
-        """
-        pass
-
     # called by updatecmd.py only, at least for now
     def loadingModelCache(self):
         """

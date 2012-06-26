@@ -599,7 +599,6 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
     shortenGroupFlavors   =  CfgBool
-    syncCapsuleDatabase   =  (CfgBool, True)
     # Upstream Conary proxy
     conaryProxy           =  CfgProxy
     # HTTP proxy

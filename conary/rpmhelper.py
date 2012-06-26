@@ -23,13 +23,10 @@ Contains functions to assist in dealing with rpm files.
 import itertools
 import os
 import re
-import StringIO
 import struct
 import tempfile
 from conary.lib import cpiostream, digestlib, openpgpfile, sha1helper, util, log
-from conary.lib.compat import namedtuple
 from conary.deps import deps
-
 
 # Note that all per-file tags must be listed in _RpmHeader:_tagListValues
 _GENERAL_TAG_BASE = 1000
@@ -393,12 +390,6 @@ class _RpmHeader(object):
 
         return items
 
-    def __hasitem__(self, tag):
-        return tag in self.entries
-
-    def getNevra(self):
-        return NEVRA.fromHeader(self)
-
     def __init__(self, f, sha1 = None, isSource = False, sigBlock = False):
         intro = f.read(16)
         (mag1, mag2, mag3, ver, reserved, entries, size) = \
@@ -511,17 +502,6 @@ def readSignatureHeader(f):
 
     sigs = _RpmHeader(f, isSource = isSource, sigBlock = True)
     return sigs
-
-
-def headerFromBlob(blob):
-    """
-    Load a header from a bare RPM structure like those from rpmlib's unload()
-    method.
-    """
-    blob = '\x8e\xad\xe8\x01\0\0\0\0' + blob
-    sio = StringIO.StringIO(blob)
-    return _RpmHeader(sio)
-
 
 def verifySignatures(f, validKeys = None):
     """
@@ -738,19 +718,8 @@ def UncompressedRpmPayload(fileIn):
     return uncompressed
 
 
-class NEVRA(namedtuple('NEVRA', 'name epoch version release arch')):
+class NEVRA(object):
     _re = re.compile("^(.*)-([^-]*)-([^-]*)\.([^.]*)$")
-
-    @classmethod
-    def fromHeader(cls, header):
-        args = []
-        for tag in [NAME, EPOCH, VERSION, RELEASE, ARCH]:
-            if tag in header:
-                args.append(header[tag])
-            else:
-                args.append(None)
-        return cls(*args)
-
     @classmethod
     def parse(cls, filename):
         """
@@ -768,18 +737,10 @@ class NEVRA(namedtuple('NEVRA', 'name epoch version release arch')):
             return n, None, v, r, a
         e, v = v.split(':', 1)
         e = int(e)
-        return cls(n, e, v, r, a)
+        return n, e, v, r, a
 
     @classmethod
     def filename(cls, name, epoch, version, release, arch):
         if epoch is not None:
             version = "%s:%s" % (epoch, version)
         return "%s-%s-%s.%s.rpm" % (name, version, release, arch)
-
-    def __str__(self):
-        if self.epoch:
-            epoch = '%s:' % self.epoch
-        else:
-            epoch = ''
-        return '%s-%s%s-%s.%s' % (self.name, epoch, self.version, self.release,
-                self.arch)
