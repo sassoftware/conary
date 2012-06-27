@@ -246,7 +246,7 @@ class Conary(CPackageRecipe):
         r.Requires(exceptions=r'%(sysconfdir)s/conary/components/')
         # We can't go back and change deps on rpm:python, so white it out
         r.Requires(exceptDeps=r'python\:\ rpm')
-        if r.plat != 'rpath':
+        if r.encapsulated:
             r.Requires('rpm:python', '%(sitepkgs)s/conary/local/rpmcapsule.py')
         if r.plat == 'rpath':
             # Ensure that we get the right version of python when migrating
