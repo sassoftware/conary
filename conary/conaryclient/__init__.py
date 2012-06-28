@@ -26,6 +26,7 @@ from conary.cmds import metadata, rollbacks
 from conary.conaryclient import clone, cmdline, password, resolve, update
 from conary.conaryclient import filetypes, mirror, callbacks  # pyflakes=ignore
 from conary.lib import log, util, openpgpkey, api
+from conary.lib.compat import namedtuple
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import searchsource
@@ -126,13 +127,15 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
         """
         Returns the Conary system model, or None if the system is not modeled
 
-        @rtype: str or None
+        @rtype: SystemModel or None
         """
         modelPath = util.joinPaths(self.cfg.root, self.cfg.modelPath)
         if not os.path.exists(modelPath):
             return None
         try:
-            return file(modelPath).read()
+            contents = file(modelPath).read()
+            mtime = int(os.stat(modelPath).st_mtime)
+            return SystemModel(contents=contents, path=modelPath, mtime=mtime)
         except IOError, e:
             if e.errno not in [2, 13]:
                 raise
@@ -592,3 +595,6 @@ def getClient(context=None, environ=None, searchCurrentDir=False, cfg=None):
         cfg = conarycfg.ConaryConfiguration(True)
     cmdline.setContext(cfg, context, environ, searchCurrentDir)
     return ConaryClient(cfg)
+
+class SystemModel(namedtuple("SystemModel", "contents path mtime")):
+    __slots__ = ()

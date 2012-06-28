@@ -685,4 +685,7 @@ The following dependencies would not be met after this update:
         util.mkdirChain(os.path.dirname(modelPath))
         file(modelPath, "w").write("install group-me\n")
         self.assertEquals(client.hasSystemModel(), True)
-        self.assertEquals(client.getSystemModel(), "install group-me\n")
+        sysmodel = client.getSystemModel()
+        self.assertEquals(sysmodel.contents, "install group-me\n")
+        self.assertEquals(sysmodel.path, modelPath)
+        self.assertEquals(sysmodel.mtime, os.stat(modelPath).st_mtime)
