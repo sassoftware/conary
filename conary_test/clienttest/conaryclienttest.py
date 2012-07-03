@@ -688,4 +688,4 @@ The following dependencies would not be met after this update:
         sysmodel = client.getSystemModel()
         self.assertEquals(sysmodel.model.filedata, ["install group-me\n"])
         self.assertEquals(sysmodel.fileFullName, modelPath)
-        self.assertEquals(sysmodel.mtime, int(os.stat(modelPath).st_mtime))
+        self.assertEquals(sysmodel.mtime, os.stat(modelPath).st_mtime)
