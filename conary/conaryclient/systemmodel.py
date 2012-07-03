@@ -57,6 +57,10 @@ class SystemModelFile(object):
         if self.exists():
             self.parse()
 
+    @property
+    def contents(self):
+        return ''.join(self.model.filedata)
+
     def snapshotExists(self):
         return util.exists(self.snapFullName)
 
