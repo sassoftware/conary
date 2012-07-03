@@ -17,10 +17,14 @@
 
 
 import itertools
+import os
 
 from conary import trove, versions
 from conary.conaryclient import modelgraph, troveset, update
+from conary.conaryclient import cml
+from conary.conaryclient import systemmodel
 from conary.deps import deps
+from conary.lib import api
 from conary.lib import log, util
 from conary.local import deptable
 from conary.repository import searchsource, trovecache, trovesource
@@ -815,3 +819,27 @@ class CMLClient(object):
             callback.done()
 
         return suggMap
+
+    @api.publicApi
+    def hasSystemModel(self):
+        """
+        Returns True if the system is modeled using a System Model
+
+        @rtype: bool
+        """
+        modelPath = util.joinPaths(self.cfg.root, self.cfg.modelPath)
+        return os.path.exists(modelPath)
+
+    @api.publicApi
+    def getSystemModel(self):
+        """
+        Returns the Conary system model, or None if the system is not modeled
+
+        @rtype: SystemModel or None
+        """
+        model = cml.CML(self.cfg)
+        modelFile = systemmodel.SystemModelFile(model)
+        if modelFile.exists():
+            return modelFile
+        else:
+            return None

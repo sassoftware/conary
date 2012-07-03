@@ -47,6 +47,7 @@ class SystemModelFile(object):
             fileName = model.cfg.modelPath
         self.fileName = fileName
         self.snapName = fileName + snapshotExt
+        self.mtime = None
         self.root = model.cfg.root
         self.model = model
 
@@ -68,7 +69,10 @@ class SystemModelFile(object):
                 fileName = self.snapFullName
             else:
                 fileName = self.fileFullName
-        self.model.filedata = open(fileName, 'r').readlines()
+        fobj = open(fileName, 'r')
+        self.mtime = os.fstat(fobj.fileno()).st_mtime
+        self.model.filedata = fobj.readlines()
+        fobj.close()
         return self.model.filedata, fileName
 
     def parse(self, fileName=None, fileData=None):
