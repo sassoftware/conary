@@ -1,3 +1,19 @@
+Changes in 2.4.3:
+  o New Features:
+    * The Conary client API now exposes a hasSystemModel() call that
+      returns True if the machine is system modeled, and a
+      getSystemModel() call to retrieve the text of the model file.
+      (CNY-3749)
+
+  o Bug Fixes:
+    * Fixed a crash that could occur when applying a multi-job rollback
+      of capsule troves. (CNY-3747)
+    * Fixed a bug that caused unusable rollbacks to be generated when
+      erasing a capsule trove while "localRollbacks True" was
+      configured. This only fixes newly-generated rollbacks -- any
+      existing rollbacks created from previous versions still cannot be
+      applied. (CNY-3751)
+
 Changes in 2.4.2:
   o Bug Fixes:
     * The 'package' option of addCapsule now properly handles package

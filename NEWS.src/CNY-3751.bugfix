@@ -1,4 +1,0 @@
-Fixed a bug that caused unusable rollbacks to be generated when erasing a
-capsule trove while "localRollbacks True" was configured. This only fixes
-newly-generated rollbacks -- any existing rollbacks created from previous
-versions still cannot be applied.
