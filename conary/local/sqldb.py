@@ -521,10 +521,11 @@ class Database:
         for (troveName, version, timeStamps, flavor, pinned) in cu:
             version = versionCache.get(version, timeStamps)
             flavor = flavorCache.get(flavor)
+            nvf = TroveTuple(troveName, version, flavor)
             if withPins:
-                yield (troveName, version, flavor), (pinned != 0)
+                yield nvf, (pinned != 0)
             else:
-                yield troveName, version, flavor
+                yield nvf
 
     def pinTroves(self, name, version, flavor, pin = True):
         if flavor is None or flavor.isEmpty():
