@@ -26,7 +26,6 @@ from conary.cmds import metadata, rollbacks
 from conary.conaryclient import clone, cmdline, password, resolve, update
 from conary.conaryclient import filetypes, mirror, callbacks  # pyflakes=ignore
 from conary.lib import log, util, openpgpkey, api
-from conary.lib.compat import namedtuple
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import searchsource
