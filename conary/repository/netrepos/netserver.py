@@ -1412,6 +1412,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     exception = errors.FileStreamNotFound
                 elif not files.frozenFileHasContents(stream):
                     exception = errors.FileHasNoContents
+                elif (self.excludeCapsuleContents and
+                        files.frozenFileFlags(stream).isEncapsulatedContent()):
+                    # Not permitted to serve this file (which may not exist on
+                    # disk anyway)
+                    exception = errors.FileStreamNotFound
                 else:
                     contents = files.frozenFileContentInfo(stream)
                     filePath = self.repos.contentsStore.hashToPath(

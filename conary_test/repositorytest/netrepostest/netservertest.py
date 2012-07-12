@@ -1297,6 +1297,8 @@ foo:runtime
         self.stopRepository()
         repos = self.openRepository(excludeCapsuleContents = True)
         simple = self.addRPMComponent("simple:rpm=1.0", 'simple-1.0-1.i386.rpm')
+        _, _, fileId, fileVer = [x for x in simple.iterFileList()
+                if x[1] == '/normal'][0]
         csPath = self.workDir + '/foo.ccs'
         job = [ ('simple:rpm', (None, None),
                                 simple.getNameVersionFlavor()[1:], True) ]
@@ -1307,6 +1309,8 @@ foo:runtime
                         util.ExtendedFile(csPath, buffering=False))
         assert(fcont.getNextFile()[0] == 'CONARYCHANGESET')
         assert(fcont.getNextFile() is None)
+        self.assertRaises(errors.FileStreamNotFound,
+                repos.getFileContents, [(fileId, fileVer)])
 
         # this resets the repository
         self.stopRepository(0)
@@ -1324,13 +1328,13 @@ foo:runtime
                     fileContents = [ ('/foo',
                                       rephelp.RegularFile(
                                             contents = open(rpmPath)) ) ] )
-        pathId, path, fileId = other.iterFileList().next()[0:3]
-
+        pathId, path, fileId, fileVer = other.iterFileList().next() 
         # the change set for 'other' should include the contents
         cs = repos.createChangeSet([ ('other:runtime', (None, None),
                                       other.getNameVersionFlavor()[1:], True)],
                                    withFiles = True, withFileContents = True)
         assert(cs.getFileContents(pathId, fileId))
+        repos.getFileContents([(fileId, fileVer)])
         self.stopRepository(0)
 
     @testhelp.context('rpm')
