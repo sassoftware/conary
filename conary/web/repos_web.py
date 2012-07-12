@@ -341,7 +341,12 @@ class ReposWeb(object):
         ver = versions.VersionFromString(fileV)
 
         fileStream = self.repos.getFileVersion(pathId, fileId, ver)
-        contents = self.repos.getFileContents([(fileId, ver)])[0]
+        try:
+            contents = self.repos.getFileContents([(fileId, ver)])[0]
+        except (errors.FileStreamMissing, errors.FileStreamNotFound):
+            return self._write("error",
+                    error="The content of that file is not available.")
+
         response = self.responseFactory(body_file=contents.get())
 
         if fileStream.flags.isConfig():
