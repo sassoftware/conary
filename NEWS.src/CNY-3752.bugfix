@@ -1,0 +1,1 @@
+A one-time crash experienced while upgrading from Conary 2.3 or earlier to Conary 2.4 has been fixed. This retroactively corrects the problem for prior versions of Conary by making the problematic module backwards-compatible, so that if it is imported partway through the upgrade process the upgrade is likely to proceed safely.

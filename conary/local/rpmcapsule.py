@@ -28,10 +28,23 @@ from conary.deps import deps
 from conary.lib import elf, util, log
 from conary.lib import sha1helper
 from conary.lib.compat import namedtuple
-from conary.local.capsules import SingleCapsuleOperation, BaseCapsulePlugin
+from conary.local import capsules
+from conary.local.capsules import SingleCapsuleOperation
 from conary.local import errors
 from conary.repository import changeset
 from conary.repository import filecontents
+
+
+try:
+    BaseCapsulePlugin = capsules.BaseCapsulePlugin
+except AttributeError:
+    # Conary < 2.4.4 delays importing rpmcapsule until the first capsule job,
+    # by which time Conary itself might have been updated already. So try to
+    # be a little bit backwards-compatible, by not failing if things that are
+    # only in 2.4.x are missing.
+    # See https://issues.rpath.com/browse/CNY-3752
+    BaseCapsulePlugin = object
+
 
 def rpmkey(hdr):
     return "%s-%s-%s.%s" % ( hdr['name'], hdr['version'],
