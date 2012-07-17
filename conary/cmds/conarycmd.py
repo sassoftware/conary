@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # Copyright (c) rPath, Inc.
 #
@@ -21,19 +20,10 @@
 The conary main program.
 """
 
-import inspect
 import sys
 if sys.version_info < (2, 4):
-    print "error: python 2.4 or later is requried"
+    print "error: python 2.4 or later is required"
     sys.exit(1)
-
-if __name__ == "__main__":
-    # ondemand importing for conary command line tool 
-    # - but don't impose it on others!  They can load it on their own if they
-    # want.
-    if '--debug-all' not in sys.argv:
-        from conary.lib import importer
-        importer.install()
 
 #stdlib
 import optparse

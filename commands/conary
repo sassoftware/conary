@@ -19,14 +19,6 @@
 
 import sys
 
-if __name__ == "__main__":
-    # ondemand importing for conary command line tool 
-    # - but don't impose it on others!  They can load it on their own if they
-    # want.
-    if '--debug-all' not in sys.argv:
-        from conary.lib import importer
-        importer.install()
-
 from conary.cmds import conarycmd
 
 if __name__ == "__main__":
