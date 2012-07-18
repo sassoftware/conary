@@ -583,7 +583,9 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
     def _getCapsuleKeyFromInfo(capsuleStream):
         nevra = capsuleStream.rpm.getNevra()
         digest = capsuleStream.rpm.sha1header()
-        return (nevra, digest)
+        # PartialTuple makes two keys with the same NEVRA where one is missing
+        # the digest still compare equal.
+        return capsules.PartialTuple((nevra, digest))
 
     def getCapsuleKeysFromTarget(self):
         txnSet = rpm.TransactionSet(self.root)
@@ -595,7 +597,8 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
                 # Skip fake packages that RPM/yum uses to hold PGP keys
                 continue
             digest = self._digest(rpmlibHeader)
-            headersByKey[(nevra, digest)] = rpmlibHeader
+            key = capsules.PartialTuple((nevra, digest))
+            headersByKey[key] = rpmlibHeader
         return headersByKey
 
     def _getPhantomNVF(self, header):

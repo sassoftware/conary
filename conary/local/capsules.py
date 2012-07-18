@@ -339,6 +339,39 @@ class MetaCapsuleDatabase(object):
         return changeSet
 
 
+class PartialTuple(tuple):
+    """
+    Tuple that compares equality by skipping fields that are empty or None in
+    one of the tuples. In other words, ('foo', 'bar') == ('foo', '') but not
+    ('foo', 'baz').
+    """
+    __slots__ = ()
+    numRequiredFields = 1
+
+    def __eq__(self, other):
+        if len(self) != len(other):
+            return False
+        for n, (a, b) in enumerate(zip(self, other)):
+            if self[n] == other[n]:
+                continue
+            if n < self.numRequiredFields:
+                # Required field is always compared
+                return False
+            if bool(a) and bool(b):
+                # Present in both tuples
+                return False
+            # Missing in one tuple but it's optional so that's OK
+        return True
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        # Hash only the required fields so tuples with and without an optional
+        # field go in the same set/dict slot.
+        return hash(tuple(self[:self.numRequiredFields]))
+
+
 class BaseCapsulePlugin(object):
     kind = None
 
