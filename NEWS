@@ -1,3 +1,21 @@
+Changes in 2.4.4:
+  o New Features:
+    * getSystemModel() now returns a SystemModel object, which exposes
+      the file's contents and the system model path. (CNY-3753)
+
+  o Bug Fixes:
+    * A one-time crash experienced while upgrading from Conary 2.3 or
+      earlier to Conary 2.4 has been fixed. This retroactively corrects
+      the problem for prior versions of Conary by making the problematic
+      module backwards-compatible, so that if it is imported partway
+      through the upgrade process the upgrade is likely to proceed
+      safely. (CNY-3752)
+    * Capsule troves that are too old to have a stored RPM header digest
+      are now matched correctly during the capsule database sync phase
+      of the update. Previously, updates to a RHEL 5 system would
+      recreate many phantom troves on every operation due to the
+      mismatch. (CNY-3755)
+
 Changes in 2.4.3:
   o New Features:
     * The Conary client API now exposes a hasSystemModel() call that

@@ -1,1 +1,0 @@
-Capsule troves that are too old to have a stored RPM header digest are now matched correctly during the capsule database sync phase of the update. Previously, updates to a RHEL 5 system would recreate many phantom troves on every operation due to the mismatch.
