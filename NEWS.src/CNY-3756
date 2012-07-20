@@ -1,0 +1,1 @@
+Fixed all updates on the CentOS 5 unencapsulated platform failing, due to the presence of an empty RPM database triggering a capsule sync.

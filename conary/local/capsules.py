@@ -298,7 +298,7 @@ class MetaCapsuleDatabase(object):
     """
     availablePlugins = {
             'rpm': ('conary.local.rpmcapsule', 'RpmCapsulePlugin',
-                '/var/lib/rpm'),
+                '/var/lib/rpm/Packages'),
             }
 
     def __init__(self, db):
@@ -322,10 +322,15 @@ class MetaCapsuleDatabase(object):
             if kind in self._loadedPlugins:
                 continue
             if isinstance(checkFunc, basestring):
-                checkFunc = lambda _path=checkFunc: os.path.isdir(
-                        util.joinPaths(db.root, _path))
-            if not checkFunc():
-                continue
+                path = util.joinPaths(db.root, checkFunc)
+                try:
+                    if not os.stat(path).st_size:
+                        continue
+                except ValueError:
+                    continue
+            else:
+                if not checkFunc():
+                    continue
             __import__(module)
             cls = getattr(sys.modules[module], className)
             self._loadedPlugins[kind] = cls(db)
