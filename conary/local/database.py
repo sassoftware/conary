@@ -21,6 +21,7 @@ import errno, fcntl
 import itertools
 import os
 import shutil
+import sys
 import tempfile
 
 #conary
@@ -2900,6 +2901,10 @@ class Database(SqlDbRepository):
         os.unlink(opJournalPath)
 
     def syncCapsuleDatabase(self, callback=None):
+        if sys.version_info < (2, 6):
+            # Silently disable capsule sync if the Python is too old for
+            # capsules.
+            return 0
         if callback is None:
             callback = UpdateCallback()
         changeSet = self.capsuleDb.getChangeSetForCapsuleChanges(callback)
