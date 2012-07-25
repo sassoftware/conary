@@ -346,6 +346,8 @@ class ReposWeb(object):
         except (errors.FileStreamMissing, errors.FileStreamNotFound):
             return self._write("error",
                     error="The content of that file is not available.")
+        except errors.FileHasNoContents, err:
+            return self._write("error", error=str(err))
 
         response = self.responseFactory(body_file=contents.get())
 
