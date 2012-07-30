@@ -236,8 +236,7 @@ class Row(object):
                 return default
             raise
         value = self.data[index]
-        self.fields = self.fields[:index] + self.fields[index+1:]
-        self.data = self.data[:index] + self.data[index+1:]
+        del self[index]
         return value
 
     def __contains__(self, key):
@@ -245,7 +244,7 @@ class Row(object):
 
     # But the item slot is magic
     def __getitem__(self, key):
-        if isinstance(key, (int, slice)):
+        if isinstance(key, (int, long, slice)):
             # Used as a sequence
             return self.data[key]
         else:
@@ -253,7 +252,7 @@ class Row(object):
             return self.data[self._indexOf(key)]
 
     def __setitem__(self, key, value):
-        if isinstance(key, (int, slice)):
+        if isinstance(key, (int, long, slice)):
             # Used as a sequence
             self.data[key] = value
         else:
@@ -261,3 +260,15 @@ class Row(object):
             self.pop(key, None)
             self.fields += (key,)
             self.data += (value,)
+
+    def __delitem__(self, key):
+        if isinstance(key, slice):
+            raise TypeError("Delete by slice is not implemented")
+        elif isinstance(key, (int, long)):
+            if key >= len(self.fields):
+                raise IndexError(key)
+            index = key
+        else:
+            index = self._indexOf(key)
+        self.fields = self.fields[:index] + self.fields[index+1:]
+        self.data = self.data[:index] + self.data[index+1:]
