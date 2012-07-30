@@ -326,7 +326,7 @@ class MetaCapsuleDatabase(object):
                 try:
                     if not os.stat(path).st_size:
                         continue
-                except ValueError:
+                except OSError:
                     continue
             else:
                 if not checkFunc():
