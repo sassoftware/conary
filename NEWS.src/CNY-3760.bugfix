@@ -1,0 +1,1 @@
+r.RemoveCapsuleFiles now works on paths that do not provide a file dependency.

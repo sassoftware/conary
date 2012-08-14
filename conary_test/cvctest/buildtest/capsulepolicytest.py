@@ -603,6 +603,30 @@ class TestRecipe(CapsuleRecipe):
                   'RemoveCapsuleFiles: Component test:foo does not exist')
 
     @conary_test.rpm
+    def testRemoveCapsuleFilesNoFileProvide(self):
+        """
+        CNY-3760: Don't traceback when a capsule file is removed that does not
+        have a matching file provide.
+        """
+
+        recipe1 = """\
+class TestRecipe(CapsuleRecipe):
+    name = 'test'
+    version = '0'
+
+    clearBuildReqs()
+
+    def setup(r):
+        r.addCapsule('shareddirs-1.0-1.x86_64.rpm', dir='/',
+            package='%(name)s:rpm')
+        r.RemoveCapsuleFiles('%(name)s:rpm', '^/shareddir$')
+"""
+
+        trv = self.build(recipe1, 'TestRecipe')
+        files1 = [ x[1] for x in trv.iterFileList() ]
+        self.assertTrue('/shareddir' not in files1)
+
+    @conary_test.rpm
     def testRPMCapsulePackageNoComponent(self):
         '''
         CNY-3743: make sure just the package name can be specified to

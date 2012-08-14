@@ -695,5 +695,5 @@ class RemoveCapsuleFiles(packagepolicy._filterSpec):
                         self.recipe._capsulePathMap.pop(fn)
                         self.recipe._capsuleDataMap.pop(fn)
                         provides.removeDeps(deps.FileDependencies,
-                                            [ deps.Dependency(fn) ] )
+                            [ deps.Dependency(fn) ], missingOkay=True)
                         break
