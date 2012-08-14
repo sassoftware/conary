@@ -2355,7 +2355,6 @@ class AtomicFile(object):
         if returnHandle:
             fObj, self.fObj = self.fObj, None
             return fObj
-            return fObj
         else:
             self.fObj.close()
 
@@ -2364,6 +2363,15 @@ class AtomicFile(object):
             removeIfExists(self.name)
             self.fObj.close()
     __del__ = close
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if exc_type:
+            self.close()
+        else:
+            self.commit()
 
 
 class TimestampedMap(object):
