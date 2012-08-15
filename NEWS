@@ -1,3 +1,11 @@
+Changes in 2.4.5:
+  o Bug Fixes:
+    * r.RemoveCapsuleFiles now works on paths that do not provide a file
+      dependency. (CNY-3760)
+    * Fixed all updates on the CentOS 5 unencapsulated platform failing,
+      due to the presence of an empty RPM database triggering a capsule
+      sync. (CNY-3756)
+
 Changes in 2.4.4:
   o New Features:
     * getSystemModel() now returns a SystemModel object, which exposes
