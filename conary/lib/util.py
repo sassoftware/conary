@@ -893,6 +893,8 @@ class ExtendedFdopen(object):
         return os.write(self.fd, s)
 
     def pread(self, bytes, offset):
+        if bytes < 0:
+            raise ValueError("Invalid byte count %s" % bytes)
         return file_utils.pread(self.fd, bytes, offset)
 
     def seek(self, offset, whence = 0):
