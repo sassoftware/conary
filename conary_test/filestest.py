@@ -128,7 +128,7 @@ class FilesTest(testhelp.TestCase):
         s.inode.perms.set(0604)
         s.inode.mtime.set(0100)
         s.inode.owner.set('daemon')
-        s.inode.group.set('bin')
+        s.inode.group.set('uucp')
         s.flags.set(0)
         s.target.set("/some/target")
         assert(s.sizeString() == "      12")
@@ -151,7 +151,7 @@ class FilesTest(testhelp.TestCase):
         assert(s == s2)
 
         # make sure that the frozen form matches what we expect
-        assert(s.freeze() == 'l\x03\x00\x04\x00\x00\x00\x00\x05\x00\x1b\x01\x00\x02\x01\x84\x02\x00\x04\x00\x00\x00@\x03\x00\x06daemon\x04\x00\x03bin\t\x00\x0c/some/target')
+        self.assertEqual(s.freeze(), 'l\x03\x00\x04\x00\x00\x00\x00\x05\x00\x1c\x01\x00\x02\x01\x84\x02\x00\x04\x00\x00\x00@\x03\x00\x06daemon\x04\x00\x04uucp\t\x00\x0c/some/target')
     
     def testSocket(self):
         s = files.Socket(None)
@@ -182,19 +182,16 @@ class FilesTest(testhelp.TestCase):
         assert(s == s2)
 
     def compareChownLog(self, expected):
-        if len(self.chownLog) != len(expected):
-            return False
+        self.assertEqual(len(self.chownLog), len(expected))
         for index in range(len(expected)):
             e = expected[index]
             r = self.chownLog[index]
             p = e[0]
             g = r[0]
-            if os.path.dirname(p) != os.path.dirname(g):
-                return False
-            if os.path.basename(g).find(os.path.basename(p)) == -1:
-                return False
-            if e[1] != r[1] or e[2] != r[2]:
-                return False
+            self.assertEqual(os.path.dirname(p), os.path.dirname(g))
+            self.assertIn(os.path.basename(p), os.path.basename(g))
+            self.assertEqual(e[1], r[1])
+            self.assertEqual(e[2], r[2])
         return True
 
     def compareChmodLog(self, expected):
@@ -218,7 +215,7 @@ class FilesTest(testhelp.TestCase):
         f.inode.perms.set(0604)
         f.inode.mtime.set(0100)
         f.inode.owner.set("daemon")
-        f.inode.group.set("bin")
+        f.inode.group.set("uucp")
 
         s = "hello world"
         contents = filecontents.FromString(s)
@@ -274,20 +271,20 @@ class FilesTest(testhelp.TestCase):
             self.mimicRoot()
             p = d + "/file"
             f.restore(contents, d, p)
-            assert self.compareChownLog([ (p, 2, 1) ])
+            assert self.compareChownLog([ (p, 2, 14) ])
             self.chownLog = []
 
             f.inode.owner.set("rootroot")
             self.logCheck(f.restore, (contents, d, p),
                           "warning: user rootroot does not exist - using root")
-            assert self.compareChownLog([ (p, 0, 1) ])
+            assert self.compareChownLog([ (p, 0, 14) ])
             self.chownLog = []
 
-            f.inode.owner.set("bin")
+            f.inode.owner.set("uucp")
             f.inode.group.set("grpgrp")
             self.logCheck(f.restore, (contents, d, p),
                           "warning: group grpgrp does not exist - using root")
-            assert self.compareChownLog([ (p, 1, 0) ])
+            assert self.compareChownLog([ (p, 10, 0) ])
 
             self.chmodLog = []
             pr = d+"/setuid"
@@ -319,7 +316,7 @@ class FilesTest(testhelp.TestCase):
         d.inode.perms.set(0604)
         d.inode.mtime.set(0100)
         d.inode.owner.set("daemon")
-        d.inode.group.set("bin")
+        d.inode.group.set("uucp")
         d.flags.set(0)
         d.devt.major.set(1)
         d.devt.minor.set(2)
@@ -329,8 +326,8 @@ class FilesTest(testhelp.TestCase):
             p = path + "/dev2/foo"
             self.mimicRoot()
             d.restore(None, path, p)
-            assert(self.mknodLog == [(p, t, os.makedev(1, 2))])
-            assert(self.chownLog == [(p, 2, 1)])
+            self.assertEqual(self.mknodLog, [(p, t, os.makedev(1, 2))])
+            self.assertEqual(self.chownLog, [(p, 2, 14)])
         finally:
             self.realRoot()
             shutil.rmtree(path)
@@ -471,7 +468,7 @@ class FilesTest(testhelp.TestCase):
                 d.inode.perms.set(0604)
                 d.inode.mtime.set(0100)
                 d.inode.owner.set("daemon")
-                d.inode.group.set("bin")
+                d.inode.group.set("uucp")
                 d.flags.set(0)
                 d.devt.major.set(3)
                 d.devt.minor.set(1)
@@ -481,8 +478,8 @@ class FilesTest(testhelp.TestCase):
                 p = path + name
                 d.restore(None, path, p, journal=journal)
             assert(journal.devnodes ==
-                   [(path, path + '/dev/block', 'b', 3, 1, 0604, 'daemon', 'bin'),
-                    (path, path + '/dev/char', 'c', 3, 1, 0604, 'daemon', 'bin')])
+                   [(path, path + '/dev/block', 'b', 3, 1, 0604, 'daemon', 'uucp'),
+                    (path, path + '/dev/char', 'c', 3, 1, 0604, 'daemon', 'uucp')])
 
             d = files.RegularFile(None)
             d.inode.perms.set(1755)
@@ -502,16 +499,16 @@ class FilesTest(testhelp.TestCase):
         f.inode.perms.set(0604)
         f.inode.mtime.set(0100)
         f.inode.owner.set("daemon")
-        f.inode.group.set("bin")
+        f.inode.group.set("uucp")
         s = "hello world"
         contents = filecontents.FromString(s)
         f.contents = files.RegularFileStream()
         f.contents.size.set(len(s))
         f.contents.sha1.set(sha1helper.sha1String(s))
         f.flags.set(0)
-        expectedId = 'a508d35e0768a05de81815cfadee498084849952'
-        assert(f.freeze() == '-\x01\x00"\x01\x00\x08\x00\x00\x00\x00\x00\x00\x00\x0b\x02\x00\x14*\xael5\xc9O\xcf\xb4\x15\xdb\xe9_@\x8b\x9c\xe9\x1e\xe8F\xed\x03\x00\x04\x00\x00\x00\x00\x05\x00\x1b\x01\x00\x02\x01\x84\x02\x00\x04\x00\x00\x00@\x03\x00\x06daemon\x04\x00\x03bin' )
-        assert(f.fileId() == sha1helper.sha1FromString(expectedId))
+        expectedId = '567355867fbbcb2be55d35c3d229a7df8152fdbc'
+        self.assertEqual(f.freeze(), '-\x01\x00"\x01\x00\x08\x00\x00\x00\x00\x00\x00\x00\x0b\x02\x00\x14*\xael5\xc9O\xcf\xb4\x15\xdb\xe9_@\x8b\x9c\xe9\x1e\xe8F\xed\x03\x00\x04\x00\x00\x00\x00\x05\x00\x1c\x01\x00\x02\x01\x84\x02\x00\x04\x00\x00\x00@\x03\x00\x06daemon\x04\x00\x04uucp')
+        self.assertEqual(sha1helper.sha1ToString(f.fileId()), expectedId)
 
     def testContentsChanged(self):
         f = files.RegularFile(None)
@@ -544,7 +541,7 @@ class FilesTest(testhelp.TestCase):
         s.inode.perms.set(0604)
         s.inode.mtime.set(0100)
         s.inode.owner.set('daemon')
-        s.inode.group.set('bin')
+        s.inode.group.set('uucp')
         s.flags.set(0)
         s.target.set("/some/target")
 
@@ -579,7 +576,7 @@ class FilesTest(testhelp.TestCase):
         s.inode.perms.set(0604)
         s.inode.mtime.set(0100)
         s.inode.owner.set('daemon')
-        s.inode.group.set('bin')
+        s.inode.group.set('uucp')
         s.flags.set(0)
         s.target.set("/some/target")
 

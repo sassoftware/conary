@@ -255,9 +255,9 @@ class SvnTest(rephelp.RepositoryHelper, _VersionControlTestClass):
     def vcInit(self):
         util.mkdirChain(os.path.dirname(self.srcRepoPath))
         os.system('svnadmin create %s' % self.srcRepoPath)
-        os.system('svn -q mkdir file://localhost%s/tags --message foo'
+        os.system('svn -q mkdir file://localhost%s/tags --message message'
                         % self.srcRepoPath)
-        os.system('svn -q mkdir file://localhost%s/trunk --message foo'
+        os.system('svn -q mkdir file://localhost%s/trunk --message message'
                         % self.srcRepoPath)
 
     def vcCheckout(self, target):

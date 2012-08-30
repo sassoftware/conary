@@ -968,7 +968,7 @@ contents(sha1)
         # other than the current user
         origstat = os.stat
         origlstat = os.lstat
-        binuser = StatWrapper(origstat, origlstat, 1, 1)
+        uucpuser = StatWrapper(origstat, origlstat, 10, 14)
         daemonuser = StatWrapper(origstat, origlstat, 2, 2)
 
         os.chdir(self.workDir)
@@ -978,9 +978,9 @@ contents(sha1)
         self.writeFile("testcase.recipe", recipes.testRecipe1)
         self.addfile("testcase.recipe")
 
-        # use the binuser for the first commit
-        os.stat = binuser.stat
-        os.lstat = binuser.lstat
+        # use the uucpuser for the first commit
+        os.stat = uucpuser.stat
+        os.lstat = uucpuser.lstat
         self.commit()
 
         repos = self.openRepository()
@@ -989,7 +989,7 @@ contents(sha1)
         (rc, str) = self.captureOutput(queryrep.displayTroves, self.cfg,
                                        [ "testcase:source=1.0-1" ],
                                        lsl = True)
-        assert("bin      bin" in str)
+        self.assertIn("uucp     uucp", str)
 
         # make a change
         sourceContents2 = recipes.testRecipe1 + "# some comments\n" 
