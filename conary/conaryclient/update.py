@@ -1941,7 +1941,7 @@ conary erase '%s=%s[%s]'
             rollbackFence = rollbackFence or \
                 troveCs.isRollbackFence(update = (job[1][0] is not None),
                                         oldCompatibilityClass = oldCompatClass)
-            capsuleType = troveCs.hasCapsule()
+            capsuleType = troveCs.getCapsuleType()
             if capsuleType:
                 updJob.addCapsuleType(capsuleType)
 

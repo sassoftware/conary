@@ -1370,11 +1370,10 @@ class FilesystemJob:
             # this forces the file to be restored, with contents
             forceUpdate = False
 
-            # if what's on disk matches what we want on disk, just go
-            # on. if it doesn't handle file types changing, which are dealt
-            # with as a bit of an exception
             if headFile == fsFile:
-                # what's on
+                # if what's on disk matches what we want on disk, just go
+                # on. if it doesn't handle file types changing, which are dealt
+                # with as a bit of an exception
                 pass
             elif baseFile.lsTag != headFile.lsTag:
                 if isinstance(baseFile, files.Directory):
@@ -1649,14 +1648,15 @@ class FilesystemJob:
         # remove and add of the same path; we build an dict which lets
         # us treat these events as file updates rather than a remove/add
         # sequence, allowing us to preserve state.
-        def _add(pathId, version, fileId, oldTroveInfo, isErase):
+        def _add(pathId, version, fileId, oldTroveInfo, isErase, capsuleType):
             if path not in removedFiles:
                 l = []
                 removedFiles[path] = l
             else:
                 l = removedFiles[path]
 
-            l.append(((pathId, version, fileId), oldTroveInfo, isErase))
+            l.append(((pathId, version, fileId), oldTroveInfo, isErase,
+                capsuleType))
 
         pathsMoved = {}
 
@@ -1664,8 +1664,9 @@ class FilesystemJob:
         removedFiles = {}
         for oldTroveInfo in changeSet.getOldTroveList():
             oldTrove = db.getTrove(pristine = False, *oldTroveInfo)
+            capsuleType = oldTrove.troveInfo.capsule.type()
             for (pathId, path, fileId, version) in oldTrove.iterFileList():
-                _add(pathId, version, fileId, oldTroveInfo, True)
+                _add(pathId, version, fileId, oldTroveInfo, True, capsuleType)
 
         for troveCs in changeSet.iterNewTroveList():
             old = troveCs.getOldVersion()
@@ -1674,11 +1675,12 @@ class FilesystemJob:
 
             oldTroveInfo = (troveCs.getName(), old, troveCs.getOldFlavor())
             oldTrove = db.getTrove(pristine = False, *oldTroveInfo)
+            capsuleType = oldTrove.troveInfo.capsule.type()
 
             for pathId in troveCs.getOldFileList():
                 if not oldTrove.hasFile(pathId): continue
                 (path, fileId, version) = oldTrove.getFile(pathId)
-                _add(pathId, version, fileId, oldTroveInfo, False)
+                _add(pathId, version, fileId, oldTroveInfo, False, capsuleType)
 
         if not removedFiles:
             return {}
@@ -1686,17 +1688,21 @@ class FilesystemJob:
         # using a single db.getFileVersions() call might be better (or it
         # might just chew RAM; who knows)
         for troveCs in changeSet.iterNewTroveList():
+            newCapsuleType = troveCs.getCapsuleType()
             for (pathId, path, fileId, fileVersion) in \
                                             troveCs.getNewFileList():
                 if path not in removedFiles:
                     continue
 
-                ((oldPathId, oldVersion, oldFileId), oldTroveInfo, isErase) = \
-                                                        removedFiles[path][0]
+                ((oldPathId, oldVersion, oldFileId), oldTroveInfo, isErase,
+                        oldCapsuleType) = removedFiles[path][0]
                 del removedFiles[path]
+                if oldCapsuleType and oldCapsuleType != newCapsuleType:
+                    # The old capsule owner will try to erase this file so it
+                    # must be reinstalled.
+                    continue
                 newTroveInfo = (troveCs.getName(), troveCs.getNewVersion(),
                                 troveCs.getNewFlavor())
-
 
                 # store information needed for the file update that's contained
                 # in the old trove and bring it to the new trove.  Information

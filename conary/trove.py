@@ -3567,11 +3567,12 @@ class AbstractTroveChangeSet(streams.StreamSet):
     def getFrozenTroveInfo(self):
         return self.absoluteTroveInfo()
 
-    def hasCapsule(self):
+    def getCapsuleType(self):
         troveInfo = self.absoluteTroveInfo()
         capsuleType = TroveInfo.find(_TROVEINFO_TAG_CAPSULE,
                                      troveInfo)
         return (capsuleType and capsuleType.type())
+    hasCapsule = getCapsuleType
 
     def getFrozenExtendedMetadata(self):
         return self.extendedMetadata()

@@ -1,0 +1,1 @@
+Fixed a crash when migrating from an encapsulated package to a native package with the same contents.

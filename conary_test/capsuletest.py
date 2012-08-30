@@ -893,3 +893,27 @@ class TestPackage(CapsuleRecipe):
     def checkOwners(self, path, troves):
         assert(self.owners(path) ==
                 set( x.getNameVersionFlavor() for x in troves ))
+
+    @conary_test.rpm
+    def testEncapToNative(self):
+        """
+        Update from encapsulated package to native package with the same
+        contents, ensure that the file does not disappear.
+        """
+        self.addRPMComponent('foo:rpm=1.0', 'simple-1.0-1.i386.rpm')
+        self.updatePkg('foo:rpm')
+
+        recipe = r"""
+class TestPackage(CapsuleRecipe):
+    name = 'foo'
+    version = '2.0'
+
+    clearBuildReqs()
+    def setup(r):
+        r.addArchive('simple-1.0-1.i386.rpm', dir='/', preserveOwnership=True)
+"""
+        src = self.makeSourceTrove('foo', recipe)
+        self.cookFromRepository('foo')[0]
+        self.updatePkg(['-foo:rpm', 'foo:runtime'])
+        path = os.path.join(self.rootDir, 'normal')
+        self.assertEqual(os.stat(path).st_size, 7)
