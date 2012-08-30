@@ -76,6 +76,7 @@ class ConaryTest(CPackageRecipe):
             'info-bin:user',
             'info-daemon:user',
             'info-rmake-chroot:user',
+            'info-uucp:user',
             'libelf:devel',
             'libxml2:runtime',
             'm2crypto:python',
