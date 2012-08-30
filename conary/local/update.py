@@ -1078,6 +1078,13 @@ class FilesystemJob:
                     existingOwners = list(
                         self.db.iterFindPathReferences(
                                             headPath, justPresent = True))
+                for info in existingOwners[:]:
+                    if info[:3] in self.oldTroves:
+                        # The previous owner is being removed in this job.
+                        # Normally this would be in pathsMoved, but some cases
+                        # like changing encapsulated to native requires a fresh
+                        # install of the file anyway.
+                        existingOwners.remove(info)
 
                 if existingOwners:
                     replaceThisFile = flags.replaceManagedFiles(headPath)
