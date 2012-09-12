@@ -3493,7 +3493,7 @@ conary erase '%s=%s[%s]'
 
         return baseCs
 
-    def _applyCs(self, cs, uJob, removeHints = {}, **kwargs):
+    def _applyCs(self, cs, uJob, **kwargs):
         # Before applying this job, reset the underlying changesets. This
         # lets us traverse user-supplied changesets multiple times.
         uJob.troveSource.reset()
@@ -3502,6 +3502,7 @@ conary erase '%s=%s[%s]'
         tagScript = kwargs['tagScript']
         justDatabase = kwargs['commitFlags'].justDatabase
         noScripts = kwargs['commitFlags'].noScripts
+        kwargs.setdefault('removeHints', {})
         # Run pre scripts, if we have the per-job information
         if (uJob.hasJobPreScriptsOrder() and 
             (tagScript or not noScripts)):
