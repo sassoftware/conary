@@ -532,3 +532,31 @@ The following dependencies would not be met after this update:
     trove: foo:devellib
   which is provided by:
     foo:devellib=1-1-1 (Would be erased)''')
+
+    def testResatisfiedUsergroup(self):
+        """
+        Info dep is resatisfied during a migrate, e.g. because of splitting
+        :user to :user and :group, while also being depended on by both a trove
+        being updated in the same operation, and by another trove not in the
+        operation.
+        @tests: CNY-3685
+        """
+        d = 'groupinfo: nobody'
+        self.addComponent('info-nobody:user', provides=d, filePrimer=1)
+        self.addComponent('info-nobody:group', provides=d, filePrimer=1)
+        self.addComponent('updated:runtime', '1.0', requires=d, filePrimer=2)
+        self.addComponent('updated:runtime', '2.0', requires=d, filePrimer=2)
+        self.addComponent('leftalone:runtime', requires=d, filePrimer=3)
+        self.addCollection('group-foo', '1', [
+            'info-nobody:user=1.0',
+            'updated:runtime=1.0',
+            'leftalone:runtime=1.0',
+            ])
+        self.addCollection('group-foo', '2', [
+            'info-nobody:group=1.0',
+            'updated:runtime=2.0',
+            'leftalone:runtime=1.0',
+            ])
+
+        self.updatePkg(['group-foo=1'], raiseError=True)
+        self.updatePkg(['group-foo=2'], raiseError=True)
