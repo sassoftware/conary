@@ -388,7 +388,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 fileStream = self.changeSet.getFileChange(None, fileId)
                 fileObj = files.ThawFile(fileStream, pathId)
 
-            absolutePath = self.root + path
+            absolutePath = util.joinPaths(self.root, path)
 
             if (fileObj.flags.isCapsuleAddition()):
                 # this was added to the package outside of the RPM; we don't
@@ -520,7 +520,8 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
         # and files which have changed (so we have to look up the diff)
         # a bit later.
         for fileInfo, fileObj in toRestore:
-            self.fsJob._restore(fileObj, self.root + path, trvInfo,
+            fullPath = util.joinPaths(self.root, path)
+            self.fsJob._restore(fileObj, fullPath, trvInfo,
                                 "restoring %s from RPM",
                                 restoreFile = False,
                                 fileId = fileId)
@@ -546,7 +547,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
             for (pathId, path, fileId, version), fileObj in \
                     itertools.izip(trv.iterFileList(), dbFileObjs):
                 hasCapsule = trv.troveInfo.capsule.type() or False
-                fullPath = self.root + path
+                fullPath = util.joinPaths(self.root,  path)
                 if not os.path.exists(fullPath):
                     continue
 
