@@ -219,12 +219,10 @@ class Conary(CPackageRecipe):
         # Conary pieces need to work together with the same version
         r.ComponentProvides('%(version)s')
         r.ComponentProvides('group-scripts')
-        r.Requires('conary:runtime(%(version)s)',
-                   '%(sitepkgs)s/conary/cvc.py')
-        r.Requires('conary:runtime(%(version)s)',
-                   '%(sitepkgs)s/conary/server/server.py')
         r.Requires('conary:python(%(version)s)',
-                   '%(bindir)s/conary')
+                   '%(sitepkgs)s/conary/cvc.py')
+        r.Requires('conary:python(%(version)s)',
+                   '%(sitepkgs)s/conary/server/server.py')
 
         if not r.encapsulated:
             r.UtilizeUser('emerge', '%(sitepkgs)s/conary/cvc.py')
