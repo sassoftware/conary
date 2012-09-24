@@ -2553,12 +2553,12 @@ class FooRecipe(PackageRecipe):
             client._combineJobs(uJob, job, critical)
 
             combined = [[y[0] for y in x] for x in uJob.getJobs() ]
-            assert(combined == expected)
+            self.assertEqual(combined, expected)
 
             combinedCrit = uJob.getCriticalJobs()
-            assert(len(combinedCrit) == len(criticalJobs))
+            self.assertEqual(len(combinedCrit), len(criticalJobs))
             for i, j in itertools.izip(combinedCrit, criticalJobs):
-                assert(combined[i] == troveNames[j])
+                self.assertEqual(combined[i], troveNames[j])
 
         _test(2, [ [ "a:run" ], [ "a" ] ],
                  [ [ "a:run", "a" ] ])
@@ -2576,14 +2576,14 @@ class FooRecipe(PackageRecipe):
         _test(10, [ [ "a:run" ], [ "a" ], [ "b" ] ],
                   [ [ "a:run", "a",  "b" ] ])
 
-        _test(10, [ [ "a:run" ], [ "a" ], [ "info-b" ] ],
-                  [ [ "a:run", "a"], [ "info-b" ] ])
+        _test(10, [ [ "a:run" ], [ "a" ], [ "info-b:user" ] ],
+                [ [ "a:run", "a"], [ "info-b:user" ] ])
 
-        _test(10, [ [ "info-a:runtime" ], [ "info-a" ], [ "b" ] ],
-                  [ [ "info-a:runtime", "info-a" ], [ "b" ] ] )
+        _test(10, [ [ "info-a:user" ], [ "info-a" ], [ "b" ] ],
+                  [ [ "info-a:user", "info-a" ], [ "b" ] ] )
 
-        _test(10, [ [ "info-a" ], [ "info-b:runtime" ], [ "info-b" ] ],
-                  [ [ "info-a" ], [ "info-b:runtime", "info-b" ] ])
+        _test(10, [ [ "info-a" ], [ "info-b:user" ], [ "info-b" ] ],
+                  [ [ "info-a" ], [ "info-b:user", "info-b" ] ])
 
         _test(2, [ [ "a:runtime", "b:runtime" ], [ "b" ] ],
                  [ [ "a:runtime", "b:runtime" ], [ "b" ] ])
