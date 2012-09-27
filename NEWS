@@ -1,3 +1,13 @@
+Changes in 2.4.6:
+  o Bug Fixes:
+    * Fixed a crash when migrating from an encapsulated package to a
+      native package with the same contents. (CNY-3762)
+    * Fixed an AssertionError crash related to info packages that was
+      typically seen when migrating an appliance with custom info
+      packages across repositories, or when migrating from a :user
+      component containing a group to a separate :group component.
+      (CNY-3685)
+
 Changes in 2.4.5:
   o Bug Fixes:
     * r.RemoveCapsuleFiles now works on paths that do not provide a file

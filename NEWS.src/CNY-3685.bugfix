@@ -1,4 +1,0 @@
-Fixed an AssertionError crash related to info packages that was typically seen
-when migrating an appliance with custom info packages across repositories, or
-when migrating from a :user component containing a group to a separate :group
-component.
