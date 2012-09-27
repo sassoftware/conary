@@ -898,10 +898,12 @@ class TestPackage(CapsuleRecipe):
     def testEncapToNative(self):
         """
         Update from encapsulated package to native package with the same
-        contents, ensure that the file does not disappear.
+        contents and modes, ensure that the file does not disappear.
+
+        @tests: CNY-3762
         """
         self.addRPMComponent('foo:rpm=1.0', 'simple-1.0-1.i386.rpm')
-        self.updatePkg('foo:rpm')
+        self.updatePkg('foo:rpm', raiseError=True)
 
         recipe = r"""
 class TestPackage(CapsuleRecipe):
@@ -914,6 +916,79 @@ class TestPackage(CapsuleRecipe):
 """
         src = self.makeSourceTrove('foo', recipe)
         self.cookFromRepository('foo')[0]
-        self.updatePkg(['-foo:rpm', 'foo:runtime'])
+        self.updatePkg(['-foo:rpm', 'foo:runtime'], depCheck=False,
+                raiseError=True)
         path = os.path.join(self.rootDir, 'normal')
         self.assertEqual(os.stat(path).st_size, 7)
+
+    @conary_test.rpm
+    def testEncapToNativeSloppy(self):
+        """
+        Update from encapsulated package to native package with the same
+        contents but different modes, ensure that the file does not disappear.
+
+        @tests: CNY-3762
+        """
+        self.addRPMComponent('foo:rpm=1.0', 'simple-1.0-1.i386.rpm')
+        self.updatePkg('foo:rpm', raiseError=True)
+
+        recipe = r"""
+class TestPackage(CapsuleRecipe):
+    name = 'foo'
+    version = '2.0'
+
+    clearBuildReqs()
+    def setup(r):
+        r.addArchive('simple-1.0-1.i386.rpm', dir='/')
+        r.Ownership('nobody', 'nobody', '.*')
+        r.SetModes('/dir', 0700)
+        r.SetModes('/normal', 0600)
+"""
+        src = self.makeSourceTrove('foo', recipe)
+        self.cookFromRepository('foo')[0]
+        self.updatePkg(['-foo:rpm', 'foo:runtime'], depCheck=False,
+                raiseError=True)
+        path = os.path.join(self.rootDir, 'normal')
+        self.assertEqual(os.stat(path).st_size, 7)
+        self.assertEqual(oct(os.stat(path).st_mode), '0100600')
+        path = os.path.join(self.rootDir, 'dir')
+        self.assertEqual(oct(os.stat(path).st_mode), '040700')
+
+    @conary_test.rpm
+    def testEncapToNativeChanged(self):
+        """
+        Update from encapsulated to native package with some different contents
+
+        @tests: CNY-3762
+        """
+        # Intentionally put a trailing slash on the root dir to tickle bugs
+        # where a path not created with joinPaths() might cause mismatches. Of
+        # course the most common real-world case, root = '/', has a "trailing"
+        # slash, whereas usually in the testsuite a chroot is used and no
+        # trailing slash is present.
+        self.rootDir += '/'
+
+        self.addRPMComponent('foo:rpm=1.0', 'simple-1.0-1.i386.rpm')
+        self.updatePkg('foo:rpm', raiseError=True)
+
+        recipe = r"""
+class TestPackage(CapsuleRecipe):
+    name = 'foo'
+    version = '2.0'
+
+    clearBuildReqs()
+    def setup(r):
+        r.addArchive('simple-1.0-1.i386.rpm', dir='/')
+        r.Ownership('nobody', 'nobody', '.*')
+        r.SetModes('/dir', 0700)
+        r.Create('/normal', contents='different stuff\n', mode=0600)
+"""
+        src = self.makeSourceTrove('foo', recipe)
+        self.cookFromRepository('foo')[0]
+        self.updatePkg(['-foo:rpm', 'foo:runtime'], depCheck=False,
+                raiseError=True)
+        path = os.path.join(self.rootDir, 'normal')
+        self.assertEqual(os.stat(path).st_size, 16)
+        self.assertEqual(oct(os.stat(path).st_mode), '0100600')
+        path = os.path.join(self.rootDir, 'dir')
+        self.assertEqual(oct(os.stat(path).st_mode), '040700')

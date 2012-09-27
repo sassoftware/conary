@@ -1112,7 +1112,8 @@ class FilesystemJob:
                     # have contents on disk
                     fullyUpdated = False
                     restoreFile = False
-                elif not self.removes.has_key(headRealPath):
+                elif (headRealPath not in self.removes
+                        and headPath not in self.directorySet):
                     fileConflict = True
                     shareFile = False
                     existingFile = files.FileFromFilesystem(

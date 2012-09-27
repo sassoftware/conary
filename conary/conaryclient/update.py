@@ -3119,7 +3119,9 @@ conary erase '%s=%s[%s]'
             isCritical = jobList in criticalJobs
 
             foundGroup = None
-            isInfo = None
+            infosAdded = set()
+            infosRemoved = set()
+            hasNonInfo = False
 
             for job in jobList:
                 (name, (oldVersion, oldFlavor),
@@ -3129,11 +3131,25 @@ conary erase '%s=%s[%s]'
                     foundGroup = True
 
                 if name.startswith('info-'):
-                    assert(isInfo is True or isInfo is None)
-                    isInfo = True
+                    if ':' in name:
+                        pkg = name.split(':')[0]
+                        if oldVersion:
+                            infosRemoved.add(pkg)
+                        if newVersion:
+                            infosAdded.add(pkg)
                 else:
-                    assert(isInfo is False or isInfo is None)
-                    isInfo = False
+                    hasNonInfo = True
+
+            # Allow infos to be installed in the same job as a regular package
+            # only when that info is replacing a matching info package that is
+            # being removed. This is the case when migrating from combined
+            # :user to split :user/:group, or when an erase+install happens
+            # instead of an update.
+            infosAdded -= infosRemoved
+            if infosAdded and hasNonInfo:
+                raise AssertionError("Attempted to install an info trove in "
+                        "the same job as a non-info trove.\nInfo troves: %s"
+                        % ", ".join(sorted(infosAdded)))
 
             addJob = uJob.addJob
 
@@ -3145,13 +3161,13 @@ conary erase '%s=%s[%s]'
 
                 finalCriticalJobs.append(len(uJob.getJobs()))
                 addJob(jobList)
-            elif isInfo:
+            elif infosAdded and not hasNonInfo:
+                # Force normal info installs into their own job
                 if newJob:
                     addJob(newJob)
                     newJob = []
 
                 addJob(jobList)
-                isInfo = None
             elif foundGroup != inGroup:
                 if newJob:
                     addJob(newJob)
@@ -3493,7 +3509,7 @@ conary erase '%s=%s[%s]'
 
         return baseCs
 
-    def _applyCs(self, cs, uJob, removeHints = {}, **kwargs):
+    def _applyCs(self, cs, uJob, **kwargs):
         # Before applying this job, reset the underlying changesets. This
         # lets us traverse user-supplied changesets multiple times.
         uJob.troveSource.reset()
@@ -3502,6 +3518,7 @@ conary erase '%s=%s[%s]'
         tagScript = kwargs['tagScript']
         justDatabase = kwargs['commitFlags'].justDatabase
         noScripts = kwargs['commitFlags'].noScripts
+        kwargs.setdefault('removeHints', {})
         # Run pre scripts, if we have the per-job information
         if (uJob.hasJobPreScriptsOrder() and 
             (tagScript or not noScripts)):
