@@ -2383,6 +2383,13 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             pass
 
 def _callSetup(cfg, recipeObj, recordCalls=True):
+    if recipeObj._trove:
+        macros = recipeObj.macros
+        version = recipeObj._trove.version()
+        if not macros.get('buildlabel'):
+            macros['buildlabel'] = version.trailingLabel().asString()
+        if not macros.get('buildbranch'):
+            macros['buildbranch'] = version.branch().asString()
     try:
         if 'abstractBaseClass' in recipeObj.__class__.__dict__ and \
                 recipeObj.abstractBaseClass:

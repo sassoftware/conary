@@ -35,8 +35,9 @@ from conary.lib import magic
 from conary.lib import util
 from conary_test import rephelp
 from conary.build import action, cook
-from conary.build import packagerecipe, macros, use
+from conary.build import macros, use
 from conary.build import policy, packagepolicy
+from conary.build import recipe
 from conary import versions
 
 class FixDirModesTest(rephelp.RepositoryHelper):
@@ -146,7 +147,7 @@ class TestRemoveNonPackageFiles(PackageRecipe):
 """
         self.reset()
         m = macros.Macros()
-        m.update(packagerecipe.loadMacros(self.cfg.defaultMacros))
+        m.update(recipe.loadMacros(self.cfg.defaultMacros))
         m.update(use.Arch._getMacros())
         (built, d) = self.buildRecipe(recipestr1, "TestRemoveNonPackageFiles")
         for p in built:

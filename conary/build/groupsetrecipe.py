@@ -22,7 +22,6 @@ from conary import trove, versions
 from conary.build import defaultrecipes, macros, use
 from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
-from conary.build.recipe import loadMacros
 from conary.conaryclient.cmdline import parseTroveSpec
 from conary.conaryclient import cml, modelgraph, troveset
 from conary.conaryclient.resolve import PythonDependencyChecker
@@ -1804,7 +1803,6 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.flavor = flavor
         self.searchSource = searchsource.NetworkSearchSource(
                 repos, self.labelPath, flavor)
-        self.macros = macros.Macros(ignoreUnknown=lightInstance)
         self.g = troveset.OperationGraph()
         self.world = GroupSearchSourceTroveSet(self.searchSource,
                                                graph = self.g)
@@ -1812,8 +1810,6 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self._dumpAll = False
         self._trackDict = {}
 
-        baseMacros = loadMacros(cfg.defaultMacros)
-        self.macros.update(baseMacros)
         for key in cfg.macros:
             self.macros._override(key, cfg['macros'][key])
         self.macros.name = self.name

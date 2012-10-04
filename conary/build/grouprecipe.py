@@ -22,13 +22,12 @@ from itertools import chain, izip
 from conary.build import defaultrecipes
 from conary.build import lookaside
 from conary.build import policy
-from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP, loadMacros
+from conary.build.recipe import Recipe, RECIPE_TYPE_GROUP
 from conary.build.errors import RecipeFileError, CookError
 from conary.build.errors import GroupDependencyFailure, GroupCyclesError
 from conary.build.errors import GroupAddAllError, GroupImplicitReplaceError
 from conary.build.errors import GroupUnmatchedReplaces, GroupUnmatchedRemoves
 from conary.build.errors import GroupUnmatchedGlobalReplaces
-from conary.build import macros
 from conary.build.packagerecipe import BaseRequiresRecipe
 from conary.build import trovefilter
 from conary.build import use
@@ -37,7 +36,7 @@ from conary import callbacks
 from conary.deps import deps
 from conary import errors
 from conary.lib import graph, log, util
-from conary.repository import changeset, netclient, trovesource, searchsource
+from conary.repository import changeset, trovesource, searchsource
 from conary import trove
 from conary import versions
 from conary import files
@@ -72,10 +71,9 @@ class _BaseGroupRecipe(Recipe):
 
     def __init__(self, laReposCache = None, srcdirs = None,
                  lightInstance = None, cfg = None):
-        Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs,
+        Recipe.__init__(self, cfg, laReposCache=laReposCache, srcdirs=srcdirs,
                         lightInstance = lightInstance)
         self.groups = {}
-        self.cfg = cfg
         self.defaultGroup = None
 
     def _addGroup(self, groupName, group):
@@ -165,7 +163,6 @@ class _GroupRecipe(_BaseGroupRecipe):
         self.labelPath = [ label ]
         self.flavor = flavor
         self.keyFlavor = None
-        self.macros = macros.Macros(ignoreUnknown=lightInstance)
         self.defaultSource = None
         if not lightInstance:
             self.searchSource = self._getSearchSource()
@@ -184,8 +181,6 @@ class _GroupRecipe(_BaseGroupRecipe):
         self.preInstallScripts = {}
         self.preUpdateScripts = {}
 
-        baseMacros = loadMacros(cfg.defaultMacros)
-        self.macros.update(baseMacros)
         for key in cfg.macros:
             self.macros._override(key, cfg['macros'][key])
         self.macros.name = self.name

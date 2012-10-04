@@ -148,14 +148,12 @@ class _FilesetRecipe(Recipe):
 
     def __init__(self, repos, cfg, label, flavor, extraMacros={},
                  laReposCache = None, srcdirs = None):
-        Recipe.__init__(self, laReposCache = laReposCache, srcdirs = srcdirs)
+        Recipe.__init__(self, cfg, laReposCache=laReposCache, srcdirs=srcdirs)
         self.repos = repos
-        self.cfg = cfg
         self.files = {}
         self.paths = {}
         self.label = label
         self.flavor = flavor
-        self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.requestedFiles = {}
 

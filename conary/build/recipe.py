@@ -20,10 +20,11 @@ import inspect
 import itertools
 
 from conary import files, trove, versions
+from conary.build import action, lookaside, source, policy
+from conary.build import macros
+from conary.build.errors import RecipeFileError, RecipeDependencyError
 from conary.deps import deps
 from conary.errors import ParseError
-from conary.build import action, lookaside, source, policy
-from conary.build.errors import RecipeFileError, RecipeDependencyError
 from conary.lib import log, util
 from conary.local import database
 from conary.conaryclient import cmdline
@@ -124,12 +125,13 @@ class Recipe(object):
     crossRequirementsOverride = None
 
 
-    def __init__(self, lightInstance = False, laReposCache = None,
+    def __init__(self, cfg, lightInstance=False, laReposCache=None,
                  srcdirs = None):
         if laReposCache is None:
             laReposCache = lookaside.RepositoryCache(None)
         assert(self.__class__ is not Recipe)
         self.validate()
+        self.cfg = cfg
         self.externalMethods = {}
         # lightInstance for only instantiating, not running (such as checkin)
         self._lightInstance = lightInstance
@@ -153,6 +155,10 @@ class Recipe(object):
         self._capsules = {}
         self._lcstate = None
         self._propertyMap = {}
+
+        baseMacros = loadMacros(cfg.defaultMacros)
+        self.macros = macros.Macros(ignoreUnknown=lightInstance)
+        self.macros.update(baseMacros)
 
         # Metadata is a hash keyed on a trove name and with a list of
         # per-trove-name MetadataItem like objects (well, dictionaries)

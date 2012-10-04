@@ -19,24 +19,19 @@
 import sys
 import os
 import inspect
-import itertools
 
-from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE, loadMacros
+from conary.build.recipe import Recipe, RECIPE_TYPE_PACKAGE
 from conary.build import defaultrecipes
 from conary.build import lookaside
-from conary.build.errors import RecipeFileError
 from conary import trove
 
 from conary.build import action
 from conary.build import build
 from conary.build import errors
-from conary.build import macros
 from conary.build import policy
 from conary.build import use
 from conary.deps import deps
-from conary.lib import log, magic, util
-
-from conary.repository import errors as repoerrors
+from conary.lib import magic, util
 
 
 
@@ -514,7 +509,7 @@ class AbstractPackageRecipe(Recipe):
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={},
                  crossCompile=None, lightInstance=False):
-        Recipe.__init__(self, lightInstance = lightInstance,
+        Recipe.__init__(self, cfg, lightInstance=lightInstance,
                         laReposCache = laReposCache, srcdirs = srcdirs)
         self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
                                            localDirs=self.srcdirs,
@@ -536,11 +531,7 @@ class AbstractPackageRecipe(Recipe):
         self._derivedFiles = {} # used only for derived packages
         self.byDefaultIncludeSet = frozenset()
         self.byDefaultExcludeSet = frozenset()
-        self.cfg = cfg
         self._repos = None
-        self.macros = macros.Macros(ignoreUnknown=lightInstance)
-        baseMacros = loadMacros(cfg.defaultMacros)
-        self.macros.update(baseMacros)
         self.hostmacros = self.macros.copy()
         self.targetmacros = self.macros.copy()
         # Mapping from trove name to scripts

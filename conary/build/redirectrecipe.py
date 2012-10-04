@@ -395,12 +395,10 @@ class _RedirectRecipe(Recipe):
         return self.redirections
 
     def __init__(self, repos, cfg, branch, flavor, extraMacros={}):
-        Recipe.__init__(self)
+        Recipe.__init__(self, cfg)
         self.repos = repos
-        self.cfg = cfg
         self.redirections = _Redirections()
         self.flavor = flavor
-        self.macros = macros.Macros()
         if branch is not None:
             self.macros.binarybranch = str(branch)
             self.macros.update(extraMacros)

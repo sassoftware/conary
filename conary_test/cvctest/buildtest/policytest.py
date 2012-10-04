@@ -28,7 +28,7 @@ class DummyRecipe(recipe.Recipe):
     # me sad.
     buildRequires = []
     def __init__(self, cfg):
-        recipe.Recipe.__init__(self)
+        recipe.Recipe.__init__(self, cfg)
         self.macros = macros.Macros()
         self.theMainDir = 'dummy-1.0'
         self.macros.builddir = tempfile.mkdtemp()
@@ -37,7 +37,6 @@ class DummyRecipe(recipe.Recipe):
         self.srcdirs = [ cfg.sourceSearchDir ]
         self.buildinfo = buildinfo.BuildInfo(self.macros.builddir)
         self.buildinfo.begin()
-        self.cfg = cfg
         self.laReposCache = lookaside.RepositoryCache(None, cfg=cfg)
         self.fileFinder = lookaside.FileFinder('dummy', self.laReposCache,
                                             self.srcdirs, {}, cfg.mirrorDirs)
