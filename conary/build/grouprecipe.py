@@ -2792,16 +2792,12 @@ def addPackagesForComponents(group, repos, troveCache):
 
     for (n,v,f), explicit, byDefault, comps, requireLatest \
             in group.iterTroveListInfo():
-        if not explicit:
-            continue
         if ':' in n:
             pkg = n.split(':', 1)[0]
-            packages.setdefault((pkg, v, f), {})[n] = byDefault
+            packages.setdefault((pkg, v, f), {})[n] = (explicit, byDefault)
 
     # if the user mentions both foo and foo:runtime, don't remove
     # direct link to foo:runtime
-    troveTups = [ x for x in packages
-                    if not (group.hasTrove(*x) and group.isExplicit(*x)) ]
     troveTups = packages.keys()
     hasTroves = repos.hasTroves(troveTups)
     if isinstance(hasTroves, list):
@@ -2816,13 +2812,14 @@ def addPackagesForComponents(group, repos, troveCache):
     for troveTup in troveTups:
         addedComps = packages[troveTup]
 
-        byDefault = bool([x for x in addedComps.iteritems() if x[1]])
-        group.addTrove(troveTup, True, byDefault, [],
+        explicit  = bool([x for x in addedComps.iteritems() if x[1][0]])
+        byDefault = bool([x for x in addedComps.iteritems() if x[1][1]])
+        group.addTrove(troveTup, explicit, byDefault, [],
                        reason=(ADD_REASON_ADDED,))
 
         for comp, byDefault, isStrong in troveCache.iterTroveListInfo(troveTup):
             if comp[0] in addedComps:
-                byDefault = addedComps[comp[0]]
+                byDefault = addedComps[comp[0]][1]
                 # delete the strong reference to this trove, so that
                 # the trove can be added as a weak reference
                 group.delTrove(*comp)

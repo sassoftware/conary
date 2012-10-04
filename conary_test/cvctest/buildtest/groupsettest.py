@@ -16,6 +16,7 @@
 #
 
 
+import pprint
 import re
 from testrunner import testhelp
 
@@ -49,13 +50,10 @@ class GroupSetTest(rephelp.RepositoryHelper):
             ((x[0][0], x[0][1].asString(), str(x[0][2])), x[1], x[2])
                     for x in collection.iterTroveListInfo())
         desiredList = sorted(desiredList)
-        self.assertEquals(len(refs), len(desiredList))
-        for actual, desired in zip(refs, desiredList):
-            self.assertEquals(actual[0][0], desired[0][0]) # name
-            self.assertEquals(actual[0][1], desired[0][1]) # version
-            self.assertEquals(actual[0][2], desired[0][2]) # flavor
-            self.assertEquals(actual[1], desired[1])       # byDefault
-            self.assertEquals(actual[2], desired[2])       # explicit
+        if refs != desiredList:
+            self.fail("Expected:\n%s\nActual:\n%s\n" % (
+                pprint.pformat(desiredList),
+                pprint.pformat(refs)))
 
     def _build(self, *coreList):
         recipe = (
@@ -1045,3 +1043,32 @@ class TestRecipe(GroupSetRecipe):
                                   trv.getFlavor())
         buildRefs = subGroup.getBuildRefs()
         assert(not buildRefs)
+
+    @testhelp.context('sysmodel')
+    def testPackagesForComponents(self):
+        """Packages are added for components in subgroups
+
+        @tests: CNY-3720
+        """
+        self.addComponent('foo:lib=1.0')
+        self.addCollection('foo=1.0', [':lib'])
+        self.addComponent('bar:lib=1.0')
+        self.addCollection('bar=1.0', [':lib'])
+        self.addComponent('baz:lib=1.0')
+        self.addCollection('baz=1.0', [':lib'])
+        grp = self._build(
+            'foo = world.find("foo:lib").createGroup("group-foo")',
+            'bar = world.find("bar:lib").createGroup("group-bar")',
+            'baz = world.find("baz:lib")',
+            'return r.Group(foo + bar.makeOptional() + baz)')
+
+        self.checkTroves(grp, [
+            (('bar',        '/localhost@rpl:linux/1.0-1-1', ''), False, False),
+            (('bar:lib',    '/localhost@rpl:linux/1.0-1-1', ''), False, False),
+            (('baz',        '/localhost@rpl:linux/1.0-1-1', ''), True,  True),
+            (('baz:lib',    '/localhost@rpl:linux/1.0-1-1', ''), True,  False),
+            (('foo',        '/localhost@rpl:linux/1.0-1-1', ''), True,  False),
+            (('foo:lib',    '/localhost@rpl:linux/1.0-1-1', ''), True,  False),
+            (('group-foo',  '/localhost@rpl:linux/1.0-1-1', ''), True,  True),
+            (('group-bar',  '/localhost@rpl:linux/1.0-1-1', ''), False, True),
+          ])
