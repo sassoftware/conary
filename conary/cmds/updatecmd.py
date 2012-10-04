@@ -826,6 +826,10 @@ def _updateTroves(cfg, applyList, **kwargs):
     if not updJob.jobs:
         # Nothing to do
         print 'Update would not modify system'
+        if model and not kwargs.get('test'):
+            # Make sure 'conary sync' clears model.next even if nothing needs
+            # to be done.
+            modelFile.closeSnapshot()
         updJob.close()
         client.close()
         return

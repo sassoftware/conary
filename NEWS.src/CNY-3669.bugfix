@@ -1,0 +1,1 @@
+Fixed "conary sync" not cleaning up an aborted update when no further operations needed to be performed
