@@ -995,6 +995,11 @@ entries when committing changes to source components.
 The path to the Conary database on the local system.  It is relative
 to \fBroot\fP (see below) and should normally not be changed.
 .TP
+.TP
+.B downloadFirst
+If set to \fBTrue\fP, all troves will be downloaded before beginning the
+update. The default is to download troves as they are applied.
+.TP
 .B environment
 Provides an environment variable and its associated value to which to
 set it (or, if no value is provided, the environment variable to unset)
