@@ -1,3 +1,14 @@
+Changes in 2.4.7:
+  o Bug Fixes:
+    * Fixed GroupSetRecipe builds featuring a subgroup containing bare
+      components. Previously the parent group would not have the
+      mandatory parent package for those components, making the group
+      unpromotable. (CNY-3720)
+    * The 'buildlabel' macro is now set at checkin time, enabling more
+      straightforward recipes (CNY-3765)
+    * Fixed "conary sync" not cleaning up an aborted update when no
+      further operations needed to be performed (CNY-3669)
+
 Changes in 2.4.6:
   o Bug Fixes:
     * Fixed a crash when migrating from an encapsulated package to a

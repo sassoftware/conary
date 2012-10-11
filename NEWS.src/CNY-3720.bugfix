@@ -1,3 +1,0 @@
-Fixed GroupSetRecipe builds featuring a subgroup containing bare components.
-Previously the parent group would not have the mandatory parent package for
-those components, making the group unpromotable.
