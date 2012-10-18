@@ -20,9 +20,11 @@ from StringIO import StringIO
 from conary_test import rephelp
 
 from conary import changelog
+from conary import trove
 from conary import versions
 from conary.conaryclient import filetypes
 from conary.deps import deps
+from conary.repository import changeset
 
 
 class ClientNewTroveTest(rephelp.RepositoryHelper):
@@ -343,9 +345,29 @@ class ClientNewTroveTest(rephelp.RepositoryHelper):
                 changelog.ChangeLog('user', 'foo'),
                 metadata=metadata)
         trvCs = cs.iterNewTroveList().next()
-        from conary import trove
         trv = trove.Trove(trvCs)
 
         self.assertEqual(
             dict(trv.troveInfo.metadata.flatten()[0].keyValue),
             metadata)
+
+    def testCreateSourceTroveRemoved(self):
+        repos = self.openRepository()
+        client = self.getConaryClient()
+        foo1 = filetypes.RegularFile(contents = 'foo1')
+        files = {'/foo1': foo1}
+        cs = client.createSourceTrove( \
+                'foo:source', self.cfg.buildLabel, '1.0',
+                files, changelog.ChangeLog('foo', 'bar'))
+        repos.commitChangeSet(cs)
+        n,v,f = cs.iterNewTroveList().next().getNewNameVersionFlavor()
+        # markremove it
+        cs = changeset.ChangeSet()
+        trv = trove.Trove(n, v, f, type=trove.TROVE_TYPE_REMOVED)
+        trv.computeDigests()
+        cs.newTrove(trv.diff(None, absolute=True)[0])
+        repos.commitChangeSet(cs)
+        # try again
+        cs = client.createSourceTrove('foo:source', self.cfg.buildLabel, '1.0',
+                files, changelog.ChangeLog('foo', 'bar'))
+        repos.commitChangeSet(cs)

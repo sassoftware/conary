@@ -21,6 +21,7 @@ import os
 from conary.build import nextversion
 from conary.deps import deps
 from conary.repository import changeset
+from conary.repository import trovesource
 from conary import trove
 from conary import versions
 
@@ -106,7 +107,7 @@ class ClientNewTrove(object):
             troveSpecs[name, str(version.trailingLabel()), None] = troveObj
 
         results = repos.findTroves(None, troveSpecs, None, allowMissing=True,
-                                   getLeaves=False)
+                getLeaves=False, troveTypes=trovesource.TROVE_QUERY_ALL)
         for troveSpec, troveObj in troveSpecs.iteritems():
             branch = troveObj.getVersion().branch()
             revision = troveObj.getVersion().trailingRevision()
