@@ -2574,11 +2574,20 @@ class Database(SqlDbRepository):
             self.commitLock(False)
             self.close()
 
-    def _applyRollbackList(self, repos, names, replaceFiles = False,
-                          callback = None, tagScript = None,
-                          justDatabase = False, transactionCounter = None,
-                          lazyCache = None, abortOnError = False,
-                          noScripts = False, capsuleChangeSet = None):
+    def _applyRollbackList(self, repos, names,
+            replaceFiles=False,
+            callback=None,
+            tagScript=None,
+            justDatabase=False,
+            transactionCounter=None,
+            lazyCache=None,
+            abortOnError=False,
+            noScripts=False,
+            capsuleChangeSet=None,
+            replaceManagedFiles=False,
+            replaceModifiedFiles=False,
+            replaceUnmanagedFiles=False,
+            ):
         assert transactionCounter is not None, ("The transactionCounter "
             "argument is mandatory")
         if transactionCounter != self.getTransactionCounter():
@@ -2662,9 +2671,9 @@ class Database(SqlDbRepository):
                 try:
                     fsJob = None
                     commitFlags = CommitChangeSetFlags(
-                        replaceManagedFiles = replaceFiles,
-                        replaceUnmanagedFiles = replaceFiles,
-                        replaceModifiedFiles = replaceFiles,
+                        replaceManagedFiles = replaceManagedFiles or replaceFiles,
+                        replaceUnmanagedFiles = replaceUnmanagedFiles or replaceFiles,
+                        replaceModifiedFiles = replaceModifiedFiles or replaceFiles,
                         justDatabase = justDatabase,
                         noScripts = noScripts)
 

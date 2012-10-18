@@ -245,13 +245,6 @@ def formatRollbacksAsUpdate(cfg, rollbackList):
 
     return 0
 
-def apply(db, cfg, rollbackSpec, **kwargs):
-    import warnings
-    warnings.warn("rollbacks.apply is deprecated, use the client's "
-                    "applyRollback call", DeprecationWarning)
-    from conary import conaryclient
-    client = conaryclient.ConaryClient(cfg)
-    return applyRollback(client, rollbackSpec, returnOnError = True, **kwargs)
 
 def applyRollback(client, rollbackSpec, returnOnError = False, **kwargs):
     """

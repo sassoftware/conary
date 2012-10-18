@@ -408,35 +408,6 @@ class testRecipe(PackageRecipe):
             self.cfg.localRollbacks = False
 
     @testhelp.context('rollback')
-    def testRollbacksApplyDeprecation(self):
-        # CNY-1455
-        oldApplyRollback = rollbacks.applyRollback
-        fd, tempf = tempfile.mkstemp(dir=self.workDir)
-        os.unlink(tempf)
-        newStderr = os.fdopen(fd, "w+")
-        oldStderr = sys.stderr
-        def newApplyRollback(*args, **kwargs):
-            return args, kwargs
-        cfg = rephelp.conarycfg.ConaryConfiguration(False)
-        cfg.root = self.workDir + '/blip'
-        try:
-            sys.stderr = newStderr
-            rollbacks.applyRollback = newApplyRollback
-            ret = rollbacks.apply(None, cfg, "r.rrr", a=1)
-        finally:
-            sys.stderr = oldStderr
-            rollbacks.applyRollback = oldApplyRollback
-
-        (conaryclient, troveSpec), kwargs = ret
-        self.assertEqual(kwargs, dict(a = 1, returnOnError = True))
-        self.assertEqual(troveSpec, "r.rrr")
-        self.assertEqual(conaryclient.db.root, self.workDir + "/blip")
-
-        newStderr.seek(0)
-        self.assertTrue("rollbacks.apply is deprecated, use the client's "
-                    "applyRollback call" in newStderr.read())
-
-    @testhelp.context('rollback')
     def testRollbackInvalidation(self):
         self.addComponent('foo:runtime', '1')
         self.addComponent('foo:runtime', '2')

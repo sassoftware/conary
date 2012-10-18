@@ -458,8 +458,18 @@ rollback operation #151 and all later operations)."""
             'from-file'     : (VERBOSE_HELP, 'search changeset(s) (or directories) for capsule contents'),
             'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
-            'replace-files' : ('Replace files on system with files from'
-                               ' rollback if conflict'),
+        'replace-files' : 'Replace existing files if file conflict found '
+                          '(equivalent to --replace-managed-files '
+                          '--replace-modified-files --replace-unmanaged-files)',
+        'replace-managed-files':
+                          'Replace files owned by other troves (including '
+                          'other troves which are part of this rollback)',
+        'replace-modified-files':
+                          'Replace non-config files on the system which have '
+                          'been changed by something other than conary',
+        'replace-unmanaged-files':
+                          'Replace files on the system which are not owned '
+                          'by any trove',
             'no-scripts': ('Do not run trove scripts'),
             'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
             'abort-on-error' : ('Abort the rollback if any prerollback script '
@@ -471,6 +481,9 @@ rollback operation #151 and all later operations)."""
         argDef["from-file"] = MULT_PARAM
         argDef["just-db"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
+        argDef["replace-managed-files"] = NO_PARAM
+        argDef["replace-modified-files"] = NO_PARAM
+        argDef["replace-unmanaged-files"] = NO_PARAM
         argDef["info"] = NO_PARAM
         argDef["no-scripts"] = NO_PARAM
         argDef["tag-script"] = ONE_PARAM
@@ -478,9 +491,13 @@ rollback operation #151 and all later operations)."""
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
-        if argSet.has_key('replace-files'):
-            kwargs['replaceFiles'] = True
-            del argSet['replace-files']
+        kwargs['replaceManagedFiles'] = argSet.pop('replace-managed-files', False)
+        kwargs['replaceModifiedFiles'] = argSet.pop('replace-modified-files', False)
+        kwargs['replaceUnmanagedFiles'] = argSet.pop('replace-unmanaged-files', False)
+        if argSet.pop('replace-files', False):
+            kwargs['replaceManagedFiles'] = True
+            kwargs['replaceModifiedFiles'] = True
+            kwargs['replaceUnmanagedFiles'] = True
 
         kwargs['tagScript'] = argSet.pop('tag-script', None)
         kwargs['justDatabase'] = argSet.pop('just-db', False)

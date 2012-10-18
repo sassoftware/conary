@@ -444,11 +444,20 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
         self.db.removeInvalidRollbacks()
 
     @api.publicApi
-    def applyRollback(self, rollbackSpec, replaceFiles = None,
-            callback = None, tagScript = None, justDatabase = None,
-            transactionCounter = None, showInfoOnly = False,
-            abortOnError = False, noScripts = False,
-            capsuleChangesets = []):
+    def applyRollback(self, rollbackSpec,
+            replaceFiles=None,
+            callback=None,
+            tagScript=None,
+            justDatabase=None,
+            transactionCounter=None,
+            showInfoOnly=False,
+            abortOnError=False,
+            noScripts=False,
+            capsuleChangesets=[],
+            replaceManagedFiles=False,
+            replaceModifiedFiles=False,
+            replaceUnmanagedFiles=False,
+            ):
         """
         Apply a rollback.
 
@@ -523,6 +532,9 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
             showInfoOnly = showInfoOnly,
             abortOnError = abortOnError,
             capsuleChangesets = capsuleChangesets,
+            replaceManagedFiles=replaceManagedFiles,
+            replaceModifiedFiles=replaceModifiedFiles,
+            replaceUnmanagedFiles=replaceUnmanagedFiles,
         )
         # If any of these arguments are None, don't even pass them, the
         # defaults are going to apply

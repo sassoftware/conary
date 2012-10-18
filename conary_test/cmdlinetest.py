@@ -613,9 +613,22 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          ignoreKeywords=True)
         self.checkConary('rollback r.106 --replace-files',
                          'conary.cmds.rollbacks.applyRollback',
-                         [None, 'r.106'], replaceFiles=True,
+                         [None, 'r.106'],
                          justDatabase = False,
-                         ignoreKeywords=True)
+                         ignoreKeywords=True,
+                         replaceManagedFiles=True,
+                         replaceModifiedFiles=True,
+                         replaceUnmanagedFiles=True,
+                         )
+        self.checkConary('rollback r.106 --replace-unmanaged-files',
+                         'conary.cmds.rollbacks.applyRollback',
+                         [None, 'r.106'],
+                         justDatabase = False,
+                         ignoreKeywords=True,
+                         replaceManagedFiles=False,
+                         replaceModifiedFiles=False,
+                         replaceUnmanagedFiles=True,
+                         )
         self.checkConary('rollback r.106 --just-db',
                          'conary.cmds.rollbacks.applyRollback',
                          [None, 'r.106'], justDatabase=True,
