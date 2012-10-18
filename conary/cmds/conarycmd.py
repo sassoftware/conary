@@ -462,14 +462,14 @@ rollback operation #151 and all later operations)."""
                           '(equivalent to --replace-managed-files '
                           '--replace-modified-files --replace-unmanaged-files)'),
         'replace-managed-files':
-                          'Replace files owned by other troves (including '
-                          'other troves which are part of this rollback)',
+            "Files changed in this rollback may replace files owned by other "
+            "troves",
         'replace-modified-files':
-                          'Replace non-config files on the system which have '
-                          'been changed by something other than conary',
+            "Non-config files changed in this rollback may replace files which "
+            "have been altered outside Conary",
         'replace-unmanaged-files':
-                          'Replace files on the system which are not owned '
-                          'by any trove',
+            "Files changed in this rollback may replace files on the filesystem "
+            "which are not owned by any trove",
             'no-scripts': ('Do not run trove scripts'),
             'tag-script': ('Output commands to run tag-script to PATH', 'PATH'),
             'abort-on-error' : ('Abort the rollback if any prerollback script '
@@ -967,17 +967,17 @@ class _UpdateCommand(ConaryCommand):
                           '(equivalent to --replace-managed-files '
                           '--replace-modified-files --replace-unmanaged-files)'),
         'replace-config-files':
-                          'Replace config files on the system which have '
-                          'been changed by something other than conary',
+            "Config files changed in this update may replace files which have "
+            "been altered outside Conary, instead of merging",
         'replace-managed-files':
-                          'Replaces files owned by other troves (including '
-                          'other troves which are part of this update)',
+            "Files changed in this update may replace files owned by other "
+            "troves",
         'replace-modified-files':
-                          'Replace non-config files on the system which have '
-                          'been changed by something other than conary',
+            "Non-config files changed in this update may replace files which "
+            "have been altered outside Conary",
         'replace-unmanaged-files':
-                          'Replace files on the system which are not owned '
-                          'by any trove',
+            "Files changed in this update may replace files on the filesystem "
+            "which are not owned by any trove",
         'resolve'       : 'Add troves to update to solve dependency problems',
         'restart'       : (VERBOSE_HELP,
                            'Restart after applying a critical update'),
