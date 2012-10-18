@@ -172,8 +172,8 @@ and likely has bugs.
 .B restore \fI<trove>[=version]*\fP
 Conary can take ownership of a file away from a trove for a number of
 reasons, such as the \fBremove\fR command or during installation when
-flags such as \fI-\-replace\-files\fR. This command restores ownership of
-all files to the specified troves. It also restores the contents and
+flags such as \fI-\-replace\-managed\-files\fR. This command restores ownership
+of all files to the specified troves. It also restores the contents and
 attributes of those files to those specified by the troves. The changes
 made are placed on the rollback stack. See the \fBrepair\fR command, as
 it may be what you really want.
@@ -211,9 +211,6 @@ Arguments include
 Look for missing capsules in \fIpath\fR. This is used for local rollbacks
 of capsule packages.
 .TP 4
-.B \-\-replace-files
-See \-\-replace-files description from \fBconary update\fP
-.TP
 .B \-\-replace-managed-files
 See \fBupdate \-\-replace-managed-files\fP
 .TP
@@ -319,11 +316,6 @@ Restart Conary after applying a critical update. It is ignored if
 an alternate root is provided using the \fB\-\-root \fI<root>\fR option
 or through a configuration file.
 .TP
-.B \-\-replace-files
-Equivalent to specifying \fB\-\-replace\-managed\-files\fR,
-\fB\-\-replace\-unmanaged\-files\fR, \fB\-\-replace\-modified\-files\fR,
-and \fB\-\-replace\-config\-files\fR simultaneously.
-.TP
 .B \-\-replace-config-files
 Config files owned by the old verson of the trove being updated which
 have been modified and have changed in the new version of the trove are
@@ -413,9 +405,6 @@ See \fBupdate \-\-no-deps\fP
 .TP
 .B \-\-no-resolve
 See \fBupdate \-\-no-replace\fP
-.TP
-.B \-\-replace-files
-See \fBupdate \-\-replace-files\fP
 .TP
 .B \-\-replace-config-files
 See \fBupdate \-\-replace-config-files\fP

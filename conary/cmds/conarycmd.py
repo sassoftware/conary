@@ -458,9 +458,9 @@ rollback operation #151 and all later operations)."""
             'from-file'     : (VERBOSE_HELP, 'search changeset(s) (or directories) for capsule contents'),
             'just-db'       : (VERBOSE_HELP,
                           'Update db only - Do not modify rest of file system'),
-        'replace-files' : 'Replace existing files if file conflict found '
+        'replace-files' : (VERBOSE_HELP, 'Replace existing files if file conflict found '
                           '(equivalent to --replace-managed-files '
-                          '--replace-modified-files --replace-unmanaged-files)',
+                          '--replace-modified-files --replace-unmanaged-files)'),
         'replace-managed-files':
                           'Replace files owned by other troves (including '
                           'other troves which are part of this rollback)',
@@ -963,9 +963,9 @@ class _UpdateCommand(ConaryCommand):
         'no-scripts'    : (VERBOSE_HELP,
                            'Do not run trove scripts'),
         'recurse'       : optparse.SUPPRESS_HELP,
-        'replace-files' : 'Replace existing files if file conflict found '
+        'replace-files' : (VERBOSE_HELP, 'Replace existing files if file conflict found '
                           '(equivalent to --replace-managed-files '
-                          '--replace-modified-files --replace-unmanaged-files)',
+                          '--replace-modified-files --replace-unmanaged-files)'),
         'replace-config-files':
                           'Replace config files on the system which have '
                           'been changed by something other than conary',
