@@ -1,3 +1,20 @@
+Changes in 2.4.8:
+  o New Features:
+    * Added --replace-modified-files, --replace-managed-files, and
+      --replace-unmanaged-files options to the "conary rollback" command
+      (CNY-3748)
+    * The --replace-files option is now deprecated. Scripts should use
+      the more specific options --replace-unmanaged-files, --replace-
+      modified-files, --replace-managed-files, and --replace-config-
+      files, depending on which scenarios need to be overridden.
+      Typically only the first two will be useful and are safe other
+      than that they may overwrite modifications to the system.
+      (CNY-3763)
+
+  o Bug Fixes:
+    * Fixed createSourceTrove conflicting with markremoved troves when
+      choosing a new version (CNY-3771)
+
 Changes in 2.4.7:
   o Bug Fixes:
     * Fixed GroupSetRecipe builds featuring a subgroup containing bare
