@@ -1,1 +1,1 @@
-Fixed createSourceTrove ignoring markremoved troves when choosing a new version
+Fixed createSourceTrove conflicting with markremoved troves when choosing a new version
