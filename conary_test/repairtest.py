@@ -107,3 +107,14 @@ class RepairTest(rephelp.RepositoryHelper):
         self.verifyFile(self.rootDir + '/config', "config\n")
         self.verifyFile(self.rootDir + '/normal', "normal\n")
         assert(os.path.isdir(self.rootDir + '/dir'))
+
+    @conary_test.rpm
+    def testRepairGhostFile(self):
+        if sys.version_info < (2, 6):
+            raise testhelp.SkipTestException(
+                    'RPM repair requires python 2.6 or later')
+        self.addRPMComponent("ghost:rpm=1.0", 'ghost-1.0-1.i386.rpm')
+        self.updatePkg('ghost:rpm', raiseError=True)
+        rc, s = self.captureOutput(self.repairTroves, [ 'ghost:rpm' ])
+        self.assertEquals(s, '')
+        self.verifyFile(self.rootDir + '/foo/ghost', '')

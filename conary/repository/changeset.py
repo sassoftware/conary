@@ -598,6 +598,10 @@ class ChangeSet(streams.StreamSet):
                         rollback.addFileContents(pathId, origFileId,
                                  ChangedFileTypes.file,
                                  filecontents.FromFilesystem(fullPath), 0)
+                    elif origFile.contents.size() == 0:
+                        rollback.addFileContents(pathId, origFileId,
+                                 ChangedFileTypes.file,
+                                 filecontents.FromString(''), 0)
                     else:
                         hldrContents.append((trv, pathId, origFileId,
                                              version, 0))
@@ -698,6 +702,11 @@ class ChangeSet(streams.StreamSet):
                                          ChangedFileTypes.file,
                                          filecontents.FromFilesystem(fullPath),
                                          isConfig)
+                    elif origFile.contents.size() == 0:
+                        # contents are wrong but the file is empty anyway
+                        rollback.addFileContents(pathId, curFileId,
+                                 ChangedFileTypes.file,
+                                 filecontents.FromString(''), 0)
                     else:
                         # the contents in the file system are wrong; add
                         # it to the list of things to deal with a bit later
@@ -756,6 +765,11 @@ class ChangeSet(streams.StreamSet):
                                         ChangedFileTypes.file,
                                         filecontents.FromFilesystem(fullPath),
                                         fileObj.flags.isConfig())
+                    elif fileObj.contents.size() == 0:
+                        # contents are wrong but the file is empty anyway
+                        rollback.addFileContents(pathId, fileId,
+                                 ChangedFileTypes.file,
+                                 filecontents.FromString(''), 0)
                     else:
                         # the contents in the file system are wrong; we'll
                         # deal with this a bit later

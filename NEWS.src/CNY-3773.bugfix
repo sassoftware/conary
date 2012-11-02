@@ -1,0 +1,1 @@
+Fixed a crash when using "conary repair" on an encapsulated RPM containing ghost files
