@@ -117,7 +117,7 @@ class Request(object):
         self.headers = HTTPHeaders(headers)
 
         # Params for sending request entity
-        self.abortCheck = lambda: False
+        self.abortCheck = None
         self.data = None
         self.size = None
         self.chunked = False
@@ -148,8 +148,6 @@ class Request(object):
             self.chunked = False
 
     def setAbortCheck(self, abortCheck):
-        if not abortCheck:
-            abortCheck = lambda: False
         self.abortCheck = abortCheck
 
     def sendRequest(self, conn, isProxied=False):

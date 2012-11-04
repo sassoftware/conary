@@ -203,7 +203,7 @@ class Connection(object):
         poller.register(conn.sock.fileno(), select.POLLIN)
         lastTimeout = time.time()
         while True:
-            if req.abortCheck():
+            if req.abortCheck and req.abortCheck():
                 raise http_error.AbortError()
 
             # Wait 5 seconds for a response.

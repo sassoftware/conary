@@ -2995,7 +2995,8 @@ class FileResultSet(list):
 
 
 def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
-        proxies=None, proxyMap=None, chunked=False, headers=()):
+        proxies=None, proxyMap=None, chunked=False, headers=(),
+        withResponse=False):
     """
     send a file to a url.  Takes a wrapper, which is an object
     that has a callback() method which takes amount, total, rate
@@ -3015,4 +3016,7 @@ def httpPutFile(url, inFile, size, callback = None, rateLimit = None,
     req.setData(inFile, size, callback=callbackFn, chunked=chunked,
             rateLimit=rateLimit)
     response = opener.open(req)
-    return response.status, response.reason
+    if withResponse:
+        return response
+    else:
+        return response.status, response.reason

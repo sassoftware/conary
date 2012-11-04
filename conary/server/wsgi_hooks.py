@@ -34,6 +34,7 @@ from conary.lib import util
 from conary.lib.formattrace import formatTrace
 from conary.repository import errors
 from conary.repository import filecontainer
+from conary.repository import netclient
 from conary.repository import shimclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
@@ -379,6 +380,10 @@ class ConaryHandler(object):
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
                     "Supported methods: GET POST PUT")
+
+        if not self.repositoryServer:
+            return self._makeError('404 Not Found',
+                    "This is a Conary proxy server, it has no web interface.")
         web = repos_web.ReposWeb(self.cfg, self.shimServer)
         return web._handleRequest(request)
 
@@ -530,9 +535,29 @@ class ConaryHandler(object):
     def putChangeset(self):
         """PUT method -- handle changeset uploads."""
         if not self.repositoryServer:
-            return self._makeError('501 Not Implemented',
-                    "Committing changesets through this proxy "
-                    "is not implemented")
+            # FIXME: this mechanism is unauthenticated and can probably be used
+            # to PUT content to random things on the internet
+            if 'content-length' in self.request.headers:
+                size = int(self.request.headers['content-length'])
+            else:
+                size = None
+            headers = [x for x in self.request.headers.items()
+                    if x[0].lower() in (
+                        'x-conary-servername',
+                        'x-conary-entitlement',
+                        )]
+            result = netclient.httpPutFile(self.request.url,
+                    self.request.body_file,
+                    size,
+                    headers=headers,
+                    chunked=(size is None),
+                    withResponse=True,
+                    )
+            return self.responseFactory(
+                    status='%s %s' % (result.status, result.reason),
+                    app_iter=self._produceProxy(result),
+                    #headerlist=result.getheaders(),
+                    )
 
         # Copy request body to the designated temporary file.
         stream = self.request.body_file
@@ -546,11 +571,21 @@ class ConaryHandler(object):
 
         return self.responseFactory(status='200 OK')
 
+    @staticmethod
+    def _produceProxy(response):
+        while True:
+            d = response.read(1024)
+            if not d:
+                break
+            yield d
+        response.close()
+
     def _changesetPath(self, suffix):
         filename = self.request.query_string
         if not filename or os.path.sep in filename:
             return None
-        return os.path.join(self.repositoryServer.tmpPath, filename + suffix)
+        server = self.repositoryServer or self.proxyServer
+        return os.path.join(server.tmpPath, filename + suffix)
 
     def _openForPut(self):
         path = self._changesetPath('-in')
