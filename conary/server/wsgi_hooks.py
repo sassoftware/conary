@@ -363,19 +363,26 @@ class ConaryHandler(object):
             self.repositoryServer.reopen()
 
         if self.request.method == 'GET':
+            # cmd is the last part of the path, ignoring all intermediate
+            # elements. When proxying, the intermediate part could be anything
+            # depending on where the real repository is mounted.
+            # e.g. /conary or /repos/foo
+            cmd = os.path.basename(self.request.path_info.rstrip('/'))
             path = self.request.path_info_peek()
-            if path == 'changeset':
+            if cmd == 'changeset':
                 return self.getChangeset()
             elif path == 'api':
                 self.request.path_info_pop()
                 return self.getApi()
+            # Fall through to web handler
         elif self.request.method == 'POST':
-            path = self.request.path_info_peek()
-            if path == '':
+            # Only check content-type because of proxying considerations; as
+            # above, the full URL will vary.
+            if self.request.content_type == 'text/xml':
                 return self.postRpc()
+            # Fall through to web handler
         elif self.request.method == 'PUT':
-            if self.request.path_info_peek() == '':
-                return self.putChangeset()
+            return self.putChangeset()
         else:
             return self._makeError('501 Not Implemented',
                     "Unsupported method %s" % self.request.method,
