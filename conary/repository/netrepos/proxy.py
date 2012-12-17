@@ -318,6 +318,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.setBaseUrlOverride(rawUrl, headers, isSecure)
 
         targetServerName = headers.get('X-Conary-Servername', None)
+        self.serverName = targetServerName
 
         # simple proxy. FIXME: caching these might help; building all
         # of this framework for every request seems dumb. it seems like
@@ -1066,9 +1067,10 @@ class ChangesetFilter(BaseProxy):
 
     def _cacheChangeSet(self, url, neededHere, csInfoList, changeSetList,
             forceProxy):
+        headers = [('X-Conary-Servername', self.serverName)]
         try:
             inF = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url,
-                    forceProxy=forceProxy)
+                    forceProxy=forceProxy, headers=headers)
         except transport.TransportError, e:
             raise errors.RepositoryError(str(e))
 
@@ -1634,8 +1636,9 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
             dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
             os.close(fd)
             os.unlink(tmpPath)
+            headers = [('X-Conary-Servername', self.serverName)]
             inUrl = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url,
-                    forceProxy=forceProxy)
+                    forceProxy=forceProxy, headers=headers)
             size = util.copyfileobj(inUrl, dest)
             inUrl.close()
             dest.seek(0)
@@ -1773,8 +1776,9 @@ class ProxyRepositoryServer(Memcache, FileCachingChangesetFilter):
         dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
         os.close(fd)
         os.unlink(tmpPath)
+        headers = [('X-Conary-Servername', self.serverName)]
         inUrl = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url,
-                forceProxy=caller._lastProxy)
+                forceProxy=caller._lastProxy, headers=headers)
         size = util.copyfileobj(inUrl, dest)
         inUrl.close()
         dest.seek(0)
