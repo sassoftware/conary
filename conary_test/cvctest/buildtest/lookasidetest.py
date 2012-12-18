@@ -29,12 +29,7 @@ from conary.build import lookaside
 
 class LookAsideTest(rephelp.RepositoryHelper):
     def testLookAsideTest1(self):
-        # this works only when connected to the net
-        # gethostbyname will fail immediately when not connected
-        try:
-            socket.gethostbyname('www.conary.com')
-        except:
-            raise testhelp.SkipTestException
+        raise testhelp.SkipTestException("tests shouldn't talk to the internet")
         self.resetCache()
         self.resetWork()
         self.resetRepository()
