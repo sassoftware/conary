@@ -266,7 +266,12 @@ def get(port, isSecure, repos, req, restHandler=None, authToken=None, repServer=
 def putFile(port, isSecure, repos, req):
     if isinstance(repos, proxy.ProxyRepositoryServer):
         contentLength = int(req.headers_in['Content-length'])
-        status, reason = netclient.httpPutFile(req.unparsed_uri, req, contentLength)
+        headers = [x for x in req.headers_in.iteritems() if x[0].lower() in (
+            'x-conary-servername',
+            'x-conary-entitlement',
+            )]
+        status, reason = netclient.httpPutFile(req.unparsed_uri, req,
+                contentLength, headers=headers)
         return status
 
     if not isSecure and repos.cfg.forceSSL or '/' in req.args:
