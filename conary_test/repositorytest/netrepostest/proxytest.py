@@ -196,6 +196,8 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
         rawUrl = '/blah'
         headers = {'X-Conary-Proxy-Host' : 'repos.example.com'}
         prs.setBaseUrlOverride(rawUrl, headers, isSecure = True)
+        # callWrapper normally sets this, but nothing here invokes it
+        prs._serverName = 'repos.example.com'
 
         caller = mock.mockClass(netreposproxy.ProxyCaller)()
         caller._getBasicUrl._mock.setDefaultReturn('http://blah')
@@ -235,7 +237,8 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
         uo.open._mock.appendReturn(
             csFileObj,
             'http://repos.example.com/my-changeset-url',
-            forceProxy=caller._lastProxy)
+            forceProxy=caller._lastProxy,
+            headers=[('X-Conary-Servername', 'repos.example.com')])
 
         authToken = (None, None, [])
         clientVersion = 51
