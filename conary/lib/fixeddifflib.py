@@ -1,11 +1,20 @@
 #! /usr/bin/env python
+#
+# Copyright (c) SAS Institute Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
-# This module is copied from Python 2.7.2, modified to be 2.4-compatible, and
-# tweaked to produce output parseable by the difflib that shipped with 2.4.
-# There was a format change in 2.7 that causes hunks to be emitted with no
-# length which cannot be parsed by older difflib; that format must not be used
-# here. A newer difflib is required due to a bug that could cause a very deep
-# recursion given certain inputs, which was fixed in 2.7.
 
 """
 Module difflib -- helpers for computing deltas between objects.
