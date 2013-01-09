@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 #-*- coding: ISO-8859-1 -*-
 import testsupport
-import os, string, sys, types, unittest
+import types, unittest
 import sqlite3 as sqlite
 import _sqlite3 as _sqlite
 
 try:
-    from mx.DateTime import Date, Time, DateTime, DateTimeDelta, DateFrom, \
+    from mx.DateTime import DateTime, DateTimeDelta, DateFrom, \
             TimeFrom, DateTimeDeltaFrom
     have_datetime = 1
 except ImportError:
