@@ -1,20 +1,35 @@
-/*
- * Copyright (c) rPath, Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
+/* -*- Mode: C; c-basic-offset: 8 tab-width: 8 indent-tabs-mode: t -*-
+**
+**                                            _ _ _
+**                      _ __  _   _ ___  __ _| (_) |_ ___
+**                     | '_ \| | | / __|/ _` | | | __/ _ \
+**                     | |_) | |_| \__ \ (_| | | | ||  __/
+**                     | .__/ \__, |___/\__, |_|_|\__\___|
+**                     |_|    |___/        |_|
+**
+**               A DB API v2.0 compatible interface to SQLite
+**                       Embedded Relational Database.
+**                          Copyright (c) 2001-2003
+**                  Michael Owens <mike@mikesclutter.com>
+**                     Gerhard Häring <gh@ghaering.de>
+**
+**          Portions Copyright (c) 2004-2005 rPath, Inc.
+**                                           Matt Wilson <msw@specifix.com>
+**              Portions Copyright (c) 2005  rpath, Inc.
+**                                           Matt Wilson <msw@rpath.com>
+**
+** All Rights Reserved
+**
+** Permission to use, copy, modify, and distribute this software and its
+** documentation for any purpose and without fee is hereby granted, provided
+** that the above copyright notice appear in all copies and that both that
+** copyright notice and this permission notice appear in supporting
+** documentation,
+**
+** This program is distributed in the hope that it will be useful, but WITHOUT
+** ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+** FITNESS FOR A PARTICULAR PURPOSE.
+*/
 
 #include "Python.h"
 #include "structmember.h"
