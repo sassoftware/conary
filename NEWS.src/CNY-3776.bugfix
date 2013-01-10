@@ -1,0 +1,1 @@
+Fixed IPv6 literals not being escaped correctly in HTTP "Host" headers.

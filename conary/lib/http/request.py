@@ -160,10 +160,10 @@ class Request(object):
         for key, value in self.headers.iteritems():
             conn.putheader(key, value)
         if 'Host' not in self.headers:
-            if self.url.hostport.port in (80, 443):
-                host = str(self.url.hostport.host)
-            else:
-                host = str(self.url.hostport)
+            hostport = self.url.hostport
+            if hostport.port in (80, 443):
+                hostport = hostport._replace(port=None)
+            host = str(hostport)
             if isinstance(host, unicode):
                 host = host.encode('idna')
             conn.putheader("Host", host)
