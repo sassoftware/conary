@@ -314,10 +314,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self._port = port
         self._protocol = protocol
 
+        self._serverName = headers.get('X-Conary-Servername', None)
+        if self._serverName:
+            rawUrl = self._mapUrl(rawUrl)
         self.setBaseUrlOverride(rawUrl, headers, isSecure)
-
-        targetServerName = headers.get('X-Conary-Servername', None)
-        self._serverName = targetServerName
 
         # simple proxy. FIXME: caching these might help; building all
         # of this framework for every request seems dumb. it seems like
@@ -327,7 +327,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                self.proxyMap, authToken,
                                                localAddr, protocolString,
                                                headers, self.cfg,
-                                               targetServerName,
+                                               self._serverName,
                                                remoteIp, isSecure,
                                                self.urlBase())
 
@@ -437,6 +437,20 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
     def getContentsStore(self):
         return None
+
+    def _mapUrl(self, rawUrl):
+        """Rewrite URL to follow a repositoryMap configured in the proxy."""
+        newBase = self.cfg.repositoryMap.find(self._serverName)
+        if not newBase:
+            return rawUrl
+        # Glue the new base URL to the original basename and query string
+        oldParts = list(urlparse.urlparse(rawUrl))
+        newParts = list(urlparse.urlparse(newBase))
+        if not newParts[2].endswith('/'):
+            newParts[2] += '/'
+        newParts[2] += os.path.basename(oldParts[2])
+        newParts[3:] = oldParts[3:]
+        return urlparse.urlunparse(newParts)
 
 
 class ChangeSetInfo(object):
