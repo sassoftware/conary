@@ -19,17 +19,17 @@
 Streaming implementation of a CPIO archive.
 Usage::
 
-    fileObj = file("archive.cpio")
-    arch = CpioStream(fileObj)
-    for ent in arch:
-        print "Entry name:", ent.filename
-        print "Payload size:", ent.header.filesize
-        # To read the entry contents
-        while True:
-            buf = ent.payload.read(1024)
-            if not buf:
-                break
-            # Do something with the data
+    >>> fileObj = file("archive.cpio")
+    >>> arch = CpioStream(fileObj)
+    >>> for ent in arch:
+    >>>    print "Entry name:", ent.filename
+    >>>    print "Payload size:", ent.header.filesize
+    >>>    # To read the entry contents
+    >>>    while True:
+    >>>        buf = ent.payload.read(1024)
+    >>>        if not buf:
+    >>>            break
+    >>>        # Do something with the data
 """
 
 import os
