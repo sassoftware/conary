@@ -189,8 +189,6 @@ def main(args, fingerprints):
 
             time.sleep(1)
 
-    import epdb; epdb.st()
-
     return 0
 
 fingerprints_conary = """
