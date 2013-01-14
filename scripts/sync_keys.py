@@ -27,7 +27,6 @@ import os
 import time
 import urllib
 import tempfile
-from StringIO import StringIO
 
 from conary import conarycfg
 from conary import conaryclient
@@ -151,7 +150,7 @@ class KeySync(object):
                 'configuration' % server_name)
             raise
 
-        self.client.repos.addNewPGPKey(server_name, user)
+        self.client.repos.addNewPGPKey(server_name, user, binary_key)
 
 
 def usage(args):
@@ -368,8 +367,4 @@ fingerprints = {
 }
 
 if __name__ == '__main__':
-    import sys
-    from conary.lib import util
-    sys.excepthook = util.genExcepthook()
-
     sys.exit(main(sys.argv, fingerprints))
