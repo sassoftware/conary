@@ -318,7 +318,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
         if self._serverName:
             # Standalone server sends us paths, not full URLs, so don't rewrite
             # those.
-            if not rawUrl.startswith('/'):
+            if rawUrl and not rawUrl.startswith('/'):
                 rawUrl = self._mapUrl(rawUrl)
         self.setBaseUrlOverride(rawUrl, headers, isSecure)
 
