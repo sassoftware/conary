@@ -316,7 +316,10 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
         self._serverName = headers.get('X-Conary-Servername', None)
         if self._serverName:
-            rawUrl = self._mapUrl(rawUrl)
+            # Standalone server sends us paths, not full URLs, so don't rewrite
+            # those.
+            if not rawUrl.startswith('/'):
+                rawUrl = self._mapUrl(rawUrl)
         self.setBaseUrlOverride(rawUrl, headers, isSecure)
 
         # simple proxy. FIXME: caching these might help; building all
