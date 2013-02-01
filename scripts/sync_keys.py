@@ -164,16 +164,6 @@ def main(args, fingerprints):
 
     cfg = conarycfg.ConaryConfiguration(False)
 
-    import socket
-    real_getaddrinfo = socket.getaddrinfo
-    def getaddrinfo(host, _, i, j):
-        if host in ('conary.rpath.com', 'rap.rpath.com', 'products.rpath.com'):
-            host = 'ec2-107-21-170-119.compute-1.amazonaws.com'
-        return real_getaddrinfo(host, None, 0, socket.SOCK_STREAM)
-    socket.getaddrinfo = getaddrinfo
-
-    cfg.configLine('user *.rpath.com admin admin')
-
     keyringfn = args[2]
     sync = KeySync(cfg, keyringfn=keyringfn)
 
