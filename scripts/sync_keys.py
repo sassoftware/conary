@@ -162,7 +162,7 @@ def main(args, fingerprints):
     if len(args) != 3:
         return usage(args)
 
-    cfg = conarycfg.ConaryConfiguration(False)
+    cfg = conarycfg.ConaryConfiguration(True)
 
     keyringfn = args[2]
     sync = KeySync(cfg, keyringfn=keyringfn)
