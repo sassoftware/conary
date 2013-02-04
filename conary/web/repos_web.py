@@ -112,8 +112,9 @@ class ReposWeb(object):
         # Run the method
         self.hasWrite = self.repServer.auth.check(auth, write=True)
         self.isAdmin = self.repServer.auth.authCheck(auth, admin=True)
+        params = self.request.params.mixed()
         try:
-            result = method(auth=auth, **self.request.params)
+            result = method(auth=auth, **params)
         except (exc.HTTPForbidden, errors.InsufficientPermission):
             if self.loggedIn:
                 raise exc.HTTPForbidden()
