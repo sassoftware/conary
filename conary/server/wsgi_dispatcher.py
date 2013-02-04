@@ -46,12 +46,24 @@ def application(environ, start_response):
         return ["ERROR: The server is not configured correctly. Check the "
             "server's error logs.\r\n"]
 
-    httphost = environ.get('HTTP_HOST', '').split(':')[0]
-    if not httphost:
-        start_response('400 Bad Request', [('Content-Type', 'text/plain')])
-        return ["ERROR: No server name was supplied\r\n"]
-    repohost = environ.get('HTTP_X_CONARY_SERVERNAME', '')
-    for var in (httphost, repohost):
+    pathhost = httphost = repohost = None
+    if environ.get('PATH_INFO'):
+        path = environ['PATH_INFO'].split('/')
+        if path[0] == '' and '.' in path[1]:
+            # http://big.server/foo.com/conary/browse
+            pathhost = path[1]
+            environ['SCRIPT_NAME'] += '/'.join(path[:2])
+            environ['PATH_INFO'] = '/' + '/'.join(path[2:])
+    if not pathhost:
+        # http://repo.hostname/conary/browse
+        httphost = environ.get('HTTP_HOST', '').split(':')[0]
+        if not httphost:
+            start_response('400 Bad Request', [('Content-Type', 'text/plain')])
+            return ["ERROR: No server name was supplied\r\n"]
+        # repositoryMap repo.hostname http://big.server/conary/
+        repohost = environ.get('HTTP_X_CONARY_SERVERNAME', '')
+    names = [x for x in [pathhost, httphost, repohost] if x]
+    for var in names:
         if '..' in var or '/' in var or os.path.sep in var:
             start_response('400 Bad Request', [('Content-Type', 'text/plain')])
             return ["ERROR: Illegal header value\r\n"]
@@ -62,9 +74,7 @@ def application(environ, start_response):
     else:
         log.error("vhost path %s not found", path)
         start_response('404 Not Found', [('Content-Type', 'text/plain')])
-        names = httphost
-        if repohost and repohost != httphost:
-            names += ' or ' + repohost
+        names = ' or '.join(names)
         return ["ERROR: No server named %s exists here\r\n" % names]
     environ['conary.netrepos.config_file'] = path
     return wsgi_hooks.makeApp({})(environ, start_response)
