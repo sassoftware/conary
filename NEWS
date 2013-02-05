@@ -1,3 +1,18 @@
+Changes in 2.4.9:
+  o New Features:
+    * Improved proxy server operation in WSGI mode
+    * Added a "vhost" WSGI entry point that allows serving different
+      repository configurations depending on the repository the client
+      requested.
+    * Conary proxies now use repositoryMap directives in their
+      configuration to override URLs given by clients
+
+  o Bug Fixes:
+    * Fixed a crash when using "conary repair" on an encapsulated RPM
+      containing ghost files (CNY-3773)
+    * Fixed IPv6 literals not being escaped correctly in HTTP "Host"
+      headers. (CNY-3776)
+
 Changes in 2.4.8:
   o New Features:
     * Added --replace-modified-files, --replace-managed-files, and
