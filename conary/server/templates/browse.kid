@@ -1,7 +1,4 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:py="http://purl.org/kid/ns#"
-      py:extends="'library.kid'">
 <?python
 #
 # Copyright (c) SAS Institute Inc.
@@ -22,6 +19,9 @@
 import string
 from urllib import quote
 ?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://purl.org/kid/ns#"
+      py:extends="'library.kid'">
     <head/>
     <body>
         <div id="inner">

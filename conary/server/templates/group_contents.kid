@@ -1,7 +1,4 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:py="http://purl.org/kid/ns#"
-      py:extends="'library.kid'">
 <?python
 #
 # Copyright (c) SAS Institute Inc.
@@ -19,7 +16,9 @@
 # limitations under the License.
 #
 ?>
-
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://purl.org/kid/ns#"
+      py:extends="'library.kid'">
     <div id="fileList" py:def="troveList(troves)">
         <table style="width: 100%; padding: 0.5em;">
             <tr style="background: #eeeeee; font-size: 120%; font-weight: bold;">

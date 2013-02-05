@@ -1,6 +1,4 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:py="http://purl.org/kid/ns#">
 <?python
 #
 # Copyright (c) SAS Institute Inc.
@@ -18,6 +16,8 @@
 # limitations under the License.
 #
 ?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://purl.org/kid/ns#">
     <head py:match="item.tag == '{http://www.w3.org/1999/xhtml}head'">
         <title>Conary Repository</title>
         <link rel="stylesheet" type="text/css" href="${cfg.staticPath}/css/common.css" />

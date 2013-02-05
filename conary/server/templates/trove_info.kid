@@ -1,7 +1,4 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:py="http://purl.org/kid/ns#"
-      py:extends="'library.kid'">
 <?python
 #
 # Copyright (c) SAS Institute Inc.
@@ -22,6 +19,9 @@
 from urllib import quote
 import time
 ?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://purl.org/kid/ns#"
+      py:extends="'library.kid'">
     <table py:def="sourceTroveInfo(trove)" class="vheader">
         <tr class="even"><td>Trove name:</td><td>${trove.getName()}</td></tr>
         <tr class="odd"><td>Change log:</td>
