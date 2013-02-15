@@ -25,6 +25,7 @@ from conary.build.errors import RecipeFileError, RecipeDependencyError
 from conary.deps import deps
 from conary.errors import ParseError
 from conary.lib import log, util
+from conary.lib.compat import any
 from conary.local import database
 from conary.conaryclient import cmdline
 
@@ -472,7 +473,7 @@ class Recipe(object):
             ps = a.getPathAndSuffix()
 
             # check if we have an autosourced file
-            if ps[0].find('://') != -1 or ps[0].find(':pserver:') != -1:
+            if any(x in ps[0] for x in ['://', ':pserver:', ':ext:']):
                 # use guess name if it is provided
                 k = os.path.basename(ps[0]) or ps[1]
                 assert(k)
