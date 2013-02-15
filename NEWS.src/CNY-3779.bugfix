@@ -1,0 +1,1 @@
+Fixed GroupSetRecipe's latestPackages() method crashing when removed troves are present in the repository

@@ -18,7 +18,7 @@
 import inspect, itertools, re, time
 
 from conary import trove, versions
-from conary.build import defaultrecipes, macros, use
+from conary.build import defaultrecipes, use
 from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.conaryclient.cmdline import parseTroveSpec
@@ -1383,9 +1383,8 @@ class LatestPackagesFromSearchSourceAction(GroupDelayedTupleSetAction):
         for label in labelList:
             d[None][label] = [ flavor ]
 
-        matches = troveSource.getTroveLatestByLabel(
-                                d, troveTypes = netclient.TROVE_QUERY_ALL,
-                                bestFlavor = True)
+        matches = troveSource.getTroveLatestByLabel(d,
+                troveTypes=netclient.TROVE_QUERY_PRESENT, bestFlavor=True)
 
         fullTupList = []
         for name in matches:

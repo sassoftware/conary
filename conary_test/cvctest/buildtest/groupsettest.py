@@ -507,6 +507,11 @@ class TestRecipe(GroupSetRecipe):
         self.makeSourceTrove('foo', 'class foo(PackageRecipe):\n'
                                     '  name = "foo"\n'
                                     '  version = "3.0"\n')
+        # CNY-3779 - removed packages shouldn't break latest
+        self.addComponent('removed:runtime=1.0')
+        trv = self.addCollection('removed=1.0', [ ':runtime' ])
+        self.markRemoved(trv.getNameVersionFlavor())
+
         grp = self.build(
 """
 class TestRecipe(GroupSetRecipe):
