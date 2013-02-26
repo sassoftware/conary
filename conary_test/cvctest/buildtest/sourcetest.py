@@ -1024,6 +1024,73 @@ class PatchTest(PackageRecipe):
         a = source.Archive(r, 'testempty.deb', dir='/')
         self.assertRaises(source.SourceError, a.doAction)
 
+    def testAllPermissionsRetention(self):
+        recipestr = """
+class TestTar(PackageRecipe):
+    name = 'foo'
+    version = '1.0'
+    clearBuildReqs()
+
+    def setup(r):
+        r.addArchive('allperms.tar', dir = '/tar',
+                     preserveOwnership = True,
+                     preserveSetid = True,
+                     preserveDirectories = True)
+        r.ExcludeDirectories(exceptions = [ '.*/foo' ] )
+"""
+        (built, d) = self.buildRecipe(recipestr, "TestTar")
+        trvInfo = (built[0][0], VFS(built[0][1]), built[0][2])
+        repos = self.openRepository()
+        cs = repos.createChangeSet(
+                [ (trvInfo[0], (None, None), (trvInfo[1], trvInfo[2]), True) ] )
+        trvCs = cs.getNewTroveVersion(*trvInfo)
+        trv = trovemod.Trove(trvCs)
+        actual = {}
+        for pathId, path, fileId, version in trv.iterFileList():
+            stream = cs.getFileChange(None, fileId)
+            fObj = files.ThawFile(stream, pathId)
+            actual[path] = (fObj.inode.owner(),
+                            fObj.inode.group(),
+                            fObj.inode.permsString())
+
+        expected = {
+            '/tar/allperms/empty':
+                ('root', 'root', 'rwxr-xr-x'),
+            '/tar/allperms/normaldir/normalfile':
+                ('root', 'root', 'rw-r--r--'),
+            '/tar/allperms/permsdir':
+                ('root', 'root', 'rwx------'),
+            '/tar/allperms/permsdir/notempty':
+                ('root', 'root', 'rw-r--r--'),
+            '/tar/allperms/owneddir':
+                ('bin', 'daemon', 'rwxr-xr-x'),
+            '/tar/allperms/owneddir/ownedfile':
+                ('nobody', 'nobody', 'rw-r--r--'),
+            '/tar/allperms/setuid':
+                ('bin', 'daemon', 'rwsr-xr-x'),
+            '/tar/allperms/setgid':
+                ('bin', 'daemon', 'rwxr-sr-x'),
+            '/tar/allperms/setudir':
+                ('root', 'root', 'rwsr-xr-x'),
+            '/tar/allperms/setgdir':
+                ('root', 'root', 'rwxr-sr-x'),
+        }
+
+        if actual != expected:
+            l = []
+            extra = sorted(list(set(actual.keys()) - set(expected.keys())))
+            for m in extra:
+                l.append('%s is extra' %m)
+            for path in actual.keys():
+                if path in expected and actual[path] != expected[path]:
+                    l.append('%s should be %s:%s %s but is %s:%s %s'
+                             %((path,) + expected[path] + actual[path]))
+            missing = sorted(list(set(expected.keys()) - set(actual.keys())))
+            for m in missing:
+                l.append('%s is missing' %m)
+            msg = '\n'.join(l)
+            self.fail(msg)
+
     def testOwnershipRetention(self):
         recipestr = """
 class TestTar(PackageRecipe):
@@ -1106,7 +1173,8 @@ class TestTar(PackageRecipe):
         try:
             self.buildRecipe(recipestr, "TestTar")
         except source.SourceError, e:
-            assert(str(e) == 'preserveOwnership not allowed when '
+            assert(str(e) == 'preserveOwnership, preserveSetid, and '
+                             'preserveDirectories not allowed when '
                              'unpacking into build directory')
         else:
             assert(0)
@@ -1124,7 +1192,8 @@ class TestTar(PackageRecipe):
         try:
             self.buildRecipe(recipestr, "TestTar")
         except source.SourceError, e:
-            assert(str(e) == 'cannot preserveOwnership for iso images')
+            assert(str(e) == 'cannot preserveOwnership, preserveSetid, or '
+                             'preserveDirectories for iso images')
         else:
             assert(0)
 
@@ -1141,7 +1210,8 @@ class TestTar(PackageRecipe):
         try:
             self.buildRecipe(recipestr, "TestTar")
         except source.SourceError, e:
-            assert(str(e) == 'cannot preserveOwnership for xpi or zip archives')
+            assert(str(e) == 'cannot preserveOwnership, preserveSetid, or '
+                             'preserveDirectories for xpi or zip archives')
         else:
             assert(0)
 

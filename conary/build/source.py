@@ -478,7 +478,7 @@ class addArchive(_Source):
 
     SYNOPSIS
     ========
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{sourceDir}=,] [I{debArchive}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{preserveSetid,}] [I{preserveDirectories=,}] [I{sourceDir}=,] [I{debArchive}=])}
 
     DESCRIPTION
     ===========
@@ -524,9 +524,19 @@ class addArchive(_Source):
     results in a warning; a failed signature check is fatal.
 
     B{preserveOwnership} : If C{preserveOwnership} is True and the files
-    are unpacked into the build directory, the packaged files are owned
+    are unpacked into the destination directory, the packaged files are owned
     by the same user and group which owned them in the archive. Only cpio,
     rpm, and tar achives are allowed when C{preserveOwnership} is used.
+
+    B{preserveSetid} : If C{preserveSetid} is True and the files
+    are unpacked into the destination directory, the packaged files preserve
+    setuid and setgid bits that were in the archive.  Only tar archives
+    are allowed when C{preserveSetid} is True.
+
+    B{preserveDirectories} : If C{preserveDirectories} is True and the files
+    are unpacked into the destination directory, the packaged files preserve
+    setuid and setgid bits that were in the archive.  Only tar archives
+    are allowed when C{preserveDirectories} is True.
 
     B{rpm} : If the C{rpm} keyword is used, C{r.addArchive}
     looks in the file or URL specified by C{rpm} for a binary or
@@ -599,6 +609,8 @@ class addArchive(_Source):
     """
     keywords = dict(_Source.keywords)
     keywords['preserveOwnership'] = None
+    keywords['preserveSetid'] = None
+    keywords['preserveDirectories'] = None
     keywords['debArchive'] = None
 
     def __init__(self, recipe, *args, **keywords):
@@ -667,10 +679,13 @@ class addArchive(_Source):
         if self.package:
             self._initManifest()
 
-        if self.preserveOwnership and \
-           not(destDir.startswith(self.recipe.macros.destdir)):
-            raise SourceError, "preserveOwnership not allowed when " \
-                               "unpacking into build directory"
+        if (self.preserveOwnership
+            or self.preserveSetid
+            or self.preserveDirectories) and not(
+                destDir.startswith(self.recipe.macros.destdir)):
+            raise SourceError, (
+                "preserveOwnership, preserveSetid, and preserveDirectories"
+                " not allowed when unpacking into build directory")
 
         guessMainDir = (not self.recipe.explicitMainDir and
                         not self.dir.startswith('/'))
@@ -688,13 +703,15 @@ class addArchive(_Source):
 
         log.info('unpacking archive %s' %os.path.basename(f))
         if f.endswith(".zip") or f.endswith(".xpi") or f.endswith(".jar") or f.endswith(".war"):
-            if self.preserveOwnership:
-                raise SourceError('cannot preserveOwnership for xpi or zip archives')
+            if (self.preserveOwnership or self.preserveSetid or self.preserveDirectories):
+                raise SourceError('cannot preserveOwnership, preserveSetid, or preserveDirectories for xpi or zip archives')
 
             util.execute("unzip -q -o -d '%s' '%s'" % (destDir, f))
             self._addActionPathBuildRequires(['unzip'])
 
         elif f.endswith(".rpm"):
+            if (self.preserveSetid or self.preserveDirectories):
+                raise SourceError('cannot preserveSetid or preserveDirectories for rpm archives')
             self._addActionPathBuildRequires(['/bin/cpio'])
             log.info("extracting %s into %s" % (f, destDir))
             ownerList = _extractFilesFromRPM(f, directory=destDir, action=self)
@@ -708,8 +725,8 @@ class addArchive(_Source):
                         d = Ownership.setdefault((user, group),[])
                         d.append(path)
         elif f.endswith(".iso"):
-            if self.preserveOwnership:
-                raise SourceError('cannot preserveOwnership for iso images')
+            if (self.preserveOwnership or self.preserveSetid or self.preserveDirectories):
+                raise SourceError('cannot preserveOwnership, preserveSetid, or preserveDirectories for iso images')
 
             self._addActionPathBuildRequires(['isoinfo'])
             _extractFilesFromISO(f, directory=destDir)
@@ -723,6 +740,7 @@ class addArchive(_Source):
             # function which parses the ownership string to get file ownership
             # details
             ownerParser = None
+            ExcludeDirectories = []
 
             actionPathBuildRequires = []
             # Question: can magic() ever get these wrong?!
@@ -832,11 +850,46 @@ class addArchive(_Source):
                 fObj.close()
 
             if ownerParser and self.preserveOwnership:
+                destdir = self.recipe.macros.destdir
                 for (path, user, group) in ownerParser(output):
                     if user != 'root' or group != 'root':
                         path = util.normpath(os.path.join(self.dir, path))
                         d = Ownership.setdefault((user, group),[])
                         d.append(path)
+                        if self.preserveDirectories:
+                            if os.path.isdir('/'.join((destdir, path))):
+                                ExcludeDirectories.append( path )
+
+            if self.preserveSetid or self.preserveDirectories:
+                destlen = len(self.recipe.macros.destdir)
+                for dirpath, dirnames, filenames in os.walk(destDir):
+                    if self.preserveSetid:
+                        for filename in filenames + dirnames:
+                            path = util.normpath(os.path.join(dirpath,
+                                                              filename))
+                            mode = os.lstat(path).st_mode
+                            sidbits = mode & 06000
+                            if sidbits:
+                                destPath = path[destlen:]
+                                self.recipe.setModes(destPath, sidbits=sidbits)
+                        for dirname in dirnames:
+                            path = util.normpath(os.path.join(dirpath,
+                                                              dirname))
+                            mode = os.lstat(path).st_mode
+                            destPath = path[destlen:]
+                            if mode & 07777 != 0755:
+                                ExcludeDirectories.append( destPath )
+                            if self.preserveSetid:
+                                sidbits = mode & 06000
+                                self.recipe.setModes(destPath, sidbits=sidbits)
+                    if self.preserveDirectories:
+                        if not filenames and not dirnames:
+                            # preserve empty directories
+                            ExcludeDirectories.append( dirpath[destlen:] )
+
+            if len(ExcludeDirectories):
+                self.recipe.ExcludeDirectories(exceptions=filter.PathSet(
+                    ExcludeDirectories))
 
         if guessMainDir:
             bd = self.builddir
