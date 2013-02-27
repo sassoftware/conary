@@ -3020,14 +3020,18 @@ def _getHashConflicts(group, troveCache, callback):
                              troveCache.getTroves(allTrovesNeeded,
                                                   withFiles = True) ) )
 
+    conflictSets = set(tuple(x) for x in conflictLists.itervalues())
+    fileMap = dict((x, [ y for y in trovesWithFiles[x].iterFileList() ])
+        for x in set(chain(*conflictSets)))
+
     # We've got the sets of conflicting troves, now
     # determine the set of conflicting files.
     conflictsWithFiles = []
-    for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
+    for conflictSet in conflictSets:
         # Build set of paths which conflicts across these troves
         conflictingPaths = None
         for tup in conflictSet:
-            newPaths = set( x[1] for x in trovesWithFiles[tup].iterFileList())
+            newPaths = set(x[1] for x in fileMap[tup])
             if conflictingPaths is None:
                 conflictingPaths = newPaths
             else:
@@ -3040,8 +3044,7 @@ def _getHashConflicts(group, troveCache, callback):
         for path in conflictingPaths:
             fileInfo = set()
             for tup in conflictSet:
-                fileInfo |= set( x for x in trovesWithFiles[tup].iterFileList()
-                                   if x[1] == path)
+                fileInfo |= set(x for x in fileMap[tup] if x[1] == path)
 
             if len(set(x[2] for x in fileInfo)) > 1:
                 paths.append((path, fileInfo))
@@ -3049,12 +3052,13 @@ def _getHashConflicts(group, troveCache, callback):
         if paths:
             conflictsWithFiles.append((conflictSet, paths))
 
-    streamsNeeded = []
+    streamsNeeded = set()
     for conflictSet, pathList in conflictsWithFiles:
         # The files have conflicting fileIds. We need to get the
         # streams to investigate further.
         for paths, fileInfo in pathList:
-                streamsNeeded.extend( (x[0], x[2], x[3]) for x in fileInfo )
+                streamsNeeded |= set((x[0], x[2], x[3]) for x in fileInfo)
+    streamsNeeded = list(streamsNeeded)
 
     fileObjs = troveCache.troveSource.getFileVersions(streamsNeeded)
     filesByFileId = dict((x[1], y) for (x, y) in izip(streamsNeeded, fileObjs))
