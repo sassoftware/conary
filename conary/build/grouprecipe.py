@@ -2982,144 +2982,141 @@ def checkGroupDependencies(group, cfg, cache, callback):
     callback.done()
     return failedDeps
 
-def calcSizeAndCheckHashes(group, troveCache, callback):
-    def _getHashConflicts(group, troveCache, callback):
-        # Get troveTup and pathHashes for all components that are
-        # byDefault True.
-        isColl = trove.troveIsCollection
-        neededInfo = [ x[0] for x in group.iterTroveListInfo()
-                            if x[2] and not isColl(x[0][0]) ]
-        neededInfo = zip(neededInfo,
-                         troveCache.getPathHashesForTroveList(neededInfo))
+def _getHashConflicts(group, troveCache, callback):
+    # Get troveTup and pathHashes for all components that are
+    # byDefault True.
+    isColl = trove.troveIsCollection
+    neededInfo = [ x[0] for x in group.iterTroveListInfo()
+                        if x[2] and not isColl(x[0][0]) ]
+    neededInfo = zip(neededInfo,
+                     troveCache.getPathHashesForTroveList(neededInfo))
 
-        # Get set of conflicting pathHashes
-        allPaths = set()
-        conflictPaths = set()
-        for troveTup, pathHashes in neededInfo:
-            if pathHashes is None:
-                continue
-            conflictPaths.update(pathHashes & allPaths)
-            allPaths.update(pathHashes)
-            callback.groupCheckingPaths(len(allPaths))
+    # Get set of conflicting pathHashes
+    allPaths = set()
+    conflictPaths = set()
+    for troveTup, pathHashes in neededInfo:
+        if pathHashes is None:
+            continue
+        conflictPaths.update(pathHashes & allPaths)
+        allPaths.update(pathHashes)
+        callback.groupCheckingPaths(len(allPaths))
 
-        # Find all troves that have conflicting pathHashes
-        conflictLists = {}
-        for troveTup, pathHashes in neededInfo:
-            if pathHashes is None:
-                continue
-            for pathHash in conflictPaths & pathHashes:
-                conflictLists.setdefault(pathHash, set()).add(troveTup)
+    # Find all troves that have conflicting pathHashes
+    conflictLists = {}
+    for troveTup, pathHashes in neededInfo:
+        if pathHashes is None:
+            continue
+        for pathHash in conflictPaths & pathHashes:
+            conflictLists.setdefault(pathHash, set()).add(troveTup)
 
-        callback.groupDeterminingPathConflicts(len(conflictLists))
+    callback.groupDeterminingPathConflicts(len(conflictLists))
 
-        # get the troves into a simple dict; it's easier than calling
-        # troveCache.getTroves([something], withFiles=True)[0]
-        # over and over
-        allTrovesNeeded = list(set(chain(*conflictLists.values())))
-        trovesWithFiles = dict( (troveTup, trv) for troveTup, trv in
-                            izip(allTrovesNeeded,
-                                 troveCache.getTroves(allTrovesNeeded,
-                                                      withFiles = True) ) )
+    # get the troves into a simple dict; it's easier than calling
+    # troveCache.getTroves([something], withFiles=True)[0]
+    # over and over
+    allTrovesNeeded = list(set(chain(*conflictLists.values())))
+    trovesWithFiles = dict( (troveTup, trv) for troveTup, trv in
+                        izip(allTrovesNeeded,
+                             troveCache.getTroves(allTrovesNeeded,
+                                                  withFiles = True) ) )
 
-        # We've got the sets of conflicting troves, now
-        # determine the set of conflicting files.
-        conflictsWithFiles = []
-        for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
-            # Build set of paths which conflicts across these troves
-            conflictingPaths = None
-            for tup in conflictSet:
-                newPaths = set( x[1] for x
-                          in trovesWithFiles[tup].iterFileList())
-                if conflictingPaths is None:
-                    conflictingPaths = newPaths
-                else:
-                    conflictingPaths &= newPaths
-
-            # If all of the troves share the same fileId for a path,
-            # it's not actually conflicting. This is expensive because
-            # we can't look up a path in a trove, just pathIds.
-            paths = []
-            for path in conflictingPaths:
-                fileInfo = set()
-                for tup in conflictSet:
-                    fileInfo |= set( x
-                                for x in trovesWithFiles[tup].iterFileList()
-                                        if x[1] == path)
-
-                if len(set(x[2] for x in fileInfo)) > 1:
-                    paths.append((path, fileInfo))
-
-            if paths:
-                conflictsWithFiles.append((conflictSet, paths))
-
-        streamsNeeded = []
-        for conflictSet, pathList in conflictsWithFiles:
-            # The files have conflicting fileIds. We need to get the
-            # streams to investigate further.
-            for paths, fileInfo in pathList:
-                    streamsNeeded.extend( (x[0], x[2], x[3]) for x in fileInfo )
-
-        fileObjs = troveCache.troveSource.getFileVersions(streamsNeeded)
-        filesByFileId = dict( (x[1], y) for (x, y) in
-                                izip(streamsNeeded, fileObjs) )
-
-        finalConflicts = []
-        for conflictSet, pathList in conflictsWithFiles:
-            # If the troves involved are RPM capsules, we have extra
-            # tests to do.
-            capsules = [ trovesWithFiles[x].troveInfo.capsule.type()
-                            for x in conflictSet ]
-            if (len([ x for x in capsules
-                        if x == trove._TROVECAPSULE_TYPE_RPM]) !=
-                len(capsules)):
-                allRpms = False
+    # We've got the sets of conflicting troves, now
+    # determine the set of conflicting files.
+    conflictsWithFiles = []
+    for conflictSet in set(tuple(x) for x in conflictLists.itervalues()):
+        # Build set of paths which conflicts across these troves
+        conflictingPaths = None
+        for tup in conflictSet:
+            newPaths = set( x[1] for x in trovesWithFiles[tup].iterFileList())
+            if conflictingPaths is None:
+                conflictingPaths = newPaths
             else:
-                allRpms = True
+                conflictingPaths &= newPaths
 
-            paths = []
-            for path, fileInfo in pathList:
-                if path.startswith('/usr/share/doc/'):
-                    # gross hack from rhel4/rhel5 patched rpm
-                    continue
+        # If all of the troves share the same fileId for a path,
+        # it's not actually conflicting. This is expensive because
+        # we can't look up a path in a trove, just pathIds.
+        paths = []
+        for path in conflictingPaths:
+            fileInfo = set()
+            for tup in conflictSet:
+                fileInfo |= set( x for x in trovesWithFiles[tup].iterFileList()
+                                   if x[1] == path)
 
-                fileIdAndObj = list(set([ (x[2], filesByFileId[x[2]])
-                                            for x in fileInfo ]))
-                # these pathIds might be compatible with each other despite
-                # having different fileIds
-                if (len(
-                      [ 1 for x in fileIdAndObj if
-                            fileIdAndObj[0][1].compatibleWith(x[1]) ]) ==
-                    len(fileIdAndObj)):
-                    continue
+            if len(set(x[2] for x in fileInfo)) > 1:
+                paths.append((path, fileInfo))
 
-                # we now have a unique set of fileIds to look at; if one is
-                # a consistent "winner" in terms of priority, we don't have
-                # an actual conflict
-                if allRpms:
-                    for i, (fileId, fileObj) in enumerate(fileIdAndObj):
-                        winner = True
-                        for j, (otherFileId, otherFileObj) in \
-                                                    enumerate(fileIdAndObj):
-                            if i == j: continue
-                            if files.rpmFileColorCmp(fileObj, otherFileObj) < 1:
-                                winner = False
-                                break
+        if paths:
+            conflictsWithFiles.append((conflictSet, paths))
 
-                        if winner:
+    streamsNeeded = []
+    for conflictSet, pathList in conflictsWithFiles:
+        # The files have conflicting fileIds. We need to get the
+        # streams to investigate further.
+        for paths, fileInfo in pathList:
+                streamsNeeded.extend( (x[0], x[2], x[3]) for x in fileInfo )
+
+    fileObjs = troveCache.troveSource.getFileVersions(streamsNeeded)
+    filesByFileId = dict((x[1], y) for (x, y) in izip(streamsNeeded, fileObjs))
+
+    finalConflicts = []
+    for conflictSet, pathList in conflictsWithFiles:
+        # If the troves involved are RPM capsules, we have extra
+        # tests to do.
+        capsules = [ trovesWithFiles[x].troveInfo.capsule.type()
+                        for x in conflictSet ]
+        if (len([ x for x in capsules
+                    if x == trove._TROVECAPSULE_TYPE_RPM]) !=
+            len(capsules)):
+            allRpms = False
+        else:
+            allRpms = True
+
+        paths = []
+        for path, fileInfo in pathList:
+            if path.startswith('/usr/share/doc/'):
+                # gross hack from rhel4/rhel5 patched rpm
+                continue
+
+            fileIdAndObj = list(set([ (x[2], filesByFileId[x[2]])
+                                        for x in fileInfo ]))
+            # these pathIds might be compatible with each other despite
+            # having different fileIds
+            if (len(
+                  [ 1 for x in fileIdAndObj if
+                        fileIdAndObj[0][1].compatibleWith(x[1]) ]) ==
+                len(fileIdAndObj)):
+                continue
+
+            # we now have a unique set of fileIds to look at; if one is
+            # a consistent "winner" in terms of priority, we don't have
+            # an actual conflict
+            if allRpms:
+                for i, (fileId, fileObj) in enumerate(fileIdAndObj):
+                    winner = True
+                    for j, (otherFileId, otherFileObj) in \
+                                                enumerate(fileIdAndObj):
+                        if i == j: continue
+                        if files.rpmFileColorCmp(fileObj, otherFileObj) < 1:
+                            winner = False
                             break
 
                     if winner:
-                        continue
+                        break
 
-                paths.append(path)
+                if winner:
+                    continue
 
-            if paths:
-                finalConflicts.append((conflictSet, paths))
+            paths.append(path)
 
-        callback.done()
+        if paths:
+            finalConflicts.append((conflictSet, paths))
 
-        return finalConflicts
+    callback.done()
 
+    return finalConflicts
+
+def calcSizeAndCheckHashes(group, troveCache, callback):
     size = 0
     validSize = True
 
