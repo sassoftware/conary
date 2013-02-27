@@ -1929,6 +1929,7 @@ class _dependency(policy.Policy):
         self.bootstrapPythonFlags = None
         self.bootstrapSysPath = []
         self.bootstrapPerlIncPath = []
+        self.cachedProviders = {}
         self.pythonFlagNamespace = None
         self.removeFlagsByDependencyClass = None # pre-transform
         self.removeFlagsByDependencyClassMap = {}
@@ -2332,13 +2333,16 @@ class _dependency(policy.Policy):
 
     def _enforceProvidedPath(self, path, fileType='interpreter',
                              unmanagedError=False):
+        key = path, fileType
+        if key in self.cachedProviders:
+            return self.cachedProviders[key]
         db = self._getDb()
         troveNames = [ x.getName() for x in db.iterTrovesByPath(path) ]
         if not troveNames:
             talk = {True: self.error, False: self.warn}[bool(unmanagedError)]
             talk('%s file %s not managed by conary' %(fileType, path))
             return None
-        troveName = troveNames[0]
+        troveName = sorted(troveNames)[0]
 
         # prefer corresponding :devel to :devellib if it exists
         package, component = troveName.split(':', 1)
@@ -2357,6 +2361,7 @@ class _dependency(policy.Policy):
         if troveName not in self.recipe._getTransitiveBuildRequiresNames():
             self.recipe.reportMissingBuildRequires(troveName)
 
+        self.cachedProviders[key] = troveName
         return troveName
 
     def _getRuby(self, macros, path):
