@@ -154,11 +154,13 @@ class Conary(CPackageRecipe):
         ####  Finally, actually build Conary
         mkargs = (
             'LDFLAGS="%(ldflags)s -L%(pylib)s -Wl,-rpath,%(pylib)s" '
-            'libdir=%(pylib)s '
             'PYINCLUDE=%(pyinc)s '
             'PYTHON=%(python)s '
             'PYVER=%(pyver)s '
-            'sitedir=%(sitepkgs)s '
+
+            'prefix=%(pyroot)s '
+            'bindir=%(bindir)s '
+            'datadir=%(datadir)s '
             )
         if not r.have_kid:
             mkargs += 'NO_KID=1 '
