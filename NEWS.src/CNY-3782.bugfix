@@ -1,1 +1,0 @@
-Improved performance of path conflict checking when building groups containing packages with many files and potential path conflicts.
