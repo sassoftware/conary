@@ -214,7 +214,7 @@ class Conary(CPackageRecipe):
                       '%(sitepkgs)s/conary/build/',
                       r'%(sitepkgs)s/conary/(checkin|clone|branch)\.py.*',
                       '%(libdir)s/conary/',
-                      '%(libexecdir)s/conary/perlreqs.pl',
+                      '%(pyroot)s/libexec/conary/perlreqs.pl',
                       '%(localstatedir)s/conary/emerge', #/var/conary for emerge
                       '%(sysconfdir)s/conary/recipeTemplates/',
                       '%(sysconfdir)s/conary/mirrors/',
@@ -250,7 +250,7 @@ class Conary(CPackageRecipe):
         # This exception needs to be here in order to bootstrap perl;
         # if we don't have perl, we won't be using this file or those
         # modules anyway.
-        r.Requires(exceptions='%(libexecdir)s/conary/perlreqs.pl')
+        r.Requires(exceptions='%(pyroot)s/libexec/conary/perlreqs.pl')
         r.Requires(exceptDeps='perl:.*')
 
         # .py files without #!
