@@ -113,6 +113,9 @@ class URLOpener(object):
             #fp = DecompressFileObj(fp)
             fp = util.decompressStream(fp)
             fp.seek(0)
+        elif encoding == 'gzip':
+            fp = util.GzipFile(fileobj=fp)
+            fp.seek(0)
         return ResponseWrapper(fp, response)
 
     def _handleError(self, req, response):
