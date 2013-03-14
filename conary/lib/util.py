@@ -1549,6 +1549,8 @@ def urlSplit(url, defaultPort = None):
         host, port = hostport, None
     else:
         host, port = networking.splitHostPort(hostport)
+    if port is None:
+        port = defaultPort
 
     if userpass:
         user, passwd = urllib.splitpasswd(userpass)
