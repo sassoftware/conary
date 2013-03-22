@@ -65,17 +65,24 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 /* StreamSetDef Implementation           */
 
 static void StreamSetDef_Dealloc(PyObject * self) {
+    int i;
     StreamSetDefObject * ssd = (StreamSetDefObject *) self;
+    for (i = 0; i < ssd->tagCount; i++) {
+        Py_CLEAR(ssd->tags[i].name);
+        Py_CLEAR(ssd->tags[i].type);
+    }
     free(ssd->tags);
     Py_TYPE(self)->tp_free(self);
 }
 
 static int StreamSetDef_Init(PyObject * self, PyObject * args,
 			     PyObject * kwargs) {
-    static char * kwlist[] = { "spec", NULL };
+    /* Borrowed references */
     StreamSetDefObject * ssd = (void *) self;
-    PyObject * spec;
-    PyListObject * items;
+    PyObject *spec;
+    /* Kept references */
+    PyListObject *items = NULL;
+    static char * kwlist[] = { "spec", NULL };
     int i, j;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
@@ -84,46 +91,60 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
     }
 
     items = (PyListObject *) PyDict_Items(spec);
-    assert(PyList_Check(items));
-
-    ssd->tagCount = Py_SIZE(items);
-    ssd->tags = malloc(Py_SIZE(items) * sizeof(*ssd->tags));
-    if (ssd->tags == NULL) {
-	PyErr_NoMemory();
-	return -1;
+    if (items == NULL) {
+        goto onerror;
     }
 
-    for (i = 0; i < Py_SIZE(items); i++) {
-	int tag;
-	PyObject * streamType;
-	int size;
-	char * name;
+    ssd->tagCount = Py_SIZE(items);
+    ssd->tags = malloc(ssd->tagCount * sizeof(*ssd->tags));
+    if (ssd->tags == NULL) {
+        PyErr_NoMemory();
+        goto onerror;
+    }
+    memset(ssd->tags, 0, ssd->tagCount * sizeof(*ssd->tags));
 
-	if (!PyArg_ParseTuple(items->ob_item[i], "i(iOs)",
-			      &tag, &size, &streamType, &name)) {
-	    return -1;
-	}
+    for (i = 0; i < ssd->tagCount; i++) {
+        int tag;
+        PyObject * streamType;
+        int size;
+        char * name;
 
-	ssd->tags[i].tag = tag;
-	ssd->tags[i].size = size;
-	ssd->tags[i].name = PYBYTES_FromString(name);
-	ssd->tags[i].type = streamType;
-	Py_INCREF(streamType);
+        if (!PyArg_ParseTuple(items->ob_item[i], "i(iOs)",
+                              &tag, &size, &streamType, &name)) {
+            goto onerror;
+        }
+
+        ssd->tags[i].tag = tag;
+        ssd->tags[i].size = size;
+        ssd->tags[i].name = PYBYTES_FromString(name);
+        ssd->tags[i].type = streamType;
+        Py_INCREF(streamType);
     }
 
     /* simple bubble sort */
     for (i = 0; i < ssd->tagCount - 1; i++) {
-	for (j = 0; j < ssd->tagCount - i - 1; j++) {
-	    if (ssd->tags[j + 1].tag < ssd->tags[j].tag) {
-		struct tagInfo tmp;
-		tmp = ssd->tags[j];
-		ssd->tags[j] = ssd->tags[j + 1];
-		ssd->tags[j + 1] = tmp;
-	    }
-	}
+        for (j = 0; j < ssd->tagCount - i - 1; j++) {
+            if (ssd->tags[j + 1].tag < ssd->tags[j].tag) {
+                struct tagInfo tmp;
+                tmp = ssd->tags[j];
+                ssd->tags[j] = ssd->tags[j + 1];
+                ssd->tags[j + 1] = tmp;
+            }
+        }
     }
 
+    Py_XDECREF(items);
     return 0;
+
+onerror:
+    Py_XDECREF(items);
+    for (i = 0; i < ssd->tagCount; i++) {
+        Py_CLEAR(ssd->tags[i].name);
+        Py_CLEAR(ssd->tags[i].type);
+    }
+    free(ssd->tags);
+    ssd->tags = NULL;
+    return -1;
 }
 
 /* ------------------------------------- */

@@ -61,9 +61,9 @@ static PyObject * pack(PyObject * self, PyObject * args) {
     int strLen;
     int argNum;
     int len, i;
-    unsigned char oneByte;
-    unsigned short twoBytes;
-    unsigned int fourBytes;
+    uint8_t oneByte;
+    uint16_t twoBytes;
+    uint32_t fourBytes;
 
     formatArg = PyTuple_GET_ITEM(args, 0);
     if (!PYBYTES_CheckExact(formatArg)) {
@@ -139,6 +139,10 @@ static PyObject * pack(PyObject * self, PyObject * args) {
     }
 
     result = malloc(strLen);
+    if (result == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
     argNum = 1;
     strLen = 0;
     formatPtr = format + 1;
@@ -192,14 +196,17 @@ static PyObject * pack(PyObject * self, PyObject * args) {
 }
 
 static PyObject * unpack(PyObject *self, PyObject *args) {
+    /* Borrowed references */
+    PyObject *formatArg, *offsetArg, *dataArg;
+    PyObject *retVal = NULL;
+    /* Kept references */
+    PyObject *retList = NULL, *dataObj = NULL;
     char * data, * format;
-    char * dataPtr, * formatPtr;
+    char *dataPtr, *formatPtr, *limit;
     char b;
     int dataLen;
     int offset;
-    PyObject * retList, * dataObj;
     unsigned int intVal;
-    PyObject * formatArg, * offsetArg, * dataArg, * retVal;
 
     /* This avoids PyArg_ParseTuple because it's sloooow */
     if (PyTuple_GET_SIZE(args) != 3) {
@@ -226,6 +233,7 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     offset = PYINT_AS_LONG(offsetArg);
     data = PYBYTES_AS_STRING(dataArg);
     dataLen = PYBYTES_GET_SIZE(dataArg);
+    limit = data + dataLen;
 
     formatPtr = format;
 
@@ -235,24 +243,43 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
     }
     formatPtr++;
 
-    retList = PyList_New(0);
     dataPtr = data + offset;
+    if (dataPtr >= limit) {
+        PyErr_SetString(PyExc_ValueError, "offset out of bounds");
+        return NULL;
+    }
+    retList = PyList_New(0);
+    if (retList == NULL) {
+        return NULL;
+    }
 
     while (*formatPtr) {
         switch (*formatPtr) {
           case 'B':
+            if (dataPtr + 1 > limit) {
+                PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                goto cleanup;
+            }
             intVal = (int) *dataPtr++;
             dataObj = PYINT_FromLong(intVal);
-            PyList_Append(retList, dataObj);
-            Py_DECREF(dataObj);
+            if (PyList_Append(retList, dataObj)) {
+                goto cleanup;
+            }
+            Py_CLEAR(dataObj);
             formatPtr++;
             break;
 
           case 'H':
+            if (dataPtr + 2 > limit) {
+                PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                goto cleanup;
+            }
             intVal = ntohs(*((short *) dataPtr));
             dataObj = PYINT_FromLong(intVal);
-            PyList_Append(retList, dataObj);
-            Py_DECREF(dataObj);
+            if (PyList_Append(retList, dataObj)) {
+                goto cleanup;
+            }
+            Py_CLEAR(dataObj);
             dataPtr += 2;
             formatPtr++;
             break;
@@ -263,10 +290,18 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
             formatPtr++;
 
             if (*formatPtr == 'H') {
+                if (dataPtr + 2 > limit) {
+                    PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                    goto cleanup;
+                }
                 intVal = ntohs(*((short *) dataPtr));
                 dataPtr += 2;
                 formatPtr++;
             } else if (*formatPtr == 'I') {
+                if (dataPtr + 4 > limit) {
+                    PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                    goto cleanup;
+                }
                 intVal = ntohl(*((int *) dataPtr));
                 dataPtr += 4;
                 formatPtr++;
@@ -280,75 +315,102 @@ static PyObject * unpack(PyObject *self, PyObject *args) {
                     *lenPtr++ = *formatPtr++;
 
                 if ((lenPtr - lenStr) == sizeof(lenStr)) {
-                    Py_DECREF(retList);
                     PyErr_SetString(PyExc_ValueError, 
                                     "length too long for S format");
-                    return NULL;
+                    goto cleanup;
                 }
 
                 *lenPtr = '\0';
 
                 intVal = atoi(lenStr);
             } else {
-                Py_DECREF(retList);
                 PyErr_SetString(PyExc_ValueError, 
                                 "# must be followed by H or I in format");
-                return NULL;
+                goto cleanup;
             }
 
+            if (dataPtr + intVal > limit) {
+                PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                goto cleanup;
+            }
             dataObj = PYBYTES_FromStringAndSize(dataPtr, intVal);
-            PyList_Append(retList, dataObj);
-            Py_DECREF(dataObj);
+            if (PyList_Append(retList, dataObj)) {
+                goto cleanup;
+            }
+            Py_CLEAR(dataObj);
             dataPtr += intVal;
             break;
 
-	case 'D':
+          case 'D':
             /* extension -- extract a string based on the length which
                preceeds it.  the length is dynamic based on the size */
             formatPtr++;
 
-	    /* high bits of the first byte
-	       00: low 6 bits are value
-	       01: low 14 bits are value
-	       10: low 30 bits are value
-	       11: low 62 bits are value (unimplemented)
-	    */
-	    /* look at the first byte */
-	    b = *dataPtr;
-	    if ((b & 0xc0) == 0x80) {
-		/* 30 bit length */
-		intVal = ntohl(*((uint32_t *) dataPtr)) & 0x3fffffff;
+            /* high bits of the first byte
+               00: low 6 bits are value
+               01: low 14 bits are value
+               10: low 30 bits are value
+               11: low 62 bits are value (unimplemented)
+            */
+            /* look at the first byte */
+            b = *dataPtr;
+            if ((b & 0xc0) == 0x80) {
+                /* 30 bit length */
+                if (dataPtr + 4 > limit) {
+                    PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                    goto cleanup;
+                }
+                intVal = ntohl(*((uint32_t *) dataPtr)) & 0x3fffffff;
                 dataPtr += sizeof(uint32_t);
-	    } else if ((b & 0xc0) == 0x40) {
-		/* 14 bit length */
-		intVal = ntohs(*((uint16_t *) dataPtr)) & 0x3fff;
-		dataPtr += sizeof(uint16_t);
-	    } else if ((b & 0xc0) == 0x00) {
-		/* 6 bit length */
-		intVal = *((uint8_t *) dataPtr) & ~(1 << 6);
-		dataPtr += sizeof(uint8_t);
-	    } else {
-		PyErr_SetString(PyExc_ValueError, 
-				"unimplemented dynamic size");
-		return NULL;
-	    }
+            } else if ((b & 0xc0) == 0x40) {
+                /* 14 bit length */
+                if (dataPtr + 2 > limit) {
+                    PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                    goto cleanup;
+                }
+                intVal = ntohs(*((uint16_t *) dataPtr)) & 0x3fff;
+                dataPtr += sizeof(uint16_t);
+            } else if ((b & 0xc0) == 0x00) {
+                /* 6 bit length */
+                if (dataPtr + 1 > limit) {
+                    PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                    goto cleanup;
+                }
+                intVal = *((uint8_t *) dataPtr) & ~(1 << 6);
+                dataPtr += sizeof(uint8_t);
+            } else {
+                PyErr_SetString(PyExc_ValueError, 
+                                "unimplemented dynamic size");
+                goto cleanup;
+            }
 
+            if (dataPtr + intVal > limit) {
+                PyErr_SetString(PyExc_ValueError, "data too short for format string");
+                goto cleanup;
+            }
             dataObj = PYBYTES_FromStringAndSize(dataPtr, intVal);
-            PyList_Append(retList, dataObj);
-            Py_DECREF(dataObj);
+            if (dataObj == NULL) {
+                goto cleanup;
+            }
+            if (PyList_Append(retList, dataObj)) {
+                goto cleanup;
+            }
+            Py_CLEAR(dataObj);
             dataPtr += intVal;
             break;
 
           default:
-            Py_DECREF(retList);
             PyErr_SetString(PyExc_ValueError, "unknown character in format");
-            return NULL;
+            goto cleanup;
         }
     }
 
     retVal = Py_BuildValue("iO", dataPtr - data, retList);
-    Py_DECREF(retList);
+    Py_CLEAR(retList);
 
+cleanup:
+    Py_XDECREF(dataObj);
+    Py_XDECREF(retList);
     return retVal;
 }
 
@@ -371,20 +433,20 @@ static PyObject * dynamicSize(PyObject *self, PyObject *args) {
 
     size = PYINT_AS_LONG(sizeArg);
     if (size < (1 << 6)) {
-	*sizebuf = (char) size;
-	sizelen = sizeof(char);
+        *sizebuf = (char) size;
+        sizelen = sizeof(char);
     } else if (size < (1 << 14)) {
-	/* mask top two bits and set them to 01 */
-	*((uint16_t *) sizebuf) = htons((size & 0x3fff) | 0x4000);
-	sizelen = sizeof(uint16_t);
+        /* mask top two bits and set them to 01 */
+        *((uint16_t *) sizebuf) = htons((size & 0x3fff) | 0x4000);
+        sizelen = sizeof(uint16_t);
     } else if (size < (1 << 30)) {
-	/* mask top two bits and set them to 10 */
-	*((uint32_t *) sizebuf) = htonl((size & 0x3fffffff) | 0x80000000);
-	sizelen = sizeof(uint32_t);
+        /* mask top two bits and set them to 10 */
+        *((uint32_t *) sizebuf) = htonl((size & 0x3fffffff) | 0x80000000);
+        sizelen = sizeof(uint32_t);
     } else {
-	PyErr_SetString(PyExc_ValueError, 
-			"unimplemented dynamic size");
-	return NULL;
+        PyErr_SetString(PyExc_ValueError, 
+                        "unimplemented dynamic size");
+        return NULL;
     }
     return PYBYTES_FromStringAndSize(sizebuf, sizelen);
 }
