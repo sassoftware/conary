@@ -1,0 +1,1 @@
+Fixed memory leaks and reference leaks in extension modules, discovered by Uri Simchoni

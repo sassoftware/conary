@@ -31,10 +31,11 @@ static PyMethodDef methods[] = {
 
 
 static PyObject * depSetSplit(PyObject *self, PyObject *args) {
-    char * data, * dataPtr, * endPtr;
+    /* Borrowed references */
+    PyObject *offsetArg, *dataArg;
+    Py_ssize_t dataSize;
+    char *data, *dataPtr, *endPtr, *limit;
     int offset, tag;
-    PyObject * retVal;
-    PyObject * offsetArg, * dataArg;
 
     /* This avoids PyArg_ParseTuple because it's sloooow */
     if (PyTuple_GET_SIZE(args) != 2) {
@@ -54,52 +55,69 @@ static PyObject * depSetSplit(PyObject *self, PyObject *args) {
     }
 
     offset = PYINT_AS_LONG(offsetArg);
-    data = PYBYTES_AS_STRING(dataArg);
+    PYBYTES_AsStringAndSize(dataArg, &data, &dataSize);
+    limit = data + dataSize;
 
+    if (offset > dataSize) {
+        PyErr_SetString(PyExc_ValueError, "offset out of bounds");
+        return NULL;
+    }
     dataPtr = data + offset;
-    /* this while is a cheap goto for the error case */
-    while (*dataPtr) {
-        endPtr = dataPtr;
+    if (*dataPtr == 0) {
+        PyErr_SetString(PyExc_ValueError, "invalid frozen dependency");
+        return NULL;
+    }
+    endPtr = dataPtr;
 
-        tag = 0;
-        /* Grab the tag first. Go ahead an convert it to an int while we're
-           grabbing it. */
-        while (*endPtr && *endPtr != '#') {
-            tag *= 10;
-            tag += *endPtr - '0';
-            endPtr++;
-        }
-        dataPtr = endPtr + 1;
-
-        /* Now look for the frozen dependency */
-        /* Grab the tag first */
-        while (*endPtr && *endPtr != '|')
-            endPtr++;
-
-        retVal = Py_BuildValue("iis#", endPtr - data + 1, tag, dataPtr,
-                                endPtr - dataPtr);
-        return retVal;
+    tag = 0;
+    /* Grab the tag first. Go ahead an convert it to an int while we're
+       grabbing it. */
+    while (*endPtr && *endPtr != '#') {
+        tag *= 10;
+        tag += *endPtr - '0';
+        endPtr++;
+    }
+    dataPtr = endPtr + 1;
+    if (dataPtr > limit) {
+        PyErr_SetString(PyExc_ValueError, "invalid frozen dependency");
+        return NULL;
     }
 
-    PyErr_SetString(PyExc_ValueError, "invalid frozen dependency");
-    return NULL;
+    /* Now look for the frozen dependency */
+    /* Grab the tag first */
+    while (*endPtr && *endPtr != '|') {
+        endPtr++;
+    }
+    if (endPtr > limit) {
+        PyErr_SetString(PyExc_ValueError, "invalid frozen dependency");
+        return NULL;
+    }
+
+    return Py_BuildValue("iis#",
+            endPtr - data + 1, tag, dataPtr, endPtr - dataPtr);
+
 }
 
 static PyObject * depSplit(PyObject *self, PyObject *args) {
-    char * origData, * data, * chptr, * endPtr;
-    PyObject * flags, * flag, * name, * ret, * dataArg;
+    /* Borrowed references */
+    PyObject *dataArg;
+    PyObject *ret = NULL;
+    /* Kept references */
+    PyObject *flags = NULL, *name = NULL;
+    PyObject *flag = NULL;
+    char *origData, *data = NULL, *chptr, *endPtr;
 
     /* This avoids PyArg_ParseTuple because it's sloooow */
     if (PyTuple_GET_SIZE(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "exactly one argument expected");
-        return NULL;
+        goto cleanup;
     }
 
     dataArg = PyTuple_GET_ITEM(args, 0);
 
     if (!PYBYTES_CheckExact(dataArg)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be a string");
-        return NULL;
+        goto cleanup;
     }
 
     origData = PYBYTES_AS_STRING(dataArg);
@@ -108,6 +126,10 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
        double :: with a single :, and \X with X (where X is anything,
        including backslash)  */
     endPtr = data = malloc(strlen(origData) + 1);
+    if (data == NULL) {
+        PyErr_NoMemory();
+        goto cleanup;
+    }
     chptr = origData;
     while (*chptr) {
         if (*chptr == ':') {
@@ -130,22 +152,38 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
 
     /* We're left with a '\0' separated list of name, flag1, ..., flagN. Get
        the name first. */
-    name = PYBYTES_FromString(data);
-    chptr = data + strlen(data) + 1;
+    chptr = data;
+    name = PYBYTES_FromString(chptr);
+    if (name == NULL) {
+        goto cleanup;
+    }
+    chptr += strlen(data) + 1;
 
     flags = PyList_New(0);
-
+    if (flags == NULL) {
+        goto cleanup;
+    }
     while (chptr < endPtr) {
         flag = PYBYTES_FromString(chptr);
-        PyList_Append(flags, flag);
-        Py_DECREF(flag);
+        if (flag == NULL) {
+            goto cleanup;
+        }
+        if (PyList_Append(flags, flag)) {
+            goto cleanup;
+        }
+        Py_CLEAR(flag);
         chptr += strlen(chptr) + 1;
     }
 
     ret = PyTuple_Pack(2, name, flags);
-    Py_DECREF(name);
-    Py_DECREF(flags);
-    free(data);
+
+cleanup:
+    Py_XDECREF(name);
+    Py_XDECREF(flags);
+    Py_XDECREF(flag);
+    if (data != NULL) {
+        free(data);
+    }
     return ret;
 }
 
@@ -199,14 +237,16 @@ static int flagSort(const void * a, const void * b) {
 
 static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
                         char ** resultPtr, int * size) {
-    PyObject * itemList;
-    PyObject * itemTuple;
-    PyObject * senseObj;
+    /* Borrowed references */
+    PyObject *itemTuple;
+    PyObject *senseObj;
+    /* Kept references */
+    PyObject *itemList = NULL;
     int itemCount;
     int itemSize;
-    int i;
-    char * next, * result;
-    struct depFlag * flags;
+    int i, rc = -1;
+    char * next, *result = NULL;
+    struct depFlag *flags = NULL;
 
     if (!PYBYTES_CheckExact(nameObj)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be a string");
@@ -219,8 +259,17 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
     }
 
     itemList = PyDict_Items(dict);
+    if (itemList == NULL) {
+        return -1;
+    }
     itemCount = PyList_GET_SIZE(itemList);
     flags = malloc(itemCount * sizeof(*flags));
+    if (flags == NULL) {
+        PyErr_NoMemory();
+        goto cleanup;
+    }
+    memset(flags, 0, itemCount * sizeof(*flags));
+
     itemSize = 0;
     for (i = 0; i < itemCount; i++) {
         itemTuple = PyList_GET_ITEM(itemList, i);
@@ -230,14 +279,12 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
 
         if (!PYBYTES_CheckExact(flags[i].flag)) {
             PyErr_SetString(PyExc_TypeError, "dict keys must be strings");
-            Py_DECREF(itemList);
-            return -1;
+            goto cleanup;
         }
 
         if (!PYINT_CheckExact(senseObj)) {
             PyErr_SetString(PyExc_TypeError, "dict values must be ints");
-            Py_DECREF(itemList);
-            return -1;
+            goto cleanup;
         }
 
         flags[i].sense = PYINT_AS_LONG(senseObj);
@@ -250,6 +297,10 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
        is * 2 due to : expansion */
     result = malloc((PYBYTES_GET_SIZE(nameObj) * 2) + 1 +
                     (itemSize * 2) + itemCount * 3);
+    if (result == NULL) {
+        PyErr_NoMemory();
+        goto cleanup;
+    }
     next = result;
     escapeName(&next, nameObj);
 
@@ -269,11 +320,8 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
                 *next++ = '!';
                 break;
             default:
-                free(result);
-                free(flags);
-                Py_DECREF(itemList);
                 PyErr_SetString(PyExc_TypeError, "unknown sense");
-                return -1;
+                goto cleanup;
         }
 
         escapeFlags(&next, flags[i].flag);
@@ -281,10 +329,18 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
 
     *size = next - result;
     *resultPtr = result;
-    free(flags);
-    Py_DECREF(itemList);
+    result = NULL;
+    rc = 0;
 
-    return 0;
+cleanup:
+    Py_XDECREF(itemList);
+    if (result != NULL) {
+        free(result);
+    }
+    if (flags != NULL) {
+        free(flags);
+    }
+    return rc;
 }
 
 struct depList {
@@ -299,15 +355,18 @@ static int depListSort(const void * a, const void * b) {
                    ((struct depList *) b)->className);
 }
 
-/* This leaks memory on error. Oh well. */
+
 static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
                           char ** resultPtr, int * resultSizePtr) {
-    PyObject * depObjList, * tuple;
-    PyObject * nameObj, * flagsObj;
-    int depCount, i, rc;
-    struct depList * depList;
+    /* Borrowed references */
+    PyObject *tuple;
+    /* Kept references */
+    PyObject *depObjList = NULL;
+    PyObject *nameObj = NULL, *flagsObj = NULL;
+    int depCount, i, rc = -1;
+    struct depList *depList = NULL;
     int totalSize, tagLen;
-    char * result, * next;
+    char *next, *result = NULL;
     char tag[12];
 
     if (!PYINT_CheckExact(tagObj)) {
@@ -320,68 +379,72 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
         return -1;
     }
 
-    tagLen = sprintf(tag, "%d#", (int) PYINT_AS_LONG(tagObj));
+    tagLen = snprintf(tag, sizeof(tag) - 1, "%d#", (int) PYINT_AS_LONG(tagObj));
 
     depObjList = PyDict_Items(dict);
+    if (depObjList == NULL) {
+        return -1;
+    }
     depCount = PyList_GET_SIZE(depObjList);
     if (!depCount) {
-        Py_DECREF(depObjList);
+        rc = 0;
         *resultPtr = NULL;
         *resultSizePtr = 0;
-        return 0;
+        goto cleanup;
     }
 
     depList = malloc(depCount * sizeof(*depList));
+    if (!depList) {
+        PyErr_NoMemory();
+        goto cleanup;
+    }
+    memset(depList, 0, depCount * sizeof(*depList));
     for (i = 0; i < depCount; i++) {
         tuple = PyList_GET_ITEM(depObjList, i);
         if (!PYBYTES_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
             PyErr_SetString(PyExc_TypeError, "dict keys must be strings");
-            Py_DECREF(depObjList);
-            free(depList);
-            return -1;
+            rc = -1;
+            goto cleanup;
         }
         depList[i].className = PYBYTES_AS_STRING(PyTuple_GET_ITEM(tuple, 0));
         depList[i].dep = PyTuple_GET_ITEM(tuple, 1);
     }
 
-    Py_DECREF(depObjList);
+    Py_CLEAR(depObjList);
 
     qsort(depList, depCount, sizeof(*depList), depListSort);
 
     totalSize = 0;
     for (i = 0; i < depCount; i++) {
         if (!(nameObj = PyObject_GetAttrString(depList[i].dep, "name"))) {
-            free(depList);
-            return -1;
+            rc = -1;
+            goto cleanup;
         }
-
         if (!(flagsObj = PyObject_GetAttrString(depList[i].dep, "flags"))) {
-            free(depList);
-            return -1;
+            rc = -1;
+            goto cleanup;
         }
-
         rc = depFreezeRaw(nameObj, flagsObj, &depList[i].frz, &depList[i].frzSize);
-
-        Py_DECREF(nameObj);
-        Py_DECREF(flagsObj);
-
+        Py_CLEAR(nameObj);
+        Py_CLEAR(flagsObj);
         if (rc == -1) {
-            free(depList);
-            return -1;
+            goto cleanup;
         }
-
-        totalSize += depList[i].frzSize;
+        /* Leave room for the tag and separator */
+        totalSize += tagLen + depList[i].frzSize + 1;
     }
 
-    /* 15 leaves plenty of room for the tag integer and the # */
-    result = malloc((depCount * 15) + totalSize);
+    result = malloc(totalSize);
+    if (result == NULL) {
+        PyErr_NoMemory();
+        rc = -1;
+        goto cleanup;
+    }
     next = result;
     for (i = 0; i < depCount; i++) {
-        /* is sprintf really the best we can do? */
-        strcpy(next, tag);
+        memcpy(next, tag, tagLen);
         next += tagLen;
         memcpy(next, depList[i].frz, depList[i].frzSize);
-        free(depList[i].frz);
         next += depList[i].frzSize;
         *next++ = '|';
     }
@@ -391,8 +454,25 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
 
     *resultPtr = result;
     *resultSizePtr = next - result;
+    result = NULL;
+    rc = 0;
 
-    return 0;
+cleanup:
+    Py_XDECREF(nameObj);
+    Py_XDECREF(flagsObj);
+    Py_XDECREF(depObjList);
+    for (i = 0; i < depCount; i++) {
+        if (depList[i].frz != NULL) {
+            free(depList[i].frz);
+        }
+    }
+    if (depList != NULL) {
+        free(depList);
+    }
+    if (result != NULL) {
+        free(result);
+    }
+    return rc;
 }
 
 struct depClassList {
@@ -413,14 +493,18 @@ static int depClassSort(const void * a, const void * b) {
     return 1;
 }
 
-/* leaks memory on error */
+
 static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
-    PyObject * memberObjs, * memberList;
-    PyObject * depClass, * tuple, * rc;
-    PyObject * tagObj, * classMembers;
-    struct depClassList * members;
+    /* Borrowed references */
+    PyObject *memberObjs;
+    PyObject *depClass, *tuple, *rc = NULL;
+    /* Kept references */
+    PyObject *memberList = NULL;
+    PyObject *tagObj = NULL;
+    PyObject *classMembers = NULL;
+    struct depClassList *members = NULL;
     int memberCount;
-    char * result, * next;
+    char *result = NULL, *next;
     int i, totalSize;
 
     if (PyTuple_GET_SIZE(args) != 1) {
@@ -442,6 +526,11 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
     }
 
     members = malloc(sizeof(*members) * memberCount);
+    if (members == NULL) {
+        PyErr_NoMemory();
+        goto cleanup;
+    }
+    memset(members, 0, sizeof(*members) * memberCount);
 
     totalSize = 0;
     for (i = 0; i < memberCount; i++) {
@@ -449,58 +538,66 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
 
         if (!PYINT_CheckExact(PyTuple_GET_ITEM(tuple, 0))) {
             PyErr_SetString(PyExc_TypeError, "dict keys must be ints");
-            Py_DECREF(memberList);
-            free(members);
-            return NULL;
+            goto cleanup;
         }
 
         members[i].tag = PYINT_AS_LONG(PyTuple_GET_ITEM(tuple, 0));
         depClass = PyTuple_GET_ITEM(tuple, 1);
 
         if (!(tagObj = PyObject_GetAttrString(depClass, "tag"))) {
-            free(members);
-            Py_DECREF(memberList);
-            return NULL;
+            goto cleanup;
         }
 
         if (!(classMembers =
                     PyObject_GetAttrString(depClass, "members"))) {
-            free(members);
-            Py_DECREF(memberList);
-            Py_DECREF(tagObj);
-            return NULL;
+            goto cleanup;
         }
 
         if (depClassFreezeRaw(tagObj, classMembers, &members[i].frz,
                               &members[i].frzSize)) {
-            Py_DECREF(memberList);
-            Py_DECREF(tagObj);
-            Py_DECREF(classMembers);
-            free(members);
-            return NULL;
+            goto cleanup;
         }
 
         totalSize += members[i].frzSize + 1;
+        Py_CLEAR(classMembers);
+        Py_CLEAR(tagObj);
     }
 
-    Py_DECREF(memberList);
+    Py_CLEAR(memberList);
 
     next = result = malloc(totalSize);
+    if (result == NULL) {
+        PyErr_NoMemory();
+        goto cleanup;
+    }
     qsort(members, memberCount, sizeof(*members), depClassSort);
 
     for (i = 0; i < memberCount; i++) {
         memcpy(next, members[i].frz, members[i].frzSize);
         next += members[i].frzSize;
         *next++ = '|';
-        free(members[i].frz);
     }
 
     /* chop off the trailing | */
     next--;
 
-    free(members);
     rc = PYBYTES_FromStringAndSize(result, next - result);
-    free(result);
+
+cleanup:
+    Py_XDECREF(classMembers);
+    Py_XDECREF(tagObj);
+    Py_XDECREF(memberList);
+    if (result != NULL) {
+        free(result);
+    }
+    if (members != NULL) {
+        for (i = 0; i < memberCount; i++) {
+            if (members[i].frz != NULL) {
+                free(members[i].frz);
+            }
+        }
+        free(members);
+    }
     return rc;
 }
 
