@@ -55,8 +55,10 @@ int getSize(char ** s, int * val) {
 }
 
 static PyObject * pack(PyObject * self, PyObject * args) {
-    PyObject * formatArg, * arg, * resultObj;
-    char * format, * formatPtr, * s, * result;
+    PyObject * formatArg, * arg;
+    PyObject *ret = NULL;
+    char * format, * formatPtr, * s;
+    char *result = NULL;
     int argCount;
     int strLen;
     int argNum;
@@ -171,12 +173,12 @@ static PyObject * pack(PyObject * self, PyObject * args) {
                     formatPtr++;
                 } else if (isdigit(*formatPtr)) {
                     if (getSize(&formatPtr, &i)) {
-                        return NULL;
+                        goto cleanup;
                     }
                 } else {
                     PyErr_SetString(PyExc_RuntimeError,
                                     "internal pack error 1");
-                    return NULL;
+                    goto cleanup;
                 }
 
 
@@ -187,12 +189,17 @@ static PyObject * pack(PyObject * self, PyObject * args) {
             default:
                 PyErr_SetString(PyExc_RuntimeError,
                                 "internal pack error 2");
-                return NULL;
+                goto cleanup;
         }
     }
 
-    resultObj = PYBYTES_FromStringAndSize(result, strLen);
-    return resultObj;
+    ret = PYBYTES_FromStringAndSize(result, strLen);
+
+cleanup:
+    if (result != NULL) {
+        free(result);
+    }
+    return ret;
 }
 
 static PyObject * unpack(PyObject *self, PyObject *args) {
