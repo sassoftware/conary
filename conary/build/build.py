@@ -698,7 +698,7 @@ class ManualConfigure(Configure):
     """
     NAME
     ====
-    B{C{r.ManualConfigure()}} - Runs make without functional DESTDIR
+    B{C{r.ManualConfigure()}} - Runs configure without default arguments
 
     SYNOPSIS
     ========
@@ -708,9 +708,11 @@ class ManualConfigure(Configure):
     ===========
     The C{r.ManualConfigure()} class is called from within a Conary recipe in
     a manner similar to C{r.Configure} except all arguments to the configure
-    script must be provided explicitly.
+    script must be provided explicitly.  It honors all the same keyword
+    arguments as C{r.Configure}.
 
-    No arguments are given beyond those explicitly provided.
+    No arguments are given to the configure script beyond those explicitly
+    provided.
 
     EXAMPLES
     ========
