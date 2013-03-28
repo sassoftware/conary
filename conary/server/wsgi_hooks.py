@@ -76,6 +76,11 @@ class ConaryRouter(object):
         self.configCache = {}
 
     def __call__(self, environ, start_response):
+        # gunicorn likes to umask(0) when daemonizing, so put back something
+        # reasonable if that's the case.
+        oldUmask = os.umask(022)
+        if oldUmask != 0:
+            os.umask(oldUmask)
         environ.update(self.envOverrides)
         mountPoint = environ.get('conary.netrepos.mount_point', 'conary')
         request = self.requestFactory(environ)
