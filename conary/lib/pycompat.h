@@ -128,6 +128,10 @@
 # define PyVarObject_HEAD_INIT(type, size) PyObject_HEAD_INIT(type) size,
 #endif
 
+#if PY_VERSION_HEX < 0x02050000
+typedef int Py_ssize_t;
+#endif
+
 
 /* Partial backport from 3.1 to make PYMODULE simpler */
 #if PY_MAJOR_VERSION < 3

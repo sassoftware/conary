@@ -18,10 +18,6 @@
 #include <Python.h>
 #include <netinet/in.h>
 
-#if PY_VERSION_HEX < 0x02050000
-typedef int Py_ssize_t;
-#endif
-
 #include "pycompat.h"
 #include "streams.h"
 
