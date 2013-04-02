@@ -160,6 +160,12 @@ class URLOpener(object):
                     else:
                         log.info("Failed to open URL %s; trying the next "
                                 "proxy: %s", req.url, lastError.format())
+                    try:
+                        req.reset()
+                    except:
+                        log.exception("Failed to rewind request body file, "
+                                "unable to retry request:")
+                        break
                 # If a proxy was used, save it here
                 self.lastProxy = proxySpec
 

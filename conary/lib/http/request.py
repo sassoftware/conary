@@ -196,6 +196,10 @@ class Request(object):
         if wrapper:
             wrapper.close()
 
+    def reset(self):
+        if hasattr(self.data, 'read'):
+            self.data.seek(0)
+
 
 class ChunkedSender(object):
     """
