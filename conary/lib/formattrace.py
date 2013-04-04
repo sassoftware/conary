@@ -196,12 +196,20 @@ def stackToList(stack):
     """
     Convert a chain of traceback or frame objects into a list of frames.
     """
-    if isinstance(stack, types.TracebackType):
-        while stack.tb_next:
-            stack = stack.tb_next
-        stack = stack.tb_frame
-
+    # - Tracebacks go down via .tb_next
+    # - Stack frames go up via .f_back
+    # Both are necessary to produce a complete snapshot of the stack at the
+    # time of the error.
     out = []
+    if isinstance(stack, types.TracebackType):
+        tb = stack
+        while tb:
+            out.append(tb.tb_frame)
+            tb = tb.tb_next
+        out.reverse()
+        # Now walk the stack up starting from the top of the traceback
+        stack = stack.tb_frame.f_back
+
     while stack:
         out.append(stack)
         stack = stack.f_back
