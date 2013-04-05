@@ -2021,7 +2021,7 @@ class addGitSnapshot(_RevisionControl):
 
     SYNOPSIS
     ========
-    C{r.addGitSnapshot([I{url},] [I{tag}=,])}
+    C{r.addGitSnapshot([I{url},] [I{tag}=,] [I{branch}=,])}
 
     DESCRIPTION
     ===========
@@ -2047,6 +2047,8 @@ class addGitSnapshot(_RevisionControl):
     specifications are considered in strict order as provided by the recipe
 
     B{tag} : Git tag to use for the snapshot.
+
+    B{branch} : Git branch to use for the snapshot.
     """
 
     name = 'git'
