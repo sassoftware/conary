@@ -99,10 +99,10 @@ class Conary(CPackageRecipe):
         r.Create('%(sysconfdir)s/conaryrc',
                  contents='includeConfigFile %(sysconfdir)s/conary/config.d/*\n')
         r.MakeDirs('%(sysconfdir)s/conary/config.d/')
-        r.ExcludeDirectories(exceptions=(
+        r.ExcludeDirectories(exceptions=[
             '%(sysconfdir)s/conary/config.d',
             '%(sysconfdir)s/conary-repos/vhosts',
-            ))
+            ])
 
         r.Create('%(sysconfdir)s/logrotate.d/conary',
                  contents='\n'.join(('/var/log/conary {',
