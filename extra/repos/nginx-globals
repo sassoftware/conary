@@ -1,0 +1,11 @@
+log_format conary
+    '[$time_iso8601] '
+    'remote=$remote_addr '
+    'cnyhost=$http_x_conary_servername '
+    'method=$request_method '
+    'uri="$scheme://$http_host$request_uri" '
+    'status=$status '
+    'bytes=$body_bytes_sent '
+    'ua="$http_user_agent" '
+    'referrer=$http_referer';
+

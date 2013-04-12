@@ -37,7 +37,7 @@ minimal:
 	NO_KID=1 $(MAKE) all
 
 
-SUBDIRS = commands conary config man scripts
+SUBDIRS = commands conary config extra man scripts
 
 extra_files = \
 	COPYING			\

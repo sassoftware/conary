@@ -78,7 +78,10 @@ class Conary(CPackageRecipe):
         r.Create('%(sysconfdir)s/conaryrc',
                  contents='includeConfigFile %(sysconfdir)s/conary/config.d/*\n')
         r.MakeDirs('%(sysconfdir)s/conary/config.d/')
-        r.ExcludeDirectories(exceptions='%(sysconfdir)s/conary/config.d')
+        r.ExcludeDirectories(exceptions=(
+            '%(sysconfdir)s/conary/config.d',
+            '%(sysconfdir)s/conary-repos/vhosts',
+            ))
 
         r.MakeDirs('%(localstatedir)s/conary/emerge')
         r.Ownership('emerge', 'emerge', '%(localstatedir)s/conary/emerge')
@@ -106,7 +109,10 @@ class Conary(CPackageRecipe):
                       '%(libdir)s/.*/conary/web/',
                       '%(libdir)s/.*/conary/server/',
                       '%(datadir)s/conary/migration/',
-                      '%(datadir)s/conary/logcat')
+                      '%(datadir)s/conary/logcat',
+                      '%(sysconfdir)s/conary-repos/',
+                      '%(sysconfdir)s/sysconfig/conary-repos',
+                      )
         r.PackageSpec('conary-build',
                       '%(bindir)s/cvc(|desc)',
                       r'%(libdir)s/.*/conary/cvc(|desc)\.py.*',

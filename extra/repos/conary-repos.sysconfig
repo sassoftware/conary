@@ -1,0 +1,2 @@
+export CONARY_VHOST_DIR=/etc/conary-repos/vhosts
+GUNICORN_ARGS="conary.server.wsgi_dispatcher -c /etc/conary-repos/gunicorn.conf -u apache -g apache"
