@@ -27,6 +27,7 @@ import time
 import webob
 import zlib
 from email import MIMEText
+from webob import exc as web_exc
 
 from conary.lib import log as cny_log
 from conary.lib import util
@@ -82,13 +83,7 @@ class ConaryRouter(object):
         if oldUmask != 0:
             os.umask(oldUmask)
         environ.update(self.envOverrides)
-        mountPoint = environ.get('conary.netrepos.mount_point', 'conary')
         request = self.requestFactory(environ)
-        for elem in mountPoint.split('/'):
-            if not elem:
-                continue
-            if request.path_info_pop() != elem:
-                return self.notFound(environ, start_response)
         try:
             response = self.handleRequest(request, start_response)
             if callable(response):
@@ -100,14 +95,6 @@ class ConaryRouter(object):
         except:
             exc_info = sys.exc_info()
             return self.handleError(request, exc_info, start_response)
-
-    def notFound(self, environ, start_response):
-        response = self.responseFactory(
-                "<h1>404 Not Found</h1>\n"
-                "<p>No application was found at the given location\n",
-            status='404 Not Found',
-            content_type='text/html')
-        return response(environ, start_response)
 
     def handleRequest(self, request, start_response):
         if 'conary.netrepos.config_file' in request.environ:
@@ -278,6 +265,19 @@ class ConaryHandler(object):
             # proper environment
             os.environ['PYTHONPATH'] = req.environ['PYTHONPATH']
 
+        for mountPoint in [
+                req.environ.get('conary.netrepos.mount_point'),
+                cfg.baseUri, 'conary']:
+            if mountPoint is not None:
+                break
+        for elem in mountPoint.split('/'):
+            if not elem:
+                continue
+            if self.request.path_info_pop() != elem:
+                raise web_exc.HTTPNotFound(
+                        "Path %s is not handled by this application."
+                        % self.request.script_name)
+
         urlBase = req.application_url
         if cfg.closed:
             # Closed repository -- returns an exception for all requests
@@ -342,6 +342,8 @@ class ConaryHandler(object):
     def handleRequest(self, request):
         try:
             return self._handleRequest(request)
+        except web_exc.HTTPException, err:
+            return err
         finally:
             # This closes the repository server immediately after the initial
             # request handling phase, meaning that 'generator' responses will

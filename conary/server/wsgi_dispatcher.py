@@ -47,7 +47,9 @@ def application(environ, start_response):
             "server's error logs.\r\n"]
 
     pathhost = httphost = repohost = None
-    if environ.get('PATH_INFO'):
+    if environ.get('HTTP_X_CONARY_VHOST'):
+        pathhost = environ['HTTP_X_CONARY_VHOST']
+    elif environ.get('PATH_INFO'):
         path = environ['PATH_INFO'].split('/')
         if path[0] == '' and '.' in path[1]:
             # http://big.server/foo.com/conary/browse
