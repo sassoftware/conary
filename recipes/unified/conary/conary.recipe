@@ -59,7 +59,6 @@ class Conary(CPackageRecipe):
         buildRequires = [
             'openssl-devel:rpm',
             'zlib-devel:rpm',
-            'bzip2-devel:rpm',
             ]
         if not embedded:
             # System python
@@ -92,12 +91,10 @@ class Conary(CPackageRecipe):
             ]
         if platver.startswith('10'):
             buildRequires.extend([
-                # bzip2-devel is missing, it seems
                 'openssl-devel:rpm',
                 ])
         else:
             buildRequires.extend([
-                'libbz2-devel:rpm',
                 'libopenssl-devel:rpm',
                 ])
         have_kid = False
@@ -209,8 +206,6 @@ class Conary(CPackageRecipe):
                       '%(sitepkgs)s/conary/server/',
                       '%(datadir)s/conary/migration/',
                       '%(datadir)s/conary/logcat',
-                      '%(sysconfdir)s/conary-repos/',
-                      '%(sysconfdir)s/sysconfig/conary-repos',
                       )
         r.PackageSpec('conary-build',
                       '%(bindir)s/cvc(|desc)',
@@ -229,6 +224,17 @@ class Conary(CPackageRecipe):
         # keyrings are binary, and we are providing the initial version only
         r.InitialContents('%(sysconfdir)s/conary/.*gpg')
 
+        # repository server, off by default and without external requires
+        r.Symlink('gunicorn', '%(initdir)s/conary-repos')
+        r.ComponentSpec('conary-repository:server',
+                      '%(initdir)s/conary-repos',
+                      '%(sysconfdir)s/conary-repos/',
+                      '%(sysconfdir)s/nginx/',
+                      '%(sysconfdir)s/sysconfig/conary-repos',
+                      )
+        r.ByDefault(exceptions='conary-repository:server')
+        r.DanglingSymlinks(exceptions='%(initdir)s/conary-repos')
+        r.Requires(exceptions='%(initdir)s/conary-repos')
 
         ### Dependencies
         r.Requires('conary-policy:lib',
