@@ -226,11 +226,14 @@ class Conary(CPackageRecipe):
 
         # repository server, off by default and without external requires
         r.Symlink('gunicorn', '%(initdir)s/conary-repos')
+        r.MakeDirs('/var/log/conary-repos')
+        r.ExcludeDirectories(exceptions='/var/log/conary-repos')
         r.ComponentSpec('conary-repository:server',
                       '%(initdir)s/conary-repos',
                       '%(sysconfdir)s/conary-repos/',
                       '%(sysconfdir)s/nginx/',
                       '%(sysconfdir)s/sysconfig/conary-repos',
+                      '/var/log/conary-repos',
                       )
         r.ByDefault(exceptions='conary-repository:server')
         r.DanglingSymlinks(exceptions='%(initdir)s/conary-repos')

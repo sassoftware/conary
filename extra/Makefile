@@ -20,6 +20,7 @@ all: default-subdirs default-all
 install: install-subdirs
 	install -D -m0644 repos/conary-repos.sysconfig $(DESTDIR)/etc/sysconfig/conary-repos
 	install -D -m0644 repos/gunicorn.conf $(DESTDIR)/etc/conary-repos/gunicorn.conf
+	install -D -m0644 repos/logrotate.conf $(DESTDIR)/etc/logrotate.d/conary-repos.conf
 	install -D -m0644 repos/nginx-globals $(DESTDIR)/etc/nginx/conf.d/conary-common.conf
 	install -D -m0644 repos/nginx-includes $(DESTDIR)/etc/conary-repos/nginx-includes
 	install -d -m0755 $(DESTDIR)/etc/conary-repos/vhosts
