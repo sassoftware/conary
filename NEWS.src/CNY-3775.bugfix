@@ -1,0 +1,1 @@
+Fixed a crash when using the web interface to view a filename containing non-ASCII characters.

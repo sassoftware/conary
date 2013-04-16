@@ -27,7 +27,7 @@
                     import os
                     from urllib import quote
 
-                    url = "getFile?path=%s;pathId=%s;fileId=%s;fileV=%s" % (os.path.basename(path),
+                    url = "getFile?path=%s;pathId=%s;fileId=%s;fileV=%s" % (quote(os.path.basename(path)),
                                                                                 sha1helper.md5ToString(pathId),
                                                                                 sha1helper.sha1ToString(fileId),
                                                                                 quote(version.asString()))
@@ -37,7 +37,7 @@
                 <td>${fObj.inode.group()}</td>
                 <td>${fObj.sizeString()}</td>
                 <td>${fObj.timeString()}</td>
-                <td><a href="${url}">${path}</a></td>
+                <td><a href="${url}">${path.decode('utf8', 'replace')}</a></td>
             </tr>
         </table>
     </div>

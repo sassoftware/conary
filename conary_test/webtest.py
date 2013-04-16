@@ -117,12 +117,14 @@ class WebFrontEndTest(WebRepositoryHelper):
             content = '<a href="troveInfo?t=test">test</a>')
 
     def testBrowsePackageFiles(self):
-        comp = self.addQuickTestComponent("test:runtime")
+        # UTF-8 in path to validate CNY-3775
+        comp = self.addQuickTestComponent("test:runtime",
+                fileContents=['contents\xc2\xa0'])
         trv = self.addQuickTestCollection("test", "1.0-1-1", [ comp ])
         n, v, f = trv.getNameVersionFlavor()
         path = self.assertContent('/files?t=%s&v=%s&f=%s' % (
                 n, v.freeze(), f.freeze()),
-            code=[200], content='<a href="getFile?path=contents0')
+            code=[200], content='<a href="getFile?path=contents%C2%A0')
 
     def testBrowseDistributedShadow(self):
         raise testhelp.SkipTestException("Fails periodically in automated tests")
