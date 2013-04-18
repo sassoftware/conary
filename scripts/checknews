@@ -59,6 +59,7 @@ class CheckNewsCommand(main.JiraNemoCommand, options.AbstractCommand):
                 if version == '@NEW@':
                     print 'change @NEW@ first'
                     sys.exit(1)
+                version = 'Conary ' + version
             if not fixVer:
                 versions = client.getVersions(project)
                 v = [ x for x in versions if x.name == version ]

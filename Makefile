@@ -40,8 +40,7 @@ minimal:
 SUBDIRS = commands conary config extra man scripts
 
 extra_files = \
-	COPYING			\
-	EULA_Conary_Dual_License.txt		\
+	LICENSE			\
 	Make.rules 		\
 	Makefile		\
 	NEWS			\
