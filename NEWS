@@ -1,3 +1,20 @@
+Changes in 2.4.11:
+  o New Features:
+    * Conary operations now succeed through proxies that unilaterally
+      re-encode as gzip (CNY-3781)
+    * Added sample WSGI server configuration under extra/repos. The
+      conary recipe also installs this in the conary-repository:server
+      component (off by default). gunicorn and nginx are required for
+      this default configuration.
+
+  o Bug Fixes:
+    * Fixed memory leaks and reference leaks in extension modules,
+      discovered by Uri Simchoni (CNY-3784)
+    * Update addGitSnapshot doc string to include information about the
+      branch option. (CNY-3787)
+    * Fixed a crash when using the web interface to view a filename
+      containing non-ASCII characters. (CNY-3775)
+
 Changes in 2.4.10:
   o New Features:
     * The addArchive source method now takes new preserveSetid and
