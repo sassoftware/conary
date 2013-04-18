@@ -1,0 +1,1 @@
+Added sample WSGI server configuration under extra/repos. The conary recipe also installs this in the conary-repository:server component (off by default). gunicorn and nginx are required for this default configuration.
