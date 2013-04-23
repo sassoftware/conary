@@ -622,7 +622,8 @@ class ConaryHandler(object):
             return self._makeError('404 Not Found',
                     "Conary web API is not enabled on this repository")
         prefix = self.request.script_name
-        restHandler = webhooks.WSGIHandler(prefix, self.repositoryServer)
+        restHandler = webhooks.WSGIHandler(prefix, self.repositoryServer,
+                authToken=self.auth)
         return restHandler.handle(self.request, path=None)
 
     def close(self):
