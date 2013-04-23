@@ -204,6 +204,7 @@ class Conary(CPackageRecipe):
                       r'%(sitepkgs)s/conary/repository/shimclient\.py.*',
                       '%(sitepkgs)s/conary/web/',
                       '%(sitepkgs)s/conary/server/',
+                      '%(sitepkgs)s/conary/(changemail|logaction)\.py.*',
                       '%(datadir)s/conary/migration/',
                       '%(datadir)s/conary/logcat',
                       )
@@ -256,7 +257,7 @@ class Conary(CPackageRecipe):
             r.UtilizeUser('emerge', '%(sitepkgs)s/conary/cvc.py')
         # emerge really requires all of conary-build, so if
         # it moves to cvc we can remove this whiteout
-        r.Requires(exceptDeps=('(%(bindir)s/conary|conarycmd.py)',
+        r.Requires(exceptDeps=('%(bindir)s/conary|conarycmd.py.*',
                                'python: conary.build.cook'))
         # CNY-3314 -- conary.commit should not depend on conary.cvc
         r.Requires(exceptDeps=('.*/conary/commit\.py.*$',

@@ -37,12 +37,8 @@ class PrintDatabase:
         self.driver = driver
         if self.driver == "sqlite":
             from conary.dbstore import sqlite_drv as drv
-        elif driver =="mysql":
-            from conary.dbstore import mysql_drv as drv
         elif driver == "postgresql":
             from conary.dbstore import postgresql_drv as drv
-        elif driver == "ingres":
-            from conary.dbstore import ingres_drv as drv
         else:
             raise AttributeError("unknown driver", driver)
         self.keywords = drv.KeywordDict()
