@@ -3594,9 +3594,9 @@ class Requires(_addInfo, _dependency):
 
         if (f.inode.perms() & 0111 and m and m.name == 'script' and
             os.path.basename(m.contents['interpreter']).startswith('python')):
-            self._addPythonRequirements(path, fullpath, pkgFiles, script=True)
+            self._addPythonRequirements(path, fullpath, pkgFiles)
         elif self._isPython(path):
-            self._addPythonRequirements(path, fullpath, pkgFiles, script=False)
+            self._addPythonRequirements(path, fullpath, pkgFiles)
 
         if (f.inode.perms() & 0111 and m and m.name == 'script' and
             os.path.basename(m.contents['interpreter']).startswith('ruby')):
@@ -3813,7 +3813,7 @@ class Requires(_addInfo, _dependency):
                 finder.close()
 
 
-    def _addPythonRequirements(self, path, fullpath, pkgFiles, script=False):
+    def _addPythonRequirements(self, path, fullpath, pkgFiles):
         destdir = self.recipe.macros.destdir
         destDirLen = len(destdir)
 
@@ -3830,24 +3830,16 @@ class Requires(_addInfo, _dependency):
             # consistency).
             return
 
-        try:
-            if script:
-                pythonModuleFinder.run_script(fullpath)
-            else:
-                pythonModuleFinder.load_file(fullpath)
-        except:
-            # not a valid python file
+        pythonModuleFinder.load_file(fullpath)
+        data = pythonModuleFinder.getDepsForPath(fullpath)
+        if data['result'] != 'ok':
             self.info('File %s is not a valid python file', path)
             return
 
-        for depPath in pythonModuleFinder.getDepsForPath(fullpath):
+        for depPath in data['paths']:
             if not depPath:
                 continue
             flags = None
-            if depPath.startswith('///invalid'):
-                # same as exception handling above
-                self.info('File %s is not a valid python file', path)
-                return
             absPath = None
             if depPath.startswith(destdir):
                 depPath = depPath[destDirLen:]
@@ -3895,9 +3887,12 @@ class Requires(_addInfo, _dependency):
                 depName = self._normalizePythonDep(depPath)
                 if depName == '__future__':
                     continue
-
             self._addRequirement(path, depName, flags, pkgFiles,
                                  deps.PythonDependencies)
+
+        #if data['missing']:
+        #    self.warn("Python file %s is missing requirements: %s" % (
+        #        path, ', '.join(data['missing'])))
 
     def _checkPackagePythonDeps(self, pkgFiles, depPath, depNames, flags):
         # Try to match depNames against all current packages

@@ -3030,6 +3030,7 @@ print f(2)(4)
 #!/usr/bin/python
 
 import os
+from bogus import missing
 """)
 
         finderModule = pydeps.moduleFinderProxy('/usr/bin/python', root,
@@ -3038,15 +3039,23 @@ import os
         try:
             finderModule.load_file(file2)
             deps = finderModule.getDepsForPath(file2)
-            self.assertEqual(deps, [ os.path.join(pythonPath, 'os.py') ])
+            self.assertEqual(deps, {
+                'result': 'ok',
+                'paths': set([ os.path.join(pythonPath, 'os.py') ]),
+                'missing': set(['bogus']),
+                })
 
             finderModule.load_file(file1)
             deps = finderModule.getDepsForPath(file1)
-            self.assertEqual(deps, [ '///invalid' ])
+            self.assertEqual(deps, {'result': 'invalid'})
 
             finderModule.load_file(file2)
             deps = finderModule.getDepsForPath(file2)
-            self.assertEqual(deps, [ os.path.join(pythonPath, 'os.py') ])
+            self.assertEqual(deps, {
+                'result': 'ok',
+                'paths': set([ os.path.join(pythonPath, 'os.py') ]),
+                'missing': set(['bogus']),
+                })
         finally:
             finderModule.close()
 
