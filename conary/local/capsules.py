@@ -449,4 +449,5 @@ class BaseCapsulePlugin(object):
         for name, version, flavor in removedTups:
             changeSet.oldTrove(name, version, flavor)
         for n, pkg in enumerate(addedPkgs):
-            self._addPhantomTrove(changeSet, pkg, callback, n, len(addedPkgs))
+            self._addPhantomTrove(changeSet, pkg, callback,
+                    n + 1, len(addedPkgs))

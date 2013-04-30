@@ -720,6 +720,10 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
 
         # Make a fake package to contain the fake component
         pkgName = name.split(':')[0]
+        if self.db.hasTrove(pkgName, version, flavor):
+            # It's possible to erase just the component and leave the package,
+            # so don't try to create it again.
+            return
         pkg = trove.Trove(pkgName, version, flavor)
         provides = deps.DependencySet()
         provides.addDep(deps.TroveDependencies, deps.Dependency(pkgName))
