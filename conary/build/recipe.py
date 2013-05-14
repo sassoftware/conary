@@ -18,7 +18,7 @@
 import inspect
 import itertools
 
-from conary import files, trove, versions
+from conary import files as files_mod, trove, versions
 from conary.build import action, lookaside, source, policy
 from conary.build import macros
 from conary.build.errors import RecipeFileError, RecipeDependencyError
@@ -330,7 +330,8 @@ class Recipe(object):
                     files.append(f)
         return files
 
-    def fetchAllSources(self, refreshFilter=None, skipFilter=None):
+    def fetchAllSources(self, refreshFilter=None, skipFilter=None,
+            withEphemeral=True):
         """
         returns a list of file locations for all the sources in
         the package recipe
@@ -351,16 +352,22 @@ class Recipe(object):
                 continue
 
             f = src.fetch(refreshFilter)
-            if f:
-                if type(f) in (tuple, list):
-                    files.extend(f)
-                else:
-                    files.append(f)
+            if not f:
+                continue
+            if src.ephemeral and not withEphemeral:
+                continue
+
+            if type(f) in (tuple, list):
+                files.extend(f)
+            else:
+                files.append(f)
         return files
 
-    def getSourcePathList(self):
+    def getSourcePathList(self, withEphemeral=True):
         return [ x for x in self._sources if isinstance(x, source._AnySource)
-                and x.__dict__.get('sourceDir') is None]
+                and x.__dict__.get('sourceDir') is None
+                and (withEphemeral or not x.__dict__.get('ephemeral'))
+                ]
 
     def extraSource(self, action):
         """
@@ -459,7 +466,7 @@ class Recipe(object):
                                               for x in fileList])
                 for i in range(len(fileList)):
                     fileObj = fileObjs[i]
-                    if isinstance(fileObj, files.RegularFile):
+                    if isinstance(fileObj, files_mod.RegularFile):
                         (pathId, path, fileId, version) = fileList[i]
                         self._lcstate.pathMap[path] = (srcName, srcVersion,
                             pathId, path, fileId, version, fileObj)
@@ -480,6 +487,9 @@ class Recipe(object):
                 sourcePaths[ k ] = ps
             else:
                 sourcePaths[ ps[0] ] = ps
+                if a.ephemeral:
+                    raise RecipeFileError("File '%s' is marked as ephemeral "
+                            "but is not autosourced" % (ps[0],))
 
         pathMap = self._lcstate.pathMap
         delList = []
@@ -761,7 +771,6 @@ class Recipe(object):
 
             else:
                 crossDb = database.Database(sysroot, cfg.dbPath)
-        time = sourceVersion.timeStamps()[-1]
 
         reqMap, missingReqs = _matchReqs(self.buildRequires, db)
         if self.needsCrossFlags() and self.crossRequires:

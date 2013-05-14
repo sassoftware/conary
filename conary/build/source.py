@@ -193,7 +193,9 @@ class _Source(_AnySource):
                 'keyid': None,
                 'httpHeaders': {},
                 'package': None,
-                'sourceDir': None}
+                'sourceDir': None,
+                'ephemeral': False,
+                }
 
     supported_targets = (TARGET_LINUX, TARGET_WINDOWS, )
 
@@ -411,12 +413,10 @@ class _Source(_AnySource):
         if self.guessname:
             sourcename += self.guessname
 
-        searchMethodMap = {
-            self.recipe.COOK_TYPE_REPOSITORY :
-                self.recipe.fileFinder.SEARCH_REPOSITORY_ONLY,
-        }
-        searchMethod = searchMethodMap.get(self.recipe.cookType,
-            self.recipe.fileFinder.SEARCH_ALL)
+        searchMethod = self.recipe.fileFinder.SEARCH_ALL
+        if (self.recipe.cookType == self.recipe.COOK_TYPE_REPOSITORY and not
+                self.ephemeral):
+            searchMethod = self.recipe.fileFinder.SEARCH_REPOSITORY_ONLY
 
         inRepos, source = self.recipe.fileFinder.fetch(sourcename,
                                             headers=httpHeaders,
@@ -478,7 +478,7 @@ class addArchive(_Source):
 
     SYNOPSIS
     ========
-    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{preserveSetid,}] [I{preserveDirectories=,}] [I{sourceDir}=,] [I{debArchive}=])}
+    C{r.addArchive(I{archivename}, [I{dir}=,] [I{keyid}=,] [I{rpm}=,] [I{httpHeaders}=,] [I{package})=,] [I{use}=,] [I{preserveOwnership=,}] [I{preserveSetid,}] [I{preserveDirectories=,}] [I{sourceDir}=,] [I{debArchive}=,] [I{ephemeral}=])}
 
     DESCRIPTION
     ===========
@@ -572,6 +572,11 @@ class addArchive(_Source):
     C{"data.tar"} (will choose C{"data.tar.gz"} or C{"data.tar.bz2"}
     but can reasonably be set to C{"control.tar"} to instead choose the
     archive containing the scripts.
+
+    B{ephemeral} : If True, the file will be downloaded again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the file can be recreated precisely in the future, for example if
+    the file comes from a source control system.  Only valid for URLs.
 
     EXAMPLES
     ========
@@ -1024,6 +1029,11 @@ class addPatch(_Source):
 
     B{patchName} : Name of patch program to run (Default: C{patch})
 
+    B{ephemeral} : If True, the file will be downloaded again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the file can be recreated precisely in the future, for example if
+    the file comes from a source control system.  Only valid for URLs.
+
     EXAMPLES
     ========
     The following examples demonstrate invocations of C{r.addPatch}
@@ -1346,6 +1356,11 @@ class addSource(_Source):
     considered relative to C{%(builddir)s}. Using C{sourceDir} prompts
     Conary to ignore the lookaside cache in favor of this directory.
 
+    B{ephemeral} : If True, the file will be downloaded again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the file can be recreated precisely in the future, for example if
+    the file comes from a source control system.  Only valid for URLs.
+
     EXAMPLES
     ========
     The following examples demonstrate invocations of C{r.addSource}
@@ -1561,6 +1576,11 @@ class addCapsule(_Source):
     B{msiArgs} : (Optional) Arguments passed to msiexec at install time. The
     default set of arguments at the time of this writing in the rPath Tools
     Install Service are "/q /l*v".
+
+    B{ephemeral} : If True, the file will be downloaded again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the file can be recreated precisely in the future, for example if
+    the file comes from a source control system.  Only valid for URLs.
 
     EXAMPLES
     ========
@@ -2048,6 +2068,12 @@ class addGitSnapshot(_RevisionControl):
     B{tag} : Git tag to use for the snapshot.
 
     B{branch} : Git branch to use for the snapshot.
+
+    B{ephemeral} : If True, the snapshot will be recreated again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the snapshot can be recreated precisely in the future.  For source
+    control snapshots, this typically means that a precise revision has been
+    passed in the B{tag} argument.  Only valid for URLs.
     """
 
     name = 'git'
@@ -2132,6 +2158,12 @@ class addMercurialSnapshot(_RevisionControl):
     specifications are considered in strict order as provided by the recipe
 
     B{tag} : Mercurial tag to use for the snapshot.
+
+    B{ephemeral} : If True, the snapshot will be recreated again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the snapshot can be recreated precisely in the future.  For source
+    control snapshots, this typically means that a precise revision has been
+    passed in the B{tag} argument.  Only valid for URLs.
     """
 
     name = 'hg'
@@ -2207,6 +2239,12 @@ class addCvsSnapshot(_RevisionControl):
     specifications are considered in strict order as provided by the recipe
 
     B{tag} : CVS tag to use for the snapshot.
+
+    B{ephemeral} : If True, the snapshot will be recreated again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the snapshot can be recreated precisely in the future.  For source
+    control snapshots, this typically means that a precise revision has been
+    passed in the B{tag} argument.  Only valid for URLs.
     """
 
     name = 'cvs'
@@ -2281,6 +2319,12 @@ class addSvnSnapshot(_RevisionControl):
     Previously-specified C{PackageSpec} or C{ComponentSpec} lines will
     override the package specification, since all package and component
     specifications are considered in strict order as provided by the recipe
+
+    B{ephemeral} : If True, the snapshot will be recreated again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the snapshot can be recreated precisely in the future.  For source
+    control snapshots, this typically means that a precise revision has been
+    passed in the B{tag} argument.  Only valid for URLs.
     """
 
     name = 'svn'
@@ -2363,6 +2407,12 @@ class addBzrSnapshot(_RevisionControl):
     The following keywords are recognized by C{r.addBzrSnapshot}:
 
     B{tag} : Specify a specific tagged revision to checkout.
+
+    B{ephemeral} : If True, the snapshot will be recreated again at cook time
+    rather than storing it in the repository in the source trove.  Use this
+    only if the snapshot can be recreated precisely in the future.  For source
+    control snapshots, this typically means that a precise revision has been
+    passed in the B{tag} argument.  Only valid for URLs.
     """
 
     name = 'bzr'

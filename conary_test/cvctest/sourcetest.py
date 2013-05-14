@@ -1262,6 +1262,30 @@ contents(sha1)
                 continue
             cs.getFileContents(pathId, fileId)
 
+    def testEphemeralSource(self):
+        os.chdir(self.workDir)
+        self.newpkg("foo")
+        os.chdir("foo")
+        self.writeFile("foo.recipe", """
+class foo(PackageRecipe):
+    name = 'foo'
+    version = '1.0'
+    clearBuildReqs()
+    def setup(r):
+        r.addSource('http://localhost/foo', ephemeral=True, dir='/')
+""")
+        self.addfile("foo.recipe")
+        dir = os.path.join(self.cfg.lookaside, 'foo', 'localhost')
+        util.mkdirChain(dir)
+        shutil.copyfile(resources.get_archive('distcc-2.9.tar.bz2'),
+                        dir + '/foo')
+        self.commit()
+        st = state.ConaryStateFromFile('CONARY')
+        assert 'foo' not in [x[1] for x in st.source.iterFileList()]
+
+        # Ensure repository cook allows using the copy in lookaside, too
+        self.cookFromRepository('foo')
+
     def testAddSourceInSubClass(self):
         # subclass is an exact duplicate of superclass -
         # it has no setup() method, and so just uses the superclass one.
