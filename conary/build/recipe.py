@@ -365,8 +365,8 @@ class Recipe(object):
 
     def getSourcePathList(self, withEphemeral=True):
         return [ x for x in self._sources if isinstance(x, source._AnySource)
-                and x.__dict__.get('sourceDir') is None
-                and (withEphemeral or not x.__dict__.get('ephemeral'))
+                and x.sourceDir is None
+                and (withEphemeral or not x.ephemeral)
                 ]
 
     def extraSource(self, action):

@@ -177,6 +177,9 @@ class WindowsHelper(object):
                 pass
 
 class _AnySource(action.RecipeAction):
+    ephemeral = False
+    sourceDir = None
+
     def checkSignature(self, f):
         pass
     # marks classes which have source files which need committing
