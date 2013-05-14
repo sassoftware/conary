@@ -1,0 +1,1 @@
+Fixed source control snapshots always being recreated when cooking locally, even if one was already cached.
