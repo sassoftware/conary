@@ -33,7 +33,6 @@ class _BaseStream(object):
 
 
 class _ValueStream(_BaseStream):
-    _valueTypes = None
     _valueDefault = None
 
     def __init__(self, value=None):
@@ -62,9 +61,7 @@ class _ValueStream(_BaseStream):
         return hash(self._value)
 
     def set(self, value):
-        if type(value) not in self._valueTypes:
-            raise TypeError("invalid type for set")
-        self._value = value
+        raise NotImplementedError
 
     def freeze(self, skipSet=None):
         return self._value
@@ -100,7 +97,6 @@ class _ValueStream(_BaseStream):
 
 
 class StringStream(_ValueStream):
-    _valueTypes = (str,)
     _valueDefault = ''
 
     def set(self, value):
@@ -109,13 +105,24 @@ class StringStream(_ValueStream):
             # None on get later, but when freezing None is treated the same as
             # empty string by containers.
             value = ''
-        _ValueStream.set(self, value)
+        elif not isinstance(value, str):
+            raise TypeError("invalid type '%s' for string stream" %
+                    type(value).__name__)
+        self._value = value
 
 
 class _NumericStream(_ValueStream):
-    _valueTypes = (int, long, type(None))
     _valueDefault = None
     _intFormat = None
+
+    def set(self, value):
+        if isinstance(value, float):
+            value = int(value)
+        elif not isinstance(value, (int, long)) and value is not None:
+            raise TypeError("invalid type '%s' for numeric stream" %
+                    type(value).__name__)
+        self._value = value
+
 
     def freeze(self, skipSet=None):
         if self._value is None:
