@@ -26,8 +26,6 @@ acceptable.
 import ctypes
 import errno
 import os
-import resource
-import select
 from conary.lib.ext import ctypes_utils
 from ctypes import c_int, c_size_t, c_long, c_void_p
 
@@ -44,22 +42,8 @@ def _fileno(fobj):
 
 
 def countOpenFileDescriptors():
-    maxfds = resource.getrlimit(resource.RLIMIT_NOFILE)[1]
-    poller = select.poll()
-    for fd in range(maxfds):
-        poller.register(fd, select.POLLIN | select.POLLPRI | select.POLLOUT)
-    while True:
-        try:
-            res = poller.poll(0)
-        except select.error, err:
-            if err.errno == errno.EINTR:
-                continue
-            raise
-        else:
-            break
-
-    badfs = len([x for x in res if x[1] == select.POLLNVAL])
-    return maxfds - badfs
+    # minus one for the handle used to list the directory
+    return len(os.listdir('/proc/self/fd')) - 1
 
 
 def fchmod(fobj, mode):
