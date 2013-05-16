@@ -308,8 +308,22 @@ class StreamSet(_BaseStream):
             out.append((tag, substream))
         return self._pack(out, includeEmpty=True)
 
-    def twm(self, diff, other):
-        raise NotImplementedError
+    def twm(self, diff, base, skip=None):
+        if type(self) != type(base):
+            raise TypeError("invalid type")
+        if not diff:
+            return False
+        tagMap = dict((x.tag, x) for x in self._getTags())
+        while diff:
+            tagNum, sizeType, substream, diff = self._readTag(diff)
+            tag = tagMap.get(tagNum)
+            if not tag:
+                raise NotImplementedError
+            if skip and tag.name in skip:
+                continue
+            myvalue = getattr(self, tag.name)
+            basevalue = getattr(base, tag.name)
+            myvalue.twm(substream, basevalue)
 
     @classmethod
     def find(cls, tagNum, frozen):
