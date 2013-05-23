@@ -333,10 +333,6 @@ class CfgRepoMap(CfgList):
         curVal.extend(newVal)
         return curVal
 
-    def getDefault(self, default=[]):
-        if hasattr(default, 'iteritems'):
-            return CfgList.getDefault(self, default.iteritems())
-        return CfgList.getDefault(self, default)
 
 class CfgFlavor(CfgType):
 
@@ -657,11 +653,19 @@ class ConaryContext(ConfigSection):
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 
     def _writeKey(self, out, cfgItem, value, options):
-        if cfgItem.isDefault():
+        # Suppress all default values, as opposed to the default behavior which
+        # only suppresses defaults that are None
+        name = cfgItem.name
+        if name not in self._values or self._values[name].isDefault():
             return
         ConfigSection._writeKey(self, out, cfgItem, value, options)
 
+
 class ConaryConfiguration(SectionedConfigFile):
+
+    # Inherit all context options
+    _cfg_bases = (ConaryContext,)
+
     # this allows a new section to be created on the fly with the type
     # ConaryContext
     _allowNewSections     = True
@@ -689,10 +693,6 @@ class ConaryConfiguration(SectionedConfigFile):
         """
         SectionedConfigFile.__init__(self)
         self._ignoreErrors = ignoreErrors
-
-        for info in ConaryContext._getConfigOptions():
-            if info[0] not in self:
-                self.addConfigOption(*info)
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 
@@ -753,9 +753,11 @@ class ConaryConfiguration(SectionedConfigFile):
         self.context = name
         context = self.getSection(name)
 
-        for key, value in context.iteritems():
-            if not context.isDefault(key):
-                self[key] = self._options[key].set(self[key], value)
+        for key, ctxval in context._values.iteritems():
+            if ctxval.isDefault():
+                continue
+            newval = self._cow(key)
+            newval.updateFromContext(ctxval)
         return True
 
     def getContext(self, name):
