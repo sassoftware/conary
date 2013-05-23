@@ -244,7 +244,7 @@ class OptionValue(object):
     def isDefault(self):
         # Try to catch cases where the value was mutated externally, e.g.
         # cfg.user.append(...)
-        return self._isDefault and self.value == self.definition.default
+        return self._isDefault and self.value == self.definition.getDefault()
 
     # Backwards compatibility
 
