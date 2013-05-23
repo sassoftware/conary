@@ -1,3 +1,22 @@
+Changes in 2.4.12:
+  o New Features:
+    * Improved python dependency analysis. Changes include detecting
+      explicit and implicit relative imports, creating all requires for
+      "from" imports rather than just the parent package, and warning on
+      missing requirements. (CNY-3790)
+    * Mirroring by group (recursive mode) now starts much more quickly.
+      (CNY-3446)
+    * Added to all source actions an "ephemeral" parameter that keeps
+      autosourced files from being committed to the repository.
+      (CNY-3794)
+
+  o Bug Fixes:
+    * Fixed a failure when synchronizing capsule databases after a
+      phantom component, but not the containing package, had been
+      erased. (CNY-3791)
+    * Fixed source control snapshots always being recreated when cooking
+      locally, even if one was already cached.
+
 Changes in 2.4.11:
   o New Features:
     * Conary operations now succeed through proxies that unilaterally
