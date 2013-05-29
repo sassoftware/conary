@@ -1,0 +1,57 @@
+#!/usr/bin/python
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+        fullPath = os.path.dirname(sys.argv[0])
+    else:
+        fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.insert(0, os.path.dirname(fullPath))
+
+from conary import files
+from conary.repository.netrepos import netserver
+
+cfgpath = sys.argv[1]
+cfg = netserver.ServerConfig()
+cfg.read(cfgpath)
+netrepos = netserver.NetworkRepositoryServer(cfg, '')
+cu = netrepos.db.cursor()
+cu.execute("SELECT item, stream FROM FileStreams JOIN TroveFiles USING(streamid) JOIN Instances USING (instanceId) JOIN items USING(itemid) WHERE stream IS NOT NULL")
+uncmp_sources = uncmp_bins = 0
+bin_sha1s = set()
+source_sha1s = set()
+for name, fileStream in cu:
+    if (not files.frozenFileFlags(fileStream).isEncapsulatedContent()
+            and files.frozenFileHasContents(fileStream)):
+        cont = files.frozenFileContentInfo(fileStream)
+        sha1 = cont.sha1().encode('hex')
+        path = '%s/%s/%s' % (sha1[:2], sha1[2:4], sha1[4:])
+        if ':source' in name:
+            if path not in source_sha1s:
+                uncmp_sources += cont.size()
+                source_sha1s.add(path)
+        else:
+            if path not in bin_sha1s:
+                uncmp_bins += cont.size()
+                bin_sha1s.add(path)
+compr_sources = compr_bins = compr_uniq_sources = 0
+for path in bin_sha1s:
+    size = os.stat(os.path.join(cfg.contentsDir, path)).st_size
+    compr_bins += size
+for path in source_sha1s:
+    size = os.stat(os.path.join(cfg.contentsDir, path)).st_size
+    compr_sources += size
+    if path not in bin_sha1s:
+        compr_uniq_sources += size
+print 'Uncompressed sizes:'
+print ' Sources:                        ', uncmp_sources
+print ' Binaries:                       ', uncmp_bins
+print 'Compressed sizes:'
+print ' Sources:                        ', compr_sources
+print ' Binaries:                       ', compr_bins
+print ' Sources not also in binaries:   ', compr_uniq_sources
+print ' Total compressed:               ', compr_uniq_sources + compr_bins

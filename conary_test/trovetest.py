@@ -19,7 +19,7 @@ from testrunner import testhelp
 from testrunner import testcase
 import itertools
 import time
-from conary import changelog, streams, trove
+from conary import changelog, streams, trove, trovetup
 from conary.trove import Trove
 from conary.trove import TroveError
 from conary.trove import ThawTroveChangeSet
@@ -1719,3 +1719,12 @@ class TroveTest2(rephelp.RepositoryHelper):
         mi2 = self.createMetadataItem(sizeOverride=0)
         trv2, cs = self.Component('foo2:run', metadata=[mi, mi2])
         self.assertEqual(trv2.getSize(), 0)
+
+    def testGetNameVersionFlavorReturnsTroveTup(self):
+        v = ThawVersion("/conary.rpath.com@test:trunk/10:1.2-3")
+        f = parseFlavor('is:x86')
+        n = 'somename'
+        t = trove.Trove(n, v, f)
+        nvf = t.getNameVersionFlavor()
+        self.assertTrue(isinstance(nvf, trovetup.TroveTuple))
+        self.assertTrue(isinstance(nvf, tuple))

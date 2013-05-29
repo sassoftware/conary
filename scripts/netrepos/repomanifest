@@ -1,0 +1,22 @@
+#!/usr/bin/python
+import os
+import sys
+
+from conary import files
+from conary.repository.netrepos import netserver
+
+cfgpath = sys.argv[1]
+cfg = netserver.ServerConfig()
+cfg.read(cfgpath)
+netrepos = netserver.NetworkRepositoryServer(cfg, '')
+cu = netrepos.db.cursor()
+cu.execute("SELECT stream FROM FileStreams WHERE stream IS NOT NULL")
+sha1s = set()
+for fileStream, in cu:
+    if (not files.frozenFileFlags(fileStream).isEncapsulatedContent()
+            and files.frozenFileHasContents(fileStream)):
+        cont = files.frozenFileContentInfo(fileStream)
+        sha1 = cont.sha1().encode('hex')
+        sha1s.add('%s/%s/%s' % (sha1[:2], sha1[2:4], sha1[4:]))
+for x in sorted(sha1s):
+    print x

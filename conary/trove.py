@@ -28,6 +28,7 @@ from conary import errors
 from conary import files
 from conary import rpmhelper
 from conary import streams
+from conary import trovetup
 from conary import versions
 from conary.deps import deps
 from conary.lib import sha1helper, api
@@ -1800,7 +1801,7 @@ class Trove(streams.StreamSet):
 
     @api.publicApi
     def getNameVersionFlavor(self):
-        return self.name(), self.version(), self.flavor()
+        return trovetup.TroveTuple(self.name(), self.version(), self.flavor())
 
     @api.publicApi
     def getMetadata(self, language=None):

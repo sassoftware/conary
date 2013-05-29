@@ -1,2 +1,0 @@
-Fixed a failure when synchronizing capsule databases after a phantom component,
-but not the containing package, had been erased.
