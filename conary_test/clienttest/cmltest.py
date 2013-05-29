@@ -624,6 +624,25 @@ class CMLTest(rephelp.RepositoryHelper):
         )))
 
     @context('sysmodel')
+    def testQuotedDataMultiItemLine(self):
+        "Ensure that data that will be split by shlex is saved quoted"
+        smf = self.getCML()
+        trvspecs = [ 'foo[is: x86 x86_64]', 'bar[is: x86 x86_64]' ]
+        smf.appendOpByName('install', text = trvspecs)
+        expected = '\n'.join([
+            "install %s" % ' '.join("'%s'" % x for x in trvspecs),
+            "",
+        ])
+        self.assertEquals(smf.format(), expected)
+        # Parse it again, make sure we get the same results
+        smf = self.getCML()
+        smf.parse(fileData=expected.strip().split('\n'))
+        self.assertEquals(smf.format(), expected)
+        self.assertEquals(
+                [ len(x.item) for x in smf.modelOps ],
+                [ 2 ])
+
+    @context('sysmodel')
     def testStartFromScratch(self):
         smf = self.getCML()
 
