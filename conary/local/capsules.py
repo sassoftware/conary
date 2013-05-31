@@ -446,7 +446,10 @@ class BaseCapsulePlugin(object):
         the equivalent Conary operations into the given changeset.
         """
         removedTups, addedPkgs = self.getCapsuleChanges()
-        for name, version, flavor in removedTups:
+        removedPkgs = [(x[0].split(':')[0], x[1], x[2]) for x in removedTups]
+        removedPkgs = [tup for (tup, exists)
+                in zip(removedPkgs, self.db.hasTroves(removedPkgs)) if exists]
+        for name, version, flavor in removedTups + removedPkgs:
             changeSet.oldTrove(name, version, flavor)
         for n, pkg in enumerate(addedPkgs):
             self._addPhantomTrove(changeSet, pkg, callback,
