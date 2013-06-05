@@ -1601,7 +1601,7 @@ class FilesystemJob:
                 # does important file conflict handling.
                 restoreFile = (not isinstance(fsFile, files.Directory))
                 self._restore(fsFile, realPath, newTroveInfo,
-                      "file has not changed",
+                      "%s has not changed",
                       contentsOverride = None,
                       overrideInternalConflicts =
                         flags.replaceManagedFiles(finalPath),
