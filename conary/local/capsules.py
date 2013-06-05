@@ -400,7 +400,7 @@ class BaseCapsulePlugin(object):
             if capsuleInfo.type() != self.kind:
                 continue
             key = self._getCapsuleKeyFromInfo(capsuleInfo)
-            tupsByKey[key] = tup
+            tupsByKey.setdefault(key, set()).add(tup)
         return tupsByKey
 
     def _getCapsuleKeyFromInfo(self, capsuleStream):
@@ -426,11 +426,23 @@ class BaseCapsulePlugin(object):
         localSet = set(local)
         target = self.getCapsuleKeysFromTarget()
         targetSet = set(target)
-        removedTups = [x[1] for x in sorted(
-            (y, local[y]) for y in localSet - targetSet)]
+        removedTups = set(x[1] for x in sorted(
+            (y, local[y]) for y in localSet - targetSet))
         addedPkgs = [x[1] for x in sorted(
             (y, target[y]) for y in targetSet - localSet)]
-        return removedTups, addedPkgs
+        # Remove duplicate phantom troves
+        for key, tups in local.iteritems():
+            if len(tups) == 1:
+                continue
+            real = [x for x in tups if not x[1].onPhantomLabel()]
+            phantom = [x for x in tups if x[1].onPhantomLabel()]
+            if real:
+                # Real trove exists, remove all phantom troves
+                removedTups.update(phantom)
+            else:
+                # Only phantom troves, remove all but one phantom trove
+                removedTups.update(sorted(phantom)[:-1])
+        return sorted(removedTups), addedPkgs
 
     def _addPhantomTrove(self, changeSet, package, callback, n, total):
         """
