@@ -15,6 +15,7 @@
 #
 
 
+import itertools
 import os
 import sys
 import tempfile
@@ -426,8 +427,8 @@ class BaseCapsulePlugin(object):
         localSet = set(local)
         target = self.getCapsuleKeysFromTarget()
         targetSet = set(target)
-        removedTups = set(x[1] for x in sorted(
-            (y, local[y]) for y in localSet - targetSet))
+        removedTups = set(itertools.chain(*(x[1] for x in sorted(
+            (y, local[y]) for y in localSet - targetSet))))
         addedPkgs = [x[1] for x in sorted(
             (y, target[y]) for y in targetSet - localSet)]
         # Remove duplicate phantom troves
