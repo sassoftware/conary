@@ -1142,10 +1142,25 @@ cvc.
 By default, if a foreign package database (e.g. RPM) is present then Conary
 will attempt to create and maintain representations of the packages installed
 there on a local "phantom" label.  These phantom troves can then be erased or
-replaced by managed packages using Conary.  Setting syncCapsuleDatabase to
-"False" will prevent this synchronization from ocurring.  When disabled, some
-capsule operations might fail due to discrepencies between the operations
-Conary attempts and the reality of what packages are in the foreign database.
+replaced by a managed package using Conary.
+Setting syncCapsuleDatabase to "\fBupdate\fR" (the default) will prevent
+phantom packages from being erased due to a system model operation, but unlike
+"pin" will allow them to be replaced with a managed package.
+Setting this option to "\fBpin\fR" will pin any phantom troves created after
+inspecting the foreign database, preventing them from being erased.  This mode
+prevents user modifications to the foreign database from being wiped out, but
+could result in future conflicts which may require manual resolution.
+Setting syncCapsuleDatabase to "\fBclean\fR" will not pin new phantom troves.
+This allows future operations to remove or replace the phantom troves and the
+associated items in the foreign database in order to reconcile system state to
+the model.
+Setting this option to "\fBfalse\fR" will prevent synchronization from ocurring
+entirely.  When disabled, some capsule operations might fail due to
+discrepancies between the operations Conary attempts and the reality of what
+packages are in the foreign database.  This mode is not recommended except as a
+workaround for bugs in Conary or in the foreign package manager, or to prevent
+Conary from interacting with the foreign package manager when capsules are not
+in use.
 .TP
 .B updateThreshold
 Defines the upper limit on the number of unrelated troves that will be

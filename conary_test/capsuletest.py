@@ -350,7 +350,7 @@ class CapsuleTest(rephelp.RepositoryHelper):
         self.assertEquals(str, [ ])
         # syncCapsuleDatabase would helpfully erase the trove before we get a
         # chance to do the same thing, so turn it off for this test
-        self.cfg.syncCapsuleDatabase = False
+        self.cfg.syncCapsuleDatabase = 'false'
         try:
             rc, str = self.captureOutput(self.erasePkg, self.rootDir,
                                      'simple:rpm',

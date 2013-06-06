@@ -690,13 +690,12 @@ def _updateTroves(cfg, applyList, **kwargs):
     if not info:
         client.checkWriteableRoot()
 
-    if cfg.syncCapsuleDatabase:
-        # Unfortunately there's no easy way to make 'test' or 'info' mode work
-        # with capsule sync, doubly so because it influences the decisions made
-        # later on about what troves to update. So this will always really
-        # apply, but the good news is that it never modifies the system outside
-        # of the Conary DB.
-        client.syncCapsuleDatabase(callback)
+    # Unfortunately there's no easy way to make 'test' or 'info' mode work
+    # with capsule sync, doubly so because it influences the decisions made
+    # later on about what troves to update. So this will always really
+    # apply, but the good news is that it never modifies the system outside
+    # of the Conary DB.
+    client.syncCapsuleDatabase(callback, makePins=True)
 
     updJob = client.newUpdateJob()
 

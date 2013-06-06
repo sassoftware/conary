@@ -3839,8 +3839,13 @@ conary erase '%s=%s[%s]'
                 pass
 
     @api.publicApi
-    def syncCapsuleDatabase(self, callback=None):
-        return self.db.syncCapsuleDatabase(callback)
+    def syncCapsuleDatabase(self, callback=None, makePins=True):
+        mode = self.cfg.syncCapsuleDatabase
+        if mode == 'false' or not mode:
+            return 0
+        elif mode != 'pin':
+            makePins = False
+        return self.db.syncCapsuleDatabase(makePins, callback)
 
 
 class UpdateError(ClientError):
