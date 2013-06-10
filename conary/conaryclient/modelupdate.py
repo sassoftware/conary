@@ -654,11 +654,14 @@ class CMLClient(object):
                                 deps.Flavor(), None)
 
         pins = set()
+        phantomsByName = {}
         for tup, pinned in self.db.iterAllTroves(withPins = True):
             existsTrv.addTrove(*tup)
             if pinned:
                 pins.add(tup)
                 targetTrv.addTrove(*tup)
+            if tup[1].onPhantomLabel():
+                phantomsByName.setdefault(tup[0], set()).add(tup)
 
         for tup, inInstall, explicit in \
                                 troveSet._walk(troveCache, recurse = True):
@@ -666,6 +669,25 @@ class CMLClient(object):
                 targetTrv.addTrove(*tup[0:3])
 
         self._closePackages(troveCache, targetTrv)
+
+        if phantomsByName and self.cfg.syncCapsuleDatabase == 'update':
+            # Allow phantom troves to be updated to a real trove, but preserve
+            # ones that would be erased outright.
+            for tup in targetTrv.iterTroveList(strongRefs=True):
+                name = tup[0]
+                if existsTrv.hasTrove(*tup):
+                    # This particular trove is not replacing anything
+                    continue
+                if name in phantomsByName:
+                    # Could be replacing a phantom trove, so keep the latter in
+                    # the old set so it will be updated.
+                    del phantomsByName[name]
+            # Discard any unmatched phantom troves from the old set so that
+            # they will be left alone.
+            for tups in phantomsByName.itervalues():
+                for tup in tups:
+                    existsTrv.delTrove(missingOkay=False, *tup)
+
         job = targetTrv.diff(existsTrv, absolute = False)[2]
 
         if callback:

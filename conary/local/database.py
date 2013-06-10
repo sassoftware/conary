@@ -2908,7 +2908,7 @@ class Database(SqlDbRepository):
         j.revert()
         os.unlink(opJournalPath)
 
-    def syncCapsuleDatabase(self, callback=None):
+    def syncCapsuleDatabase(self, makePins, callback=None):
         if sys.version_info < (2, 6):
             # Silently disable capsule sync if the Python is too old for
             # capsules.
@@ -2932,6 +2932,10 @@ class Database(SqlDbRepository):
                 commitFlags=commitFlags,
                 repair=True,
                 )
+        if makePins:
+            for tup in changeSet.newTroves:
+                self.db.pinTroves(pin=True, *tup)
+            self.commit()
         return added + removed
 
     def _initDb(self):

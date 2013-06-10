@@ -513,6 +513,16 @@ class CfgProxyMap(CfgType):
             yield ' '.join([str(pattern)] + [str(x) for x in targets])
 
 
+class CfgCapsuleSync(CfgEnum):
+    validValues = [ 'false', 'clean', 'pin', 'update' ]
+
+    def parseString(self, val):
+        if val.lower() == 'true':
+            # Backwards compatibility
+            val = 'clean'
+        return CfgEnum.parseString(self, val)
+
+
 def _getDefaultPublicKeyrings():
     publicKeyrings = []
     # If we are root, don't use the keyring in $HOME, since a process started
@@ -594,7 +604,7 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/policy',
                                             '~/.conary/policy'))
     shortenGroupFlavors   =  CfgBool
-    syncCapsuleDatabase   =  (CfgBool, True)
+    syncCapsuleDatabase   =  (CfgCapsuleSync, 'update')
     # Upstream Conary proxy
     conaryProxy           =  CfgProxy
     # HTTP proxy
