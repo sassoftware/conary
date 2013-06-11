@@ -232,6 +232,7 @@ class Conary(CPackageRecipe):
         r.ComponentSpec('conary-repository:server',
                       '%(initdir)s/conary-repos',
                       '%(sysconfdir)s/conary-repos/',
+                      '%(sysconfdir)s/logrotate.d/conary-repos.conf',
                       '%(sysconfdir)s/nginx/',
                       '%(sysconfdir)s/sysconfig/conary-repos',
                       '/var/log/conary-repos',
