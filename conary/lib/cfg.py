@@ -27,7 +27,7 @@ import sys
 import textwrap
 import urllib2
 
-from conary.lib import cfgtypes, util, api
+from conary.lib import util, api
 from conary.lib.http import proxy_map
 from conary import constants, errors
 from conary.repository import transport
@@ -37,9 +37,329 @@ configVersion = 1
 # NOTE: programs expect to be able to access all of the cfg types from
 # lib.cfg, so we import them here.  At some point, we may wish to make this
 # separation between the two modules real.
-from conary.lib.cfgtypes import *
+# pyflakes=ignore
+from conary.lib.cfgtypes import (CfgType, CfgString, CfgPath, CfgInt, CfgBool,
+        CfgRegExp, CfgSignedRegExp, CfgEnum, CfgCallBack, CfgLineList,
+        CfgQuotedLineList, CfgList, CfgDict, CfgEnumDict, CfgRegExpList,
+        CfgSignedRegExpList, CfgError, ParseError, CfgEnvironmentError,
+        RegularExpressionList, SignedRegularExpressionList, CfgPathList)
 
 __developer_api__ = True
+
+
+class ConfigDefinition(object):
+    """
+    Container for the structure of a single configuration class. Currently this
+    is just the list of options in the class, including those inherited from
+    other classes.
+    """
+
+    def __init__(self, options, aliases, hidden, sections, directives):
+        self.options = options
+        self.sections = sections
+        self.hidden = set(x.lower() for x in hidden)
+        self.directives = directives
+        self.lowerCaseMap = dict((x.lower(), y)
+                for (x, y) in options.iteritems())
+        for key_from, key_to in aliases:
+            self.lowerCaseMap[key_from.lower()] = self[key_to]
+
+    def __getitem__(self, key):
+        lower = key.lower()
+        if lower not in self.lowerCaseMap:
+            raise KeyError("No such config option %r" % (key,), key)
+        return self.lowerCaseMap[lower]
+
+    def __contains__(self, key):
+        return key.lower() in self.lowerCaseMap
+
+    _SIGIL = object()
+    def getExact(self, key, default=_SIGIL):
+        optdef = self.options.get(key, default)
+        if optdef is self._SIGIL:
+            raise KeyError(key)
+        return optdef
+
+    def extend(self, other):
+        self.options.update(other.options)
+        self.sections.update(other.sections)
+        self.hidden.update(other.sections)
+        self.lowerCaseMap = dict((x.lower(), y)
+                for (x, y) in self.options.iteritems())
+
+
+class OptionDefinition(object):
+    """
+    Definition of a single configuration option.
+
+    It also serves as a data descriptor for fetching that option from a parent
+    config instance.
+    """
+    __slots__ = ('name', 'valueType', 'default', 'doc')
+
+    def __init__(self, name, valueType, default=None, doc=None):
+        self.name = name
+        if inspect.isclass(valueType):
+            valueType = valueType()
+        self.valueType = valueType
+        self.default = default
+        self.doc = doc
+
+    def __repr__(self):
+        return '<%s %r>' % (self.__class__.__name__, self.name)
+
+    def getDefault(self):
+        return self.valueType.getDefault(self.default)
+
+    def writeDoc(self, out, displayOptions=None):
+        """ Output documentation and default information in a way that
+            is parsable by ConfigFiles
+        """
+        if displayOptions is None:
+            displayOptions = {}
+        tw = textwrap.TextWrapper(initial_indent='# ',
+                                  subsequent_indent='# ', width=70)
+        out.write('# %s (Default: %s)\n' % (self.name,
+            ', '.join(self.valueType.toStrings(self.getDefault(), displayOptions))))
+        if self.doc:
+            out.write('\n'.join(tw.wrap(self.doc)))
+            out.write('\n')
+
+    def __get__(self, pself, pcls):
+        if pself is None:
+            # SomeClass.foo -> foo_definition
+            return self
+        # someInst.foo -> foo_value
+        return pself[self.name]
+
+    def __set__(self, pself, value):
+        pself[self.name] = value
+
+    def __delete__(self, pself):
+        pself.resetToDefault(self.name)
+
+
+class OptionValue(object):
+    """
+    Container for the value of a single option, including peripheral data.
+    """
+    __slots__ = ('definition', 'listeners', 'origins', 'value', '_isDefault')
+
+    _NOT_SET = object()
+
+    def __init__(self, definition, value=_NOT_SET):
+        self.definition = definition
+        self.listeners = []
+        self.origins = []
+        if value is self._NOT_SET:
+            self.value = definition.getDefault()
+            self._isDefault = True
+        else:
+            # The caller is responsible for copying values before passing them
+            # in if sharing would be undesirable.
+            self.value = value
+            self._isDefault = False
+
+    def __repr__(self):
+        return '<%s %r>' % (self.__class__.__name__, self.definition.name)
+
+    def __deepcopy__(self, memo=None):
+        new = type(self)(self.definition)
+        new.listeners = list(self.listeners)
+        new.origins = list(self.origins)
+        new.value = copy.deepcopy(self.value, memo)
+        new._isDefault = self._isDefault
+        return new
+
+    # Shortcuts to the option definition
+
+    name = property(lambda self: self.definition.name)
+    valueType = property(lambda self: self.definition.valueType)
+    default = property(lambda self: self.definition.getDefault())
+    doc = property(lambda self: self.definition.doc)
+
+    # Storing values
+
+    def updateFromString(self, data, path=None, line=None):
+        if self.isDefault():
+            value = self.valueType.setFromString(self.default, data)
+        else:
+            value = self.valueType.updateFromString(self.value, data)
+        self.set(value, path, line)
+
+    def updateFromContext(self, other):
+        """Merge another value object into this one."""
+        value = self.valueType.set(self.value, other.value)
+        self.set(value)
+        self.origins.extend(other.origins)
+
+    def set(self, value, path=None, line=None):
+        self._callListeners()
+        self._isDefault = False
+        self.value = value
+        if path is not None:
+            self.origins.append((path, line))
+
+    # Other features
+
+    def addListener(self, fn):
+        self.listeners.append(fn)
+
+    def _callListeners(self):
+        for listenFn in self.listeners:
+            listenFn(self.definition.name)
+
+    def write(self, out, ignored, displayOptions=None):
+        """Writes a config option name and value."""
+        # "ignored" argument for bw compat with rmake
+        if displayOptions is None:
+            displayOptions = {}
+
+        if displayOptions.get('showLineOrigins', False):
+            lineStrs = []
+            curPath = None
+            for path, lineNum in self.origins:
+                if path == curPath:
+                    continue
+                else:
+                    lineStrs.append('%s' % (path,))
+                    curPath = path
+            if lineStrs:
+                out.write('# %s: %s\n' % (self.name, ' '.join(lineStrs)))
+        for line in self.valueType.toStrings(self.value, displayOptions):
+            out.write('%-25s %s\n' % (self.name, line))
+
+    def resetToDefault(self):
+        """Reset to the default value.
+
+        Returns True if the new value has any meaningful ancillary properties
+        (e.g. listeners). If it does not, then the value can be removed from
+        the parent object's value dictionary.
+        """
+        self.origins = []
+        self.value = self.definition.getDefault()
+        self._isDefault = True
+        return bool(self.listeners)
+
+    def isDefault(self):
+        # Try to catch cases where the value was mutated externally, e.g.
+        # cfg.user.append(...)
+        return self._isDefault and self.value == self.definition.getDefault()
+
+    # Backwards compatibility
+
+    def parseString(self, curVal, newStr, path=None, line=None):
+        self.updateFromString(newStr, path, line)
+        return self.value
+
+
+def directive(func):
+    """
+    Decorator for 'directives' -- options that invoke a method instead of
+    storing a value.
+
+    @directive
+    def someDirective(self, value):
+        self.dostuff()
+    """
+    func.cfg_is_directive = True
+    return func
+
+
+class _ConfigMeta(type):
+    """
+    Metaclass that all configuration classes must use. This happens
+    automatically if the configuration class inherits from ConfigFile.
+
+    This handles inheritance and creation of OptionDefinition objects and
+    creates and binds a ConfigDefinition to the class.
+    """
+    fields = ('type', 'default', 'doc')
+
+    def __new__(metacls, name, clsbases, clsdict):
+        options = {}
+        sections = {}
+        directives = {}
+        # Merge options from bases and "config" bases
+        bases = list(clsbases)
+        if clsdict.get('_cfg_bases'):
+            bases = list(clsdict['_cfg_bases']) + bases
+        bases.reverse()
+        for cls in bases:
+            if hasattr(cls, '_cfg_def'):
+                options.update(cls._cfg_def.options)
+                sections.update(cls._cfg_def.sections)
+                directives.update(cls._cfg_def.directives)
+        # Add options from this class
+        for key, value in clsdict.items():
+            if key[0] == '_':
+                continue
+            elif isinstance(value, (list, tuple)):
+                # foo = (CfgThing, default, doc)
+                args = value
+            elif value is None or isinstance(value, basestring):
+                # foo = 'default'
+                args = (CfgString, value)
+            elif inspect.isclass(value):
+                if issubclass(value, CfgType):
+                    # foo = CfgThing
+                    args = (value(), None)
+                elif issubclass(value, ConfigSection):
+                    # foo = MySectionType
+                    args = (value, None, None)
+                else:
+                    continue
+            elif isinstance(value, CfgType):
+                # foo = CfgThing('frobnoz')
+                args = (value, None)
+            elif callable(value) and getattr(value, 'cfg_is_directive', False):
+                # @directive
+                # Only save the name of the function and fetch it later with
+                # getattr() to avoid violating the principle of least surprise.
+                # Room left for optional args and kwargs at a later date.
+                directives[key.lower()] = (key, (), {})
+                continue
+            else:
+                continue
+
+            if inspect.isclass(args[0]) and issubclass(args[0], ConfigSection):
+                sections[key] = tuple(args)
+            else:
+                options[key] = OptionDefinition(key, *args)
+        # Add aliases from base classes, then this class
+        aliases = metacls._fold(bases, clsdict, '_cfg_aliases', [], list.extend)
+        hidden = metacls._fold(bases, clsdict, '_cfg_hidden', [], list.extend)
+        # Copy definition to class dictionary to act as a data descriptor,
+        # enabling attribute get/set/delete.
+        for key, optdef in options.iteritems():
+            clsdict[key] = optdef
+
+        clsdict['_cfg_def'] = ConfigDefinition(options, aliases, hidden,
+                sections, directives)
+        return type.__new__(metacls, name, clsbases, clsdict)
+
+    @staticmethod
+    def _fold(bases, clsdict, name, value, func):
+        for pcls in bases:
+            for mcls in reversed(pcls.mro()):
+                mval = getattr(mcls, name, None)
+                if mval is not None:
+                    func(value, mval)
+        if clsdict.get(name):
+            value.extend(clsdict[name])
+        return value
+
+    def extend(clself, other):
+        """
+        Add options in config class C{other} to this class.
+
+        Since this method is attached to the metaclass, it is only visible on
+        the config classes but not instanes of those classes.
+        """
+        clself._cfg_def.extend(other._cfg_def)
+        for key, optdef in clself._cfg_def.options.iteritems():
+            setattr(clself, key, optdef)
+
 
 class _Config(object):
     """ Base configuration class.  Supports defining a configuration object,
@@ -61,94 +381,46 @@ class _Config(object):
         a string into a configuration item, and display it.  The
         expected interface is documented in ConfigType.
     """
+    __metaclass__ = _ConfigMeta
 
-    _keyLocation = '__dict__'
-    # keyLocation determines where key lists are defined
+    # To be filled in by the metaclass.
+    _cfg_def = None
 
-    _optionParams = ('type', 'default', 'doc')
-    # option params defines the meaning of the variables in the tuple
-    # to the left of the
+    # Optional list of (from, to) tuples of config aliases.
+    _cfg_aliases = None
 
-    _cfgTypes = cfgtypes.CfgType,
+    # Optional list of "base classes" to inherit options from.
+    # Note that actual base classes also work, but this way prevents methods
+    # and other non-option attributes from being inherited.
+    _cfg_bases = None
+
+    # Optional list of keys that should not be displayed.
+    _cfg_hidden = None
 
     def __init__(self):
-        self._options = {}
-        self._lowerCaseMap = {}
+        self._values = {}
         self._displayOptions = {}
-        self._directives = {}
 
-        # iterate through the config items defined in this class
-        # and any superclasses
-        for class_ in reversed(inspect.getmro(self.__class__)):
-            if not hasattr(class_, '_getConfigOptions'):
-                continue
+    def _cow(self, key):
+        """Copy-on-write -- return a L{OptionValue} for the given key, creating
+        and storing it if necessary.
 
-            for info in class_._getConfigOptions():
-                self.addConfigOption(*info)
-
-    @classmethod
-    def _getConfigOptions(class_):
+        Do not use if you are not going to modify the value as that would bloat
+        the value dictionary.
         """
-        Scrape the supported configuration items from a class definition.
-        Yields (name, CfgType, default) tuples.
-
-        Expects foo = (CfgType, [default]) variables to defined in the class
-        """
-        for name, keyInfo in getattr(class_, class_._keyLocation).iteritems():
-            if name.startswith('_'):
-                continue
-            info = class_._getOneConfigOption(name, keyInfo)
-            if info is not None:
-                yield [name] + info
-
-    @classmethod
-    def _getOneConfigOption(class_, name, keyInfo, ):
-        kw = dict.fromkeys(class_._optionParams)
-
-        if isinstance(keyInfo, (list,tuple)):
-            for param, val in zip(class_._optionParams, keyInfo):
-                kw[param] = val
-
-        elif keyInfo is None or isinstance(keyInfo, str):
-            kw['type'] = CfgString
-            kw['default'] = keyInfo
-        elif inspect.isclass(keyInfo) and issubclass(keyInfo, class_._cfgTypes):
-            kw['type'] = keyInfo
-        elif isinstance(keyInfo, class_._cfgTypes):
-            kw['type'] = keyInfo
-        else:
-            return None
-
-        return [kw[x] for x in class_._optionParams]
-
-    def addConfigOption(self, key, type, default=None, doc=None):
-        """
-        Defines a Configuration Item for this configuration.
-        This config item defines an available configuration setting.
-        """
-        self._options[key] = ConfigOption(key, type, default, doc)
-
-        self._lowerCaseMap[key.lower()] = key
-        self[key] = copy.deepcopy(self._options[key].default)
-        self._options[key].setIsDefault(True)
+        optdef = self._cfg_def[key]
+        optval = self._values.get(optdef.name)
+        if optval is None:
+            optval = self._values[optdef.name] = OptionValue(optdef)
+        return optval
 
     def addListener(self, key, fn):
         """
         Add a listener function that will be called when the given key is
         updated.  The function will be called with key as a single parameter.
         """
-        self._options[key].addListener(fn)
-
-    def addDirective(self, key, fn):
-        """
-        Add a directive that acts as a config option.  When that config
-        option is read in, the function will be called with (key, value)
-        where value is whatever was after the directive in the config file.
-        """
-        self._directives[key.lower()] = fn
-
-    def addAlias(self, alias, realKey):
-        self._lowerCaseMap[alias.lower()] = self._lowerCaseMap[realKey.lower()]
+        value = self._cow(key)
+        value.addListener(fn)
 
     # --- Display options allow arbitrary display parameters to be set --
     # they can be picked up by the strings printing themselves
@@ -166,70 +438,60 @@ class _Config(object):
             return self._displayOptions.get(key)
 
     # --- accessing/setting values ---
+    # Both item and attribute access work. The former is implemented here, and
+    # the latter is implemented using OptionDefinition as a data descriptor.
 
     def __getitem__(self, name):
-        """ Provide a dict-list interface to config items """
-        # getitem should not be used to access internal values
-        if name[0] == '_' or name not in self._options:
-            raise KeyError, 'No such config item "%s"' % name
-        return self.__dict__[name]
+        # Theoretically this could return the default value without COWing, but
+        # then operations like "cfg.repositoryMap.update()" would either mutate
+        # the default value or be discarded.
+        optval = self._cow(name)
+        return optval.value
 
     def __setitem__(self, key, value):
-        if key[0] == '_' or key.lower() not in self._lowerCaseMap:
-            raise KeyError, 'No such attribute "%s"' % key
-        key = self._lowerCaseMap[key.lower()]
-        self.__dict__[key] = value
-        self._options[key].setIsDefault(False)
-
-    def __setattr__(self, key, value):
-        # This ensures that the isDefault flag gets cleared if attributes are
-        # used to change an option. Note that unlike __setitem__ this function
-        # doesn't use lowerCaseMap and is therefore case-sensitive.
-        if key[0] == '_' or key not in self._options:
-            return object.__setattr__(self, key, value)
-        self.__dict__[key] = value
-        self._options[key].setIsDefault(False)
+        optval = self._cow(key)
+        optval.set(value)
 
     def __contains__(self, key):
-        if key[0] == '_' or key.lower() not in self._lowerCaseMap:
-            return False
-        return True
+        return key in self._cfg_def
 
     def setValue(self, key, value):
         self[key] = value
 
     def getDefaultValue(self, name):
-        return self._options[name].getDefault()
+        return self._cfg_def[name].getDefault()
 
     @api.publicApi
     def isDefault(self, key):
         # NOTE: There are ways (in code) to modify options without the
         # isDefault flag being cleared, e.g. modifying a mutable option value
         # directly. This is for advisory purposes only.
-        return self._options[key].isDefault()
+        optdef = self._cfg_def[key]
+        optval = self._values.get(optdef.name)
+        if optval is None:
+            return True
+        else:
+            return optval.isDefault()
 
     def resetToDefault(self, key):
-        self[key] = copy.deepcopy(self.getDefaultValue(key))
-        return self._options[key].setIsDefault(True)
+        self._cfg_def[key]  # test for existence
+        optval = self._values.get(key)
+        if optval is not None and not optval.resetToDefault():
+            # Delete if we have no other reason (e.g. listeners) to keep
+            # the value object around.
+            del self._values[key]
 
     def keys(self):
-        return self._options.keys()
+        return self._cfg_def.options.keys()
 
     def iterkeys(self):
-        return self._options.iterkeys()
-
-    def itervalues(self):
-        for name, item in self._options.iterkeys():
-            yield self[name]
-
-    def values(self):
-        return list(self.itervalues())
+        return self._cfg_def.options.iterkeys()
 
     def items(self):
         return list(self.iteritems())
 
     def iteritems(self):
-        for name, item in self._options.iteritems():
+        for name in self._cfg_def.options:
             yield name, self[name]
 
     # --- displaying/writing values ---
@@ -250,45 +512,60 @@ class _Config(object):
     def displayKey(self, key, out=None):
         if out is None:
             out = sys.stdout
-        self._writeKey(out, self._options[key], self[key], self._displayOptions)
+        self._writeKey(out, self._cfg_def[key], None, self._displayOptions)
 
     @api.publicApi
     def storeKey(self, key, out):
-        self._writeKey(out, self._options[key], self[key], dict(prettyPrint=False))
+        self._writeKey(out, self._cfg_def[key], None, dict(prettyPrint=False))
 
     def writeToFile(self, path, includeDocs=True):
         util.mkdirChain(os.path.dirname(path))
         self.store(open(path, 'w'), includeDocs)
 
     def _write(self, out, options, includeDocs=True):
-        for name, item in sorted(self._options.iteritems()):
+        hidden = options.get('displayHidden', False)
+        for name, optdef in sorted(self._cfg_def.options.iteritems()):
+            if not hidden and optdef.name.lower() in self._cfg_def.hidden:
+                continue
             if includeDocs:
-                item.writeDoc(out, options)
-            self._writeKey(out, item, self[name], options)
+                optdef.writeDoc(out, options)
+            self._writeKey(out, optdef, None, options)
 
-    def _writeKey(self, out, cfgItem, value, options):
-        cfgItem.write(out, value, options)
+    def _writeKey(self, out, optdef, ignored, options):
+        # "ignored" argument for bw compat with rmake
+        optval = self._values.get(optdef.name) or OptionValue(optdef)
+        if optval.isDefault() and optval.value is None:
+            return
+        optval.write(out, None, options)
 
     # --- pickle protocol ---
 
     def __getstate__(self):
         return {
                 'flags': {},
-                'options': [ (key, self.__dict__[key], option.isDefault())
-                    for key, option in self._options.iteritems() ],
+                'options': [ (key, value.value)
+                    for (key, value) in self._values.iteritems() ],
                 }
 
     def __setstate__(self, state):
         self.__dict__.clear()
         self.__init__(**state['flags'])
 
-        for key, value, isDefault in state['options']:
+        for row in state['options']:
+            key, value = row[:2]
             # If the option is unknown, skip it. This allows for a little
             # flexibility if the config definition changed.
-            option = self._options.get(key)
-            if option:
-                self.__dict__[key] = value
-                option.setIsDefault(isDefault)
+            optdef = self._cfg_def.getExact(key, None)
+            if optdef:
+                self._values[key] = OptionValue(optdef, value)
+
+    # --- metadata backwards compatibility ---
+
+    @property
+    def _options(self):
+        return dict((key,
+            self._values.get(key) or OptionValue(self._cfg_def.getExact(key)))
+            for key in self._cfg_def.options)
 
 
 class ConfigFile(_Config):
@@ -300,7 +577,6 @@ class ConfigFile(_Config):
         self._keyLimiters = set()
         self._configFileStack = []
         _Config.__init__(self)
-        self.addDirective('includeConfigFile', 'includeConfigFile')
 
     def limitToKeys(self, *keys):
         if keys == (False,):
@@ -396,12 +672,11 @@ class ConfigFile(_Config):
         try:
             f = self._openUrl(url)
             self.readObject(url, f)
-        except CfgEnvironmentError, err:
+        except CfgEnvironmentError:
             if not self._ignoreErrors:
                 raise
 
     def configLine(self, line, fileName = "override", lineno = '<No line>'):
-        origLine = line
         line = line.strip()
         line = line.replace('\\\\', '\0').replace('\\#', '\1')
         line = line.split('#', 1)[0]
@@ -416,10 +691,11 @@ class ConfigFile(_Config):
         else:
             (key, val) = parts
 
-        if key.lower() in self._directives:
-            fn = getattr(self, self._directives[key.lower()])
+        if key.lower() in self._cfg_def.directives:
+            funcName, args, kwargs = self._cfg_def.directives[key.lower()]
+            fn = getattr(self, funcName)
             try:
-                fn(val)
+                fn(val, *args, **kwargs)
             except Exception, err:
                 if errors.exceptionIsUncatchable(err):
                     raise
@@ -430,21 +706,17 @@ class ConfigFile(_Config):
 
     def configKey(self, key, val, fileName = "override", lineno = '<No line>'):
         try:
-            key = self._lowerCaseMap[key.lower()]
-            if self._keyLimiters and key not in self._keyLimiters:
-                return
-            self[key] = self._options[key].parseString(self[key], val,
-                                                       fileName, lineno)
-            if hasattr(self._options[key].valueType, 'overrides'):
-                overrides = self._options[key].valueType.overrides
-                if overrides and hasattr(self, overrides):
-                    self.resetToDefault(overrides)
-        except KeyError, msg:
+            option = self._cfg_def[key]
+        except KeyError:
             if self._ignoreErrors:
-                pass
-            else:
-                raise ParseError, "%s:%s: unknown config item '%s'" % (fileName,
-                                                                   lineno, key)
+                return
+            raise ParseError("%s:%s: unknown config item '%s'" % (fileName,
+                lineno, key))
+        try:
+            if self._keyLimiters and option.name not in self._keyLimiters:
+                return
+            value = self._cow(key)
+            value.updateFromString(val, fileName, lineno)
         except ParseError, msg:
             if not self._ignoreErrors:
                 raise ParseError, "%s:%s: %s for configuration item '%s'" \
@@ -520,6 +792,7 @@ class ConfigFile(_Config):
             relativeTo = os.getcwd()
         return os.path.join(relativeTo, relpath)
 
+    @directive
     def includeConfigFile(self, val, fileName = "override",
                           lineno = '<No line>'):
         abspath = self._absPath(val)
@@ -539,7 +812,7 @@ class ConfigSection(ConfigFile):
         self._parent = parent
         ConfigFile.__init__(self)
         if doc:
-            self.__doc__ = doc
+            self.doc = doc
 
     def getParent(self):
         return self._parent
@@ -571,24 +844,14 @@ class SectionedConfigFile(ConfigFile):
     _allowNewSections = False
     _defaultSectionType = None
 
-    _cfgTypes = (cfgtypes.CfgType, ConfigSection)
-
     def __init__(self):
+        ConfigFile.__init__(self)
         self._sections = {}
         self._sectionName = ''
-        ConfigFile.__init__(self)
-
-    def addConfigOption(self, key, type, default=None, doc=None):
-        """
-        Defines a Configuration Item for this configuration.
-        This config item defines an available configuration setting.
-        """
-        if inspect.isclass(type) and issubclass(type, ConfigSection):
-            section = type(self, doc)
+        for key, (sectionType, _, doc) in self._cfg_def.sections.items():
+            section = sectionType(self, doc)
             self._addSection(key, section)
-            self.__dict__[key] = section
-        else:
-            ConfigFile.addConfigOption(self, key, type, default, doc)
+            setattr(self, key, section)
 
     def iterSections(self):
         return self._sections.itervalues()
@@ -681,123 +944,3 @@ class SectionedConfigFile(ConfigFile):
         ConfigFile.__setstate__(self, state)
         for name, section in state['sections'].iteritems():
             self._addSection(name, section)
-
-
-#----------------------------------------------------------
-
-class ConfigOption:
-    """ A name, value Type pair that knows how to display itself and
-        parse values for itself.
-
-        Note that a config option doesn't have any particular value associated
-        with it.
-    """
-
-    def __init__(self, name, valueType, default=None, doc=None):
-        self.name = name
-
-        # CfgTypes must be instantiated to parse values, because they
-        # optionally store data that helps them parse.
-
-        if (inspect.isclass(valueType)
-            and issubclass(valueType, cfgtypes.CfgType)):
-            valueType = valueType()
-
-        self.valueType = valueType
-        self.default = valueType.getDefault(default)
-        self.__doc__ = doc
-        self._isDefault = True
-        self.listeners = []
-        self.origins = []
-
-    def parseString(self, curVal, str,
-                    path=None, lineNum=None):
-        """
-        Takes the current value for this option, and a string to update that
-        value, and returns an updated value (which may either overwrite the
-        current value or update it depending on the valueType)
-        """
-        self._callListeners()
-
-        if curVal == self.default and self._isDefault:
-            self.origins = [(path, lineNum)]
-            return self.valueType.setFromString(curVal, str)
-        else:
-            self.origins.append((path, lineNum))
-            return self.valueType.updateFromString(curVal, str)
-
-    def set(self, curVal, newVal):
-        return self.valueType.set(curVal, newVal)
-
-    def __deepcopy__(self, memo):
-        # we implement deepcopy because this object keeps track of a
-        # set of listener functions, and copy.__deepcopy__ doesn't
-        # handle copying functions.  Since we don't particularly care
-        # about that use case (if you're modifying code in a function object,
-        # you're on your own), just copy the list of fns.
-        valueType = copy.deepcopy(self.valueType, memo)
-        default = valueType.copy(self.default)
-        new = self.__class__(self.name, valueType, default)
-        listeners = list(self.listeners)
-        new._isDefault = self._isDefault
-        new.origins = list(self.origins)
-        new.listeners = listeners
-        return new
-
-    def addDoc(self, docString):
-        self.__doc__ = docString
-
-    def getValueType(self):
-        return self.valueType
-
-    def getDefault(self):
-        return self.default
-
-    @api.publicApi
-    def isDefault(self):
-        return self._isDefault
-
-    def setIsDefault(self, val):
-        self._isDefault = val
-
-    def addListener(self, listenFn):
-        self.listeners.append(listenFn)
-
-    def _callListeners(self):
-        for listenFn in self.listeners:
-            listenFn(self.name)
-
-    def write(self, out, value, displayOptions=None):
-        """ Writes a config option name and value.
-        """
-        if displayOptions is None:
-            diplayOptions = {}
-        if self.isDefault() and value is None:
-            return
-
-        if displayOptions.get('showLineOrigins', False):
-            lineStrs = []
-            curPath = None
-            for path, lineNum in self.origins:
-                if path == curPath:
-                    continue
-                else:
-                    lineStrs.append('%s' % (path,))
-                    curPath = path
-            if lineStrs:
-                out.write('# %s: %s\n' % (self.name, ' '.join(lineStrs)))
-        for line in self.valueType.toStrings(value, displayOptions):
-            out.write('%-25s %s\n' % (self.name, line))
-
-    def writeDoc(self, out, displayOptions=None):
-        """ Output documentation and default information in a way that
-            is parsable by ConfigFiles
-        """
-        if displayOptions is None:
-            displayOptions = {}
-        tw = textwrap.TextWrapper(initial_indent='# ',
-                                  subsequent_indent='# ', width=70)
-        out.write('# %s (Default: %s)\n' % (self.name, ', '.join(self.valueType.toStrings(self.default, displayOptions))))
-        if self.__doc__:
-            out.write('\n'.join(tw.wrap(self.__doc__)))
-            out.write('\n')
