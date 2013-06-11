@@ -4105,7 +4105,6 @@ class BuildMSI(BuildAction):
 
         # FIXME: None of these values should need to be hard coded. They
         #        should be defaults in the Windows Build Service. (CNY-3562)
-        jobCfg.product.icon = 'icon.ico'
         jobCfg.product.packageName = 'Setup'
         jobCfg.product.allUsers = 'true'
 
