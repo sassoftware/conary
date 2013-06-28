@@ -1,3 +1,15 @@
+Changes in 2.4.13:
+  o New Features:
+    * A trove's getNameVersionFlavor() now returns a
+      trovetup.TroveTuple. (CNY-3798)
+    * The syncCapsuleDatabase option now has four modes of operation in
+      total. The new default is to prevent phantom troves from being
+      erased during a model operation but permit them to be updated.
+      See the description in the manpage for details.
+
+  o Bug Fixes:
+    * Remove hard coded icon name for windows package builds. (CNY-3801)
+
 Changes in 2.4.12:
   o New Features:
     * Improved python dependency analysis. Changes include detecting
