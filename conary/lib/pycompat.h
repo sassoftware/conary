@@ -121,18 +121,6 @@
 #define PYSTR_FromStringAndSize     _PYSTR(FromStringAndSize)
 
 
-/* Backports from 2.6 */
-#if PY_VERSION_HEX < 0x02060000
-# define Py_TYPE(ob)                (ob)->ob_type
-# define Py_SIZE(ob)                (ob)->ob_size
-# define PyVarObject_HEAD_INIT(type, size) PyObject_HEAD_INIT(type) size,
-#endif
-
-#if PY_VERSION_HEX < 0x02050000
-typedef int Py_ssize_t;
-#endif
-
-
 /* Partial backport from 3.1 to make PYMODULE simpler */
 #if PY_MAJOR_VERSION < 3
 #define PyModuleDef_HEAD_INIT       NULL
