@@ -971,7 +971,8 @@ class UpdateJob:
 
     def iterJobPreScriptsForJobSet(self, jobSetIdx):
         jl = self._jobPreScriptsByJob
-        if jl is None:
+        if not jl:
+            assert not self._jobPreScripts, "Must call reorderPreScripts first"
             raise StopIteration
         actionsInOrder = [ 'prerollback', 'preinstall', 'preupdate', 'preerase' ]
         for action, lAction in zip(actionsInOrder, jl):

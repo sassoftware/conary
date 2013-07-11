@@ -1,0 +1,1 @@
+Fixed preinstall and preupdate scripts not running during system-model updates.

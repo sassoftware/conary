@@ -822,7 +822,7 @@ class CMLClient(object):
         self._findAcceptablePathConflicts(job, uJob, troveCache)
         log.info("combining jobs")
         self._combineJobs(uJob, splitJob, criticalUpdates)
-        log.info("combining jobs")
+        uJob.reorderPreScripts(criticalUpdateInfo)
         uJob.setTransactionCounter(self.db.getTransactionCounter())
 
         # remove things from the suggMap which are in the already installed
