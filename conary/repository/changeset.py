@@ -1032,19 +1032,19 @@ class ChangeSet(streams.StreamSet):
                 except:
                     isConfig = False
 
-                if isConfig and oldFileId and oldFileObj.hasContents:
-                    oldContents = troveSource.getFileContents(
-                            [ (oldFileId, oldFileVersion) ])[0]
-                    if oldContents is None:
-                        # contents are unavailable. assume it's binary
-                        # rather than making repository calls
+            if isConfig and oldFileId and oldFileObj.hasContents:
+                oldContents = troveSource.getFileContents(
+                        [ (oldFileId, oldFileVersion) ])[0]
+                if oldContents is None:
+                    # contents are unavailable. assume it's binary
+                    # rather than making repository calls
+                    isConfig = False
+                else:
+                    contents = oldContents.get().read()
+                    try:
+                        contents.decode('utf-8')
+                    except:
                         isConfig = False
-                    else:
-                        contents = oldContents.get().read()
-                        try:
-                            contents.decode('utf-8')
-                        except:
-                            isConfig = False
 
             if isConfig:
                 yield "--- a%s\n" % oldPath

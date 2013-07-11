@@ -814,6 +814,18 @@ class RepQueryTest(rephelp.RepositoryHelper):
             self.cfg, troveSpec)
         self.assertEqual(outs, '')
 
+    def testRdiff9(self):
+        """Binary changes to config; using --diff"""
+        rf1 = rephelp.RegularFile(contents='1\n2\n3\n4\n5\n6\n7\n8\n',
+            perms = 0644, mtime = 1136921017, config=False)
+        rf2 = rephelp.RegularFile(contents='1\n2\n4\n5\n6\n7\n8\n9\n',
+            perms = 0644, mtime = 1136921317, config=True)
+
+        self.addComponent('foo:config', '1', [('/etc/foo', rf1)])
+        self.addComponent('foo:config', '2', [('/etc/foo', rf2)])
+        ret, outs = self._rdiff('foo:config=1--2', asDiff=True)
+        self.assertEqual(outs, expOutput9)
+
 expOutput1noargs = """\
 Update  foo(:run) (1-1-1[is: x86] -> 2-1-1[is: x86_64])
 Install foo:doc=2-1-1
@@ -898,6 +910,22 @@ expOutput6 = """\
 Install added(:run)=1-1-1
 Erase   erased=1-1-1
 Update  group-foo (1-1-1 -> 2-1-1)
+"""
+
+expOutput9 = """\
+diff --git a/etc/foo b/etc/foo
+--- a/etc/foo
++++ b/etc/foo
+@@ -1,8 +1,8 @@
+ 1
+ 2
+-3
+ 4
+ 5
+ 6
+ 7
+ 8
++9
 """
 
 class MultiRepQueryTest(rephelp.RepositoryHelper):

@@ -1,0 +1,1 @@
+"conary rdiff --diff" no longer crashes when a binary file changes to a config file
