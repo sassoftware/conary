@@ -27,6 +27,7 @@ from conary_test import rephelp
 from conary import conaryclient, versions
 from conary.conaryclient import cml
 from conary.deps import deps
+from conary.repository.errors import TroveNotFound
 
 
 class CMCoreTest(rephelp.RepositoryHelper):
@@ -544,6 +545,57 @@ class CMTest(rephelp.RepositoryHelper):
              'update bar=g@h:i/2.0-1-2',
              'install pinned==g@h:i/2.0-1-1',
              'include cml-inc=g@h:i/1.0-1-2'])
+
+        # Old group is missing
+        findtroves = {
+             ('group-foo', 'g@h:i', None):
+                 [('group-foo', 
+                   versions.VersionFromString('/g@h:i/1.0-1-2'),
+                   deps.parseFlavor('foo'))],
+             #('group-foo', 'g@h:i/1.0-1-2', None):
+             ('bar', 'g@h:i', None):
+                 [('bar', 
+                   versions.VersionFromString('/g@h:i/2.0-1-2'),
+                   deps.parseFlavor('foo'))],
+             ('bar', 'g@h:i/2.0-1-2', None):
+                 [('bar',
+                   versions.VersionFromString('/g@h:i/2.0-1-2'),
+                   deps.parseFlavor('foo'))],
+             ('pinned', 'g@h:i', None):
+                 [('pinned', 
+                   versions.VersionFromString('/g@h:i/2.0-1-2'),
+                   deps.parseFlavor('foo'))],
+             ('pinned', 'g@h:i/2.0-1-1', None):
+                 [('pinned',
+                   versions.VersionFromString('/g@h:i/2.0-1-1'),
+                   deps.parseFlavor('foo'))],
+             ('cml-inc', 'g@h:i', None):
+                 [('cml-inc', 
+                   versions.VersionFromString('/g@h:i/1.0-1-2'),
+                   deps.parseFlavor('foo'))],
+             ('cml-inc', 'g@h:i/1.0-1-2', None):
+                 [('cml-inc',
+                   versions.VersionFromString('/g@h:i/1.0-1-2'),
+                   deps.parseFlavor('foo'))],
+            }
+        repos.findTroves._mock.setDefaultReturn(findtroves)
+        m.refreshVersionSnapshots()
+        self.assertEquals(m.modified(), True)
+        self.assertEquals([x.format() for x in m.modelOps],
+            ['search group-foo=g@h:i/1.0-1-2',
+             'search j@k:l',
+             'update bar=g@h:i/2.0-1-2',
+             'install pinned==g@h:i/2.0-1-1',
+             'include cml-inc=g@h:i/1.0-1-2'])
+
+        # New version is missing
+        del findtroves[('group-foo', 'g@h:i', None)]
+        err = self.assertRaises(TroveNotFound, m.refreshVersionSnapshots)
+        self.assertEquals(str(err), "Trove not found: group-foo=g@h:i")
+        del findtroves[('bar', 'g@h:i', None)]
+        err = self.assertRaises(TroveNotFound, m.refreshVersionSnapshots)
+        self.assertEquals(str(err),
+                "2 troves not found:\nbar=g@h:i\ngroup-foo=g@h:i")
 
     def testNoRefreshLocalVersions(self):
         m = self.getCM()

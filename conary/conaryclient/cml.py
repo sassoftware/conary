@@ -488,14 +488,23 @@ class CM:
             return
 
         foundTroves = repos.findTroves(cfg.installLabelPath, 
-            allOpSpecs, defaultFlavor = cfg.flavor)
+            allOpSpecs, defaultFlavor=cfg.flavor, allowMissing=True)
+        # origOps may be missing, newOps may not
+        missing = set(newOps) - set(foundTroves)
+        if missing:
+            missing = sorted('%s=%s' % x[:2] for x in missing)
+            if len(missing) == 1:
+                raise errors.TroveNotFound("Trove not found: " + missing[0])
+            else:
+                raise errors.TroveNotFound("%d troves not found:\n%s" % (
+                    len(missing), "\n".join(missing)))
 
         # Calculate the appropriate replacements from the lookup
         replaceSpecs = {} # CMTroveSpec: TroveSpec
         for troveKey in foundTroves:
             if troveKey in newOps:
                 for oldTroveKey in newOps[troveKey]:
-                    if foundTroves[troveKey] != foundTroves[oldTroveKey]:
+                    if foundTroves[troveKey] != foundTroves.get(oldTroveKey):
                         # found a new version, create replacement troveSpec
                         foundTrove = foundTroves[troveKey][0]
                         newVersion = foundTrove[1]
