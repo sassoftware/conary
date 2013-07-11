@@ -1109,7 +1109,9 @@ class TestTar(PackageRecipe):
                      preserveOwnership = True)
         r.addArchive('dotslashownerships.tar', dir = '/dotslash',
                      preserveOwnership = True)
-        r.ExcludeDirectories(exceptions = [ '.*/foo' ] )
+        r.addArchive('ownerships_spaces.tar', dir='/spaces',
+                preserveOwnership=True)
+        r.ExcludeDirectories(exceptions = [ '.*/foo', '/spaces/.*' ] )
 """
         (built, d) = self.buildRecipe(recipestr, "TestTar")
         trvInfo = (built[0][0], VFS(built[0][1]), built[0][2])
@@ -1150,6 +1152,11 @@ class TestTar(PackageRecipe):
                   '/dotslash/foo/fourth':  ('nobody', 'nobody'),
                   '/dotslash/foo/second':  ('postfix', 'rmake'),
                   '/dotslash/foo/third':   ('ident', 'dovecot'),
+                  '/spaces/without':                ('nobody', 'nobody'),
+                  '/spaces/without/bork bork':      ('nobody', 'nobody'),
+                  '/spaces/with spaces':            ('nobody', 'nobody'),
+                  '/spaces/with spaces/foo':        ('nobody', 'nobody'),
+                  '/spaces/with spaces/bar baz':    ('nobody', 'nobody'),
                 }
 
         if actual != expected:

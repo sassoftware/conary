@@ -663,7 +663,7 @@ class addArchive(_Source):
         lines = fullOutput.split('\n')
         for line in lines:
             if not line: continue
-            fields = line.split()
+            fields = line.split(None, 8)
             yield (fields[8], fields[2], fields[3])
 
     @staticmethod
@@ -674,7 +674,7 @@ class addArchive(_Source):
             if line.startswith('d') and ' Creating directory: ' in line:
                 # CNY-3060 -- intermediate directory not included in archive
                 continue
-            fields = line.split()
+            fields = line.split(None, 5)
             owner, group = fields[1].split('/')
             yield (fields[5], owner, group)
 
