@@ -409,6 +409,7 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
             list, uJob.iterJobPreScriptsForJobSet(0))
 
         # No data
+        uJob._jobPreScripts = []
         uJob._jobPreScriptsByJob = None
         ret = list(uJob.iterJobPreScriptsForJobSet(0))
         self.assertEqual(ret, [])
