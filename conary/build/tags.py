@@ -21,7 +21,8 @@ Module implementing tag file handling
 import os
 
 from conary.build import filter
-from conary.lib.cfg import CfgCallBack, CfgEnum, CfgList, CfgString, ConfigFile, ParseError
+from conary.lib.cfg import CfgEnum, CfgList, CfgString, ConfigFile, ParseError
+from conary.lib.cfg import directive
 
 EXCLUDE, INCLUDE = range(2)
 
@@ -53,16 +54,6 @@ class CfgDataSource(CfgEnum):
 
 
 class TagFile(ConfigFile):
-    def filterCB(self, val, key):
-        if not self.macros:
-            return
-        if key == 'exclude':
-            keytype = EXCLUDE
-        elif key == 'include':
-            keytype = INCLUDE
-        self.filterlist.append((keytype, filter.Filter(val, self.macros)))
-
-
     file              = CfgString
     name              = CfgString
     description       = CfgString
@@ -71,8 +62,6 @@ class TagFile(ConfigFile):
 
     def __init__(self, filename, macros = {}, warn=False):
         ConfigFile.__init__(self)
-        self.addConfigOption('include', CfgCallBack(self.filterCB, 'include'))
-        self.addConfigOption('exclude', CfgCallBack(self.filterCB, 'exclude'))
 
         self.tag = os.path.basename(filename)
         self.tagFile = filename
@@ -94,6 +83,17 @@ class TagFile(ConfigFile):
                     # throw this away
                     continue
 
+    @directive
+    def include(self, val):
+        if not self.macros:
+            return
+        self.filterlist.append((INCLUDE, filter.Filter(val, self.macros)))
+
+    @directive
+    def exclude(self, val):
+        if not self.macros:
+            return
+        self.filterlist.append((EXCLUDE, filter.Filter(val, self.macros)))
 
     def match(self, filename):
         for keytype, filter in self.filterlist:
