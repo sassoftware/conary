@@ -3732,6 +3732,7 @@ class ServerConfig(ConfigFile):
     tmpDir                  = (CfgPath, '/var/tmp')
     traceLog                = tracelog.CfgTraceLog
     user                    = CfgUserInfo
+    webEnabled              = (CfgBool, True)
 
     def getProxyMap(self):
         return getProxyMap(self)
