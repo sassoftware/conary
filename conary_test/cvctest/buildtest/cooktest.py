@@ -22,6 +22,7 @@ import os
 import re
 import shutil
 import tempfile
+import textwrap
 
 
 #testsuite
@@ -37,6 +38,7 @@ from conary.build import cook, loadrecipe, macros, use, packagerecipe
 from conary.build import errors as builderrors
 from conary.cmds import queryrep
 from conary.conaryclient import cmdline
+from conary.deps import arch
 from conary.deps import deps
 from conary.lib import log
 from conary.lib import util
@@ -1051,6 +1053,22 @@ class TestRecipe(PackageRecipe):
 
         trv = self.build(recipe, "FooRecipe")
         assert(sorted([ x[1] for x in trv.iterFileList()]) == [ '/1', '/2' ])
+
+    def testMixedFlavorAssertion(self):
+        """@tests: CNY-3807"""
+        recipe = textwrap.dedent("""
+            class Foo(PackageRecipe):
+                name = 'foo'
+                version = '1'
+                clearBuildReqs()
+                def setup(r):
+                    from conary.deps import deps
+                    r._buildFlavor = deps.parseFlavor('is: x86_64 sparc')
+                    r.addSource('sparc-libelf-0.97.so', dir='/lib')
+                    r.addSource('ld-x86_64-Linux-abi.so', dir='/lib')
+            """)
+        self.assertRaises(arch.IncompatibleInstructionSets,
+                self.build, recipe, 'Foo')
 
 class MultipleMainPackageTest(rephelp.RepositoryHelper):
     def testMultipleMainPackageTest1(self):

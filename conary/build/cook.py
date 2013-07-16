@@ -582,6 +582,9 @@ def cookObject(repos, cfg, loaderList, sourceVersion,
         return []
 
     (cs, built, cleanup) = ret
+    for tup in built:
+        # Sanity check for valid instruction sets (CNY-3807)
+        deps.getMajorArch(tup[2])
 
     if needsSigning:
         # sign the changeset
