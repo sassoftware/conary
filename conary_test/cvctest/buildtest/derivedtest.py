@@ -20,6 +20,7 @@ from testrunner import testhelp
 import os
 import itertools
 import stat
+import textwrap
 
 import conary_test
 from conary_test import rephelp
@@ -1183,3 +1184,42 @@ class TestRecipe(DerivedPackageRecipe):
         self.assertRaises(builderrors.RecipeFileError,
                                self.cookFromRepository, pkgname,
                                buildLabel=self.shadowLabel)
+
+    def testMixedFlavor(self):
+        """File flavors of wrong arch shouldn't bubble up to built package
+
+        @tests: CNY-3807
+        """
+        recipe = textwrap.dedent("""
+            class TestFlavors(PackageRecipe):
+                name = "%(pkgname)s"
+                version = "0.1"
+
+                clearBuildReqs()
+
+                def setup(r):
+                    r.addSource('sparc-libelf-0.97.so', dir='/usr/lib')
+            """)
+        pkgname = "test-flavors"
+        repos = self.openRepository()
+        os.chdir(self.workDir)
+        self.newpkg(pkgname)
+        os.chdir(pkgname)
+        self.writeFile(pkgname + '.recipe', recipe % dict(pkgname=pkgname))
+        self.addfile(pkgname + '.recipe')
+        self.commit()
+        built = self.cookFromRepository(pkgname)
+        self.assertEquals(built[0][2], deps.Flavor())
+        v = versions.VersionFromString(built[0][1])
+
+        self.mkbranch(self.defLabel, self.shadowLabel, pkgname + ":source",
+                      shadow=True)
+        os.chdir(self.workDir)
+        self.checkout(pkgname, self.shadowLabel.asString(),
+                      dir=pkgname + '-derived')
+        os.chdir(pkgname + '-derived')
+        self.writeFile(pkgname + '.recipe',
+                self.getRecipe(pkgname, v, ['pass']))
+        self.commit()
+        built = self.cookFromRepository(pkgname, buildLabel=self.shadowLabel)
+        self.assertEquals(built[0][2], deps.Flavor())

@@ -1,0 +1,1 @@
+Fixed derived packages inheriting all file flavor instruction sets, not just those that are compatible with the build flavor.
