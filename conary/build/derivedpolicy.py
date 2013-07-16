@@ -128,7 +128,9 @@ class Flavor(packagepolicy.Flavor):
         if self.fileChanged(path):
             packagepolicy.Flavor.doFile(self, path)
         else:
-            self.packageFlavor.union(f.flavor())
+            isnset = deps.getMajorArch(f.flavor())
+            if isnset in self.allowableIsnSets:
+                self.packageFlavor.union(f.flavor())
 
 class Requires(packagepolicy.Requires):
     processUnmodified = True

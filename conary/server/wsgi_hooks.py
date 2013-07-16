@@ -397,6 +397,9 @@ class ConaryHandler(object):
         if not self.repositoryServer:
             return self._makeError('404 Not Found',
                     "This is a Conary proxy server, it has no web interface.")
+        if not self.cfg.webEnabled:
+            return self._makeError('404 Not Found',
+                    "Web interface disabled by administrator.")
         web = repos_web.ReposWeb(self.cfg, self.shimServer)
         return web._handleRequest(request)
 
