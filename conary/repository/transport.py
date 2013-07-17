@@ -96,7 +96,7 @@ class Transport(xmlrpclib.Transport):
         self.compress = False
         self.abortCheck = None
         self.proxyMap = proxyMap
-        self.extraHeaders = ()
+        self.extraHeaders = {}
         self.serverName = serverName
         self.caCerts = caCerts
         self.responseHeaders = None
