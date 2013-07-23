@@ -65,6 +65,9 @@ class CallLogTest(rephelp.RepositoryHelper):
             ( 5, 'serverName', 123412341, '172.31.254.254',
                 ('user', [('a', 'a'), ('b', 'b')]), 'someMethod', [1, 2],
                 {'a' : 'a', 'b' : 'b'}, 'exception', 1000),
+            ( 6, 'serverName', 123412341, '172.31.254.254',
+                ('user', [('a', 'a'), ('b', 'b')]), 'someMethod', [1, 2],
+                {'a' : 'a', 'b' : 'b'}, 'exception', 1000, 'system_1234'),
         ]
 
         for info in infos:
@@ -89,14 +92,16 @@ class CallLogTest(rephelp.RepositoryHelper):
             else:
                 self.assertEqual(entry.kwArgs, info[7])
                 self.assertEqual(entry.exceptionStr, info[8])
-                if entry.revision == 5:
+                if entry.revision >= 5:
                     self.assertEqual(entry.latency, info[9])
+                if entry.revision >= 6:
+                    self.assertEqual(entry.systemId, info[10])
 
             if entry.revision == 1:
                 x = (entry.user, entry.entClass)
             elif entry.revision == 2:
                 x = (entry.user, entry.entClass, entry.entKey)
-            elif entry.revision in [3, 4, 5]:
+            elif entry.revision in (3, 4, 5, 6):
                 x = (entry.user, entry.entitlements)
             else:
                 assert(0)
@@ -115,16 +120,17 @@ class CallLogTest(rephelp.RepositoryHelper):
         kwargs = {1 : 1, 2 : 2}
         exception = 'exception text'
         latency = .23
+        systemId = 'system_foo'
 
         log.log(remoteIp, authToken, methodName, args, kwargs, exception,
-                latency)
+                latency, systemId)
 
         log = reposlog.RepositoryCallLogger(logPath, None, readOnly = True)
         ents = [ x for x in log ]
         self.assertEqual(len(ents), len(infos) + 1)
 
         entry = ents[-1]
-        self.assertEqual(entry.revision, 5)
+        self.assertEqual(entry.revision, 6)
         self.assertEqual(entry.serverName, serverNameList)
         self.assertEqual(entry.remoteIp, remoteIp)
         self.assertEqual(entry.methodName, methodName)
@@ -135,3 +141,4 @@ class CallLogTest(rephelp.RepositoryHelper):
         self.assertEqual(entry.latency, latency)
         self.assertEqual(entry.user, authToken[0])
         self.assertEqual(entry.entitlements, authToken[2])
+        self.assertEqual(entry.systemId, systemId)

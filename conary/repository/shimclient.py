@@ -27,10 +27,10 @@ import time
 # this returns the same server for any server name or label
 # requested; because a shim can only refer to one server.
 class FakeServerCache(netclient.ServerCache):
-    def __init__(self, server, repMap, userMap, conaryProxies):
+    def __init__(self, server, repMap, userMap, conaryProxies, systemId=None):
         self._server = server
         netclient.ServerCache.__init__(self, repMap, userMap,
-                proxies=conaryProxies)
+                proxies=conaryProxies, systemId=systemId)
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)
@@ -201,7 +201,7 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
                              hidden = hidden)
 
     def __init__(self, server, protocol, port, authToken, repMap, userMap,
-            conaryProxies=None):
+            conaryProxies=None, systemId=None):
         if type(authToken[2]) is not list:
             # old-style [single entitlement] authToken
             authToken = (authToken[0], authToken[1],
@@ -210,17 +210,19 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
             authToken = authToken + (None,)
 
         netclient.NetworkRepositoryClient.__init__(self, repMap, userMap,
-                proxy=conaryProxies)
-        proxy = ShimServerProxy(server, protocol, port, authToken)
-        self.c = FakeServerCache(proxy, repMap, userMap, conaryProxies)
+                proxy=conaryProxies, systemId=systemId)
+        proxy = ShimServerProxy(server, protocol, port, authToken, systemId)
+        self.c = FakeServerCache(proxy, repMap, userMap, conaryProxies,
+                systemId=systemId)
 
 
 class ShimServerProxy(netclient.ServerProxy):
-    def __init__(self, server, protocol, port, authToken):
+    def __init__(self, server, protocol, port, authToken, systemId=None):
         self._authToken = authToken
         self._server = server
         self._protocol = protocol
         self._port = port
+        self._systemId = systemId
         self._protocolVersion = netclient.CLIENT_VERSIONS[-1]
 
         if 'CONARY_CLIENT_LOG' in os.environ:
@@ -245,7 +247,7 @@ class ShimServerProxy(netclient.ServerProxy):
         args = [self._protocolVersion] + list(args)
         start = time.time()
         result = self._server.callWrapper(self._protocol, self._port, method,
-                self._authToken, args, kwargs)
+                self._authToken, args, kwargs, systemId=self._systemId)
 
         if self._callLog:
             self._callLog.log("shim-" + self._server.repos.serverNameList[0],

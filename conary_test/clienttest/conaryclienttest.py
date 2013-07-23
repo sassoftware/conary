@@ -19,6 +19,7 @@ from testrunner import testhelp
 import copy
 import itertools
 import os
+import base64
 import tempfile
 
 #testsuite
@@ -688,3 +689,21 @@ The following dependencies would not be met after this update:
         self.assertEquals(sysmodel.model.filedata, ["install group-me\n"])
         self.assertEquals(sysmodel.fileFullName, modelPath)
         self.assertEquals(sysmodel.mtime, os.stat(modelPath).st_mtime)
+
+    def testSystemIdScript(self):
+        systemId = 'foobar'
+        script = os.path.join(self.workDir, 'script.sh')
+        fh = open(script, 'w')
+        fh.write("""\
+#!/bin/bash
+echo -n "%s"
+exit 0
+""" % systemId)
+        fh.flush()
+        fh.close()
+        os.chmod(script, 0755)
+
+        self.cfg.systemIdScript = script
+        client = conaryclient.ConaryClient(self.cfg)
+
+        self.assertEquals(base64.b64encode(systemId), client.repos.c.systemId)

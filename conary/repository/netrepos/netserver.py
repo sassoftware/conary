@@ -244,7 +244,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def callWrapper(self, protocol, port, methodname, authToken,
                     orderedArgs, kwArgs,
-                    remoteIp = None, rawUrl = None, isSecure = False):
+                    remoteIp = None, rawUrl = None, isSecure = False,
+                    systemId = None):
         """
         Returns a tuple of (Exception, result).  Exception is a Boolean
         stating whether an error occurred.
@@ -287,19 +288,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if self.callLog:
                 self.callLog.log(remoteIp, authToken, methodname,
                                  orderedArgs, kwArgs,
-                                 latency = time.time() - start)
+                                 latency = time.time() - start,
+                                 systemId = systemId)
             return r
 
         if self.callLog:
             if isinstance(e, HiddenException):
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  kwArgs, exception = e.forLog,
-                                 latency = time.time() - start)
+                                 latency = time.time() - start,
+                                 systemId = systemId)
                 exceptionOverride = e.forReturn
             else:
                 self.callLog.log(remoteIp, authToken, methodname, orderedArgs,
                                  kwArgs, exception = e,
-                                 latency = time.time() - start)
+                                 latency = time.time() - start,
+                                 systemId = systemId)
         elif isinstance(e, HiddenException):
             exceptionOverride = e.forReturn
 

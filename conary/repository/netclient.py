@@ -183,7 +183,7 @@ class ServerCache:
     TransportFactory = transport.Transport
     def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
             callback=None, proxies=None, proxyMap=None, entitlementDir=None,
-            caCerts=None, connectAttempts=None):
+            caCerts=None, connectAttempts=None, systemId=None):
         self.cache = {}
         self.shareCache = {}
         self.map = repMap
@@ -197,6 +197,7 @@ class ServerCache:
         self.caCerts = caCerts
         self.connectAttempts = connectAttempts
         self.callLog = None
+        self.systemId = systemId
 
         if 'CONARY_CLIENT_LOG' in os.environ:
             self.callLog = calllog.ClientCallLogger(
@@ -344,6 +345,7 @@ class ServerCache:
                 caCerts=self.caCerts, connectAttempts=self.connectAttempts)
         transporter.setCompress(True)
         transporter.setEntitlements(entList)
+        transporter.addExtraHeaders({'X-Conary-SystemId': self.systemId})
         server = ServerProxy(url=url, serverName=serverName,
                 transporter=transporter, entitlementDir=self.entitlementDir,
                 callLog=self.callLog)
@@ -393,7 +395,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
             entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
             entitlements=None, proxy=None, proxyMap=None, caCerts=None,
-            connectAttempts=None):
+            connectAttempts=None, systemId=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
@@ -419,7 +421,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
                 proxies=proxies, entitlementDir=entitlementDir,
                 caCerts=caCerts, proxyMap=proxyMap,
-                connectAttempts=connectAttempts)
+                connectAttempts=connectAttempts, systemId=systemId)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)

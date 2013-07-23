@@ -143,7 +143,7 @@ class ProxyCallFactory:
     @staticmethod
     def createCaller(protocol, port, rawUrl, proxyMap, authToken, localAddr,
                      protocolString, headers, cfg, targetServerName,
-                     remoteIp, isSecure, baseUrl):
+                     remoteIp, isSecure, baseUrl, systemId):
         entitlementList = authToken[2][:]
         injEntList = cfg.entitlement.find(targetServerName)
         if injEntList:
@@ -179,6 +179,7 @@ class ProxyCallFactory:
         transporter = transport.Transport(proxyMap=proxyMap,
                                           serverName = targetServerName)
         transporter.setExtraHeaders(lheaders)
+        transporter.addExtraHeaders({'X-Conary-SystemId': systemId})
         transporter.setEntitlements(entitlementList)
 
         transporter.setCompress(True)
@@ -208,6 +209,7 @@ class RepositoryCaller(xmlshims.NetworkConvertors):
                 remoteIp=self.remoteIp,
                 rawUrl=self.rawUrl,
                 isSecure=self.isSecure,
+                systemId=self.systemId
                 )
 
     def callByRequest(self, methodname, request):
@@ -239,7 +241,7 @@ class RepositoryCaller(xmlshims.NetworkConvertors):
         return lambda *args, **kwargs: self.callByName(method, *args, **kwargs)
 
     def __init__(self, protocol, port, authToken, repos, remoteIp, rawUrl,
-                 isSecure):
+                 isSecure, systemId):
         self.repos = repos
         self.protocol = protocol
         self.port = port
@@ -249,6 +251,7 @@ class RepositoryCaller(xmlshims.NetworkConvertors):
         self.rawUrl = rawUrl
         self.isSecure = isSecure
         self.lastProxy = None
+        self.systemId = systemId
 
 
 class RepositoryCallFactory:
@@ -259,11 +262,12 @@ class RepositoryCallFactory:
 
     def createCaller(self, protocol, port, rawUrl, proxyMap, authToken,
                      localAddr, protocolString, headers, cfg,
-                     targetServerName, remoteIp, isSecure, baseUrl):
+                     targetServerName, remoteIp, isSecure, baseUrl,
+                     systemId):
         if 'via' in headers:
             self.log(2, "HTTP Via: %s" % headers['via'])
         return RepositoryCaller(protocol, port, authToken, self.repos,
-                                remoteIp, baseUrl, isSecure)
+                                remoteIp, baseUrl, isSecure, systemId)
 
 class BaseProxy(xmlshims.NetworkConvertors):
 
@@ -299,7 +303,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
     def callWrapper(self, protocol, port, methodname, authToken, request,
                     remoteIp = None, rawUrl = None, localAddr = None,
-                    protocolString = None, headers = None, isSecure = False):
+                    protocolString = None, headers = None, isSecure = False,
+                    systemId = None):
         """
         @param localAddr: if set, a string host:port identifying the address
         the client used to talk to us.
@@ -322,6 +327,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
                 rawUrl = self._mapUrl(rawUrl)
         self.setBaseUrlOverride(rawUrl, headers, isSecure)
 
+        systemId = headers.get('X-Conary-SystemId', None)
+
         # simple proxy. FIXME: caching these might help; building all
         # of this framework for every request seems dumb. it seems like
         # we could get away with one total since we're just changing
@@ -332,7 +339,7 @@ class BaseProxy(xmlshims.NetworkConvertors):
                                                headers, self.cfg,
                                                self._serverName,
                                                remoteIp, isSecure,
-                                               self.urlBase())
+                                               self.urlBase(), systemId)
 
         response = None
         try:
@@ -346,14 +353,14 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
                 if self.callLog:
                     self.callLog.log(remoteIp, authToken, '+' + methodname,
-                            args, kwargs)
+                            args, kwargs, systemId=systemId)
 
                 r = method(caller, authToken, *args, **kwargs)
             else:
                 # Forward directly to the next server.
                 if self.callLog:
                     self.callLog.log(remoteIp, authToken, methodname, args,
-                            kwargs)
+                            kwargs, systemId=systemId)
                 # This is incredibly silly.
                 r = caller.callByName(methodname, *args, **kwargs)
 
@@ -956,7 +963,7 @@ class ChangesetFilter(BaseProxy):
 
         if self.callLog and changeSetsNeeded:
             self.callLog.log(None, authToken, '__createChangeSets',
-                             changeSetsNeeded)
+                             changeSetsNeeded, systemId=caller.systemId)
 
         if serverVersion < 50 or self.forceSingleCsJob:
             # calling internal changeset generation, which only supports

@@ -304,7 +304,7 @@ class ProxyTest(rephelp.RepositoryHelper):
             authToken = authToken, localAddr = '1.2.3.4',
             protocolString = "protocolString", headers = {}, cfg = self.cfg,
             targetServerName = 'example.com', remoteIp = '5.6.7.8',
-            isSecure = False, baseUrl = "http://blah")
+            isSecure = False, baseUrl = "http://blah", systemId='foo')
         self.assertEquals(caller.url.scheme, 'https')
         self.assertEquals(caller.url.hostport.port, 443)
         # This whole thing points out a workaround for _not_ going through SSL

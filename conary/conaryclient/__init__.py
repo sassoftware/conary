@@ -130,7 +130,8 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
                 downloadRateLimit=cfg.downloadRateLimit,
                 uploadRateLimit=cfg.uploadRateLimit,
                 entitlements=cfg.entitlement, proxyMap=proxyMap,
-                caCerts=cfg.trustedCerts, connectAttempts=cfg.connectAttempts)
+                caCerts=cfg.trustedCerts, connectAttempts=cfg.connectAttempts,
+                systemId=util.SystemIdFactory(cfg.systemIdScript).getId())
         repos.setFlavorPreferenceList(cfg.flavorPreferences)
         return repos
 

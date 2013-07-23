@@ -1020,6 +1020,55 @@ class NetServerTest(rephelp.RepositoryHelper):
         repos.getTrove(*comp.getNameVersionFlavor())
         _checkLog(proxyLog, [ '+getChangeSet' ])
 
+    def testSystemIdThroughProxy(self):
+        def _reset(path):
+            # zero out the file
+            os.close(os.open(path, os.O_WRONLY | os.O_TRUNC))
+
+        def _checkLog(path, systemId=None):
+            cl = reposlog.RepositoryCallLogger(path, None)
+            got = set((x.systemId for x in cl))
+            if isinstance(systemId, str):
+                systemId = set([systemId ])
+            elif not systemId:
+                systemId = set()
+            self.assertEquals(systemId, got)
+
+        repos = self.openRepository()
+        server = self.servers.getServer()
+        systemId = repos.c.systemId
+        comp = self.addComponent('foo:runtime', '1.0')
+
+        if self.proxy:
+            proxyLog = os.path.join(self.proxy.reposDir, 'proxy.log')
+            _reset(proxyLog)
+
+        repoLog = os.path.join(server.reposDir, 'repos.log')
+        _reset(repoLog)
+
+        # we should see getChangeSet followed by change set creation
+        repos.getTrove(*comp.getNameVersionFlavor())
+
+        if self.proxy:
+            _checkLog(proxyLog, systemId)
+            _reset(proxyLog)
+
+        _checkLog(repoLog, systemId)
+        _reset(repoLog)
+
+        # we should see getChangeSet, but no change set creation
+        # because it's already cached
+        repos.getTrove(*comp.getNameVersionFlavor())
+
+        if self.proxy:
+            _checkLog(proxyLog, systemId)
+            # I don't think the repository log should get an entry since the
+            # proxy should already have a cached copy.
+            _checkLog(repoLog)
+
+        if not self.proxy:
+            _checkLog(repoLog, systemId)
+
     def testDatabaseLocked(self):
         # CNY-1596
         if os.environ.get('CONARY_REPOS_DB', 'sqlite') != 'sqlite':

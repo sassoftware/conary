@@ -15,6 +15,7 @@
 #
 
 
+import base64
 import bdb
 import bz2
 import debugger
@@ -22,6 +23,7 @@ import errno
 import fcntl
 import fnmatch
 import gzip
+import hashlib
 import os
 import re
 import select
@@ -36,6 +38,7 @@ import tempfile
 import time
 import types
 import urllib
+import uuid
 import weakref
 import xmlrpclib
 import zlib
@@ -2483,3 +2486,39 @@ class cachedProperty(object):
         ret = propself.func(ownself)
         setattr(ownself, propself.func.func_name, ret)
         return ret
+
+
+class SystemIdFactory(object):
+    def __init__(self, script):
+        self.script = script
+        self.systemId = None
+
+    def _run(self):
+        try:
+            p = subprocess.Popen(self.script, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+            stdout, stderr = p.communicate()
+
+            if p.returncode != 0:
+                log.warning('SystemId script exited with %s', p.returncode)
+                return None
+
+            return base64.b64encode(stdout)
+        except OSError, e:
+            err, msg = e.args
+            log.warning('SystemId script failed with the following error: '
+                    '%s', msg)
+            return None
+
+    def getId(self):
+        if self.systemId:
+            return self.systemId
+
+        if self.script and os.path.exists(self.script):
+            self.systemId = self._run()
+        else:
+            sha = hashlib.sha256()
+            sha.update(str(uuid.getnode()))
+            self.systemId = base64.b64encode(sha.hexdigest())
+
+        return self.systemId

@@ -48,20 +48,25 @@ class RepositoryCallLogEntry:
              (self.user, self.entitlements),
              self.methodName, self.args, self.kwArgs,
              self.exceptionStr, self.latency) = info[1:]
+        elif (self.revision == 6):
+            (self.serverName, self.timeStamp, self.remoteIp,
+             (self.user, self.entitlements),
+             self.methodName, self.args, self.kwArgs,
+             self.exceptionStr, self.latency, self.systemId) = info[1:]
         else:
             assert(0)
 
 class RepositoryCallLogger(calllog.AbstractCallLogger):
 
     EntryClass = RepositoryCallLogEntry
-    logFormatRevision = 5
+    logFormatRevision = 6
 
     def __init__(self, logPath, serverNameList, readOnly = False):
         self.serverNameList = serverNameList
         calllog.AbstractCallLogger.__init__(self, logPath, readOnly = readOnly)
 
     def log(self, remoteIp, authToken, methodName, args, kwArgs = {},
-            exception = None, latency = None):
+            exception = None, latency = None, systemId=None):
         # lazy re-open the log file in case it was rotated from underneath us
         self.reopen()
         if exception:
@@ -71,7 +76,7 @@ class RepositoryCallLogger(calllog.AbstractCallLogger):
         logStr = cPickle.dumps((self.logFormatRevision, self.serverNameList,
                                 time.time(), remoteIp, (user, entitlements),
                                 methodName, args, kwArgs, exception,
-                                latency))
+                                latency, systemId))
         try:
             self.fobj.write(struct.pack("!I", len(logStr)) + logStr)
             self.fobj.flush()

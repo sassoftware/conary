@@ -23,6 +23,7 @@ import StringIO
 import tempfile
 import time
 import zlib
+import base64
 import subprocess
 from conary.lib import util
 from conary.lib.ext import file_utils
@@ -1242,3 +1243,44 @@ class UrlTests(testhelp.TestCase):
         for tup, url in tests:
             nurl = util.urlUnsplit(tup)
             self.assertEqual(nurl, url)
+
+
+class SystemIdFactoryTests(testhelp.TestCase):
+    def setUp(self):
+        testhelp.TestCase.setUp(self)
+        self.workDir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        util.rmtree(self.workDir)
+        testhelp.TestCase.tearDown(self)
+
+    def testNoScript(self):
+        factory = util.SystemIdFactory(None)
+        id1 = factory.getId()
+        id2 = factory.getId()
+        self.assertEquals(id1, id2)
+
+    def _writeScript(self, script, systemId, exitCode=0):
+        open(script, 'w').write("""\
+#!/bin/bash
+echo -n "%(systemId)s"
+exit %(exitCode)s
+""" % {'systemId': systemId, 'exitCode': exitCode})
+        os.chmod(script, 0755)
+
+    def testScript(self):
+        script = os.path.join(self.workDir, 'script.sh')
+        factory = util.SystemIdFactory(script)
+
+        for systemId in ['abc', '123', 'asdfklajsdfasdgfalgklh']:
+            self._writeScript(script, systemId)
+            self.assertEquals(factory.getId(), base64.b64encode(systemId))
+            factory.systemId = None
+
+    def testScriptFail(self):
+        script = os.path.join(self.workDir, 'script.sh')
+        factory = util.SystemIdFactory(script)
+
+        self._writeScript(script, '12345', 1)
+        systemId = factory.getId()
+        self.assertEquals(systemId, None)
