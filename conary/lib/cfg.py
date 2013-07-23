@@ -252,6 +252,9 @@ class OptionValue(object):
         self.updateFromString(newStr, path, line)
         return self.value
 
+    def writeDoc(self, out, displayOptions=None):
+        return self.definition.writeDoc(out, displayOptions)
+
 
 def directive(func):
     """
