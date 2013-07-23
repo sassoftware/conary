@@ -129,12 +129,6 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     _defaultSectionType = MirrorConfigurationSection
 
 
-# for compatibility with older code base that requires a source and a
-# target to de defined
-class MirrorConfiguration(MirrorFileConfiguration):
-    source = MirrorConfigurationSection
-    target = MirrorConfigurationSection
-
 # some sanity checks for the mirror configuration
 def checkConfig(cfg):
     if not cfg.host:

@@ -20,8 +20,8 @@ The conary main program.
 """
 
 import sys
-if sys.version_info < (2, 4):
-    print "error: python 2.4 or later is required"
+if sys.version_info < (2, 6):
+    print "error: python 2.6 or later is required"
     sys.exit(1)
 
 #stdlib
