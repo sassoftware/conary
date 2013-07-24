@@ -642,7 +642,7 @@ class MirrorTest(rephelp.RepositoryHelper):
     def testMirrorAccess(self):
         src, dst = self.createRepositories()
         mirrorFile = self.createConfigurationFile()
-        cfg = mirror.MirrorConfiguration()
+        cfg = mirror.MirrorFileConfiguration()
         cfg.host = "localhost"
         # get a non-mirror user access
         src1 = self.getRepositoryClient("nomirror", "nomirror", serverIdx=0)
@@ -761,7 +761,7 @@ class MirrorTest(rephelp.RepositoryHelper):
             ], repos=src)
         dst = self._getMultiTarget(2, ["myhost", "myotherhost"])
         # create the mirror config
-        cfg = mirror.MirrorConfiguration()
+        cfg = mirror.MirrorFileConfiguration()
         cfg.host = "myotherhost"
         self._runMirrorCfg(src, dst, cfg)
 
@@ -787,7 +787,7 @@ class MirrorTest(rephelp.RepositoryHelper):
         dst = self._getMultiTarget(2, ["myhost","myotherhost"])
 
         # create the mirror config
-        cfg = mirror.MirrorConfiguration()
+        cfg = mirror.MirrorFileConfiguration()
         cfg.host = "myhost"
         cfg.labels = [versions.Label("myhost@src:test")]
         cfg.recurseGroups = True
@@ -883,6 +883,6 @@ class MirrorTest(rephelp.RepositoryHelper):
 
         dst = self._getMultiTarget(2, ["myhost", "myotherhost"])
         # create the mirror config
-        cfg = mirror.MirrorConfiguration()
+        cfg = mirror.MirrorFileConfiguration()
         cfg.host = "myotherhost"
         self._runMirrorCfg(src, dst, cfg)
