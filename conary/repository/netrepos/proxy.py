@@ -131,11 +131,12 @@ class ProxyCaller:
     def _getBasicUrl(self):
         return self.url._replace(userpass=(None, None))
 
-    def __init__(self, url, proxy, transport):
+    def __init__(self, url, proxy, transport, systemId):
         self.url = url
         self.proxy = proxy
         self._lastProxy = None
         self._transport = transport
+        self.systemId = systemId
 
 
 class ProxyCallFactory:
@@ -185,7 +186,7 @@ class ProxyCallFactory:
         transporter.setCompress(True)
         proxy = ProxyClient(url, transporter)
 
-        return ProxyCaller(url, proxy, transporter)
+        return ProxyCaller(url, proxy, transporter, systemId)
 
 class RepositoryCaller(xmlshims.NetworkConvertors):
     """

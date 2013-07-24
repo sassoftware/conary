@@ -66,7 +66,7 @@ class RepositoryCallLogger(calllog.AbstractCallLogger):
         calllog.AbstractCallLogger.__init__(self, logPath, readOnly = readOnly)
 
     def log(self, remoteIp, authToken, methodName, args, kwArgs = {},
-            exception = None, latency = None, systemId=None):
+            exception = None, latency = None, systemId = None):
         # lazy re-open the log file in case it was rotated from underneath us
         self.reopen()
         if exception:
