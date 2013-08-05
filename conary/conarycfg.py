@@ -23,17 +23,22 @@ import os
 import sys
 import xml
 import re
+import tempfile
+import textwrap
 import traceback
 import urllib
-import pwd
 
 from conary.deps import deps, arch
 from conary.lib import util, api
-from conary.lib.cfg import *  # pyflakes=ignore
+from conary.lib.cfg import ParseError, SectionedConfigFile, ConfigSection
+from conary.lib.cfgtypes import (CfgType, CfgString, CfgBool, CfgPath, CfgEnum,
+        CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt)
+from conary.lib.cfgtypes import RegularExpressionList
 from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions
 from conary import flavorcfg
+from conary.repository import transport
 
 # ----------- conary specific types
 
@@ -531,6 +536,7 @@ def _getDefaultPublicKeyrings():
     # CNY-2722: look up the directory with getpwuid, instead of using $HOME
 
     try:
+        import pwd
         ent = pwd.getpwuid(os.getuid())
         pwDir = ent[5]
         # If home dir doesn't exist, don't bother
@@ -541,6 +547,14 @@ def _getDefaultPublicKeyrings():
 
     publicKeyrings.append('/etc/conary/pubring.gpg')
     return publicKeyrings
+
+
+def _getDefaultTempDir():
+    if os.name == 'posix':
+        return '/var/tmp'
+    else:
+        return tempfile.gettempdir()
+
 
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
@@ -638,7 +652,7 @@ class ConaryContext(ConfigSection):
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     downloadFirst         =  (CfgBool, False)
-    tmpDir                =  (CfgPath, '/var/tmp')
+    tmpDir                =  (CfgPath, _getDefaultTempDir())
     trustThreshold        =  (CfgInt, 0)
     trustedCerts          =  (CfgPathList, (),
             'List of CA certificates which are trusted to identify a remote '
