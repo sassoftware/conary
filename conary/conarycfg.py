@@ -1130,3 +1130,14 @@ def getProxyMap(cfg):
                 url = 'conarys:' + url[6:]
             proxyDict[scheme] = url
     return proxy_map.ProxyMap.fromDict(proxyDict)
+
+
+# These are regrettably part of the module's published API
+# pyflakes=ignore
+from conary.lib.cfgtypes import (CfgType, CfgString, CfgPath, CfgInt, CfgBool,
+        CfgRegExp, CfgSignedRegExp, CfgEnum, CfgCallBack, CfgLineList,
+        CfgQuotedLineList, CfgList, CfgDict, CfgEnumDict, CfgRegExpList,
+        CfgSignedRegExpList, CfgError, CfgEnvironmentError,
+        RegularExpressionList, SignedRegularExpressionList, CfgPathList)
+# pyflakes=ignore
+from conary.lib.cfg import ConfigFile, ConfigSection, SectionedConfigFile
