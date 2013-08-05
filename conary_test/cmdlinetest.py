@@ -29,7 +29,7 @@ from conary_test import rephelp
 from conary_test import resources
 
 from conary import constants, errors
-from conary import cvc as cvccmd # test legacy import location
+from conary.cmds import cvccmd
 from conary.cmds import conarycmd
 from conary.cmds import queryrep
 from conary.deps import deps

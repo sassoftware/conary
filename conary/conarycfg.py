@@ -33,7 +33,6 @@ from conary.lib import util, api
 from conary.lib.cfg import ParseError, SectionedConfigFile, ConfigSection
 from conary.lib.cfgtypes import (CfgType, CfgString, CfgBool, CfgPath, CfgEnum,
         CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt)
-from conary.lib.cfgtypes import RegularExpressionList
 from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions

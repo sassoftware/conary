@@ -29,9 +29,9 @@ from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.errors import DatabaseLockedError, DecodingError
 from conary.callbacks import UpdateCallback
-from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, sha1helper, sigprotect, util, api
+from conary.lib.cfgtypes import RegularExpressionList
 from conary.local import capsules as capsulesmod
 from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
