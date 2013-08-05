@@ -109,11 +109,15 @@ def mkdirIfMissing(path):
 def pread(fobj, count, offset):
     if offset >= 0x8000000000000000:
         raise OverflowError
+    fd = _fileno(fobj)
+    if os.name != 'posix':
+        os.lseek(fd, offset, os.SEEK_SET)
+        return os.read(fd, count)
     buf = ctypes.create_string_buffer(count)
     libc = ctypes_utils.get_libc()
     libc.pread.argtypes = (c_int, c_void_p, c_size_t, c_long)
     libc.pread.restype = c_int
-    rc = libc.pread(_fileno(fobj), buf, count, offset)
+    rc = libc.pread(fd, buf, count, offset)
     if rc < 0:
         ctypes_utils.throw_errno(libc)
     else:

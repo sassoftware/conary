@@ -15,11 +15,14 @@
 #
 
 
+import os
 from conary.lib.ext import ctypes_utils
 from ctypes import c_int
 
 
 def res_init():
+    if os.name != 'posix':
+        return
     libc = ctypes_utils.get_libc()
     libc.__res_init.argtypes = ()
     libc.__res_init.restype = c_int
