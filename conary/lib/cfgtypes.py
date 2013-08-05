@@ -114,31 +114,34 @@ class CfgType(object):
 
 CfgString = CfgType
 
-_pathCache = {}
-def Path(str):
-    if str in ["stdin", "stdout", "stderr"]:
-        return _Path(str)
-    if str not in _pathCache:
 
-        if '~' not in str and '$' not in str and str[0] == '/':
-            p = _Path(str)
-        elif str == ':memory:':
-            p = _Path(str)
-        else:
-            try:
-                p = _ExpandedPath(str)
-            except OSError:
-                p = _Path(str)
-        _pathCache[str] = p
-        return p
-    elif '~' in str or '$' in str or (str[0] != '/' and str != ':memory:'):
+def _pathIsAbsolute(path):
+    if path in ['stdin', 'stdout', 'stderr', ':memory:']:
+        return True
+    if '$' in path or '~' in path:
+        return False
+    return os.path.isabs(path)
+
+
+_pathCache = {}
+def Path(path):
+    cached = _pathCache.get(path)
+    absolute = _pathIsAbsolute(path)
+    if absolute:
+        if cached:
+            return cached
+        p = _Path(path)
+    else:
         try:
-            p = _ExpandedPath(str)
+            p = _ExpandedPath(path)
         except OSError:
-            p = _Path(str)
-        if p != _pathCache[str]:
-            _pathCache[str] = p
-    return _pathCache[str]
+            p = _Path(path)
+    if cached == p:
+        p = cached
+    else:
+        _pathCache[path] = p
+    return p
+
 
 class _Path(str):
     __slots__ = []
