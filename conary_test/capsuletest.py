@@ -22,8 +22,9 @@ import conary_test
 from conary import trove
 from conary_test import rephelp
 
-from conary import errors, files, rpmhelper, showchangeset, versions
+from conary import errors, files, rpmhelper, versions
 from conary import conaryclient
+from conary.cmds import showchangeset
 from conary.deps import deps
 from conary.cmds import query, queryrep, updatecmd
 from conary.lib import util

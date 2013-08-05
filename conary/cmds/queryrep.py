@@ -20,11 +20,12 @@ Provides the output for the "conary repquery" command
 """
 import itertools
 
-from conary import conaryclient, showchangeset, trove
+from conary import conaryclient, trove
 from conary.conaryclient import cmdline
 from conary import display
 from conary.deps import deps
 from conary.cmds import cscmd
+from conary.cmds import showchangeset
 from conary.repository import trovesource, errors
 from conary.lib import log
 from conary.errors import ConaryError

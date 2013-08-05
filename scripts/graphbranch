@@ -28,14 +28,9 @@ else:
     fullPath = os.getcwd()
 
 sys.path.append(os.path.dirname(fullPath))
-from conary.repository.changeset import ChangeSetFromFile
 from conary.repository import netclient
-from conary.local import database
 from conary import conarycfg
 from conary.lib import util
-from conary import queryrep
-from conary import checkin
-from conary versions
 
 sys.excepthook = util.genExcepthook()
 
