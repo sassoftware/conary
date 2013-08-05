@@ -174,6 +174,8 @@ class FileContainer:
         nameLen = self.file.pread(10, offset)
         if not len(nameLen):
             return (None, None, None, None, None)
+        elif len(nameLen) < 10:
+            raise BadContainer("file container is truncated")
 
         offset += 10
 
@@ -183,6 +185,8 @@ class FileContainer:
             totalSize = (most << 32) + least
 
             otherLengths = self.file.pread(4, offset + totalSize)
+            if len(otherLengths) < 4:
+                raise BadContainer("file container is truncated")
             nameLen, tagLen  = struct.unpack("!HH", otherLengths)
             size = totalSize - nameLen - tagLen
             nextOffset = offset + totalSize + 4
@@ -192,8 +196,12 @@ class FileContainer:
             nextOffset = offset + nameLen + tagLen + size
 
         name = self.file.pread(nameLen, offset)
+        if len(name) < nameLen:
+            raise BadContainer("file container is truncated")
         offset += nameLen
         tag = self.file.pread(tagLen, offset)
+        if len(tag) < tagLen:
+            raise BadContainer("file container is truncated")
         offset += tagLen
 
         return (name, tag, size, offset, nextOffset)
