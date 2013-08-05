@@ -25,12 +25,17 @@ import select
 import signal
 import struct
 import sys
-import termios
 import threading
 import time
-import tty
 from xml.sax import saxutils
 from conary.errors import ConaryError
+
+try:
+    import fcntl
+    import termios
+    import tty
+except ImportError:
+    fcntl = termios = tty = None  # pyflakes=ignore
 
 
 BUFFER=1024*4096
@@ -580,6 +585,8 @@ class Logger:
         # By using 42 octets we ensure that the probability of encountering
         # the marker string accidentally is negligible with a high degree of
         # confidence.
+        if not termios:
+            raise RuntimeError("The build logger requires the termios module")
         self.marker = base64.b64encode(os.urandom(42))
         self.lexer = Lexer(self.marker)
         for writer in writers:
@@ -847,7 +854,6 @@ class _ChildLogger:
             been resized, pass that information to the pseudo tty so that
             output can be reformated
         """
-        import fcntl
         s = struct.pack('HHHH', 0, 0, 0, 0)
         result = fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, s)
         rows, cols = struct.unpack('HHHH', result)[0:2]
@@ -855,7 +861,6 @@ class _ChildLogger:
         fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
 
     def _setTerminalSize(self, rows, cols):
-        import fcntl
         s = struct.pack('HHHH', rows, cols, 0, 0)
         fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
 
