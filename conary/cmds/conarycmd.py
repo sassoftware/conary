@@ -27,7 +27,6 @@ if sys.version_info < (2, 6):
 #stdlib
 import optparse
 import os
-import pwd
 import errno
 
 #conary
@@ -159,6 +158,11 @@ class EmergeCommand(ConaryCommand):
             from conary.build import cook
         except ImportError:
             log.error('Conary build tools not installed - cannot build packages.  Please install conary-build')
+            return 1
+        try:
+            import pwd
+        except ImportError:
+            log.error("emerge requires a POSIX operating system")
             return 1
 
         log.setVerbosity(log.INFO)
