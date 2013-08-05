@@ -20,7 +20,6 @@ import bdb
 import bz2
 import debugger
 import errno
-import fcntl
 import fnmatch
 import gzip
 import hashlib
@@ -852,14 +851,25 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
     return tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=dir, text=text)
 
 
+def setCloseOnExec(fd):
+    try:
+        import fcntl
+    except ImportError:
+        return
+    if hasattr(fd, 'fileno'):
+        fd = fd.fileno()
+    flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+    flags |= fcntl.FD_CLOEXEC
+    fcntl.fcntl(fd, fcntl.F_SETFD, flags)
+
+
 class ExtendedFdopen(object):
 
     __slots__ = [ 'fd' ]
 
     def __init__(self, fd):
         self.fd = fd
-        # set close-on-exec flag
-        fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
+        setCloseOnExec(fd)
 
     def fileno(self):
         return self.fd
@@ -1444,7 +1454,7 @@ class BoundedStringIO(object):
         fd, name = tempfile.mkstemp(suffix=".tmp", prefix="tmpBSIO")
         # Get rid of the file from the filesystem, we'll keep an open fd to it
         os.unlink(name)
-        fcntl.fcntl(fd, fcntl.F_SETFD, 1)
+        setCloseOnExec(fd)
         backendFile = os.fdopen(fd, "w+")
         # Copy the data from the current StringIO (up to the current position)
         backend.seek(0)
@@ -2251,6 +2261,7 @@ class LockedFile(object):
         At this point the lock is acquired.  Use write() and commit() to
         have the file created and the lock released.
         """
+        import fcntl
 
         if self._lockfobj is not None:
             self.close()

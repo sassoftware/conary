@@ -2462,10 +2462,7 @@ class Database(SqlDbRepository):
 
             if lockFd is None:
                 lockFd = os.open(self.lockFile, os.O_RDWR)
-
-            fcntl.fcntl(lockFd, fcntl.F_SETFD,
-                        fcntl.fcntl(lockFd, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
-
+            util.setCloseOnExec(lockFd)
             try:
                 fcntl.lockf(lockFd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except IOError, e:

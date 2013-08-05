@@ -18,7 +18,6 @@
 import base64
 import bz2
 import errno
-import fcntl
 import gzip
 import os
 import re
@@ -848,6 +847,7 @@ class _ChildLogger:
             been resized, pass that information to the pseudo tty so that
             output can be reformated
         """
+        import fcntl
         s = struct.pack('HHHH', 0, 0, 0, 0)
         result = fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, s)
         rows, cols = struct.unpack('HHHH', result)[0:2]
@@ -855,6 +855,7 @@ class _ChildLogger:
         fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
 
     def _setTerminalSize(self, rows, cols):
+        import fcntl
         s = struct.pack('HHHH', rows, cols, 0, 0)
         fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
 

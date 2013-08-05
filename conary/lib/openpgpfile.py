@@ -17,7 +17,6 @@
 
 import base64
 import binascii
-import fcntl
 import itertools
 import os
 import stat
@@ -478,6 +477,7 @@ def addPackets(pkts, fpath, pktIdFunc, messageFactory, streamIterFunc):
     """Add packets to the file. Return the packet IDs for the added packets"""
     # This code really expects the stream to be based on a file, since we need
     # a fileno() too
+    import fcntl
 
     pktsDict = {}
     for k in pkts:
