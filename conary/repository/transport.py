@@ -176,7 +176,7 @@ class Transport(xmlrpclib.Transport):
                 if isinstance(e_value, socket.error):
                     errmsg = http_error.splitSocketError(e_value)[1]
                 elif isinstance(e_value, EnvironmentError):
-                    errmsg = e_value.sterror
+                    errmsg = e_value.strerror
                     # sometimes there is a socket error hiding inside an
                     # IOError!
                     if isinstance(errmsg, socket.error):
