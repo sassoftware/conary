@@ -1496,7 +1496,7 @@ class CmdLineTest(rephelp.RepositoryHelper):
         # CNY-2786
         cmd = [ "python" ,"-c",
             "import sys; sys.path.insert(0, '%s'); del sys.argv; "
-            "from conary import cvc" % resources.get_path() ]
+            "from conary.cmds import cvccmd" % resources.get_path() ]
         p = subprocess.Popen(cmd, stdout = subprocess.PIPE,
             stderr = subprocess.PIPE)
         stdout, stderr = p.communicate()
