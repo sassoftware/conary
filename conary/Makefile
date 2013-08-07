@@ -20,6 +20,14 @@ all: subdirs constants.py
 SUBDIRS=build local repository server lib pysqlite3 deps web \
         conaryclient dbstore ScanDeps cmds
 
+# No longer generated, but cleaned
+compat_modules=commit.py cscmd.py fmtroves.py metadata.py \
+	query.py queryrep.py rollbacks.py showchangeset.py \
+	updatecmd.py verify.py branch.py clone.py cvc.py
+
+# constants.py, cvc.py, and compat_modules have to be listed
+# explicitly here because they are generated and therefore might
+# not exist when the wildcard is run
 python_files = $(wildcard *.py) constants.py
 
 extra_files = \
@@ -48,5 +56,6 @@ clean: clean-subdirs default-clean
 	rm -rf sqlite sqlite3
 	rm -f constants.py
 	rm -rf *.egg-info
+	rm -f $(compat_modules)
 
 include ../Make.rules
