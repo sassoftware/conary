@@ -15,20 +15,22 @@
 #
 
 
-all: subdirs constants.py
+all: subdirs constants.py stubs
 
 SUBDIRS=build local repository server lib pysqlite3 deps web \
         conaryclient dbstore ScanDeps cmds
 
-# No longer generated, but cleaned
+# These are stubs that must be maintained for as long as there is
+# active code that uses any of these modules that needs to work
+# against conary 2.1 or earlier.  If in doubt, leave these here.
 compat_modules=commit.py cscmd.py fmtroves.py metadata.py \
 	query.py queryrep.py rollbacks.py showchangeset.py \
 	updatecmd.py verify.py branch.py clone.py cvc.py
 
-# constants.py, cvc.py, and compat_modules have to be listed
+# constants.py and compat_modules have to be listed
 # explicitly here because they are generated and therefore might
 # not exist when the wildcard is run
-python_files = $(wildcard *.py) constants.py
+python_files = $(wildcard *.py) constants.py $(compat_modules)
 
 extra_files = \
 	Makefile		\
@@ -38,7 +40,13 @@ dist_files = $(python_files) $(extra_files)
 
 generated_files = *.pyo *.pyc 
 
-.PHONY: clean dist install subdirs
+.PHONY: clean dist install subdirs stubs
+
+stubs:
+	for cmd in $(compat_modules); do \
+		if [ $$cmd == cvc.py ]; then newmod=conary.cmds.cvccmd; else newmod="conary.cmds.$$(basename $${cmd} .py)"; fi; \
+		echo -e "import warnings\nwarnings.warn('This module is deprecated; please import $$newmod instead.', DeprecationWarning, 2)\nfrom $$newmod import *" > $$cmd ; \
+	done;
 
 subdirs: default-subdirs
 
