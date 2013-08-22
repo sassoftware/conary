@@ -2331,6 +2331,8 @@ class RepositoryHelper(testhelp.TestCase):
             if isinstance(value, (list, tuple)):
                 for val in value:
                     getattr(mi, key).set(val)
+            elif isinstance(value, dict):
+                getattr(mi, key).update(value)
             else:
                 getattr(mi, key).set(value)
         return mi

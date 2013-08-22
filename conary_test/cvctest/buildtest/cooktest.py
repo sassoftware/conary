@@ -2188,6 +2188,69 @@ class GroupFoo(GroupRecipe):
         md = self.findAndGetTrove('group-bar').getMetadata()
         assert(set(md.values()) == set([None]))
 
+    def testMetadataSetPackage(self):
+        pkgFoo = """
+class Foo(PackageRecipe):
+    name = 'foo'
+    version = '1'
+    clearBuildRequires()
+
+    def setup(r):
+        r.Create('/foo')
+        itemDict = {
+            'keyValue': {
+                'test1': 'bar',
+                'test2': 'baz',
+            }
+        }
+        r._addMetadataItem([r.name, ], itemDict)
+"""
+        self.addComponent('foo:source', [('foo.recipe', pkgFoo)])
+        repos = self.openRepository()
+        built = self.cookItem(repos, self.cfg, 'foo')
+        assert(built[0][0])
+
+        md = self.findAndGetTrove('foo').getMetadata()
+
+        self.failUnless('keyValue' in md)
+        self.failUnlessEqual(md.get('keyValue').items(),
+                [('test1', 'bar'), ('test2', 'baz')])
+
+    def testMetadataSetGroup(self):
+        groupFoo = """
+class GroupFoo(GroupRecipe):
+    name = 'group-foo'
+    version = '1'
+    clearBuildRequires()
+
+    def setup(r):
+        r.setLabelPath('localhost@rpl:linux')
+        r.add('simple:runtime')
+
+        itemDict = {
+            'keyValue': {
+                'test1': 'bar',
+                'test2': 'baz',
+            }
+        }
+        r._addMetadataItem([r.name, ], itemDict)
+"""
+        self.addComponent('simple:runtime=1')
+        self.addCollection('group-foo', ['simple:runtime'],
+                metadata=self.createMetadataItem(keyValue={
+                    'test1': 'foo',
+                }))
+        self.addComponent('group-foo:source', [('group-foo.recipe', groupFoo)])
+        repos = self.openRepository()
+        built = self.cookItem(repos, self.cfg, 'group-foo')
+        assert(built[0][0])
+
+        md = self.findAndGetTrove('group-foo').getMetadata()
+
+        self.failUnless('keyValue' in md)
+        self.failUnlessEqual(md.get('keyValue').items(),
+                [('test1', 'bar'), ('test2', 'baz')])
+
     def testMetadataMatching(self):
         def getTroves(spec, compList):
             name, versionSpec, flavor = cmdline.parseTroveSpec(spec)

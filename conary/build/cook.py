@@ -902,12 +902,15 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         _copyForwardTroveMetadata(repos, troveList, recipeObj)
         for grpTrv in troveList:
+            _setCookTroveMetadata(grpTrv,
+                    recipeObj._metadataItemsMap.get(grpTrv.name(), {}))
+
+        for grpTrv in troveList:
             grpDiff = grpTrv.diff(None, absolute = 1)[0]
             changeSet.newTrove(grpDiff)
 
             built.append((grpTrv.getName(), str(grpTrv.getVersion()),
                                             grpTrv.getFlavor()))
-
 
     return (changeSet, built, None)
 
@@ -2671,6 +2674,8 @@ def _setCookTroveMetadata(trv, itemDictList):
                 assert isinstance(tagValue, (list, tuple))
                 for v in tagValue:
                     stream.set(v)
+            elif isinstance(stream, trove.KeyValueItemsStream):
+                stream.update(tagValue)
             else:
                 stream.set(tagValue)
         metadata.addItem(item)
