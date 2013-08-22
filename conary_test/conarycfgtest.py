@@ -489,8 +489,8 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
         cfg.user.addServerGlob('name*', 'user', 'passwd')
         cfg.configLine('user foobar a')
-        assert(cfg.user.find('namefoo') == ('user', 'passwd'))
-        assert(cfg.user.find('foobar') == ('a', None))
+        self.assertEqual(cfg.user.find('namefoo'), ('user', 'passwd'))
+        self.assertEqual(cfg.user.find('foobar'), ('a', None))
 
         out = StringIO()
         cfg.setDisplayOptions(hidePasswords=True)
@@ -948,7 +948,7 @@ repositoryMap             conary.rpath.com          http://localhost/conary/
 repositoryMap             foo.rpath.org             http://localhost:1/conary/
 ''')
             rc, txt = self.captureOutput(cfg.displayContext)
-            assert(txt == '''\
+            self.assertEqual(txt, '''\
 [foo]
 repositoryMap             foo.rpath.org             http://localhost:1/conary/
 showLabels                False
@@ -986,7 +986,7 @@ buildLabel bam.rpath.org@rpl:devel
             assert(str(cfg.installLabelPath[0]) == 'foo.rpath.org@rpl:ilp')
             assert(len(cfg.installLabelPath) == 1)
             rc, txt = self.captureOutput(cfg.displayContext)
-            assert(txt == '''\
+            self.assertEqual(txt, '''\
 [foo]
 buildLabel                foo.rpath.org@rpl:devel
 installLabelPath          foo.rpath.org@rpl:ilp
