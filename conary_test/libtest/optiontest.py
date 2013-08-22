@@ -16,6 +16,7 @@
 
 
 from testrunner import testhelp
+import StringIO
 
 #conary
 from conary.lib import options
@@ -82,3 +83,18 @@ class OptionTest(testhelp.TestCase):
                              '', argv=['foo', '--coverage=bar'])[0:2]
         assert(flags['coverage'] == 'bar')
         assert(args == ['foo'])
+
+    def testDefaultValues(self):
+        flags, args, parser = options._processArgs(
+                {'option' : (options.ONE_PARAM,
+                    dict(help="Help text", metavar="aaa", default='abc'),
+                    )}, {}, conarycfg.ConaryConfiguration(False),
+                '', argv=['foo'])[0:3]
+        assert(flags['option'] == 'abc')
+        sio = StringIO.StringIO()
+        parser.print_help(sio)
+        self.assertEquals(sio.getvalue(), '''\
+Options:
+  Command Options:
+    --option=aaa       Help text
+''')

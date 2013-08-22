@@ -151,6 +151,7 @@ def addOptions(parser, argDef, skip=None):
         help_level = NORMAL_HELP
         shortOpt = None
         meta = None
+        default = None
         if isinstance(data, (list, tuple)):
             if isinstance(data[0], str) and data[0].startswith('-'):
                 shortOpt = data[0]
@@ -158,7 +159,12 @@ def addOptions(parser, argDef, skip=None):
             if len(data) >= 2:
                 help = data[-1]
                 data = data[:-1]
-                if isinstance(help, (list, tuple)):
+                if isinstance(help, dict):
+                    default = help.get('default')
+                    help_level = help.get('level', help_level)
+                    meta = help.get('metavar', meta)
+                    help = help.get('help')
+                elif isinstance(help, (list, tuple)):
                     if isinstance(help[0], int):
                         help_level = help[0]
                         help = help[1:]
@@ -183,6 +189,8 @@ def addOptions(parser, argDef, skip=None):
             'help_level': help_level,
             'metavar': meta,
             }
+        if default is not None:
+            attrs.update(default=default)
         if paramType == NO_PARAM:
             attrs['action'] = 'store_true'
         elif paramType == ONE_PARAM:
