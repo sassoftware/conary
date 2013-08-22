@@ -20,7 +20,6 @@ import bdb
 import bz2
 import debugger
 import errno
-import fcntl
 import fnmatch
 import gzip
 import hashlib
@@ -57,7 +56,7 @@ from conary.lib.formattrace import formatTrace
 
 def normpath(path):
     s = os.path.normpath(path)
-    if s.startswith(os.sep + os.sep):
+    if s.startswith('//'):
         return s[1:]
     return s
 
@@ -107,7 +106,7 @@ def searchPath(filename, basepath):
 
 def searchFile(file, searchdirs, error=None):
     for dir in searchdirs:
-        s = "%s%s%s" %(dir, os.sep, file)
+        s = os.path.join(dir, file)
         if os.path.exists(s):
             return s
     if error:
@@ -522,7 +521,7 @@ def rmtree(paths, ignore_errors=False, onerror=None):
 
 def _permsVisit(arg, dirname, names):
     for name in names:
-        path = dirname + os.sep + name
+        path = joinPaths(dirname, name)
         mode = os.lstat(path)[stat.ST_MODE]
         # has to be executable to cd, readable to list, writeable to delete
         if stat.S_ISDIR(mode) and (mode & 0700) != 0700:
@@ -635,9 +634,8 @@ def _copyVisit(arg, dirname, names):
         os.chmod(dirname, dirmode)
     for name in names:
         if filemode:
-            os.chmod(dirname+os.sep+name, filemode)
-        sourcelist.append(os.path.normpath(
-            dest + os.sep + dirname[sourcelen:] + os.sep + name))
+            os.chmod(joinPaths(dirname, name), filemode)
+        sourcelist.append(joinPaths(dest, dirname[sourcelen:], name))
 
 def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     """
@@ -649,7 +647,7 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
         if os.path.isdir(source):
             if source[-1] == '/':
                 source = source[:-1]
-            thisdest = '%s%s%s' %(dest, os.sep, os.path.basename(source))
+            thisdest = joinPaths(dest, os.path.basename(source))
             log.debug('copying [tree] %s to %s', source, thisdest)
             shutil.copytree(source, thisdest, symlinks)
             if dirmode:
@@ -660,7 +658,7 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
             log.debug('copying [file] %s to %s', source, dest)
             shutil.copy2(source, dest)
             if dest.endswith(os.sep):
-                thisdest = dest + os.sep + os.path.basename(source)
+                thisdest = joinPaths(dest, os.path.basename(source))
             else:
                 thisdest = dest
             if filemode:
@@ -852,14 +850,25 @@ def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
     return tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=dir, text=text)
 
 
+def setCloseOnExec(fd):
+    try:
+        import fcntl
+    except ImportError:
+        return
+    if hasattr(fd, 'fileno'):
+        fd = fd.fileno()
+    flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+    flags |= fcntl.FD_CLOEXEC
+    fcntl.fcntl(fd, fcntl.F_SETFD, flags)
+
+
 class ExtendedFdopen(object):
 
     __slots__ = [ 'fd' ]
 
     def __init__(self, fd):
         self.fd = fd
-        # set close-on-exec flag
-        fcntl.fcntl(self.fd, fcntl.F_SETFD, 1)
+        setCloseOnExec(fd)
 
     def fileno(self):
         return self.fd
@@ -1444,7 +1453,7 @@ class BoundedStringIO(object):
         fd, name = tempfile.mkstemp(suffix=".tmp", prefix="tmpBSIO")
         # Get rid of the file from the filesystem, we'll keep an open fd to it
         os.unlink(name)
-        fcntl.fcntl(fd, fcntl.F_SETFD, 1)
+        setCloseOnExec(fd)
         backendFile = os.fdopen(fd, "w+")
         # Copy the data from the current StringIO (up to the current position)
         backend.seek(0)
@@ -1925,7 +1934,7 @@ class LZMAFile:
         self.executable = None
         for executable, args in (('xz', ('-dc',)), ('unlzma', ('-dc',))):
             for pathElement in os.getenv('PATH', '').split(os.path.pathsep):
-                fullpath = os.sep.join((pathElement, executable))
+                fullpath = joinPaths(pathElement, executable)
                 if os.path.exists(fullpath):
                     self.executable = fullpath
                     commandLine = (executable,) + args
@@ -2251,6 +2260,7 @@ class LockedFile(object):
         At this point the lock is acquired.  Use write() and commit() to
         have the file created and the lock released.
         """
+        import fcntl
 
         if self._lockfobj is not None:
             self.close()

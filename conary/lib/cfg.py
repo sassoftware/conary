@@ -758,7 +758,10 @@ class ConfigFile(_Config):
                     socket.setdefaulttimeout(timeout)
                     continue
                 except (IOError, socket.error), err:
-                    raise CfgEnvironmentError(url, err.args[1])
+                    if len(err.args) > 1:
+                        raise CfgEnvironmentError(url, err.args[1])
+                    else:
+                        raise CfgEnvironmentError(url, err.args[0])
                 except EnvironmentError, err:
                     raise CfgEnvironmentError(err.filename, err.msg)
             else: # for

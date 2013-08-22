@@ -26,12 +26,13 @@ import tempfile
 import traceback
 import sys
 
-from conary import conarycfg, constants
+from conary import constants
 from conary.callbacks import UpdateCallback
 from conary.conaryclient import cmdline, resolve
 from conary.deps import deps
 from conary.errors import ClientError, ConaryError, InternalConaryError, MissingTrovesError, DecodingError
 from conary.lib import log, util, api
+from conary.lib import cfgtypes
 from conary.local import capsules
 from conary.local import database
 from conary.repository import changeset, trovesource, searchsource
@@ -3642,7 +3643,7 @@ conary erase '%s=%s[%s]'
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None,
                     test = False, justDatabase = False, journal = None,
                     callback = None, localRollbacks = False,
-                    autoPinList = conarycfg.RegularExpressionList(),
+                    autoPinList = cfgtypes.RegularExpressionList(),
                     keepJournal = False, noScripts = False):
         """
         DEPRECATED, use L{applyUpdateJob} instead.

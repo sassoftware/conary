@@ -28,10 +28,10 @@ from conary_test import rephelp
 from conary import versions
 from conary.versions import VersionFromString as VFS
 from conary.build import cook, errors, grouprecipe, loadrecipe, use
-from conary.conarycfg import RegularExpressionList
 from conary import conaryclient
 from conary.deps import deps
 from conary.lib import log
+from conary.lib.cfgtypes import RegularExpressionList
 from conary.local import database
 from conary.repository import changeset, netclient
 from conary_test import resources

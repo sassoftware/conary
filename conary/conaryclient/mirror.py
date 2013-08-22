@@ -15,7 +15,6 @@
 #
 
 
-import fcntl
 import itertools
 import optparse
 import os
@@ -143,6 +142,7 @@ def checkConfig(cfg):
 def mainWorkflow(cfg = None, callback=ChangesetCallback(),
                  test=False, sync=False, infoSync=False,
                  checkSync=False, fastSync=False):
+    import fcntl
     if cfg.lockFile:
         try:
             log.debug('checking for lock file')

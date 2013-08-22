@@ -29,9 +29,9 @@ from conary.build import tags
 from conary.errors import ConaryError, DatabaseError, DatabasePathConflicts
 from conary.errors import DatabaseLockedError, DecodingError
 from conary.callbacks import UpdateCallback
-from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary.lib import log, sha1helper, sigprotect, util, api
+from conary.lib.cfgtypes import RegularExpressionList
 from conary.local import capsules as capsulesmod
 from conary.local import localrep, sqldb, schema, update
 from conary.local.errors import DatabasePathConflictError, FileInWayError
@@ -2462,10 +2462,7 @@ class Database(SqlDbRepository):
 
             if lockFd is None:
                 lockFd = os.open(self.lockFile, os.O_RDWR)
-
-            fcntl.fcntl(lockFd, fcntl.F_SETFD,
-                        fcntl.fcntl(lockFd, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
-
+            util.setCloseOnExec(lockFd)
             try:
                 fcntl.lockf(lockFd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except IOError, e:
