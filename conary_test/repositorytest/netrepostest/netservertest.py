@@ -820,6 +820,25 @@ class NetServerTest(rephelp.RepositoryHelper):
         tup = (trv1.getName(), trv2.getVersion(), trv1.getFlavor())
         self.assertRaises(errors.TroveMissing, repos.addMetadataItems,
                               [ (tup, mi) ])
+        chL = [ (trv2.getName(), (None, None),
+                (trv2.getVersion(), trv2.getFlavor()), True) ]
+        fpList = repos.getChangeSetFingerprints(chL, False, False, False,
+                False, False)
+        # This will replace the previous key/value metadata
+        mi3 = trove.MetadataItem()
+        mi3.keyValue['key1'] = 'val1'
+        mi3.keyValue['key2'] = 'val2'
+        repos.addMetadataItems([(trv2.getNameVersionFlavor(), mi3)])
+        t = repos.getTrove(*trv2.getNameVersionFlavor())
+        self.assertEqual(t.getMetadata()['url'], 'http://localhost3/')
+        # XXX CNY-3811: key/value metadata should be additive
+        self.assertEqual(sorted(t.getMetadata()['keyValue'].items()),
+                # correct values after CNY-3811 gets fixed
+                # [('key', 'lock'), ('key1', 'val1'), ('key2', 'val2')])
+                [('key1', 'val1'), ('key2', 'val2')])
+        fpList2 = repos.getChangeSetFingerprints(chL, False, False, False,
+                False, False)
+        self.assertNotEqual(fpList2, fpList)
 
     def testCreateChangesetOptimizations(self):
         # ensure that if you call createChangeSet on a trove with
