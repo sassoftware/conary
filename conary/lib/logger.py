@@ -18,7 +18,6 @@
 import base64
 import bz2
 import errno
-import fcntl
 import gzip
 import os
 import re
@@ -26,12 +25,17 @@ import select
 import signal
 import struct
 import sys
-import termios
 import threading
 import time
-import tty
 from xml.sax import saxutils
 from conary.errors import ConaryError
+
+try:
+    import fcntl
+    import termios
+    import tty
+except ImportError:
+    fcntl = termios = tty = None  # pyflakes=ignore
 
 
 BUFFER=1024*4096
@@ -581,6 +585,8 @@ class Logger:
         # By using 42 octets we ensure that the probability of encountering
         # the marker string accidentally is negligible with a high degree of
         # confidence.
+        if not termios:
+            raise RuntimeError("The build logger requires the termios module")
         self.marker = base64.b64encode(os.urandom(42))
         self.lexer = Lexer(self.marker)
         for writer in writers:

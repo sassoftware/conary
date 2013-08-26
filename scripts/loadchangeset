@@ -16,8 +16,6 @@
 #
 
 
-import errno
-import itertools
 import os
 import pgsql
 import signal
@@ -34,8 +32,7 @@ sys.path.insert(0, os.path.dirname(fullPath))
 from conary import conarycfg, conaryclient, dbstore
 from conary.lib.util import rmtree
 from conary.local import schema as depSchema
-from conary.updatecmd import UpdateCallback
-from conary.server import migrate
+from conary.cmds.updatecmd import UpdateCallback
 from conary.server import schema
 from conary.trove import Trove
 from conary.repository import changeset

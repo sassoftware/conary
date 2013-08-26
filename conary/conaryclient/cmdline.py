@@ -285,11 +285,15 @@ def setContext(cfg, context=None, environ=None, searchCurrentDir=False):
     else:
         context = cfg.context
         where = 'specified as the default context in the conary configuration'
-        if searchCurrentDir and os.access('CONARY', os.R_OK):
-            conaryState = state.ConaryStateFromFile('CONARY', parseSource=False)
-            if conaryState.hasContext():
-                context = conaryState.getContext()
-                where = 'specified in the CONARY state file'
+        if searchCurrentDir:
+            try:
+                conaryState = state.ConaryStateFromFile('CONARY',
+                        parseSource=False)
+                if conaryState.hasContext():
+                    context = conaryState.getContext()
+                    where = 'specified in the CONARY state file'
+            except state.CONARYFileMissing:
+                pass
 
         if 'CONARY_CONTEXT' in environ:
             context = environ['CONARY_CONTEXT']

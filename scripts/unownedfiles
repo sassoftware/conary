@@ -19,7 +19,6 @@
 """ Finds file(s) matching the given regexp that are unowned """
 
 import os
-import re
 import sys
 
 if os.path.dirname(sys.argv[0]) != ".":
@@ -33,11 +32,8 @@ else:
 sys.path.insert(0, os.path.dirname(fullPath))
 
 from conary import conarycfg
-from conary.deps import deps
 from conary.local import database
 from conary.lib import util
-from conary import versions
-from conary import updatecmd
 
 def usage():
     print """\

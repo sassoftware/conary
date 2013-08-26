@@ -23,7 +23,8 @@ from conary_test import rephelp
 from conary_test import recipes
 import shutil
 
-from conary import conaryclient, cvc, state
+from conary import conaryclient, state
+from conary.cmds import cvccmd
 from conary.deps import deps
 from conary import errors, conarycfg
 from conary.versions import Label, VersionFromString as VFS
@@ -900,7 +901,7 @@ cannot shadow earlier trove
         # Test the callback
         shutil.rmtree('testcase')
 
-        c = cvc.CvcMain()
+        c = cvccmd.CvcMain()
         cmd = c._supportedCommands['checkout']
 
         expOutput = """\

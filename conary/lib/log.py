@@ -26,7 +26,6 @@ For example::
    log.error("%s not found", foo)
 """
 
-import fcntl
 import logging
 import os
 import sys
@@ -93,13 +92,12 @@ class SysLog:
     def open(self):
         from conary.lib import util
         self.f = None
-        logList = [ os.path.normpath(os.path.sep.join((self.root, x)))
-                                for x in self.path ]
+        logList = [ util.joinPaths(self.root, x) for x in self.path ]
         for pathElement in logList:
             try:
                 util.mkdirChain(os.path.dirname(pathElement))
                 self.f = open(pathElement, "a")
-                fcntl.fcntl(self.f.fileno(), fcntl.F_SETFD, 1)
+                util.setCloseOnExec(self.f)
                 break
             except:
                 pass
@@ -123,7 +121,7 @@ class SysLog:
 def openSysLog(root, path):
     global syslog
     if not path:
-        path = '/dev/null'
+        path = os.devnull
     if root == ':memory:':
         root = '/'
     syslog = SysLog(root, path)

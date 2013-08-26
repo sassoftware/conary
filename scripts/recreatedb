@@ -30,9 +30,7 @@ be sought in conary repositories and matching packages represented
 in the conary database.
 """
 
-import itertools
 import os
-import struct
 import sys
 import tempfile
 
@@ -48,16 +46,15 @@ sys.path.append(os.path.dirname(fullPath))
 
 from conary.deps import deps
 from conary.lib import util, sha1helper
-from conary.repository import filecontents, netclient, changeset
+from conary.repository import filecontents, changeset
 from conary.local import database
-from conary import callbacks
 from conary import conarycfg
 from conary import conaryclient
 from conary import files
 from conary import rpmhelper
 from conary import sqlite3
 from conary import trove
-from conary import updatecmd
+from conary.cmds import updatecmd
 from conary import versions
 
 def usage():

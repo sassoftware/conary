@@ -25,12 +25,12 @@ SUBDIRS=build local repository server lib pysqlite3 deps web \
 # against conary 2.1 or earlier.  If in doubt, leave these here.
 compat_modules=commit.py cscmd.py fmtroves.py metadata.py \
 	query.py queryrep.py rollbacks.py showchangeset.py \
-	updatecmd.py verify.py branch.py clone.py
+	updatecmd.py verify.py branch.py clone.py cvc.py
 
-# constants.py, cvc.py, and compat_modules have to be listed
+# constants.py and compat_modules have to be listed
 # explicitly here because they are generated and therefore might
 # not exist when the wildcard is run
-python_files = $(wildcard *.py) constants.py cvc.py $(compat_modules)
+python_files = $(wildcard *.py) constants.py $(compat_modules)
 
 extra_files = \
 	Makefile		\
@@ -44,9 +44,9 @@ generated_files = *.pyo *.pyc
 
 stubs:
 	for cmd in $(compat_modules); do \
-	  echo "from conary.cmds.$$(basename $${cmd} .py) import *" > $$cmd ; \
-	done; \
-	echo 'from conary.cmds.cvccmd import *' > cvc.py
+		if [ $$cmd == cvc.py ]; then newmod=conary.cmds.cvccmd; else newmod="conary.cmds.$$(basename $${cmd} .py)"; fi; \
+		echo -e "import warnings\nwarnings.warn('This module is deprecated; please import $$newmod instead.', DeprecationWarning, 2)\nfrom $$newmod import *" > $$cmd ; \
+	done;
 
 subdirs: default-subdirs
 
@@ -64,6 +64,6 @@ clean: clean-subdirs default-clean
 	rm -rf sqlite sqlite3
 	rm -f constants.py
 	rm -rf *.egg-info
-	rm -f $(compat_modules) cvc.py
+	rm -f $(compat_modules)
 
 include ../Make.rules
