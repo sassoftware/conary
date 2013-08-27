@@ -358,8 +358,8 @@ def createUsers(db):
         CREATE TABLE Users (
             userId          %(PRIMARYKEY)s,
             userName        VARCHAR(254) NOT NULL,
-            salt            %(BINARY4)s NOT NULL,
-            password        %(BINARY254)s,
+            salt            %(STRING)s,
+            password        %(STRING)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Users"] = []

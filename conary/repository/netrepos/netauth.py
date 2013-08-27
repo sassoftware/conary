@@ -51,7 +51,7 @@ class UserAuthorization:
         try:
             cu.execute("INSERT INTO Users (userName, salt, password) "
                        "VALUES (?, ?, ?)",
-                       (user, cu.binary(salt), cu.binary(password)))
+                       (user, salt.encode('hex'), password))
             uid = cu.lastrowid
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
@@ -71,7 +71,7 @@ class UserAuthorization:
             raise errors.CannotChangePassword
 
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
-                   cu.binary(password), cu.binary(salt), user)
+                   password, salt.encode('hex'), user)
 
     def _checkPassword(self, user, salt, password, challenge, remoteIp = None):
         if challenge is ValidPasswordToken:
@@ -178,8 +178,8 @@ class UserAuthorization:
             result = userPasswords
         if userPasswords and not self._checkPassword(
                                         user,
-                                        cu.frombinary(userPasswords[0][0]),
-                                        cu.frombinary(userPasswords[0][1]),
+                                        userPasswords[0][0].decode('hex'),
+                                        userPasswords[0][1],
                                         password, remoteIp):
             result = [ x for x in result if x[3] == 'anonymous' ]
 
@@ -505,8 +505,7 @@ class NetworkAuthorization:
         if not len(rows):
             return False
         salt, challenge = rows[0]
-        salt = cu.frombinary(salt)
-        challenge = cu.frombinary(challenge)
+        salt = salt.decode('hex')
         return self.userAuth._checkPassword(user, salt, challenge, password)
 
     # a simple call to auth.check(authToken) checks that the role
