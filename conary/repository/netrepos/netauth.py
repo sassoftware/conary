@@ -25,12 +25,10 @@ from conary import conarycfg, versions
 from conary.repository import errors
 from conary.lib import digestlib, sha1helper, tracelog
 from conary.dbstore import sqlerrors
-from conary.repository.netrepos import items, versionops, accessmap
 from conary.server.schema import resetTable
+from . import items, accessmap
+from .auth_tokens import AuthToken, ValidUser, ValidPasswordToken
 
-# FIXME: remove these compatibilty error classes later
-UserAlreadyExists = errors.UserAlreadyExists
-GroupAlreadyExists = errors.GroupAlreadyExists
 
 MAX_ENTITLEMENT_LENGTH = 255
 
@@ -249,7 +247,7 @@ class EntitlementAuthorization:
             try:
                 f = urllib2.urlopen(url)
                 xmlResponse = f.read()
-            except Exception, e:
+            except Exception:
                 return set()
 
             p = conarycfg.EntitlementParser()
@@ -315,38 +313,18 @@ class NetworkAuthorization:
         self.ri = accessmap.RoleInstances(db)
 
     def getAuthRoles(self, cu, authToken, allowAnonymous = True):
+        """Return the set of roleIds that the caller belongs to"""
         self.log(4, authToken[0], authToken[2])
-        # Find what role(s) this user belongs to
-        # anonymous users should come through as anonymous, not None
-        assert(authToken[0])
-
-        # we need a hashable tuple, a list won't work
-        authToken = tuple(authToken)
-
-        if type(authToken[2]) is not list:
-            # this code is for compatibility with old callers who
-            # form up an old (user, pass, entclass, entkey) authToken.
-            # rBuilder is one such caller.
-            entList = []
-            entClass = authToken[2]
-            entKey = authToken[3]
-            if entClass is not None and entKey is not None:
-                entList.append((entClass, entKey))
-            remoteIp = None
-        elif len(authToken) == 3:
-            entList = authToken[2]
-            remoteIp = None
-        else:
-            entList = authToken[2]
-            remoteIp = authToken[3]
+        if not isinstance(authToken, AuthToken):
+            authToken = AuthToken(*authToken)
 
         roleSet = self.userAuth.getAuthorizedRoles(
-            cu, authToken[0], authToken[1],
-            allowAnonymous = allowAnonymous,
-            remoteIp = remoteIp)
+            cu, authToken.user, authToken.password,
+            allowAnonymous=allowAnonymous,
+            remoteIp=authToken.remote_ip)
 
         timedOut = []
-        for entClass, entKey in entList:
+        for entClass, entKey in authToken.entitlements:
             # XXX serverName is passed only for compatibility with the server
             # and entitlement class based entitlement design; it's only used
             # here during external authentication (used by some rPath
@@ -354,7 +332,7 @@ class NetworkAuthorization:
             try:
                 rolesFromEntitlement = \
                     self.entitlementAuth.getAuthorizedRoles(
-                        cu, self.serverNameList[0], remoteIp,
+                        cu, self.serverNameList[0], authToken.remote_ip,
                         entClass, entKey)
                 roleSet.update(rolesFromEntitlement)
             except errors.EntitlementTimeout, e:
@@ -754,6 +732,7 @@ class NetworkAuthorization:
             raise
         else:
             self.db.commit()
+        return uid
 
     def deleteUserByName(self, user, deleteRole=True):
         self.log(3, user)
@@ -786,7 +765,7 @@ class NetworkAuthorization:
             if cu.fetchone()[0] == 0:
                 try:
                     self.deleteRole(user, False)
-                except errors.RoleNotFound, e:
+                except errors.RoleNotFound:
                     pass
         self.userAuth.deleteUser(cu, user)
         self.db.commit()
@@ -1288,81 +1267,3 @@ class PasswordCheckParser(dict):
         self.p.CharacterDataHandler = self.CharacterDataHandler
         self.valid = False
         dict.__init__(self)
-
-
-class ValidPasswordTokenType(object):
-    """
-    Type of L{ValidPasswordToken}, a token used in lieu of a password in
-    authToken to represent a user that has been authorized by other
-    means (e.g. a one-time token).
-
-    For example, a script that needs to perform some operation from a
-    particular user's viewpoint, but has direct access to the database
-    via a shim client, may use L{ValidPasswordToken} instead of a
-    password in authToken to bypass password checks while still adhering
-    to the user's own capabilities and limitations.
-
-    This type should be instantiated exactly once (as
-    L{ValidPasswordToken}).
-    """
-    __slots__ = ()
-
-    def __str__(self):
-        return '<Valid Password>'
-
-    def __repr__(self):
-        return 'ValidPasswordToken'
-ValidPasswordToken = ValidPasswordTokenType()
-
-
-class ValidUser(object):
-    """
-    Object used in lieu of a username in authToken to represent an imaginary
-    user with a given set of roles.
-
-    For example, a script that needs to perform a repository operation with a
-    particular set of permissions, but has direct access to the database via
-    a shim client, may use an instance of L{ValidUser} instead of a username
-    in authToken to bypass username and password checks while still adhering
-    to the limitations of the specified set of roles.
-
-    The set of roles is given as a list containing role names, or integer
-    roleIds. Mixing of names and IDs is allowed. Additionally, a role of '*'
-    will entitle the user to all roles in the repository; if no arguments are
-    given this is the default.
-    """
-    __slots__ = ('roles', 'username')
-
-    def __init__(self, *roles, **kwargs):
-        if not roles:
-            roles = ['*']
-        if isinstance(roles[0], (list, tuple)):
-            roles = roles[0]
-        self.roles = frozenset(roles)
-        self.username = kwargs.pop('username', None)
-        if kwargs:
-            raise TypeError("Unexpected keyword argument %s" %
-                    (kwargs.popitem()[0]))
-
-    def __str__(self):
-        if self.username:
-            user_fmt = '%r ' % (self.username,)
-        else:
-            user_fmt = ''
-        if '*' in self.roles:
-            return '<User %swith all roles>' % (user_fmt,)
-        else:
-            return '<User %swith roles %s>' % (user_fmt,
-                    ', '.join(unicode(x) for x in self.roles))
-
-    def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, sorted(self.roles))
-
-    def __reduce__(self):
-        # Be pickleable, but don't actually pickle the object as it could
-        # then cross a RPC boundary and become a security vulnerability. Plus,
-        # it would confuse logcat.
-        if self.username:
-            return str, (str(self.username),)
-        else:
-            return str, (str(self),)

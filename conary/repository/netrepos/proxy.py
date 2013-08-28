@@ -31,6 +31,7 @@ from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
 from conary.repository.netrepos import cache, netserver, reposlog
+from conary.repository.netrepos.auth_tokens import AuthToken
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -316,6 +317,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
         if methodname not in self.publicCalls:
             return (self.responseFilter.newException(
                 "MethodNotSupported", (methodname,)), extraInfo)
+        if not isinstance(authToken, AuthToken):
+            authToken = AuthToken(*authToken)
 
         self._port = port
         self._protocol = protocol

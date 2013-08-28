@@ -53,9 +53,10 @@ class ReposWeb(object):
 
     responseFactory = webob.Response
 
-    def __init__(self, cfg, repositoryServer):
+    def __init__(self, cfg, repositoryServer, authToken=None):
         self.cfg = cfg
         self.repServer = repositoryServer
+        self.authToken = authToken
         #self.repServer.__class__ = shimclient.NetworkRepositoryServer
         self.templatePath = os.path.dirname(templates.__file__)
 
@@ -73,9 +74,9 @@ class ReposWeb(object):
             self.repos = None
 
     def _getResponse(self):
-        self.authToken = auth = getAuth(self.request)
-        if auth is None:
-            return self._requestAuth("Invalid authentication token")
+        if self.authToken is None:
+            self.authToken = getAuth(self.request)
+        auth = self.authToken
 
         # Repository setup
         self.serverNameList = self.repServer.serverNameList

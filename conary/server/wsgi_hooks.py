@@ -39,6 +39,7 @@ from conary.repository import shimclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
+from conary.repository.netrepos.auth_tokens import AuthToken
 from conary.web import repos_web
 from conary.web import webauth
 
@@ -302,7 +303,7 @@ class ConaryHandler(object):
 
     def _loadAuth(self):
         """Extract authentication info from the request."""
-        self.auth = netserver.AuthToken()
+        self.auth = AuthToken()
         self._loadAuthPassword()
         self._loadAuthEntitlement()
         self.auth.remote_ip = self.request.remote_addr
@@ -400,7 +401,7 @@ class ConaryHandler(object):
         if not self.cfg.webEnabled:
             return self._makeError('404 Not Found',
                     "Web interface disabled by administrator.")
-        web = repos_web.ReposWeb(self.cfg, self.shimServer)
+        web = repos_web.ReposWeb(self.cfg, self.shimServer, authToken=self.auth)
         return web._handleRequest(request)
 
     def postRpc(self):

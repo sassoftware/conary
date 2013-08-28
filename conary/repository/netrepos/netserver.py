@@ -39,7 +39,6 @@ from conary.repository.netrepos import fsrepos, instances, trovestore
 from conary.repository.netrepos import accessmap, deptable, fingerprints
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
-from conary.repository.netrepos.netauth import ValidPasswordToken
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -180,7 +179,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
             self.__delDB = True
-        dbVer = schema.checkVersion(self.db)
+        schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
         self.troveStore = trovestore.TroveStore(self.db, self.log)
@@ -2945,7 +2944,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if False in self.auth.batchCheck(authToken, [t for t,s in infoList],
                                          write=True, cu = cu):
             raise errors.InsufficientPermission
-        updateCount = 0
 
         # look up if we have all the troves we're asked
         schema.resetTable(cu, "tmpInstanceId")
@@ -3185,7 +3183,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ret.append( (float(mark), (name, version, flavor), troveType) )
             if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
-                junk = cu.fetchall()
+                cu.fetchall()
                 break
         # older mirror clients do not support getting the troveType values
         if clientVersion < 40:
@@ -3270,7 +3268,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             prov = [ '' ] * len(troveList)
 
         for tableName, dsList in tblList:
-            start = time.time()
             cu.execute("""
                 SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
                     JOIN Items ON
@@ -3634,66 +3631,6 @@ class GlobListType(list):
                 return True
 
         return False
-
-
-class AuthToken(list):
-    __slots__ = ()
-
-    _user, _password, _entitlements, _remote_ip = range(4)
-
-    def __init__(self, user='anonymous', password='anonymous', entitlements=(),
-            remote_ip=None):
-        list.__init__(self, [None] * 4)
-        self.user = user
-        self.password = password
-        self.entitlements = list(entitlements)
-        self.remote_ip = remote_ip
-
-    def _get_user(self):
-        return self[self._user]
-    def _set_user(self, user):
-        self[self._user] = user
-    user = property(_get_user, _set_user)
-
-    def _get_password(self):
-        return self[self._password]
-    def _set_password(self, password):
-        if self.user == password == 'anonymous':
-            pass
-        elif password is ValidPasswordToken:
-            pass
-        else:
-            password = util.ProtectedString(password)
-        self[self._password] = password
-    password = property(_get_password, _set_password)
-
-    def _get_entitlements(self):
-        return self[self._entitlements]
-    def _set_entitlements(self, entitlements):
-        self[self._entitlements] = entitlements
-    entitlements = property(_get_entitlements, _set_entitlements)
-
-    def _get_remote_ip(self):
-        return self[self._remote_ip]
-    def _set_remote_ip(self, remote_ip):
-        self[self._remote_ip] = remote_ip
-    remote_ip = property(_get_remote_ip, _set_remote_ip)
-
-    def __repr__(self):
-        out = '<AuthToken'
-        if self.user != 'anonymous' or not self.entitlements:
-            out += ' user=%s' % (self.user,)
-        if self.entitlements:
-            ents = []
-            for ent in self.entitlements:
-                if isinstance(ent, (tuple, list)):
-                    # Remove entitlement class
-                    ent = ent[1]
-                ents.append('%s...' % ent[:6])
-            out += ' entitlements=[%s]' % (', '.join(ents))
-        if self.remote_ip:
-            out += ' remote_ip=%s' % self.remote_ip
-        return out + '>'
 
 
 class ServerConfig(ConfigFile):
