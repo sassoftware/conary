@@ -96,12 +96,12 @@ import time
             <hr />
             <div py:strip="True" py:if="troves[0].getName().endswith(':source')">
                 ${sourceTroveInfo(troves[0])}
-                <p><a href="files?t=${quote(troveName)};v=${quote(troves[0].getVersion().freeze())};f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
+                <p><a href="files?t=${quote(troveName)};v=${quote(str(troves[0].getVersion()))};f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
             </div>
             <div py:strip="True" py:if="not trove.getName().endswith(':source')"
                  py:for="trove in troves">
                 ${binaryTroveInfo(trove)}
-                <p><a href="files?t=${quote(troveName)};v=${quote(trove.getVersion().freeze())};f=${quote(trove.getFlavor().freeze())}">
+                <p><a href="files?t=${quote(troveName)};v=${quote(str(trove.getVersion()))};f=${quote(trove.getFlavor().freeze())}">
                     Show ${troveName.startswith('group-') and 'Troves' or 'Files'}</a>
                 </p>
             </div>
@@ -111,7 +111,7 @@ import time
                 <h3>All Versions:</h3>
                 <ul>
                     <li py:for="ver in versionList">
-                        <a href="troveInfo?t=${quote(troveName)};v=${quote(ver.freeze())}"
+                        <a href="troveInfo?t=${quote(troveName)};v=${quote(str(ver))}"
                            py:if="ver != reqVer">${ver.asString()}</a>
                         <span py:strip="True" py:if="ver == reqVer"><b>${ver.asString()}</b> (selected)</span>
                     </li>

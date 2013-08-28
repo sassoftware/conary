@@ -80,14 +80,20 @@
                         class="${i % 2 and 'even' or 'odd'}">
                     <?python #
                     rows = list(enumerate(netAuth.iterPermsByRole(role)))
+                    ta = ri.listTroveAccess(role)
+                    filt = netAuth.getRoleFilters([role])[role]
                     ?>
                         <td><b>${role}</b></td>
                         <td py:if="netAuth.roleIsAdmin(role)" py:content="'yes'"/>
                         <td py:if="not netAuth.roleIsAdmin(role)" py:content="'no'"/>
                         <td py:if="netAuth.roleCanMirror(role)" py:content="'yes'"/>
                         <td py:if="not netAuth.roleCanMirror(role)" py:content="'no'"/>
-                        <td py:if="rows" py:content="permTable(role, rows)"/>
-                        <td py:if="not rows" style="font-size: 80%;">Role has no permissions</td>
+                        <td>
+                          <div py:if="rows" py:content="permTable(role, rows)"/>
+                          <span py:if="not rows" style="font-size: 80%;">Role has no permissions</span>
+                          <div py:if="ta" style="font-size: 80%;">Role has trove access entries</div>
+                          <div py:if="not (filt[0].isEmpty() and filt[1].isEmpty())" style="font-size: 80%;">Role has filter flags</div>
+                        </td>
                         <td style="text-align: right;"><a href="addPermForm?roleName=${role}">Add&nbsp;Permission</a>&nbsp;|&nbsp;<a href="deleteRole?roleName=${role}">Delete&nbsp;Role</a>&nbsp;|&nbsp;<a href="manageRoleForm?roleName=${role}">Edit&nbsp;Role</a></td>
                     </tr>
                 </tbody>

@@ -287,10 +287,10 @@ class ReposWeb(object):
             reqVer = versionList[0]
         else:
             try:
-                reqVer = versions.ThawVersion(v)
+                reqVer = versions.VersionFromString(v)
             except (versions.ParseError, ValueError):
                 try:
-                    reqVer = versions.VersionFromString(v)
+                    reqVer = versions.ThawVersion(v)
                 except:
                     return self._write("error",
                                        error = "Invalid version: %s" %v)
@@ -314,7 +314,10 @@ class ReposWeb(object):
     @strFields(t = None, v = None, f = "")
     @checkAuth(write=False)
     def files(self, auth, t, v, f):
-        v = versions.ThawVersion(v)
+        try:
+            v = versions.VersionFromString(v)
+        except (versions.ParseError, ValueError):
+            v = versions.ThawVersion(v)
         f = deps.ThawFlavor(f)
         parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
         # non-source group troves only show contained troves
@@ -367,7 +370,10 @@ class ReposWeb(object):
 
     @checkAuth(admin = True)
     def userlist(self, auth):
-        return self._write("user_admin", netAuth = self.repServer.auth)
+        return self._write("user_admin",
+                netAuth=self.repServer.auth,
+                ri=self.repServer.ri,
+                )
 
     @checkAuth(admin = True)
     @strFields(roleName = "")
@@ -443,7 +449,10 @@ class ReposWeb(object):
         users = self.repServer.auth.userAuth.getUserList()
         return self._write("add_role", modify = False, role = None,
                            users = users, members = [], canMirror = False,
-                           roleIsAdmin = False)
+                           roleIsAdmin=False,
+                           acceptFlags='',
+                           troveAccess=None,
+                           )
 
     @checkAuth(admin = True)
     @strFields(roleName = None)
@@ -452,19 +461,26 @@ class ReposWeb(object):
         members = set(self.repServer.auth.getRoleMembers(roleName))
         canMirror = self.repServer.auth.roleCanMirror(roleName)
         roleIsAdmin = self.repServer.auth.roleIsAdmin(roleName)
+        flags = self.repServer.auth.getRoleFilters([roleName])[roleName]
+        troveAccess = [((n, versions.VersionFromString(v), deps.ThawFlavor(f)), recursive)
+                for ((n, v, f), recursive)
+                in self.repServer.ri.listTroveAccess(roleName)]
 
         return self._write("add_role", role = roleName,
                            users = users, members = members,
                            canMirror = canMirror, roleIsAdmin = roleIsAdmin,
-                           modify = True)
+                           modify=True,
+                           acceptFlags=flags[0],
+                           troveAccess=troveAccess,
+                           )
 
     @checkAuth(admin = True)
-    @strFields(roleName = None, newRoleName = None)
+    @strFields(roleName = None, newRoleName = None, acceptFlags='')
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
     @intFields(roleIsAdmin = False)
     def manageRole(self, auth, roleName, newRoleName, memberList,
-                   canMirror, roleIsAdmin):
+                   canMirror, roleIsAdmin, acceptFlags):
         if roleName != newRoleName:
             try:
                 self.repServer.auth.renameRole(roleName, newRoleName)
@@ -477,6 +493,8 @@ class ReposWeb(object):
         self.repServer.auth.updateRoleMembers(roleName, memberList)
         self.repServer.auth.setMirror(roleName, canMirror)
         self.repServer.auth.setAdmin(roleName, roleIsAdmin)
+        acceptFlags = deps.parseFlavor(acceptFlags, raiseError=True)
+        self.repServer.auth.setRoleFilters({roleName: (acceptFlags, None)})
 
         self._redirect("userlist")
 

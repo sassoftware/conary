@@ -18,6 +18,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+from urllib import quote
 ?>
     <head/>
     <body>
@@ -57,6 +59,31 @@
                             <input type="radio" name="canMirror" value="1" py:attrs="{'checked' : canMirror and 'checked' or None }"/>Yes
                             <input type="radio" name="canMirror" value="0" py:attrs="{'checked' : (not canMirror) and 'checked' or None }"/>No
                         </td>
+                    </tr>
+                    <tr>
+                        <td id="header">Trove access:</td>
+                        <td py:if="not troveAccess">No trove access records in this role</td>
+                        <td py:if="troveAccess"><table>
+                            <thead><tr>
+                                <th>Name</th>
+                                <th>Version</th>
+                                <th>Flavor</th>
+                                <th>Recursive</th>
+                            </tr></thead>
+                            <tbody>
+                              <tr py:for="i, ((name, version, flavor), recursive) in enumerate(troveAccess)"
+                                  class="${i % 2 and 'even' or 'odd'}">
+                                <td><a href="troveInfo?t=${quote(name)};v=${quote(str(version))}">${name}</a></td>
+                                <td>${version.trailingLabel()}/${version.trailingRevision()}</td>
+                                <td>${flavor}</td>
+                                <td>${'Yes' if recursive else 'No'}</td>
+                              </tr>
+                            </tbody>
+                        </table></td>
+                    </tr>
+                    <tr>
+                        <td id="header">GeoIP filter:</td>
+                        <td><input type="text" name="acceptFlags" value="${acceptFlags}" placeholder="e.g. !country.AA"/></td>
                     </tr>
                 </table>
                 <p>
