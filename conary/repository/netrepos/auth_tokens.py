@@ -116,12 +116,12 @@ class AuthToken(list):
     __slots__ = ('flags',)
     _user, _password, _entitlements, _remote_ip, _forwarded_for = range(5)
 
-    def __init__(self, user='anonymous', password='anonymous', entitlements=(),
-            remote_ip=None, forwarded_for=None):
+    def __init__(self, user='anonymous', password='anonymous',
+            entitlements=None, remote_ip=None, forwarded_for=None):
         list.__init__(self, [None] * 5)
         self.user = user
         self.password = password
-        self.entitlements = list(entitlements)
+        self.entitlements = list(entitlements or ())
         self.remote_ip = remote_ip
         self.forwarded_for = list(forwarded_for) if forwarded_for else []
         self.flags = None
@@ -160,3 +160,9 @@ class AuthToken(list):
 
     def getAllIps(self):
         return set([self.remote_ip] + self.forwarded_for)
+
+    def copy(self):
+        obj = type(self)(*self)
+        if self.flags is not None:
+            obj.flags = self.flags.copy()
+        return obj

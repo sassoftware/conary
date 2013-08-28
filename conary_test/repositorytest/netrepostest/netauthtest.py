@@ -22,9 +22,11 @@ from conary_test import dbstoretest
 
 from conary.repository import errors
 from conary.repository.netrepos import netauth
+from conary.repository.netrepos.auth_tokens import AuthToken
 from conary.repository.netrepos.trovestore import TroveStore
 from conary.server import schema
 from conary import versions
+from conary.deps import deps
 
 
 class NetAuthTest(dbstoretest.DBStoreTestBase):
@@ -483,6 +485,36 @@ class NetAuthTest(dbstoretest.DBStoreTestBase):
         self.assertRaises(errors.UnknownEntitlementClass,
                           na.addEntitlementKey,
                           ("root", "rootpass", None, None), "group", "1234")
+
+    def testRoleFilters(self):
+        db = self._setupDB()
+        na = netauth.NetworkAuthorization(db, "conary.rpath.com")
+        self._addUserRole(na, "testuser", "testpass")
+        roleId = na._getRoleIdByName('testuser')
+        geoip = {
+                '1.2.3.4': deps.parseFlavor('country.XC'),
+                '5.6.7.8': deps.parseFlavor('country.XB'),
+                }
+        na.geoIp.getFlags = lambda x: geoip[x]
+
+        na.setRoleFilters({'testuser': (
+            deps.parseFlavor('!country.XA,!country.XB'), None)})
+        self.assertEqual(na.getRoleFilters(['testuser']),
+                {'testuser': (
+                    deps.parseFlavor('!country.XA,!country.XB'), deps.Flavor())})
+
+        token = AuthToken('testuser', 'testpass', remote_ip='1.2.3.4')
+        self.assertEqual(
+                na.getAuthRoles(db.cursor(), token), set([roleId]))
+
+        token = AuthToken('testuser', 'testpass', remote_ip='5.6.7.8')
+        level = netauth.log.level
+        netauth.log.setLevel(100)
+        try:
+            self.assertRaises(errors.InsufficientPermission,
+                    na.getAuthRoles, db.cursor(), token)
+        finally:
+            netauth.log.setLevel(level)
 
 class NetAuthTest2(rephelp.RepositoryHelper):
     def _setupDB(self):

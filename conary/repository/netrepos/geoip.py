@@ -20,8 +20,10 @@ from conary.lib import networking
 
 try:
     import pygeoip
+    GeoIPError = pygeoip.GeoIPError
 except ImportError:
     pygeoip = None  # pyflakes=ignore
+    GeoIPError = RuntimeError  # for testing
 
 
 FLAG_RE = re.compile('^[a-zA-Z0-9]+$')
@@ -77,7 +79,7 @@ class GeoIPLookup(object):
         for db in self.dbs:
             try:
                 cc = db.country_code_by_addr(str(remote_ip))
-            except pygeoip.GeoIPError:
+            except GeoIPError:
                 continue
             if not FLAG_RE.match(cc):
                 continue

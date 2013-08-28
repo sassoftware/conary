@@ -331,7 +331,7 @@ class NetworkAuthorization:
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
         self.items = items.Items(db)
         self.ri = accessmap.RoleInstances(db)
-        self.geoIp = geoip.GeoIPLookup(geoIpFiles)
+        self.geoIp = geoip.GeoIPLookup(geoIpFiles or [])
 
     def getAuthRoles(self, cu, authToken, allowAnonymous = True):
         """Return the set of roleIds that the caller has access to.
@@ -381,6 +381,8 @@ class NetworkAuthorization:
     def _getFlags(self, authToken):
         flags = deps.Flavor()
         for addr in authToken.getAllIps():
+            if not addr:
+                continue
             flags.union(self.geoIp.getFlags(addr))
         return flags
 

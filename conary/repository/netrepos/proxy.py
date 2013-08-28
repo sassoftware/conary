@@ -153,8 +153,8 @@ class ProxyCallFactory:
 
         userOverride = cfg.user.find(targetServerName)
         if userOverride:
-            authToken = authToken[:]
-            authToken[0], authToken[1] = userOverride
+            authToken = authToken.copy()
+            authToken.user, authToken.password = userOverride
 
         url = redirectUrl(authToken, rawUrl)
         url = req_mod.URL.parse(url)

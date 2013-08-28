@@ -36,6 +36,7 @@ from conary.repository import netclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import proxy as netreposproxy
 from conary.repository.netrepos import netserver
+from conary.repository.netrepos.auth_tokens import AuthToken
 from conary.server import server as cnyserver
 
 
@@ -239,7 +240,7 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
             forceProxy=caller._lastProxy,
             headers=[('X-Conary-Servername', 'repos.example.com')])
 
-        authToken = (None, None, [])
+        authToken = AuthToken(None, None, [])
         clientVersion = 51
 
         prs.getChangeSet(caller, authToken, clientVersion, changeSetList,
@@ -298,7 +299,7 @@ class ProxyTest(rephelp.RepositoryHelper):
         # injected for a server running on the default http port (80, but the
         # URL not specifying it).
         self.cfg.entitlement.append(('example.com', 'sikrit'))
-        authToken = ['test', 'foo', [], '127.0.0.1']
+        authToken = AuthToken('test', 'foo', [], '127.0.0.1')
         caller = netreposproxy.ProxyCallFactory.createCaller('unused', 'unused',
             'http://example.com/conary', proxyMap = self.cfg.getProxyMap(),
             authToken = authToken, localAddr = '1.2.3.4',
@@ -934,7 +935,7 @@ class TestPackage(DerivedCapsuleRecipe):
             netServer = netserver.NetworkRepositoryServer(servercfg, basicUrl)
             netFilter = netreposproxy.CachingRepositoryServer(servercfg,
                     basicUrl, netServer)
-            authToken = ['test', 'foo', [], '127.0.0.1']
+            authToken = AuthToken('test', 'foo', [], '127.0.0.1')
 
             # Lame shim client implementation that lets us pass things that
             # netclient doesn't (authCheckOnly)
