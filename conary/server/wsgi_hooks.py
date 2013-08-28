@@ -310,13 +310,21 @@ class ConaryHandler(object):
 
     @staticmethod
     def setRemoteIp(authToken, request, useForwarded=False):
-        authToken.remote_ip = request.remote_addr
+        remote_ip = request.remote_addr
         forward = request.headers.get('X-Forwarded-For').split(',')
         if forward:
             if useForwarded:
-                authToken.remote_ip = forward[-1].strip()
+                remote_ip = forward[-1].strip()
                 forward = forward[:-1]
-            authToken.forwarded_for = [x.strip() for x in forward]
+            authToken.forwarded_for = []
+            for addr in forward:
+                addr = addr.strip()
+                if addr.startswith('::ffff:'):
+                    addr = addr[7:]
+                authToken.forwarded_for.append(addr)
+        if remote_ip.startswith('::ffff:'):
+            remote_ip = remote_ip[7:]
+        authToken.remote_ip = remote_ip
 
     def _loadAuthPassword(self):
         """Extract HTTP Basic Authorization from the request."""

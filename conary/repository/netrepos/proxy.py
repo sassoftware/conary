@@ -170,6 +170,13 @@ class ProxyCallFactory:
         if via:
             lheaders['Via'] = ', '.join(via)
 
+        forwarded = list(authToken.forwarded_for)
+        if remoteIp and remoteIp not in ['127.0.0.1', '::1'] and (
+                not forwarded or forwarded[-1] != remoteIp):
+            forwarded.append(remoteIp)
+        if forwarded:
+            lheaders['X-Forwarded-For'] = ', '.join(forwarded)
+
         # If the proxy injected entitlements or user information, switch to
         # SSL -- IF they are using
         # default ports (if they specify ports, we have no way of
