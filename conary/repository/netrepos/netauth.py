@@ -1277,6 +1277,30 @@ class NetworkAuthorization:
 
         self.db.commit()
 
+    def getRoleFilters(self, roles):
+        cu = self.db.cursor()
+        placeholders = ','.join('?' for x in roles)
+        query = ("""SELECT userGroup, accept_flags, filter_flags
+                FROM UserGroups WHERE userGroup in (%s)""" % placeholders)
+        cu.execute(query, list(roles))
+        return dict((x[0], (deps.ThawFlavor(x[1]), deps.ThawFlavor(x[2])))
+                for x in cu)
+
+    def setRoleFilters(self, roleFiltersMap):
+        cu = self.db.cursor()
+        for role, flags in roleFiltersMap.iteritems():
+            args = []
+            for flag in flags:
+                if flag is not None:
+                    flag = flag.freeze()
+                if flag == '':
+                    flag = None
+                args.append(flag)
+            args.append(role)
+            cu.execute("""UPDATE UserGroups SET accept_flags = ?,
+                    filter_flags = ? WHERE userGroup = ?""", args)
+        self.db.commit()
+
 
 class PasswordCheckParser(dict):
 

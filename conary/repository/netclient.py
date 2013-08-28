@@ -54,7 +54,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 71 + 1)
+CLIENT_VERSIONS = range(36, 72 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -667,6 +667,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             self.c[reposLabel].setUserGroupIsAdmin(role, admin)
             return
         self.c[reposLabel].setRoleIsAdmin(role, admin)
+
+    def getRoleFilters(self, label, roles):
+        if self.c[label].getProtocolVersion() < 72:
+            raise errors.InvalidServerVersion("getRoleFilters requires a "
+                    "server running Conary 2.5.0 or later")
+        result = self.c[label].getRoleFilters(roles)
+        ret = {}
+        for role, (acceptFlags, filterFlags) in result.iteritems():
+            ret[role] = ( self.toFlavor(acceptFlags),
+                    self.toFlavor(filterFlags) )
+        return ret
+
+    def setRoleFilters(self, label, roleFiltersMap):
+        if self.c[label].getProtocolVersion() < 72:
+            raise errors.InvalidServerVersion("setRoleFilters requires a "
+                    "server running Conary 2.5.0 or later")
+        out = {}
+        for role, (acceptFlags, filterFlags) in roleFiltersMap.iteritems():
+            out[role] = ( self.fromFlavor(acceptFlags),
+                    self.fromFlavor(filterFlags) )
+        self.c[label].setRoleFilters(out)
 
     def addTroveAccess(self, role, troveList):
         byServer = {}
