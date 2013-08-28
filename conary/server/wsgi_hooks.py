@@ -306,11 +306,17 @@ class ConaryHandler(object):
         self.auth = AuthToken()
         self._loadAuthPassword()
         self._loadAuthEntitlement()
-        self.auth.remote_ip = self.request.remote_addr
-        if self._useForwardedHeaders:
-            forward = self.request.headers.get('X-Forwarded-For')
-            if forward:
-                self.auth.remote_ip = forward.split(',')[-1].strip()
+        self.setRemoteIp(self.auth, self.request, self._useForwardedHeaders)
+
+    @staticmethod
+    def setRemoteIp(authToken, request, useForwarded=False):
+        authToken.remote_ip = request.remote_addr
+        forward = request.headers.get('X-Forwarded-For').split(',')
+        if forward:
+            if useForwarded:
+                authToken.remote_ip = forward[-1].strip()
+                forward = forward[:-1]
+            authToken.forwarded_for = [x.strip() for x in forward]
 
     def _loadAuthPassword(self):
         """Extract HTTP Basic Authorization from the request."""

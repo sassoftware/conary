@@ -855,6 +855,10 @@ class MigrateTo_18(SchemaMigration):
                     " ALTER password TYPE %(STRING)s,"
                     " ALTER salt TYPE %(STRING)s USING encode(salt, 'hex')"
                     % self.db.keywords)
+        cu.execute("ALTER TABLE UserGroups ADD accept_flags %(STRING)s"
+                % self.db.keywords)
+        cu.execute("ALTER TABLE UserGroups ADD filter_flags %(STRING)s"
+                % self.db.keywords)
         return True
 
 def _getMigration(major):

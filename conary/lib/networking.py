@@ -208,6 +208,8 @@ class BaseIPAddress(namedtuple('BaseIPAddress', 'address mask'), BaseAddress):
     def _parse_direct(cls, val):
         if cls is BaseIPAddress:
             # Called as BaseIPAddress, so try to figure out what it is
+            if val.startswith('::ffff:') and '.' in val:
+                val = val[7:]
             if ':' in val:
                 return IPv6Address._parse_direct(val)
             else:

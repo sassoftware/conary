@@ -143,6 +143,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.serializeCommits = cfg.serializeCommits
         self.paranoidCommits = cfg.paranoidCommits
         self.excludeCapsuleContents = cfg.excludeCapsuleContents
+        self.geoIpFiles = cfg.geoIpFiles
 
         self.__delDB = False
         self.log = tracelog.getLog(None)
@@ -191,7 +192,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.db, self.serverNameList, log = self.log,
             cacheTimeout = self.authCacheTimeout,
             passwordURL = self.externalPasswordURL,
-            entCheckURL = self.entitlementCheckURL)
+            entCheckURL = self.entitlementCheckURL,
+            geoIpFiles=self.geoIpFiles,
+            )
         self.ri = accessmap.RoleInstances(self.db)
         self.deptable = deptable.DependencyTables(self.db)
         self.log.reset()
@@ -3656,6 +3659,7 @@ class ServerConfig(ConfigFile):
     excludeCapsuleContents  = (CfgBool, False)
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
+    geoIpFiles              = CfgList(CfgPath)
     injectCapsuleContentServers = CfgList(CfgString)
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)

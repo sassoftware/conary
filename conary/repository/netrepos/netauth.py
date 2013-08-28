@@ -16,18 +16,22 @@
 
 
 import itertools
+import logging
 import os
 import time
 import urllib, urllib2
 import xml
 
 from conary import conarycfg, versions
+from conary.deps import deps
 from conary.repository import errors
 from conary.lib import digestlib, sha1helper, tracelog
 from conary.dbstore import sqlerrors
 from conary.server.schema import resetTable
-from . import items, accessmap
+from . import items, accessmap, geoip
 from .auth_tokens import AuthToken, ValidUser, ValidPasswordToken
+
+log = logging.getLogger(__name__)
 
 
 MAX_ENTITLEMENT_LENGTH = 255
@@ -125,42 +129,58 @@ class UserAuthorization:
         sql = "DELETE from Users WHERE userId=?"
         cu.execute(sql, userId)
 
+    def _rolesFromNames(self, cu, roleList):
+        if not roleList:
+            return {}
+        where = []
+        args = []
+        if '*' in roleList:
+            where.append('true')
+        else:
+            ids = set([x for x in roleList if isinstance(x, int)])
+            names = set([x for x in roleList if not isinstance(x, int)])
+            if ids:
+                places = ', '.join('?' for x in ids)
+                where.append('userGroupId IN ( %s )' % (places,))
+                args.extend(ids)
+            if names:
+                places = ', '.join('?' for x in names)
+                where.append('userGroup IN ( %s )' % (places,))
+                args.extend(names)
+        if not where:
+            return {}
+        where = ' OR '.join(where)
+        query = ("SELECT userGroupId, accept_flags FROM UserGroups"
+                " WHERE %s" % where)
+        cu.execute(query, args)
+        return dict((x[0], deps.ThawFlavor(x[1])) for x in cu)
+
     def getAuthorizedRoles(self, cu, user, password, allowAnonymous = True,
                            remoteIp = None):
         """
         Given a user and password, return the list of roles that are
-        authorized via these credentials
+        authorized via these credentials.
+
+        Returns a dictionary where the key is a role ID and the value is a
+        Flavor object holding the role's accept flags.
         """
 
         if isinstance(user, ValidUser):
             # Short-circuit for shim-using code that knows what roles
             # it wants.
-            roles = set()
-            if '*' in user.roles:
-                cu.execute("SELECT userGroupId FROM UserGroups")
-            else:
-                roles = set([x for x in user.roles if isinstance(x, int)])
-
-                names = set([x for x in user.roles if not isinstance(x, int)])
-                if not names:
-                    return roles
-                places = ', '.join('?' for x in names)
-                cu.execute("""SELECT userGroupId FROM UserGroups
-                        WHERE userGroup IN ( %s )""" % (places,), *names)
-            roles.update(x[0] for x in cu)
-            return roles
+            return self._rolesFromNames(cu, user.roles)
 
         cu.execute("""
         SELECT Users.salt, Users.password, UserGroupMembers.userGroupId,
-               Users.userName, UserGroups.canMirror
+               Users.userName, UserGroups.canMirror, UserGroups.accept_flags
         FROM Users
         JOIN UserGroupMembers USING(userId)
         JOIN UserGroups USING(userGroupId)
         WHERE Users.userName = ? OR Users.userName = 'anonymous'
         """, user)
-        result = [ x for x in cu ]
+        result = cu.fetchall()
         if not result:
-            return set()
+            return {}
 
         canMirror = (sum(x[4] for x in result) > 0)
 
@@ -180,8 +200,7 @@ class UserAuthorization:
                                         userPasswords[0][1],
                                         password, remoteIp):
             result = [ x for x in result if x[3] == 'anonymous' ]
-
-        return set(x[2] for x in result)
+        return dict((x[2], deps.ThawFlavor(x[5])) for x in result)
 
     def getRolesByUser(self, user):
         cu = self.db.cursor()
@@ -273,13 +292,14 @@ class EntitlementAuthorization:
 
         # look up entitlements
         cu.execute("""
-        SELECT userGroupId FROM Entitlements
+        SELECT UserGroups.userGroupId, UserGroups.accept_flags
+        FROM Entitlements
         JOIN EntitlementAccessMap USING (entGroupId)
+        JOIN UserGroups USING (userGroupId)
         WHERE entitlement=?
         """, entitlement)
 
-        roleIds = set(x[0] for x in cu)
-
+        roleIds = dict((x[0], deps.ThawFlavor(x[1])) for x in cu)
         if self.entCheckUrl:
             # cacheEntry is still set from the cache check above
             self.cache[cacheEntry] = (roleIds,
@@ -290,7 +310,7 @@ class EntitlementAuthorization:
 
 class NetworkAuthorization:
     def __init__(self, db, serverNameList, cacheTimeout = None, log = None,
-                 passwordURL = None, entCheckURL = None):
+            passwordURL=None, entCheckURL=None, geoIpFiles=None):
         """
         @param cacheTimeout: Timeout, in seconds, for authorization cache
         entries. If None, no cache is used.
@@ -311,9 +331,14 @@ class NetworkAuthorization:
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
         self.items = items.Items(db)
         self.ri = accessmap.RoleInstances(db)
+        self.geoIp = geoip.GeoIPLookup(geoIpFiles)
 
     def getAuthRoles(self, cu, authToken, allowAnonymous = True):
-        """Return the set of roleIds that the caller belongs to"""
+        """Return the set of roleIds that the caller has access to.
+
+        If any role has an "accept flag" set that the auth token does not
+        satisfy, InsufficientPermission will be raised immediately.
+        """
         self.log(4, authToken[0], authToken[2])
         if not isinstance(authToken, AuthToken):
             authToken = AuthToken(*authToken)
@@ -341,7 +366,23 @@ class NetworkAuthorization:
         if timedOut:
             raise errors.EntitlementTimeout(timedOut)
 
-        return roleSet
+        for roleId, acceptFlags in roleSet.items():
+            if authToken.flags is None:
+                authToken.flags = self._getFlags(authToken)
+            if not authToken.flags.satisfies(acceptFlags):
+                log.error("Rejecting client %s access to role %s due to "
+                        "acceptFlags mismatch:  has: %s  required: %s",
+                        authToken.remote_ip, roleId,
+                        authToken.flags, acceptFlags)
+                raise errors.InsufficientPermission
+
+        return set(roleSet)
+
+    def _getFlags(self, authToken):
+        flags = deps.Flavor()
+        for addr in authToken.getAllIps():
+            flags.union(self.geoIp.getFlags(addr))
+        return flags
 
     def batchCheck(self, authToken, troveList, write = False, cu = None):
         """ checks access permissions for a set of *existing* troves in the repository """

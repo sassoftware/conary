@@ -95,49 +95,50 @@ class ValidUser(object):
             return str, (str(self),)
 
 
+class _Accessor(object):
+
+    def __init__(self, index, filter=None):
+        self.index = index
+        self.filter = filter.__name__ if filter else None
+
+    def __get__(self, ownself, owncls):
+        if ownself is None:
+            return self
+        return ownself[self.index]
+
+    def __set__(self, ownself, value):
+        if self.filter:
+            value = getattr(ownself, self.filter)(value)
+        ownself[self.index] = value
+
 
 class AuthToken(list):
-    __slots__ = ()
-
-    _user, _password, _entitlements, _remote_ip = range(4)
+    __slots__ = ('flags',)
+    _user, _password, _entitlements, _remote_ip, _forwarded_for = range(5)
 
     def __init__(self, user='anonymous', password='anonymous', entitlements=(),
-            remote_ip=None):
-        list.__init__(self, [None] * 4)
+            remote_ip=None, forwarded_for=None):
+        list.__init__(self, [None] * 5)
         self.user = user
         self.password = password
         self.entitlements = list(entitlements)
         self.remote_ip = remote_ip
+        self.forwarded_for = list(forwarded_for) if forwarded_for else []
+        self.flags = None
 
-    def _get_user(self):
-        return self[self._user]
-    def _set_user(self, user):
-        self[self._user] = user
-    user = property(_get_user, _set_user)
-
-    def _get_password(self):
-        return self[self._password]
-    def _set_password(self, password):
+    def _filter_password(self, password):
         if self.user == password == 'anonymous':
-            pass
+            return password
         elif password is ValidPasswordToken:
-            pass
+            return password
         else:
-            password = util.ProtectedString(password)
-        self[self._password] = password
-    password = property(_get_password, _set_password)
+            return util.ProtectedString(password)
 
-    def _get_entitlements(self):
-        return self[self._entitlements]
-    def _set_entitlements(self, entitlements):
-        self[self._entitlements] = entitlements
-    entitlements = property(_get_entitlements, _set_entitlements)
-
-    def _get_remote_ip(self):
-        return self[self._remote_ip]
-    def _set_remote_ip(self, remote_ip):
-        self[self._remote_ip] = remote_ip
-    remote_ip = property(_get_remote_ip, _set_remote_ip)
+    user = _Accessor(_user)
+    password = _Accessor(_password, _filter_password)
+    entitlements = _Accessor(_entitlements)
+    remote_ip = _Accessor(_remote_ip)
+    forwarded_for = _Accessor(_forwarded_for)
 
     def __repr__(self):
         out = '<AuthToken'
@@ -153,4 +154,9 @@ class AuthToken(list):
             out += ' entitlements=[%s]' % (', '.join(ents))
         if self.remote_ip:
             out += ' remote_ip=%s' % self.remote_ip
+        if self.forwarded_for:
+            out += ' forwarded_for=%s' % (','.join(self.forwarded_for))
         return out + '>'
+
+    def getAllIps(self):
+        return set([self.remote_ip] + self.forwarded_for)

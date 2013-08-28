@@ -375,6 +375,8 @@ def createUsers(db):
             userGroup       VARCHAR(254) NOT NULL,
             canMirror       INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
+            accept_flags    %(STRING)s,
+            filter_flags    %(STRING)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroups"] = []
