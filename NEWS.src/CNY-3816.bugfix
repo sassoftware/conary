@@ -1,0 +1,1 @@
+Negative cache entries are no longer used when there is only one URL to fetch for a source action.

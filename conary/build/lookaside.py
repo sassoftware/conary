@@ -184,7 +184,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
 
     try:
         url = laUrl(name)
-        return ff.searchNetworkSources(url, headers=httpHeaders)
+        return ff.searchNetworkSources(url, headers=httpHeaders, single=True)
     except PathFound, pathInfo:
         return pathInfo.path
 
@@ -215,12 +215,15 @@ class FileFinder(object):
               refreshFilter=None):
 
         urlList = self._getPathsToSearch(urlStr, suffixes)
+        single = len(urlList) == 1
         for url in urlList:
             try:
                 self._fetch(url,
                             archivePath, headers=headers,
                             refreshFilter=refreshFilter,
-                            searchMethod=searchMethod)
+                            searchMethod=searchMethod,
+                            single=single,
+                            )
             except PathFound, pathInfo:
                 return pathInfo.isFromRepos, pathInfo.path
 
@@ -231,7 +234,7 @@ class FileFinder(object):
         return None, None
 
     def _fetch(self, url, archivePath, searchMethod, headers=None,
-               refreshFilter=None):
+               refreshFilter=None, single=False):
         if isinstance(url, str):
             url = laUrl(url)
 
@@ -243,17 +246,17 @@ class FileFinder(object):
             if archivePath:
                 self.searchArchive(archivePath, url)
             elif refresh:
-                self.searchNetworkSources(url, headers)
+                self.searchNetworkSources(url, headers, single)
             self.searchRepository(url)
         else:  # SEARCH_ALL
             self.searchFilesystem(url)
             if archivePath:
                 self.searchArchive(archivePath, url)
             elif refresh:
-                self.searchNetworkSources(url, headers)
+                self.searchNetworkSources(url, headers, single)
             self.searchRepository(url)
             self.searchLocalCache(url)
-            self.searchNetworkSources(url, headers)
+            self.searchNetworkSources(url, headers, single)
 
     def searchRepository(self, url):
         if self.repCache.hasFilePath(url):
@@ -280,16 +283,18 @@ class FileFinder(object):
         if path:
             raise PathFound(path, True)
 
-    def searchNetworkSources(self, url, headers):
+    def searchNetworkSources(self, url, headers, single):
         if url.scheme not in NETWORK_SCHEMES:
             return
 
         # check for negative cache entries to avoid spamming servers
-        negativePath = self.repCache.checkNegativeCache(self.recipeName, url)
-        if negativePath:
-            log.warning('not fetching %s (negative cache entry %s exists)',
+        if not single:
+            negativePath = self.repCache.checkNegativeCache(self.recipeName,
+                    url)
+            if negativePath:
+                log.warning('not fetching %s (negative cache entry %s exists)',
                         url, negativePath)
-            return
+                return
 
         log.info('Trying %s...', str(url))
         if headers is None:
