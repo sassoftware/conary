@@ -19,6 +19,7 @@
 Provides a cache for storing files locally, including
 downloads and unpacking layers of files.
 """
+import base64
 import cookielib
 import errno
 import os
@@ -374,10 +375,8 @@ class FileFinder(object):
                 # add password handler if needed
                 if url.user:
                     url.passwd = url.passwd or ''
-                    passwdMgr = self.BasicPasswordManager()
-                    passwdMgr.add_password(url.user, url.passwd)
                     opener.add_handler(
-                        urllib2.HTTPBasicAuthHandler(passwdMgr))
+                            HTTPBasicAuthHandler(url.user, url.passwd))
 
                 # add proxy and proxy password handler if needed
                 if self.cfg.proxy and \
@@ -623,3 +622,17 @@ class PathFound(Exception):
     def __init__(self, path, isFromRepos):
         self.path = path
         self.isFromRepos = isFromRepos
+
+
+class HTTPBasicAuthHandler(urllib2.BaseHandler):
+
+    def __init__(self, user, passwd):
+        self.user = user
+        self.passwd = passwd
+
+    def http_request(self, request):
+        if 'Authorization' not in request.headers:
+            request.headers['Authorization'] = 'Basic ' + base64.b64encode(
+                    '%s:%s' % (self.user, self.passwd))
+        return request
+    https_request = http_request
