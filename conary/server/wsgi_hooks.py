@@ -311,8 +311,9 @@ class ConaryHandler(object):
     @staticmethod
     def setRemoteIp(authToken, request, useForwarded=False):
         remote_ip = request.remote_addr
-        forward = request.headers.get('X-Forwarded-For').split(',')
+        forward = request.headers.get('X-Forwarded-For')
         if forward:
+            forward = forward.split(',')
             if useForwarded:
                 remote_ip = forward[-1].strip()
                 forward = forward[:-1]
