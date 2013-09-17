@@ -19,6 +19,7 @@ import inspect, itertools, re, time
 
 from conary import trove, versions
 from conary.build import defaultrecipes, use
+from conary.build import lookaside
 from conary.build.errors import CookError
 from conary.build.grouprecipe import _BaseGroupRecipe, _SingleGroup
 from conary.conaryclient.cmdline import parseTroveSpec
@@ -1804,6 +1805,13 @@ class _GroupSetRecipe(_BaseGroupRecipe):
         self.g = troveset.OperationGraph()
         self.world = GroupSearchSourceTroveSet(self.searchSource,
                                                graph = self.g)
+
+        self.fileFinder = lookaside.FileFinder(self.name, self.laReposCache,
+                                               localDirs=self.srcdirs,
+                                               multiurlMap=self.multiurlMap,
+                                               mirrorDirs=cfg.mirrorDirs,
+                                               cfg=cfg)
+ 
 
         self._dumpAll = False
         self._trackDict = {}

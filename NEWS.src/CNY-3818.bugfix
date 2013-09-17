@@ -1,0 +1,1 @@
+GroupSetRecipe now defines an instance of the findFile interface to lookaside to enable fetching files.
