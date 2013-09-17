@@ -1,0 +1,1 @@
+Basic auth is now always sent when fetching a source, rather than waiting for a 401 status code

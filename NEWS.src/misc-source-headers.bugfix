@@ -1,0 +1,1 @@
+Fixed a few instances where httpHeaders was not correctly passed when using a source action.

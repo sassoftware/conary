@@ -289,6 +289,7 @@ class _Source(_AnySource):
 
         inRepos, f = self.recipe.fileFinder.fetch(sourcename + filename,
                                                    suffixes=suffixes,
+                                                   headers=self.httpHeaders,
                                                    allowNone=True)
         if f:
             self.localgpgfile = f
@@ -379,7 +380,8 @@ class _Source(_AnySource):
         source lookaside cache for the extracted file.
         """
         # Always pull from RPM
-        inRepos, r = self.recipe.fileFinder.fetch(self.rpm)
+        inRepos, r = self.recipe.fileFinder.fetch(self.rpm,
+                headers=self.httpHeaders)
         self.archiveInRepos = inRepos
 
         # by using the rpm's name in the full path, we ensure that different
@@ -405,7 +407,7 @@ class _Source(_AnySource):
             self.guessname = "%(archive_name)s-%(archive_version)s" % self.recipe.macros
             self.suffixes = DEFAULT_SUFFIXES
 
-    def _findSource(self, httpHeaders={}, braceGlob = False):
+    def _findSource(self, braceGlob=False):
         if self.sourceDir is not None:
             defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
             # blank string should map to maindir, not destdir
@@ -422,7 +424,7 @@ class _Source(_AnySource):
             searchMethod = self.recipe.fileFinder.SEARCH_REPOSITORY_ONLY
 
         inRepos, source = self.recipe.fileFinder.fetch(sourcename,
-                                            headers=httpHeaders,
+                                            headers=self.httpHeaders,
                                            suffixes=self.suffixes,
                                            archivePath=self.archivePath,
                                            searchMethod=searchMethod)
@@ -442,6 +444,7 @@ class _Source(_AnySource):
             toFetch += guessname
         inRepos, f = self.recipe.fileFinder.fetch(toFetch,
                                           suffixes=suffixes,
+                                          headers=self.httpHeaders,
                                           refreshFilter=refreshFilter,
                                           archivePath = self.archivePath)
 
@@ -656,7 +659,7 @@ class addArchive(_Source):
         _Source.__init__(self, recipe, *args, **keywords)
 
     def doDownload(self):
-        return self._findSource(self.httpHeaders)
+        return self._findSource()
 
     @staticmethod
     def _cpioOwners(fullOutput):

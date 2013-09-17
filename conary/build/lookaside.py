@@ -19,6 +19,7 @@
 Provides a cache for storing files locally, including
 downloads and unpacking layers of files.
 """
+import base64
 import cookielib
 import errno
 import os
@@ -184,7 +185,7 @@ def fetchURL(cfg, name, location, httpHeaders={}, guessName=None, mirror=None):
 
     try:
         url = laUrl(name)
-        return ff.searchNetworkSources(url, headers=httpHeaders)
+        return ff.searchNetworkSources(url, headers=httpHeaders, single=True)
     except PathFound, pathInfo:
         return pathInfo.path
 
@@ -215,12 +216,15 @@ class FileFinder(object):
               refreshFilter=None):
 
         urlList = self._getPathsToSearch(urlStr, suffixes)
+        single = len(urlList) == 1
         for url in urlList:
             try:
                 self._fetch(url,
                             archivePath, headers=headers,
                             refreshFilter=refreshFilter,
-                            searchMethod=searchMethod)
+                            searchMethod=searchMethod,
+                            single=single,
+                            )
             except PathFound, pathInfo:
                 return pathInfo.isFromRepos, pathInfo.path
 
@@ -231,7 +235,7 @@ class FileFinder(object):
         return None, None
 
     def _fetch(self, url, archivePath, searchMethod, headers=None,
-               refreshFilter=None):
+               refreshFilter=None, single=False):
         if isinstance(url, str):
             url = laUrl(url)
 
@@ -243,17 +247,17 @@ class FileFinder(object):
             if archivePath:
                 self.searchArchive(archivePath, url)
             elif refresh:
-                self.searchNetworkSources(url, headers)
+                self.searchNetworkSources(url, headers, single)
             self.searchRepository(url)
         else:  # SEARCH_ALL
             self.searchFilesystem(url)
             if archivePath:
                 self.searchArchive(archivePath, url)
             elif refresh:
-                self.searchNetworkSources(url, headers)
+                self.searchNetworkSources(url, headers, single)
             self.searchRepository(url)
             self.searchLocalCache(url)
-            self.searchNetworkSources(url, headers)
+            self.searchNetworkSources(url, headers, single)
 
     def searchRepository(self, url):
         if self.repCache.hasFilePath(url):
@@ -280,16 +284,18 @@ class FileFinder(object):
         if path:
             raise PathFound(path, True)
 
-    def searchNetworkSources(self, url, headers):
+    def searchNetworkSources(self, url, headers, single):
         if url.scheme not in NETWORK_SCHEMES:
             return
 
         # check for negative cache entries to avoid spamming servers
-        negativePath = self.repCache.checkNegativeCache(self.recipeName, url)
-        if negativePath:
-            log.warning('not fetching %s (negative cache entry %s exists)',
+        if not single:
+            negativePath = self.repCache.checkNegativeCache(self.recipeName,
+                    url)
+            if negativePath:
+                log.warning('not fetching %s (negative cache entry %s exists)',
                         url, negativePath)
-            return
+                return
 
         log.info('Trying %s...', str(url))
         if headers is None:
@@ -369,10 +375,8 @@ class FileFinder(object):
                 # add password handler if needed
                 if url.user:
                     url.passwd = url.passwd or ''
-                    passwdMgr = self.BasicPasswordManager()
-                    passwdMgr.add_password(url.user, url.passwd)
                     opener.add_handler(
-                        urllib2.HTTPBasicAuthHandler(passwdMgr))
+                            HTTPBasicAuthHandler(url.user, url.passwd))
 
                 # add proxy and proxy password handler if needed
                 if self.cfg.proxy and \
@@ -618,3 +622,17 @@ class PathFound(Exception):
     def __init__(self, path, isFromRepos):
         self.path = path
         self.isFromRepos = isFromRepos
+
+
+class HTTPBasicAuthHandler(urllib2.BaseHandler):
+
+    def __init__(self, user, passwd):
+        self.user = user
+        self.passwd = passwd
+
+    def http_request(self, request):
+        if 'Authorization' not in request.headers:
+            request.headers['Authorization'] = 'Basic ' + base64.b64encode(
+                    '%s:%s' % (self.user, self.passwd))
+        return request
+    https_request = http_request
