@@ -500,6 +500,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         q = repos.getAllTroveLeaves('localhost', {})
         assert(q.keys() == [ 'foo:runtime' ] )
         assert(len(q['foo:runtime']) == 1)
+        self.stopRepository(0)
 
     def testPrepareCallbackException(self):
         # CNY-1271
@@ -787,6 +788,7 @@ class NetclientTest(rephelp.RepositoryHelper):
 
         assert(wildcardRepos.hasTrove(*trv1.getNameVersionFlavor()))
         assert(wildcardRepos.hasTrove(*trv2.getNameVersionFlavor()))
+        self.stopRepository(0)
 
     def testErrorMessagesMentioningProxy(self):
         # CNY-1313
@@ -912,6 +914,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         # servername headers depending on who we are talking to
         # so there are different objects.
         assert(repos.c['localhost'] is not repos.c['localhost1'])
+        self.servers.stopAllServers()
 
     def testJobSizes(self):
         def _check(job, size):
