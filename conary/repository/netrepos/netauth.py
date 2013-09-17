@@ -383,7 +383,10 @@ class NetworkAuthorization:
         for addr in authToken.getAllIps():
             if not addr:
                 continue
-            flags.union(self.geoIp.getFlags(addr))
+            try:
+                flags.union(self.geoIp.getFlags(addr))
+            except:
+                continue
         return flags
 
     def batchCheck(self, authToken, troveList, write = False, cu = None):
