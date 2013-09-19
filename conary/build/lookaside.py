@@ -508,7 +508,9 @@ class RepositoryCache(object):
 
             f = self.repos.getFileContents(
                 [(fileId, troveFileVersion)], callback=csCallback)[0].get()
-            util.copyfileobj(f, open(cachePath, "w"))
+            outF = util.AtomicFile(cachePath, chmod=0644)
+            util.copyfileobj(f, outF)
+            outF.commit()
             fileObj = self.repos.getFileVersion(
                 pathId, fileId, troveFileVersion)
             fileObj.chmod(cachePath)
@@ -525,7 +527,7 @@ class RepositoryCache(object):
         # contents in different packages do not collide
         cachedname = self.getCachePath(cachePrefix, url)
         util.mkdirChain(os.path.dirname(cachedname))
-        f = open(cachedname, "w+")
+        f = util.AtomicFile(cachedname, chmod=0644)
 
         try:
             BLOCKSIZE = 1024 * 4
@@ -541,10 +543,10 @@ class RepositoryCache(object):
                              rateLimit=self.downloadRateLimit,
                              callback=wrapper.callback)
 
-            f.close()
+            f.commit()
             infile.close()
         except:
-            os.unlink(cachedname)
+            f.close()
             raise
 
         # work around FTP bug (msw had a better way?)
