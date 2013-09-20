@@ -86,7 +86,7 @@ class MirrorTest(rephelp.RepositoryHelper):
 
     def runMirror(self, cfgFile, verbose = False, fastSync = False,
                   absolute=False):
-        args = ["--config-file", cfgFile]
+        args = ["--config-file", cfgFile.name]
         if verbose:
             args.append("-v")
         if fastSync:
@@ -133,10 +133,8 @@ class MirrorTest(rephelp.RepositoryHelper):
                                 labels=None, recurseGroups=False,
                                 srcuser="mirror mirror",
                                 dstuser="mirror mirror"):
-        (fd, mirrorFile) = tempfile.mkstemp()
-        os.close(fd)
-        mirrorCfg = open(mirrorFile, "w")
-
+        mirrorCfg = tempfile.NamedTemporaryFile(prefix='mirror-',
+                suffix='.cfg')
         print >> mirrorCfg, "host localhost"
         if matchTroves:
             print >> mirrorCfg, "matchTroves ", matchTroves
@@ -154,8 +152,8 @@ class MirrorTest(rephelp.RepositoryHelper):
         print >> mirrorCfg, "[target]"
         print >> mirrorCfg, "user localhost %s" % dstuser
         print >> mirrorCfg, "repositoryMap localhost %s" % self.targetMap
-        mirrorCfg.close()
-        return mirrorFile
+        mirrorCfg.flush()
+        return mirrorCfg
 
     def _flatten(self, troveSpec):
         l = []
@@ -484,13 +482,12 @@ class MirrorTest(rephelp.RepositoryHelper):
         target2Repos = self.getRepositoryClient("mirror", "mirror", serverIdx=2)
         self.target2Map = target2Repos.c.map["localhost"]
         mirrorFile2 = self.createConfigurationFile()
-        fd = open(mirrorFile2, "a")
-        print >> fd
-        print >> fd, "[target2]"
-        print >> fd, "user localhost mirror mirror"
-        print >> fd, "repositoryMap localhost %s" % self.target2Map
-        fd.close()
-        
+        print >> mirrorFile2
+        print >> mirrorFile2, "[target2]"
+        print >> mirrorFile2, "user localhost mirror mirror"
+        print >> mirrorFile2, "repositoryMap localhost %s" % self.target2Map
+        mirrorFile2.flush()
+
         self.createTroves(sourceRepos, 10, 2)
         # test simple trove mirroring
         self.runMirror(mirrorFile2)

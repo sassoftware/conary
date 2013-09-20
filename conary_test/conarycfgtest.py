@@ -328,11 +328,10 @@ flavor use:ssl,krb,readline,\
             os.unlink(cf)
 
     def testIncludeUnreachableNetworkConfigFile(self):
-        fd, configfile = tempfile.mkstemp()
-        f = os.fdopen(fd, "w+")
         configUrl = "http://10.1.1.1/conaryrc"
-        f.write("includeConfigFile %s\n" % configUrl)
-        f.close()
+        fobj = tempfile.NamedTemporaryFile()
+        print >> fobj, "includeConfigFile", configUrl
+        fobj.flush()
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
 
         msg = "Timeout reading configuration file %s; retrying...\n" % configUrl
@@ -345,7 +344,7 @@ flavor use:ssl,krb,readline,\
             os.unlink(tempf)
             stderr = sys.stderr = os.fdopen(fd, "w+")
             try:
-                cfg.read(configfile)
+                cfg.read(fobj.name)
             except conarycfg.ParseError, e:
                 if 'Network is unreachable' in str(e):
                     raise testhelp.SkipTestException('requires default route')
