@@ -1102,12 +1102,20 @@ class ChangesetFilter(BaseProxy):
 
     def _cacheChangeSet(self, url, neededHere, csInfoList, changeSetList,
             forceProxy):
-        headers = [('X-Conary-Servername', self._serverName)]
-        try:
-            inF = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url,
-                    forceProxy=forceProxy, headers=headers)
-        except transport.TransportError, e:
-            raise errors.RepositoryError(str(e))
+        inPath = None
+        if hasattr(url, 'read'):
+            # Nested changeset file in multi-part response
+            inF = url
+        elif url.startswith('file://localhost/'):
+            inPath = url[16:]
+            inF = open(inPath, 'rb')
+        else:
+            headers = [('X-Conary-Servername', self._serverName)]
+            try:
+                inF = transport.ConaryURLOpener(proxyMap=self.proxyMap
+                        ).open(url, forceProxy=forceProxy, headers=headers)
+            except transport.TransportError, e:
+                raise errors.RepositoryError(str(e))
 
         for (jobIdx, (rawJob, fingerprint)), csInfo in \
                         itertools.izip(neededHere, csInfoList):
@@ -1135,9 +1143,8 @@ class ChangesetFilter(BaseProxy):
             csInfo.cached = cachable
             changeSetList[jobIdx] = csInfo
 
-        if url.startswith('file://localhost/'):
-            os.unlink(url[16:])
-
+        if inPath:
+            os.unlink(inPath)
         inF.close()
 
     def toJob(self, job):

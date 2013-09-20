@@ -447,7 +447,7 @@ class ConaryHandler(object):
 
         # Execution phase -- locate and call the target method
         try:
-            response, extraInfo = self.proxyServer.callWrapper(
+            responseArgs, extraInfo = self.proxyServer.callWrapper(
                     protocol=None,
                     port=None,
                     methodname=method,
@@ -462,7 +462,7 @@ class ConaryHandler(object):
         except errors.InsufficientPermission:
             return self._makeError('403 Forbidden', "Insufficient permission")
 
-        rawResponse, headers = response.toWire(request.version)
+        rawResponse, headers = responseArgs.toWire(request.version)
         response = self.responseFactory(
                 headerlist=headers.items(),
                 content_type='text/xml',
@@ -480,15 +480,24 @@ class ConaryHandler(object):
             headers['Via'] = proxy.formatViaHeader(localAddr,
                     self.request.http_version, prefix=extraInfo.getVia())
 
-        return response
+        if (method == 'getChangeSet'
+                and request.version >= 71
+                and not responseArgs.isException
+                and response.status_int == 200
+                and responseArgs.result[0]
+                and 'multipart/mixed' in list(self.request.accept)
+                ):
+            return self.inlineChangeset(response, responseArgs, headers)
+        else:
+            return response
 
-    def getChangeset(self):
+    def getChangeset(self, filename=None):
         """GET a prepared changeset file."""
         # IMPORTANT: As used here, "expandedSize" means the size of the
         # changeset as it is sent over the wire. The size of the file we are
         # reading from may be different if it includes references to other
         # files in lieu of their actual contents.
-        path = self._changesetPath('-out')
+        path = self._changesetPath('-out', filename)
         if not path:
             return self._makeError('403 Forbidden',
                     "Illegal changeset request")
@@ -563,6 +572,42 @@ class ConaryHandler(object):
             if not preserveFile:
                 os.unlink(path)
 
+    def inlineChangeset(self, rpcResponse, responseArgs, headers):
+        filename = responseArgs.result[0].split('?')[-1]
+        csResponse = self.getChangeset(filename=filename)
+        if csResponse.status_int != 200:
+            return csResponse
+
+        # Build a multipart MIME response from the two responses
+        boundary = os.urandom(24).encode('hex')
+        totalSize = 0
+        iterables = []
+        for response in [rpcResponse, csResponse]:
+            leader = "--%s\r\n" % boundary
+            for name in ['Content-Type', 'Content-Length', 'Content-Encoding']:
+                if name in response.headers:
+                    leader += "%s: %s\r\n" % (name, response.headers[name])
+            leader += "\r\n"
+            trailer = "\r\n"
+            totalSize += len(leader) + response.content_length + len(trailer)
+            iterables.extend([[leader], response.app_iter, [trailer]])
+        final = "--%s--\r\n" % boundary
+        totalSize += len(final)
+        iterables.append([final])
+
+        def _produceInline():
+            for iterable in iterables:
+                for data in iterable:
+                    yield data
+        response = self.responseFactory(
+                status='200 OK',
+                headerlist=headers.items(),
+                app_iter=_produceInline(),
+                )
+        response.content_type = 'multipart/mixed; boundary="%s"' % boundary
+        response.content_length=str(totalSize)
+        return response
+
     def putChangeset(self):
         """PUT method -- handle changeset uploads."""
         if not self.repositoryServer:
@@ -611,10 +656,11 @@ class ConaryHandler(object):
             yield d
         response.close()
 
-    def _changesetPath(self, suffix):
-        filename = self.request.query_string
-        if not filename or os.path.sep in filename:
-            return None
+    def _changesetPath(self, suffix, filename=None):
+        if not filename:
+            filename = self.request.query_string
+            if not filename or os.path.sep in filename:
+                return None
         server = self.repositoryServer or self.proxyServer
         return os.path.join(server.tmpPath, filename + suffix)
 

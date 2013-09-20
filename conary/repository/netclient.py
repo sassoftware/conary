@@ -16,6 +16,7 @@
 
 
 import base64
+import errno
 import gzip
 import itertools
 import os
@@ -1620,15 +1621,28 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            # "forceProxy" here makes sure that multi-part requests go back
-            # through the same proxy on subsequent requests.
-            forceProxy = server.usedProxy()
-            headers = [('X-Conary-Servername', server._serverName)]
-            try:
-                inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
-                        url, forceProxy=forceProxy, headers=headers)
-            except transport.TransportError, e:
-                raise errors.RepositoryError(str(e))
+            if hasattr(url, 'read'):
+                # Nested changeset file in a multi-part response
+                inF = url
+            elif os.path.exists(url):
+                # attempt to remove temporary local files
+                # possibly created by a shim client
+                inF = open(url, 'rb')
+                try:
+                    os.unlink(url)
+                except OSError, err:
+                    if err.args[0] != errno.EPERM:
+                        raise
+            else:
+                # "forceProxy" here makes sure that multi-part requests go back
+                # through the same proxy on subsequent requests.
+                forceProxy = server.usedProxy()
+                headers = [('X-Conary-Servername', server._serverName)]
+                try:
+                    inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap
+                            ).open(url, forceProxy=forceProxy, headers=headers)
+                except transport.TransportError, e:
+                    raise errors.RepositoryError(str(e))
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -1648,14 +1662,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                          abortCheck = abortCheck,
                                          rateLimit = self.downloadRateLimit)
 
-            # attempt to remove temporary local files
-            # possibly created by a shim client
-            if os.path.exists(url) and os.access(url, os.W_OK):
-                os.unlink(url)
-
             if totalSize == None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            elif 'content-length' in inF.headers:
+            elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
                 expectSize = long(inF.headers['content-length'])
                 if totalSize != expectSize:
                     raise errors.RepositoryError("Changeset was truncated in "
