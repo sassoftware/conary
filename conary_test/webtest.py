@@ -266,48 +266,6 @@ class WebFrontEndTest(WebRepositoryHelper):
                                   content = 'Unauthorized')
 
     @testhelp.context('entitlements')
-    def testGetLog(self):
-        # make sure you can't get the log when not logged in
-        self.assertContent('/log', '', [401])
-        # log in as admin
-        self.setBasicAuth('test', 'foo')
-        # one method that should be in the log is addNewAsciiPGPKey (part of
-        # the repository setup)
-        self.assertContent('/log', 'addNewAsciiPGPKey', [200])
-
-        # make sure that you can access the log with an entitlement
-        # that has admin privs
-        self.clearBasicAuth()
-        repos = self.getRepositoryClient()
-        bl = self.cfg.buildLabel
-        repos.addRole(bl, 'ent')
-        repos.addAcl(bl, 'ent', 'ALL', bl)
-        repos.setRoleIsAdmin(bl, 'ent', True)
-        repos.addEntitlementClass('localhost', 'ent', 'ent')
-        repos.addEntitlementKeys('localhost', 'ent', ['12345'])
-
-        ent = "%s %s" % ('ent', base64.b64encode('12345'))
-        headers = {'X-Conary-Entitlement': ent}
-        request = urllib2.Request('http://%s:%s/log' %(self.server, self.port),
-                                  headers=headers)
-        f = urllib2.urlopen(request)
-        log = f.read()
-        # we should no have an addNewAsciiPGPKey in this version of
-        # the log, since it wasn't called after we rotated the log
-        assert('addNewAsciiPGPKey' not in log)
-        for call in ('addRole', 'addAcl', 'addEntitlementClass',
-                     'addEntitlementKeys'):
-            assert(call in log)
-
-        #Call again immediatly and make sure we get a 404
-        try:
-            f = urllib2.urlopen(request)
-        except urllib2.HTTPError, e:
-            assert e.code == 404
-        else:
-            raise RuntimeError('404 not returned')
-
-    @testhelp.context('entitlements')
     def testManageEntitlements(self):
         # make sure that authentication is required
         # FIXME! no auth required

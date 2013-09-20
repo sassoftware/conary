@@ -175,43 +175,6 @@ class ReposWeb(object):
         else:
             self._redirect('browse')
 
-    @checkAuth(admin=True)
-    def log(self, auth):
-        """
-        Send the current repository log (if one exists).
-        This is accomplished by rotating the current log to logFile-$TIMESTAMP
-        and sending the rotated log to the client.
-        This method requires admin access.
-        """
-        if not self.cfg.logFile or not os.path.exists(self.cfg.logFile):
-            raise exc.HTTPNotFound()
-        if not os.access(self.cfg.logFile, os.R_OK):
-            raise exc.HTTPForbidden()
-        # the base new pathname for the logfile
-        base = self.cfg.logFile + time.strftime('-%F_%H:%M:%S')
-        # an optional serial number to add to a suffic (in case two
-        # clients accessing the URL at the same second)
-        serial = 0
-        suffix = ''
-        while 1:
-            rotated = base + suffix
-            try:
-                os.link(self.cfg.logFile, rotated)
-                break
-            except OSError, e:
-                if e.errno == errno.EEXIST:
-                    # the rotated file already exists.  append a serial number
-                    serial += 1
-                    suffix = '.' + str(serial)
-                else:
-                    raise
-        os.unlink(self.cfg.logFile)
-        return self.responseFactory(
-                body_file=open(rotated),
-                content_type='application/octet-stream',
-                charset=None,
-                )
-
     @strFields(char = '')
     @checkAuth(write=False)
     def browse(self, auth, char):
