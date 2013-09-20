@@ -237,7 +237,7 @@ class RepositoryServer(base_server.BaseServer):
                  conaryPath, repMap, requireSigs, authCheck=None,
                  entCheck=None, authTimeout = None, readOnlyRepository=False,
                  serverIdx=0, proxies=None, useSSL=False, forceSSL = False,
-                 sslCert=None, sslKey=None, closed=False, commitAction = None,
+                 sslCert=None, sslKey=None, commitAction = None,
                  deadlockRetry=None, excludeCapsuleContents=False,
                  withCache=False):
         base_server.BaseServer.__init__(self)
@@ -279,7 +279,6 @@ class RepositoryServer(base_server.BaseServer):
                 sslKey = resources.get_archive('ssl-cert.key')
         self.sslCert = sslCert
         self.sslKey = sslKey
-        self.closed = closed
         self.initPort()
         self.commitAction = commitAction
         self.needsReset = True
@@ -317,8 +316,6 @@ class RepositoryServer(base_server.BaseServer):
             configValues['readOnlyRepository'] = self.readOnlyRepository
         if self.sslEnabled and self.useSSL and self.sslCert:
             self.writeSSLRepoConfig(configValues)
-        if self.closed:
-            configValues['closed'] = self.closed
         if self.commitAction:
             configValues['commitAction'] = self.commitAction
         if self.cache:
@@ -368,8 +365,6 @@ class ApacheServer(RepositoryServer, apache_server.ApacheServer):
             'traceLog'  : '3 ' + self.traceLog,
             'authCacheTimeout': self.authTimeout or 0,
         }
-        if self.closed:
-            configValues['closed'] = self.closed
         if self.useCache:
             configValues['changesetCacheDir'] = \
                     os.path.join(self.serverRoot, 'cscache')
@@ -686,7 +681,7 @@ class ServerCache:
                     entCheck = None, authTimeout = None,
                     readOnlyRepository=False, needsPGPKey=True,
                     useSSL=False, sslCert=None, sslKey=None, forceSSL = False,
-                    closed = False, commitAction = None, deadlockRetry = None,
+                    commitAction = None, deadlockRetry = None,
                     resetDir = True, excludeCapsuleContents = False,
                     **kwargs):
         if self.servers[serverIdx] is not None:
@@ -734,7 +729,6 @@ class ServerCache:
                                               sslKey = sslKey,
                                               forceSSL = forceSSL,
                                               deadlockRetry = deadlockRetry,
-                                              closed = closed,
                                               commitAction = commitAction,
                                               excludeCapsuleContents =
                                                     excludeCapsuleContents,
@@ -1087,7 +1081,7 @@ class RepositoryHelper(testhelp.TestCase):
                        readOnlyRepository=False, proxies=None,
                        useSSL=False, sslCert=None, sslKey=None,
                        authTimeout=None, forceSSL=False,
-                       closed=False, commitAction=None,
+                       commitAction=None,
                        deadlockRetry=None, serverCache=None,
                        resetDir=True, excludeCapsuleContents=False,
                        **kwargs):
@@ -1111,7 +1105,6 @@ class RepositoryHelper(testhelp.TestCase):
                                           sslKey = sslKey,
                                           authTimeout = authTimeout,
                                           forceSSL = forceSSL,
-                                          closed = closed,
                                           commitAction = commitAction,
                                           deadlockRetry = deadlockRetry,
                                           excludeCapsuleContents =
@@ -1208,27 +1201,15 @@ class RepositoryHelper(testhelp.TestCase):
         ready = False
         while count < 500:
             try:
-                try:
-                    repos.troveNames(label)
-                    ready = True
-                    break
-                except Exception, e:
-                    if closed and closed in str(e):
-                        # If in closed mode, stop looping when we get the message
-                        # we expect
-                        break
-                    raise
+                repos.troveNames(label)
+                ready = True
+                break
             except repo_errors.OpenError:
                 pass
 
             time.sleep(0.01)
             count += 1
         if not ready:
-            if closed:
-                # Well, this is a closed repo, we expect it not to pass some
-                # of the tests above
-                return repos
-
             #import epdb, sys
             #epdb.post_mortem(sys.exc_info()[2])
 

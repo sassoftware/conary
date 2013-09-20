@@ -280,11 +280,7 @@ class ConaryHandler(object):
                         % self.request.script_name)
 
         urlBase = req.application_url
-        if cfg.closed:
-            # Closed repository -- returns an exception for all requests
-            self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
-            self.shimServer = self.repositoryServer
-        elif cfg.proxyContentsDir:
+        if cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
             self.shimServer = None

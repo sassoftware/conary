@@ -27,7 +27,6 @@ import traceback
 
 from conary.lib import coveragehook
 from conary.lib import log
-from conary.lib import util
 from conary.lib.formattrace import formatTrace
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
@@ -187,12 +186,7 @@ def _handler(req):
         if os.path.realpath(cfg.tmpDir) != cfg.tmpDir:
             log.error("tmpDir cannot include symbolic links")
 
-        if cfg.closed:
-            # Closed repository
-            repServer = netserver.ClosedRepositoryServer(cfg)
-            proxyServer = proxy.SimpleRepositoryFilter(cfg, urlBase, repServer)
-            restHandler = None
-        elif cfg.proxyContentsDir:
+        if cfg.proxyContentsDir:
             # Caching proxy
             repServer = None
             proxyServer = proxy.ProxyRepositoryServer(cfg, urlBase)

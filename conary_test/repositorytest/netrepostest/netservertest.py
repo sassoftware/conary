@@ -1112,42 +1112,6 @@ class NetServerTest(rephelp.RepositoryHelper):
                           self.cfg.buildLabel, 'user', 'password')
         self.stopRepository()
 
-    def testClosedMode(self):
-        # CNY-2005
-        if not os.environ.get('CONARY_SERVER', '').startswith('apache'):
-            raise testhelp.SkipTestException("Closed mode only supported with apache")
-        self.stopRepository(1)
-        msg = 'Closed for the day'
-        repos = self.openRepository(1, closed = msg)
-        server = self.servers.getServer(1)
-        label = versions.Label("%s@rpl:linux" % server.getName())
-
-        try:
-            try:
-                repos.troveNames(label)
-            except errors.OpenError, e:
-                self.assertTrue(msg in str(e), "%s not in %s" % (msg, str(e)))
-            else:
-                self.fail('OpenError not raised')
-
-            try:
-                __import__('webob')
-            except ImportError:
-                raise testhelp.SkipTestException("webob required for this test")
-
-            # CNY-2229
-            keyId = 'B12DC19B'
-            url = 'http://localhost:%s/getOpenPGPKey?search=%s' % (
-                server.port, keyId)
-            # Make a GET request (we're using the PGP key retrieval since it's
-            # conveniently available)
-            f = urllib2.urlopen(url)
-            data = f.read()
-            self.assertIn(keyId, data)
-
-        finally:
-            self.stopRepository(1)
-
     def testServerURL(self):
         # CNY-2034
         comp = self.addComponent('foo:runtime', '1.0')

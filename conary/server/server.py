@@ -413,9 +413,8 @@ class ServerConfig(netserver.ServerConfig):
         self.read(path, exception=False)
 
     def check(self):
-        if self.closed:
-            print >> sys.stderr, ("warning: closed config option is ignored "
-                                  "by the standalone server")
+        pass
+
 
 def usage():
     print "usage: %s" % sys.argv[0]
