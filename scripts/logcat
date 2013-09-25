@@ -90,6 +90,8 @@ class ReposDumper:
             ents = [ x for x in entry.entitlements if x[1] is not None ]
             if ents:
                 userInfo.append("entitlements=%s" % entry.entitlements)
+        if hasattr(entry, 'systemId') and entry.systemId is not None:
+            userInfo.append('systemId=%s' % entry.systemId)
 
         if userInfo:
             userStr = " ".join(userInfo) + " "

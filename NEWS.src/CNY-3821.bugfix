@@ -1,0 +1,1 @@
+Added support to logcat for parsing systemId field of the repository log.
