@@ -69,6 +69,7 @@ class ConaryTest(CPackageRecipe):
             'libelf:devel',
             'libxml2:runtime',
             'm2crypto:python',
+            'memcached:runtime',
             'mercurial:runtime',
             'mkisofs:runtime',
             'net-tools:runtime',
@@ -79,6 +80,7 @@ class ConaryTest(CPackageRecipe):
             'psycopg2:python',
             'python:devel',
             'python-ctypes:python',
+            'python-memcached:python',
             'python-pgsql:python',
             'python-webob:python',
             'python:runtime',
@@ -125,6 +127,7 @@ class ConaryTest(CPackageRecipe):
             'glibc-static:rpm',
             'gnupg2:rpm',
             'libxml2:rpm',
+            'memcached:rpm',
             'mercurial:rpm',
             'net-tools:rpm',
             'patch:rpm',
@@ -145,6 +148,7 @@ class ConaryTest(CPackageRecipe):
             # Non-CentOS
             'gunicorn:runtime',
             'nginx:runtime',
+            'python-memcached:python',
             'python-webob:python',
             'python-webunit:python',
             ]
