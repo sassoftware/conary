@@ -348,9 +348,7 @@ class SigTest(rephelp.RepositoryHelper):
 
         try:
             checkout(repos, self.cfg, self.workDir, ["test"])
-            # only multithreaded apache servers are capable of giving the key
-            if os.getenv('CONARY_SERVER') == 'apache':
-                newKeyCache.getPublicKey(fingerprint)
+            newKeyCache.getPublicKey(fingerprint)
         finally:
             self.cfg.pubRing = pubRing
             openpgpkey.setKeyCache(keyCache)
@@ -383,9 +381,7 @@ class SigTest(rephelp.RepositoryHelper):
 
         try:
             self.updatePkg(self.rootDir, "test:doc")
-            # only multithreaded apache servers are capable of giving the key
-            if os.getenv('CONARY_SERVER') == 'apache':
-                newKeyCache.getPublicKey(fingerprint)
+            newKeyCache.getPublicKey(fingerprint)
         finally:
             self.cfg.pubRing = pubRing
             openpgpkey.setKeyCache(keyCache)

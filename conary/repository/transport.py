@@ -80,6 +80,9 @@ class ConaryURLOpener(opener.URLOpener):
             # Add a custom header to tell the proxy which name
             # we contacted it on
             req.headers['X-Conary-Proxy-Host'] = str(proxy.hostport)
+            # The full target URL is sent on the request line, but
+            # intermediaries like nginx don't have a way to pass it on.
+            req.headers['X-Conary-Proxy-Target-Scheme'] = req.url.scheme
         return opener.URLOpener._requestOnce(self, req, proxy)
 
 

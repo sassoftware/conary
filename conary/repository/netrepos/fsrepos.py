@@ -302,7 +302,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                    excludeCapsuleContents =
                                         excludeCapsuleContents,
                                    requireSigs = self.requireSigs)
-        except openpgpfile.KeyNotFound:
+        except (openpgpfile.KeyNotFound, errors.DigitalSignatureVerificationError):
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
             raise

@@ -32,6 +32,7 @@ from webob import exc as web_exc
 from conary.lib import log as cny_log
 from conary.lib import util
 from conary.lib.formattrace import formatTrace
+from conary.lib.http.request import URL
 from conary.repository import errors
 from conary.repository import filecontainer
 from conary.repository import netclient
@@ -48,9 +49,13 @@ log = logging.getLogger('wsgi_hooks')
 
 def makeApp(settings):
     """Paster entry point"""
+    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
+    elif 'CONARY_SERVER_CONFIG' in os.environ:
+        envOverrides['conary.netrepos.config_file'
+                ] = os.environ['CONARY_SERVER_CONFIG']
     if 'mount_point' in settings:
         envOverrides['conary.netrepos.mount_point'] = settings['mount_point']
     app = ConaryRouter(envOverrides)
@@ -59,7 +64,6 @@ def makeApp(settings):
 
 def paster_main(global_config, **settings):
     """Wrapper to enable "paster serve" """
-    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     return makeApp(settings)
 
 
@@ -249,7 +253,7 @@ class ConaryHandler(object):
             raise ConfigurationError("tmpDir must not contain symbolic links.")
 
         self._useForwardedHeaders = self._getEnvBool(
-                'use_forwarded_headers', False)
+                'use_forwarded_headers', True)
         if self._useForwardedHeaders:
             for key in ('x-forwarded-scheme', 'x-forwarded-proto'):
                 if req.headers.get(key):
@@ -351,6 +355,13 @@ class ConaryHandler(object):
                 content_type='text/plain',
                 )
 
+    def getLocalPort(self):
+        env = self.request.environ
+        if 'gunicorn.socket' in env:
+            return env['gunicorn.socket'].getsockname()[1]
+        else:
+            return 0
+
     def handleRequest(self, request):
         try:
             return self._handleRequest(request)
@@ -434,12 +445,17 @@ class ConaryHandler(object):
             return self._makeError('400 Bad Request',
                     "Malformed XMLRPC request")
 
-        localAddr = socket.gethostname()
+        localAddr = '%s:%s' % (socket.gethostname(), self.getLocalPort())
         try:
             request = self.requestFilter.fromWire(params)
         except (TypeError, ValueError, IndexError):
             return self._makeError('400 Bad Request',
                     "Malformed XMLRPC arguments")
+
+        rawUrl = self.request.url
+        scheme = self.request.headers.get('X-Conary-Proxy-Target-Scheme')
+        if scheme in ('http', 'https'):
+            rawUrl = str(URL(rawUrl)._replace(scheme=scheme))
 
         # Execution phase -- locate and call the target method
         try:
@@ -450,7 +466,7 @@ class ConaryHandler(object):
                     authToken=self.auth,
                     request=request,
                     remoteIp=self.auth.remote_ip,
-                    rawUrl=self.request.url,
+                    rawUrl=rawUrl,
                     localAddr=localAddr,
                     protocolString=self.request.http_version,
                     headers=self.request.headers,
@@ -459,10 +475,11 @@ class ConaryHandler(object):
             return self._makeError('403 Forbidden', "Insufficient permission")
 
         rawResponse, headers = responseArgs.toWire(request.version)
-        response = self.responseFactory(
-                headerlist=headers.items(),
-                content_type='text/xml',
-                )
+        if extraInfo:
+            headers['Via'] = proxy.formatViaHeader(localAddr,
+                    self.request.http_version, prefix=extraInfo.getVia())
+        response = self.responseFactory(headerlist=headers.items())
+        response.content_type = 'text/xml'
 
         # Output phase -- serialize and write the response
         body = util.xmlrpcDump((rawResponse,), methodresponse=1)
@@ -472,9 +489,6 @@ class ConaryHandler(object):
             response.body = zlib.compress(body, 5)
         else:
             response.body = body
-        if extraInfo:
-            headers['Via'] = proxy.formatViaHeader(localAddr,
-                    self.request.http_version, prefix=extraInfo.getVia())
 
         if (method == 'getChangeSet'
                 and request.version >= 71

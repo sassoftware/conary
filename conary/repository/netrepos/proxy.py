@@ -289,6 +289,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
     publicCalls = netserver.NetworkRepositoryServer.publicCalls
     responseFilter = xmlshims.ResponseArgs
 
+    repositoryVersionCache = RepositoryVersionCache()
+
     def __init__(self, cfg, basicUrl):
         self.cfg = cfg
         self.basicUrl = basicUrl
@@ -296,7 +298,6 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.tmpPath = cfg.tmpDir
         util.mkdirChain(self.tmpPath)
         self.proxyMap = conarycfg.getProxyMap(cfg)
-        self.repositoryVersionCache = RepositoryVersionCache()
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -1968,7 +1969,11 @@ class ChangesetCache(object):
             # We did not get a lock for it
             csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
 
-        written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
+        try:
+            written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
+        except transport.MultipartDecodeError:
+            raise errors.RepositoryError("The changeset was corrupted in "
+                    "transit, please try again")
         if sizeLimit is not None and written != sizeLimit:
             raise errors.RepositoryError("Changeset was truncated in transit "
                     "(expected %d bytes, got %d bytes for subchangeset)" %

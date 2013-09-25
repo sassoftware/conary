@@ -39,12 +39,13 @@ MAX_ENTITLEMENT_LENGTH = 255
 nameCharacterSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-\\@'
 
 class UserAuthorization:
+
+    pwCache = {}
+
     def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
         self.db = db
         self.pwCheckUrl = pwCheckUrl
         self.cacheTimeout = cacheTimeout
-        self.pwCache = {}
-
 
     def addUserByMD5(self, cu, user, salt, password):
         for letter in user:
@@ -227,10 +228,12 @@ class UserAuthorization:
 
 
 class EntitlementAuthorization:
+
+    cache = {}
+
     def __init__(self, entCheckUrl = None, cacheTimeout = None):
         self.entCheckUrl = entCheckUrl
         self.cacheTimeout = cacheTimeout
-        self.cache = {}
 
     def getAuthorizedRoles(self, cu, serverName, remoteIp,
                            entitlementClass, entitlement):

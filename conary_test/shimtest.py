@@ -37,7 +37,7 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
         cfg = netserver.ServerConfig()
         cfg.serverName = testserver.getName()
         cfg.tmpDir = self.tmpDir
-        cfg.contentsDir = testserver.reposDir + '/contents'
+        cfg.contentsDir = testserver.contents.getPath()
         cfg.configLine('repositoryDB %s' %testserver.reposDB.getDriver())
 
         server = shimclient.NetworkRepositoryServer(cfg,
