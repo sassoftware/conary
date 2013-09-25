@@ -1,0 +1,2 @@
+Command line options can now be defined using a dictionary-like syntax, which
+allows for default values too. (CNY-3810)

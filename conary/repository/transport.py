@@ -20,9 +20,12 @@
     XMLRPC commands to be sent, hence the XMLOpener class """
 
 import base64
+import cgi
 import socket
+import StringIO
 import sys
 import xmlrpclib
+import zlib
 
 from conary import constants
 from conary.lib import timeutil
@@ -77,6 +80,9 @@ class ConaryURLOpener(opener.URLOpener):
             # Add a custom header to tell the proxy which name
             # we contacted it on
             req.headers['X-Conary-Proxy-Host'] = str(proxy.hostport)
+            # The full target URL is sent on the request line, but
+            # intermediaries like nginx don't have a way to pass it on.
+            req.headers['X-Conary-Proxy-Target-Scheme'] = req.url.scheme
         return opener.URLOpener._requestOnce(self, req, proxy)
 
 
@@ -90,6 +96,8 @@ class Transport(xmlrpclib.Transport):
     user_agent = "Conary/%s" % constants.version
 
     openerFactory = XMLOpener
+    contentTypes = ['text/xml', 'application/xml']
+    mixedType = 'multipart/mixed'
 
     def __init__(self, proxyMap=None, serverName=None, caCerts=None,
             connectAttempts=None):
@@ -153,6 +161,7 @@ class Transport(xmlrpclib.Transport):
         if self.serverName:
             req.headers['X-Conary-Servername'] = self.serverName
         req.headers['User-agent'] = self.user_agent
+        req.headers['Accept'] = ','.join(self.contentTypes + [self.mixedType])
 
         # Make sure we capture some useful information from the
         # opener, even if we failed
@@ -176,7 +185,7 @@ class Transport(xmlrpclib.Transport):
                 if isinstance(e_value, socket.error):
                     errmsg = http_error.splitSocketError(e_value)[1]
                 elif isinstance(e_value, EnvironmentError):
-                    errmsg = e_value.sterror
+                    errmsg = e_value.strerror
                     # sometimes there is a socket error hiding inside an
                     # IOError!
                     if isinstance(errmsg, socket.error):
@@ -201,3 +210,143 @@ class Transport(xmlrpclib.Transport):
 
     def getparser(self):
         return util.xmlrpcGetParser()
+
+    @staticmethod
+    def _parse_multipart_header(response, boundary):
+        if response.readline() != "--%s\r\n" % (boundary,):
+            raise xmlrpclib.ResponseError("Response body is corrupted")
+        ctype = cenc = clen = None
+        while True:
+            line = response.readline().rstrip('\r\n')
+            if not line:
+                break
+            key, value = line.split(': ')
+            if key.lower() == 'content-type':
+                ctype = cgi.parse_header(value)[0]
+            elif key.lower() == 'content-encoding':
+                cenc = value
+            elif key.lower() == 'content-length':
+                clen = int(value)
+        return ctype, cenc, clen
+
+    def parse_response(self, response):
+        ctype = response.headers.get('content-type', '')
+        ctype, pdict = cgi.parse_header(ctype)
+        if ctype in self.contentTypes:
+            return xmlrpclib.Transport.parse_response(self, response)
+        elif ctype != self.mixedType:
+            raise xmlrpclib.ResponseError(
+                    "Response has invalid or missing Content-Type")
+        decoder = MultipartDecoder(response, pdict['boundary'])
+
+        # Read XMLRPC response
+        rpcHeaders, rpcBody = decoder.get()
+        if (cgi.parse_header(rpcHeaders.get('content-type'))[0]
+                not in self.contentTypes):
+            raise xmlrpclib.ResponseError(
+                    "Response has invalid or missing Content-Type")
+        rpcBody = StringIO.StringIO(rpcBody)
+        result = xmlrpclib.Transport.parse_response(self, rpcBody)
+
+        # Replace the URL in the XMLRPC response with a file-like object that
+        # reads out the second part of the multipart response
+        csResponse = decoder.getStream()
+        if csResponse.headers.get('content-type') != (
+                'application/x-conary-change-set'):
+            raise xmlrpclib.ResponseError(
+                    "Response body has wrong Content-Type")
+        result[0][1][0] = csResponse
+        return result
+
+
+class MultipartDecodeError(RuntimeError):
+    pass
+
+
+class MultipartDecoder(object):
+
+    def __init__(self, fobj, boundary):
+        self.fobj = fobj
+        self.boundary = boundary
+
+    def _getHeader(self):
+        if self.fobj.readline() != "--%s\r\n" % (self.boundary,):
+            raise MultipartDecodeError("Invalid multipart response")
+        headers = {}
+        while True:
+            line = self.fobj.readline().rstrip('\r\n')
+            if not line:
+                break
+            key, value = line.split(': ')
+            headers[key.lower()] = value
+        return headers
+
+    @staticmethod
+    def _decode(body, headers, hname):
+        encoding = headers.get(hname.lower())
+        if encoding == 'deflate':
+            return zlib.decompress(body)
+        elif encoding in (None, 'identity'):
+            return body
+        else:
+            raise MultipartDecodeError(
+                    "Unrecognized %s in multipart response: %s"
+                    % (hname.title(), encoding))
+
+    def get(self):
+        headers = self._getHeader()
+        clen = int(headers.get('content-length', -1))
+        if clen < 0:
+            raise MultipartDecodeError("Invalid multipart response")
+        body = self.fobj.read(clen)
+        if len(body) < clen:
+            raise MultipartDecodeError("Multipart response was truncated")
+        body = self._decode(body, headers, 'content-transfer-encoding')
+        body = self._decode(body, headers, 'content-encoding')
+        if self.fobj.readline() != '\r\n':
+            raise MultipartDecodeError("Invalid multipart response")
+        return headers, body
+
+    def getStream(self, final=True):
+        headers = self._getHeader()
+        clen = int(headers.get('content-length', -1))
+        if clen < 0:
+            raise MultipartDecodeError("Invalid multipart response")
+        if headers.get('content-transfer-encoding') not in (None, 'identity'):
+            raise MultipartDecodeError("Invalid multipart response")
+        if headers.get('content-encoding') not in (None, 'identity'):
+            raise MultipartDecodeError("Invalid multipart response")
+        return MultipartResponseFile(self.fobj, headers, clen, self.boundary,
+                final)
+
+
+class MultipartResponseFile(object):
+    def __init__(self, fobj, headers, clen, boundary, final):
+        self.fobj = fobj
+        self.headers = headers
+        self.boundary = boundary
+        self.remaining = clen
+        self.eof = False
+        self.final = final
+
+    def read(self, count=None):
+        if self.eof:
+            return ''
+        if count is None:
+            count = self.remaining
+        count = min(count, self.remaining)
+        data = self.fobj.read(count)
+        self.remaining -= len(data)
+        if self.remaining == 0:
+            self.eof = True
+            if self.fobj.readline() != '\r\n':
+                raise MultipartDecodeError("Invalid multipart response")
+        return data
+
+    def close(self):
+        if self.final:
+            if (self.eof and self.fobj.readline()
+                    != "--%s--\r\n" % self.boundary):
+                raise MultipartDecodeError("Invalid multipart response")
+            self.fobj.close()
+        self.fobj = None

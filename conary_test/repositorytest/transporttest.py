@@ -228,13 +228,10 @@ class TransportTest(rephelp.RepositoryHelper):
             server.kill()
 
     def _assertProxy(self, via, cProxy):
-            via = networking.HostPort(via.strip().split(' ')[1])
-            self.assertEqual(via.port, cProxy.port)
-            self.assertIn(str(via.host), [
-                    '127.0.0.1',
-                    '::ffff:127.0.0.1',
-                    '::1',
-                    ])
+        via = networking.HostPort(via.strip().split(' ')[1])
+        # Not all app servers can report their local port, and not all app
+        # servers will even have one (UNIX socket, etc.)
+        self.assertIn(via.port, [cProxy.appServer.port, 0])
 
     def testConaryProxy(self):
         self.openRepository()
@@ -246,9 +243,7 @@ class TransportTest(rephelp.RepositoryHelper):
 
         try:
             cProxy.start()
-            sock_utils.tryConnect('127.0.0.1', cProxy.port)
-
-            self.cfg.configLine("conaryProxy http://localhost:%s" % cProxy.port)
+            cProxy.addToConfig(self.cfg)
             repos = conaryclient.ConaryClient(self.cfg).getRepos()
 
             pv = repos.c['localhost'].getProtocolVersion()
@@ -278,20 +273,16 @@ class TransportTest(rephelp.RepositoryHelper):
             cProxy1 = self.getConaryProxy(proxies = self.cfg.conaryProxy)
             cProxy1.start()
 
-            proxy1Addr = "127.0.0.1:%s" % cProxy1.port
+            proxy1Addr = str(request.URL(cProxy1.getUrl()).hostport)
             proxyHash = dict(http  = ('conary://' + proxy1Addr),
                              https = ('conarys://' + proxy1Addr))
 
             cProxy2 = self.getConaryProxy(1, proxies=proxyHash)
             cProxy2.start()
 
-            proxy2Addr = "127.0.0.1:%s" % cProxy2.port
+            proxy2Addr = str(request.URL(cProxy2.getUrl()).hostport)
 
             self.cfg.configLine("conaryProxy http://" + proxy2Addr)
-
-            sock_utils.tryConnect('127.0.0.1', cProxy1.port)
-            sock_utils.tryConnect('127.0.0.1', cProxy2.port)
-
             proxyCount += 2
 
             repos = conaryclient.ConaryClient(self.cfg).getRepos()
@@ -330,12 +321,11 @@ class TransportTest(rephelp.RepositoryHelper):
         cp = self.getConaryProxy(proxies = cfg.proxy)
 
         # Client config
-        self.cfg.configLine('conaryProxy http://localhost:%s' % cp.port)
+        cp.addToConfig(self.cfg)
         client = conaryclient.ConaryClient(self.cfg)
 
         try:
             cp.start()
-            sock_utils.tryConnect("127.0.0.1", cp.port)
 
             logsz0 = h.getAccessLogSize()
 
@@ -476,14 +466,6 @@ class TransportTest(rephelp.RepositoryHelper):
             client = conaryclient.ConaryClient(self.cfg)
             repos = client.getRepos()
             versions = repos.c['localhost'].checkVersion()
-
-            # Check if we can force the server in SSL mode, we don't control that
-            # in non-standalone mode
-            server = self.servers.getCachedServer(0)
-            if not isinstance(server, rephelp.StandaloneServer):
-                raise testhelp.SkipTestException("Skipping testing of "
-                    "authenticated HTTP proxies in SSL mode, not a standalone "
-                    "server")
 
             # Using a different server for SSL, it's better to not stop the one on
             # slot 0 for caching reasons

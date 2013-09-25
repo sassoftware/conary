@@ -23,17 +23,21 @@ import os
 import sys
 import xml
 import re
+import tempfile
+import textwrap
 import traceback
 import urllib
-import pwd
 
 from conary.deps import deps, arch
 from conary.lib import util, api
-from conary.lib.cfg import *  # pyflakes=ignore
+from conary.lib.cfg import ParseError, SectionedConfigFile, ConfigSection
+from conary.lib.cfgtypes import (CfgType, CfgString, CfgBool, CfgPath, CfgEnum,
+        CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt)
 from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions
 from conary import flavorcfg
+from conary.repository import transport
 
 # ----------- conary specific types
 
@@ -333,10 +337,6 @@ class CfgRepoMap(CfgList):
         curVal.extend(newVal)
         return curVal
 
-    def getDefault(self, default=[]):
-        if hasattr(default, 'iteritems'):
-            return CfgList.getDefault(self, default.iteritems())
-        return CfgList.getDefault(self, default)
 
 class CfgFlavor(CfgType):
 
@@ -535,6 +535,7 @@ def _getDefaultPublicKeyrings():
     # CNY-2722: look up the directory with getpwuid, instead of using $HOME
 
     try:
+        import pwd
         ent = pwd.getpwuid(os.getuid())
         pwDir = ent[5]
         # If home dir doesn't exist, don't bother
@@ -545,6 +546,14 @@ def _getDefaultPublicKeyrings():
 
     publicKeyrings.append('/etc/conary/pubring.gpg')
     return publicKeyrings
+
+
+def _getDefaultTempDir():
+    if os.name == 'posix':
+        return '/var/tmp'
+    else:
+        return tempfile.gettempdir()
+
 
 class ConaryContext(ConfigSection):
     """ Conary uses context to let the value of particular config parameters
@@ -642,7 +651,7 @@ class ConaryContext(ConfigSection):
     sourceSearchDir       =  (CfgPath, '.')
     threaded              =  (CfgBool, True)
     downloadFirst         =  (CfgBool, False)
-    tmpDir                =  (CfgPath, '/var/tmp')
+    tmpDir                =  (CfgPath, _getDefaultTempDir())
     trustThreshold        =  (CfgInt, 0)
     trustedCerts          =  (CfgPathList, (),
             'List of CA certificates which are trusted to identify a remote '
@@ -669,11 +678,19 @@ class ConaryContext(ConfigSection):
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 
     def _writeKey(self, out, cfgItem, value, options):
-        if cfgItem.isDefault():
+        # Suppress all default values, as opposed to the default behavior which
+        # only suppresses defaults that are None
+        name = cfgItem.name
+        if name not in self._values or self._values[name].isDefault():
             return
         ConfigSection._writeKey(self, out, cfgItem, value, options)
 
+
 class ConaryConfiguration(SectionedConfigFile):
+
+    # Inherit all context options
+    _cfg_bases = (ConaryContext,)
+
     # this allows a new section to be created on the fly with the type
     # ConaryContext
     _allowNewSections     = True
@@ -701,10 +718,6 @@ class ConaryConfiguration(SectionedConfigFile):
         """
         SectionedConfigFile.__init__(self)
         self._ignoreErrors = ignoreErrors
-
-        for info in ConaryContext._getConfigOptions():
-            if info[0] not in self:
-                self.addConfigOption(*info)
 
         self.addListener('signatureKey', lambda *args: self._resetSigMap())
 
@@ -765,9 +778,11 @@ class ConaryConfiguration(SectionedConfigFile):
         self.context = name
         context = self.getSection(name)
 
-        for key, value in context.iteritems():
-            if not context.isDefault(key):
-                self[key] = self._options[key].set(self[key], value)
+        for key, ctxval in context._values.iteritems():
+            if ctxval.isDefault():
+                continue
+            newval = self._cow(key)
+            newval.updateFromContext(ctxval)
         return True
 
     def getContext(self, name):
@@ -1115,3 +1130,14 @@ def getProxyMap(cfg):
                 url = 'conarys:' + url[6:]
             proxyDict[scheme] = url
     return proxy_map.ProxyMap.fromDict(proxyDict)
+
+
+# These are regrettably part of the module's published API
+# pyflakes=ignore
+from conary.lib.cfgtypes import (CfgType, CfgString, CfgPath, CfgInt, CfgBool,
+        CfgRegExp, CfgSignedRegExp, CfgEnum, CfgCallBack, CfgLineList,
+        CfgQuotedLineList, CfgList, CfgDict, CfgEnumDict, CfgRegExpList,
+        CfgSignedRegExpList, CfgError, CfgEnvironmentError,
+        RegularExpressionList, SignedRegularExpressionList, CfgPathList)
+# pyflakes=ignore
+from conary.lib.cfg import ConfigFile, ConfigSection, SectionedConfigFile

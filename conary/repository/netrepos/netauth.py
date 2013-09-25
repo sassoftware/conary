@@ -16,33 +16,36 @@
 
 
 import itertools
+import logging
 import os
 import time
 import urllib, urllib2
 import xml
 
 from conary import conarycfg, versions
+from conary.deps import deps
 from conary.repository import errors
 from conary.lib import digestlib, sha1helper, tracelog
 from conary.dbstore import sqlerrors
-from conary.repository.netrepos import items, versionops, accessmap
 from conary.server.schema import resetTable
+from . import items, accessmap, geoip
+from .auth_tokens import AuthToken, ValidUser, ValidPasswordToken
 
-# FIXME: remove these compatibilty error classes later
-UserAlreadyExists = errors.UserAlreadyExists
-GroupAlreadyExists = errors.GroupAlreadyExists
+log = logging.getLogger(__name__)
+
 
 MAX_ENTITLEMENT_LENGTH = 255
 
 nameCharacterSet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-\\@'
 
 class UserAuthorization:
+
+    pwCache = {}
+
     def __init__(self, db, pwCheckUrl = None, cacheTimeout = None):
         self.db = db
         self.pwCheckUrl = pwCheckUrl
         self.cacheTimeout = cacheTimeout
-        self.pwCache = {}
-
 
     def addUserByMD5(self, cu, user, salt, password):
         for letter in user:
@@ -51,7 +54,7 @@ class UserAuthorization:
         try:
             cu.execute("INSERT INTO Users (userName, salt, password) "
                        "VALUES (?, ?, ?)",
-                       (user, cu.binary(salt), cu.binary(password)))
+                       (user, salt.encode('hex'), password))
             uid = cu.lastrowid
         except sqlerrors.ColumnNotUnique:
             raise errors.UserAlreadyExists, 'user: %s' % user
@@ -71,7 +74,7 @@ class UserAuthorization:
             raise errors.CannotChangePassword
 
         cu.execute("UPDATE Users SET password=?, salt=? WHERE userName=?",
-                   cu.binary(password), cu.binary(salt), user)
+                   password, salt.encode('hex'), user)
 
     def _checkPassword(self, user, salt, password, challenge, remoteIp = None):
         if challenge is ValidPasswordToken:
@@ -127,42 +130,58 @@ class UserAuthorization:
         sql = "DELETE from Users WHERE userId=?"
         cu.execute(sql, userId)
 
+    def _rolesFromNames(self, cu, roleList):
+        if not roleList:
+            return {}
+        where = []
+        args = []
+        if '*' in roleList:
+            where.append('true')
+        else:
+            ids = set([x for x in roleList if isinstance(x, int)])
+            names = set([x for x in roleList if not isinstance(x, int)])
+            if ids:
+                places = ', '.join('?' for x in ids)
+                where.append('userGroupId IN ( %s )' % (places,))
+                args.extend(ids)
+            if names:
+                places = ', '.join('?' for x in names)
+                where.append('userGroup IN ( %s )' % (places,))
+                args.extend(names)
+        if not where:
+            return {}
+        where = ' OR '.join(where)
+        query = ("SELECT userGroupId, accept_flags FROM UserGroups"
+                " WHERE %s" % where)
+        cu.execute(query, args)
+        return dict((x[0], deps.ThawFlavor(x[1])) for x in cu)
+
     def getAuthorizedRoles(self, cu, user, password, allowAnonymous = True,
                            remoteIp = None):
         """
         Given a user and password, return the list of roles that are
-        authorized via these credentials
+        authorized via these credentials.
+
+        Returns a dictionary where the key is a role ID and the value is a
+        Flavor object holding the role's accept flags.
         """
 
         if isinstance(user, ValidUser):
             # Short-circuit for shim-using code that knows what roles
             # it wants.
-            roles = set()
-            if '*' in user.roles:
-                cu.execute("SELECT userGroupId FROM UserGroups")
-            else:
-                roles = set([x for x in user.roles if isinstance(x, int)])
-
-                names = set([x for x in user.roles if not isinstance(x, int)])
-                if not names:
-                    return roles
-                places = ', '.join('?' for x in names)
-                cu.execute("""SELECT userGroupId FROM UserGroups
-                        WHERE userGroup IN ( %s )""" % (places,), *names)
-            roles.update(x[0] for x in cu)
-            return roles
+            return self._rolesFromNames(cu, user.roles)
 
         cu.execute("""
         SELECT Users.salt, Users.password, UserGroupMembers.userGroupId,
-               Users.userName, UserGroups.canMirror
+               Users.userName, UserGroups.canMirror, UserGroups.accept_flags
         FROM Users
         JOIN UserGroupMembers USING(userId)
         JOIN UserGroups USING(userGroupId)
         WHERE Users.userName = ? OR Users.userName = 'anonymous'
         """, user)
-        result = [ x for x in cu ]
+        result = cu.fetchall()
         if not result:
-            return set()
+            return {}
 
         canMirror = (sum(x[4] for x in result) > 0)
 
@@ -178,12 +197,11 @@ class UserAuthorization:
             result = userPasswords
         if userPasswords and not self._checkPassword(
                                         user,
-                                        cu.frombinary(userPasswords[0][0]),
-                                        cu.frombinary(userPasswords[0][1]),
+                                        userPasswords[0][0].decode('hex'),
+                                        userPasswords[0][1],
                                         password, remoteIp):
             result = [ x for x in result if x[3] == 'anonymous' ]
-
-        return set(x[2] for x in result)
+        return dict((x[2], deps.ThawFlavor(x[5])) for x in result)
 
     def getRolesByUser(self, user):
         cu = self.db.cursor()
@@ -210,10 +228,12 @@ class UserAuthorization:
 
 
 class EntitlementAuthorization:
+
+    cache = {}
+
     def __init__(self, entCheckUrl = None, cacheTimeout = None):
         self.entCheckUrl = entCheckUrl
         self.cacheTimeout = cacheTimeout
-        self.cache = {}
 
     def getAuthorizedRoles(self, cu, serverName, remoteIp,
                            entitlementClass, entitlement):
@@ -249,7 +269,7 @@ class EntitlementAuthorization:
             try:
                 f = urllib2.urlopen(url)
                 xmlResponse = f.read()
-            except Exception, e:
+            except Exception:
                 return set()
 
             p = conarycfg.EntitlementParser()
@@ -275,13 +295,14 @@ class EntitlementAuthorization:
 
         # look up entitlements
         cu.execute("""
-        SELECT userGroupId FROM Entitlements
+        SELECT UserGroups.userGroupId, UserGroups.accept_flags
+        FROM Entitlements
         JOIN EntitlementAccessMap USING (entGroupId)
+        JOIN UserGroups USING (userGroupId)
         WHERE entitlement=?
         """, entitlement)
 
-        roleIds = set(x[0] for x in cu)
-
+        roleIds = dict((x[0], deps.ThawFlavor(x[1])) for x in cu)
         if self.entCheckUrl:
             # cacheEntry is still set from the cache check above
             self.cache[cacheEntry] = (roleIds,
@@ -292,7 +313,7 @@ class EntitlementAuthorization:
 
 class NetworkAuthorization:
     def __init__(self, db, serverNameList, cacheTimeout = None, log = None,
-                 passwordURL = None, entCheckURL = None):
+            passwordURL=None, entCheckURL=None, geoIpFiles=None):
         """
         @param cacheTimeout: Timeout, in seconds, for authorization cache
         entries. If None, no cache is used.
@@ -313,40 +334,25 @@ class NetworkAuthorization:
             cacheTimeout = cacheTimeout, entCheckUrl = entCheckURL)
         self.items = items.Items(db)
         self.ri = accessmap.RoleInstances(db)
+        self.geoIp = geoip.GeoIPLookup(geoIpFiles or [])
 
     def getAuthRoles(self, cu, authToken, allowAnonymous = True):
+        """Return the set of roleIds that the caller has access to.
+
+        If any role has an "accept flag" set that the auth token does not
+        satisfy, InsufficientPermission will be raised immediately.
+        """
         self.log(4, authToken[0], authToken[2])
-        # Find what role(s) this user belongs to
-        # anonymous users should come through as anonymous, not None
-        assert(authToken[0])
-
-        # we need a hashable tuple, a list won't work
-        authToken = tuple(authToken)
-
-        if type(authToken[2]) is not list:
-            # this code is for compatibility with old callers who
-            # form up an old (user, pass, entclass, entkey) authToken.
-            # rBuilder is one such caller.
-            entList = []
-            entClass = authToken[2]
-            entKey = authToken[3]
-            if entClass is not None and entKey is not None:
-                entList.append((entClass, entKey))
-            remoteIp = None
-        elif len(authToken) == 3:
-            entList = authToken[2]
-            remoteIp = None
-        else:
-            entList = authToken[2]
-            remoteIp = authToken[3]
+        if not isinstance(authToken, AuthToken):
+            authToken = AuthToken(*authToken)
 
         roleSet = self.userAuth.getAuthorizedRoles(
-            cu, authToken[0], authToken[1],
-            allowAnonymous = allowAnonymous,
-            remoteIp = remoteIp)
+            cu, authToken.user, authToken.password,
+            allowAnonymous=allowAnonymous,
+            remoteIp=authToken.remote_ip)
 
         timedOut = []
-        for entClass, entKey in entList:
+        for entClass, entKey in authToken.entitlements:
             # XXX serverName is passed only for compatibility with the server
             # and entitlement class based entitlement design; it's only used
             # here during external authentication (used by some rPath
@@ -354,7 +360,7 @@ class NetworkAuthorization:
             try:
                 rolesFromEntitlement = \
                     self.entitlementAuth.getAuthorizedRoles(
-                        cu, self.serverNameList[0], remoteIp,
+                        cu, self.serverNameList[0], authToken.remote_ip,
                         entClass, entKey)
                 roleSet.update(rolesFromEntitlement)
             except errors.EntitlementTimeout, e:
@@ -363,7 +369,28 @@ class NetworkAuthorization:
         if timedOut:
             raise errors.EntitlementTimeout(timedOut)
 
-        return roleSet
+        for roleId, acceptFlags in roleSet.items():
+            if authToken.flags is None:
+                authToken.flags = self._getFlags(authToken)
+            if not authToken.flags.satisfies(acceptFlags):
+                log.error("Rejecting client %s access to role %s due to "
+                        "acceptFlags mismatch:  has: %s  required: %s",
+                        authToken.remote_ip, roleId,
+                        authToken.flags, acceptFlags)
+                raise errors.InsufficientPermission
+
+        return set(roleSet)
+
+    def _getFlags(self, authToken):
+        flags = deps.Flavor()
+        for addr in authToken.getAllIps():
+            if not addr:
+                continue
+            try:
+                flags.union(self.geoIp.getFlags(addr))
+            except:
+                continue
+        return flags
 
     def batchCheck(self, authToken, troveList, write = False, cu = None):
         """ checks access permissions for a set of *existing* troves in the repository """
@@ -505,8 +532,7 @@ class NetworkAuthorization:
         if not len(rows):
             return False
         salt, challenge = rows[0]
-        salt = cu.frombinary(salt)
-        challenge = cu.frombinary(challenge)
+        salt = salt.decode('hex')
         return self.userAuth._checkPassword(user, salt, challenge, password)
 
     # a simple call to auth.check(authToken) checks that the role
@@ -755,6 +781,7 @@ class NetworkAuthorization:
             raise
         else:
             self.db.commit()
+        return uid
 
     def deleteUserByName(self, user, deleteRole=True):
         self.log(3, user)
@@ -787,7 +814,7 @@ class NetworkAuthorization:
             if cu.fetchone()[0] == 0:
                 try:
                     self.deleteRole(user, False)
-                except errors.RoleNotFound, e:
+                except errors.RoleNotFound:
                     pass
         self.userAuth.deleteUser(cu, user)
         self.db.commit()
@@ -1258,6 +1285,30 @@ class NetworkAuthorization:
 
         self.db.commit()
 
+    def getRoleFilters(self, roles):
+        cu = self.db.cursor()
+        placeholders = ','.join('?' for x in roles)
+        query = ("""SELECT userGroup, accept_flags, filter_flags
+                FROM UserGroups WHERE userGroup in (%s)""" % placeholders)
+        cu.execute(query, list(roles))
+        return dict((x[0], (deps.ThawFlavor(x[1]), deps.ThawFlavor(x[2])))
+                for x in cu)
+
+    def setRoleFilters(self, roleFiltersMap):
+        cu = self.db.cursor()
+        for role, flags in roleFiltersMap.iteritems():
+            args = []
+            for flag in flags:
+                if flag is not None:
+                    flag = flag.freeze()
+                if flag == '':
+                    flag = None
+                args.append(flag)
+            args.append(role)
+            cu.execute("""UPDATE UserGroups SET accept_flags = ?,
+                    filter_flags = ? WHERE userGroup = ?""", args)
+        self.db.commit()
+
 
 class PasswordCheckParser(dict):
 
@@ -1289,81 +1340,3 @@ class PasswordCheckParser(dict):
         self.p.CharacterDataHandler = self.CharacterDataHandler
         self.valid = False
         dict.__init__(self)
-
-
-class ValidPasswordTokenType(object):
-    """
-    Type of L{ValidPasswordToken}, a token used in lieu of a password in
-    authToken to represent a user that has been authorized by other
-    means (e.g. a one-time token).
-
-    For example, a script that needs to perform some operation from a
-    particular user's viewpoint, but has direct access to the database
-    via a shim client, may use L{ValidPasswordToken} instead of a
-    password in authToken to bypass password checks while still adhering
-    to the user's own capabilities and limitations.
-
-    This type should be instantiated exactly once (as
-    L{ValidPasswordToken}).
-    """
-    __slots__ = ()
-
-    def __str__(self):
-        return '<Valid Password>'
-
-    def __repr__(self):
-        return 'ValidPasswordToken'
-ValidPasswordToken = ValidPasswordTokenType()
-
-
-class ValidUser(object):
-    """
-    Object used in lieu of a username in authToken to represent an imaginary
-    user with a given set of roles.
-
-    For example, a script that needs to perform a repository operation with a
-    particular set of permissions, but has direct access to the database via
-    a shim client, may use an instance of L{ValidUser} instead of a username
-    in authToken to bypass username and password checks while still adhering
-    to the limitations of the specified set of roles.
-
-    The set of roles is given as a list containing role names, or integer
-    roleIds. Mixing of names and IDs is allowed. Additionally, a role of '*'
-    will entitle the user to all roles in the repository; if no arguments are
-    given this is the default.
-    """
-    __slots__ = ('roles', 'username')
-
-    def __init__(self, *roles, **kwargs):
-        if not roles:
-            roles = ['*']
-        if isinstance(roles[0], (list, tuple)):
-            roles = roles[0]
-        self.roles = frozenset(roles)
-        self.username = kwargs.pop('username', None)
-        if kwargs:
-            raise TypeError("Unexpected keyword argument %s" %
-                    (kwargs.popitem()[0]))
-
-    def __str__(self):
-        if self.username:
-            user_fmt = '%r ' % (self.username,)
-        else:
-            user_fmt = ''
-        if '*' in self.roles:
-            return '<User %swith all roles>' % (user_fmt,)
-        else:
-            return '<User %swith roles %s>' % (user_fmt,
-                    ', '.join(unicode(x) for x in self.roles))
-
-    def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, sorted(self.roles))
-
-    def __reduce__(self):
-        # Be pickleable, but don't actually pickle the object as it could
-        # then cross a RPC boundary and become a security vulnerability. Plus,
-        # it would confuse logcat.
-        if self.username:
-            return str, (str(self.username),)
-        else:
-            return str, (str(self),)

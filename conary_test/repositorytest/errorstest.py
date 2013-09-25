@@ -59,10 +59,11 @@ class ErrorOutputTest(rephelp.RepositoryHelper):
     def testFailedPut(self):
         # CNY-1182
         repos = self.openRepository()
+        server = self.servers.getCachedServer()
         url = repos.c['localhost'].prepareChangeSet()[0]
         self.assertRaises(errors.CommitError,
                           repos.c['localhost'].commitChangeSet, url)
-        log = reposlog.RepositoryCallLogger(self.reposDir + '/repos.log', None,
+        log = reposlog.RepositoryCallLogger(server.reposLog, None,
                                             readOnly = True)
         for lastEntry in log:
             pass

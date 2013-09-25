@@ -149,10 +149,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         # to test missing contents error handling.  It's OK to do this
         # since the server is about to be reset anyway...
         server = self.servers.getServer(0)
-        if server.reposDir is None:
-            raise testhelp.SkipTestException, "can't do FileContentsNotFound test on non-managed repository"
-        
-        shutil.rmtree(server.reposDir + '/contents')
+        shutil.rmtree(server.contents.getPath())
         try:
             f = repos.getFileContents([ (fileId, version) ])
         except errors.FileContentsNotFound, e:
@@ -500,6 +497,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         q = repos.getAllTroveLeaves('localhost', {})
         assert(q.keys() == [ 'foo:runtime' ] )
         assert(len(q['foo:runtime']) == 1)
+        self.stopRepository(0)
 
     def testPrepareCallbackException(self):
         # CNY-1271
@@ -578,8 +576,10 @@ class NetclientTest(rephelp.RepositoryHelper):
                 self.expect = ver
 
             def __call__(self, url, inF, size, **kwargs):
-                fc = filecontainer.FileContainer(inF)
+                f2 = util.ExtendedFdopen(os.dup(inF.fileno()))
+                fc = filecontainer.FileContainer(f2)
                 assert(fc.version == self.expect)
+                f2.close()
                 inF.seek(0)
                 return self.old(url, inF, size, **kwargs)
 
@@ -594,13 +594,6 @@ class NetclientTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
 
         old = netclient.httpPutFile
-        # I feel dirty.  All this to make code that uses open() use
-        # ExtendedFile instead.
-        import __builtin__
-        oldopen = __builtin__.open
-        def open(fn, mode='r', buffering=False):
-            return util.ExtendedFile(fn, mode, buffering)
-        __builtin__.open = open
         try:
             repos = self.openRepository()
             netclient.httpPutFile = PutProxy(old,
@@ -615,7 +608,7 @@ class NetclientTest(rephelp.RepositoryHelper):
             repos.commitChangeSet(cs)
         finally:
             netclient.httpPutFile = old
-            __builtin__.open = oldopen
+            self.stopRepository()
 
     def testChangeSetConversionError(self):
         # Test returning non-200 or 403 errors
@@ -787,6 +780,7 @@ class NetclientTest(rephelp.RepositoryHelper):
 
         assert(wildcardRepos.hasTrove(*trv1.getNameVersionFlavor()))
         assert(wildcardRepos.hasTrove(*trv2.getNameVersionFlavor()))
+        self.stopRepository(0)
 
     def testErrorMessagesMentioningProxy(self):
         # CNY-1313
@@ -829,7 +823,8 @@ class NetclientTest(rephelp.RepositoryHelper):
 
         log = calllog.ClientCallLogger(p)
         methods = [ x.methodName for x in log ]
-        assert(methods == ['checkVersion', 'troveNames', 'addNewAsciiPGPKey'] )
+        self.assertEqual(methods, ['checkVersion', 'addNewAsciiPGPKey'])
+
 
 class ServerProxyTest(rephelp.RepositoryHelper):
     def testBadProtocol(self):
@@ -912,6 +907,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         # servername headers depending on who we are talking to
         # so there are different objects.
         assert(repos.c['localhost'] is not repos.c['localhost1'])
+        self.servers.stopAllServers()
 
     def testJobSizes(self):
         def _check(job, size):
@@ -993,26 +989,19 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         if not conaryserver.SSL:
             raise testhelp.SkipTestException("m2crypto not installed")
         self.stopRepository(1)
-        self.openRepository(1, useSSL = True)
-
-        proxy = self.getConaryProxy()
-
-        proxy.start()
-
-        self.cfg.configLine("conaryProxy http http://localhost:%s" %
-            proxy.port)
-        self.cfg.configLine("conaryProxy https http://localhost:%s" %
-            proxy.port)
-
-        client = conaryclient.ConaryClient(self.cfg)
-        repos = client.getRepos()
-
-        sock_utils.tryConnect("localhost", proxy.port)
+        self.openRepository(1, useSSL=True)
         try:
-            repos.c['localhost1'].checkVersion()
+            proxy = self.getConaryProxy()
+            proxy.start()
+            try:
+                proxy.addToConfig(self.cfg)
+                client = conaryclient.ConaryClient(self.cfg)
+                repos = client.getRepos()
+                repos.c['localhost1'].checkVersion()
+            finally:
+                proxy.stop()
         finally:
             self.stopRepository(1)
-            proxy.stop()
 
     def testUnderUnderMethodName(self):
         # CNY-2289

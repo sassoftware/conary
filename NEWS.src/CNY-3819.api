@@ -1,0 +1,3 @@
+Changesets are now inlined within the HTTP response when doing a getChangeSet
+call to the repository. This improves compatibility with load balancers and
+round-robin configurations by removing the need for a second request.

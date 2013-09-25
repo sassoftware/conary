@@ -311,7 +311,11 @@ class ConaryStateFromFile(ConaryState):
     def __init__(self, path, repos=None, parseSource=True):
         if not os.path.exists(path):
             raise CONARYFileMissing
-        elif not os.path.isfile(path):
+        if 'CONARY' not in os.listdir(os.path.dirname(os.path.abspath(path))):
+            # Must test for exact case otherwise files/directories called
+            # 'conary' will be interpreted as state files
+            raise CONARYFileMissing
+        if not os.path.isfile(path):
             raise CONARYNotFile
 
         versionUpdated = self.parseFile(path, repos=repos,

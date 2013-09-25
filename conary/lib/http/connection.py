@@ -198,8 +198,6 @@ class Connection(object):
             raise http_error.RequestError(wrapped)
 
         # Wait for a response.
-        poller = select.poll()
-        poller.register(conn.sock.fileno(), select.POLLIN)
         lastTimeout = time.time()
         while True:
             if req.abortCheck and req.abortCheck():
@@ -207,7 +205,7 @@ class Connection(object):
 
             # Wait 5 seconds for a response.
             try:
-                active = poller.poll(5000)
+                active = select.select([conn.sock], [], [], 5)[0]
             except select.error, err:
                 if err.args[0] == errno.EINTR:
                     # Interrupted system call -- we caught a signal but it was

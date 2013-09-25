@@ -29,7 +29,7 @@ from conary_test import rephelp
 from conary_test import resources
 
 from conary import constants, errors
-from conary import cvc as cvccmd # test legacy import location
+from conary.cmds import cvccmd
 from conary.cmds import conarycmd
 from conary.cmds import queryrep
 from conary.deps import deps
@@ -1496,7 +1496,7 @@ class CmdLineTest(rephelp.RepositoryHelper):
         # CNY-2786
         cmd = [ "python" ,"-c",
             "import sys; sys.path.insert(0, '%s'); del sys.argv; "
-            "from conary import cvc" % resources.get_path() ]
+            "from conary.cmds import cvccmd" % resources.get_path() ]
         p = subprocess.Popen(cmd, stdout = subprocess.PIPE,
             stderr = subprocess.PIPE)
         stdout, stderr = p.communicate()

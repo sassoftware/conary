@@ -32,6 +32,7 @@ from webob import exc as web_exc
 from conary.lib import log as cny_log
 from conary.lib import util
 from conary.lib.formattrace import formatTrace
+from conary.lib.http.request import URL
 from conary.repository import errors
 from conary.repository import filecontainer
 from conary.repository import netclient
@@ -39,6 +40,7 @@ from conary.repository import shimclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver
 from conary.repository.netrepos import proxy
+from conary.repository.netrepos.auth_tokens import AuthToken
 from conary.web import repos_web
 from conary.web import webauth
 
@@ -47,9 +49,13 @@ log = logging.getLogger('wsgi_hooks')
 
 def makeApp(settings):
     """Paster entry point"""
+    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
+    elif 'CONARY_SERVER_CONFIG' in os.environ:
+        envOverrides['conary.netrepos.config_file'
+                ] = os.environ['CONARY_SERVER_CONFIG']
     if 'mount_point' in settings:
         envOverrides['conary.netrepos.mount_point'] = settings['mount_point']
     app = ConaryRouter(envOverrides)
@@ -58,7 +64,6 @@ def makeApp(settings):
 
 def paster_main(global_config, **settings):
     """Wrapper to enable "paster serve" """
-    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     return makeApp(settings)
 
 
@@ -248,7 +253,7 @@ class ConaryHandler(object):
             raise ConfigurationError("tmpDir must not contain symbolic links.")
 
         self._useForwardedHeaders = self._getEnvBool(
-                'use_forwarded_headers', False)
+                'use_forwarded_headers', True)
         if self._useForwardedHeaders:
             for key in ('x-forwarded-scheme', 'x-forwarded-proto'):
                 if req.headers.get(key):
@@ -279,11 +284,7 @@ class ConaryHandler(object):
                         % self.request.script_name)
 
         urlBase = req.application_url
-        if cfg.closed:
-            # Closed repository -- returns an exception for all requests
-            self.repositoryServer = netserver.ClosedRepositoryServer(cfg)
-            self.shimServer = self.repositoryServer
-        elif cfg.proxyContentsDir:
+        if cfg.proxyContentsDir:
             # Caching proxy (no repository)
             self.repositoryServer = None
             self.shimServer = None
@@ -302,14 +303,29 @@ class ConaryHandler(object):
 
     def _loadAuth(self):
         """Extract authentication info from the request."""
-        self.auth = netserver.AuthToken()
+        self.auth = AuthToken()
         self._loadAuthPassword()
         self._loadAuthEntitlement()
-        self.auth.remote_ip = self.request.remote_addr
-        if self._useForwardedHeaders:
-            forward = self.request.headers.get('X-Forwarded-For')
-            if forward:
-                self.auth.remote_ip = forward.split(',')[-1].strip()
+        self.setRemoteIp(self.auth, self.request, self._useForwardedHeaders)
+
+    @staticmethod
+    def setRemoteIp(authToken, request, useForwarded=False):
+        remote_ip = request.remote_addr
+        forward = request.headers.get('X-Forwarded-For')
+        if forward:
+            forward = forward.split(',')
+            if useForwarded:
+                remote_ip = forward[-1].strip()
+                forward = forward[:-1]
+            authToken.forwarded_for = []
+            for addr in forward:
+                addr = addr.strip()
+                if addr.startswith('::ffff:'):
+                    addr = addr[7:]
+                authToken.forwarded_for.append(addr)
+        if remote_ip.startswith('::ffff:'):
+            remote_ip = remote_ip[7:]
+        authToken.remote_ip = remote_ip
 
     def _loadAuthPassword(self):
         """Extract HTTP Basic Authorization from the request."""
@@ -338,6 +354,13 @@ class ConaryHandler(object):
                 status=status,
                 content_type='text/plain',
                 )
+
+    def getLocalPort(self):
+        env = self.request.environ
+        if 'gunicorn.socket' in env:
+            return env['gunicorn.socket'].getsockname()[1]
+        else:
+            return 0
 
     def handleRequest(self, request):
         try:
@@ -400,7 +423,7 @@ class ConaryHandler(object):
         if not self.cfg.webEnabled:
             return self._makeError('404 Not Found',
                     "Web interface disabled by administrator.")
-        web = repos_web.ReposWeb(self.cfg, self.shimServer)
+        web = repos_web.ReposWeb(self.cfg, self.shimServer, authToken=self.auth)
         return web._handleRequest(request)
 
     def postRpc(self):
@@ -422,23 +445,28 @@ class ConaryHandler(object):
             return self._makeError('400 Bad Request',
                     "Malformed XMLRPC request")
 
-        localAddr = socket.gethostname()
+        localAddr = '%s:%s' % (socket.gethostname(), self.getLocalPort())
         try:
             request = self.requestFilter.fromWire(params)
         except (TypeError, ValueError, IndexError):
             return self._makeError('400 Bad Request',
                     "Malformed XMLRPC arguments")
 
+        rawUrl = self.request.url
+        scheme = self.request.headers.get('X-Conary-Proxy-Target-Scheme')
+        if scheme in ('http', 'https'):
+            rawUrl = str(URL(rawUrl)._replace(scheme=scheme))
+
         # Execution phase -- locate and call the target method
         try:
-            response, extraInfo = self.proxyServer.callWrapper(
+            responseArgs, extraInfo = self.proxyServer.callWrapper(
                     protocol=None,
                     port=None,
                     methodname=method,
                     authToken=self.auth,
                     request=request,
                     remoteIp=self.auth.remote_ip,
-                    rawUrl=self.request.url,
+                    rawUrl=rawUrl,
                     localAddr=localAddr,
                     protocolString=self.request.http_version,
                     headers=self.request.headers,
@@ -446,11 +474,12 @@ class ConaryHandler(object):
         except errors.InsufficientPermission:
             return self._makeError('403 Forbidden', "Insufficient permission")
 
-        rawResponse, headers = response.toWire(request.version)
-        response = self.responseFactory(
-                headerlist=headers.items(),
-                content_type='text/xml',
-                )
+        rawResponse, headers = responseArgs.toWire(request.version)
+        if extraInfo:
+            headers['Via'] = proxy.formatViaHeader(localAddr,
+                    self.request.http_version, prefix=extraInfo.getVia())
+        response = self.responseFactory(headerlist=headers.items())
+        response.content_type = 'text/xml'
 
         # Output phase -- serialize and write the response
         body = util.xmlrpcDump((rawResponse,), methodresponse=1)
@@ -460,19 +489,25 @@ class ConaryHandler(object):
             response.body = zlib.compress(body, 5)
         else:
             response.body = body
-        if extraInfo:
-            headers['Via'] = proxy.formatViaHeader(localAddr,
-                    self.request.http_version, prefix=extraInfo.getVia())
 
-        return response
+        if (method == 'getChangeSet'
+                and request.version >= 71
+                and not responseArgs.isException
+                and response.status_int == 200
+                and responseArgs.result[0]
+                and 'multipart/mixed' in list(self.request.accept)
+                ):
+            return self.inlineChangeset(response, responseArgs, headers)
+        else:
+            return response
 
-    def getChangeset(self):
+    def getChangeset(self, filename=None):
         """GET a prepared changeset file."""
         # IMPORTANT: As used here, "expandedSize" means the size of the
         # changeset as it is sent over the wire. The size of the file we are
         # reading from may be different if it includes references to other
         # files in lieu of their actual contents.
-        path = self._changesetPath('-out')
+        path = self._changesetPath('-out', filename)
         if not path:
             return self._makeError('403 Forbidden',
                     "Illegal changeset request")
@@ -547,6 +582,42 @@ class ConaryHandler(object):
             if not preserveFile:
                 os.unlink(path)
 
+    def inlineChangeset(self, rpcResponse, responseArgs, headers):
+        filename = responseArgs.result[0].split('?')[-1]
+        csResponse = self.getChangeset(filename=filename)
+        if csResponse.status_int != 200:
+            return csResponse
+
+        # Build a multipart MIME response from the two responses
+        boundary = os.urandom(24).encode('hex')
+        totalSize = 0
+        iterables = []
+        for response in [rpcResponse, csResponse]:
+            leader = "--%s\r\n" % boundary
+            for name in ['Content-Type', 'Content-Length', 'Content-Encoding']:
+                if name in response.headers:
+                    leader += "%s: %s\r\n" % (name, response.headers[name])
+            leader += "\r\n"
+            trailer = "\r\n"
+            totalSize += len(leader) + response.content_length + len(trailer)
+            iterables.extend([[leader], response.app_iter, [trailer]])
+        final = "--%s--\r\n" % boundary
+        totalSize += len(final)
+        iterables.append([final])
+
+        def _produceInline():
+            for iterable in iterables:
+                for data in iterable:
+                    yield data
+        response = self.responseFactory(
+                status='200 OK',
+                headerlist=headers.items(),
+                app_iter=_produceInline(),
+                )
+        response.content_type = 'multipart/mixed; boundary="%s"' % boundary
+        response.content_length=str(totalSize)
+        return response
+
     def putChangeset(self):
         """PUT method -- handle changeset uploads."""
         if not self.repositoryServer:
@@ -595,10 +666,11 @@ class ConaryHandler(object):
             yield d
         response.close()
 
-    def _changesetPath(self, suffix):
-        filename = self.request.query_string
-        if not filename or os.path.sep in filename:
-            return None
+    def _changesetPath(self, suffix, filename=None):
+        if not filename:
+            filename = self.request.query_string
+            if not filename or os.path.sep in filename:
+                return None
         server = self.repositoryServer or self.proxyServer
         return os.path.join(server.tmpPath, filename + suffix)
 

@@ -31,6 +31,7 @@ from conary.repository import changeset, datastore, errors, netclient
 from conary.repository import filecontainer, transport, xmlshims
 from conary.repository import filecontents
 from conary.repository.netrepos import cache, netserver, reposlog
+from conary.repository.netrepos.auth_tokens import AuthToken
 
 # A list of changeset versions we support
 # These are just shortcuts
@@ -152,8 +153,8 @@ class ProxyCallFactory:
 
         userOverride = cfg.user.find(targetServerName)
         if userOverride:
-            authToken = authToken[:]
-            authToken[0], authToken[1] = userOverride
+            authToken = authToken.copy()
+            authToken.user, authToken.password = userOverride
 
         url = redirectUrl(authToken, rawUrl)
         url = req_mod.URL.parse(url)
@@ -168,6 +169,13 @@ class ProxyCallFactory:
         lheaders = {}
         if via:
             lheaders['Via'] = ', '.join(via)
+
+        forwarded = list(authToken.forwarded_for)
+        if remoteIp and remoteIp not in ['127.0.0.1', '::1'] and (
+                not forwarded or forwarded[-1] != remoteIp):
+            forwarded.append(remoteIp)
+        if forwarded:
+            lheaders['X-Forwarded-For'] = ', '.join(forwarded)
 
         # If the proxy injected entitlements or user information, switch to
         # SSL -- IF they are using
@@ -281,6 +289,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
     publicCalls = netserver.NetworkRepositoryServer.publicCalls
     responseFilter = xmlshims.ResponseArgs
 
+    repositoryVersionCache = RepositoryVersionCache()
+
     def __init__(self, cfg, basicUrl):
         self.cfg = cfg
         self.basicUrl = basicUrl
@@ -288,7 +298,6 @@ class BaseProxy(xmlshims.NetworkConvertors):
         self.tmpPath = cfg.tmpDir
         util.mkdirChain(self.tmpPath)
         self.proxyMap = conarycfg.getProxyMap(cfg)
-        self.repositoryVersionCache = RepositoryVersionCache()
 
         self.log = tracelog.getLog(None)
         if cfg.traceLog:
@@ -316,6 +325,8 @@ class BaseProxy(xmlshims.NetworkConvertors):
         if methodname not in self.publicCalls:
             return (self.responseFilter.newException(
                 "MethodNotSupported", (methodname,)), extraInfo)
+        if not isinstance(authToken, AuthToken):
+            authToken = AuthToken(*authToken)
 
         self._port = port
         self._protocol = protocol
@@ -1092,12 +1103,20 @@ class ChangesetFilter(BaseProxy):
 
     def _cacheChangeSet(self, url, neededHere, csInfoList, changeSetList,
             forceProxy):
-        headers = [('X-Conary-Servername', self._serverName)]
-        try:
-            inF = transport.ConaryURLOpener(proxyMap=self.proxyMap).open(url,
-                    forceProxy=forceProxy, headers=headers)
-        except transport.TransportError, e:
-            raise errors.RepositoryError(str(e))
+        inPath = None
+        if hasattr(url, 'read'):
+            # Nested changeset file in multi-part response
+            inF = url
+        elif url.startswith('file://localhost/'):
+            inPath = url[16:]
+            inF = open(inPath, 'rb')
+        else:
+            headers = [('X-Conary-Servername', self._serverName)]
+            try:
+                inF = transport.ConaryURLOpener(proxyMap=self.proxyMap
+                        ).open(url, forceProxy=forceProxy, headers=headers)
+            except transport.TransportError, e:
+                raise errors.RepositoryError(str(e))
 
         for (jobIdx, (rawJob, fingerprint)), csInfo in \
                         itertools.izip(neededHere, csInfoList):
@@ -1125,9 +1144,8 @@ class ChangesetFilter(BaseProxy):
             csInfo.cached = cachable
             changeSetList[jobIdx] = csInfo
 
-        if url.startswith('file://localhost/'):
-            os.unlink(url[16:])
-
+        if inPath:
+            os.unlink(inPath)
         inF.close()
 
     def toJob(self, job):
@@ -1951,7 +1969,11 @@ class ChangesetCache(object):
             # We did not get a lock for it
             csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
 
-        written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
+        try:
+            written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
+        except transport.MultipartDecodeError:
+            raise errors.RepositoryError("The changeset was corrupted in "
+                    "transit, please try again")
         if sizeLimit is not None and written != sizeLimit:
             raise errors.RepositoryError("Changeset was truncated in transit "
                     "(expected %d bytes, got %d bytes for subchangeset)" %

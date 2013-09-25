@@ -26,11 +26,11 @@ from conary_test import rephelp
 from testrunner.testhelp import context
 
 #conary
-from conary.conarycfg import RegularExpressionList
 from conary.deps import deps
 from conary import conaryclient, sqlite3
 from conary.conaryclient import cmdline, update
 from conary.lib import util
+from conary.lib.cfgtypes import RegularExpressionList
 from conary.local import database
 from conary import callbacks, errors, versions
 from conary.cmds import query

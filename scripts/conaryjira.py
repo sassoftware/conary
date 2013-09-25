@@ -61,20 +61,14 @@ if __name__ == "__main__":
 """
 
 import os
-import re
-import sys
 import textwrap
 
 from conary import conarycfg
 from conary import conaryclient
 from conary import dbstore
 from conary import trove
-from conary import updatecmd
 from conary import versions
 from conary.deps import deps
-from conary.lib import util
-from conary.local import database
-from conary.repository import netclient
 
 class jiraMine:
 

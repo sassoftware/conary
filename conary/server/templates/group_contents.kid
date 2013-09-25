@@ -30,7 +30,7 @@
                 <?python #
                     from urllib import quote
                     from conary.web.repos_web import flavorWrap
-                    url = "files?t=%s;v=%s;f=%s" % (quote(name), quote(version.freeze()), quote(flavor.freeze()))
+                    url = "files?t=%s;v=%s;f=%s" % (quote(name), quote(str(version)), quote(flavor.freeze()))
                 ?>
                 <td style="vertical-align: top;"><a href="${url}">${name}</a></td>
                 <td style="vertical-align: top;">${str(version)}</td>

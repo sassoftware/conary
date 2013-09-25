@@ -37,7 +37,7 @@ from conary import conarycfg
 from conary.constants import version
 from conary import checkin
 from conary.build import cook
-from conary import cvc
+from conary.cmds import cvccmd
 
 from conary_test import resources
 
@@ -348,9 +348,7 @@ class SigTest(rephelp.RepositoryHelper):
 
         try:
             checkout(repos, self.cfg, self.workDir, ["test"])
-            # only multithreaded apache servers are capable of giving the key
-            if os.getenv('CONARY_SERVER') == 'apache':
-                newKeyCache.getPublicKey(fingerprint)
+            newKeyCache.getPublicKey(fingerprint)
         finally:
             self.cfg.pubRing = pubRing
             openpgpkey.setKeyCache(keyCache)
@@ -383,9 +381,7 @@ class SigTest(rephelp.RepositoryHelper):
 
         try:
             self.updatePkg(self.rootDir, "test:doc")
-            # only multithreaded apache servers are capable of giving the key
-            if os.getenv('CONARY_SERVER') == 'apache':
-                newKeyCache.getPublicKey(fingerprint)
+            newKeyCache.getPublicKey(fingerprint)
         finally:
             self.cfg.pubRing = pubRing
             openpgpkey.setKeyCache(keyCache)
@@ -771,7 +767,7 @@ class SigTest(rephelp.RepositoryHelper):
         try:
             # first sign the outer group trove
             #signtrove.signTroves(self.cfg, [ "group-outer" ])
-            cvc.sourceCommand(self.cfg, ["sign", "group-outer"],
+            cvccmd.sourceCommand(self.cfg, ["sign", "group-outer"],
                               {'recurse' : True})
 
             # check the sig on each trove in the group, since group signing
@@ -824,7 +820,7 @@ class SigTest(rephelp.RepositoryHelper):
         try:
             # first sign the outer group trove
             #signtrove.signTroves(self.cfg, [ "group-outer" ])
-            cvc.sourceCommand(self.cfg, ["sign", "group-outer"], {})
+            cvccmd.sourceCommand(self.cfg, ["sign", "group-outer"], {})
 
             try:
                 t = repos.getTrove('group-outer', v, f)
@@ -872,8 +868,8 @@ class SigTest(rephelp.RepositoryHelper):
         try:
             self.cfg.user = conarycfg.UserInformation()
             self.cfg.user.addServerGlob('localhost', 'foo', 'bar')
-            self.assertRaises(errors.InsufficientPermission, cvc.sourceCommand,
-                              self.cfg, ["sign", "test:doc"], {})
+            self.assertRaises(errors.InsufficientPermission,
+                    cvccmd.sourceCommand, self.cfg, ["sign", "test:doc"], {})
         finally:
             self.cfg.user = conarycfg.UserInformation()
             self.cfg.user.extend(oldUser)

@@ -18,7 +18,7 @@
 from conary_test import rephelp
 
 class HarnessTest(rephelp.RepositoryHelper):
-    def testOpenRepository1(self):
+    def testOpenRepository(self):
         # close all repositories
         self.servers.stopAllServers()
         # the fd leaks in this test are intentional
@@ -34,7 +34,9 @@ class HarnessTest(rephelp.RepositoryHelper):
         self.assertEqual(ret, {foo.getName():{foo.getVersion():[foo.getFlavor()]}})
         self.assertEqual(ret1, {bar.getName():{bar.getVersion():[bar.getFlavor()]}})
 
-    def testOpenRepository2(self):
+        self.tearDown()
+        self.setUp()
+
         # this test is meant to check that repository databases get
         # correctly reset when we do not call stopRepository()
         repos = self.getRepositoryClient()

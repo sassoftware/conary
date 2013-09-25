@@ -1,4 +1,7 @@
 # this file documents the wire protocol changes for conary.
+Version 72:
+  - added getRoleFilters, setRoleFilters
+
 Version 71:
   - corrected accidental use of X-Conary-UsedAnonymous as an error flag
 

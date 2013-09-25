@@ -30,6 +30,8 @@ class RemoveTest(rephelp.RepositoryHelper):
 
     @testhelp.context('remove')
     def testMarkRemoved(self):
+        repos = self.openRepository()
+        server = self.servers.getCachedServer()
 
         def _checkMissing(*args):
             for t in args:
@@ -39,10 +41,8 @@ class RemoveTest(rephelp.RepositoryHelper):
 
         def _checkEmptyStore():
             # the files store should be empty now
-            for root, dirs, files in os.walk(self.reposDir + '/contents'):
+            for root, dirs, files in os.walk(server.contents.getPath()):
                 assert(not files)
-
-        repos = self.openRepository()
 
         t = self.addComponent('test:runtime', '1.0-1-1')
         info = (t.getName(), t.getVersion(), t.getFlavor() )

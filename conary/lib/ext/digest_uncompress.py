@@ -15,12 +15,10 @@
 #
 
 
+import hashlib
 import os
 import tempfile
 import zlib
-# FIXME
-#from conary.lib import digestlib
-import hashlib as digestlib
 from conary.lib.ext import file_utils
 
 
@@ -31,7 +29,7 @@ def sha1Uncompress((inFd, inStart, inSize), path, baseName, targetPath):
     outFd, tmpPath = tempfile.mkstemp(prefix='.ct' + baseName, dir=path)
     try:
         outFobj = os.fdopen(outFd, 'wb')
-        digest = digestlib.sha1()
+        digest = hashlib.sha1()
         decomp = zlib.decompressobj(31)
 
         inStop = inSize + inStart
@@ -72,7 +70,7 @@ def sha1Uncompress((inFd, inStart, inSize), path, baseName, targetPath):
 
 
 def sha1Copy((inFd, inStart, inSize), outFds):
-    digest = digestlib.sha1()
+    digest = hashlib.sha1()
     decomp = zlib.decompressobj(31)
     inStop = inSize + inStart
     inAt = inStart

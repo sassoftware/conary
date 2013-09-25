@@ -381,10 +381,9 @@ class FilesTest(testhelp.TestCase):
         # CNY-1071
         # Tests that FileFromFilesystem packs '+UID' as the owner (and '+GID'
         # as the group) if the owner/group don't exist.
-        open('test-unknown-user', "w+").write('test\n')
-        fd, fpath = tempfile.mkstemp()
-        os.write(fd, "test\n")
-        os.close(fd)
+        fobj = tempfile.NamedTemporaryFile()
+        fobj.write("test\n")
+        fobj.flush()
 
         uid, gid = self.findUnknownIds()
 
@@ -392,7 +391,7 @@ class FilesTest(testhelp.TestCase):
         origLstat = os.lstat
         def myLstat(path):
             s = origLstat(path)
-            if path == fpath:
+            if path == fobj.name:
                 # Convert the stat info to a tuple
                 s = tuple(s)
                 # Replace st_uid and st_gid
@@ -406,7 +405,7 @@ class FilesTest(testhelp.TestCase):
         try:
             os.lstat = myLstat
             # No failure here
-            f = files.FileFromFilesystem(fpath, None)
+            f = files.FileFromFilesystem(fobj.name, None)
             self.assertEqual(f.inode.owner(), "+" + str(uid))
             self.assertEqual(f.inode.group(), "+" + str(gid))
         finally:

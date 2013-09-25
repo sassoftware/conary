@@ -1100,8 +1100,11 @@ class AclTest(AuthHelper):
                         withClass = False, onDisk = True).getRepos()
         entServer = AuthorizationServer(RequestClass)
         try:
-            repos = self.openRepository(entCheck = entServer.url() + 'entcheck',
-                                        authTimeout = authCacheTimeout)
+            repos = self.openRepository(
+                    entCheck=entServer.url() + 'entcheck',
+                    authTimeout=authCacheTimeout,
+                    singleWorker=True,  # allow the cache to work
+                    )
 
             self.setupEntitlement(repos, 'group', 'ent', self.cfg.buildLabel,
                                   None, None, onDisk = False)

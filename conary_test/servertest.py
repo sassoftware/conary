@@ -28,7 +28,6 @@ from conary_test import resources
 from conary import conarycfg
 from conary import conaryclient
 from conary import dbstore
-from conary import errors
 from conary.lib import util
 from conary.repository.netrepos import netserver, proxy
 from conary.repository.netrepos import netauth
@@ -167,15 +166,18 @@ class ServerTest(rephelp.RepositoryHelper):
         pid = os.fork()
         if pid == 0:
             # In the child
-            errfd = os.open(os.path.join(self.workDir, "proxy.log"),
-                os.O_RDWR | os.O_CREAT)
-            os.dup2(errfd, sys.stderr.fileno())
-            os.close(errfd)
-            srvpy = rephelp.server_path
-            os.execv(srvpy, [ srvpy, '--config-file', cfgfile ])
-            os._exit(0)
+            try:
+                errfd = os.open(os.path.join(self.workDir, "proxy.log"),
+                    os.O_RDWR | os.O_CREAT)
+                os.dup2(errfd, sys.stderr.fileno())
+                os.close(errfd)
+                srvpy = os.path.abspath(server.__file__).replace('.pyc', '.py')
+                os.execv(srvpy, [ srvpy, '--config-file', cfgfile ])
+                os._exit(0)
+            except:
+                os._exit(70)
 
-        self.openRepository(serverIdx=2, useSSL=True)
+        self.openRepository(2, useSSL=True)
         # In the parent
         try:
             # Set conary proxy
@@ -188,98 +190,6 @@ class ServerTest(rephelp.RepositoryHelper):
             srvVers = client.repos.c['localhost2'].checkVersion()
             self.assertTrue(srvVers)
         finally:
-            self.servers.stopServer(serverIdx=2)
-            os.kill(pid, signal.SIGTERM)
-            os.waitpid(pid, 0)
-
-    def testErrorConaryProxy(self):
-        # CNY-1322, CNY-1682
-
-        # We need to create a repository that responds with 404 to everything
-        topdir = os.path.join(self.workDir, "dummy-repo")
-        cfg = dict(port = testhelp.findPorts(1)[0],
-                   contentsDir = os.path.join(topdir, 'contents'),
-                   repositoryDB = 'sqlite ' + os.path.join(topdir, 'serverdb'),
-                   logFile = os.path.join(topdir, 'serverlog'),
-                   tmpDir = os.path.join(topdir, 'tmp'),
-                   serverName = 'localhost',
-                   traceLog = '3 ' + os.path.join(topdir, 'trace.log'),
-        )
-        util.mkdirChain(cfg['tmpDir'])
-        util.mkdirChain(cfg['contentsDir'])
-        serverrc = os.path.join(topdir, "serverrc")
-
-        # Initialize the repo database
-        (driver, database) = cfg['repositoryDB'].split()
-        db = dbstore.connect(database, driver)
-        schema.loadSchema(db)
-        schema.setupTempTables(db)
-        auth = netauth.NetworkAuthorization(db, 'localhost')
-        auth.addRole('test')
-        auth.addUser('test', 'foo')
-        auth.addRoleMember('test', 'test')
-        auth.addAcl('test', None, None, write = True)
-
-        auth.addRole('anonymous')
-        auth.addUser('anonymous', 'anonymous')
-        auth.addRoleMember('anonymous', 'anonymous')
-        auth.addAcl('anonymous', None, None)
-
-        db.commit()
-        db.close()
-        del db
-        del auth
-
-        # Write server's config file to disk
-        f = open(serverrc, "w+")
-        for k, v in cfg.items():
-            f.write(k)
-            f.write(" ")
-            f.write(str(v))
-            f.write("\n")
-        f.close()
-
-        class HttpRequestsSubclass(server.HttpRequests):
-            def do_GET(self):
-                self.send_error(404, "File not found")
-
-        argv = ['dummy', '--config-file', serverrc]
-        pid = os.fork()
-        if not pid:
-            try:
-                httpServer, profile = server.getServer(argv = argv,
-                                                       reqClass = HttpRequestsSubclass)
-                self.captureOutput(server.serve, httpServer)
-            finally:
-                os._exit(0)
-        try:
-            serverPort = cfg['port']
-
-            cproxy = self.getConaryProxy()
-            cproxy.start()
-
-            # Point client to the conary proxy, and make sure we repoMap the
-            # server properly
-            self.cfg.configLine("repositoryMap localhost http://localhost:%s/" %
-                serverPort)
-            self.cfg.configLine("conaryProxy http http://localhost:%s/" %
-                cproxy.port)
-
-            client = conaryclient.ConaryClient(self.cfg)
-            repos = client.getRepos()
-
-            sock_utils.tryConnect("localhost", serverPort)
-            sock_utils.tryConnect("localhost", cproxy.port)
-
-            self.addComponent('foo:run', '1', repos=repos)
-            self.addCollection('foo', '1', [':run'], repos=repos)
-
-            fname = os.path.join(self.workDir, "foo.ccs")
-            try:
-                cs = self.changeset(repos, [ "foo=--1", ], fname)
-            except errors.RepositoryError, e:
-                self.assertTrue(e[0].endswith('File not found'), e[0])
-
-        finally:
+            self.servers.stopServer(2)
             os.kill(pid, signal.SIGTERM)
             os.waitpid(pid, 0)

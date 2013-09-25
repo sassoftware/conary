@@ -23,7 +23,7 @@ TROVE_TROVES_BYDEFAULT = 1 << 0
 TROVE_TROVES_WEAKREF   = 1 << 1
 
 # This is the major number of the schema we need
-VERSION = sqllib.DBversion(17)
+VERSION = sqllib.DBversion(18)
 
 def createTrigger(db, table, column = "changed"):
     retInsert = db.createTrigger(table, column, "INSERT")
@@ -43,6 +43,7 @@ def createInstances(db):
             clonedFromId    INTEGER,
             troveType       INTEGER NOT NULL DEFAULT 0,
             isPresent       INTEGER NOT NULL DEFAULT 0,
+            fingerprint     %(BINARY20)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0,
             CONSTRAINT Instances_itemId_fk
                 FOREIGN KEY (itemId) REFERENCES Items(itemId)
@@ -357,8 +358,8 @@ def createUsers(db):
         CREATE TABLE Users (
             userId          %(PRIMARYKEY)s,
             userName        VARCHAR(254) NOT NULL,
-            salt            %(BINARY4)s NOT NULL,
-            password        %(BINARY254)s,
+            salt            %(STRING)s,
+            password        %(STRING)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["Users"] = []
@@ -374,6 +375,8 @@ def createUsers(db):
             userGroup       VARCHAR(254) NOT NULL,
             canMirror       INTEGER NOT NULL DEFAULT 0,
             admin           INTEGER NOT NULL DEFAULT 0,
+            accept_flags    %(STRING)s,
+            filter_flags    %(STRING)s,
             changed         NUMERIC(14,0) NOT NULL DEFAULT 0
         ) %(TABLEOPTS)s""" % db.keywords)
         db.tables["UserGroups"] = []

@@ -17,8 +17,6 @@
 
 from testrunner import testhelp
 import base64
-import os
-import urllib2
 
 try:
     from webunit.webunittest import WebTestCase as _WebTestCase
@@ -33,35 +31,24 @@ except ImportError:
             pass
     webunitPresent = False
 
+from conary.lib.http import request
 from conary_test import rephelp
+
 
 class WebRepositoryHelper(rephelp.RepositoryHelper, WebTestCase):
     def __init__(self, methodName):
         WebTestCase.__init__(self, methodName)
         rephelp.RepositoryHelper.__init__(self, methodName)
 
-    def getServer(self, num=0):
-        server = 'localhost'
-
-        self.openRepository(num)
-        return server, self.servers.servers[num].port
-
     def useServer(self, num=0):
-        self.server, self.port = self.getServer(num)
-        self.URL = 'http://test:foo@%s:%d/' % (self.server, self.port)
+        self.openRepository(num)
+        server = self.servers.getCachedServer(num)
+        self.server = server.getName()
+        self.port = request.URL(server.getUrl()).hostport[1]
 
     def setUp(self):
         if not webunitPresent:
             raise testhelp.SkipTestException('this test requires webunit')
-
-        if not os.environ.get('CONARY_SERVER', '').startswith('apache'):
-            raise testhelp.SkipTestException('web tests only run in apache '
-                                              'mode')
-        try:
-            __import__('webob')
-        except ImportError:
-            raise testhelp.SkipTestException(
-                   "Web tests require the 'webob' package")
         WebTestCase.setUp(self)
         rephelp.RepositoryHelper.setUp(self)
 
@@ -84,6 +71,11 @@ class WebRepositoryHelper(rephelp.RepositoryHelper, WebTestCase):
         parser = SimpleDOM.SimpleDOMParser()
         parser.parseString(page.body)
         return parser.getDOM()
+
+    def fetch(self, url, *args, **kwargs):
+        if url.startswith('/'):
+            url = '/conary' + url
+        return WebTestCase.fetch(self, url, *args, **kwargs)
 
 
 class WebFrontEndTest(WebRepositoryHelper):
@@ -264,48 +256,6 @@ class WebFrontEndTest(WebRepositoryHelper):
         self.authinfo = base64.encodestring('foo:bar:baz').strip()
         page = self.assertContent('/userlist', code=[401],
                                   content = 'Unauthorized')
-
-    @testhelp.context('entitlements')
-    def testGetLog(self):
-        # make sure you can't get the log when not logged in
-        self.assertContent('/log', '', [401])
-        # log in as admin
-        self.setBasicAuth('test', 'foo')
-        # one method that should be in the log is addNewAsciiPGPKey (part of
-        # the repository setup)
-        self.assertContent('/log', 'addNewAsciiPGPKey', [200])
-
-        # make sure that you can access the log with an entitlement
-        # that has admin privs
-        self.clearBasicAuth()
-        repos = self.getRepositoryClient()
-        bl = self.cfg.buildLabel
-        repos.addRole(bl, 'ent')
-        repos.addAcl(bl, 'ent', 'ALL', bl)
-        repos.setRoleIsAdmin(bl, 'ent', True)
-        repos.addEntitlementClass('localhost', 'ent', 'ent')
-        repos.addEntitlementKeys('localhost', 'ent', ['12345'])
-
-        ent = "%s %s" % ('ent', base64.b64encode('12345'))
-        headers = {'X-Conary-Entitlement': ent}
-        request = urllib2.Request('http://%s:%s/log' %(self.server, self.port),
-                                  headers=headers)
-        f = urllib2.urlopen(request)
-        log = f.read()
-        # we should no have an addNewAsciiPGPKey in this version of
-        # the log, since it wasn't called after we rotated the log
-        assert('addNewAsciiPGPKey' not in log)
-        for call in ('addRole', 'addAcl', 'addEntitlementClass',
-                     'addEntitlementKeys'):
-            assert(call in log)
-
-        #Call again immediatly and make sure we get a 404
-        try:
-            f = urllib2.urlopen(request)
-        except urllib2.HTTPError, e:
-            assert e.code == 404
-        else:
-            raise RuntimeError('404 not returned')
 
     @testhelp.context('entitlements')
     def testManageEntitlements(self):

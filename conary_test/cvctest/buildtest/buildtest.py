@@ -1397,6 +1397,8 @@ class DesktopfileTest(rephelp.RepositoryHelper):
         """
         Test Desktopfile
         """
+        if not os.path.exists('/usr/bin/desktop-file-validate'):
+            raise testhelp.SkipTestException("desktop-file-utils is not installed")
 
         recipestr1 = """
 class TestDesktopfile(PackageRecipe):

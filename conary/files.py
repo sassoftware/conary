@@ -29,7 +29,7 @@ import time
 
 from conary import errors, streams
 from conary.deps import deps
-from conary.lib import elf, util, sha1helper, log, digestlib
+from conary.lib import util, sha1helper, log, digestlib
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
@@ -758,6 +758,7 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
 
         undoPrelink = False
         try:
+            from conary.lib import elf
             if (os.access(PRELINK_CMD[0], os.X_OK) and
                 f.inode.isExecutable() and elf.prelinked(path)):
                 undoPrelink = True

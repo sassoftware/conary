@@ -16,6 +16,7 @@
 
 
 import base64
+import errno
 import gzip
 import itertools
 import os
@@ -54,7 +55,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 71 + 1)
+CLIENT_VERSIONS = range(36, 72 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -667,6 +668,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             self.c[reposLabel].setUserGroupIsAdmin(role, admin)
             return
         self.c[reposLabel].setRoleIsAdmin(role, admin)
+
+    def getRoleFilters(self, label, roles):
+        if self.c[label].getProtocolVersion() < 72:
+            raise errors.InvalidServerVersion("getRoleFilters requires a "
+                    "server running Conary 2.5.0 or later")
+        result = self.c[label].getRoleFilters(roles)
+        ret = {}
+        for role, (acceptFlags, filterFlags) in result.iteritems():
+            ret[role] = ( self.toFlavor(acceptFlags),
+                    self.toFlavor(filterFlags) )
+        return ret
+
+    def setRoleFilters(self, label, roleFiltersMap):
+        if self.c[label].getProtocolVersion() < 72:
+            raise errors.InvalidServerVersion("setRoleFilters requires a "
+                    "server running Conary 2.5.0 or later")
+        out = {}
+        for role, (acceptFlags, filterFlags) in roleFiltersMap.iteritems():
+            out[role] = ( self.fromFlavor(acceptFlags),
+                    self.fromFlavor(filterFlags) )
+        self.c[label].setRoleFilters(out)
 
     def addTroveAccess(self, role, troveList):
         byServer = {}
@@ -1599,15 +1621,28 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             filesNeeded.update(_cvtFileList(extraFileList))
             removedList += _cvtTroveList(removedTroveList)
 
-            # "forceProxy" here makes sure that multi-part requests go back
-            # through the same proxy on subsequent requests.
-            forceProxy = server.usedProxy()
-            headers = [('X-Conary-Servername', server._serverName)]
-            try:
-                inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap).open(
-                        url, forceProxy=forceProxy, headers=headers)
-            except transport.TransportError, e:
-                raise errors.RepositoryError(str(e))
+            if hasattr(url, 'read'):
+                # Nested changeset file in a multi-part response
+                inF = url
+            elif os.path.exists(url):
+                # attempt to remove temporary local files
+                # possibly created by a shim client
+                inF = open(url, 'rb')
+                try:
+                    os.unlink(url)
+                except OSError, err:
+                    if err.args[0] != errno.EPERM:
+                        raise
+            else:
+                # "forceProxy" here makes sure that multi-part requests go back
+                # through the same proxy on subsequent requests.
+                forceProxy = server.usedProxy()
+                headers = [('X-Conary-Servername', server._serverName)]
+                try:
+                    inF = transport.ConaryURLOpener(proxyMap=self.c.proxyMap
+                            ).open(url, forceProxy=forceProxy, headers=headers)
+                except transport.TransportError, e:
+                    raise errors.RepositoryError(str(e))
 
             if callback:
                 wrapper = callbacks.CallbackRateWrapper(
@@ -1627,14 +1662,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                          abortCheck = abortCheck,
                                          rateLimit = self.downloadRateLimit)
 
-            # attempt to remove temporary local files
-            # possibly created by a shim client
-            if os.path.exists(url) and os.access(url, os.W_OK):
-                os.unlink(url)
-
             if totalSize == None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            elif 'content-length' in inF.headers:
+            elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
                 expectSize = long(inF.headers['content-length'])
                 if totalSize != expectSize:
                     raise errors.RepositoryError("Changeset was truncated in "

@@ -16,6 +16,7 @@
 
 
 #python
+import atexit
 import BaseHTTPServer
 import copy
 import errno
@@ -66,18 +67,17 @@ from conary.lib import openpgpkey
 from conary.lib import sha1helper
 from conary.lib import util
 from conary.local import database
-from conary.repository import errors as repo_errors
-from conary.repository import netclient, changeset, filecontents, trovesource
+from conary.repository import changeset, filecontents, trovesource
 from conary.repository import searchsource
-from conary.server  import server as cny_server
 from conary.server.server import SecureHTTPServer
 #test
 from testrunner import testhelp
 from testrunner.testcase import safe_repr
-from testutils import apache_server, base_server, os_utils, sock_utils
+from testutils import base_server, os_utils, sock_utils
 from testutils import sqlharness
 from conary_test import recipes
 from conary_test import resources
+from conary_test.lib.repserver import RepositoryServer, ProxyServer
 
 # make tryConnect available
 tryConnect = sock_utils.tryConnect
@@ -88,16 +88,10 @@ class _NoneArg:
 NoneArg = _NoneArg()
 
 _File = filetypes._File
-server_path = os.path.abspath(cny_server.__file__).replace('.pyc', '.py')
 
 def _isIndividual():
-# Make it compatible with testsuites that are not class-based yet
-    individual = getattr(testsuite, '_individual', None)
-    if individual is None:
-        individual = getattr(testsuite, 'Suite').individual
-    global _individual
-    _individual = individual
-    return individual
+    return False
+
 
 class Symlink(filetypes.Symlink):
     pass
@@ -187,678 +181,97 @@ class IdGen3(IdGen0):
     formatStr = "111%s"
 
 
-class ContentStore:
-
-    def getPath(self):
-        return self.path
-
-    def reset(self):
-        if os.path.exists(self.path):
-            shutil.rmtree(self.path)
-        util.mkdirChain(self.path)
-
-    def __init__(self, path):
-        self.path = path
-
-class RepositoryServer(base_server.BaseServer):
-    """
-    sets up a repository that will be run as a child process
-    """
-    def setNeedsReset(self):
-        self.needsReset = True
-
-    def reset(self):
-        self.contents.reset()
-        if self.reposDB:
-            self.reposDB.reset()
-        if self.cache:
-            self.cache.reset()
-        self.needsPGPKey = True
-        self.needsReset = False
-        super(RepositoryServer, self).reset()
-
-    def resetIfNeeded(self):
-        if self.needsReset:
-            self.reset()
-
-    def getMap(self):
-        if self.sslEnabled and self.useSSL:
-            dest = 'https://localhost:%d/conary/' % self.port
-        else:
-            dest = 'http://localhost:%d/conary/' % self.port
-        d = dict((name, dest) for name in self.nameList)
-        return d
-
-    # assume the first entry in a multihomed name list is the "main" name
-    def getName(self):
-        return self.nameList[0]
-
-    def __init__(self, nameList, reposDB, contents, server, serverDir, reposDir,
-                 conaryPath, repMap, requireSigs, authCheck=None,
-                 entCheck=None, authTimeout = None, readOnlyRepository=False,
-                 serverIdx=0, proxies=None, useSSL=False, forceSSL = False,
-                 sslCert=None, sslKey=None, closed=False, commitAction = None,
-                 deadlockRetry=None, excludeCapsuleContents=False,
-                 withCache=False):
-        base_server.BaseServer.__init__(self)
-        assert(isinstance(contents, ContentStore))
-        assert(reposDB is None or isinstance(reposDB, sqlharness.RepositoryDatabase))
-        self.contents = contents
-        self.reposDB = reposDB
-        if isinstance(nameList, str):
-            nameList = [nameList]
-        self.nameList = nameList
-        self.needsPGPKey = True
-        self.conaryPath = conaryPath
-        self.serverDir = serverDir
-        self.server = server
-        self.requireSigs = requireSigs
-        self.reposDir = reposDir
-        self.traceLog = os.path.join(self.reposDir, 'trace.log')
-        self.tmpDir = reposDir
-        self.authCheck = authCheck
-        self.entCheck = entCheck
-        self.authTimeout = authTimeout
-        self.readOnlyRepository = readOnlyRepository
-        self.repMap = repMap
-        self.serverIdx = serverIdx
-        self.proxies = proxies
-        self.useSSL = getattr(self, 'sslOnly', useSSL)
-        self.forceSSL = forceSSL
-        self.excludeCapsuleContents = excludeCapsuleContents
-        self.deadlockRetry = deadlockRetry
-        if withCache:
-            self.cache = ContentStore(reposDir + '/cscache')
-            self.cache.reset()
-        else:
-            self.cache = None
-        if self.useSSL and (sslCert is None or sslKey is None):
-            if sslCert is None:
-                sslCert = resources.get_archive('ssl-cert.crt')
-            if sslKey is None:
-                sslKey = resources.get_archive('ssl-cert.key')
-        self.sslCert = sslCert
-        self.sslKey = sslKey
-        self.closed = closed
-        self.initPort()
-        self.commitAction = commitAction
-        self.needsReset = True
-
-    def writeServerConfigFile(self, configFile, **kw):
-        conaryrc = kw.pop('conaryrc', None)
-
-        configValues = {
-            'contentsDir'           : self.contents.getPath(),
-            'baseUri'               : '/conary',
-            'repositoryDB'          : self.reposDB.getDriver(),
-            'serverName'            : " ".join(self.nameList),
-            'traceLog'              : '3 ' + self.traceLog,
-            'logFile'               : os.path.join(self.reposDir, 'repos.log'),
-            'tmpDir'                : self.reposDir,
-        }
-        if self.requireSigs:
-            configValues['requireSigs'] = True
-
-        if self.authCheck:
-            configValues['externalPasswordURL'] = self.authCheck
-        if self.entCheck:
-            configValues['entitlementCheckURL'] = self.entCheck
-        if self.authTimeout is not None:
-            configValues['authCacheTimeout'] = self.authTimeout
-        if self.authTimeout is not None:
-            configValues['authCacheTimeout'] = self.authTimeout
-        if self.forceSSL:
-            configValues['forceSSL'] = True
-        if self.excludeCapsuleContents:
-            configValues['excludeCapsuleContents'] = True
-        if self.deadlockRetry is not None:
-            configValues['deadlockRetry'] = self.deadlockRetry
-        if self.readOnlyRepository:
-            configValues['readOnlyRepository'] = self.readOnlyRepository
-        if self.sslEnabled and self.useSSL and self.sslCert:
-            self.writeSSLRepoConfig(configValues)
-        if self.closed:
-            configValues['closed'] = self.closed
-        if self.commitAction:
-            configValues['commitAction'] = self.commitAction
-        if self.cache:
-            configValues['changesetCacheDir'] = self.cache.getPath()
-
-        # Add the command line options
-        configValues.update(kw)
-
-        f = open(configFile, "w+")
-        for item in configValues.iteritems():
-            print >> f, "%s %s" % item
-        # Multi-valued, cannot be added to a dictionary
-        for repname, reppath in self.repMap.iteritems():
-            print >> f, 'repositoryMap %s %s' %(repname, reppath)
-        f.close()
-
-        if conaryrc:
-            f = open(conaryrc, 'w')
-            for serverName in self.nameList:
-                f.write('repositoryMap %s http://localhost:%s/conary/\n'
-                            % (serverName, configValues['port']) )
-            f.write('installLabelPath localhost@rpl:linux\n')
-
-        f.close()
-
-    def writeSSLRepoConfig(self, configValues):
-        configValues['useSSL'] = True
-        configValues['sslCert'] = self.sslCert
-        configValues['sslKey'] = self.sslKey
-
-class ApacheServer(RepositoryServer, apache_server.ApacheServer):
-    def __init__(self, *args, **kwargs):
-        self.useCache = kwargs.pop('useCache', False)
-        RepositoryServer.__init__(self, *args, **kwargs)
-        apache_server.ApacheServer.__init__(self, topDir=self.reposDir)
-        self.logFileObj = None
-
-    def getServerDir(self):
-        return resources.get_path('conary_test', 'server')
-
-    def getPythonHandler(self):
-        return 'conary.server.apachehooks'
-
-    def _createAppConfig(self):
-        configValues = {
-            'tmpDir'    : self.tmpDir,
-            'traceLog'  : '3 ' + self.traceLog,
-            'authCacheTimeout': self.authTimeout or 0,
-        }
-        if self.closed:
-            configValues['closed'] = self.closed
-        if self.useCache:
-            configValues['changesetCacheDir'] = \
-                    os.path.join(self.serverRoot, 'cscache')
-            self.cache = ContentStore(configValues['changesetCacheDir'])
-            if self.authTimeout is None:
-                configValues['authCacheTimeout'] = 2
-
-        self.writeServerConfigFile(os.path.join(self.serverRoot, 'test.cnr'),
-                                   **configValues)
-
-    def reset(self):
-        if not self.logFileObj:
-            try:
-                self.logFileObj = open(self.serverRoot + '/error_log')
-            except OSError, err:
-                if err.errno != errno.ENOENT:
-                    raise
-        data = self.logFileObj.read()
-        if 'Traceback (most recent call last)' in data:
-            sys.stderr.write("Contents of error_log after test:\n" + data)
-            sys.stderr.flush()
-
-        # this is a bad hack to clear the cache
-        csCachePath = os.path.join(self.serverRoot, 'cscache')
-        if os.path.exists(csCachePath):
-            shutil.rmtree(csCachePath)
-        os.mkdir(csCachePath)
-
-        super(ApacheServer, self).reset()
-
-    def _startAppSpecificTasks(self, resetDir = True):
-        if resetDir:
-            if os.path.exists(self.reposDir):
-                shutil.rmtree(self.reposDir)
-            os.mkdir(self.reposDir)
-            self.createConfig()
-        if self.reposDB:
-            self.reposDB.reset()
-
-    def _stopAppSpecificTasks(self):
-        if self.reposDB:
-            self.reposDB._reset()
-            self.reposDB.stop()
-
-    def getServerConfigPath(self):
-        return os.path.join(self.serverRoot, 'test.cnr')
-
-
-class ApacheServerWithCache(ApacheServer):
-    def __init__(self, *args, **kwargs):
-        kwargs['useCache'] = True
-        ApacheServer.__init__(self, *args, **kwargs)
-
-class ApacheSSLServer(ApacheServer, apache_server.ApacheSSLMixin):
-    sslEnabled = True
-    sslOnly = True
-
-    def initPort(self):
-        return apache_server.ApacheSSLMixin.initPort(self)
-
-    def createConfig(self):
-        ApacheServer.createConfig(self)
-        return apache_server.ApacheSSLMixin.createConfig(self)
-
-    def writeSSLRepoConfig(self, configValues):
-        # No need to add anything in the repository's config
-        pass
-
-class ApacheSSLServerWithCache(ApacheSSLServer, ApacheServerWithCache):
-    def __init__(self, *args, **kwargs):
-        kwargs['useCache'] = True
-        ApacheSSLServer.__init__(self, *args, **kwargs)
-
-class StandaloneServer(RepositoryServer):
-    sslEnabled = True
-    def __init__(self, *args, **kwargs):
-        RepositoryServer.__init__(self, *args, **kwargs)
-        self.serverpid = -1
-        if 'SERVER_FILE_PATH' in os.environ:
-            self.serverFilePath = os.environ['SERVER_FILE_PATH']
-            self.delServerPath = False
-        else:
-            self.serverFilePath =  None
-            self.delServerPath = True
-        self.serverLog = self.reposDir + '/server.log'
-        util.removeIfExists(self.serverLog)
-
-    def start(self, resetDir = True):
-        if self.serverpid != -1:
-            return
-        if resetDir:
-            if os.path.exists(self.reposDir):
-                shutil.rmtree(self.reposDir)
-            os.mkdir(self.reposDir)
-            self.contents.reset()
-
-        if self.reposDB:
-            if resetDir:
-                self.reposDB.reset()
-            self.reposDB.stop()
-
-        sb = os.stat(self.server)
-        if not stat.S_ISREG(sb.st_mode) or not os.access(self.server, os.X_OK):
-            print "bad server path: %s" % self.server
-            sys.exit(1)
-
-        if self.serverFilePath is None:
-            self.serverFilePath = testhelp.getTempDir('conarytest-server-file-')
-
-        if getattr(self, 'socket', None):
-            self.socket.close()
-            self.socket = None
-        self.serverpid = os.fork()
-        if self.serverpid == 0:
-            try:
-                log = os.open(self.serverLog, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
-                os.dup2(log, 1)
-                os.dup2(log, 2)
-                os.close(log)
-                print "starting server"
-                sys.stdout.flush()
-                serverrc = os.path.join(self.reposDir, 'serverrc')
-                conaryrc = os.path.join(self.reposDir, 'conaryrc')
-                self.writeServerConfigFile(serverrc, port=self.port,
-                                           conaryrc = conaryrc)
-                args = (sys.executable, self.server, '--config-file', serverrc)
-                #if self.reposDB:
-                #    self.reposDB.stop()
-                os_utils.osExec(args)
-            except:
-                traceback.print_exc()
-                os._exit(70)
-
-    def stop(self):
-        if self.serverpid != -1:
-            signals = [signal.SIGTERM, signal.SIGTERM, signal.SIGKILL]
-            if os.environ.get('COVERAGE_DIR', None):
-                signals.insert(0, signal.SIGUSR2)
-            for signum in signals:
-                os.kill(self.serverpid, signum)
-                pid, status = os.waitpid(self.serverpid, os.WNOHANG)
-                if pid:
-                    # Process successfully reaped
-                    self.serverpid = -1
-                    break
-                time.sleep(0.5)
-            else:
-                # Still not dead 0.5s after a SIGKILL, keep waiting.
-                os.waitpid(self.serverpid, 0)
-        if self.reposDB:
-            self.reposDB.stop()
-            self.reposDB = None
-        if self.serverFilePath and self.delServerPath:
-            util.rmtree(self.serverFilePath)
-            self.serverFilePath = None
-
-    def isStarted(self):
-        return self.serverpid != -1 or self.reposDB is not None
-
-    def getServerConfigPath(self):
-        return os.path.join(self.reposDir, 'serverrc')
-
-
-class ExistingServer(RepositoryServer):
-    def __init__(self, name, port=8000):
-        RepositoryServer.__init__(self, [name])
-        self.port = port
-        self.reposDir = None
-        self.name = name
-        #self.reset()
-
-    def reset(self):
-        repos = netclient.StandaloneServer(self.getMap())
-        repos.c[self.name].reset()
-        self.needsPGPKey = True
-
-    def start(self):
-        pass
-
-    def stop(self):
-        pass
-
-class ProxyServerOverrides:
-
-    def writeServerConfigFile(self, configFile, **kw):
-        configValues = {
-            'proxyContentsDir'      : self.contents.getPath(),
-            'changesetCacheDir'     : os.path.join(self.reposDir, 'cscache'),
-            'tmpDir'                : self.reposDir,
-            'traceLog'              : '3 %s' %
-                                      os.path.join(self.reposDir, 'trace.log'),
-            'logFile'               : os.path.join(self.reposDir, 'proxy.log')
-        }
-
-        if self.capsuleServerUrl:
-            configValues['capsuleServerUrl'] = self.capsuleServerUrl
-            # We only proxy localhost1
-            configValues['injectCapsuleContentServers'] = 'localhost1'
-
-        if self.cacheTimeout is not None:
-            configValues['memCacheTimeout'] = "%d" % self.cacheTimeout
-
-        if self.cacheLocation is not None:
-            configValues['memCache'] = "%s" % self.cacheLocation
-
-        # discard this for proxies
-        kw.pop('conaryrc', False)
-
-        if self.proxies:
-            for k, v in self.proxies.items():
-                if v.startswith('conary'):
-                    configValues["conaryProxy " + k] = "http" + v[6:]
-                else:
-                    configValues["proxy " + k] = v
-
-        # Add the command line options
-        configValues.update(kw)
-
-        if self.sslEnabled and self.useSSL and self.sslCert:
-            self.writeSSLRepoConfig(configValues)
-
-        f = open(configFile, "w+")
-        for item in configValues.iteritems():
-            print >> f, "%s %s" % item
-        for ent in self.entitlements:
-            print >> f, "entitlement %s %s" % ent
-        for user in self.users:
-            print >> f, "user %s %s %s" % user
-
-        f.close()
-
-    def updateConfig(self, cfg):
-        cfg.configLine("conaryProxy http http://localhost:%s" % self.port)
-
-    def reset(self):
-        self.contents.reset()
-        csCacheDir = os.path.join(self.reposDir, 'cscache')
-        shutil.rmtree(csCacheDir, ignore_errors = True)
-        os.mkdir(csCacheDir)
-
-        self.contents.reset()
-
-    def __init__(self, entitlements, users, capsuleServerUrl, cacheTimeout,
-                 cacheLocation):
-        self.entitlements = entitlements
-        self.users = users
-        self.capsuleServerUrl = capsuleServerUrl
-        self.cacheTimeout = cacheTimeout
-        self.cacheLocation = cacheLocation
-
-class StandaloneProxyServer(ProxyServerOverrides, StandaloneServer):
-
-    def __init__(self, *args, **kwargs):
-        entitlements = kwargs.pop('entitlements', [])
-        users = kwargs.pop('users', [])
-        capsuleServerUrl = kwargs.pop('capsuleServerUrl', None)
-        cacheTimeout = kwargs.pop('cacheTimeout', None)
-        cacheLocation = kwargs.pop('cacheLocation', None)
-        ProxyServerOverrides.__init__(self, entitlements, users,
-            capsuleServerUrl, cacheTimeout, cacheLocation)
-        StandaloneServer.__init__(self, *args, **kwargs)
-
-class StandaloneSSLProxyServer(ProxyServerOverrides, StandaloneServer):
-
-    def __init__(self, *args, **kwargs):
-        entitlements = kwargs.pop('entitlements', [])
-        users = kwargs.pop('users', [])
-        capsuleServerUrl = kwargs.pop('capsuleServerUrl', None)
-        ProxyServerOverrides.__init__(self, entitlements, users,
-            capsuleServerUrl)
-        kwargs['useSSL'] = True
-        kwargs['forceSSL'] = True
-        StandaloneServer.__init__(self, *args, **kwargs)
-
-
-class ApacheProxyServer(ProxyServerOverrides, ApacheServer):
-
-    def __init__(self, *args, **kwargs):
-        entitlements = kwargs.pop('entitlements', [])
-        users = kwargs.pop('users', [])
-        capsuleServerUrl = kwargs.pop('capsuleServerUrl', None)
-        cacheTimeout = kwargs.pop('cacheTimeout', None)
-        cacheLocation = kwargs.pop('cacheLocation', None)
-        ProxyServerOverrides.__init__(self, entitlements, users,
-            capsuleServerUrl, cacheTimeout, cacheLocation)
-        ApacheServer.__init__(self, *args, **kwargs)
-
-class ApacheSSLProxyServer(ProxyServerOverrides, ApacheSSLServer):
-    def __init__(self, *args, **kwargs):
-        entitlements = kwargs.pop('entitlements', [])
-        users = kwargs.pop('users', [])
-        capsuleServerUrl = kwargs.pop('capsuleServerUrl', None)
-        ProxyServerOverrides.__init__(self, entitlements, users,
-            capsuleServerUrl)
-        ApacheSSLServer.__init__(self, *args, **kwargs)
-
-class ServerCache:
+class ServerCache(object):
     serverType = ''
 
     def __init__(self):
-        self.servers = [ None ] * 5
+        self._topDir = None
+        self.servers = {}
+        atexit.register(self.cleanup)
 
-    def stopServer(self, serverIdx):
-        if self.servers[serverIdx] is not None:
-            server = self.servers[serverIdx]
-            self.servers[serverIdx] = None
+    @property
+    def topDir(self):
+        if not self._topDir:
+            self._topDir = testhelp.getTempDir('conarytestrepos-')
+        return self._topDir
+
+    def stopServer(self, key):
+        if key in self.servers:
+            server = self.servers.pop(key)
             server.stop()
 
-    def getCachedServer(self, serverIdx):
-        return self.servers[serverIdx]
+    def getCachedServer(self, key=0):
+        return self.servers.get(key)
+    getServer = getCachedServer
 
-    def startServer(self, reposDir, conaryPath, SQLserver, serverIdx = 0,
-                    requireSigs = False, serverName = None, authCheck = None,
-                    entCheck = None, authTimeout = None,
-                    readOnlyRepository=False, needsPGPKey=True,
-                    useSSL=False, sslCert=None, sslKey=None, forceSSL = False,
-                    closed = False, commitAction = None, deadlockRetry = None,
-                    resetDir = True, excludeCapsuleContents = False,
-                    **kwargs):
-        if self.servers[serverIdx] is not None:
-            self.servers[serverIdx].resetIfNeeded()
-            return self.servers[serverIdx]
+    def startServer(self,
+            SQLserver,
+            key=0,
+            serverName=None,
+            singleWorker=False,
+            **kwargs):
 
-        if serverName is None:
-            name = 'localhost'
-            if serverIdx > 0:
-                name += str(serverIdx)
-        else:
-            name = serverName
-
-        envname = 'CONARY_SERVER'
-        if serverIdx > 0:
-            reposDir += '-%d' %serverIdx
-            envname += str(serverIdx)
-
-        if not os.path.isdir(reposDir):
-            os.mkdir(reposDir)
-
-        reposDB = SQLserver.getDB("testdb%d" % serverIdx,
-            keepExisting = not resetDir)
-
-        server, serverClass, serverDir, proxyClass, proxy = \
-                                        self.getServerClass(envname, useSSL)
-        if not serverClass and serverDir:
+        if key in self.servers:
+            server = self.servers[key]
+            server.resetIfNeeded()
             return server
 
-        contents = ContentStore(reposDir + '/contents')
+        if not serverName:
+            serverName = 'localhost'
+            if key != 0:
+                serverName += '%s' % key
+        reposDir = os.path.join(self.topDir, 'repos-%s' % key)
+        reposDB = SQLserver.getDB("testdb-%s" % key, keepExisting=False)
 
-        self.servers[serverIdx] = serverClass(name, reposDB, contents, server,
-                                              serverDir,
-                                              reposDir,
-                                              conaryPath,
-                                              self.getMap(),
-                                              requireSigs,
-                                              authCheck = authCheck,
-                                              entCheck = entCheck,
-                                              authTimeout = authTimeout,
-                                              readOnlyRepository = readOnlyRepository,
-                                              serverIdx = serverIdx,
-                                              useSSL = useSSL,
-                                              sslCert = sslCert,
-                                              sslKey = sslKey,
-                                              forceSSL = forceSSL,
-                                              deadlockRetry = deadlockRetry,
-                                              closed = closed,
-                                              commitAction = commitAction,
-                                              excludeCapsuleContents =
-                                                    excludeCapsuleContents,
-                                              **kwargs)
-        self.servers[serverIdx].start(resetDir = resetDir)
-        return self.servers[serverIdx]
-
-    def getServerClass(self, envname, useSSL):
-        useDefault = False
-        server = os.environ.get(envname, None)
-        kw = {}
-        if server is None:
-            useDefault = True
-            server = os.environ.get('CONARY_SERVER', None)
-        if server is None:
-            server = server_path
-
-        if useSSL and server.startswith('apache') and 'ssl' not in server:
-            server = 'apachessl' + server[6:]
-
-        srvClassMap = [
-            ('apache', ApacheServer),
-            ('apachecached', ApacheServerWithCache),
-            ('apachessl', ApacheSSLServer),
-            ('apachesslcached', ApacheSSLServerWithCache),
-        ]
-        serverDir = serverClass = None
-        for srvName, srvClass in srvClassMap:
-            if server == srvName:
-                serverDir = resources.get_path('conary', 'server')
-                serverClass = srvClass
-                break
-            if server.startswith(srvName + ':'):
-                server = serverDir = server.split(":", 1)[1]
-                serverClass = srvClass
-                break
-
-        if serverDir is None: # Not found in the previous mappings
-            # use localhost: only if explicitly set
-            if server.startswith("localhost:") and not useDefault:
-                server = 'localhost'
-                serverDir = None
-                serverClass = ExistingServer
-            else:
-                serverClass = StandaloneServer
-                serverDir = os.path.dirname(server)
-
-        conaryProxyType = os.environ.get('CONARY_PROXY', None)
-        if conaryProxyType is not None:
-            if conaryProxyType == 'standalone':
-                proxyClass = StandaloneProxyServer
-                #proxyPath = server
-                proxyPath = server_path
-            elif conaryProxyType == 'apache':
-                proxyClass = ApacheProxyServer
-                proxyPath = server
-            else:
-                raise ValueError, "Unknown setting for CONARY_PROXY '%s'" % \
-                        conaryProxyType
-        else:
-            proxyClass = None
-            proxyPath = None
-
-        return server, serverClass, serverDir, proxyClass, proxyPath
+        server = RepositoryServer(reposDir,
+                nameList=serverName,
+                reposDB=reposDB,
+                singleWorker=singleWorker,
+                **kwargs)
+        server.start()
+        self.servers[key] = server
+        return server
 
     def resetAllServers(self):
-        for i in range(len(self.servers)):
-            server = self.servers[i]
-            if server is not None:
-                server.reset()
+        for server in self.servers.values():
+            server.reset()
 
     def resetAllServersIfNeeded(self):
-        for i in range(len(self.servers)):
-            server = self.servers[i]
-            if server is not None:
-                server.resetIfNeeded()
+        for server in self.servers.values():
+            server.resetIfNeeded()
 
-    def stopAllServers(self, clean=False):
-        for i in range(len(self.servers)):
-            server = self.servers[i]
-            if server is not None:
-                self.servers[i] = None
-                server.stop()
-                if clean and hasattr(server, 'reposDir'):
-                    util.rmtree(server.reposDir, ignore_errors=True)
+    def stopAllServers(self):
+        for server in self.servers.values():
+            server.stop()
+            server.reset()
+        self.servers = {}
 
-
-    def getServer(self, serverIdx=0):
-        return self.servers[serverIdx]
+    def cleanup(self):
+        self.stopAllServers()
+        if self._topDir:
+            util.rmtree(self._topDir, ignore_errors=True)
+            self._topDir = None
 
     def getMap(self):
         servers = {}
-        for server in self.servers:
-            if server:
-                servers.update(server.getMap())
+        for server in self.servers.values():
+            servers.update(server.getMap())
         return servers
 
     def getServerNames(self):
-        for server in self.servers:
-            if server:
-                yield server.getName()
+        names = set()
+        for server in self.servers.values():
+            names.update(server.nameList)
+        return names
+
 
 _servers = ServerCache()
-_reposDir = None
 _proxy = None
 _httpProxy = None
 
-def getReposDir(globalvar, testname):
-    if globalvar:
-        return globalvar
-    if _isIndividual():
-        globalvar = '/tmp/%s/repos' % testname
-        if not os.access(globalvar, os.W_OK):
-            globalvar = ('/tmp/%s-%s/repos' % (testname, os_utils.effectiveUser))
-    else:
-        globalvar = testhelp.getTempDir('%s-repos-' % testname)
-        # add /repos to the end of this so that the proxy can live in
-        # this temp directory too
-        globalvar += '/repos'
-        os.mkdir(globalvar)
-    return globalvar
 
 class RepositoryHelper(testhelp.TestCase):
-    topDir = None
+    topDir = None  # DEPRECATED
     defLabel = versions.Label("localhost@rpl:linux")
 
     def __init__(self, *args, **kw):
@@ -867,34 +280,17 @@ class RepositoryHelper(testhelp.TestCase):
         self.servers = _servers
         self.proxy = _proxy
 
-    def _getReposDir(self):
-        ## Need to be able to override this in base classes
-        global _reposDir
-        _reposDir = getReposDir(_reposDir, 'conarytest')
-        return _reposDir
-
     def setUp(self):
         if 'CONARY_IDGEN' in os.environ:
             className = "IdGen%s" % os.environ['CONARY_IDGEN']
             cook._IdGen = sys.modules[__name__].__dict__[className]
 
-        if _isIndividual():
-            self.topDir = '/tmp/conarytest-%s' % os_utils.effectiveUser
-
-        if self.topDir:
-            self.tmpDir = self.topDir
-        else:
-            self.tmpDir = testhelp.getTempDir('conarytest-')
-
-        self.reposDir = self._getReposDir()
+        self.tmpDir = testhelp.getTempDir('conarytest-')
         self.workDir = self.tmpDir + "/work"
         self.buildDir = self.tmpDir + "/build"
         self.rootDir = self.tmpDir + "/root"
         self.cacheDir = self.tmpDir + "/cache"
         self.configDir = self.tmpDir + "/cfg"
-
-        if self.topDir:
-            self.reset()
 
         self.cfg = conarycfg.ConaryConfiguration(False)
         self.cfg.name = 'Test'
@@ -983,15 +379,12 @@ class RepositoryHelper(testhelp.TestCase):
 
         self.origTroveVersion = (trove.TROVE_VERSION, trove.TROVE_VERSION_1_1)
 
-        if self.topDir and os.path.isdir(self.tmpDir):
-            self.reset()
-        else:
-            if not os.path.exists(self.tmpDir):
-                os.mkdir(self.tmpDir)
-            os.mkdir(self.workDir)
-            os.mkdir(self.rootDir)
-            os.mkdir(self.cacheDir)
-            os.mkdir(self.configDir)
+        if not os.path.exists(self.tmpDir):
+            os.mkdir(self.tmpDir)
+        os.mkdir(self.workDir)
+        os.mkdir(self.rootDir)
+        os.mkdir(self.cacheDir)
+        os.mkdir(self.configDir)
 
         # save the original environment
         self.origEnv = dict(os.environ)
@@ -1012,9 +405,8 @@ class RepositoryHelper(testhelp.TestCase):
         os.chdir(self._origDir)
         testhelp.TestCase.tearDown(self)
 
-        if not _isIndividual():
-            self.reset()
-            shutil.rmtree(self.tmpDir)
+        self.reset()
+        shutil.rmtree(self.tmpDir)
         trove.TROVE_VERSION = self.origTroveVersion[0]
         trove.TROVE_VERSION_1_1 = self.origTroveVersion[1]
         self.logFilter.clear()
@@ -1023,8 +415,7 @@ class RepositoryHelper(testhelp.TestCase):
             del os.environ[key]
         for key, value in self.origEnv.iteritems():
             os.environ[key] = value
-        if hasattr(self, 'cfg'):
-            del self.cfg
+        self.cfg = None
 
     def getRepositoryClient(self, user = 'test', password = 'foo',
                             serverIdx = None, repositoryMap = None):
@@ -1074,183 +465,187 @@ class RepositoryHelper(testhelp.TestCase):
     def getConaryClient(self):
         return conaryclient.ConaryClient(self.cfg)
 
-    def openRepository(self, *args, **kwargs):
-        for count in range(3):
-            try:
-                return self.__openRepository(*args, **kwargs)
-            except:
-                time.sleep(0.5 * (count + 1))
-        return self.__openRepository(*args, **kwargs)
+    def openRepository(self,
+            serverIdx=0,
+            # Everything below here MUST be passed as a keyword argument
+            configValues={},
+            proxies=None,
+            serverCache=None,
+            serverName=None,
+            singleWorker=False,
+            sslCert=None,
+            sslKey=None,
+            useSSL=False,
 
-    def __openRepository(self, serverIdx=0, requireSigs=False,
-                       serverName=None, authCheck=None, entCheck=None,
-                       readOnlyRepository=False, proxies=None,
-                       useSSL=False, sslCert=None, sslKey=None,
-                       authTimeout=None, forceSSL=False,
-                       closed=False, commitAction=None,
-                       deadlockRetry=None, serverCache=None,
-                       resetDir=True, excludeCapsuleContents=False,
-                       **kwargs):
+            # DEPRECATED - do not add more repos config options here, just put
+            # them into configValues.
+            authCheck=None,
+            authTimeout=None,
+            commitAction=None,
+            deadlockRetry=None,
+            entCheck=None,
+            excludeCapsuleContents=None,
+            forceSSL=None,
+            readOnlyRepository=None,
+            requireSigs=None,
+            ):
+
+        defaultValues = dict(
+            authCacheTimeout=authTimeout,
+            commitAction=commitAction,
+            deadlockRetry=deadlockRetry,
+            entitlementCheckURL=entCheck,
+            excludeCapsuleContents=excludeCapsuleContents,
+            externalPasswordURL=authCheck,
+            forceSSL=forceSSL,
+            readOnlyRepository=readOnlyRepository,
+            requireSigs=requireSigs,
+            )
+        configValues = dict(configValues)
+        for key, value in defaultValues.items():
+            if value is None:
+                continue
+            if key in configValues:
+                continue
+            configValues[key] = value
+        configValues.update(self._reformatProxies(proxies))
+        if useSSL:
+            if sslCert:
+                sslCertAndKey = (sslCert, sslKey)
+            else:
+                sslCertAndKey = True
+        else:
+            sslCertAndKey = None
+
+        for count in range(4):
+            try:
+                return self.__openRepository(
+                        serverIdx=serverIdx,
+                        configValues=configValues,
+                        serverCache=serverCache,
+                        serverName=serverName,
+                        singleWorker=singleWorker,
+                        sslCertAndKey=sslCertAndKey,
+                        )
+            except:
+                if count == 3:
+                    raise
+                time.sleep(0.5 * (count + 1))
+        raise
+
+    @staticmethod
+    def _reformatProxies(proxies):
+        if not proxies:
+            return {}
+        values = {}
+        for key, value in proxies.items():
+            if value.startswith('conary'):
+                values.setdefault('conaryProxy', []).append(
+                        '%s http%s' % (key, value[6:]))
+            else:
+                values.setdefault('proxy', []).append(
+                        '%s %s' % (key, value))
+        return values
+
+    def __openRepository(self, serverIdx, configValues, serverCache,
+            serverName, sslCertAndKey, singleWorker):
 
         if serverCache is None:
             serverCache = self.servers
         server = serverCache.getCachedServer(serverIdx)
-        SQLserver = sqlharness.start(self.topDir)
-        newServer = server is None
-        reposDir = self.reposDir
-        if newServer:
-            if serverCache.serverType:
-                reposDir += '-%s' % serverCache.serverType
-            server = serverCache.startServer(reposDir, resources.get_path(), SQLserver,
-                                          serverIdx, requireSigs, serverName,
-                                          authCheck = authCheck,
-                                          entCheck = entCheck,
-                                          readOnlyRepository=readOnlyRepository,
-                                          useSSL = useSSL,
-                                          sslCert = sslCert,
-                                          sslKey = sslKey,
-                                          authTimeout = authTimeout,
-                                          forceSSL = forceSSL,
-                                          closed = closed,
-                                          commitAction = commitAction,
-                                          deadlockRetry = deadlockRetry,
-                                          excludeCapsuleContents =
-                                                excludeCapsuleContents,
-                                          resetDir = resetDir,
-                                          **kwargs)
+        SQLserver = sqlharness.start()
+        if server is None:
+            newServer = True
+            server = serverCache.startServer(
+                    # ServerCache
+                    SQLserver=SQLserver,
+                    key=serverIdx,
+                    serverName=serverName,
+                    singleWorker=singleWorker,
+                    # ConaryServer
+                    sslCertAndKey=sslCertAndKey,
+                    withCache=True,
+                    configValues=configValues,
+                    )
             # We keep this open to stop others from reusing the port; tell the
             # code which tracks fd leaks so this doesn't reported
             if getattr(server, 'socket', None):
                 self._expectedFdLeak(server.socket.fileno())
         else:
+            newServer = False
             server.setNeedsReset()
-
-
-        if 'CONARY_HTTP_PROXY' in os.environ:
-            httpAddr = os.environ['CONARY_HTTP_PROXY']
-            global _httpProxy
-            if _httpProxy is None and httpAddr:
-                proxyPath = os.path.join(
-                                os.path.dirname(self.reposDir), "http-proxy")
-                _httpProxy = self.getHTTPProxy(path = proxyPath)
 
         # make sure map is up to date
         self.cfg.repositoryMap.update(serverCache.getMap())
 
-        serverPath, serverClass, serverDir, proxyClass, proxyPath = \
-                            serverCache.getServerClass('CONARY_SERVER', useSSL)
-        if newServer and proxyPath:
-            # if we're using a proxy, (re)start it with the right server map
-            proxyDir = os.path.dirname(self.reposDir) + '/proxy'
-            contents = ContentStore(proxyDir + '/contents')
-            if self.proxy:
-                self.proxy.stop()
+        # FIXME
+        #serverPath, serverClass, serverDir, proxyClass, proxyPath = \
+        #                    serverCache.getServerClass('CONARY_SERVER', useSSL)
+        #if newServer and proxyPath:
+        #    # if we're using a proxy, (re)start it with the right server map
+        #    proxyDir = os.path.dirname(self.reposDir) + '/proxy'
+        #    contents = ContentStore(proxyDir + '/contents')
+        #    if self.proxy:
+        #        self.proxy.stop()
 
-            if proxies is None and _httpProxy is not None:
-                # No proxies were specified, and we have an HTTP proxy. Use it
-                # for the Conary proxy
-                d = lambda: 1
-                _httpProxy.updateConfig(d)
-                pp = d.proxy
-            else:
-                pp = proxies
+        #    if proxies is None and _httpProxy is not None:
+        #        # No proxies were specified, and we have an HTTP proxy. Use it
+        #        # for the Conary proxy
+        #        d = lambda: 1
+        #        _httpProxy.updateConfig(d)
+        #        pp = d.proxy
+        #    else:
+        #        pp = proxies
 
-            self.proxy = proxyClass('proxy', None,
-                                    contents, proxyPath, None,
-                                    proxyDir, resources.get_path(),
-                                    self.cfg.repositoryMap,
-                                    None, proxies = pp)
-            self.proxy.start()
-            global _proxy
-            _proxy = self.proxy
+        #    self.proxy = proxyClass('proxy', None,
+        #                            contents, proxyPath, None,
+        #                            proxyDir, resources.get_path(),
+        #                            self.cfg.repositoryMap,
+        #                            None, proxies = pp)
+        #    self.proxy.start()
+        #    global _proxy
+        #    _proxy = self.proxy
 
-        if self.proxy:
-            self.proxy.updateConfig(self.cfg)
-        elif _httpProxy:
-            _httpProxy.updateConfig(self.cfg)
+        #if self.proxy:
+        #    self.proxy.updateConfig(self.cfg)
+        #elif _httpProxy:
+        #    _httpProxy.updateConfig(self.cfg)
 
-        count = 0
         client = conaryclient.ConaryClient(self.cfg)
         repos = client.getRepos()
 
         label = versions.Label("%s@rpl:linux" % server.getName())
 
-        # Try to connect several times with the much safer tryConnect
-        # (which consumes one port, not one port per iteration)
-        # We wait 60 seconds. Sometimes we're seeing the build bots being
-        # overloaded, and spawning a server might take longer than 10 seconds
-        # to come up
-        try:
-            sock_utils.tryConnect('localhost', server.port)
-        except socket.error, e:
-            msg = 'unable to open networked repository: %s' %str(e)
-            print >> sys.stderr, msg
-            print >> sys.stderr, 'server log follows:'
-            print >> sys.stderr, '-------------------'
-            f = open(server.serverLog, 'r')
-            print >> sys.stderr, f.read()
-            f.close()
-            try:
-                # We failed to connect. Try to stop the server,
-                # hopefully that unblocks the next test
-                self.stopRepository(serverIdx)
-            except Exception, e:
-                print traceback.format_exc()
-                print 'failed to stop server: %s: %s' % (e.__class__.__name__, e)
-            raise RuntimeError(msg)
+        ## There may be other things that were not fully started yet, like HTTP
+        ## caches and so on. We'll now try an end-to-end connection.
 
-        if self.proxy:
-            sock_utils.tryConnect('localhost', self.proxy.port)
+        #ready = False
+        #count = 0
+        #while count < 500:
+        #    try:
+        #        repos.troveNames(label)
+        #        ready = True
+        #        break
+        #    except repo_errors.OpenError:
+        #        pass
 
-        # There may be other things that were not fully started yet, like HTTP
-        # caches and so on. We'll now try an end-to-end connection.
+        #    time.sleep(0.01)
+        #    count += 1
+        #if not ready:
+        #    #import epdb, sys
+        #    #epdb.post_mortem(sys.exc_info()[2])
 
-        ready = False
-        while count < 500:
-            try:
-                try:
-                    repos.troveNames(label)
-                    ready = True
-                    break
-                except Exception, e:
-                    if closed and closed in str(e):
-                        # If in closed mode, stop looping when we get the message
-                        # we expect
-                        break
-                    raise
-            except repo_errors.OpenError:
-                pass
+        #    try:
+        #        self.stopRepository(serverIdx)
+        #    except:
+        #        pass
+        #    raise RuntimeError('unable to open networked repository: %s'
+        #                       %str(e))
 
-            time.sleep(0.01)
-            count += 1
-        if not ready:
-            if closed:
-                # Well, this is a closed repo, we expect it not to pass some
-                # of the tests above
-                return repos
-
-            #import epdb, sys
-            #epdb.post_mortem(sys.exc_info()[2])
-
-            try:
-                self.stopRepository(serverIdx)
-            except:
-                pass
-            raise RuntimeError('unable to open networked repository: %s'
-                               %str(e))
-
-        if server.needsPGPKey and not server.readOnlyRepository:
+        if server.needsPGPKey and not server.configValues.get('readOnlyRepository'):
             ascKey = open(resources.get_archive('key.asc'), 'r').read()
-            for n in range(50):
-                try:
-                    repos.addNewAsciiPGPKey(label, 'test', ascKey)
-                    break
-                except repo_errors.InsufficientPermission:
-                    # This seems to be the #1 cause of transient test failures.
-                    time.sleep(0.1)
-            else:
-                raise
-            server.needsPGPKey = False
+            repos.addNewAsciiPGPKey(label, 'test', ascKey)
+            server.clearNeedsPGPKey()
         return repos
 
     def addfile(self, *fileList, **kwArgs):
@@ -3345,44 +2740,40 @@ class RepositoryHelper(testhelp.TestCase):
         self.cfg.buildFlavor = oldBuildFlavor
         return recipeClass
 
-    def getConaryProxy(self, idx = 0, proxies = None,
-                       entitlements = [], users = [], useApache = False,
-                       withCapsuleContentServer = False,
-                       useSSL = False, cacheTimeout = None, cacheLocation = None):
+    def getConaryProxy(self, idx=0,
+            proxies=None,
+            entitlements=(),
+            users=(),
+            singleWorker=False,
+            useSSL=False,
+            cacheTimeout=None,
+            cacheLocation=None,
+            withCapsuleContentServer=None,
+            ):
         cProxyDir = os.path.join(self.tmpDir, "conary-proxy")
         if idx:
             cProxyDir += "-%s" % str(idx)
-        cProxyContentsDir = os.path.join(cProxyDir, "contents")
+        util.rmtree(cProxyDir, ignore_errors=True)
 
-        util.rmtree(cProxyDir, ignore_errors = True)
-
-        util.mkdirChain(cProxyContentsDir)
-        conaryPath = resources.get_path()
-        server = server_path
-
-        classMap = {
-            (True, True): ApacheSSLProxyServer,
-            (True, False) : ApacheProxyServer,
-            (False, True) : StandaloneSSLProxyServer,
-            (False, False) : StandaloneProxyServer,
-        }
-        key = (bool(useApache), bool(useSSL))
-        ProxyClass = classMap[key]
-
+        configValues = dict(
+                authCacheTimeout=cacheTimeout,
+                entitlement=[' '.join(x) for x in entitlements],
+                memCache=cacheLocation,
+                memCacheTimeout=(60 if cacheLocation else -1),
+                user=[' '.join(x) for x in users],
+                )
+        configValues.update(self._reformatProxies(proxies))
         if withCapsuleContentServer:
-            capsuleServerUrl = "http://localhost:%s/toplevel" % \
-                self.capsuleContentServer.port
-        else:
-            capsuleServerUrl = None
-
-        cProxy = ProxyClass('proxy', None,
-            ContentStore(cProxyContentsDir), server, None,
-            cProxyDir, conaryPath, None, None, serverIdx = idx,
-            proxies = proxies, entitlements = entitlements,
-            users = users, capsuleServerUrl = capsuleServerUrl,
-            cacheTimeout = cacheTimeout, cacheLocation = cacheLocation)
-
-        return cProxy
+            capsuleServerUrl = "http://localhost:%s/toplevel" % (
+                    self.capsuleContentServer.port,)
+            configValues['capsuleServerUrl'] = capsuleServerUrl
+            configValues['injectCapsuleContentServers'] = 'localhost1'
+        return ProxyServer(cProxyDir,
+                withCache=True,
+                singleWorker=singleWorker,
+                sslCertAndKey=useSSL,
+                configValues=configValues,
+                )
 
     def getHTTPProxy(self, idx = 0, path = None):
         if path:
@@ -3743,20 +3134,14 @@ class HTTPServerController(base_server.BaseServer):
 
 
 def _cleanUp():
-    individual = _isIndividual()
-    global _servers
-    _servers.stopAllServers(clean=not individual)
+    global _proxy
     if _proxy:
         _proxy.stop()
-        # Clean up the proxy dir too
-        if not individual and hasattr(_proxy, 'reposDir'):
-            util.rmtree(_proxy.reposDir, ignore_errors = True)
-            # If nothing else lives in the parent for reposDir, go ahead and
-            # remove that directory too
-            try:
-                os.rmdir(os.path.dirname(_proxy.reposDir))
-            except OSError:
-                pass
+        util.rmtree(_proxy.reposDir, ignore_errors=True)
+        _proxy = None
+    _servers.cleanup()
+atexit.register(_cleanUp)
+
 
 def getOpenFiles():
     procdir = "/proc/self/fd"

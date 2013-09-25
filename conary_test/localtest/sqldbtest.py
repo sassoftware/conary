@@ -657,6 +657,8 @@ class SqlDB(rephelp.RepositoryHelper):
         cu.execute('select count(*) from sqlite_stat1')
         count = cu.fetchall()[0][0]
         self.assertEqual(count, 0)
+        db.close()
+        os.unlink(fn)
 
     def testMigrationReadOnly(self):
         dbfile = os.path.join(resources.get_archive(), 'conarydbs',

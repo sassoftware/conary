@@ -15,7 +15,6 @@
 #
 
 
-import fcntl
 import itertools
 import optparse
 import os
@@ -129,12 +128,6 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     _defaultSectionType = MirrorConfigurationSection
 
 
-# for compatibility with older code base that requires a source and a
-# target to de defined
-class MirrorConfiguration(MirrorFileConfiguration):
-    source = MirrorConfigurationSection
-    target = MirrorConfigurationSection
-
 # some sanity checks for the mirror configuration
 def checkConfig(cfg):
     if not cfg.host:
@@ -149,6 +142,7 @@ def checkConfig(cfg):
 def mainWorkflow(cfg = None, callback=ChangesetCallback(),
                  test=False, sync=False, infoSync=False,
                  checkSync=False, fastSync=False):
+    import fcntl
     if cfg.lockFile:
         try:
             log.debug('checking for lock file')

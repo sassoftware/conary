@@ -848,6 +848,17 @@ class MigrateTo_18(SchemaMigration):
         cu = self.db.cursor()
         cu.execute("alter table instances add column "
                    "fingerprint     %(BINARY20)s" % self.db.keywords)
+        if self.db.kind == 'sqlite':
+            cu.execute("UPDATE Users SET salt = hex(salt)")
+        else:
+            cu.execute("ALTER TABLE Users"
+                    " ALTER password TYPE %(STRING)s,"
+                    " ALTER salt TYPE %(STRING)s USING encode(salt, 'hex')"
+                    % self.db.keywords)
+        cu.execute("ALTER TABLE UserGroups ADD accept_flags %(STRING)s"
+                % self.db.keywords)
+        cu.execute("ALTER TABLE UserGroups ADD filter_flags %(STRING)s"
+                % self.db.keywords)
         return True
 
 def _getMigration(major):

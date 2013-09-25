@@ -294,6 +294,7 @@ class ResponseWrapper(object):
     def __init__(self, fp, response):
         self.fp = fp
         self.response = response
+        self._linebuf = ''
 
         self.status = response.status
         self.reason = response.reason
@@ -301,23 +302,24 @@ class ResponseWrapper(object):
         self.protocolVersion = "HTTP/%.1f" % (response.version / 10.0)
 
         self.getheader = response.getheader
-        self.read = fp.read
 
     def close(self):
         self.fp.close()
         self.response.close()
 
-    def _readlineify(self):
-        if hasattr(self.fp, 'readline'):
-            return
-        fp = util.BoundedStringIO()
-        util.copyfileobj(self.fp, fp)
-        fp.seek(0)
-        self.fp = fp
-
     def readline(self):
-        self._readlineify()
-        return self.fp.readline()
+        while '\n' not in self._linebuf:
+            d = self.fp.read(1024)
+            if not d:
+                break
+            self._linebuf += d
+        idx = self._linebuf.find('\n')
+        if idx >= 0:
+            idx += 1
+            ret, self._linebuf = self._linebuf[:idx], self._linebuf[idx:]
+        else:
+            ret, self._linebuf = self._linebuf, ''
+        return ret
 
     def __iter__(self):
         while True:
@@ -328,6 +330,19 @@ class ResponseWrapper(object):
 
     def readlines(self):
         return list(self)
+
+    def read(self, count=None):
+        if count is None:
+            return self._linebuf + self.fp.read()
+        n = min(count, len(self._linebuf))
+        if n:
+            ret, self._linebuf = self._linebuf[:n], self._linebuf[n:]
+            count -= n
+            if count:
+                ret += self.fp.read(count)
+            return ret
+        else:
+            return self.fp.read(count)
 
     # Backwards compatibility with urllib.addinfourl
     code = property(lambda self: self.status)

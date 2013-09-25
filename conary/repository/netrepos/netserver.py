@@ -39,7 +39,6 @@ from conary.repository.netrepos import fsrepos, instances, trovestore
 from conary.repository.netrepos import accessmap, deptable, fingerprints
 from conary.lib.openpgpfile import KeyNotFound
 from conary.repository.netrepos.netauth import NetworkAuthorization
-from conary.repository.netrepos.netauth import ValidPasswordToken
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
@@ -53,7 +52,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 71 + 1)
+SERVER_VERSIONS = range(36, 72 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -144,6 +143,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.serializeCommits = cfg.serializeCommits
         self.paranoidCommits = cfg.paranoidCommits
         self.excludeCapsuleContents = cfg.excludeCapsuleContents
+        self.geoIpFiles = cfg.geoIpFiles
 
         self.__delDB = False
         self.log = tracelog.getLog(None)
@@ -180,7 +180,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if connect:
             self.db = dbstore.connect(self.repDB[1], driver = self.repDB[0])
             self.__delDB = True
-        dbVer = schema.checkVersion(self.db)
+        schema.checkVersion(self.db)
         schema.setupTempTables(self.db)
         depSchema.setupTempDepTables(self.db)
         self.troveStore = trovestore.TroveStore(self.db, self.log)
@@ -192,7 +192,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.db, self.serverNameList, log = self.log,
             cacheTimeout = self.authCacheTimeout,
             passwordURL = self.externalPasswordURL,
-            entCheckURL = self.entitlementCheckURL)
+            entCheckURL = self.entitlementCheckURL,
+            geoIpFiles=self.geoIpFiles,
+            )
         self.ri = accessmap.RoleInstances(self.db)
         self.deptable = deptable.DependencyTables(self.db)
         self.log.reset()
@@ -432,6 +434,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
         self.log(2, authToken[0], role, canMirror)
         self.auth.setMirror(role, canMirror)
+        return True
+
+    @accessReadOnly
+    def getRoleFilters(self, authToken, clientVersion, roles):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], roles)
+        ret = self.auth.getRoleFilters(roles)
+        for role, flags in ret.iteritems():
+            ret[role] = [self.fromFlavor(x) for x in flags]
+        return ret
+
+    @accessReadWrite
+    def setRoleFilters(self, authToken, clientVersion, roleFiltersMap):
+        if not self.auth.authCheck(authToken, admin = True):
+            raise errors.InsufficientPermission
+        self.log(2, authToken[0], roleFiltersMap)
+        for role, flags in roleFiltersMap.iteritems():
+            roleFiltersMap[role] = [self.toFlavor(x) for x in flags]
+        self.auth.setRoleFilters(roleFiltersMap)
         return True
 
     @accessReadWrite
@@ -2945,7 +2967,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if False in self.auth.batchCheck(authToken, [t for t,s in infoList],
                                          write=True, cu = cu):
             raise errors.InsufficientPermission
-        updateCount = 0
 
         # look up if we have all the troves we're asked
         schema.resetTable(cu, "tmpInstanceId")
@@ -3185,7 +3206,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             ret.append( (float(mark), (name, version, flavor), troveType) )
             if len(ret) >= lim:
                 # we need to flush the cursor to stop a backend from complaining
-                junk = cu.fetchall()
+                cu.fetchall()
                 break
         # older mirror clients do not support getting the troveType values
         if clientVersion < 40:
@@ -3270,7 +3291,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             prov = [ '' ] * len(troveList)
 
         for tableName, dsList in tblList:
-            start = time.time()
             cu.execute("""
                 SELECT tmpNVF.idx, D.class, D.name, D.flag FROM tmpNVF
                     JOIN Items ON
@@ -3570,38 +3590,6 @@ for attr, val in NetworkRepositoryServer.__dict__.iteritems():
         if hasattr(val, '_accessType'):
             NetworkRepositoryServer.publicCalls.add(attr)
 
-class NullAuthorization:
-    """Authorization class for L{ClosedRepositoryServer} objects"""
-    def check(self, *args, **kwargs):
-        """Dummy function that always returns True"""
-        return True
-    listEntitlementClasses = check
-    authCheck = check
-
-class ClosedRepositoryServer(xmlshims.NetworkConvertors):
-    def callWrapper(self, protocol, port, methodname, *args, **kwargs):
-        raise errors.RepositoryClosed(self.cfg.closed)
-
-    def __init__(self, cfg):
-        self.log = tracelog.getLog(None)
-        self.cfg = cfg
-        self.troveStore = None
-        if isinstance(cfg.serverName, str):
-            self.serverNameList = [ cfg.serverName ]
-        else:
-            self.serverNameList = cfg.serverName
-        self.map = cfg.repositoryMap
-        self.auth = NullAuthorization()
-
-    def getAsciiOpenPGPKey(self, *args, **kwargs):
-        return None
-
-    def reset(self):
-        pass
-
-    def reopen(self):
-        pass
-
 
 class HiddenException(Exception):
 
@@ -3636,66 +3624,6 @@ class GlobListType(list):
         return False
 
 
-class AuthToken(list):
-    __slots__ = ()
-
-    _user, _password, _entitlements, _remote_ip = range(4)
-
-    def __init__(self, user='anonymous', password='anonymous', entitlements=(),
-            remote_ip=None):
-        list.__init__(self, [None] * 4)
-        self.user = user
-        self.password = password
-        self.entitlements = list(entitlements)
-        self.remote_ip = remote_ip
-
-    def _get_user(self):
-        return self[self._user]
-    def _set_user(self, user):
-        self[self._user] = user
-    user = property(_get_user, _set_user)
-
-    def _get_password(self):
-        return self[self._password]
-    def _set_password(self, password):
-        if self.user == password == 'anonymous':
-            pass
-        elif password is ValidPasswordToken:
-            pass
-        else:
-            password = util.ProtectedString(password)
-        self[self._password] = password
-    password = property(_get_password, _set_password)
-
-    def _get_entitlements(self):
-        return self[self._entitlements]
-    def _set_entitlements(self, entitlements):
-        self[self._entitlements] = entitlements
-    entitlements = property(_get_entitlements, _set_entitlements)
-
-    def _get_remote_ip(self):
-        return self[self._remote_ip]
-    def _set_remote_ip(self, remote_ip):
-        self[self._remote_ip] = remote_ip
-    remote_ip = property(_get_remote_ip, _set_remote_ip)
-
-    def __repr__(self):
-        out = '<AuthToken'
-        if self.user != 'anonymous' or not self.entitlements:
-            out += ' user=%s' % (self.user,)
-        if self.entitlements:
-            ents = []
-            for ent in self.entitlements:
-                if isinstance(ent, (tuple, list)):
-                    # Remove entitlement class
-                    ent = ent[1]
-                ents.append('%s...' % ent[:6])
-            out += ' entitlements=[%s]' % (', '.join(ents))
-        if self.remote_ip:
-            out += ' remote_ip=%s' % self.remote_ip
-        return out + '>'
-
-
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
     baseUri                 = (CfgString, None)
@@ -3709,7 +3637,6 @@ class ServerConfig(ConfigFile):
     memCachePrefix          = CfgString
     changesetCacheDir       = CfgPath
     changesetCacheLogFile   = CfgPath
-    closed                  = CfgString
     commitAction            = CfgString
     contentsDir             = CfgPath
     capsuleServerUrl        = (CfgString, None)
@@ -3719,6 +3646,7 @@ class ServerConfig(ConfigFile):
     excludeCapsuleContents  = (CfgBool, False)
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
+    geoIpFiles              = CfgList(CfgPath)
     injectCapsuleContentServers = CfgList(CfgString)
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)

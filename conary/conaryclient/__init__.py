@@ -18,13 +18,11 @@
 import os
 import pickle
 
-#conary imports. the unused imports of filetypes, mirror, and callbacks
-#are part of the conaryclient api
 from conary import conarycfg, errors, trove
 from conary.cmds import metadata, rollbacks
 from conary.conaryclient import clone, cmdline, password, resolve, update
-from conary.conaryclient import filetypes, mirror, callbacks  # pyflakes=ignore
 from conary.lib import log, util, openpgpkey, api
+from conary.lib import cfgtypes
 from conary.local import database
 from conary.repository.netclient import NetworkRepositoryClient
 from conary.repository import searchsource
@@ -224,7 +222,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
 
     def _createChangeSetList(self, csList, recurse = True,
                              skipNotByDefault = False,
-                             excludeList = conarycfg.RegularExpressionList(),
+                             excludeList=cfgtypes.RegularExpressionList(),
                              callback = None):
         primaryList = []
         headerList = []
@@ -303,7 +301,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
     @api.publicApi
     def createChangeSet(self, csList, recurse = True,
                         skipNotByDefault = True,
-                        excludeList = conarycfg.RegularExpressionList(),
+                        excludeList = cfgtypes.RegularExpressionList(),
                         callback = None, withFiles = False,
                         withFileContents = False):
         """
@@ -325,7 +323,7 @@ class ConaryClient(ClientClone, ClientBranch, ClientUpdate, ClientNewTrove,
 
     def createChangeSetFile(self, path, csList, recurse = True,
                             skipNotByDefault = True,
-                            excludeList = conarycfg.RegularExpressionList(),
+                            excludeList = cfgtypes.RegularExpressionList(),
                             callback = None):
         """
         Creates <path> as a change set file.
