@@ -30,19 +30,8 @@ class ConaryTest(CPackageRecipe):
     # DB (default sqlite)
     Flags.db_pgsql = False
 
-    # Server (default standalone)
-    Flags.srv_apache = False
-    Flags.srv_apache_cached = False
-
-    # Proxy (default none)
-    Flags.proxy_apache = False
-    Flags.proxy_standalone = False
-
-    # HTTP Proxy (default off)
-    Flags.http_proxy = False
-
     # RPM tests
-    Flags.rpm = False
+    Flags.rpm = True
 
     # Split tests
     Flags.split1 = False
@@ -72,7 +61,7 @@ class ConaryTest(CPackageRecipe):
             'gcc-java:devel',
             'git:runtime',
             'gnupg:runtime',
-            'httpd:runtime',
+            'gunicorn:runtime',
             'info-bin:user',
             'info-daemon:user',
             'info-rmake-chroot:user',
@@ -82,9 +71,8 @@ class ConaryTest(CPackageRecipe):
             'm2crypto:python',
             'mercurial:runtime',
             'mkisofs:runtime',
-            'mod_python:runtime',
-            'mod_ssl:runtime',
             'net-tools:runtime',
+            'nginx:runtime',
             'popt:devel',
             'postgresql:runtime',
             'postgresql-server:runtime',
@@ -92,6 +80,7 @@ class ConaryTest(CPackageRecipe):
             'python:devel',
             'python-ctypes:python',
             'python-pgsql:python',
+            'python-webob:python',
             'python:runtime',
             'python-setuptools:python',
             'sqlite:devel',
@@ -135,10 +124,8 @@ class ConaryTest(CPackageRecipe):
             'git:rpm',
             'glibc-static:rpm',
             'gnupg2:rpm',
-            'httpd:rpm',
             'libxml2:rpm',
             'mercurial:rpm',
-            'mod_ssl:rpm',
             'net-tools:rpm',
             'patch:rpm',
             'perl:rpm',
@@ -156,7 +143,9 @@ class ConaryTest(CPackageRecipe):
             'xz:rpm',
 
             # Non-CentOS
-            'mod_python:runtime',
+            'gunicorn:runtime',
+            'nginx:runtime',
+            'python-webob:python',
             'python-webunit:python',
             ]
 
@@ -198,29 +187,6 @@ class ConaryTest(CPackageRecipe):
             Flags.db_pgsql and 'psycopg2' \
             or 'sqlite'
         environ += 'CONARY_REPOS_DB=%s ' % config['repos_db']
-
-        # Server
-        config['server'] = \
-            Flags.srv_apache and 'apache' \
-            or Flags.srv_apache_cached and 'apachecached' \
-            or 'builtin'
-        if config['server'] != 'builtin':
-            environ += 'CONARY_SERVER=%s ' % config['server']
-
-        # Proxy
-        config['proxy'] = \
-            Flags.proxy_apache and 'apache' \
-            or Flags.proxy_standalone and 'standalone' \
-            or 'none'
-        if config['proxy'] != 'none':
-            environ += 'CONARY_PROXY=%s ' % config['proxy']
-
-        # HTTP Proxy
-        if Flags.http_proxy:
-            environ += 'CONARY_HTTP_PROXY=1 '
-            config['http_proxy'] = 'yes'
-        else:
-            config['http_proxy'] = 'no'
 
         pythonPath = []
         if Flags.rpm:
