@@ -1,1 +1,0 @@
-Fixed preserveOwnership not applying to files and directories with spaces in the name.

@@ -1,2 +1,0 @@
-"conary updateall" no longer fails if snapshotted troves in the system-model
-have been markremoved or otherwise cannot be found.

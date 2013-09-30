@@ -1,3 +1,50 @@
+Changes in 2.5.0:
+  o New Features:
+    * Significant performance improvements when working with
+      configuration objects. Configuration metadata, such as the
+      definition of each option, is now processed at import time and not
+      each time the configuration is instantiated or copied.
+    * Dropped support for Python 2.4. Conary now requires Python 2.6 or
+      later.
+    * Added systemId header to repository requests for client tracking.
+      (CNY-3806)
+
+  o API Changes:
+    * Changesets are now inlined within the HTTP response when doing a
+      getChangeSet call to the repository. This improves compatibility
+      with load balancers and round-robin configurations by removing the
+      need for a second request. (CNY-3819)
+    * The 'getLog' web call has been removed
+    * The 'closed' repository configuration option has been removed
+
+  o Bug Fixes:
+    * Fixed preinstall and preupdate scripts not running during system-
+      model updates. (CNY-3803)
+    * Fixed preserveOwnership not applying to files and directories with
+      spaces in the name. (CNY-3789)
+    * "conary rdiff --diff" no longer crashes when a binary file changes
+      to a config file (CNY-3804)
+    * "conary updateall" no longer fails if snapshotted troves in the
+      system-model have been markremoved or otherwise cannot be found.
+      (CNY-3796)
+    * Fixed derived packages inheriting all file flavor instruction
+      sets, not just those that are compatible with the build flavor.
+      (CNY-3807)
+    * Appropriately attach key/value metadata to troves through the
+      r._addMetadataItem recipe method. (CNY-3809)
+    * Command line options can now be defined using a dictionary-like
+      syntax, which allows for default values too. (CNY-3810) (CNY-3810)
+    * Negative cache entries are no longer used when there is only one
+      URL to fetch for a source action. (CNY-3816)
+    * Fixed a few instances where httpHeaders was not correctly passed
+      when using a source action.
+    * Basic auth is now always sent when fetching a source, rather than
+      waiting for a 401 status code
+    * GroupSetRecipe now defines an instance of the findFile interface
+      to lookaside to enable fetching files. (CNY-3818)
+    * Added support to logcat for parsing systemId field of the
+      repository log. (CNY-3821)
+
 Changes in 2.4.13:
   o New Features:
     * A trove's getNameVersionFlavor() now returns a
