@@ -251,6 +251,14 @@ class ConaryTest(CPackageRecipe):
         r.Requires(exceptDeps='python: webunit.*')
         r.Requires(exceptDeps='python: rpm.*')
 
+        # Add requirements for the viarous app servers taht we now requires.
+        r.Requires('gunicorn:runtime',
+            '%(sitepkgs)s/conary_test/lib/repserver.py')
+        r.Requires('uwsgi:runtime',
+            '%(sitepkgs)s/conary_test/lib/repserver.py')
+        r.Requires('nginx:runtime',
+            '%(sitepkgs)s/conary_test/lib/repserver.py')
+
     def test(r):
         r.config = {}
         environ = r.setupEnvironment()
