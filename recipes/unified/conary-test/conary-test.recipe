@@ -256,6 +256,8 @@ class ConaryTest(CPackageRecipe):
             '%(sitepkgs)s/conary_test/lib/repserver.py')
         r.Requires('nginx:runtime',
             '%(sitepkgs)s/conary_test/lib/repserver.py')
+        r.Requires('python-webob:python',
+            '%(sitepkgs)s/conary_test/lib/repserver.py')
 
     def test(r):
         r.config = {}
