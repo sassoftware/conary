@@ -547,7 +547,9 @@ class _Config(object):
         return {
                 'flags': {},
                 'options': [ (key, value.value)
-                    for (key, value) in self._values.iteritems() ],
+                    for (key, value) in self._values.iteritems()
+                    if not value.isDefault()
+                    ],
                 }
 
     def __setstate__(self, state):
