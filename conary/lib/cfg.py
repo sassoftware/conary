@@ -163,13 +163,20 @@ class OptionValue(object):
     def __repr__(self):
         return '<%s %r>' % (self.__class__.__name__, self.definition.name)
 
-    def __deepcopy__(self, memo=None):
+    def copy(self, memo=None, shallow=False):
         new = type(self)(self.definition)
         new.listeners = list(self.listeners)
         new.origins = list(self.origins)
-        new.value = copy.deepcopy(self.value, memo)
+        if shallow:
+            new.value = self.value
+        else:
+            new.value = copy.deepcopy(self.value, memo)
         new._isDefault = self._isDefault
         return new
+    __deepcopy__ = copy
+
+    def __copy__(self):
+        return self.copy(shallow=True)
 
     # Shortcuts to the option definition
 
@@ -563,6 +570,16 @@ class _Config(object):
             optdef = self._cfg_def.getExact(key, None)
             if optdef:
                 self._values[key] = OptionValue(optdef, value)
+
+    def __copy__(self):
+        # Don't use getstate, we want to copy all values even if they're
+        # default.
+        cls = type(self)
+        obj = cls.__new__(cls)
+        obj.__dict__ = self.__dict__.copy()
+        obj._values = dict((key, value.copy(shallow=True))
+                for (key, value) in self._values.iteritems())
+        return obj
 
     # --- metadata backwards compatibility ---
 
