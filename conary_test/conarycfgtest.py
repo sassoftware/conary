@@ -995,6 +995,27 @@ threaded                  False
             os.chdir(cwd)
             shutil.rmtree(tdir)
 
+    def testCopyContext(self):
+        """
+        Test that applying a context to a deepcopy'd config behaves sanely; in
+        particular the defaultness of the values in each section must be
+        preserved.
+        """
+        cfg = conarycfg.ConaryConfiguration(False)
+        cfg.configLine("installLabelPath desired@install:label")
+        cfg.configLine("[context]")
+        cfg.configLine("flavor is: x86_64")
+        desired = [versions.Label("desired@install:label")]
+        self.assertEqual(cfg.installLabelPath, desired)
+        # NB: This will COW the context's value before copying in order to
+        # expose the original issue.
+        self.assertEqual(cfg.getSection('context').installLabelPath, [])
+
+        cfg2 = copy.deepcopy(cfg)
+        cfg2.setContext('context')
+        self.assertEqual(cfg2.installLabelPath, desired)
+
+
 class ProxyConfigtest(testhelp.TestCase):
     def testProxyOverrides(self):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)

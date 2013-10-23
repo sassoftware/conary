@@ -182,6 +182,7 @@ class IdGen3(IdGen0):
 
 
 class ServerCache(object):
+    serverClass = RepositoryServer
     serverType = ''
 
     def __init__(self):
@@ -209,6 +210,7 @@ class ServerCache(object):
             key=0,
             serverName=None,
             singleWorker=False,
+            resetDir=True,
             **kwargs):
 
         if key in self.servers:
@@ -221,9 +223,11 @@ class ServerCache(object):
             if key != 0:
                 serverName += '%s' % key
         reposDir = os.path.join(self.topDir, 'repos-%s' % key)
-        reposDB = SQLserver.getDB("testdb-%s" % key, keepExisting=False)
+        reposDB = SQLserver.getDB("testdb-%s" % key, keepExisting=True)
+        if resetDir:
+            reposDB.reset()
 
-        server = RepositoryServer(reposDir,
+        server = self.serverClass(reposDir,
                 nameList=serverName,
                 reposDB=reposDB,
                 singleWorker=singleWorker,
@@ -468,6 +472,7 @@ class RepositoryHelper(testhelp.TestCase):
     def openRepository(self,
             serverIdx=0,
             # Everything below here MUST be passed as a keyword argument
+            resetDir=True,
             configValues={},
             proxies=None,
             serverCache=None,
@@ -521,6 +526,7 @@ class RepositoryHelper(testhelp.TestCase):
             try:
                 return self.__openRepository(
                         serverIdx=serverIdx,
+                        resetDir=resetDir,
                         configValues=configValues,
                         serverCache=serverCache,
                         serverName=serverName,
@@ -547,7 +553,7 @@ class RepositoryHelper(testhelp.TestCase):
                         '%s %s' % (key, value))
         return values
 
-    def __openRepository(self, serverIdx, configValues, serverCache,
+    def __openRepository(self, serverIdx, resetDir, configValues, serverCache,
             serverName, sslCertAndKey, singleWorker):
 
         if serverCache is None:
@@ -562,6 +568,7 @@ class RepositoryHelper(testhelp.TestCase):
                     key=serverIdx,
                     serverName=serverName,
                     singleWorker=singleWorker,
+                    resetDir=resetDir,
                     # ConaryServer
                     sslCertAndKey=sslCertAndKey,
                     withCache=True,

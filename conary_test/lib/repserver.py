@@ -93,7 +93,6 @@ class ConaryServer(object):
         self.needsReset = True
 
     def start(self):
-        self.reset()
         self.needsReset = True
         self.createConfig()
         self.appServer.start()
