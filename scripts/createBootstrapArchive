@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) rPath, Inc.
+# Copyright (c) SAS Institute, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -98,12 +98,12 @@ EOF
 
         cat > $T/root/conaryBootstrap/installrpm <<EOF
 #!/bin/sh
-rpmver=\$(rpm -q rpm | sed 's/rpm-//;s/-/_/')
+rpmver=\$(rpm -q rpm --qf '%{version}_%{release}')
 echo 'Ensuring correct permissions in bootstrap Conary packages...'
 /usr/bin/conary repair $BOOTSTRAP_PACKAGES
 echo 'Installing RPM python bindings for Conary...'
 set -x
-/usr/bin/conary update \$(ls -1 /root/conaryBootstrap/rpmpython-\${rpmver}*.ccs | head -1)
+/usr/bin/conary update --config 'syncCapsuleDatabase false' \$(ls -1 /root/conaryBootstrap/rpmpython-\${rpmver}*.ccs | head -1)
 EOF
         chmod 755 $T/root/conaryBootstrap/installrpm
 
