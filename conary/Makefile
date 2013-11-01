@@ -56,6 +56,8 @@ constants.py: constants.py.in ../Makefile
 install: all install-subdirs pyfiles-install constants.py
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
+	# backwards compatibility
+	ln -sfn server/commitaction.py $(DESTDIR)$(conarydir)/commitaction
 
 dist: default-dist
 

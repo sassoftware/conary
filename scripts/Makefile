@@ -16,7 +16,7 @@
 
 
 extra_dist = Makefile \
-             logaction.py changemail.py commitaction \
+             logaction.py changemail.py \
 	     perlreqs.pl findmissingbuildreqs
 
 bin_scripts = rpm2cpio dbsh conary-debug ccs2tar
@@ -34,7 +34,6 @@ install: install-subdirs
 	install -m 755 $(bin_scripts) $(DESTDIR)$(bindir)
 	mkdir -p $(DESTDIR)$(datadir)/conary
 	install -m 755 $(util_scripts) $(DESTDIR)$(datadir)/conary
-	install -m 755 commitaction $(DESTDIR)$(conarydir)
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
 	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 
