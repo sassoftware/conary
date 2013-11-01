@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) rPath, Inc.
+# Copyright (c) SAS Institute, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,13 +26,13 @@ NAMESPACES='rhel-4-as rhel-5-server rhel-5-client-workstation'
 FLAVORS='32 64'
 REPOSITORY='rhel.rpath.com'
 # Must use local rBuilder instance with RHN subscription for RHEL RPMs
-RBUILDER='rbuilder.example.com'
+#RBUILDER='rbuilder.example.com'
 #CUSTOMLABELS='platform.rbuilder.example.com@example:imports-$namespace'
 
 # Encapsulated CentOS configuration:
-#NAMESPACES='centos-5e'
-#FLAVORS='32 64'
-#REPOSITORY='centos.rpath.com'
+NAMESPACES='centos-6e'
+FLAVORS='32 64'
+REPOSITORY='centos6.rpath.com'
 ## Use local rBuilder with centos configured if you have one; otherwise,
 ## leave blank to use rPath's upstream repository
 #RBUILDER=''
@@ -63,7 +63,8 @@ for namespace in $NAMESPACES; do
         # similar pattern for rhel4 and centos
         toolspace=$(echo $namespace | sed '/rhel-5/s/-5-.*$/-5/;
                                            /rhel-4/s/-4-.*$/-4/;
-                                           /centos-5e/s/-5e\(-.*\)\?$/-5-common/')
+                                           /centos-5e/s/-5e\(-.*\)\?$/-5-common/;
+                                           /centos-6e/s/-6e\(-.*\)\?$/-6-common/')
         conary update --no-deps --no-restart --no-interactive --root=$T \
             $BOOTSTRAP_TROVES \
             --config="flavor ${flavorMap[$flavor]}" \
@@ -97,12 +98,12 @@ EOF
 
         cat > $T/root/conaryBootstrap/installrpm <<EOF
 #!/bin/sh
-rpmver=\$(rpm -q rpm | sed 's/rpm-//;s/-/_/')
+rpmver=\$(rpm -q rpm --qf '%{version}_%{release}')
 echo 'Ensuring correct permissions in bootstrap Conary packages...'
 /usr/bin/conary repair $BOOTSTRAP_PACKAGES
 echo 'Installing RPM python bindings for Conary...'
 set -x
-/usr/bin/conary update \$(ls -1 /root/conaryBootstrap/rpmpython-\${rpmver}*.ccs | head -1)
+/usr/bin/conary update --config 'syncCapsuleDatabase false' \$(ls -1 /root/conaryBootstrap/rpmpython-\${rpmver}*.ccs | head -1)
 EOF
         chmod 755 $T/root/conaryBootstrap/installrpm
 
