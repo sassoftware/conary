@@ -50,8 +50,7 @@ class URL(namedtuple('URL', 'scheme userpass hostport path')):
     def unsplit(self):
         username, password = self.userpass
         host, port = self.hostport
-        if (self.scheme == 'http' and port == 80) or (
-                self.scheme == 'https' and port == 443):
+        if port in (80, 443):
             port = None
         return util.urlUnsplit((self.scheme, username, password, str(host),
             port, self.path, None, None))
