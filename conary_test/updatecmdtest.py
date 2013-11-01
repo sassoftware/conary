@@ -1913,7 +1913,7 @@ touch %(root)s/%(package)s;
                 self.q.put((val1, val2))
 
         import Queue
-        from conary.lib.fixedthreading import Thread
+        from threading import Thread
 
         q = Queue.Queue(2)
         cb = MyUpdateCallback()
