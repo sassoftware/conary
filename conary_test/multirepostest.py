@@ -464,7 +464,8 @@ class TestGroup(GroupRecipe):
         fc = filecontainer.FileContainer(
                                 util.ExtendedFile(csPath, buffering = False))
         fc.getNextFile()
-        assert(fc.getNextFile())
+        if not singleRepos:
+            assert(fc.getNextFile())
 
         repos.createChangeSetFile( [
             ( 'test:runtime', ( orig.getVersion(), orig.getFlavor() ),

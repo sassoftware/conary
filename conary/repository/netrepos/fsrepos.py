@@ -533,7 +533,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 # Skip identical fileids when mirroring, but always use
                 # absolute file changes if there is any difference. See note
                 # below.
-                if mirrorMode and oldFileId and oldFileId != newFileId:
+                forceAbsolute = (mirrorMode and oldFileId
+                        and oldFileId != newFileId)
+                if forceAbsolute:
                     (filecs, contentsHash) = changeset.fileChangeSet(pathId,
                                                                      None,
                                                                      newFile)
@@ -563,9 +565,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 if (contentsHash
                         or (oldFile and newFile.flags.isConfig()
                             and not oldFile.flags.isConfig())
-                        or (mirrorMode
-                            and newFile.hasContents
-                            and oldFileId != newFileId)
+                        or (forceAbsolute and newFile.hasContents)
                         ):
                     if oldFileVersion and oldFile.hasContents:
                         oldCont = self.getFileContents(
