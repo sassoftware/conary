@@ -523,16 +523,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                  newFileVersion) in localFilesNeeded:
                 oldFile = None
                 if oldFileVersion:
-                    #oldFile = idIdx[(pathId, oldFileId)]
                     oldFile = files.ThawFile(streams[oldFileId], pathId)
 
                 oldCont = None
                 newCont = None
 
-                #newFile = idIdx[(pathId, newFileId)]
                 newFile = files.ThawFile(streams[newFileId], pathId)
 
-                if mirrorMode:
+                # Skip identical fileids when mirroring, but always use
+                # absolute file changes if there is any difference. See note
+                # below.
+                if mirrorMode and oldFileId and oldFileId != newFileId:
                     (filecs, contentsHash) = changeset.fileChangeSet(pathId,
                                                                      None,
                                                                      newFile)
@@ -556,9 +557,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 # config files to config files; these need to be included
                 # unconditionally so we always have the pristine contents
                 # to include in the local database
-                if ((mirrorMode and newFile.hasContents) or contentsHash or
-                             (oldFile and newFile.flags.isConfig()
-                                      and not oldFile.flags.isConfig())):
+                # Also include contents of config files when mirroring if the
+                # fileid changed, even if the SHA-1 did not.
+                # cf CNY-1570, CNY-1699, CNY-2210
+                if (contentsHash
+                        or (oldFile and newFile.flags.isConfig()
+                            and not oldFile.flags.isConfig())
+                        or (mirrorMode
+                            and newFile.hasContents
+                            and oldFileId != newFileId)
+                        ):
                     if oldFileVersion and oldFile.hasContents:
                         oldCont = self.getFileContents(
                             [ (oldFileId, oldFileVersion, oldFile) ])[0]

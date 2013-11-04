@@ -1909,7 +1909,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         newFileError, pathId, newFileId, newFileVersion))
                     continue
 
-                if mirrorMode:
+                if (mirrorMode and oldFileObj
+                        and oldFileObj.fileId() != newFileObj.fileId()):
                     (filecs, hash) = changeset.fileChangeSet(pathId,
                                                              None,
                                                              newFileObj)
@@ -1923,8 +1924,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if excludeAutoSource and newFileObj.flags.isAutoSource():
                     continue
 
-                if (withFileContents and
-                        ((mirrorMode and newFileObj.hasContents) or hash)):
+                if (withFileContents and (
+                        hash
+                        or (mirrorMode
+                            and newFileObj.hasContents
+                            and oldFileId != newFileId
+                            )
+                        )):
                     # pull contents from the trove it was originally
                     # built in
                     fetchItems = []

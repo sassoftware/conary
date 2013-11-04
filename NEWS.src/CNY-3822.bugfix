@@ -1,0 +1,2 @@
+Fixed mirror-mode changesets always including all file contents, instead of
+only those files that have changed.
