@@ -836,7 +836,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         except errors.OpenError, e:
             self.assertEqual(str(e),
                                  'Error occurred opening repository '
-                                 'httsp://test:<PASSWD>@localhost:80/: '
+                                 'httsp://test:<PASSWD>@localhost/: '
                                  "ParameterError: Unknown URL scheme 'httsp'")
         else:
             self.fail('expected exception not raised')
