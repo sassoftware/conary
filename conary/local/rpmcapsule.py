@@ -637,7 +637,7 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
                         ):
             fullPath = util.joinPaths(self.root, path)
             fakestat = FakeStat(mode, 0, None, 1, owner, group, size,
-                    mtime, mtime, mtime, st_rdev=rdev)
+                    mtime, mtime, mtime, st_rdev=rdev, linkto=linkto)
             pathId = os.urandom(16)
 
             # Adapted from conary.build.source.addCapsule.doRPM
@@ -758,7 +758,7 @@ def rpmExpandMacro(val):
 # after st_ctime, e.g. rdev
 class FakeStat(namedtuple('FakeStat', 'st_mode st_ino st_dev st_nlink st_uid '
         'st_gid st_size st_atime st_mtime st_ctime st_blksize st_blocks '
-        'st_rdev')):
+        'st_rdev linkto')):
     __slots__ = ()
 
     def __new__(cls, *args, **kwargs):

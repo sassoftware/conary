@@ -711,7 +711,10 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
         needsSha1 = 1
     elif (stat.S_ISLNK(s.st_mode)):
         f = SymbolicLink(pathId)
-        f.target.set(os.readlink(path))
+        if hasattr(s, 'linkto'):
+            f.target.set(s.linkto)
+        else:
+            f.target.set(os.readlink(path))
     elif (stat.S_ISDIR(s.st_mode)):
         f = Directory(pathId)
     elif (stat.S_ISSOCK(s.st_mode)):
