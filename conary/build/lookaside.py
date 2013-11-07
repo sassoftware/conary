@@ -403,7 +403,7 @@ class FileFinder(object):
 
                 inFile = opener.open(req)
                 if not urlStr.startswith('ftp://'):
-                    content_type = inFile.info()['content-type']
+                    content_type = inFile.info().get('content-type')
                     if not url.explicit() and 'text/html' in content_type:
                         raise urllib2.URLError('"%s" not found' % urlStr)
                 log.info('Downloading %s...', urlStr)
