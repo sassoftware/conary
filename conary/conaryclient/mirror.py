@@ -396,35 +396,78 @@ def recurseTrove(sourceRepos, name, version, flavor,
     return ret
 
 
-# format a bundle for display
+
+def _toBraces(items):
+    if len(items) > 1:
+        return '{%s}' % (','.join(sorted(items)))
+    else:
+        return list(items)[0]
+
+
+def formatTroveNames(names):
+    """Group trove names by package and format them like a shell glob."""
+    # Group names by package
+    packages = {}
+    for name in names:
+        if ':' in name:
+            package, component = name.split(':')
+            component = ':' + component
+        else:
+            package, component = name, ''
+        packages.setdefault(package, []).append(component)
+    # If all the component sets are the same, collapse them.
+    componentSets = set(tuple(x) for x in packages.values())
+    if len(componentSets) == 1:
+        components = list(componentSets)[0]
+        if len(components) > 1:
+            prefix = _toBraces(packages)
+            suffix = _toBraces(components)
+            return prefix + suffix
+    # Format the components for each package
+    nameList = []
+    for package, components in sorted(packages.items()):
+        if len(components) == 1:
+            # foo or foo:bar
+            formatted = package + components[0]
+        else:
+            # foo and foo:bar
+            components.sort()
+            formatted = package + _toBraces(components)
+        nameList.append(formatted)
+    # Combine into one big set
+    if len(nameList) == 1:
+        return nameList[0]
+    else:
+        nameList.sort()
+        return _toBraces(nameList)
+
+
 def displayBundle(bundle):
+    """Format a job bundle for display"""
     minMark = min([x[0] for x in bundle])
-    names = [x[1][0] for x in bundle]
-    names.sort()
-    oldVF = set([x[1][1] for x in bundle])
-    newVF = set([x[1][2] for x in bundle])
-    if len(oldVF) > 1 or len(newVF) > 1:
-        # this bundle doesn't use common version/flavors
-        # XXX: find out why? for now, return old style display
-        return [ x[1] for x in bundle ]
-    oldVF = list(oldVF)[0]
-    newVF = list(newVF)[0]
-    ret = []
-    if minMark > 0:
-        markLine = "mark: %.0f " % (minMark,)
-    else:
-        markLine = ""
-    if oldVF == (None, None):
-        markLine += "absolute changeset"
-        ret.append(markLine)
-    else:
-        markLine += "relative changeset"
-        ret.append(markLine)
-    ret.append("troves: " + ' '.join(names))
-    if oldVF != (None, None):
-        ret.append("oldVF: %s" % (oldVF,))
-    ret.append("newVF: %s" % (newVF,))
-    return "\n  ".join(ret)
+    # Group by version and flavor
+    trovesByVF = {}
+    for mark, (name, oldVF, newVF, absolute) in bundle:
+        trovesByVF.setdefault((oldVF, newVF), set()).add(name)
+    # Within each VF set, sort and fold the names and format for display.
+    lines = []
+    for (oldVF, newVF), names in trovesByVF.items():
+        allNames = formatTroveNames(names)
+        # Add version and flavor info
+        if oldVF[0]:
+            if oldVF[1] != newVF[1]:
+                oldInfo = '%s[%s]--' % oldVF
+            else:
+                oldInfo = '%s--' % (oldVF[0],)
+        else:
+            oldInfo = ''
+        newInfo = '%s[%s]' % newVF
+        lines.append(''.join((allNames, '=', oldInfo, newInfo)))
+    lines.sort()
+    lines.insert(0, '')
+    lines.append('New mark: %.0f' % (minMark,))
+    return "\n  ".join(lines)
+
 
 # wrapper for displaying a simple jobList
 def displayJobList(jobList):
