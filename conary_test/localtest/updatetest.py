@@ -1648,3 +1648,26 @@ implements files remove
         fsJob._counter = DelCounter()
         del fsJob
         self.assertEqual(DelCounter.counter, 1)
+
+    def testCommentsInPasswdFile(self):
+        """Commented lines in passwd file
+
+        @tests: CNY-3824"""
+        util.mkdirChain(self.workDir + '/etc')
+        with open(self.workDir + '/etc/passwd', 'w') as f:
+            f.write("""\
+# This is a comment: 10
+root:x:0:0:root:/root:/bin/bash
+# This is a comment
+bin:x:1:1:bin:/bin:/sbin/nologin
+""")
+        with open(self.workDir + '/foo', 'w') as f:
+            print >> f, "PREFERRED_UID=1234"
+        update.userAction(self.workDir, [self.workDir + '/foo'])
+        with open(self.workDir + '/etc/passwd') as f:
+            actual = f.read()
+        self.assertEqual(actual, """\
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+foo:*:1234:1234::/:/sbin/nologin
+""")

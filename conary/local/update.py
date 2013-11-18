@@ -2354,16 +2354,21 @@ class _InfoFile(dict):
         self._keyfield = keyfield
         self._idfield = idfield
         self._listfield = listfield
+
         try:
-            f = file('/'.join((root, path)))
-            self._lines = [ x.strip().split(':') for x in f.readlines() ]
-            f.close()
+            with open(util.joinPaths(root, path)) as f:
+                lines = [x.strip().split(':') for x in f]
         except:
+            lines = []
+        if not lines:
+            lines = [defaultList]
             self._modified = True
-        if not self._lines:
-            self._lines.append(defaultList)
-            self._modified = True
-        for line in self._lines:
+
+        for line in lines:
+            if line[0].startswith('#') or len(line) < idfield + 1:
+                self._modified = True
+                continue
+            self._lines.append(line)
             self[line[keyfield]] = line
             self._idmap[line[idfield]] = line
 

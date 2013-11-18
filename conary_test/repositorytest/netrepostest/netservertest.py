@@ -1510,7 +1510,6 @@ foo:runtime
         # Chronologically, troves are timestamped in this order:
         # b:x86 a:x86 a:x86_64 b:x86_64
         # The result should be a:* then b:*
-        times = range(1000000000, 1000000004)
         cs = changeset.ReadOnlyChangeSet()
         for v, f, t in [
                 ('b', 'is: x86',    1000000000),
