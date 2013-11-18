@@ -123,6 +123,9 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     absoluteChangesets = (cfg.CfgBool, False)
     includeSources = (cfg.CfgBool, False)
     excludeCapsuleContents = (cfg.CfgBool, False)
+    splitNodes = (cfg.CfgBool, True,
+            "Split jobs that would commit two versions of a trove at once. "
+            "Needed for compatibility with older repositories.")
 
     _allowNewSections = True
     _defaultSectionType = MirrorConfigurationSection
@@ -269,7 +272,8 @@ def groupTroves(troveList):
     grouping.sort(_groupsort)
     return grouping
 
-def buildJobList(src, target, groupList, absolute = False):
+def buildJobList(src, target, groupList, absolute=False, splitNodes=True,
+        jobSize=20):
     # Match each trove with something we already have; this is to mirror
     # using relative changesets, which is a lot more efficient than using
     # absolute ones.
@@ -290,6 +294,11 @@ def buildJobList(src, target, groupList, absolute = False):
     latestAvailable = {}
     if len(q):
         latestAvailable = target.getTroveLeavesByBranch(q)
+        latestAvailable = dict(
+                    (name, dict(
+                        (version, set(flavors))
+                        for (version, flavors) in versions.iteritems()
+                    )) for (name, versions) in latestAvailable.iteritems())
     if len(latestAvailable):
         def _tol(d):
             for n, vd in d.iteritems():
@@ -299,13 +308,41 @@ def buildJobList(src, target, groupList, absolute = False):
         ret = src.hasTroves(list(_tol(latestAvailable)), hidden=True)
         srcAvailable.update(ret)
 
+    def _split():
+        # Stop adding troves to this job and allow its troves to be used for
+        # the next job's relative changesets.
+        for mark, job in jobList[-1]:
+            name = job[0]
+            if trove.troveIsGroup(name):
+                continue
+            oldVersion, oldFlavor = job[1]
+            newVersion, newFlavor = job[2]
+
+            srcAvailable[(name, newVersion, newFlavor)] = True
+            d = latestAvailable.setdefault(name, {})
+
+            if oldVersion in d and oldVersion.branch() == newVersion.branch():
+                # If the old version is on the same branch as the new one,
+                # replace the old with the new. If it's on a different
+                # branch, we'll track both.
+                flavorList = d[oldVersion]
+                flavorList.discard(oldFlavor)
+                if not flavorList:
+                    del d[oldVersion]
+
+            flavorList = d.setdefault(newVersion, set())
+            flavorList.add(newFlavor)
+        if jobList[-1]:
+            jobList.append([])
+
     # we'll keep latestAvailable in sync with what the target will look like
     # as the mirror progresses
-    jobList = []
+    jobList = [[]]
+    currentNodes = set()
+    currentHost = None
     for group in groupList:
-        groupJobList = []
-        # for each job find what it's relative to and build up groupJobList
-        # as the job list for this group
+        # for each job find what it's relative to and build up a job list
+        thisJob = []
         for mark, (name, version, flavor) in group:
             # name, version, versionDistance, flavorScore
             currentMatch = (None, None, None, None)
@@ -342,33 +379,28 @@ def buildJobList(src, target, groupList, absolute = False):
                 job = (name, (currentMatch[0], currentMatch[1]),
                               (version, flavor), currentMatch[0] is None)
 
-            groupJobList.append((mark, job))
+            thisJob.append((mark, job))
 
-        # now iterate through groupJobList and update latestAvailable to
-        # reflect the state of the mirror after this job completes
-        for mark, job in groupJobList:
-            name = job[0]
-            if trove.troveIsGroup(name):
-                continue
-            oldVersion, oldFlavor = job[1]
-            newVersion, newFlavor = job[2]
+        newNodes = set((x[1][0], x[1][2][0].branch()) for x in thisJob)
+        newHosts = set(x[1][2][0].getHost() for x in thisJob)
+        assert len(newHosts) == 1
+        newHost = list(newHosts)[0]
+        if (len(jobList[-1]) >= jobSize
+                # Can't commit two versions of the same trove
+                or (splitNodes and newNodes & currentNodes)
+                # Can't commit troves on different hosts
+                or currentHost not in (None, newHost)
+                ):
+            _split()
+            currentNodes = set()
+        jobList[-1].extend(thisJob)
+        currentNodes.update(newNodes)
+        currentHost = newHost
 
-            srcAvailable[(name, newVersion, newFlavor)] = True
-            d = latestAvailable.setdefault(name, {})
-
-            if oldVersion in d and oldVersion.branch() == newVersion.branch():
-                # If the old version is on the same branch as the new one,
-                # replace the old with the new. If it's on a different
-                # branch, we'll track both.
-                d[oldVersion].remove(oldFlavor)
-                if not d[oldVersion]: del d[oldVersion]
-
-            flavorList = d.setdefault(newVersion, [])
-            flavorList.append(newFlavor)
-
-        jobList.append(groupJobList)
-
+    if not jobList[-1]:
+        jobList.pop()
     return jobList
+
 
 recursedGroups = set()
 def recurseTrove(sourceRepos, name, version, flavor,
@@ -718,12 +750,14 @@ class TargetRepository:
         self.repo.presentHiddenTroves(self.cfg.host)
 
 # split a troveList in changeset jobs
-def buildBundles(sourceRepos, target, troveList, absolute=False):
+def buildBundles(sourceRepos, target, troveList, absolute=False,
+        splitNodes=True):
     bundles = []
     log.debug("grouping %d troves based on version and flavor", len(troveList))
     groupList = groupTroves(troveList)
     log.debug("building grouped job list")
-    bundles = buildJobList(sourceRepos, target.repo, groupList, absolute)
+    bundles = buildJobList(sourceRepos, target.repo, groupList, absolute,
+            splitNodes)
     return bundles
 
 # return the new list of troves to process after filtering and sanity checks
@@ -939,7 +973,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # since these troves are required for all targets, we can use
         # the "first" one to build the relative changeset requests
         target = list(targetSet)[0]
-        bundles = buildBundles(sourceRepos, target, troveList, cfg.absoluteChangesets)
+        bundles = buildBundles(sourceRepos, target, troveList,
+                cfg.absoluteChangesets, cfg.splitNodes)
         for i, bundle in enumerate(bundles):
             jobList = [ x[1] for x in bundle ]
             # XXX it's a shame we can't give a hint as to what server to use
