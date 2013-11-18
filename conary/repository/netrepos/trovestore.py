@@ -193,9 +193,6 @@ class TroveStore:
 
         self.needsCleanup = False
         self.log = log or tracelog.getLog(None)
-        self.LATEST_TYPE_ANY = versionops.LATEST_TYPE_ANY
-        self.LATEST_TYPE_NORMAL = versionops.LATEST_TYPE_NORMAL
-        self.LATEST_TYPE_PRESENT = versionops.LATEST_TYPE_PRESENT
 
         self.versionIdCache = {}
         self.itemIdCache = {}
@@ -312,14 +309,19 @@ class TroveStore:
     # refresh the latest for all the recently presented troves
     def presentHiddenTroves(self):
         cu = self.db.cursor()
+        schema.resetTable(cu, 'tmpNewTroves')
         cu.execute("""
-        select i.instanceId, i.itemId, n.branchId, i.flavorId
-        from Instances as i join Nodes as n using(itemId, versionId)
-        where i.isPresent = ?""", instances.INSTANCE_PRESENT_HIDDEN)
-        for (instanceId, itemId, branchId, flavorId) in cu.fetchall():
-            cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=?",
-                       (instances.INSTANCE_PRESENT_NORMAL, instanceId))
-            self.latest.update(cu, itemId, branchId, flavorId)
+            INSERT INTO tmpNewTroves (itemId, branchId, flavorId,
+                versionId, instanceId, hidden, finaltimestamp)
+            SELECT itemId, branchId, flavorId, 0, instanceId, 0, 0
+            FROM Instances
+            JOIN Nodes USING (itemId, versionId)
+            WHERE isPresent = ?
+            """, instances.INSTANCE_PRESENT_HIDDEN)
+        cu.execute("""UPDATE Instances SET isPresent = ?
+            WHERE instanceId IN (SELECT instanceId FROM tmpNewTroves)
+            """, instances.INSTANCE_PRESENT_NORMAL)
+        self.latest.updateFromNewTroves('tmpNewTroves')
 
     def addTrove(self, trv, trvCs, hidden = False):
         cu = self.db.cursor()
@@ -869,140 +871,10 @@ class TroveStore:
 
         self.ri.addInstanceIdSet('tmpNewTroves', 'instanceId')
         self.depAdder.done()
-
-        d = { 'LATEST_TYPE_ANY' : versionops.LATEST_TYPE_ANY,
-              'LATEST_TYPE_PRESENT' : versionops.LATEST_TYPE_PRESENT,
-              'LATEST_TYPE_NORMAL' : versionops.LATEST_TYPE_NORMAL,
-              'TROVE_TYPE_REDIRECT' : trove.TROVE_TYPE_REDIRECT,
-              'TROVE_TYPE_REMOVED' : trove.TROVE_TYPE_REMOVED,
-              'INSTANCE_PRESENT_HIDDEN' : instances.INSTANCE_PRESENT_HIDDEN }
-
-        # LATEST_TYPE_ANY -- if what was just committed is newer, it wins.
-        # if not, it loses. Note that Nodes.finalTimestamp could be NULL,
-        # and the logic in the CASE gives the new troves timestamp in that
-        # case. We do a normal join against UserGroups here to make sure
-        # we check this trove for every user group, not just user groups
-        # who currently have permissions for troves on the branch. The
-        # WHERE clause restricts us to adding rows where we have something
-        # currently latest or where we have permissions to see the not
-        # hidden new trove.
-        #
-        # Note that the WHEN clause in the CASE is nearly the inverse of the
-        # WHERE clause after the OR. That's important to make sure we don't try
-        # to insert NULLs.
-        sql1 = """
-        INSERT INTO tmpNewLatest(userGroupId, itemId, branchId, flavorId,
-                                 versionId, latestType)
-        SELECT UserGroups.userGroupId, tmpNewTroves.itemId,
-               tmpNewTroves.branchId, tmpNewTroves.flavorId,
-               CASE
-                   WHEN Nodes.finalTimestamp > tmpNewTroves.finalTimestamp OR
-                        ugi.instanceId IS NULL OR
-                        tmpNewTroves.hidden = 1
-                   THEN lc.versionId
-                   ELSE tmpNewTroves.versionId
-               END AS latestVersionId,
-               %(LATEST_TYPE_ANY)d
-        FROM tmpNewTroves
-        CROSS JOIN UserGroups
-        LEFT OUTER JOIN UserGroupInstancesCache AS ugi ON
-                ugi.instanceId = tmpNewTroves.instanceId AND
-                ugi.userGroupId = UserGroups.userGroupId
-        LEFT OUTER JOIN LatestCache AS lc ON
-                tmpNewTroves.itemId = lc.itemId AND
-                tmpNewTroves.branchId = lc.branchId AND
-                tmpNewTroves.flavorId = lc.flavorId AND
-                UserGroups.userGroupId = lc.userGroupId AND
-                lc.latestType = %(LATEST_TYPE_ANY)d
-        LEFT OUTER JOIN Nodes ON lc.itemId = Nodes.itemId AND
-                                 lc.versionId = Nodes.versionId
-        WHERE
-            lc.versionId IS NOT NULL OR
-            (ugi.instanceId IS NOT NULL AND tmpNewTroves.hidden = 0)
-        """ % d
-        callback.updatingDatabase('latest', 1, 5)
-        cu.execute(sql1)
-
-        # LATEST_TYPE_PRESENT -- this is the same as LATEST_TYPE_ANY, but
-        # if a REMOVED type is being added stick with whatever was already
-        # in the latest table (unless there is nothing in the latest table;
-        # in that case we don't add anything here either)
-        sql2 = """
-        INSERT INTO tmpNewLatest(userGroupId, itemId, branchId, flavorId,
-                                 versionId, latestType)
-        SELECT UserGroups.userGroupId, tmpNewTroves.itemId,
-               tmpNewTroves.branchId, tmpNewTroves.flavorId,
-               CASE
-                   WHEN Nodes.finalTimestamp > tmpNewTroves.finalTimestamp OR
-                        tmpNewTroves.troveType = %(TROVE_TYPE_REMOVED)d OR
-                        ugi.instanceId IS NULL OR
-                        tmpNewTroves.hidden = 1
-                   THEN lc.versionId
-                   ELSE tmpNewTroves.versionId
-               END AS latestVersionId,
-               %(LATEST_TYPE_PRESENT)d
-        FROM tmpNewTroves
-        CROSS JOIN UserGroups
-        LEFT OUTER JOIN UserGroupInstancesCache AS ugi ON
-                ugi.instanceId = tmpNewTroves.instanceId AND
-                ugi.userGroupId = UserGroups.userGroupId
-        LEFT OUTER JOIN LatestCache AS lc ON
-                tmpNewTroves.itemId = lc.itemId AND
-                tmpNewTroves.branchId = lc.branchId AND
-                tmpNewTroves.flavorId = lc.flavorId AND
-                UserGroups.userGroupId = lc.userGroupId AND
-                lc.latestType = %(LATEST_TYPE_PRESENT)d
-        LEFT OUTER JOIN Nodes ON lc.itemId = Nodes.itemId AND
-                                 lc.versionId = Nodes.versionId
-        WHERE
-                lc.versionId IS NOT NULL OR
-                (tmpNewTroves.troveType != %(TROVE_TYPE_REMOVED)d AND
-                 tmpNewTroves.hidden = 0 AND
-                 ugi.instanceId IS NOT NULL)
-        """ % d
-        callback.updatingDatabase('latest', 2, 5)
-        cu.execute(sql2)
-
-        # LATEST_TYPE_NORMAL -- this is the same as LATEST_TYPE_PRESENT, but
-        # if a REDIRECT type is latest omit the row entirely
-        sql3 = """
-        INSERT INTO tmpNewLatest(userGroupId, itemId, branchId, flavorId,
-                                 versionId, latestType)
-        SELECT tmpNewLatest.userGroupId, tmpNewLatest.itemId,
-               tmpNewLatest.branchId, tmpNewLatest.flavorId,
-               tmpNewLatest.versionId, %(LATEST_TYPE_NORMAL)d
-        FROM tmpNewLatest JOIN Instances USING
-                (itemId, versionId, flavorId)
-        WHERE
-                tmpNewLatest.latestType = %(LATEST_TYPE_PRESENT)d AND
-                (Instances.troveType != %(TROVE_TYPE_REDIRECT)d OR
-                 Instances.isPresent = %(INSTANCE_PRESENT_HIDDEN)d)
-        """ % d
-        callback.updatingDatabase('latest', 3, 5)
-        cu.execute(sql3)
-
-        callback.updatingDatabase('latest', 4, 5)
-        if self.db.kind == 'postgresql':
-            cu.execute("DELETE FROM LatestCache USING tmpNewTroves WHERE"
-                        "   LatestCache.itemId = tmpNewTroves.itemId AND "
-                       "    LatestCache.branchId = tmpNewTroves.branchId AND "
-                       "    LatestCache.flavorId = tmpNewTroves.flavorId")
-        else:
-            new = list(cu.execute("SELECT DISTINCT itemId, branchId, "
-                                  "flavorId FROM tmpNewTroves"))
-            for (i, b, f) in new:
-                cu.execute("DELETE FROM LatestCache WHERE "
-                           "itemId = ? AND branchId = ? AND "
-                           "flavorId = ?", i, b, f)
-
-        callback.updatingDatabase('latest', 5, 5)
-        cu.execute("""
-                INSERT INTO LatestCache(userGroupId, itemId, branchId,
-                                        flavorId, versionId, latestType)
-                    SELECT userGroupId, itemId, branchId, flavorId,
-                           versionId, latestType FROM tmpNewLatest""")
-
         self.depAdder = None
+
+        callback.updatingDatabase('latest', 1, 1)
+        self.latest.updateFromNewTroves('tmpNewTroves')
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
                     urls, licenses, categories, source, language):

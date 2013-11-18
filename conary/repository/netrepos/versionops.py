@@ -189,6 +189,36 @@ class LatestTable:
         for itemId, flavorId, branchId in cu.fetchall():
             self.update(cu, itemId, branchId, flavorId, roleId)
 
+    def updateFromNewTroves(self, table='tmpNewTroves'):
+        """
+        Update latest entries for all item+branch+flavor slots mentioned in
+        tmpNewTroves.
+        """
+        cu = self.db.cursor()
+        if self.db.kind != 'sqlite':
+            cu.execute("""
+                DELETE FROM LatestCache old USING %s new
+                    WHERE old.itemId = new.itemId
+                    AND old.branchId = new.branchId
+                    AND old.flavorId = new.flavorId
+                """ % (table,))
+        else:
+            cu.execute("""SELECT DISTINCT itemId, branchId, flavorId
+                    FROM %s""" % (table,))
+            slots = [tuple(x) for x in cu.fetchall()]
+            cu.executemany("""DELETE FROM LatestCache
+                    WHERE itemId = ? AND branchId = ? AND flavorId = ?""",
+                    slots)
+
+        cu.execute("""
+            INSERT INTO LatestCache (latestType, userGroupId, itemId, branchId,
+                    flavorId, versionId)
+            SELECT DISTINCT v.latestType, v.userGroupId, v.itemId, v.branchId,
+                    v.flavorId, v.versionId
+            FROM LatestView v
+            JOIN %s n USING (itemId, branchId, flavorId)
+            """ % (table,))
+
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):

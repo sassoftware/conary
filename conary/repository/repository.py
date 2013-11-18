@@ -18,10 +18,12 @@
 # defines the Conary repository
 
 import itertools
+import time
 
 from conary.repository import changeset, errors, filecontents
 from conary import files, trove
-from conary.lib import log, patch, openpgpkey, openpgpfile, sha1helper, util
+from conary.lib import log, patch, sha1helper, util
+
 
 class AbstractTroveDatabase:
 
@@ -706,22 +708,35 @@ class ChangeSetJob:
         newList = [ x for x in cs.iterNewTroveList() ]
 
         if resetTimestamps:
-            # This depends intimiately on the versions cache. We don't
-            # change the timestamps on each version, because the cache
-            # ensures they are all a single underlying object. Slick,
-            # but brittle?
-            updated = {}
+            now = time.time()
+            slots = {}
+            for trvCs in newList:
+                slot = (trvCs.getName(), trvCs.getNewVersion().branch())
+                slots.setdefault(slot, set()).add(trvCs)
+            for slot, troves in slots.iteritems():
+                # The latest trove in each LatestCache slot is reset to the
+                # current server time. This avoids client clock skew causing
+                # new troves to be older than existing troves. All other
+                # versions in that slot must have a lower timestamp than the
+                # latest one.
 
-            for csTrove in newList:
-                ver = csTrove.getNewVersion()
-                if ver in updated:
-                    pass
-                else:
-                    oldVer = ver.copy()
-                    ver.trailingRevision().resetTimeStamp()
-                    updated[oldVer] = ver
-
-            del updated
+                # First, map out the latest timestamp for each unique version
+                # in this slot. This establishes an order to the versions.
+                nodes = {}
+                for trvCs in troves:
+                    ver = trvCs.getNewVersion()
+                    nodes[str(ver)] = max(nodes.get(str(ver), 0),
+                            ver.trailingRevision().timeStamp)
+                # Now reset all the timestamps, using now for the latest node
+                # and a lesser value for each preceding one.
+                newStamp = now
+                for ver, stamp in sorted(nodes.items(), key=lambda x: x[1],
+                        reverse=True):
+                    for trvCs in troves:
+                        if str(trvCs.getNewVersion()) == ver:
+                            trvCs.getNewVersion().trailingRevision(
+                                    ).timeStamp = newStamp
+                    newStamp -= 1
 
         troveNo, configRestoreList, normalRestoreList = \
             self._createInstallTroveObjects(fileHostFilter = fileHostFilter,
@@ -757,7 +772,7 @@ class ChangeSetJob:
                     raise errors.IntegrityError(
                         "Missing file contents for pathId %s, fileId %s" % (
                                         sha1helper.md5ToString(pathId),
-                                        sha1helper.sha1ToString(fileId)))
+                                        sha1helper.sha1ToString(oldFileId)))
 
                 oldLines = f.readlines()
                 f.close()

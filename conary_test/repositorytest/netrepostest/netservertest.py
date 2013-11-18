@@ -1504,3 +1504,39 @@ foo:runtime
         repos.deleteUserByName(self.cfg.buildLabel, 'test')
         self.assertEquals(repos.getAsciiOpenPGPKey(self.cfg.buildLabel,
             fingerprint), armored)
+
+    def testMultiVersionChangeset(self):
+        """Changeset with multiple versions of a trove"""
+        # Chronologically, troves are timestamped in this order:
+        # b:x86 a:x86 a:x86_64 b:x86_64
+        # The result should be a:* then b:*
+        times = range(1000000000, 1000000004)
+        cs = changeset.ReadOnlyChangeSet()
+        for v, f, t in [
+                ('b', 'is: x86',    1000000000),
+                ('a', 'is: x86',    1000000001),
+                ('a', 'is: x86_64', 1000000002),
+                ('b', 'is: x86_64', 1000000003),
+                ]:
+            trv, cs1 = self.Component('foo:runtime', v, f)
+            trv.version().trailingRevision().timeStamp = t
+            cs.merge(cs1)
+        repos = self.openRepository()
+        repos.commitChangeSet(cs)
+        matches = sorted(repos.findTrove(None,
+            ('foo:runtime', 'localhost@rpl:linux', None), getLeaves=False))
+        VFS = versions.VersionFromString
+        Flavor = deps.parseFlavor
+        self.assertEqual(matches, [
+            ('foo:runtime', VFS('/localhost@rpl:linux/a-1-1'), Flavor('is: x86')),
+            ('foo:runtime', VFS('/localhost@rpl:linux/a-1-1'), Flavor('is: x86_64')),
+            ('foo:runtime', VFS('/localhost@rpl:linux/b-1-1'), Flavor('is: x86')),
+            ('foo:runtime', VFS('/localhost@rpl:linux/b-1-1'), Flavor('is: x86_64')),
+            ])
+        ts = [x[1].trailingRevision().timeStamp for x in matches]
+        # Timestamps must have been reset
+        assert ts[0] > 1000000003
+        # Timestamps must match between flavors, and be different between versions
+        assert ts[0] == ts[1]
+        assert ts[0] < ts[2]
+        assert ts[2] == ts[3]
