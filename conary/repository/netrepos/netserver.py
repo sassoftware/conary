@@ -1352,10 +1352,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getFileContentsFromTrove(self, authToken, clientVersion,
                                  troveName, version, flavor, pathList):
         self.log(2, troveName, version, flavor, pathList)
-        if not self.auth.check(authToken,
-                               label=self.toVersion(version).trailingLabel(),
-                               trove=troveName):
-            raise errors.InsufficientPermission
+
+        trvList = self._lookupTroves(authToken, [(troveName, version, flavor)])
+        for isPresent, hasAccess in trvList:
+            if isPresent and not hasAccess:
+                raise errors.InsufficientPermission
+
         pathList = [ base64.decodestring(x) for x in pathList ]
         cu = self.db.cursor()
         schema.resetTable(cu, 'tmpFilePaths')
