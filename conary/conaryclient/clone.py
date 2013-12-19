@@ -1045,12 +1045,12 @@ class ClientClone(object):
             try:
                 cl = cloneJob.options.callback.getCloneChangeLog(trv)
             except Exception, e:
-                log.error(str(e))
+                log.error("%s", str(e))
                 return None
 
             if cl is None:
                 log.error("no change log message was given"
-                          " for %s." % trv.getName())
+                          " for %s.", trv.getName())
                 return None
             trv.changeChangeLog(cl)
         # reset the signatures, because all the versions have now
@@ -1646,8 +1646,8 @@ class LeafMap(object):
                 infoList = troveCache.getTroveInfo(
                                 trove._TROVEINFO_TAG_CLONEDFROMLIST, troveTups)
             except errors.ConaryError, msg:
-                log.debug('warning: Could not access host %s: %s' %
-                                (host, msg))
+                log.debug('warning: Could not access host %s: %s',
+                                host, msg)
 
             # handle old CLONEDFROM adequately if CLONEDFROMLIST doesn't
             # exist
@@ -1660,8 +1660,8 @@ class LeafMap(object):
                                 trove._TROVEINFO_TAG_CLONEDFROM,
                                 [ troveTups[x] for x in missingList ])
             except errors.ConaryError, msg:
-                log.debug('warning: Could not access host %s: %s' %
-                                (host, msg))
+                log.debug('warning: Could not access host %s: %s',
+                                host, msg)
 
             for i, clonedFrom in itertools.izip(missingList, cfList):
                 if clonedFrom:
