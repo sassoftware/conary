@@ -15,18 +15,22 @@
 #
 
 
-import cPickle
+try:
+    import cPickle as _pickle
+    pickle = _pickle
+except ImportError:
+    import pickle
 import os
 import imp
 import modulefinder
-from modulefinder import READ_MODE
 import struct
 import sys
+import traceback
 
 if __name__ != "__main__":
     # We may not be able to find these when being run as a program
     # via the moduleFinderProxy
-    from conary.lib import coveragehook
+    from conary.lib import coveragehook  # pyflakes=ignore
     from conary import errors
 
     # only in the conary module case do we care about
@@ -80,7 +84,7 @@ class DirBasedModuleFinder(modulefinder.ModuleFinder):
             mode = 'rb'
         else:
             fileType = imp.PY_SOURCE
-            mode = READ_MODE
+            mode = 'rU'
         fp = open(pathname, mode)
         stuff = (ext, mode, fileType)
         missing = self.missing.setdefault(pathname, set())
@@ -180,7 +184,7 @@ class DirBasedModuleFinder(modulefinder.ModuleFinder):
 
 def getData(inFile):
     def readAll(remaining):
-        data = ''
+        data = b''
         while remaining > 0:
             partial = inFile.read(remaining)
             if not partial:
@@ -196,11 +200,11 @@ def getData(inFile):
     if len(data) != size:
         raise ModuleFinderProtocolError(
             'Insufficient data: got %s expected %s', len(data), size)
-    return cPickle.loads(data)
+    return pickle.loads(data)
 
 
 def putData(outFile, data):
-    data = cPickle.dumps(data)
+    data = pickle.dumps(data, 2)
     size = len(data)
     size = struct.pack('!I', size)
     outFile.write(size+data)
@@ -231,7 +235,7 @@ class moduleFinderProxy:
         data = {'cmd': 'init', 'destdir': destdir, 'sysPath': sysPath}
         try:
             putData(self.proxyProcess.stdin, data)
-        except IOError, e:
+        except IOError as e:
             # failure to write to pipe means child did not initialize
             raise ModuleFinderInitializationError(e)
         try:
@@ -239,7 +243,7 @@ class moduleFinderProxy:
             if ack['result'] != 'ready':
                 raise ModuleFinderProtocolError('Wrong initial response from'
                     ' dependency discovery process')
-        except ModuleFinderProtocolErrorNoData, e:
+        except ModuleFinderProtocolErrorNoData as e:
             # no data available now means child did not initialize
             raise ModuleFinderInitializationError(e)
         self.poll()
@@ -267,6 +271,12 @@ class moduleFinderProxy:
 def main():
     # Proxy process that does the actual scanning using the target python
     destDir = sysPath = finder = None
+    try:
+        # Python 3
+        sys.stdin = sys.stdin.detach()
+        sys.stdout = sys.stdout.detach()
+    except AttributeError:
+        pass
 
     while True:
         data = getData(sys.stdin)
@@ -316,7 +326,8 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except ModuleFinderProtocolError, e:
+    except ModuleFinderProtocolError as e:
         os._exit(1)
     except:
+        traceback.print_exc()
         os._exit(4)
