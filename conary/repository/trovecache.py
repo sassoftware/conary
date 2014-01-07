@@ -44,7 +44,7 @@ class CacheDict(dict):
 
 class TroveCache(trovesource.AbstractTroveSource):
 
-    VERSION = (2, 0)                    # (major, minor)
+    VERSION = (3, 0)                    # (major, minor)
 
     _fileId = '\0' * 40
     _troveCacheVersionPathId = 'TROVE-CACHE-FILE-VERSION--------'
@@ -385,9 +385,11 @@ class TroveCache(trovesource.AbstractTroveSource):
         self._savePickle(self._depCachePathId, depList)
 
     def _loadDepSolutions(self):
-        if self.version < (2, 0):
-            # Earlier versions were missing timestamps, which interferes with
-            # dep solver tie-breaking.
+        if self.version < (3, 0):
+            # Version 1 was missing timestamps, which interferes with dep
+            # solver tie-breaking.
+            # Version 2 could have bogus unresolved dep solutions due to a bug
+            # so the version was bumped to invalidate those.
             return
         depSolutionsList = self._loadPickle(self._depSolutionsPathId)
         for (sig, depSet, aResult) in depSolutionsList:

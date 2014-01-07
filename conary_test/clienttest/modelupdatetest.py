@@ -29,7 +29,9 @@ from conary.repository import changeset
 
 class ModelUpdateTest(rephelp.RepositoryHelper):
 
-    def _applyModel(self, modelList, addSearchLabel=True, apply=True):
+    def _applyModel(self, modelList, addSearchLabel=True, apply=True,
+            useCache=None):
+        cachePath = os.path.join(self.workDir, 'modelcache')
         from conary import callbacks
         client = conaryclient.ConaryClient(self.cfg,
                                 updateCallback = callbacks.UpdateCallback())
@@ -37,6 +39,8 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
         model = cml.CML(self.cfg)
         cache = modelupdate.CMLTroveCache(
                                     client.getDatabase(), client.getRepos())
+        if useCache and os.path.exists(cachePath):
+            cache.load(cachePath)
 
         if addSearchLabel:
             updatedModel = list(modelList)
@@ -49,6 +53,8 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
         updJob = client.newUpdateJob()
         ts = client.cmlGraph(model)
         suggMap = client._updateFromTroveSetGraph(updJob, ts, cache)
+        if useCache:
+            cache.save(cachePath)
 
         if not apply:
             return ts
@@ -687,3 +693,26 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
         self.addComponent('foo:runtime', '1.0-1-1')
         self.addCollection('foo', '1.0-1-1', [':runtime'])
         self._applyModel([ 'install foo=/localhost@rpl:linux' ])
+
+    def testCacheMergeBug(self):
+        "@tests: CNY-3770"
+        self.addComponent('foo:runtime', provides='file: /bin/foo')
+        self.addComponent('bar:runtime', provides='file: /bin/bar')
+        self.addComponent('foo2:runtime', requires='file: /bin/foo')
+        self.addComponent('bar2:runtime', requires='file: /bin/bar')
+        for name in ['foo', 'foo2', 'bar', 'bar2']:
+            self.addCollection(name, [':runtime'])
+        model = [
+                'search bar=localhost@rpl:linux',
+                'search foo=localhost@rpl:linux',
+                'install foo2:runtime=localhost@rpl:linux',
+                ]
+        # First pass caches a hit for /bin/foo on the foo= search line.
+        self._applyModel(model, addSearchLabel=False, useCache=True)
+        # Second pass caches a miss for /bin/bar on the foo= search line.
+        # The bug is that it would also cache a miss for all other foo=
+        # solutions including the /bin/foo one.
+        model.append('install bar2:runtime=localhost@rpl:linux')
+        self._applyModel(model, addSearchLabel=False, useCache=True)
+        # The third operation would always fail now that the cache is poisoned.
+        self._applyModel(model, addSearchLabel=False, useCache=True)

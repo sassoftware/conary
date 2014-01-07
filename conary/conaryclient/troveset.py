@@ -156,7 +156,7 @@ class ResolveTroveTupleSetTroveSource(SimpleFilteredTroveSource):
         if not self.depTroveIdMap:
             # No requirements were matched by troves in this set, so add
             # negative cache entries for all of the requirements checked.
-            for depSet in depList:
+            for depSet in finalDepList:
                 self.troveCache.addDepSolution(self.troveTupSig, depSet, [])
             return cachedSuggMap
 

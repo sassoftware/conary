@@ -1,0 +1,2 @@
+Fixed a long-standing caching bug in which a system-model update would fail
+with unresolved dependencies that were already satisfied by installed troves.
