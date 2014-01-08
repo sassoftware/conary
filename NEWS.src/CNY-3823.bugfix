@@ -1,2 +1,0 @@
-Capsule synchronization no longer fails if a RPM contains a symlink but the
-filesystem contains a different type of file instead.

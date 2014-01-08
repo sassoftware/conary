@@ -1,3 +1,30 @@
+Changes in 2.5.1:
+  o New Features:
+    * The mirror process can now build bigger changesets, which slightly
+      speeds up mirror jobs.  If configured using the new 'splitNodes
+      False' option, the mirror can commit multiple versions of a trove
+      at once, although doing so on an older repository will cause a
+      crash.
+    * Minor performance improvements when committing changesets.
+    * Repositories can now accept changesets containing multiple
+      versions of the same trove.
+    * The Python dep analyzer is now compatible with Python 3, but no
+      longer compatible with Python 2.4 (CNY-3828)
+
+  o Bug Fixes:
+    * Fixed mirror-mode changesets always including all file contents,
+      instead of only those files that have changed. (CNY-3822)
+    * Capsule synchronization no longer fails if a RPM contains a
+      symlink but the filesystem contains a different type of file
+      instead. (CNY-3823)
+    * Fixed default userinfo handler crashing when malformed lines (e.g.
+      comments) are present in passwd and group files. (CNY-3824)
+    * A bug that caused erroneous Insufficient Permission errors when
+      authenticating via an entitlement has been fixed. (CNY-3827)
+    * Fixed a long-standing caching bug in which a system-model update
+      would fail with unresolved dependencies that were already
+      satisfied by installed troves. (CNY-3770)
+
 Changes in 2.5.0:
   o New Features:
     * Significant performance improvements when working with

@@ -1,1 +1,0 @@
-Fixed default userinfo handler crashing when malformed lines (e.g. comments) are present in passwd and group files.
