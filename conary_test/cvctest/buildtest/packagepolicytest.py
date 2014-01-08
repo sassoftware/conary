@@ -167,12 +167,15 @@ class TestBadInterpreterPaths(PackageRecipe):
             recipestr1, "TestBadInterpreterPaths")
 
     def testSymlinkInterpreter(self):
-        bin2 = self.workDir + '/bin2'
-        with open(bin2, 'w') as f:
-            f.write('#!/bin/bash')
-        os.chmod(bin2, 0755)
-        link2 = self.workDir + '/link2'
-        os.symlink('bin2', link2)
+        os.mkdir(self.workDir + '/dir1')
+        open(self.workDir + '/dir1/bin1', 'w').close()
+        os.chmod(self.workDir + '/dir1/bin1', 0755)
+        os.symlink('bin1', self.workDir + '/dir1/link1')
+        os.symlink('dir1', self.workDir + '/dirlink1')
+
+        open(self.workDir + '/bin2', 'w').close()
+        os.chmod(self.workDir + '/bin2', 0755)
+        os.symlink('bin2', self.workDir + '/link2')
         recipestr1 = """
 class TestBadInterpreterPaths(PackageRecipe):
     name = 'test'
@@ -180,11 +183,20 @@ class TestBadInterpreterPaths(PackageRecipe):
     clearBuildReqs()
 
     def setup(self):
-        self.Create('/bin/prog2', contents='#!%(link2)s\\n', mode=0755)
-""" % dict(link2=link2)
+        self.Create('/bin/prog1', contents='#!%(workDir)s/dirlink1/bin1\\n', mode=0755)
+        self.Create('/bin/prog1b', contents='#!%(workDir)s/dirlink1/link1\\n', mode=0755)
+        self.Create('/bin/prog2', contents='#!%(workDir)s/link2\\n', mode=0755)
+""" % dict(workDir=self.workDir)
         self.buildRecipe(recipestr1, 'TestBadInterpreterPaths')
         self.updatePkg('test:runtime', depCheck=False)
-        self.assertEquals(open(self.rootDir + '/bin/prog2').read(), '#!%s\n' % bin2)
+        # Dir symlink was rewritten
+        self.assertEquals(open(self.rootDir + '/bin/prog1').read(),
+                '#!%s/dir1/bin1\n' % self.workDir)
+        self.assertEquals(open(self.rootDir + '/bin/prog1b').read(),
+                '#!%s/dir1/link1\n' % self.workDir)
+        # File symlink was not
+        self.assertEquals(open(self.rootDir + '/bin/prog2').read(),
+                '#!%s/link2\n' % self.workDir)
 
 
 class NonMultilibComponentTest(rephelp.RepositoryHelper):
