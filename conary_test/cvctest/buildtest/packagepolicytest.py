@@ -166,6 +166,26 @@ class TestBadInterpreterPaths(PackageRecipe):
         self.assertRaises(policy.PolicyError, self.buildRecipe,
             recipestr1, "TestBadInterpreterPaths")
 
+    def testSymlinkInterpreter(self):
+        bin2 = self.workDir + '/bin2'
+        with open(bin2, 'w') as f:
+            f.write('#!/bin/bash')
+        os.chmod(bin2, 0755)
+        link2 = self.workDir + '/link2'
+        os.symlink('bin2', link2)
+        recipestr1 = """
+class TestBadInterpreterPaths(PackageRecipe):
+    name = 'test'
+    version = '0'
+    clearBuildReqs()
+
+    def setup(self):
+        self.Create('/bin/prog2', contents='#!%(link2)s\\n', mode=0755)
+""" % dict(link2=link2)
+        self.buildRecipe(recipestr1, 'TestBadInterpreterPaths')
+        self.updatePkg('test:runtime', depCheck=False)
+        self.assertEquals(open(self.rootDir + '/bin/prog2').read(), '#!%s\n' % bin2)
+
 
 class NonMultilibComponentTest(rephelp.RepositoryHelper):
     def testNonMultilibComponentTest1(self):
