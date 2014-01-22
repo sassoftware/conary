@@ -462,12 +462,12 @@ class ReposWeb(object):
         self._redirect("userlist")
 
     @checkAuth(admin = True)
-    @strFields(newRoleName = None)
+    @strFields(newRoleName = None, acceptFlags='')
     @listFields(str, memberList = [])
     @intFields(canMirror = False)
     @intFields(roleIsAdmin = False)
     def addRole(self, auth, newRoleName, memberList, canMirror,
-                roleIsAdmin):
+                roleIsAdmin, acceptFlags):
         try:
             self.repServer.auth.addRole(newRoleName)
         except errors.RoleAlreadyExists:
@@ -477,6 +477,8 @@ class ReposWeb(object):
         self.repServer.auth.updateRoleMembers(newRoleName, memberList)
         self.repServer.auth.setMirror(newRoleName, canMirror)
         self.repServer.auth.setAdmin(newRoleName, roleIsAdmin)
+        acceptFlags = deps.parseFlavor(acceptFlags, raiseError=True)
+        self.repServer.auth.setRoleFilters({newRoleName: (acceptFlags, None)})
 
         self._redirect("userlist")
 
