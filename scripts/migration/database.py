@@ -138,7 +138,8 @@ class Database:
         return [x.lower() for x in self.db.tables]
     def iterRows(self, table, fields = "*"):
         cu = self.db.itercursor()
-        cu.execute("select %s %s from %s" % (self._hint, fields, table))
+        cu.execute("select %s %s from %s %s" % (self._hint, fields, table,
+            '' if fields == '*' else ('order by ' + fields) ))
         return cu
     # functions for when the instance is a target
     def prepareInsert(self, table, fields):
