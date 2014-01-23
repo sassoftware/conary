@@ -191,33 +191,30 @@ class LatestTable:
 
     def updateFromNewTroves(self, table='tmpNewTroves'):
         """
-        Update latest entries for all item+branch+flavor slots mentioned in
-        tmpNewTroves.
+        Update latest entries for a list of (itemId, branchId, flavorId) slots.
         """
+        # This used to use the temp table but with very large databases the
+        # query planner would make some awful decisions and end up taking 5
+        # minutes to insert a single new trove. This way has great performance
+        # for single troves and scales suitably well into the thousands.
+        #
+        # TODO: it's likely that the rest of the commit path would be better
+        # off using a list in software instead of a temporary table.
+        # Investigate that.
         cu = self.db.cursor()
-        if self.db.kind != 'sqlite':
-            cu.execute("""
-                DELETE FROM LatestCache old USING %s new
-                    WHERE old.itemId = new.itemId
-                    AND old.branchId = new.branchId
-                    AND old.flavorId = new.flavorId
-                """ % (table,))
-        else:
-            cu.execute("""SELECT DISTINCT itemId, branchId, flavorId
-                    FROM %s""" % (table,))
-            slots = [tuple(x) for x in cu.fetchall()]
-            cu.executemany("""DELETE FROM LatestCache
-                    WHERE itemId = ? AND branchId = ? AND flavorId = ?""",
-                    slots)
-
+        cu.execute("SELECT itemId, branchId, flavorId FROM %s" % table)
+        query = ' OR '.join(
+                '(itemId = %d AND branchId = %d AND flavorId = %d)'
+                % tuple(x) for x in cu)
+        if not query:
+            return
+        cu.execute("DELETE FROM LatestCache WHERE " + query)
         cu.execute("""
             INSERT INTO LatestCache (latestType, userGroupId, itemId, branchId,
                     flavorId, versionId)
             SELECT DISTINCT v.latestType, v.userGroupId, v.itemId, v.branchId,
                     v.flavorId, v.versionId
-            FROM LatestView v
-            JOIN %s n USING (itemId, branchId, flavorId)
-            """ % (table,))
+            FROM LatestView v WHERE """ + query)
 
 
 class LabelMap(idtable.IdPairSet):
