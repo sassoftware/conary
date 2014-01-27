@@ -1,0 +1,13 @@
+commit.py
+cscmd.py
+fmtroves.py
+metadata.py
+query.py
+queryrep.py
+rollbacks.py
+showchangeset.py
+updatecmd.py
+verify.py
+branch.py
+clone.py
+cvc.py

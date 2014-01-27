@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright (c) SAS Institute Inc.
 #
@@ -19,6 +19,11 @@
 hgDir=`dirname $0`/..
 if [[ -x /usr/bin/hg && -d $hgDir/.hg ]] ; then
     rev=`hg id -i`
+elif [[ -x /usr/bin/git && -d $hgDir/.git ]]; then
+    rev=$(git rev-parse --short=12 HEAD)
+    if ! git diff-index --quiet HEAD; then
+        rev="${rev}+"
+    fi
 elif [ -f $hgDir/.hg_archival.txt ]; then
     rev=`grep node $hgDir/.hg_archival.txt |cut -d' ' -f 2 |head -c 12`;
 else
