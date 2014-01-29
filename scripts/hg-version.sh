@@ -16,17 +16,24 @@
 #
 
 
-hgDir=`dirname $0`/..
-if [[ -x /usr/bin/hg && -d $hgDir/.hg ]] ; then
-    rev=`hg id -i`
-elif [[ -x /usr/bin/git && -d $hgDir/.git ]]; then
+top=$(dirname $0)/..
+if [[ -x /usr/bin/hg && -d "$top/.hg" ]]
+then
+    hg id -i
+elif [[ -x /usr/bin/git && -d "$top/.git" ]]
+then
     rev=$(git rev-parse --short=12 HEAD)
-    if ! git diff-index --quiet HEAD; then
+    if ! git diff-index --quiet HEAD
+    then
         rev="${rev}+"
     fi
-elif [ -f $hgDir/.hg_archival.txt ]; then
-    rev=`grep node $hgDir/.hg_archival.txt |cut -d' ' -f 2 |head -c 12`;
-else
-    rev= ;
-fi ;
-echo "$rev"
+    echo "$rev"
+elif [[ -f "$top/.hg_archival.txt" ]]
+then
+    grep node $top/.hg_archival.txt |cut -d' ' -f 2 |head -c 12
+    echo
+elif grep -qv '$Format' "$top/.commit_id.txt"
+then
+    head -c 12 "$top/.commit_id.txt"
+    echo
+fi
