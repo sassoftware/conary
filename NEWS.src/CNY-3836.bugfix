@@ -1,0 +1,1 @@
+Fixed model cache corruption when the system-model contained 'patch' operations.
