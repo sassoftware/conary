@@ -1,0 +1,524 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="svg1"
+   sodipodi:version="0.32"
+   inkscape:version="0.48.4 r9939"
+   width="451.21875"
+   height="161.8125"
+   sodipodi:docname="packagestructure.svg"
+   inkscape:export-filename="/home/johnsonm/d/docs/techpapers/techoverview/packagestructure.png"
+   inkscape:export-xdpi="110.00000"
+   inkscape:export-ydpi="110.00000"
+   version="1.1">
+  <metadata
+     id="metadata130">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs3" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.4142136"
+     inkscape:cx="239.72125"
+     inkscape:cy="109.07374"
+     inkscape:window-width="1059"
+     inkscape:window-height="675"
+     showgrid="true"
+     snaptogrid="false"
+     vertgrid="true"
+     horizgrid="true"
+     gridtolerance="0.050000000in"
+     showguides="true"
+     snaptoguides="false"
+     inkscape:window-x="147"
+     inkscape:window-y="36"
+     inkscape:current-layer="svg1"
+     inkscape:window-maximized="0"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0">
+    <sodipodi:guide
+       orientation="vertical"
+       position="-17.46875,-89.330945"
+       id="guide825" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,-17.330945"
+       id="guide826" />
+    <sodipodi:guide
+       orientation="vertical"
+       position="341.15928,-89.330945"
+       id="guide1681" />
+    <sodipodi:guide
+       orientation="vertical"
+       position="148.82624,-89.330945"
+       id="guide1682" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,99.466565"
+       id="guide1912" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,83.910215"
+       id="guide1913" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,68.353865"
+       id="guide1914" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,54.211735"
+       id="guide1915" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,40.069595"
+       id="guide1916" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,25.927465"
+       id="guide1917" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,12.492435"
+       id="guide1918" />
+    <sodipodi:guide
+       orientation="horizontal"
+       position="-89.46875,-1.6497049"
+       id="guide1920" />
+    <sodipodi:guide
+       orientation="vertical"
+       position="37.81047,-89.330945"
+       id="guide1921" />
+    <sodipodi:guide
+       orientation="vertical"
+       position="196.20239,-89.330945"
+       id="guide1922" />
+    <inkscape:grid
+       id="GridFromPre046Settings"
+       type="xygrid"
+       originx="-0.99409722in"
+       originy="-0.99256607in"
+       spacingx="0.20000000in"
+       spacingy="0.19685039in"
+       color="#3f3fff"
+       empcolor="#3f3fff"
+       opacity="0.15"
+       empopacity="0.38"
+       empspacing="5"
+       units="in"
+       visible="true"
+       enabled="true"
+       snapvisiblegridlinesonly="true" />
+  </sodipodi:namedview>
+  <g
+     id="g1786"
+     transform="translate(-89.46875,-801.21875)">
+    <rect
+       style="fill:#e5e5ff;fill-opacity:0.75;fill-rule:evenodd;stroke:#000000;stroke-width:1.06394854pt"
+       id="rect827"
+       width="449.85916"
+       height="160.48924"
+       x="90.148483"
+       y="801.87292" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="98.262718"
+       y="816.91986"
+       id="text993"><tspan
+         id="tspan994">package</tspan></text>
+  </g>
+  <text
+     xml:space="preserve"
+     style="font-size:12.26075268px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+     x="42.948238"
+     y="56.264717"
+     id="text872"
+     sodipodi:linespacing="100%"
+     transform="scale(1.0217294,0.97873272)"><tspan
+       id="tspan873">file</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.398041"
+     y="15.878726"
+     id="text1396"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan1397">gzip</tspan></text>
+  <g
+     id="g2237"
+     transform="translate(-89.46875,-621.21875)">
+    <g
+       id="g2141"
+       transform="translate(-2.5,0)">
+      <g
+         id="g2130"
+         transform="matrix(0.971911,0,0,1,3.062959,0)">
+        <rect
+           style="fill:#c3c2ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.05066137pt"
+           id="rect832"
+           width="187.66121"
+           height="124.01575"
+           x="109.60473"
+           y="823.448"
+           transform="translate(0,-180)" />
+        <rect
+           style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.09838161pt"
+           id="rect835"
+           width="166.79079"
+           height="17.716522"
+           x="130.47517"
+           y="929.74719"
+           transform="translate(0,-180)" />
+        <rect
+           style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.09838161pt"
+           id="rect851"
+           width="166.79079"
+           height="17.716522"
+           x="130.47517"
+           y="912.24719"
+           transform="translate(0,-180)" />
+        <rect
+           style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.09838161pt"
+           id="rect856"
+           width="166.79079"
+           height="17.716522"
+           x="130.47517"
+           y="894.74719"
+           transform="translate(0,-180)" />
+        <rect
+           style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.09838161pt"
+           id="rect861"
+           width="166.79079"
+           height="17.716522"
+           x="130.47517"
+           y="877.24719"
+           transform="translate(0,-180)" />
+        <rect
+           style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.09838161pt"
+           id="rect866"
+           width="166.79079"
+           height="17.716522"
+           x="130.47517"
+           y="859.74719"
+           transform="translate(0,-180)" />
+        <rect
+           style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.09838161pt"
+           id="rect876"
+           width="166.79079"
+           height="17.716522"
+           x="130.47517"
+           y="842.24719"
+           transform="translate(0,-180)" />
+      </g>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="111.0834"
+         y="836.98859"
+         id="text880"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan881">component</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="127.73855"
+         y="943.78687"
+         id="text842"
+         sodipodi:linespacing="100%"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan843">file</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="127.73855"
+         y="926.28687"
+         id="text852"
+         sodipodi:linespacing="100%"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan853">file</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="127.73855"
+         y="908.78687"
+         id="text857"
+         sodipodi:linespacing="100%"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan858">file</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="127.73855"
+         y="891.28687"
+         id="text862"
+         sodipodi:linespacing="100%"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan863">file</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="127.73855"
+         y="873.78687"
+         id="text867"
+         sodipodi:linespacing="100%"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan868">file</tspan></text>
+      <text
+         xml:space="preserve"
+         style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+         x="127.73855"
+         y="856.28687"
+         id="text877"
+         sodipodi:linespacing="100%"
+         transform="matrix(1.043931,0,0,1,0,-180)"><tspan
+           id="tspan878">file</tspan></text>
+    </g>
+    <rect
+       style="fill:#c3c2ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.05066137pt"
+       id="rect2173"
+       width="187.66121"
+       height="124.01575"
+       x="109.60473"
+       y="823.448"
+       transform="matrix(1.168321,0,0,1,179.165,-180)" />
+    <rect
+       style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.20578899pt"
+       id="rect2174"
+       width="201.0056"
+       height="17.716522"
+       x="325.43808"
+       y="749.74719" />
+    <rect
+       style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.20578899pt"
+       id="rect2175"
+       width="201.0056"
+       height="17.716522"
+       x="325.43808"
+       y="732.24719" />
+    <rect
+       style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.20578899pt"
+       id="rect2176"
+       width="201.0056"
+       height="17.716522"
+       x="325.43808"
+       y="714.74719" />
+    <rect
+       style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.20578899pt"
+       id="rect2177"
+       width="201.0056"
+       height="17.716522"
+       x="325.43808"
+       y="697.24719" />
+    <rect
+       style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.20578899pt"
+       id="rect2178"
+       width="201.0056"
+       height="17.716522"
+       x="325.43808"
+       y="679.74719" />
+    <rect
+       style="fill:#7a77ff;fill-rule:evenodd;stroke:#000000;stroke-width:1.20578899pt"
+       id="rect2179"
+       width="201.0056"
+       height="17.716522"
+       x="325.43808"
+       y="662.24719" />
+    <text
+       xml:space="preserve"
+       style="font-size:12px;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="297.87735"
+       y="656.98859"
+       id="text2180"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2181">component</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="315.37918"
+       y="763.78687"
+       id="text2183"
+       sodipodi:linespacing="100%"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2184">file</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="315.37918"
+       y="746.28687"
+       id="text2186"
+       sodipodi:linespacing="100%"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2187">file</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="315.37918"
+       y="728.78687"
+       id="text2189"
+       sodipodi:linespacing="100%"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2190">file</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="315.37918"
+       y="711.28687"
+       id="text2192"
+       sodipodi:linespacing="100%"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2193">file</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="315.37918"
+       y="693.78687"
+       id="text2195"
+       sodipodi:linespacing="100%"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2196">file</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:12px;line-height:100%;stroke-width:1pt;font-family:Nimbus Sans L"
+       x="315.37918"
+       y="676.28687"
+       id="text2198"
+       sodipodi:linespacing="100%"
+       transform="scale(1.043931,1)"><tspan
+         id="tspan2199">file</tspan></text>
+  </g>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="103.89804"
+     y="35.878727"
+     id="text1923"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan1924">gzip:runtime</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="303.89804"
+     y="35.878727"
+     id="text1926"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan1927">gzip:doc</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.797806"
+     y="55.232975"
+     id="text1929"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan1930">/bin/gunzip</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="266.79782"
+     y="55.232975"
+     id="text1935"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan1936">...info/gzip.info.gz</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="266.79782"
+     y="72.732971"
+     id="text1938"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan1939">...man1/gunzip.1.gz</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="266.79782"
+     y="90.232971"
+     id="text2299"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2300">...man1/gzip.1.gz</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="266.79782"
+     y="107.73297"
+     id="text2302"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2303">...man1/zcat.1.gz</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="266.79782"
+     y="125.23297"
+     id="text2305"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2306">...man1/zgrep.1.gz</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="266.79782"
+     y="142.73297"
+     id="text2308"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2309">...man1/zdiff.1.gz</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.797806"
+     y="72.732971"
+     id="text2311"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2312">/bin/gzip</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.797806"
+     y="90.232971"
+     id="text2314"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2315">/bin/zcat</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.797806"
+     y="107.73297"
+     id="text2317"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2318">/bin/zdiff</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.797806"
+     y="125.23297"
+     id="text2320"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2321">/bin/zegrep</tspan></text>
+  <text
+     xml:space="preserve"
+     style="font-size:12px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:100%;writing-mode:lr-tb;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier"
+     x="71.797806"
+     y="142.73297"
+     id="text2323"
+     sodipodi:linespacing="100%"><tspan
+       id="tspan2324">/bin/zgrep</tspan></text>
+</svg>
