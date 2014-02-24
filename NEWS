@@ -1,3 +1,18 @@
+Changes in 2.5.2:
+  o New Features:
+    * Added an updated version of the Conary introductory technical
+      paper as doc/ConaryTechnology.fodt
+
+  o Bug Fixes:
+    * Fixed being unable to create roles via the web interface.
+      (CNY-3837)
+    * Fixed performance regression when committing to a very large
+      repository. (CNY-3834)
+    * Fixed model cache corruption when the system-model contained
+      'patch' operations. (CNY-3836)
+    * lookaside: fix sourceSearchDir always missing autosourced files
+      (CNY-3845)
+
 Changes in 2.5.1:
   o New Features:
     * The mirror process can now build bigger changesets, which slightly
