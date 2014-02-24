@@ -19,10 +19,9 @@
 import codecs
 import os
 import re
+import subprocess
 import sys
 import textwrap
-import time
-from mercurial import hg, ui
 
 
 PRODUCT_NAME = "Conary"
@@ -38,14 +37,33 @@ NEWSDIR = 'NEWS.src'
 RE_ISSUE = re.compile('^[A-Z0-9]+-\d+')
 
 
+def git(args):
+    args = ['git'] + list(args)
+    proc = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE)
+    stdout, _ = proc.communicate()
+    if proc.returncode:
+        sys.exit("git exited with status code %s" % proc.returncode)
+    return stdout
+
+
+def ls_files():
+    return set(
+            git(['ls-tree', '--name-only', 'HEAD', NEWSDIR + '/']
+        ).splitlines())
+
+
+def ls_changed():
+    return set(x[3:] for x in
+            git(['status', '--porcelain', NEWSDIR + '/']
+        ).splitlines())
+
+
 def main():
     rootdir = os.path.realpath(__file__ + '/../..')
     os.chdir(rootdir)
 
     if not os.path.isdir(NEWSDIR):
         sys.exit("Can't find news directory")
-
-    repo = hg.repository(ui.ui(), '.')
 
     args = sys.argv[1:]
     if args:
@@ -54,9 +72,9 @@ def main():
         command = 'preview'
 
     if command == 'generate':
-        generate(repo)
+        generate()
     elif command == 'preview':
-        out, htmlOut, _ = preview(repo)
+        out, htmlOut, _ = preview()
         print 'Text Version:\n'
         for line in out:
             print line
@@ -67,14 +85,14 @@ def main():
         sys.exit("Usage: %s <preview|generate>" % sys.argv[0])
 
 
-def preview(repo, modifiedOK=True):
-    mod, add, rem, del_, unk, ign, cln = repo.status(clean=True)
-    ok = set(cln)
-    bad = set(mod + add + rem + del_)
+def preview(modifiedOK=True):
+    existing = ls_files()
+    changed = ls_changed()
+    ok = existing - changed
 
     kind_map = {}
     files = set()
-    for filename in os.listdir(NEWSDIR):
+    for filename in sorted(os.listdir(NEWSDIR)):
         path = '/'.join((NEWSDIR, filename))
         if filename[0] == '.' or '.' not in filename:
             continue
@@ -84,10 +102,9 @@ def preview(repo, modifiedOK=True):
                     filename, kind)
             continue
 
-        if path in bad:
+        if path in changed:
             if modifiedOK:
                 print >> sys.stderr, "warning: '%s' is modified." % (path,)
-                modified = time.time()
             else:
                 sys.exit("File '%s' is modified and must be committed first." %
                         (path,))
@@ -95,21 +112,18 @@ def preview(repo, modifiedOK=True):
             if modifiedOK:
                 print >> sys.stderr, "warning: '%s' is not checked in." % (
                         path,)
-                modified = time.time()
             else:
                 sys.exit("File '%s' is not checked in and must be "
                         "committed first." % (path,))
         else:
             files.add(path)
-            modified = _firstModified(repo, path)
 
         entries = [x.replace('\n', ' ') for x in
                    codecs.open(path, 'r', 'utf8').read().split('\n\n')]
         for n, line in enumerate(entries):
             entry = line.strip()
             if entry:
-                kind_map.setdefault(kind, []).append((modified, issue, n,
-                    entry))
+                kind_map.setdefault(kind, []).append((issue, n, entry))
 
     out = ['Changes in %s:' % _getVersion()]
     htmlOut = ['<p>%s %s is a maintenance release</p>' % (PRODUCT_NAME,
@@ -121,11 +135,11 @@ def preview(repo, modifiedOK=True):
         out.append('  o %s:' % heading)
         htmlOut.append('<strong>%s:</strong>' % heading)
         htmlOut.append("<ul>")
-        for _, issue, _, entry in sorted(entries):
+        for issue, _, entry in sorted(entries):
             htmlEntry = '    <li>' + entry
             if RE_ISSUE.match(issue):
                 entry += ' (%s)' % issue
-                htmlEntry += ' (<a href="https://issues.rpath.com/browse/%s">%s</a>)' % (issue,issue)
+                htmlEntry += ' (<a href="https://opensource.sas.com/its/browse/%s">%s</a>)' % (issue,issue)
             lines = textwrap.wrap(entry, 66)
             out.append('    * %s' % (lines.pop(0),))
             for line in lines:
@@ -137,7 +151,7 @@ def preview(repo, modifiedOK=True):
     return out, htmlOut, files
 
 
-def generate(repo):
+def generate():
     version = _getVersion()
     old = codecs.open('NEWS', 'r', 'utf8').read()
     if '@NEW@' in old:
@@ -145,7 +159,7 @@ def generate(repo):
     elif ('Changes in %s:' % version) in old:
         sys.exit("error: NEWS already contains a %s section" % version)
 
-    lines, htmlLines, files = preview(repo, modifiedOK=False)
+    lines, htmlLines, files = preview(modifiedOK=False)
     new = '\n'.join(lines) + '\n'
     newHtml = '\n'.join(htmlLines) + '\n'
 
@@ -157,20 +171,10 @@ def generate(repo):
     print >> sys.stderr, "Updated NEWS"
     print >> sys.stderr, "Wrote NEWS.html"
 
-    wlock = repo.wlock()
-    try:
-        for name in files:
-            os.unlink(name)
-            repo.dirstate.remove(name)
-    finally:
-        wlock.release()
+    git(['rm'] + sorted(files))
+    git(['add', 'NEWS'])
     print >> sys.stderr, "Deleted %s news fragments" % len(files)
-
-
-def _firstModified(repo, path):
-    fl = repo.file(path)
-    ctx = repo[fl.linkrev(0)]
-    return ctx.date()[0]
+    os.system("git status")
 
 
 def _getVersion():
