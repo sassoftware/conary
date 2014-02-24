@@ -106,7 +106,7 @@ def searchPath(filename, basepath):
 
 def searchFile(file, searchdirs, error=None):
     for dir in searchdirs:
-        s = os.path.join(dir, file)
+        s = joinPaths(dir, file)
         if os.path.exists(s):
             return s
     if error:
