@@ -44,7 +44,7 @@ class CacheDict(dict):
 
 class TroveCache(trovesource.AbstractTroveSource):
 
-    VERSION = (3, 0)                    # (major, minor)
+    VERSION = (4, 0)                    # (major, minor)
 
     _fileId = '\0' * 40
     _troveCacheVersionPathId = 'TROVE-CACHE-FILE-VERSION--------'
@@ -354,6 +354,8 @@ class TroveCache(trovesource.AbstractTroveSource):
                 filecontents.FromString(pickled), False)
 
     def _loadTimestamps(self):
+        if self.version < (4, 0):
+            return
         timeStampList = self._loadPickle(self._timeStampsPathId)
         for (name, frozenVersion) in timeStampList:
             thawed = versions.ThawVersion(frozenVersion)
@@ -362,7 +364,7 @@ class TroveCache(trovesource.AbstractTroveSource):
     def _saveTimestamps(self):
         timeStamps = []
         for (name, baseVersion), version in self.timeStampCache.items():
-            timeStamps.append( (timeStamps, version.freeze()) )
+            timeStamps.append( (name, version.freeze()) )
         self._savePickle(self._timeStampsPathId, timeStamps)
 
     def _loadDeps(self):
