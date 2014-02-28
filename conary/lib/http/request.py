@@ -138,7 +138,8 @@ class Request(object):
             except TypeError:
                 pass
         self.size = size
-        self.headers['Content-Length'] = str(size)
+        if size is not None:
+            self.headers['Content-Length'] = str(size)
         if chunked or size is None:
             self.chunked = True
             self.headers['Transfer-Encoding'] = 'chunked'
