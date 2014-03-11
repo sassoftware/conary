@@ -350,3 +350,9 @@ class MultipartResponseFile(object):
                 raise MultipartDecodeError("Invalid multipart response")
             self.fobj.close()
         self.fobj = None
+
+    def __reduce__(self):
+        # This object is passed back in the XMLRPC client layer as part of the
+        # 'response', which the client then tries to pickle into the client
+        # call log when enabled. Better not let it try to pickle us.
+        return str, ('<multipart response>',)
