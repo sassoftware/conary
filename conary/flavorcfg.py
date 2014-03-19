@@ -201,7 +201,7 @@ class FlavorConfig:
                         self.flags[flag] = UseFlagConfig(flag)
                     self.flags[flag].read(flagPath)
         for archDir in archDirs:
-            useDir = os.path.expanduser(useDir)
+            archDir = os.path.expanduser(archDir)
             if archDir and os.path.exists(archDir):
                 for arch in os.listdir(archDir):
                     if (os.path.isfile(os.path.join(archDir, arch)) and
