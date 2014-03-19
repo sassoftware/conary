@@ -213,9 +213,8 @@ class FlavorConfig:
     def toDependency(self, override=None):
         useFlags = deps.Flavor()
         flags = [x.toDepFlag() for x in self.flags.values() ]
-
-        useFlags.addDep(deps.UseDependency,
-                        deps.Dependency("use", flags))
+        if flags:
+            useFlags.addDep(deps.UseDependency, deps.Dependency("use", flags))
         if override:
             if isinstance(override, list):
                 newUseFlags = []
