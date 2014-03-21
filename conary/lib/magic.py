@@ -19,6 +19,7 @@ import os
 import re
 import stat
 import string
+import struct
 import xml.dom.minidom
 import zipfile
 import gzip as gzip_module
@@ -354,10 +355,10 @@ def magic(path, basedir=''):
             uncompressedBuffer = gzip_module.GzipFile(n).read(4096)
             if _tarMagic(uncompressedBuffer):
                 return tar_gz(path, basedir, b, uncompressedBuffer)
-        except (IOError, zlib.error):
-            # gzip sometimes raises IOError instead of any module-specific
-            # errors; in either error case just do not consider this a
-            # gzip file.
+        except (IOError, zlib.error, struct.error):
+            # gzip sometimes raises lets through other errors instead
+            # of any module-specific errors; in either error case just
+            # do not consider this a gzip file.
             # Note that gzip or tar_gz magic does not imply that the
             # entire file has been tested to have no compression errors!
             pass

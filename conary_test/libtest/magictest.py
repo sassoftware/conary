@@ -186,6 +186,10 @@ class MagicTest(rephelp.RepositoryHelper):
         f.close()
         m = magic.magic(archivePath)
 
+    def testShortGzipContents(self):
+        # example short file from perl-PerlIO-gzip
+        m = magic.magic(os.path.join(resources.get_archive(), 'ok50.gz.short'))
+
     def testGzipContentsBasedir(self):
         archivePath = os.path.join('nested_dir', 'busted.tar.gz')
         fullPath = os.path.join(self.workDir, archivePath)
