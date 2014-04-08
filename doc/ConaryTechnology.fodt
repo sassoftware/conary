@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0" xmlns:ooo="http://openoffice.org/2004/office" xmlns:ooow="http://openoffice.org/2004/writer" xmlns:oooc="http://openoffice.org/2004/calc" xmlns:dom="http://www.w3.org/2001/xml-events" xmlns:xforms="http://www.w3.org/2002/xforms" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:rpt="http://openoffice.org/2005/report" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:grddl="http://www.w3.org/2003/g/data-view#" xmlns:officeooo="http://openoffice.org/2009/office" xmlns:tableooo="http://openoffice.org/2009/table" xmlns:drawooo="http://openoffice.org/2010/draw" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" xmlns:field="urn:openoffice:names:experimental:ooo-ms-interop:xmlns:field:1.0" xmlns:formx="urn:openoffice:names:experimental:ooxml-odf-interop:xmlns:form:1.0" xmlns:css3t="http://www.w3.org/TR/css3-text/" office:version="1.2" office:mimetype="application/vnd.oasis.opendocument.text">
- <office:meta><meta:initial-creator>Michael Johnson</meta:initial-creator><meta:creation-date>2014-02-05T16:22:14.708520637</meta:creation-date><dc:date>2014-02-18T08:57:17.356925014</dc:date><dc:creator>Michael Johnson</dc:creator><meta:editing-duration>P7DT13H32M44S</meta:editing-duration><meta:editing-cycles>26</meta:editing-cycles><meta:generator>LibreOffice/4.1.4.2$Linux_X86_64 LibreOffice_project/410$Build-2</meta:generator><meta:printed-by>Michael Johnson</meta:printed-by><meta:print-date>2014-02-10T16:09:41.435302570</meta:print-date><meta:document-statistic meta:table-count="0" meta:image-count="1" meta:object-count="0" meta:page-count="8" meta:paragraph-count="103" meta:word-count="3942" meta:character-count="25193" meta:non-whitespace-character-count="21336"/></office:meta>
+ <office:meta><meta:initial-creator>Michael Johnson</meta:initial-creator><meta:creation-date>2014-02-05T16:22:14.708520637</meta:creation-date><dc:date>2014-04-08T15:18:13.527104080</dc:date><dc:creator>Michael Johnson</dc:creator><meta:editing-duration>P7DT13H32M44S</meta:editing-duration><meta:editing-cycles>27</meta:editing-cycles><meta:generator>LibreOffice/4.1.4.2$Linux_X86_64 LibreOffice_project/410$Build-2</meta:generator><meta:printed-by>Michael Johnson</meta:printed-by><meta:print-date>2014-02-10T16:09:41.435302570</meta:print-date><meta:document-statistic meta:table-count="0" meta:image-count="1" meta:object-count="0" meta:page-count="8" meta:paragraph-count="102" meta:word-count="3990" meta:character-count="25530" meta:non-whitespace-character-count="21625"/></office:meta>
  <office:settings>
   <config:config-item-set config:name="ooo:view-settings">
-   <config:config-item config:name="ViewAreaTop" config:type="long">194680</config:config-item>
+   <config:config-item config:name="ViewAreaTop" config:type="long">129706</config:config-item>
    <config:config-item config:name="ViewAreaLeft" config:type="long">0</config:config-item>
-   <config:config-item config:name="ViewAreaWidth" config:type="long">22627</config:config-item>
-   <config:config-item config:name="ViewAreaHeight" config:type="long">16231</config:config-item>
+   <config:config-item config:name="ViewAreaWidth" config:type="long">26123</config:config-item>
+   <config:config-item config:name="ViewAreaHeight" config:type="long">20182</config:config-item>
    <config:config-item config:name="ShowRedlineChanges" config:type="boolean">true</config:config-item>
    <config:config-item config:name="InBrowseMode" config:type="boolean">false</config:config-item>
    <config:config-item-map-indexed config:name="Views">
     <config:config-item-map-entry>
      <config:config-item config:name="ViewId" config:type="string">view2</config:config-item>
-     <config:config-item config:name="ViewLeft" config:type="long">18822</config:config-item>
-     <config:config-item config:name="ViewTop" config:type="long">204526</config:config-item>
+     <config:config-item config:name="ViewLeft" config:type="long">7408</config:config-item>
+     <config:config-item config:name="ViewTop" config:type="long">145891</config:config-item>
      <config:config-item config:name="VisibleLeft" config:type="long">0</config:config-item>
-     <config:config-item config:name="VisibleTop" config:type="long">194680</config:config-item>
-     <config:config-item config:name="VisibleRight" config:type="long">22625</config:config-item>
-     <config:config-item config:name="VisibleBottom" config:type="long">210910</config:config-item>
-     <config:config-item config:name="ZoomType" config:type="short">3</config:config-item>
+     <config:config-item config:name="VisibleTop" config:type="long">129706</config:config-item>
+     <config:config-item config:name="VisibleRight" config:type="long">26121</config:config-item>
+     <config:config-item config:name="VisibleBottom" config:type="long">149886</config:config-item>
+     <config:config-item config:name="ZoomType" config:type="short">0</config:config-item>
      <config:config-item config:name="ViewLayoutColumns" config:type="short">0</config:config-item>
      <config:config-item config:name="ViewLayoutBookMode" config:type="boolean">false</config:config-item>
-     <config:config-item config:name="ZoomFactor" config:type="short">127</config:config-item>
+     <config:config-item config:name="ZoomFactor" config:type="short">110</config:config-item>
      <config:config-item config:name="IsSelectedFrame" config:type="boolean">false</config:config-item>
     </config:config-item-map-entry>
    </config:config-item-map-indexed>
@@ -81,7 +81,7 @@
    <config:config-item config:name="RedlineProtectionKey" config:type="base64Binary"/>
    <config:config-item config:name="PrinterSetup" config:type="base64Binary">lwH+/21mcC1SMQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ1VQUzptZnAtUjEAAAAAAAAAAAAAAAAAAAAAAAAAAAAWAAMAvQAAAAAAAAAIAFZUAAAkbQAASm9iRGF0YSAxCnByaW50ZXI9bWZwLVIxCm9yaWVudGF0aW9uPVBvcnRyYWl0CmNvcGllcz0xCm1hcmdpbmRhanVzdG1lbnQ9MCwwLDAsMApjb2xvcmRlcHRoPTI0CnBzbGV2ZWw9MApwZGZkZXZpY2U9MQpjb2xvcmRldmljZT0wClBQRENvbnRleERhdGEKUGFnZVNpemU6TGV0dGVyAER1cGxleDpOb25lAElucHV0U2xvdDpUcmF5MQAAEgBDT01QQVRfRFVQTEVYX01PREUKAERVUExFWF9PRkY=</config:config-item>
    <config:config-item config:name="PrintProspectRTL" config:type="boolean">false</config:config-item>
-   <config:config-item config:name="Rsid" config:type="int">4340779</config:config-item>
+   <config:config-item config:name="Rsid" config:type="int">4591709</config:config-item>
    <config:config-item config:name="AlignTabStopPosition" config:type="boolean">true</config:config-item>
    <config:config-item config:name="ProtectForm" config:type="boolean">false</config:config-item>
    <config:config-item config:name="InvertBorderSpacing" config:type="boolean">false</config:config-item>
@@ -275,28 +275,28 @@
    <style:text-properties officeooo:paragraph-rsid="0025dab2"/>
   </style:style>
   <style:style style:name="P6" style:family="paragraph" style:parent-style-name="Text_20_body">
-   <style:text-properties officeooo:rsid="0025dab2" officeooo:paragraph-rsid="0025dab2"/>
+   <style:text-properties officeooo:rsid="0025dab2" officeooo:paragraph-rsid="003fe439"/>
   </style:style>
   <style:style style:name="P7" style:family="paragraph" style:parent-style-name="Text_20_body">
-   <style:text-properties officeooo:rsid="0025dab2" officeooo:paragraph-rsid="003a3a48"/>
-  </style:style>
-  <style:style style:name="P8" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties officeooo:paragraph-rsid="00277b6c"/>
   </style:style>
-  <style:style style:name="P9" style:family="paragraph" style:parent-style-name="Text_20_body">
+  <style:style style:name="P8" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties fo:font-style="italic" officeooo:rsid="0036cb16" officeooo:paragraph-rsid="0036cb16" style:font-style-asian="italic" style:font-style-complex="italic"/>
   </style:style>
-  <style:style style:name="P10" style:family="paragraph" style:parent-style-name="Text_20_body">
+  <style:style style:name="P9" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties officeooo:paragraph-rsid="002d0af4"/>
   </style:style>
-  <style:style style:name="P11" style:family="paragraph" style:parent-style-name="Text_20_body">
+  <style:style style:name="P10" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties officeooo:rsid="002d0af4" officeooo:paragraph-rsid="002d0af4"/>
   </style:style>
-  <style:style style:name="P12" style:family="paragraph" style:parent-style-name="Text_20_body">
+  <style:style style:name="P11" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties officeooo:paragraph-rsid="0031b39e"/>
   </style:style>
-  <style:style style:name="P13" style:family="paragraph" style:parent-style-name="Text_20_body">
+  <style:style style:name="P12" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties officeooo:rsid="00365d12" officeooo:paragraph-rsid="00365d12"/>
+  </style:style>
+  <style:style style:name="P13" style:family="paragraph" style:parent-style-name="Text_20_body">
+   <style:text-properties officeooo:rsid="00365d12" officeooo:paragraph-rsid="003fe439"/>
   </style:style>
   <style:style style:name="P14" style:family="paragraph" style:parent-style-name="Text_20_body">
    <style:text-properties officeooo:paragraph-rsid="00365d12"/>
@@ -311,44 +311,35 @@
    <style:text-properties officeooo:rsid="003ac407" officeooo:paragraph-rsid="003ac407"/>
   </style:style>
   <style:style style:name="P18" style:family="paragraph" style:parent-style-name="Text_20_body">
-   <style:text-properties officeooo:paragraph-rsid="002f9d06"/>
+   <style:text-properties officeooo:paragraph-rsid="0041432d"/>
   </style:style>
   <style:style style:name="P19" style:family="paragraph" style:parent-style-name="Heading_20_3">
    <style:text-properties officeooo:paragraph-rsid="0025dab2"/>
   </style:style>
   <style:style style:name="P20" style:family="paragraph" style:parent-style-name="Heading_20_3">
-   <style:text-properties officeooo:rsid="0025dab2" officeooo:paragraph-rsid="0025dab2"/>
-  </style:style>
-  <style:style style:name="P21" style:family="paragraph" style:parent-style-name="Heading_20_3">
    <style:text-properties officeooo:paragraph-rsid="003b35ee"/>
   </style:style>
-  <style:style style:name="P22" style:family="paragraph" style:parent-style-name="Heading_20_3">
-   <style:text-properties officeooo:rsid="003b35ee" officeooo:paragraph-rsid="003a3a48"/>
-  </style:style>
-  <style:style style:name="P23" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L1"/>
-  <style:style style:name="P24" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L1">
+  <style:style style:name="P21" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L1"/>
+  <style:style style:name="P22" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L1">
    <style:text-properties officeooo:paragraph-rsid="002f9d06"/>
   </style:style>
-  <style:style style:name="P25" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L2"/>
-  <style:style style:name="P26" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L3"/>
-  <style:style style:name="P27" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L4">
+  <style:style style:name="P23" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L2"/>
+  <style:style style:name="P24" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L3"/>
+  <style:style style:name="P25" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L4">
    <style:text-properties officeooo:paragraph-rsid="003b35ee"/>
   </style:style>
-  <style:style style:name="P28" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L5">
+  <style:style style:name="P26" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L5">
    <style:text-properties officeooo:paragraph-rsid="003b35ee"/>
   </style:style>
-  <style:style style:name="P29" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L6">
+  <style:style style:name="P27" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L6">
    <style:text-properties officeooo:paragraph-rsid="003b35ee"/>
   </style:style>
-  <style:style style:name="P30" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L7"/>
-  <style:style style:name="P31" style:family="paragraph" style:parent-style-name="Text_20_body">
-   <style:text-properties officeooo:rsid="00365d12" officeooo:paragraph-rsid="003fe439"/>
+  <style:style style:name="P28" style:family="paragraph" style:parent-style-name="Text_20_body" style:list-style-name="L7"/>
+  <style:style style:name="P29" style:family="paragraph" style:parent-style-name="Text_20_body">
+   <style:text-properties officeooo:paragraph-rsid="0046105d"/>
   </style:style>
-  <style:style style:name="P32" style:family="paragraph" style:parent-style-name="Text_20_body">
-   <style:text-properties officeooo:rsid="0025dab2" officeooo:paragraph-rsid="003fe439"/>
-  </style:style>
-  <style:style style:name="P33" style:family="paragraph" style:parent-style-name="Text_20_body">
-   <style:text-properties officeooo:paragraph-rsid="0041432d"/>
+  <style:style style:name="P30" style:family="paragraph" style:parent-style-name="Heading_20_3">
+   <style:text-properties officeooo:rsid="003b35ee" officeooo:paragraph-rsid="0025dab2"/>
   </style:style>
   <style:style style:name="T1" style:family="text">
    <style:text-properties officeooo:rsid="001ec9af"/>
@@ -363,109 +354,109 @@
    <style:text-properties officeooo:rsid="002465a0"/>
   </style:style>
   <style:style style:name="T5" style:family="text">
-   <style:text-properties style:font-name="DejaVu Sans Mono"/>
-  </style:style>
-  <style:style style:name="T6" style:family="text">
-   <style:text-properties style:font-name="DejaVu Sans Mono" officeooo:rsid="00227c77"/>
-  </style:style>
-  <style:style style:name="T7" style:family="text">
    <style:text-properties officeooo:rsid="00277b6c"/>
   </style:style>
-  <style:style style:name="T8" style:family="text">
+  <style:style style:name="T6" style:family="text">
    <style:text-properties officeooo:rsid="0028637c"/>
   </style:style>
-  <style:style style:name="T9" style:family="text">
+  <style:style style:name="T7" style:family="text">
    <style:text-properties officeooo:rsid="0028d0b0"/>
   </style:style>
-  <style:style style:name="T10" style:family="text">
+  <style:style style:name="T8" style:family="text">
    <style:text-properties officeooo:rsid="002d0af4"/>
   </style:style>
-  <style:style style:name="T11" style:family="text">
+  <style:style style:name="T9" style:family="text">
    <style:text-properties fo:font-style="italic" style:font-style-asian="italic" style:font-style-complex="italic"/>
   </style:style>
-  <style:style style:name="T12" style:family="text">
+  <style:style style:name="T10" style:family="text">
    <style:text-properties fo:font-style="italic" officeooo:rsid="002d0af4" style:font-style-asian="italic" style:font-style-complex="italic"/>
   </style:style>
-  <style:style style:name="T13" style:family="text">
+  <style:style style:name="T11" style:family="text">
    <style:text-properties style:font-name="Liberation Serif"/>
   </style:style>
-  <style:style style:name="T14" style:family="text">
+  <style:style style:name="T12" style:family="text">
    <style:text-properties officeooo:rsid="002eddbb"/>
   </style:style>
-  <style:style style:name="T15" style:family="text">
+  <style:style style:name="T13" style:family="text">
    <style:text-properties officeooo:rsid="002f9d06"/>
   </style:style>
-  <style:style style:name="T16" style:family="text">
+  <style:style style:name="T14" style:family="text">
    <style:text-properties officeooo:rsid="002fb670"/>
   </style:style>
-  <style:style style:name="T17" style:family="text">
+  <style:style style:name="T15" style:family="text">
    <style:text-properties officeooo:rsid="0031b39e"/>
   </style:style>
-  <style:style style:name="T18" style:family="text">
+  <style:style style:name="T16" style:family="text">
    <style:text-properties fo:font-weight="bold" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T19" style:family="text">
+  <style:style style:name="T17" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="0031b39e" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T20" style:family="text">
+  <style:style style:name="T18" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="002465a0" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T21" style:family="text">
+  <style:style style:name="T19" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="003523df" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T22" style:family="text">
+  <style:style style:name="T20" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="002f9d06" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T23" style:family="text">
+  <style:style style:name="T21" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="0041432d" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T24" style:family="text">
+  <style:style style:name="T22" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="0028d0b0" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T25" style:family="text">
+  <style:style style:name="T23" style:family="text">
    <style:text-properties fo:font-weight="bold" officeooo:rsid="00423c2b" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
   </style:style>
-  <style:style style:name="T26" style:family="text">
+  <style:style style:name="T24" style:family="text">
+   <style:text-properties fo:font-weight="bold" officeooo:rsid="0046105d" style:font-weight-asian="bold" style:font-weight-complex="bold"/>
+  </style:style>
+  <style:style style:name="T25" style:family="text">
    <style:text-properties officeooo:rsid="00330651"/>
   </style:style>
-  <style:style style:name="T27" style:family="text">
+  <style:style style:name="T26" style:family="text">
    <style:text-properties officeooo:rsid="00343db9"/>
   </style:style>
-  <style:style style:name="T28" style:family="text">
+  <style:style style:name="T27" style:family="text">
    <style:text-properties officeooo:rsid="003523df"/>
   </style:style>
-  <style:style style:name="T29" style:family="text">
+  <style:style style:name="T28" style:family="text">
    <style:text-properties officeooo:rsid="00365d12"/>
   </style:style>
-  <style:style style:name="T30" style:family="text">
+  <style:style style:name="T29" style:family="text">
    <style:text-properties officeooo:rsid="0037595c"/>
   </style:style>
-  <style:style style:name="T31" style:family="text">
+  <style:style style:name="T30" style:family="text">
    <style:text-properties officeooo:rsid="00381187"/>
   </style:style>
-  <style:style style:name="T32" style:family="text">
+  <style:style style:name="T31" style:family="text">
    <style:text-properties officeooo:rsid="0038df59"/>
   </style:style>
-  <style:style style:name="T33" style:family="text">
+  <style:style style:name="T32" style:family="text">
    <style:text-properties officeooo:rsid="003a3a48"/>
   </style:style>
-  <style:style style:name="T34" style:family="text">
+  <style:style style:name="T33" style:family="text">
    <style:text-properties officeooo:rsid="003a5176"/>
   </style:style>
-  <style:style style:name="T35" style:family="text">
+  <style:style style:name="T34" style:family="text">
    <style:text-properties officeooo:rsid="003ac407"/>
   </style:style>
-  <style:style style:name="T36" style:family="text">
+  <style:style style:name="T35" style:family="text">
    <style:text-properties officeooo:rsid="003b35ee"/>
   </style:style>
-  <style:style style:name="T37" style:family="text">
+  <style:style style:name="T36" style:family="text">
    <style:text-properties officeooo:rsid="003fe439"/>
   </style:style>
-  <style:style style:name="T38" style:family="text">
+  <style:style style:name="T37" style:family="text">
    <style:text-properties officeooo:rsid="0041432d"/>
   </style:style>
-  <style:style style:name="T39" style:family="text">
+  <style:style style:name="T38" style:family="text">
    <style:text-properties officeooo:rsid="00423c2b"/>
+  </style:style>
+  <style:style style:name="T39" style:family="text">
+   <style:text-properties officeooo:rsid="0046105d"/>
   </style:style>
   <style:style style:name="fr1" style:family="graphic" style:parent-style-name="Graphics">
    <style:graphic-properties style:vertical-pos="top" style:vertical-rel="paragraph" style:horizontal-pos="center" style:horizontal-rel="paragraph" style:mirror="none" fo:clip="rect(0in, 0in, 0in, 0in)" draw:luminance="0%" draw:contrast="0%" draw:red="0%" draw:green="0%" draw:blue="0%" draw:gamma="100%" draw:color-inversion="false" draw:image-opacity="100%" draw:color-mode="standard"/>
@@ -714,21 +705,21 @@
     <text:sequence-decl text:display-outline-level="0" text:name="Drawing"/>
    </text:sequence-decls>
    <text:h text:style-name="Heading_20_1" text:outline-level="1">Introduction to Conary</text:h>
-   <text:p text:style-name="P9">Conary: Git for system management</text:p>
+   <text:p text:style-name="P8">Conary: Git for system management</text:p>
    <text:p text:style-name="P1"><text:span text:style-name="T1">Conary is a system software provisioning and management tool that brings concepts from distributed source code control systems such as Git and Mercurial to system management. Conary provides differential update, rollback, configuration management, staging/promotion, entitlement, replication, dependency management, introspection, attribution/lineage, repeatable build, and layered platform/system definition. Unlike most package-based software management tools that depend on archive files as <text:s/>their primary mechanism of distribution, Conary provides</text:span> networked repositories containing structured version hierarch<text:span text:style-name="T2">ies</text:span> of all the files and organized sets of files in <text:span text:style-name="T2">software products</text:span>.</text:p>
-   <text:p text:style-name="P31">Conary has three main components: software repository, system management, <text:span text:style-name="T37">and software </text:span>build. The system management component manages the state of an individual system (based on the contents of a Conary repository), the build component automates building software and collections of software into a Conary repository, and the Conary repository is a web application that stores versions of software and collections of software. <text:span text:style-name="T37">This paper introduces the repository and system management components of Conary.</text:span></text:p>
-   <text:p text:style-name="P8">Conary<text:span text:style-name="T7"> models the intended state of a system</text:span>, <text:span text:style-name="T7">such that it can recreate the same state</text:span> systematically on other machines, <text:span text:style-name="T7">enabling precise staging (“dev/test/prod”) of changes through a deployment process, and</text:span> easing provisioning of large sets of similar or identical systems. <text:span text:style-name="T29">A model can be maintained on a target system or packaged into a Conary repository. </text:span>Conary <text:span text:style-name="T8">also</text:span> intelligently preserves <text:span text:style-name="T2">intentional </text:span>local changes on installed systems, <text:span text:style-name="T37">such that a</text:span>n update will not blindly obliterate <text:span text:style-name="T2">local changes such as changes to configuration files.</text:span></text:p>
-   <text:p text:style-name="P13">Conary is also the core technology of a family of tools that further automate the software build and management process.</text:p>
-   <text:h text:style-name="Heading_20_2" text:outline-level="2"><text:bookmark text:name="repository"/><text:span text:style-name="T36">1. </text:span>Repository</text:h>
-   <text:p text:style-name="Text_20_body">Conary stores <text:span text:style-name="T30">all software and collections of software </text:span>in <text:span text:style-name="Strong_20_Emphasis">repositor</text:span><text:span text:style-name="Strong_20_Emphasis"><text:span text:style-name="T4">ies</text:span></text:span>, instead of in package files. <text:span text:style-name="T30">A Conary r</text:span>epository is a network-accessible database that contains files for multiple packages, and multiple versions of these packages, on multiple development branches. Nothing is ever removed from <text:span text:style-name="T10">a</text:span> repository once it has been added. In simple terms, Conary is like a source control system married to a <text:span text:style-name="T4">software management</text:span> system.</text:p>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:span text:style-name="T36">1.1 </text:span>Software Version Management</text:h>
-   <text:p text:style-name="P14">Conary keeps track of <text:span text:style-name="T10">software </text:span>versions in a tree structure, much like a source code control system. <text:span text:style-name="T29">(Technically, it is a directed acyclic graph of versions.)</text:span> The difference between Conary and many source code control systems is that Conary does not need all the branches of a tree to be kept in a single <text:span text:style-name="T4">repository; instead, branches can be </text:span><text:span text:style-name="T20">distributed</text:span><text:span text:style-name="T4"> between multiple repositories</text:span>. <text:span text:style-name="T4">Like Git, one repository can contain a branch from another repository; unlike Git, those branches are maintained by reference rather than as a copy. Conary&apos;s collections of software can and normally do reference software in multiple repositories.</text:span></text:p>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="trovetypes"/><text:span text:style-name="T36">1.2 </text:span>Troves, Packages, and Components</text:h>
-   <text:p text:style-name="Text_20_body">When you build software with Conary, it collects the files into <text:span text:style-name="Strong_20_Emphasis">components</text:span>, and then collects the <text:soft-page-break/>components into one or more <text:span text:style-name="Strong_20_Emphasis">packages</text:span>. Components and packages are both called <text:span text:style-name="Strong_20_Emphasis">troves</text:span>. A trove <text:span text:style-name="T31">generically discribes any </text:span>collection of files or other troves <text:span text:style-name="T31">in Conary</text:span>.</text:p>
-   <text:p text:style-name="P10">A package does not directly contain files; a package references components, and the components reference files. Every component&apos;s name <text:span text:style-name="T10">follows the form </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T12">packagename</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T10">:</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T12">component</text:span></text:span>; <text:span text:style-name="T10">it is </text:span>constructed from the name of <text:span text:style-name="T10">the containing</text:span> package, a <text:span text:style-name="Source_20_Text">:</text:span> character, and a suffix describing the component. Conary has several standard component suffixes; <text:span text:style-name="T10">for example,</text:span> <text:span text:style-name="Source_20_Text">:source</text:span>, <text:span text:style-name="Source_20_Text">:runtime</text:span>, <text:span text:style-name="Source_20_Text">:devel</text:span>, <text:span text:style-name="T10">and</text:span> <text:span text:style-name="Source_20_Text">:docs</text:span>. Conary automatically assigns files to components during the build process, but <text:span text:style-name="T10">the packager</text:span> can overrule its assignments and create arbitrary component suffixes as appropriate. </text:p>
-   <text:p text:style-name="P11">For example, when the gzip package is built, several components are built, including <text:span text:style-name="Source_20_Text">gzip:runtime</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T13"> and </text:span></text:span><text:span text:style-name="Source_20_Text">gzip:doc</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T13">. The following diagram shows their relationships.</text:span></text:span></text:p>
-   <text:p text:style-name="P11"><text:span text:style-name="Source_20_Text"><text:span text:style-name="T13"/></text:span></text:p>
-   <text:p text:style-name="P11"><draw:frame draw:style-name="fr1" draw:name="packagestructure" text:anchor-type="paragraph" svg:width="5.6528in" svg:height="2.0634in" draw:z-index="0"><draw:image>
+   <text:p text:style-name="P13">Conary has three main components: software repository, system management, <text:span text:style-name="T36">and software </text:span>build. The system management component manages the state of an individual system (based on the contents of a Conary repository), the build component automates building software and collections of software into a Conary repository, and the Conary repository is a web application that stores versions of software and collections of software. <text:span text:style-name="T36">This paper introduces the repository and system management components of Conary.</text:span></text:p>
+   <text:p text:style-name="P7">Conary<text:span text:style-name="T5"> models the intended state of a system</text:span>, <text:span text:style-name="T5">such that it can recreate the same state</text:span> systematically on other machines, <text:span text:style-name="T5">enabling precise staging (“dev/test/prod”) of changes through a deployment process, and</text:span> easing provisioning of large sets of similar or identical systems. <text:span text:style-name="T28">A model can be maintained on a target system or packaged into a Conary repository. </text:span>Conary <text:span text:style-name="T6">also</text:span> intelligently preserves <text:span text:style-name="T2">intentional </text:span>local changes on installed systems, <text:span text:style-name="T36">such that a</text:span>n update will not blindly obliterate <text:span text:style-name="T2">local changes such as changes to configuration files.</text:span></text:p>
+   <text:p text:style-name="P12">Conary is also the core technology of a family of tools that further automate the software build and management process.</text:p>
+   <text:h text:style-name="Heading_20_2" text:outline-level="2"><text:bookmark text:name="repository"/><text:span text:style-name="T35">1. </text:span>Repository</text:h>
+   <text:p text:style-name="Text_20_body">Conary stores <text:span text:style-name="T29">all software and collections of software </text:span>in <text:span text:style-name="Strong_20_Emphasis">repositor</text:span><text:span text:style-name="Strong_20_Emphasis"><text:span text:style-name="T4">ies</text:span></text:span>, instead of in package files. <text:span text:style-name="T29">A Conary r</text:span>epository is a network-accessible database that contains files for multiple packages, and multiple versions of these packages, on multiple development branches. Nothing is ever removed from <text:span text:style-name="T8">a</text:span> repository once it has been added. In simple terms, Conary is like a source control system married to a <text:span text:style-name="T4">software management</text:span> system.</text:p>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:span text:style-name="T35">1.1 </text:span>Software Version Management</text:h>
+   <text:p text:style-name="P14">Conary keeps track of <text:span text:style-name="T8">software </text:span>versions in a tree structure, much like a source code control system. <text:span text:style-name="T28">(Technically, it is a directed acyclic graph of versions.)</text:span> The difference between Conary and many source code control systems is that Conary does not need all the branches of a tree to be kept in a single <text:span text:style-name="T4">repository; instead, branches can be </text:span><text:span text:style-name="T18">distributed</text:span><text:span text:style-name="T4"> between multiple repositories</text:span>. <text:span text:style-name="T4">Like Git, one repository can contain a branch from another repository; unlike Git, those branches are maintained by reference rather than as a copy. Conary&apos;s collections of software can and normally do reference software in multiple repositories.</text:span></text:p>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="trovetypes"/><text:span text:style-name="T35">1.2 </text:span>Troves, Packages, and Components</text:h>
+   <text:p text:style-name="Text_20_body">When you build software with Conary, it collects the files into <text:span text:style-name="Strong_20_Emphasis">components</text:span>, and then collects the <text:soft-page-break/>components into one or more <text:span text:style-name="Strong_20_Emphasis">packages</text:span>. Components and packages are both called <text:span text:style-name="Strong_20_Emphasis">troves</text:span>. A trove <text:span text:style-name="T30">generically discribes any </text:span>collection of files or other troves <text:span text:style-name="T30">in Conary</text:span>.</text:p>
+   <text:p text:style-name="P9">A package does not directly contain files; a package references components, and the components reference files. Every component&apos;s name <text:span text:style-name="T8">follows the form </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T10">packagename</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T8">:</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T10">component</text:span></text:span>; <text:span text:style-name="T8">it is </text:span>constructed from the name of <text:span text:style-name="T8">the containing</text:span> package, a <text:span text:style-name="Source_20_Text">:</text:span> character, and a suffix describing the component. Conary has several standard component suffixes; <text:span text:style-name="T8">for example,</text:span> <text:span text:style-name="Source_20_Text">:source</text:span>, <text:span text:style-name="Source_20_Text">:runtime</text:span>, <text:span text:style-name="Source_20_Text">:devel</text:span>, <text:span text:style-name="T8">and</text:span> <text:span text:style-name="Source_20_Text">:docs</text:span>. Conary automatically assigns files to components during the build process, but <text:span text:style-name="T8">the packager</text:span> can overrule its assignments and create arbitrary component suffixes as appropriate. </text:p>
+   <text:p text:style-name="P10">For example, when the gzip package is built, several components are built, including <text:span text:style-name="Source_20_Text">gzip:runtime</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T11"> and </text:span></text:span><text:span text:style-name="Source_20_Text">gzip:doc</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T11">. The following diagram shows their relationships.</text:span></text:span></text:p>
+   <text:p text:style-name="P10"><text:span text:style-name="Source_20_Text"><text:span text:style-name="T11"/></text:span></text:p>
+   <text:p text:style-name="P10"><draw:frame draw:style-name="fr1" draw:name="packagestructure" text:anchor-type="paragraph" svg:width="5.6528in" svg:height="2.0634in" draw:z-index="0"><draw:image>
       <office:binary-data>PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+
        CjwhLS0gQ3JlYXRlZCB3aXRoIElua3NjYXBlIChodHRwOi8vd3d3Lmlua3NjYXBlLm9yZy8p
        IC0tPgoKPHN2ZwogICB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEu
@@ -1084,159 +1075,158 @@
        PC90c3Bhbj48L3RleHQ+Cjwvc3ZnPgo=
       </office:binary-data>
      </draw:image>
-    </draw:frame><text:span text:style-name="Source_20_Text"><text:span text:style-name="T13"/></text:span></text:p>
-   <text:p text:style-name="Text_20_body">One <text:span text:style-name="T10">unique</text:span> component, with the suffix <text:span text:style-name="Source_20_Text">:source</text:span>, holds all source files (archives, patches, and build instructions); the other components hold files to be installed. The <text:span text:style-name="Source_20_Text">:source</text:span> component is not included in any package, <text:span text:style-name="T10">but Conary keeps a reference to</text:span> exactly which source component was used to build any <text:span text:style-name="T10">binary</text:span> component. </text:p>
-   <text:h text:style-name="P19" text:outline-level="3"><text:span text:style-name="T36">1.3 </text:span>Groups</text:h>
+    </draw:frame><text:span text:style-name="Source_20_Text"><text:span text:style-name="T11"/></text:span></text:p>
+   <text:p text:style-name="Text_20_body">One <text:span text:style-name="T8">unique</text:span> component, with the suffix <text:span text:style-name="Source_20_Text">:source</text:span>, holds all source files (archives, patches, and build instructions); the other components hold files to be installed. The <text:span text:style-name="Source_20_Text">:source</text:span> component is not included in any package, <text:span text:style-name="T8">but Conary keeps a reference to</text:span> exactly which source component was used to build any <text:span text:style-name="T8">binary</text:span> component. </text:p>
+   <text:h text:style-name="P19" text:outline-level="3"><text:span text:style-name="T35">1.3 </text:span>Groups</text:h>
    <text:p text:style-name="P5"><text:span text:style-name="Strong_20_Emphasis">Groups</text:span> are <text:span text:style-name="T3">collections of software components of any kind (any kind of Conary “trove”). In most software management systems, lists of component names are bound to specific versions at the time an action is invoked on an end system. Conary instead considers binding names to versions as a compilation task comparable to compiling product source code to binaries. Like packages, Conary groups are built from </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T3">:source</text:span></text:span><text:span text:style-name="T3"> components containing text. This text is compiled to produce the version bindings as a build action.</text:span></text:p>
-   <text:p text:style-name="P3">Groups are normally nested to represent the normal relationships of software components. <text:span text:style-name="T14">Nested groups can be built from a single definition at once, or separately. For example, an operating system platform could be built as a single large group containing sub-groups representing major functionality divisions such as “web server” or “desktop environment” or “developer workstation”, all from a single definition of the entire group structure, built in a single build action. A product could then be built from different sources that merely reference the relevant parts of the operating system platform by the names of the relevant groups, and also includes the product software, built and managed independently of the operating system platform.</text:span></text:p>
+   <text:p text:style-name="P3">Groups are normally nested to represent the normal relationships of software components. <text:span text:style-name="T12">Nested groups can be built from a single definition at once, or separately. For example, an operating system platform could be built as a single large group containing sub-groups representing major functionality divisions such as “web server” or “desktop environment” or “developer workstation”, all from a single definition of the entire group structure, built in a single build action. A product could then be built from different sources that merely reference the relevant parts of the operating system platform by the names of the relevant groups, and also includes the product software, built and managed independently of the operating system platform.</text:span></text:p>
    <text:p text:style-name="P3">Systems are managed primarily in terms of groups that define sets of software components that work together.</text:p>
-   <text:p text:style-name="P5"><text:soft-page-break/><text:span text:style-name="T37">Names p</text:span>refixed with <text:span text:style-name="Source_20_Text">group-</text:span> <text:span text:style-name="T37">are </text:span>reserved <text:span text:style-name="T37">and required for groups.</text:span></text:p>
-   <text:h text:style-name="P20" text:outline-level="3"><text:span text:style-name="T36">1.4 </text:span>Factories</text:h>
-   <text:p text:style-name="P32"><text:span text:style-name="T18">Factories</text:span> are build automation components that can introspect sources to build packages and groups. <text:span text:style-name="T37">Names p</text:span>refixed with <text:span text:style-name="Source_20_Text"><text:span text:style-name="T37">factory</text:span></text:span><text:span text:style-name="Source_20_Text">-</text:span> <text:span text:style-name="T37">are </text:span>reserved <text:span text:style-name="T37">and required for factories.</text:span></text:p>
-   <text:h text:style-name="P22" text:outline-level="3">1.5 Filesets</text:h>
-   <text:p text:style-name="P32"><text:span text:style-name="Strong_20_Emphasis">Filesets</text:span> are troves that contain only files, but those files come from <text:span text:style-name="T33">other </text:span>components <text:span text:style-name="T33">already </text:span>in the repository. <text:span text:style-name="T37">Names p</text:span>refixed with <text:span text:style-name="Source_20_Text"><text:span text:style-name="T37">fileset</text:span></text:span><text:span text:style-name="Source_20_Text">-</text:span> <text:span text:style-name="T37">are </text:span>reserved <text:span text:style-name="T37">and required for filesets.</text:span> <text:span text:style-name="T3">Filesets are very rarely used because they are not useful enough to be worth the work to create them; they were originally intended to be useful for small embedded systems where they could have been.</text:span></text:p>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="labels"/><text:span text:style-name="T36">1.6 </text:span>Labels and Versions</text:h>
-   <text:p text:style-name="Text_20_body">Conary uses strongly descriptive strings to compose the version and branch structure. The amount of description makes them quite long, so Conary <text:span text:style-name="T32">by default</text:span> hides as much of the string as possible for normal use. <text:span text:style-name="T38">L</text:span>ike domain names, <text:span text:style-name="T38">in</text:span> normal use you need only a short portion <text:span text:style-name="T38">of a Conary version string</text:span>. For example, the version <text:span text:style-name="Source_20_Text">/conary.</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T15">example</text:span></text:span><text:span text:style-name="Source_20_Text">.com@</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T15">plat</text:span></text:span><text:span text:style-name="Source_20_Text">:1/2.2.3-4-2</text:span> can usually be referred to and displayed as <text:span text:style-name="Source_20_Text">2.2.3-4-2</text:span>. The entire version string <text:span text:style-name="T38">is globally </text:span>unique, <text:span text:style-name="T38">and</text:span> identifies both the source of a package and its intended context.</text:p>
-   <text:p text:style-name="P33">Let&apos;s dissect the version string <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">/conary.</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">example</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">.com@</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">plat</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">:1/2.2.3-4-2</text:span></text:span>.</text:p>
-   <text:p text:style-name="P33">The first part, <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">conary.</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">example</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">.com@</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">plat</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">:1</text:span></text:span>, is a <text:span text:style-name="Strong_20_Emphasis">label</text:span>. The label holds: </text:p>
-   <text:list xml:id="list6324272815942193788" text:style-name="L1">
+   <text:p text:style-name="P5"><text:soft-page-break/><text:span text:style-name="T36">Names p</text:span>refixed with <text:span text:style-name="Source_20_Text">group-</text:span> <text:span text:style-name="T36">are </text:span>reserved <text:span text:style-name="T36">and required for groups.</text:span></text:p>
+   <text:h text:style-name="P30" text:outline-level="3">1.4 Other reserved trove names</text:h>
+   <text:p text:style-name="P6"><text:span text:style-name="T16">Factories</text:span> are build automation components that can introspect sources to build packages and groups. <text:span text:style-name="T36">Names p</text:span>refixed with <text:span text:style-name="Source_20_Text"><text:span text:style-name="T36">factory</text:span></text:span><text:span text:style-name="Source_20_Text">-</text:span> <text:span text:style-name="T36">are </text:span>reserved <text:span text:style-name="T36">and required for factories.</text:span></text:p>
+   <text:p text:style-name="P6"><text:span text:style-name="Strong_20_Emphasis">Filesets</text:span> are troves that contain only files, but those files come from <text:span text:style-name="T32">other </text:span>components <text:span text:style-name="T32">already </text:span>in the repository. <text:span text:style-name="T36">Names p</text:span>refixed with <text:span text:style-name="Source_20_Text"><text:span text:style-name="T36">fileset</text:span></text:span><text:span text:style-name="Source_20_Text">-</text:span> <text:span text:style-name="T36">are </text:span>reserved <text:span text:style-name="T36">and required for filesets.</text:span> <text:span text:style-name="T3">Filesets are very rarely used because they are not useful enough to be worth the work to create them; they were originally intended to be useful for small embedded systems where they could have been.</text:span></text:p>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="labels"/><text:span text:style-name="T35">1.5 </text:span>Labels and Versions</text:h>
+   <text:p text:style-name="Text_20_body">Conary uses strongly descriptive strings to compose the version and branch structure. The amount of description makes them quite long, so Conary <text:span text:style-name="T31">by default</text:span> hides as much of the string as possible for normal use. <text:span text:style-name="T37">L</text:span>ike domain names, <text:span text:style-name="T37">in</text:span> normal use you need only a short portion <text:span text:style-name="T37">of a Conary version string</text:span>. For example, the version <text:span text:style-name="Source_20_Text">/conary.</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T13">example</text:span></text:span><text:span text:style-name="Source_20_Text">.com@</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T13">plat</text:span></text:span><text:span text:style-name="Source_20_Text">:1/2.2.3-4-2</text:span> can usually be referred to and displayed as <text:span text:style-name="Source_20_Text">2.2.3-4-2</text:span>. The entire version string <text:span text:style-name="T37">is globally </text:span>unique, <text:span text:style-name="T37">and</text:span> identifies both the source of a package and its intended context.</text:p>
+   <text:p text:style-name="P18">Let&apos;s dissect the version string <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">/conary.</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T20">example</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">.com@</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T20">plat</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">:1/2.2.3-4-2</text:span></text:span>.</text:p>
+   <text:p text:style-name="P18">The first part, <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">conary.</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T20">example</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">.com@</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T20">plat</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">:1</text:span></text:span>, is a <text:span text:style-name="Strong_20_Emphasis">label</text:span>. The label holds: </text:p>
+   <text:list xml:id="list6367570142115623186" text:style-name="L1">
     <text:list-item>
-     <text:p text:style-name="P23"><text:span text:style-name="Strong_20_Emphasis">The repository host name:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">conary.</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">example</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">.com</text:span></text:span> <text:span text:style-name="T38">is generally a fully-qualified domain name that can be resolved.</text:span></text:p>
+     <text:p text:style-name="P21"><text:span text:style-name="Strong_20_Emphasis">The repository host name:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">conary.</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T20">example</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">.com</text:span></text:span> <text:span text:style-name="T37">is generally a fully-qualified domain name that can be resolved.</text:span></text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P23"><text:span text:style-name="Strong_20_Emphasis">Branch name:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T23">plat:</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">1</text:span></text:span> <text:span text:style-name="T38">is a context identifier made up of a </text:span><text:span text:style-name="T23">namespace</text:span><text:span text:style-name="T38"> and a </text:span><text:span text:style-name="T23">tag</text:span><text:span text:style-name="T38">:</text:span></text:p>
+     <text:p text:style-name="P21"><text:span text:style-name="Strong_20_Emphasis">Branch name:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T21">plat:</text:span></text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">1</text:span></text:span> <text:span text:style-name="T37">is a context identifier made up of a </text:span><text:span text:style-name="T21">namespace</text:span><text:span text:style-name="T37"> and a </text:span><text:span text:style-name="T21">tag</text:span><text:span text:style-name="T37">:</text:span></text:p>
      <text:list>
       <text:list-item>
-       <text:p text:style-name="P23"><text:span text:style-name="Strong_20_Emphasis">Namespace:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">plat</text:span></text:span> A high-level context specifier that <text:span text:style-name="T9">by convention communicates relationship between otherwise independent</text:span> branch names. <text:span text:style-name="T38">(</text:span>The <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">local</text:span></text:span> label is reserved for internal <text:span text:style-name="T9">C</text:span>onary <text:span text:style-name="T15">purposes</text:span>.<text:span text:style-name="T38">)</text:span></text:p>
+       <text:p text:style-name="P21"><text:span text:style-name="Strong_20_Emphasis">Namespace:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T20">plat</text:span></text:span> A high-level context specifier that <text:span text:style-name="T7">by convention communicates relationship between otherwise independent</text:span> branch names. <text:span text:style-name="T37">(</text:span>The <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">local</text:span></text:span> label is reserved for internal <text:span text:style-name="T7">C</text:span>onary <text:span text:style-name="T13">purposes</text:span>.<text:span text:style-name="T37">)</text:span></text:p>
       </text:list-item>
       <text:list-item>
-       <text:p text:style-name="P24"><text:span text:style-name="Strong_20_Emphasis">Tag:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">1</text:span></text:span> This is the only portion of the label that is essentially arbitrary; and will be defined by the owner of the namespace it is part of. <text:span text:style-name="T9">It usually represents a major version and usually product stage; related tags might be </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T24">1-devel</text:span></text:span><text:span text:style-name="T9"> and </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T24">1-qa</text:span></text:span><text:span text:style-name="T9"> representing the development and QA stages of product development, respectively.</text:span></text:p>
+       <text:p text:style-name="P22"><text:span text:style-name="Strong_20_Emphasis">Tag:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">1</text:span></text:span> This is the only portion of the label that is essentially arbitrary; and will be defined by the owner of the namespace it is part of. <text:span text:style-name="T7">It usually represents a major version and usually product stage; related tags might be </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">1-devel</text:span></text:span><text:span text:style-name="T7"> and </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T22">1-qa</text:span></text:span><text:span text:style-name="T7"> representing the development and QA stages of product development, respectively.</text:span></text:p>
       </text:list-item>
      </text:list>
     </text:list-item>
    </text:list>
-   <text:p text:style-name="Text_20_body">The next part, <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">2.2.3-4-2</text:span></text:span>, is called the <text:span text:style-name="Strong_20_Emphasis">revision</text:span> and contains the more traditional version information. </text:p>
-   <text:list xml:id="list3208741672728656024" text:style-name="L2">
+   <text:p text:style-name="Text_20_body">The next part, <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">2.2.3-4-2</text:span></text:span>, is called the <text:span text:style-name="Strong_20_Emphasis">revision</text:span> and contains the more traditional version information. </text:p>
+   <text:list xml:id="list4423276832532693406" text:style-name="L2">
     <text:list-item>
-     <text:p text:style-name="P25"><text:span text:style-name="Strong_20_Emphasis">Upstream version string:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T18">2.2.3</text:span></text:span> This is the version <text:span text:style-name="T9">(</text:span>number or string<text:span text:style-name="T9">) of the source code, whatever its origin</text:span>. Conary merely checks whether this upstream version exists already (to see which source count to use; see below), that it starts with a numeric character (to distinguish versions from labels when abbreviating versions), and that the <text:span text:style-name="Source_20_Text">-</text:span> character is not in it (because the <text:span text:style-name="Source_20_Text">-</text:span> character separates the upstream version string from the next data element). The upstream version string is there primarily to present useful information to the user. Conary never tries to determine whether one upstream version is “newer” or “older” than another. Instead, the ordering specified by the repository&apos;s version tree determines what Conary thinks is older or newer; the most recent commit to the <text:span text:style-name="T9">label</text:span> is the newest.</text:p>
+     <text:p text:style-name="P23"><text:span text:style-name="Strong_20_Emphasis">Upstream version string:</text:span> <text:span text:style-name="Source_20_Text"><text:span text:style-name="T16">2.2.3</text:span></text:span> This is the version <text:span text:style-name="T7">(</text:span>number or string<text:span text:style-name="T7">) of the source code, whatever its origin</text:span>. Conary merely checks whether this upstream version exists already (to see which source count to use; see below), that it starts with a numeric character (to distinguish versions from labels when abbreviating versions), and that the <text:span text:style-name="Source_20_Text">-</text:span> character is not in it (because the <text:span text:style-name="Source_20_Text">-</text:span> character separates the upstream version string from the next data element). The upstream version string is there primarily to present useful information to the user. Conary never tries to determine whether one upstream version is “newer” or “older” than another. Instead, the ordering specified by the repository&apos;s version tree determines what Conary thinks is older or newer; the most recent commit to the <text:span text:style-name="T7">label</text:span> is the newest.</text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P25"><text:soft-page-break/><text:span text:style-name="Strong_20_Emphasis">Source count:</text:span> <text:span text:style-name="Source_20_Text">4</text:span> Incremented each time a <text:span text:style-name="T9">new re</text:span>v<text:span text:style-name="T9">ision</text:span> of the source <text:span text:style-name="T9">component containing</text:span> <text:span text:style-name="T9">t</text:span>he same upstream version string is checked in <text:span text:style-name="T9">to the Conary repository</text:span>. It is similar to the release number used by traditional packaging systems. </text:p>
+     <text:p text:style-name="P23"><text:span text:style-name="Strong_20_Emphasis">Source count:</text:span> <text:span text:style-name="Source_20_Text">4</text:span> Incremented each time a <text:span text:style-name="T7">new re</text:span>v<text:span text:style-name="T7">ision</text:span> of the source <text:span text:style-name="T7">component containing</text:span> <text:span text:style-name="T7">t</text:span>he same upstream version string is checked in <text:span text:style-name="T7">to the Conary repository</text:span>. It is similar to the release <text:soft-page-break/>number used by traditional packaging systems. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P25"><text:span text:style-name="Strong_20_Emphasis">Build count:</text:span> <text:span text:style-name="Source_20_Text">2</text:span> How many times the source component that this component comes from has been built <text:span text:style-name="T9">into a corresponding binary package</text:span>. <text:span text:style-name="T16">Source components have no build count because they are the input to the build process</text:span>. </text:p>
+     <text:p text:style-name="P23"><text:span text:style-name="Strong_20_Emphasis">Build count:</text:span> <text:span text:style-name="Source_20_Text">2</text:span> How many times the source component that this component comes from has been built <text:span text:style-name="T7">into a corresponding binary package</text:span>. <text:span text:style-name="T14">Source components have no build count because they are the input to the build process</text:span>. </text:p>
     </text:list-item>
    </text:list>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="shadows"/><text:span text:style-name="T36">1.7 </text:span>Shadows</text:h>
-   <text:p text:style-name="P12"><text:span text:style-name="T17">Conary introduced the concept of a branch that tracks rather than diverges from its parent as a </text:span><text:span text:style-name="T19">shadow</text:span><text:span text:style-name="T17">. This is similar to the Git concept of a “tracking branch”, where the developer can choose to merge changes into the shadow (tracking branch) as well as to push changes from the shadow (tracking branch) to the parent. Unlike Git, Conary stores the relationship between the parent branch and the shadow in the version of the shadow. </text:span>The name of a shadow is the name of the parent with <text:span text:style-name="Source_20_Text">//shadowname</text:span> appended; for example, <text:span text:style-name="Source_20_Text">/parent//shadow</text:span>. (<text:span text:style-name="T30">Of course,</text:span> <text:span text:style-name="Source_20_Text">/parent</text:span> will really be something like <text:span text:style-name="Source_20_Text">/conary.</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T17">example</text:span></text:span><text:span text:style-name="Source_20_Text">.com@</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T17">plat</text:span></text:span><text:span text:style-name="Source_20_Text">:1</text:span> and <text:span text:style-name="Source_20_Text">//shadow</text:span> will really be something like <text:span text:style-name="Source_20_Text">//c</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T26">hild</text:span></text:span><text:span text:style-name="Source_20_Text">.example.com@example:myshadow</text:span>) </text:p>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="shadows"/><text:span text:style-name="T35">1.6 </text:span>Shadows</text:h>
+   <text:p text:style-name="P11"><text:span text:style-name="T15">Conary introduced the concept of a branch that tracks rather than diverges from its parent as a </text:span><text:span text:style-name="T17">shadow</text:span><text:span text:style-name="T15">. This is similar to the Git concept of a “tracking branch”, where the developer can choose to merge changes into the shadow (tracking branch) as well as to push changes from the shadow (tracking branch) to the parent. Unlike Git, Conary stores the relationship between the parent branch and the shadow in the version of the shadow. </text:span>The name of a shadow is the name of the parent with <text:span text:style-name="Source_20_Text">//shadowname</text:span> appended; for example, <text:span text:style-name="Source_20_Text">/parent//shadow</text:span>. (<text:span text:style-name="T29">Of course,</text:span> <text:span text:style-name="Source_20_Text">/parent</text:span> will really be something like <text:span text:style-name="Source_20_Text">/conary.</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T15">example</text:span></text:span><text:span text:style-name="Source_20_Text">.com@</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T15">plat</text:span></text:span><text:span text:style-name="Source_20_Text">:1</text:span> and <text:span text:style-name="Source_20_Text">//shadow</text:span> will really be something like <text:span text:style-name="Source_20_Text">//c</text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T25">hild</text:span></text:span><text:span text:style-name="Source_20_Text">.example.com@example:myshadow</text:span>) </text:p>
    <text:p text:style-name="Text_20_body">Both <text:span text:style-name="Source_20_Text">/parent/1.2.3-3</text:span> and <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.3-3</text:span> refer to exactly the same contents. Changes are represented with a “dotted” source count, so the first change to <text:span text:style-name="Source_20_Text">/parent/1.2.3-3</text:span> that you check in on the <text:span text:style-name="Source_20_Text">/parent//shadow</text:span> shadow will be called <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.3-3.1</text:span>. When you build binaries, you will have versions like <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.3-3.1-1.1</text:span> where the build count has also been “dotted”.</text:p>
-   <text:p text:style-name="P12">If you update to a new upstream source version on your shadow without merging <text:span text:style-name="T26">that version from</text:span> the parent, <text:span text:style-name="Source_20_Text">0</text:span> is used as a placeholder for the parent source count, <text:span text:style-name="T17">since the source count is 1-based and is never </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T17">0</text:span></text:span><text:span text:style-name="T17"> otherwise</text:span>. <text:span text:style-name="T38">Therefore,</text:span> if you check in version 1.2.4 on this shadow, you will get <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.4-0.1</text:span> as your version. The same thing happens for build count; if the source version <text:span text:style-name="Source_20_Text">/parent/1.2.4-1</text:span> exists, but the build version <text:span text:style-name="Source_20_Text">/parent/1.2.4-1-1</text:span> does not exist when you build on your shadow, you will get versions that look like <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.4-1.1-0.1</text:span> </text:p>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="flavors"/><text:span text:style-name="T36">1.8 </text:span>Flavors</text:h>
-   <text:p text:style-name="Text_20_body">Conary has a unified approach to handling multiple architectures and modified configurations. It has a very fine-grained view of architecture and configuration. Architectures are viewed as an instruction set, including settings for optional capabilities. Configuration is set with system-wide flags, and per-package flags for configuration that <text:span text:style-name="T38">are</text:span> very package-specific. <text:span text:style-name="T38">A </text:span><text:span text:style-name="T23">flavor</text:span><text:span text:style-name="T38"> is an </text:span>architecture/configuration combination.</text:p>
-   <text:p text:style-name="Text_20_body">Using flavors, the same source package can be built multiple times with different architecture and configuration settings. For example, it could be built once for <text:span text:style-name="Source_20_Text">x86</text:span> with <text:span text:style-name="Source_20_Text">i686</text:span> and <text:span text:style-name="Source_20_Text">SSE2</text:span> enabled, and once for <text:span text:style-name="Source_20_Text">x86</text:span> with <text:span text:style-name="Source_20_Text">i686</text:span> enabled but <text:span text:style-name="Source_20_Text">SSE2</text:span> disabled. Each of those architecture builds could be done twice, once with <text:span text:style-name="T27">pam </text:span>enabled <text:span text:style-name="T27">for authentication</text:span>, and once with <text:span text:style-name="T27">pam </text:span>disabled. All these versions, built from exactly the same sources, are stored together in the repository, <text:span text:style-name="T27">and given the same version string</text:span>.</text:p>
-   <text:p text:style-name="Text_20_body">At install time, Conary picks the most appropriate flavor of a component to install for the local machine and configuration (unless you override Conary&apos;s choice, of course). Furthermore, if two flavors of a component do not have overlapping files, and both are compatible with the local machine and configuration, both can be installed. For example, library files for the <text:span text:style-name="Source_20_Text">i386</text:span> family are kept in <text:span text:style-name="Source_20_Text">/lib</text:span> <text:soft-page-break/>and <text:span text:style-name="Source_20_Text">/usr/lib</text:span>, but for <text:span text:style-name="Source_20_Text">x86_64</text:span> they are kept in <text:span text:style-name="Source_20_Text">/lib64</text:span> and <text:span text:style-name="Source_20_Text">/usr/lib64</text:span>, so there is no reason that they should not both be installed, and since the <text:span text:style-name="T27">x86_64</text:span> platform can run both, it is convenient to have them both installed. </text:p>
-   <text:h text:style-name="Heading_20_2" text:outline-level="2"><text:span text:style-name="T36">2. </text:span>System Management</text:h>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:span text:style-name="T36">2.1 </text:span>System Model</text:h>
-   <text:p text:style-name="P16">To manage a system, Conary stores a file called a <text:span text:style-name="T18">system model</text:span> that is a plain text description of the desired state of the system. It looks like a log of operations, but it isn&apos;t: it is a description of operations <text:span text:style-name="T30">that could</text:span> be used to get to the desired state. <text:span text:style-name="T30">Packages installed only to satisfy dependencies are not included in that description, and Conary updates to newer versions by changing the versions in the model, processing the model to describe the newly-desired state of the system, and then making whatever changes are needed to synchronize the system to that newly-desired state.</text:span></text:p>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="changesets"/><text:span text:style-name="T36">2.2 </text:span>Changesets</text:h>
+   <text:p text:style-name="P11">If you update to a new upstream source version on your shadow without merging <text:span text:style-name="T25">that version from</text:span> the parent, <text:span text:style-name="Source_20_Text">0</text:span> is used as a placeholder for the parent source count, <text:span text:style-name="T15">since the source count is 1-based and is never </text:span><text:span text:style-name="Source_20_Text"><text:span text:style-name="T15">0</text:span></text:span><text:span text:style-name="T15"> otherwise</text:span>. <text:span text:style-name="T37">Therefore,</text:span> if you check in version 1.2.4 on this shadow, you will get <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.4-0.1</text:span> as your version. The same thing happens for build count; if the source version <text:span text:style-name="Source_20_Text">/parent/1.2.4-1</text:span> exists, but the build version <text:span text:style-name="Source_20_Text">/parent/1.2.4-1-1</text:span> does not exist when you build on your shadow, you will get versions that look like <text:span text:style-name="Source_20_Text">/parent//shadow/1.2.4-1.1-0.1</text:span> </text:p>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="flavors"/><text:span text:style-name="T35">1.7 </text:span>Flavors</text:h>
+   <text:p text:style-name="Text_20_body">Conary has a unified approach to handling multiple architectures and modified configurations. It has a very fine-grained view of architecture and configuration. Architectures are viewed as an instruction set, including settings for optional capabilities. Configuration is set with system-wide flags, and per-package flags for configuration that <text:span text:style-name="T37">are</text:span> very package-specific. <text:span text:style-name="T37">A </text:span><text:span text:style-name="T21">flavor</text:span><text:span text:style-name="T37"> is an </text:span>architecture/configuration combination.</text:p>
+   <text:p text:style-name="Text_20_body">Using flavors, the same source package can be built multiple times with different architecture and configuration settings. For example, it could be built once for <text:span text:style-name="Source_20_Text">x86</text:span> with <text:span text:style-name="Source_20_Text">i686</text:span> and <text:span text:style-name="Source_20_Text">SSE2</text:span> enabled, and once for <text:span text:style-name="Source_20_Text">x86</text:span> with <text:span text:style-name="Source_20_Text">i686</text:span> enabled but <text:span text:style-name="Source_20_Text">SSE2</text:span> disabled. Each of those architecture builds could be done twice, once with <text:span text:style-name="T26">pam </text:span>enabled <text:span text:style-name="T26">for authentication</text:span>, and once with <text:span text:style-name="T26">pam </text:span>disabled. All these versions, built from exactly the same sources, are stored together in the repository, <text:span text:style-name="T26">and given the same version string</text:span>.</text:p>
+   <text:p text:style-name="Text_20_body">At install time, Conary picks the most appropriate flavor of a component to install for the local machine and configuration (unless you override Conary&apos;s choice, of course). Furthermore, if two flavors of a component do not have overlapping files, and both are compatible with the local machine and configuration, both can be installed. For example, library files for the <text:span text:style-name="Source_20_Text">i386</text:span> family are kept in <text:span text:style-name="Source_20_Text">/lib</text:span> and <text:span text:style-name="Source_20_Text">/usr/lib</text:span>, but for <text:span text:style-name="Source_20_Text">x86_64</text:span> they are kept in <text:span text:style-name="Source_20_Text">/lib64</text:span> and <text:span text:style-name="Source_20_Text">/usr/lib64</text:span>, so there is no reason that they should not both be installed, and since the <text:span text:style-name="T26">x86_64</text:span> platform can run both, it is convenient to <text:soft-page-break/>have them both installed. </text:p>
+   <text:h text:style-name="Heading_20_2" text:outline-level="2"><text:span text:style-name="T35">2. </text:span>System Management</text:h>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:span text:style-name="T35">2.1 </text:span>System Model</text:h>
+   <text:p text:style-name="P16">To manage a system, Conary stores a file called a <text:span text:style-name="T16">system model</text:span> that is a plain text description of the desired state of the system. It looks like a log of operations, but it isn&apos;t: it is a description of operations <text:span text:style-name="T29">that could</text:span> be used to get to the desired state. <text:span text:style-name="T29">Packages installed only to satisfy dependencies are not included in that description, and Conary updates to newer versions by changing the versions in the model, processing the model to describe the newly-desired state of the system, and then making whatever changes are needed to synchronize the system to that newly-desired state.</text:span></text:p>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="changesets"/><text:span text:style-name="T35">2.2 </text:span>Changesets</text:h>
    <text:p text:style-name="Text_20_body">Just as source code control systems use patch files to describe the differences between two versions of a file, Conary uses <text:span text:style-name="Strong_20_Emphasis">changesets</text:span> to describe the differences between versions of troves and files. These changesets include information on how files have changed, as well as how the troves that reference those files have changed. </text:p>
-   <text:p text:style-name="Text_20_body"><text:span text:style-name="T38">C</text:span>hangesets are transient objects; they are created as part of an operation and disappear when that operation has completed. <text:span text:style-name="T2">Copies of changesets can be stored in files for inspection</text:span>. </text:p>
-   <text:p text:style-name="Text_20_body">Applying changesets rather than installing new versions of packages allows Conary to update only the parts of a package that have changed, <text:span text:style-name="T39">apply changes to configuration files, and even</text:span> <text:span text:style-name="T39">respect</text:span> file metadata <text:span text:style-name="T39">changes</text:span> such as permissions. </text:p>
-   <text:p text:style-name="Text_20_body">This capability is very useful if you wish to maintain a shadow of a package<text:span text:style-name="T39">—</text:span>for example, keeping current with vendor maintenance of a package, while adding a couple of patches to meet local needs. </text:p>
-   <text:p text:style-name="Text_20_body">Conary also keeps track of local changes in essentially the same way, preserving them. <text:span text:style-name="T39">F</text:span>or example, <text:span text:style-name="T39">when </text:span>you add a few lines to a configuration file on an installed system, and then a new version of a package is released with changes to that configuration file, Conary can merge the two <text:span text:style-name="T39">except in the rare case of conflict</text:span>. If you change a file&apos;s permission bits, those changes will be preserved across upgrades. </text:p>
+   <text:p text:style-name="Text_20_body"><text:span text:style-name="T37">C</text:span>hangesets are transient objects; they are created as part of an operation and disappear when that operation has completed. <text:span text:style-name="T2">Copies of changesets can be stored in files for inspection</text:span>. </text:p>
+   <text:p text:style-name="Text_20_body">Applying changesets rather than installing new versions of packages allows Conary to update only the parts of a package that have changed, <text:span text:style-name="T38">apply changes to configuration files, and even</text:span> <text:span text:style-name="T38">respect</text:span> file metadata <text:span text:style-name="T38">changes</text:span> such as permissions. </text:p>
+   <text:p text:style-name="Text_20_body">This capability is very useful if you wish to maintain a shadow of a package<text:span text:style-name="T38">—</text:span>for example, keeping current with vendor maintenance of a package, while adding a couple of patches to meet local needs. </text:p>
+   <text:p text:style-name="Text_20_body">Conary also keeps track of local changes in essentially the same way, preserving them. <text:span text:style-name="T38">F</text:span>or example, <text:span text:style-name="T38">when </text:span>you add a few lines to a configuration file on an installed system, and then a new version of a package is released with changes to that configuration file, Conary can merge the two <text:span text:style-name="T38">except in the rare case of conflict</text:span>. If you change a file&apos;s permission bits, those changes will be preserved across upgrades. </text:p>
    <text:p text:style-name="Text_20_body">Conary supports two types of change sets: </text:p>
-   <text:list xml:id="list8800007122420459963" text:style-name="L3">
+   <text:list xml:id="list8110667071838106239" text:style-name="L3">
     <text:list-item>
-     <text:p text:style-name="P26"><text:span text:style-name="T39">A </text:span><text:span text:style-name="T25">relative changeset</text:span><text:span text:style-name="T39"> expresses t</text:span>he differences between two versions in a repository </text:p>
+     <text:p text:style-name="P24"><text:span text:style-name="T38">A </text:span><text:span text:style-name="T23">relative changeset</text:span><text:span text:style-name="T38"> expresses t</text:span>he differences between two versions in a repository </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P26"><text:span text:style-name="T39">An </text:span><text:span text:style-name="T25">absolute changeset</text:span><text:span text:style-name="T39"> expresses t</text:span>he complete contents of a version in a repository (logically, this is the difference between nothing at all and that version). If you use an absolute changeset to upgrade to the version provided in the absolute changeset, Conary internally converts the changeset to a relative changeset, thereby preserving your local changes.</text:p>
+     <text:p text:style-name="P24"><text:span text:style-name="T38">An </text:span><text:span text:style-name="T23">absolute changeset</text:span><text:span text:style-name="T38"> expresses t</text:span>he complete contents of a version in a repository (logically, this is the difference between nothing at all and that version). If you use an absolute changeset to upgrade to the version provided in the absolute changeset, Conary internally converts the changeset to a relative changeset, thereby preserving your local changes.</text:p>
     </text:list-item>
    </text:list>
-   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="merging"/><text:span text:style-name="T36">2.3 </text:span>Merging <text:span text:style-name="T35">Changes</text:span></text:h>
-   <text:p text:style-name="Text_20_body">When Conary updates a system, it does not blindly obliterate all changes that have been made on the local system. Instead, it does a three-way merge between the currently installed version of a file as originally installed, that file as it exists on the local system, and the new version of the file being installed. If an attribute of the file was not changed on the local system, that attribute&apos;s value is set from <text:soft-page-break/>the new version of the package. Similarly, if the attribute did not change between versions of the package, the attribute from the local system is preserved. <text:span text:style-name="T39">C</text:span>onflicts occur <text:span text:style-name="T39">only</text:span> if both the new value and the local value of the attribute have changed; in that case a warning is given and the administrator <text:span text:style-name="T39">must</text:span> resolve the conflict. </text:p>
-   <text:p text:style-name="Text_20_body">For configuration files, Conary creates and applies context diffs. This preserves changes using the the widely-understood diff/patch process. </text:p>
-   <text:h text:style-name="P21" text:outline-level="3"><text:span text:style-name="T36">2.4 </text:span>Rollbacks</text:h>
+   <text:h text:style-name="Heading_20_3" text:outline-level="3"><text:bookmark text:name="merging"/><text:span text:style-name="T35">2.3 </text:span>Merging <text:span text:style-name="T34">Changes</text:span></text:h>
+   <text:p text:style-name="Text_20_body">When Conary updates a system, it does not blindly obliterate all changes that have been made on the local system. Instead, it <text:span text:style-name="T39">merges attribute changes </text:span>between the currently installed version of a file as originally installed, that file as it exists on the local system, and the new version of the file being installed. If an attribute of the file was not changed on the local system, that attribute&apos;s value is set from the new version of the package. Similarly, if the attribute did not change between versions of the package, the attribute from the local system is preserved. <text:span text:style-name="T38">C</text:span>onflicts occur <text:span text:style-name="T38">only</text:span> if both the new value <text:soft-page-break/>and the local value of the attribute have changed; in that case a warning is given and the administrator <text:span text:style-name="T38">must</text:span> resolve the conflict. </text:p>
+   <text:p text:style-name="P29">For <text:span text:style-name="T16">configuration</text:span> files, Conary creates and applies context diffs. This preserves changes using the the widely-understood diff/patch process. <text:span text:style-name="T39">For other files, Conary supports different content merge behavior based on the file type: </text:span><text:span text:style-name="T24">transient</text:span><text:span text:style-name="T39"> files unconditionally replace file content on the system with content from the repository; </text:span><text:span text:style-name="T24">initial contents</text:span><text:span text:style-name="T39"> files unconditionally retain content from the system, and other file types by default abort update operations on conflict</text:span>.</text:p>
+   <text:h text:style-name="P20" text:outline-level="3"><text:span text:style-name="T35">2.4 </text:span>Rollbacks</text:h>
    <text:p text:style-name="P2">Because Conary updates systems by applying changesets, and because it is able to follow changes on the local system intrinsically, it easily supports <text:span text:style-name="Strong_20_Emphasis">rollbacks</text:span>. Conary store<text:span text:style-name="T2">s</text:span> an inverse changeset that represents each <text:span text:style-name="Strong_20_Emphasis">transaction</text:span> (a set of trove updates that maintains system consistency, including any dependencies) that it commits to the local system. If the update creates or causes problems, Conary <text:span text:style-name="T2">can</text:span> <text:span text:style-name="T2">apply </text:span>the changeset that represents the rollback.</text:p>
-   <text:p text:style-name="P2"><text:span text:style-name="T28">Rollbacks are meant only for precisely undoing Conary operations, not for version downgrades. Rollback operations </text:span>are strictly stacked; you can (in effect) go backward through time, but you cannot browse <text:span text:style-name="T28">and selectively revert parts of history</text:span>. You have to apply the most recent rollback before you apply the next most recent rollback, and so forth. <text:span text:style-name="T28">Applying a rollback cannot itself be rolled back. </text:span>Because Conary maintains local changes vigorously, including merging changes to configuration files, and because all the old versions you might have installed before are still in the repositories they came from, <text:span text:style-name="T28">you</text:span> can <text:span text:style-name="T28">downgrade by </text:span>“updat<text:span text:style-name="T28">ing</text:span>” to older versions of troves. <text:span text:style-name="T39">This is similar</text:span> <text:span text:style-name="T39">to</text:span> rolling back your upgrade from that older version, <text:span text:style-name="T28">except that the operation of downgrading can itself be rolled back</text:span>.</text:p>
-   <text:h text:style-name="P21" text:outline-level="3"><text:span text:style-name="T36">2.5 </text:span>Dynamic Tags</text:h>
+   <text:p text:style-name="P2"><text:span text:style-name="T27">Rollbacks are meant only for precisely undoing Conary operations, not for version downgrades. Rollback operations </text:span>are strictly stacked; you can (in effect) go backward through time, but you cannot browse <text:span text:style-name="T27">and selectively revert parts of history</text:span>. You have to apply the most recent rollback before you apply the next most recent rollback, and so forth. <text:span text:style-name="T27">Applying a rollback cannot itself be rolled back. </text:span>Because Conary maintains local changes vigorously, including merging changes to configuration files, and because all the old versions you might have installed before are still in the repositories they came from, <text:span text:style-name="T27">you</text:span> can <text:span text:style-name="T27">downgrade by </text:span>“updat<text:span text:style-name="T27">ing</text:span>” to older versions of troves. <text:span text:style-name="T38">This is similar</text:span> <text:span text:style-name="T38">to</text:span> rolling back your upgrade from that older version, <text:span text:style-name="T27">except that the operation of downgrading can itself be rolled back</text:span>.</text:p>
+   <text:h text:style-name="P20" text:outline-level="3"><text:span text:style-name="T35">2.5 </text:span>Dynamic Tags</text:h>
    <text:p text:style-name="P2">Traditional <text:span text:style-name="T2">software </text:span>package management systems allow the packager to attach arbitrary scripts <text:span text:style-name="T2">or programs</text:span> to packages as metadata. These scripts are run in response to package actions such as installation and removal. This approach creates several problems. </text:p>
-   <text:list xml:id="list2226322694625997119" text:style-name="L4">
+   <text:list xml:id="list1740906997692222481" text:style-name="L4">
     <text:list-item>
-     <text:p text:style-name="P27">Bugs in scripts <text:span text:style-name="T2">can be</text:span> catastrophic and require complicated workarounds in newer versions of packages. This can arbitrarily limit the ability to revert to old versions of packages. </text:p>
+     <text:p text:style-name="P25">Bugs in scripts <text:span text:style-name="T2">can be</text:span> catastrophic and require complicated workarounds in newer versions of packages. This can arbitrarily limit the ability to revert to old versions of packages. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P27"><text:span text:style-name="T2">S</text:span>cripts are <text:span text:style-name="T2">often</text:span> boilerplate that is copied from package to package. This increases the potential for error, both from faulty transcription (introducing new errors while copying) and from transcription of faults (preserving old errors while copying). </text:p>
+     <text:p text:style-name="P25"><text:span text:style-name="T2">S</text:span>cripts are <text:span text:style-name="T2">often</text:span> boilerplate that is copied from package to package. This increases the potential for error, both from faulty transcription (introducing new errors while copying) and from transcription of faults (preserving old errors while copying). </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P27"><text:span text:style-name="T2">Some systems have t</text:span>riggers (scripts contained in one package but run in response to an action done to a different package), <text:span text:style-name="T2">which</text:span> introduce <text:span text:style-name="T2">combinatoric </text:span>complexity that def<text:span text:style-name="T2">ies</text:span> reasonable QA efforts. </text:p>
+     <text:p text:style-name="P25"><text:span text:style-name="T2">Some systems have t</text:span>riggers (scripts contained in one package but run in response to an action done to a different package), <text:span text:style-name="T2">which</text:span> introduce <text:span text:style-name="T2">combinatoric </text:span>complexity that def<text:span text:style-name="T2">ies</text:span> reasonable QA efforts. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P27">Scripts cannot be customized to handle local system needs. </text:p>
+     <text:p text:style-name="P25">Scripts cannot be customized to handle local system needs. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P27">Scripts embedded in traditional packages often fail <text:span text:style-name="T2">when a software unit is installed in a context that was not explicitly tested for.</text:span></text:p>
+     <text:p text:style-name="P25">Scripts embedded in traditional packages often fail <text:span text:style-name="T2">when a software unit is installed in a context that was not explicitly tested for.</text:span></text:p>
     </text:list-item>
    </text:list>
    <text:p text:style-name="P2">In place of the fragile script metadata provided by traditional package management systems, Conary introduces a concept called <text:span text:style-name="Strong_20_Emphasis">dynamic tags</text:span>. Files managed by Conary can have sets of arbitrary text tags that describe them. Some of these tags are defined by Conary (for example, “<text:span text:style-name="Source_20_Text">shlib</text:span>” <text:span text:style-name="T2">is</text:span> reserved to describe shared library files that <text:span text:style-name="T2">on Linux </text:span>cause<text:span text:style-name="T2">s</text:span> Conary to update <text:span text:style-name="T2">the</text:span> /etc/ld.so.conf <text:span text:style-name="T2">file if necessary, </text:span>and run <text:span text:style-name="T2">the </text:span>“<text:span text:style-name="Source_20_Text">ldconfig</text:span>” <text:span text:style-name="T2">command)</text:span>, and others can be arbitrary. </text:p>
    <text:p text:style-name="P2"><text:soft-page-break/>Tag names are intended to be shared between repositories and distributions as much as is reasonably possible. When tag names are shared, tags will not introduce arbitrary incompatibilities in packaging. If one distribution needs something special done for any particular type of file, it should modify or replace the tag handler for that tag, but should leave the tag name the same.</text:p>
-   <text:p text:style-name="P2">By convention, a tag is a noun or noun phrase describing the file; it is not a description of what to do to the file. That is, <text:span text:style-name="Source_20_Text"><text:span text:style-name="T11">file</text:span></text:span> is a <text:span text:style-name="Source_20_Text"><text:span text:style-name="T11">tag</text:span></text:span>. For example, a shared library is tagged as <text:span text:style-name="Source_20_Text">shlib</text:span> instead of as <text:span text:style-name="Source_20_Text">ldconfig</text:span>. Similarly, an info file is tagged as <text:span text:style-name="Source_20_Text">info-file</text:span>, not as <text:span text:style-name="Source_20_Text">install-info</text:span>. </text:p>
+   <text:p text:style-name="P2">By convention, a tag is a noun or noun phrase describing the file; it is not a description of what to do to the file. That is, <text:span text:style-name="Source_20_Text"><text:span text:style-name="T9">file</text:span></text:span> is a <text:span text:style-name="Source_20_Text"><text:span text:style-name="T9">tag</text:span></text:span>. For example, a shared library is tagged as <text:span text:style-name="Source_20_Text">shlib</text:span> instead of as <text:span text:style-name="Source_20_Text">ldconfig</text:span>. Similarly, an info file is tagged as <text:span text:style-name="Source_20_Text">info-file</text:span>, not as <text:span text:style-name="Source_20_Text">install-info</text:span>. </text:p>
    <text:p text:style-name="P2">Conary can be explicitly directed to apply a tag to a file, and it can also automatically apply tags to files based on a <text:span text:style-name="Strong_20_Emphasis">tag description</text:span> file. A tag description file provides the name of the tag, a set of regular expressions that determine which files the tag applies to, the path of the <text:span text:style-name="Strong_20_Emphasis">tag handler</text:span> program that Conary runs to process changes involving tagged files, and a list of actions that the handler cares about. Conary then calls the handler at appropriate times to handle the changes involving the tagged files. </text:p>
    <text:p text:style-name="P2">Actions include changes involving either the tagged files or the tag handlers. Conary will pass in lists of affected files whenever it makes sense, and will coalesce actions rather than running all possible actions once for every file or component installed. </text:p>
    <text:p text:style-name="P2">The current list of possible actions is: </text:p>
-   <text:list xml:id="list243043120931500225" text:style-name="L5">
+   <text:list xml:id="list1892775145740306837" text:style-name="L5">
     <text:list-item>
-     <text:p text:style-name="P28">Tagged files have been installed or updated; Conary provides a list of all installed or updated tagged files. </text:p>
+     <text:p text:style-name="P26">Tagged files have been installed or updated; Conary provides a list of all installed or updated tagged files. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P28">Tagged files are going to be removed; Conary provides a list of all tagged files to be removed. </text:p>
+     <text:p text:style-name="P26">Tagged files are going to be removed; Conary provides a list of all tagged files to be removed. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P28">Tagged files have been removed; Conary provides a list of filenames that were removed. </text:p>
+     <text:p text:style-name="P26">Tagged files have been removed; Conary provides a list of filenames that were removed. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P28">The tag handler or tag description have been installed or updated; Conary provides a list of all tagged files already installed on the system. </text:p>
+     <text:p text:style-name="P26">The tag handler or tag description have been installed or updated; Conary provides a list of all tagged files already installed on the system. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P28">The tag handler or tag description will be removed; Conary provides a list of all the tagged files already installed on the system to facilitate cleanup. </text:p>
+     <text:p text:style-name="P26">The tag handler or tag description will be removed; Conary provides a list of all the tagged files already installed on the system to facilitate cleanup. </text:p>
     </text:list-item>
    </text:list>
    <text:p text:style-name="P2">Because the tag description files list the actions they handle, the tag handler API can be expanded easily while maintaining backward compatibility with old handlers. </text:p>
-   <text:p text:style-name="P2"><text:span text:style-name="T34">W</text:span>riting scripts once instead of many times avoids bugs in scripts. <text:span text:style-name="T34">I</text:span>t avoids whole classes of common bugs that cause package upgrades to break installed software, and even more importantly from a provisioning standpoint, bugs that would cause rollbacks to fail. It makes it much easier to fix bugs when they do occur, without any need for “trigger” scripts that <text:span text:style-name="T34">have</text:span> often <text:span text:style-name="T34">been </text:span>needed to work around script bugs in traditional package management. It also allows components to be installed across <text:span text:style-name="T2">software </text:span>distributions<text:span text:style-name="T2">—</text:span>as long as they agree on the semantics for the tags, the actions taken for any particular tag will be correct for the distribution on which the package is being installed.</text:p>
+   <text:p text:style-name="P2"><text:span text:style-name="T33">W</text:span>riting scripts once instead of many times avoids bugs in scripts. <text:span text:style-name="T33">I</text:span>t avoids whole classes of common bugs that cause package upgrades to break installed software, and even more importantly from a provisioning standpoint, bugs that would cause rollbacks to fail. It makes it much easier to fix bugs when they do occur, without any need for “trigger” scripts that <text:span text:style-name="T33">have</text:span> often <text:span text:style-name="T33">been </text:span>needed to work around script bugs in traditional package management. It also allows components to be installed across <text:span text:style-name="T2">software </text:span>distributions<text:span text:style-name="T2">—</text:span>as long as they agree on the semantics for the tags, the actions taken for any particular tag will be correct for the distribution on which the package is being installed.</text:p>
    <text:p text:style-name="P2">Calling tag handlers when they have been updated makes recovery from bugs in older versions of tag handlers relatively benign; Conary needs to install only a single new tag handler with the capability to recover from the effects of the bug. Older versions of packages with tagged files will use the new, fixed tag handler, which allows you to revert those packages to older versions as desired, without fear of re-introducing bugs created by old versions of scripts. </text:p>
    <text:p text:style-name="P2">Furthermore, storing the scripts as files in the filesystem instead of as metadata in a package database means: </text:p>
-   <text:list xml:id="list8757369656703404230" text:style-name="L6">
+   <text:list xml:id="list6149887838234322565" text:style-name="L6">
     <text:list-item>
-     <text:p text:style-name="P29">they can be modified to suit local system peculiarities, and those modifications will be tracked just like other configuration file modifications; </text:p>
+     <text:p text:style-name="P27">they can be modified to suit local system peculiarities, and those modifications will be tracked just like other configuration file modifications; </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P29"><text:soft-page-break/>they are easier for system administrators to inspect; and </text:p>
+     <text:p text:style-name="P27"><text:soft-page-break/>they are easier for system administrators to inspect; and </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P29">they are more readily available for system administrators to use for custom tasks. </text:p>
+     <text:p text:style-name="P27">they are more readily available for system administrators to use for custom tasks. </text:p>
     </text:list-item>
    </text:list>
-   <text:p text:style-name="P2"><text:span text:style-name="T28">Conary also provides </text:span><text:span text:style-name="T21">trove scripts</text:span><text:span text:style-name="T28"> that are attached to specific versions of troves and function essentially like the scripts in traditional package management systems. They are usually added to groups, particularly to implement workarounds for bugs. However, they have all the downsides of their analogs in traditional package management systems, in particular making rollbacks less reliable.</text:span></text:p>
-   <text:h text:style-name="Heading_20_2" text:outline-level="2"><text:bookmark text:name="efficiency"/><text:span text:style-name="T36">3. </text:span>Efficiency</text:h>
-   <text:p text:style-name="Text_20_body">Conary <text:span text:style-name="T35">has several efficiency benefits over traditional software package management systems.</text:span></text:p>
-   <text:list xml:id="list3707886395284001936" text:style-name="L7">
+   <text:p text:style-name="P2"><text:span text:style-name="T27">Conary also provides </text:span><text:span text:style-name="T19">trove scripts</text:span><text:span text:style-name="T27"> that are attached to specific versions of troves and function essentially like the scripts in traditional package management systems. They are usually added to groups, particularly to implement workarounds for bugs. However, they have all the downsides of their analogs in traditional package management systems, in particular making rollbacks less reliable.</text:span></text:p>
+   <text:h text:style-name="Heading_20_2" text:outline-level="2"><text:bookmark text:name="efficiency"/><text:span text:style-name="T35">3. </text:span>Efficiency</text:h>
+   <text:p text:style-name="Text_20_body">Conary <text:span text:style-name="T34">has several efficiency benefits over traditional software package management systems.</text:span></text:p>
+   <text:list xml:id="list477179238363470998" text:style-name="L7">
     <text:list-item>
-     <text:p text:style-name="P30">By utilizing relative changesets whenever possible, Conary uses less bandwidth. </text:p>
+     <text:p text:style-name="P28">By utilizing relative changesets whenever possible, Conary uses less bandwidth. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P30">By modifying only changed files on updates, Conary uses less time to do updates, particularly for large packages with small changes. </text:p>
+     <text:p text:style-name="P28">By modifying only changed files on updates, Conary uses less time to do updates, particularly for large packages with small changes. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P30">By using a versioned repository <text:span text:style-name="T36">based on content-addressable storage</text:span>, Conary saves space because unchanged files are stored once for the whole repository, instead of once in each version of each package. </text:p>
+     <text:p text:style-name="P28">By using a versioned repository <text:span text:style-name="T35">based on content-addressable storage</text:span>, Conary saves space because unchanged files are stored once for the whole repository, instead of once in each version of each package. </text:p>
     </text:list-item>
     <text:list-item>
-     <text:p text:style-name="P30">By enabling distributed repositories, Conary </text:p>
+     <text:p text:style-name="P28">By enabling distributed repositories, Conary </text:p>
      <text:list>
       <text:list-item>
-       <text:p text:style-name="P30">saves the time it takes to maintain a modified copy of an entire repository, and </text:p>
+       <text:p text:style-name="P28">saves the time it takes to maintain a modified copy of an entire repository, and </text:p>
       </text:list-item>
       <text:list-item>
-       <text:p text:style-name="P30">saves the space it takes to store complete copies of an entire repository. </text:p>
+       <text:p text:style-name="P28">saves the space it takes to store complete copies of an entire repository. </text:p>
       </text:list-item>
      </text:list>
     </text:list-item>
@@ -1245,9 +1235,9 @@
    <text:h text:style-name="Heading_20_1" text:outline-level="1">Conclusion</text:h>
    <text:p text:style-name="Text_20_body">Conary was <text:span text:style-name="T3">originally </text:span>designed to address many of the limitations of the traditional packaging metaphor. The enormous growth in the Linux developer base over the past <text:span text:style-name="T3">two </text:span>decade<text:span text:style-name="T3">s</text:span> <text:span text:style-name="T3">demonstrated</text:span> that packaging systems do not scale well to multiple repositories with conflicting content, and can make it difficult for large numbers of developers to coordinate package releases. <text:span text:style-name="T3">Beyond Linux, growing software complexity has exposed weaknesses in classic software management paradigms.</text:span></text:p>
    <text:p text:style-name="P4">Conary brings the concepts behind “fork me on github” for distributed development to software system management.</text:p>
-   <text:p text:style-name="P9">Copyright © SAS Institute Inc.</text:p>
-   <text:p text:style-name="P15"><text:span text:style-name="T11">Licensed under the Apache License, Version 2.0 (the &quot;License&quot;); you may not use this file except in compliance with the License. You may obtain a copy of the License at </text:span><text:a xlink:type="simple" xlink:href="http://www.apache.org/licenses/LICENSE-2.0"><text:span text:style-name="T11">http://www.apache.org/licenses/LICENSE-2.0</text:span></text:a><text:span text:style-name="T11"> </text:span></text:p>
-   <text:p text:style-name="P9">Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License. </text:p>
+   <text:p text:style-name="P8">Copyright © SAS Institute Inc.</text:p>
+   <text:p text:style-name="P15"><text:span text:style-name="T9">Licensed under the Apache License, Version 2.0 (the &quot;License&quot;); you may not use this file except in compliance with the License. You may obtain a copy of the License at </text:span><text:a xlink:type="simple" xlink:href="http://www.apache.org/licenses/LICENSE-2.0"><text:span text:style-name="T9">http://www.apache.org/licenses/LICENSE-2.0</text:span></text:a><text:span text:style-name="T9"> </text:span></text:p>
+   <text:p text:style-name="P8">Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License. </text:p>
   </office:text>
  </office:body>
 </office:document>
