@@ -1929,6 +1929,7 @@ class _dependency(policy.Policy):
         self.bootstrapPythonFlags = None
         self.bootstrapSysPath = []
         self.bootstrapPerlIncPath = []
+        self.bootstrapRubyLibs = []
         self.cachedProviders = {}
         self.pythonFlagNamespace = None
         self.removeFlagsByDependencyClass = None # pre-transform
@@ -2384,7 +2385,9 @@ class _dependency(policy.Policy):
         # Returns tuple of (invocationString, loadPathList)
         destdir = macros.destdir
         if bootstrap:
+            rubyLibPath = [destdir + x for x in self.bootstrapRubyLibs]
             rubyInvocation = (('LD_LIBRARY_PATH=%(destdir)s%(libdir)s '
+                               'RUBYLIB="'+':'.join(rubyLibPath)+'" '
                                +rubyInvocation)%macros)
         rubyLoadPath = util.popen("%s -e 'puts $:'" %rubyInvocation).readlines()
         rubyLoadPath = [ x.strip() for x in rubyLoadPath if x.startswith('/') ]
@@ -2687,6 +2690,9 @@ class Provides(_dependency):
         bootstrapPerlIncPath = keywords.pop('_bootstrapPerlIncPath', None)
         if bootstrapPerlIncPath is not None:
             self.bootstrapPerlIncPath = bootstrapPerlIncPath
+        bootstrapRubyLibs = keywords.pop('_bootstrapRubyLibs', None)
+        if bootstrapRubyLibs is not None:
+            self.bootstrapRubyLibs = bootstrapRubyLibs
         if keywords.get('removeFlagsByDependencyClass', None):
             self.error('removeFlagsByDependencyClass not currently implemented for Provides (CNY-3443)')
 
@@ -3371,6 +3377,7 @@ class Requires(_addInfo, _dependency):
         self.bootstrapPythonFlags = set()
         self.bootstrapSysPath = []
         self.bootstrapPerlIncPath = []
+        self.bootstrapRubyLibs = []
         self.pythonFlagNamespace = None
         self.sonameSubtrees = set()
         self._privateDepMap = {}
@@ -3440,6 +3447,15 @@ class Requires(_addInfo, _dependency):
             # pass full set to Provides to share the exact same data
             self.recipe.Provides(
                 _bootstrapPerlIncPath=self.bootstrapPerlIncPath)
+        bootstrapRubyLibs = keywords.pop('bootstrapRubyLibs', None)
+        if bootstrapRubyLibs is not None:
+            if type(bootstrapRubyLibs) in (list, tuple):
+                self.bootstrapRubyLibs.extend(bootstrapRubyLibs)
+            else:
+                self.error('bootstrapRubyLibs must be list or tuple')
+            # pass full set to Provides to share the exact same data
+            self.recipe.Provides(
+                _bootstrapRubyLibs=self.bootstrapRubyLibs)
         _CILPolicyProvides = keywords.pop('_CILPolicyProvides', None)
         if _CILPolicyProvides:
             self._CILPolicyProvides.update(_CILPolicyProvides)
