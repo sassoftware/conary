@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-
 """
 Module used after C{%(destdir)s} has been finalized to create the
 initial packaging.  Also contains error reporting.
@@ -2389,7 +2388,14 @@ class _dependency(policy.Policy):
             rubyInvocation = (('LD_LIBRARY_PATH=%(destdir)s%(libdir)s '
                                'RUBYLIB="'+':'.join(rubyLibPath)+'" '
                                +rubyInvocation)%macros)
-        rubyLoadPath = util.popen("%s -e 'puts $:'" %rubyInvocation).readlines()
+        rubyLoadPath = util.popen(
+            "%s -e 'puts $:'" %
+            rubyInvocation).readlines()
+        # get gem dir if rubygems is installed
+        if os.access('%(bindir)s/gem' %macros, os.X_OK):
+            rubyLoadPath.extend(
+                util.popen("%s -rubygems -e 'puts Gem.default_dir'" %
+                        rubyInvocation).readlines())
         rubyLoadPath = [ x.strip() for x in rubyLoadPath if x.startswith('/') ]
         loadPathList = rubyLoadPath[:]
         if bootstrap:
@@ -2415,7 +2421,10 @@ class _dependency(policy.Policy):
             if not foundLib and dirName.startswith('lib'):
                 foundLib = True
                 flags.add(dirName)
-            elif not foundVer and dirName == rubyVersion:
+            elif not foundVer and dirName.split('.')[:1] == rubyVersion.split('.')[:1]:
+                # we only compare major and minor versions due to
+                # ruby api version (dirName) differing from programs
+                # version (rubyVersion)
                 foundVer = True
                 flags.add(dirName)
             if foundLib and foundVer:
@@ -3050,8 +3059,13 @@ class Provides(_dependency):
                 return False
 
             for pathElement in self.rubyLoadPath:
-                if path.startswith(pathElement) and '.' in os.path.basename(path):
-                    return path[len(pathElement)+1:].rsplit('.', 1)[0]
+                if path.startswith(pathElement) \
+                        and (path.endswith('.rb') or path.endswith('.so')):
+                    if '/gems/' in path:
+                        if '/lib/' in path:
+                            return path.partition('/lib/')[-1].rsplit('.', 1)[0]
+                    else:
+                        return path[len(pathElement)+1:].rsplit('.', 1)[0]
         return False
 
     def _addRubyProvides(self, path, m, pkgFiles, macros, prov):
@@ -3617,7 +3631,7 @@ class Requires(_addInfo, _dependency):
         if (f.inode.perms() & 0111 and m and m.name == 'script' and
             os.path.basename(m.contents['interpreter']).startswith('ruby')):
             self._addRubyRequirements(path, fullpath, pkgFiles, script=True)
-        elif '/ruby/' in path:
+        elif '/ruby/' in path and path.endswith('.rb'):
             self._addRubyRequirements(path, fullpath, pkgFiles, script=False)
 
         if self._isCIL(m):
@@ -3990,7 +4004,8 @@ class Requires(_addInfo, _dependency):
         # dependencies will find most of the required packages in
         # practice
         depEntries = [x.strip() for x in file(fullpath)
-                      if x.startswith('require')]
+                      if x.startswith('require ') or
+                         x.startswith('require(')]
         depEntries = (x.split() for x in depEntries)
         depEntries = (x[1].strip("\"'") for x in depEntries
                       if len(x) == 2 and x[1].startswith("'") and
@@ -4016,8 +4031,11 @@ class Requires(_addInfo, _dependency):
             for prefix in (destdir, ''):
                 for pathElement in self.rubyLoadPath:
                     for suffix in ('.rb', '.so'):
-                        candidate = util.joinPaths(pathElement, depEntry+suffix)
-                        if util.exists(prefix+candidate):
+                        candidate = util.searchPath(
+                            os.path.basename(depEntry) + suffix,
+                            prefix + pathElement,
+                            )
+                        if candidate:
                             return candidate
             return None
 

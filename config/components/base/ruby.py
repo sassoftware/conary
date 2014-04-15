@@ -18,5 +18,9 @@
 # Note that Ruby components have %(lib)s in them; we depend on the
 # NonMultilibComponent policy to ensure that Ruby is multilib-safe.
 
-filters = ('ruby', ('/usr/(%(lib)s|lib)/ruby.*/site_ruby/',))
+filters = ('ruby',
+    ('/usr/(%(lib)s|lib)/ruby/gems/',
+     '/usr/(%(lib)s|lib)/ruby/site_ruby/',
+     '/usr/(%(lib)s|lib)/ruby/vendor_ruby/',
+     ))
 precedes = ('devellib', 'lib', 'devel')
