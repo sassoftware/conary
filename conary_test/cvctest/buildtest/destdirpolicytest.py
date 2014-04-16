@@ -141,6 +141,7 @@ class TestRemoveNonPackageFiles(PackageRecipe):
         self.Create('/tmp/asdf')
         self.Create('/var/tmp/asdf')
         self.Create('%(servicedir)s/www/tmp/somefile.xml')
+        self.Create('%(libdir)s/ruby/1.2.3/gems/cache/foo.gem')
         self.RemoveNonPackageFiles(exceptions='/bar~')
         self.RemoveNonPackageFiles(exceptions='/bar\..*')
 """
@@ -155,6 +156,8 @@ class TestRemoveNonPackageFiles(PackageRecipe):
             self.workDir+'foo.la')
         self.assertRaises(OSError, os.stat,
             self.workDir+'%(libdir)s/python/site-packages/foo.a' %m)
+        self.assertRaises(OSError, os.stat,
+            self.workDir+'%(libdir)s/ruby/1.2.3/gmes/cache/foo.gem' %m)
         # none of these should raise OSError...
         os.stat(self.workDir+'/foo.la.foo')
         os.stat(self.workDir+'/%(libdir)s/python/site-packages/foo.a.so' %m)

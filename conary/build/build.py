@@ -1380,6 +1380,95 @@ class PythonSetup(BuildCommand):
                 self.recipe.reportErrors(errorMsg)
 
 
+class RubyGemInstall(BuildCommand):
+    """
+    NAME
+    ====
+
+    B{C{r.RubyGemInstall()}} - Invokes 'gem' to install Ruby code from a prepackaged Gem. 
+
+    SYNOPSIS
+    ========
+
+    C{r.RubyGemInstall([I{action},] [I{gemName},] [I{dir},] [I{installDir},] )}
+
+    DESCRIPTION
+    ===========
+
+    The C{r.RubyGemInstall()} class is called from within a Conary recipe to
+    invoke Ruby's "gem" tool to install a pre-built Ruby Gem.
+
+    KEYWORDS
+    ========
+    The C{r.RubyGemInstall()} class accepts the following keywords, with
+    default values shown in parentheses when applicable:
+
+    B{action} : (C{install}) The main argument to pass to C{gem}
+
+    B{gemName} : (C{%(name)s-%(version)s.gem}) The name of the gem file to
+    install
+
+    B{dir} : (C{%(builddir)s}) Directory in which to find the gem file;
+    defaults to the build directory.
+
+    B{installDir} : (C{default gem directory}) The directory to pass to gem via
+    the C{--install-dir} option.
+
+    EXAMPLES
+    ========
+
+    C{r.RubyGemInstall()}
+
+    Calls C{r.RubyGemInstall()} and to install a gem named
+    packagename-version.gem.
+    """
+    template = (
+        '%%(cdcmd)s'
+        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
+        ' CPPFLAGS="%%(cppflags)s"'
+        ' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
+        ' gem'
+        ' %(action)s'
+        ' %(gemName)s'
+        ' --install-dir=%(installDir)s'
+        ' --bindir=%(binDir)s'
+        ' --ignore-dependencies'
+        ' --local'
+        ' --verbose'
+    )
+    keywords = {
+        'action': 'install',
+        'gemName': '%(name)s-%(version)s.gem',
+        'dir': '%(builddir)s',
+        'installDir': "%(destdir)s$(ruby -rubygems -e 'puts Gem.default_dir')",
+        'binDir': '%(destdir)s%(bindir)s'
+    }
+
+    def do(self, macros):
+        self._addActionTroveBuildRequires(['rubygems:runtime'])
+        macros = macros.copy()
+        if self.dir == '%(builddir)s':
+            rundir = macros.builddir  # do not expand!
+            macros.cdcmd = ''
+        else:
+            rundir = action._expandOnePath(self.dir, macros)
+            macros.cdcmd = 'cd \'%s\'; ' % rundir
+
+        macros.gemName = self.gemName
+
+        if self.installDir == '%(destdir)s':
+            macros.installDir = '%(destdir)s'
+        else:
+            macros.installDir = '%(destdir)s/' + self.installDir
+
+        if self.binDir == '%(destdir)s':
+            macros.binDir = '%(destdir)s'
+        else:
+            macros.binDir = '%(destdir)s/' + self.binDir
+
+        util.execute(self.command % macros)
+
+
 class Ldconfig(BuildCommand):
     """
     NAME
