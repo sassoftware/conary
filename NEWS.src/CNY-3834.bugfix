@@ -1,1 +1,0 @@
-Fixed performance regression when committing to a very large repository.

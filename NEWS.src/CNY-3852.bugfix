@@ -1,0 +1,1 @@
+Some truncated gzip files no longer abort builds due to uncaught struct.error exception

@@ -694,6 +694,7 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
         self.addCollection('foo', '1.0-1-1', [':runtime'])
         self._applyModel([ 'install foo=/localhost@rpl:linux' ])
 
+    @testhelp.context('sysmodel')
     def testCacheMergeBug(self):
         "@tests: CNY-3770"
         self.addComponent('foo:runtime', provides='file: /bin/foo')
@@ -716,3 +717,26 @@ class ModelUpdateTest(rephelp.RepositoryHelper):
         self._applyModel(model, addSearchLabel=False, useCache=True)
         # The third operation would always fail now that the cache is poisoned.
         self._applyModel(model, addSearchLabel=False, useCache=True)
+
+    @testhelp.context('sysmodel')
+    def testImplicitDepUpdate(self):
+        "@tests: CNY-3841"
+        t1 = self.addComponent('foo:runtime=1.0', provides='file: /bin/foo')
+        t2 = self.addComponent('foo:runtime=2.0', provides='file: /bin/foo')
+        self.addComponent('bar:runtime', requires='file: /bin/foo')
+        self.addCollection('foo=1.0', [':runtime'])
+        self.addCollection('foo=2.0', [':runtime'])
+        self.addCollection('bar', [':runtime'])
+        self._applyModel([
+                'search foo=localhost@rpl:linux/1.0',
+                'install bar=localhost@rpl:linux',
+                ])
+        jobs, suggMap = self._applyModel([
+                'search foo=localhost@rpl:linux/2.0',
+                'install bar=localhost@rpl:linux',
+                ])
+        jobs = sorted(sum(jobs.jobs, []))
+        self.assertEqual(jobs, [
+            ('foo',         (t1.getVersion(), t1.getFlavor()), (t2.getVersion(), t2.getFlavor()), False),
+            ('foo:runtime', (t1.getVersion(), t1.getFlavor()), (t2.getVersion(), t2.getFlavor()), False),
+            ])

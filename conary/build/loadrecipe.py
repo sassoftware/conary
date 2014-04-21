@@ -27,17 +27,16 @@ import types
 import tempfile
 import traceback
 
-from conary.repository import errors, trovesource
-from conary.build import defaultrecipes
+from conary.repository import errors
 from conary.build import recipe, use
 from conary.build import errors as builderrors
 from conary.build.errors import RecipeFileError
-from conary.build.factory import Factory as FactoryRecipe
 from conary.conaryclient import cmdline
 from conary.deps import deps
 from conary.lib import api, graph, log, util
 from conary.local import database
-from conary import trove
+from conary.repository import searchsource
+from conary.repository import trovesource
 from conary import versions
 
 class SubloadData(object):
@@ -415,11 +414,11 @@ class RecipeLoaderFromString(object):
         troveSpecs = [ cmdline.parseTroveSpec(x) for x in cfg.autoLoadRecipes ]
 
         # Look on the repository first to match the trove specs
+        searchSource = searchsource.NetworkSearchSource(repos,
+                cfg.installLabelPath, cfg.flavor, db)
         try:
-            nvfDict = repos.findTroves(cfg.installLabelPath, troveSpecs,
-                                       cfg.flavor,
-                                       allowMissing=True,
-                                       bestFlavor=True)
+            nvfDict = searchSource.findTroves(troveSpecs, allowMissing=True,
+                    bestFlavor=True)
         except errors.OpenError, err:
             nvfDict = {}
 

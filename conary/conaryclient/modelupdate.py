@@ -610,28 +610,37 @@ class CMLClient(object):
             the behavior of exceptions within callbacks.
         """
 
-        def _updateJob(origJob, addedTroves):
-            newJob = []
-            for oneJob in origJob:
-                if oneJob[1][0] is None:
-                    newJob.append(oneJob)
+        def _updateJob(job, addedTroves):
+            for newTup in addedTroves:
+                # First look for an exact erase or update in the old job that
+                # would remove this trove
+                erases = [x for x in job
+                        if (x[0], x[1][0], x[1][1]) == newTup]
+                if erases:
+                    if len(erases) > 1 or erases[0][2][0] is not None:
+                        # Corner case, fall back to doing a full diff
+                        return False
+                    # We're adding back a trove that the job would have erased
+                    # and the two annihilate each other
+                    job.remove(erases[0])
                     continue
 
-                oldTroveTup = (oneJob[0], oneJob[1][0], oneJob[1][1])
-                if oldTroveTup not in added:
-                    newJob.append(oneJob)
+                # Then look for a name-only match against an erase
+                erases = [x for x in job
+                        if x[0] == newTup[0] and x[2][0] is None]
+                if erases:
+                    if len(erases) > 1:
+                        # Corner case
+                        return False
+                    # Convert this erasure into an update
+                    job.remove(erases[0])
+                    oldVF = erases[0][1]
+                    job.append( (newTup[0], oldVF, newTup[1:3], False) )
                     continue
 
-                if oneJob[2][0] is not None:
-                    return None
-
-                added.remove(oldTroveTup)
-
-            for troveTup in added:
-                newJob.append( (troveTup[0], (None, None),
-                                troveTup[1:], True) )
-
-            return newJob
+                # No match, it's a new install
+                job.append( (newTup[0], (None, None), newTup[1:3], True) )
+            return True
 
         if criticalUpdateInfo is None:
             criticalUpdateInfo = update.CriticalUpdateInfo()
@@ -770,8 +779,7 @@ class CMLClient(object):
                                                  newTroves = added))
 
                 # try to avoid a diff here
-                job = _updateJob(job, added)
-                if job is None:
+                if not _updateJob(job, added):
                     job = targetTrv.diff(existsTrv, absolute = False)[2]
 
                 log.info("resolving dependencies (job length %d)", len(job))
