@@ -28,7 +28,7 @@ from conary.cmds import cscmd
 from conary.cmds import showchangeset
 from conary.repository import trovesource, errors
 from conary.lib import log
-from conary.errors import ConaryError
+from conary.errors import ConaryError, LabelPathNeeded
 
 VERSION_FILTER_ALL    = 0
 VERSION_FILTER_LATEST = 1
@@ -345,6 +345,9 @@ def getTrovesToDisplay(repos, troveSpecs, pathList, whatProvidesList,
         else:
             troveTups.extend(itertools.chain(*results.itervalues()))
     else:
+        if not labelPath:
+            raise LabelPathNeeded("No search label path given and no label "
+                    "specified - set the installLabelPath")
         if flavorFilter == FLAVOR_FILTER_EXACT:
             flavorFilter = FLAVOR_FILTER_BEST
 
