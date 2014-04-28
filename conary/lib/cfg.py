@@ -26,6 +26,7 @@ import socket
 import sys
 import textwrap
 import urllib2
+import urlparse
 
 from conary.lib import util, api
 from conary.lib.http import proxy_map
@@ -815,7 +816,11 @@ class ConfigFile(_Config):
             relativeTo = os.path.dirname(self._configFileStack[-1])
         else:
             relativeTo = os.getcwd()
-        return os.path.join(relativeTo, relpath)
+
+        if self.isUrl(relativeTo):
+            parts = urlparse.urlsplit(relativeTo)
+            return urlparse.urlunsplit((parts.scheme, parts.netloc, os.path.normpath(os.path.join(parts.path, relpath)), parts.query, parts.fragment))
+        return os.path.normpath(os.path.join(relativeTo, relpath))
 
     @directive
     def includeConfigFile(self, val, fileName = "override",
