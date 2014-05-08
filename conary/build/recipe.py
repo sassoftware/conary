@@ -138,7 +138,9 @@ class Recipe(object):
         self._sources = []
         self.loadSourceActions()
         self.buildinfo = None
-        self.metadataSkipSet = []
+        self.metadataSkipSet = [
+            'keyValue',
+        ]
         self.laReposCache = laReposCache
         self.srcdirs = srcdirs
         self.sourcePathMap = {}

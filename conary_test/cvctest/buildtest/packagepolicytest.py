@@ -6696,6 +6696,7 @@ class FooRecipe(PackageRecipe):
     clearBuildReqs()
 
     def setup(r):
+        r.metadataSkipSet.remove('keyValue')
         r.Create("/usr/share/foo", contents="11")
         r.ResetKeyValueMetadata('a')
 """
@@ -6713,12 +6714,27 @@ class FooRecipe(PackageRecipe):
     clearBuildReqs()
 
     def setup(r):
+        r.metadataSkipSet.remove('keyValue')
         r.Create("/usr/share/foo", contents="11")
 """
         trv = self.build(recipestr, "FooRecipe", returnTrove='foo')
         self.assertEqual(
             sorted(trv.troveInfo.metadata.get()['keyValue'].items()),
             [('b', '2')])
+
+        # Cook again without removing keyValue from the skip set, metadata
+        # should not be copied to the new version.
+        recipestr = """
+class FooRecipe(PackageRecipe):
+    name = 'foo'
+    version = '3'
+    clearBuildReqs()
+
+    def setup(r):
+        r.Create("/usr/share/foo", contents="11")
+"""
+        trv = self.build(recipestr, "FooRecipe", returnTrove='foo')
+        self.assertFalse('keyValue' in trv.troveInfo.metadata)
 
         # Set metadata remotely
         mi = trove.MetadataItem()
