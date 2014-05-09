@@ -16,6 +16,7 @@
 
 
 import copy
+import json
 import os
 import itertools
 import sys
@@ -391,6 +392,286 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                                             baseFlavors=baseFlavors,
                                             showComponents=showComponents)
         self.formatter.dcfg.setJobDisplay(compressJobs=not showComponents)
+
+
+class JsonUpdateCallback(UpdateCallback):
+    def __del__(self):
+        pass
+
+    def _message(self, msg):
+        self.out.write('%s\n' % msg)
+
+    def _capsuleSync(self, name, step, done=None, total=None, rate=None):
+        step = max(step, 1)
+        self.updateMsg(
+            step_name=name, step=step, step_total=3, phase=1,
+            phase_name="Capsule sync", done=done, total=total, rate=rate)
+
+    def _calculateUpdate(self, name, step, done=None, total=None, rate=None):
+        step = max(step, 1)
+        self.updateMsg(
+            step_name=name, step=step, step_total=4, phase=2,
+            phase_name="Calculate update", done=done, total=total, rate=rate)
+
+    def _applyUpdate(self, name, done=None, total=None, rate=None, jobs=None):
+        step, step_total = self.updateHunk
+        step = max(step, 1)
+        step_total = max(step_total, 1)
+        if jobs:
+            self.updateMsg(
+                step_name=name, step=step, step_total=step_total,
+                phase=3, phase_name="Apply update", done=done, total=total,
+                rate=rate, jobs=jobs)
+        else:
+            self.updateMsg(
+                step_name=name, step=step, step_total=step_total,
+                phase=3, phase_name="Apply update", done=done, total=total,
+                rate=rate)
+
+    def _applyUpdateCS(self, name, done=None, total=None, rate=None):
+        step, step_total = self.updateHunk
+        step = max(step, 1)
+        step_total = max(step_total, 1)
+        self.updateMsg(
+            step_name=name, step=step, step_total=step_total,
+            phase=3, phase_name="Apply update", done=done, total=total,
+            rate=rate)
+
+    def update(self):
+        """
+        Called by this callback object to udpate the status. This method
+        convets dictionaries into json strings. This method is not thread safe
+        - obtain a lock before calling.
+
+        @return None
+        """
+        if self.updateText:
+            t = self.updateText
+
+        if self.csText:
+            t = self.csText
+
+        t['percent'] = None
+        if t.get('done') is not None and t.get('total'):
+            t['percent'] = (t['done'] * 100) / t['total']
+        if t:
+            self._message(json.dumps(t))
+
+    @locked
+    def updateMsg(self, *args, **kwargs):
+        self.updateText = kwargs
+        self.updateText['phase_total'] = 3
+        if args:
+            self.updateText['msg'] = args[0]
+        self.update()
+
+    @locked
+    def csMsg(self, *args, **kwargs):
+        self.csText = kwargs
+        self.csText['phase_total'] = 3
+        if args:
+            if args[0] is None:
+                self.csText = dict()
+            else:
+                self.csText['msg'] = args[0]
+        self.update()
+
+    def executingSystemModel(self):
+        self._calculateUpdate("Processing system model", step=2)
+
+    def loadingModelCache(self):
+        self._calculateUpdate("Loading system model cache", step=1)
+
+    def savingModelCache(self):
+        self._calculateUpdate("Saving system model cache", step=4)
+
+    def preparingChangeSet(self):
+        self._applyUpdate("Preparing changeset request")
+
+    def resolvingDependencies(self):
+        self._calculateUpdate("Resolving dependencies", step=3)
+
+    def creatingRollback(self):
+        """
+        @see: callbacks.UpdateCallback.creatingRollback
+        """
+        self._applyUpdate("Creating rollback")
+
+    def preparingUpdate(self, troveNum, troveCount):
+        """
+        @see: callbacks.UpdateCallback.preparingUpdate
+        """
+        self._applyUpdate("Preparing update", done=troveNum, total=troveCount)
+
+    @locked
+    def restoreFiles(self, size, totalSize):
+        """
+        @see: callbacks.UpdateCallback.restoreFiles
+        """
+        # Locked, because we modify self.restored
+        if totalSize != 0:
+            self.restored += size
+            self._applyUpdate("Restoring Files", done=self.restored / 1024,
+                              total=totalSize / 1024)
+
+    def removeFiles(self, fileNum, total):
+        """
+        @see: callbacks.UpdateCallback.removeFiles
+        """
+        if total != 0:
+            self._applyUpdate("Removing Files", done=fileNum, total=total)
+
+    def creatingDatabaseTransaction(self, troveNum, troveCount):
+        """
+        @see: callbacks.UpdateCallback.creatingDatabaseTransaction
+        """
+        self._applyUpdate("Creating database transaction", done=troveNum,
+                          total=troveCount)
+
+    def updatingDatabase(self, step, stepNum, stepCount):
+        if step == 'latest':
+            self._applyUpdate(
+                'Updating list of latest versions',
+                done=stepNum,
+                total=stepCount,
+                )
+        else:
+            self._applyUpdate(
+                'Updating database', done=stepNum, total=stepCount)
+
+    def runningPreTagHandlers(self):
+        """
+        @see: callbacks.UpdateCallback.runningPreTagHandlers
+        """
+        self._applyUpdate("Running tag prescripts")
+
+    def runningPostTagHandlers(self):
+        """
+        @see: callbacks.UpdateCallback.runningPostTagHandlers
+        """
+        self._applyUpdate("Running tag post-scripts")
+
+    def committingTransaction(self):
+        """
+        @see: callbacks.UpdateCallback.committingTransaction
+        """
+        self._applyUpdate("Committing database transaction")
+
+    @locked
+    def setUpdateJob(self, jobs):
+        """
+        @see: callbacks.UpdateCallback.setUpdateJob
+        """
+        jobs_collection = []
+        self.formatter.prepareJobs(jobs)
+        for line in self.formatter.formatJobTups(jobs):
+            action, trove_spec = line.split(None, 1)
+            jobs_collection.append(dict(action=action, trove=trove_spec))
+        self._applyUpdate(
+            'Applying update job',
+            jobs=jobs_collection,
+            )
+
+    def capsuleSyncScan(self, capsuleType):
+        self._capsuleSync(
+            "Scanning for %s capsule changes" % capsuleType, step=1)
+
+    def capsuleSyncCreate(self, capsuleType, name, num, total):
+        self._capsuleSync(
+            "Collecting modifications to %s database" % capsuleType,
+            step=2, done=num, total=total)
+
+    @locked
+    def _downloading(self, msg, got, rate, need):
+        """
+        Called by this callback object to handle different kinds of
+        download-related progress information.  This method puts together
+        download rate information.
+
+        @param msg: status message
+        @type msg: string
+        @param got: number of bytes retrieved so far
+        @type got: integer
+        @param rate: bytes per second
+        @type rate: integer
+        @param need: number of bytes total to be retrieved
+        @type need: integer
+        @return: None
+        """
+        # This function acquires a lock just because it looks at self.csHunk
+        # and self.updateText directly. Otherwise, self.csMsg will acquire the
+        # lock (which is now reentrant)
+        if got == need:
+            self.csMsg(None)
+        elif need != 0:
+            if self.csHunk[1] < 2 or not self.updateText:
+                self._applyUpdateCS(msg, done=got / 1024, total=need / 1024,
+                                    rate=rate / 1024)
+            else:
+                self._applyUpdateCS("%s %d of %d" % ((msg,) + self.csHunk),
+                                    done=got / 1024, total=need / 1024,
+                                    rate=rate / 1024)
+        else:
+            # no idea how much we need, just keep on counting...
+            self._applyUpdateCS(msg, done=got / 1024, rate=rate / 1024)
+
+    def downloadingFileContents(self, got, need):
+        """
+        @see: callbacks.ChangesetCallback.downloadingFileContents
+        """
+        self._applyUpdateCS('Downloading files for changeset', done=got,
+                            rate=self.rate, total=need)
+
+    def downloadingChangeSet(self, got, need):
+        """
+        @see: callbacks.ChangesetCallback.downloadingChangeSet
+        """
+        self._applyUpdateCS('Downloading', done=got, rate=self.rate,
+                            total=need)
+
+    def requestingFileContents(self):
+        """
+        @see: callbacks.ChangesetCallback.requestingFileContents
+        """
+        self._applyUpdateCS(
+            "Requesting file contents for changeset",
+            done=max(self.csHunk[0], 1),
+            total=max(self.csHunk[1], 1),
+            )
+
+    def requestingChangeSet(self):
+        """
+        @see: callbacks.ChangesetCallback.requestingChangeSet
+        """
+        self._applyUpdateCS(
+            "Requesting changeset",
+            done=max(self.csHunk[0], 1),
+            total=max(self.csHunk[1], 1),
+            )
+
+    @locked
+    def troveScriptOutput(self, typ, msg):
+        """
+        @see: callbacks.UpdateCallback.troveScriptOutput
+        """
+        self._applyUpdate("[%s] %s" % (typ, msg))
+
+    @locked
+    def troveScriptFailure(self, typ, errcode):
+        """
+        @see: callbacks.UpdateCallback.troveScriptFailure
+        """
+        self._applyUpdate("[%s] %s" % (typ, errcode))
+
+    def capsuleSyncApply(self, added, removed):
+        self._capsuleSync('Synchronizing database with capsule changes',
+                          step=3)
+
+    def __init__(self, *args, **kwargs):
+        UpdateCallback.__init__(self, *args, **kwargs)
+        self.updateText = {}
+        self.csText = {}
+
 
 def displayChangedJobs(addedJobs, removedJobs, cfg):
     db = conaryclient.ConaryClient(cfg).db
@@ -911,7 +1192,8 @@ def updateAll(cfg, **kwargs):
             return None
 
     kwargs['installMissing'] = kwargs['removeNotByDefault'] = migrate
-    kwargs['callback'] = UpdateCallback(cfg)
+    if 'callback' not in kwargs or not kwargs.get('callback'):
+        kwargs['callback'] = UpdateCallback(cfg)
     # load trove cache only if --info provided
     kwargs['loadTroveCache'] = infoArg
 

@@ -48,6 +48,14 @@ class CmdLineTest(rephelp.RepositoryHelper):
         self.skipDefaultConfig=True
         log.resetErrorOccurred()
         rephelp.RepositoryHelper.setUp(self)
+        self.callback = mock.MockObject()
+        self.json_callback = mock.MockObject()
+
+        def _getCallback(obj, cfg, argSet, *args, **kwargs):
+            if 'json' in argSet:
+                return self.json_callback
+            return self.callback
+        conarycmd._CallbackCommand.getCallback = _getCallback
 
     def _prepCmd(self, cmd):
         if self.skipDefaultConfig:
@@ -89,12 +97,24 @@ class CmdLineTest(rephelp.RepositoryHelper):
         self.checkConary('update test',
                          'conary.cmds.updatecmd.doUpdate',
                          [None, ['test']], ignoreKeywords=True,
-                         updateByDefault=True)
+                         updateByDefault=True, callback=self.callback)
+
+        self.checkConary('update test --json',
+                         'conary.cmds.updatecmd.doUpdate',
+                         [None, ['test']], ignoreKeywords=True,
+                         updateByDefault=True, callback=self.json_callback)
 
         self.checkConary('erase test',
                          'conary.cmds.updatecmd.doUpdate',
                          [None, ['test']], ignoreKeywords=True,
-                         noRestart=True, updateByDefault=False)
+                         noRestart=True, updateByDefault=False,
+                         callback=self.callback)
+
+        self.checkConary('erase test --json',
+                         'conary.cmds.updatecmd.doUpdate',
+                         [None, ['test']], ignoreKeywords=True,
+                         noRestart=True, updateByDefault=False,
+                         callback=self.json_callback)
 
         self.checkConary('update test --info', 'conary.cmds.updatecmd.doUpdate',
                          [None, ['test']], info=True,
@@ -135,6 +155,18 @@ class CmdLineTest(rephelp.RepositoryHelper):
                 'updateall --root /foo',
                 'conary.cmds.updatecmd.updateAll',
                 [None ], noRestart = True, ignoreKeywords=True)
+
+        self.checkConary(
+                'updateall --root /foo',
+                'conary.cmds.updatecmd.updateAll',
+                [None ], noRestart = True, ignoreKeywords=True,
+                callback=self.callback)
+
+        self.checkConary(
+                'updateall --root /foo --json',
+                'conary.cmds.updatecmd.updateAll',
+                [None ], noRestart = True, ignoreKeywords=True,
+                callback=self.json_callback)
 
         self.checkConary(
                 'updateall --no-restart --root /foo',
@@ -187,7 +219,8 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          modelGraph=None,
                          modelTrace=None,
                          cfgValues={'root': '%s/foo' % self.rootDir,
-                                    'keepRequired' : False},)
+                                    'keepRequired' : False},
+                         callback=self.callback)
 
         self.checkConary('updateall --no-conflict-check --keep-required',
                          'conary.cmds.updatecmd.updateAll', [None],
@@ -302,13 +335,27 @@ class CmdLineTest(rephelp.RepositoryHelper):
         self.checkConary('sync',
                          'conary.cmds.updatecmd.doModelUpdate',
                          [None, sysmodelO, modelFileO, []], {},
-                         ignoreKeywords=True)
+                         ignoreKeywords=True, callback=self.callback)
+
+        self.checkConary('sync --json',
+                         'conary.cmds.updatecmd.doModelUpdate',
+                         [None, sysmodelO, modelFileO, []], {},
+                         ignoreKeywords=True, callback=self.json_callback)
 
         self.checkConary('update foo',
                          'conary.cmds.updatecmd.doModelUpdate',
                          [None, sysmodelO, modelFileO, ['foo']], {},
                          model=False,
                          keepExisting=False,
+                         callback=self.callback,
+                         ignoreKeywords=True)
+
+        self.checkConary('update foo --json',
+                         'conary.cmds.updatecmd.doModelUpdate',
+                         [None, sysmodelO, modelFileO, ['foo']], {},
+                         model=False,
+                         keepExisting=False,
+                         callback=self.json_callback,
                          ignoreKeywords=True)
 
         self.checkConary('update foo --keep-existing',
@@ -323,6 +370,15 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          [None, sysmodelO, modelFileO, ['foo']], {},
                          model=False,
                          keepExisting=True,
+                         callback=self.callback,
+                         ignoreKeywords=True)
+
+        self.checkConary('install foo --json',
+                         'conary.cmds.updatecmd.doModelUpdate',
+                         [None, sysmodelO, modelFileO, ['foo']], {},
+                         model=False,
+                         keepExisting=True,
+                         callback=self.json_callback,
                          ignoreKeywords=True)
 
         self.checkConary('update foo --model',
@@ -335,6 +391,14 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          'conary.cmds.updatecmd.doModelUpdate',
                          [None, sysmodelO, modelFileO, ['foo']], {},
                          model=False,
+                         callback=self.callback,
+                         ignoreKeywords=True)
+
+        self.checkConary('erase foo --json',
+                         'conary.cmds.updatecmd.doModelUpdate',
+                         [None, sysmodelO, modelFileO, ['foo']], {},
+                         model=False,
+                         callback=self.json_callback,
                          ignoreKeywords=True)
 
         self.checkConary('patch group-errata',
@@ -342,6 +406,15 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          [None, sysmodelO, modelFileO, []], {},
                          model=False,
                          ignoreKeywords=True,
+                         callback=self.callback,
+                         patchSpec=['group-errata'])
+
+        self.checkConary('patch group-errata --json',
+                         'conary.cmds.updatecmd.doModelUpdate',
+                         [None, sysmodelO, modelFileO, []], {},
+                         model=False,
+                         ignoreKeywords=True,
+                         callback=self.json_callback,
                          patchSpec=['group-errata'])
 
         self.checkConary('update -foo --model',
@@ -356,6 +429,11 @@ class CmdLineTest(rephelp.RepositoryHelper):
                           ' with a system model'])
 
         self.checkConary('migrate',
+                         'conary.lib.log.error',
+                         ['The "migrate" command does not function'
+                          ' with a system model'])
+
+        self.checkConary('migrate --json',
                          'conary.lib.log.error',
                          ['The "migrate" command does not function'
                           ' with a system model'])
@@ -483,6 +561,19 @@ class CmdLineTest(rephelp.RepositoryHelper):
                   updateOnly=True, removeNotByDefault=True,
                   ignoreKeywords=True)
 
+        # test callback selection
+        self.checkConary(
+                  'sync test',
+                  'conary.cmds.updatecmd.doUpdate',
+                  [None, ['test']], callback=self.callback,
+                  ignoreKeywords=True)
+
+        # test callback selection
+        self.checkConary(
+                  'sync test --json',
+                  'conary.cmds.updatecmd.doUpdate',
+                  [None, ['test']], callback=self.json_callback,
+                  ignoreKeywords=True)
 
     def testMigrate(self):
         self.writeFile('%s/conaryrc' % self.rootDir,
@@ -498,6 +589,18 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          migrate=True, applyCriticalOnly=True,
                          restartInfo='/tmp/foo')
 
+        # test callback selection
+        self.checkConary('migrate test',
+                         'conary.cmds.updatecmd.doUpdate',
+                         [None, ['test']], ignoreKeywords=True,
+                         migrate=True, applyCriticalOnly=False,
+                         restartInfo=None, callback=self.callback)
+
+        self.checkConary('migrate test --json',
+                         'conary.cmds.updatecmd.doUpdate',
+                         [None, ['test']], ignoreKeywords=True,
+                         migrate=True, applyCriticalOnly=False,
+                         restartInfo=None, callback=self.json_callback)
 
 
     def testConaryChangeset(self):
@@ -637,6 +740,15 @@ class CmdLineTest(rephelp.RepositoryHelper):
                          [None, 'r.106'],
                          capsuleChangesets = [ 'foo', 'bar' ],
                          ignoreKeywords=True)
+
+        # test callback selection
+        self.checkConary('rollback 1',
+            'conary.cmds.rollbacks.applyRollback',
+            [None, '1'], callback=self.callback, ignoreKeywords=True)
+
+        self.checkConary('rollback 1 --json',
+            'conary.cmds.rollbacks.applyRollback',
+            [None, '1'], callback=self.json_callback, ignoreKeywords=True)
 
     @context('rollback')
     def testConaryRemoveRollback(self):

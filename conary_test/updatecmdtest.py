@@ -2082,3 +2082,219 @@ applying update would cause errors:
 
         # replaceFiles does all options at once.
         self.discardOutput(self.updateAll, replaceFiles=True, test=True)
+
+
+class JsonUpdateCallbackTest(testhelp.TestCase):
+    json_fields = ("phase_name", "percent", "rate", "step", "done", "jobs",
+                   "step_name", "phase", "total", "phase_total", "step_total",)
+
+    def validateJson(self, **kwargs):
+        if not self.out.write._mock.calls:
+            if kwargs:
+                self.fail("No calls but expected: '%s'" % kwargs)
+            return
+
+        args, keywords = self.out.write._mock.calls[-1]
+        self.out.write._mock.calls.remove((args, keywords))
+        if keywords:
+            self.fail("got keywords in call")
+
+        for key, value in json.loads(args[0]).iteritems():
+            self.assertTrue(key in self.json_fields)
+            if key in kwargs:
+                self.assertEquals((key, value), (key, kwargs[key]))
+
+    def setUp(self):
+        testhelp.TestCase.setUp(self)
+        self.callback = updatecmd.JsonUpdateCallback()
+        mock.mock(self.callback, 'out')
+        self.out = self.callback.out
+
+    def test_message(self):
+        self.callback._message('foo')
+        self.out.write._mock.assertCalled('foo\n')
+
+    def test_capsuleSync(self):
+        self.callback._capsuleSync('foo', 1)
+        self.validateJson(phase_name="Capsule sync", step=1, step_name="foo",
+                          phase=1, phase_total=3, step_total=3)
+
+    def test_applyUpdate(self):
+        self.callback._applyUpdate('foo')
+        self.validateJson(phase_name="Apply update", step=1, step_name="foo",
+                          phase=3, phase_total=3, step_total=1)
+
+        self.callback.updateHunk = (0, 0)
+        self.callback._applyUpdate('foo')
+        self.validateJson(phase_name="Apply update", step=1, step_name="foo",
+                          phase=3, phase_total=3, step_total=1)
+
+        self.callback.updateHunk = (1, 3)
+        self.callback._applyUpdate('foo')
+        self.validateJson(phase_name="Apply update", step=1, step_name="foo",
+                          phase=3, phase_total=3, step_total=3)
+
+    def test_applyUpdateCS(self):
+        self.callback._applyUpdateCS('foo')
+        self.validateJson(phase_name="Apply update", step=1, step_name="foo",
+                          phase=3, phase_total=3, step_total=1)
+
+        self.callback.updateHunk = (0, 0)
+        self.callback._applyUpdateCS('foo')
+        self.validateJson(phase_name="Apply update", step=1, step_name="foo",
+                          phase=3, phase_total=3, step_total=1)
+
+        self.callback.updateHunk = (1, 3)
+        self.callback._applyUpdateCS('foo')
+        self.validateJson(phase_name="Apply update", step=1, step_name="foo",
+                          phase=3, phase_total=3, step_total=3)
+
+    def testUpdate(self):
+        '''Test update method's json output'''
+        # we always override percent with calcuated values
+        self.callback.updateText = dict(percent=100)
+        self.callback.update()
+        self.validateJson(percent=None)
+
+        # don't calculate percent if done or total is not set
+        self.callback.updateText = dict(done=10)
+        self.callback.update()
+        self.validateJson(percent=None, done=10)
+
+        self.callback.updateText = dict(total=10)
+        self.callback.update()
+        self.validateJson(percent=None, total=10)
+
+        # Don't calculate percent if total is 0 (divide by zero)
+        self.callback.updateText = dict(total=0, done=5)
+        self.callback.update()
+        self.validateJson(percent=None, total=0, done=5)
+
+        # calculate percent
+        self.callback.updateText = dict(total=10, done=5)
+        self.callback.update()
+        self.validateJson(percent=50, total=10, done=5)
+
+        self.callback.updateText = dict(total=10, done=0)
+        self.callback.update()
+        self.validateJson(percent=0, total=10, done=0)
+
+        # csText overrides updateText
+        self.callback.csText = dict(percent=20)
+        self.callback.update()
+        self.validateJson(percent=None)
+
+    def testCallbackMethods(self):
+        self.callback.executingSystemModel()
+        self.validateJson(step_name="Processing system model", step=2)
+
+        self.callback.loadingModelCache()
+        self.validateJson(step_name="Loading system model cache", step=1)
+
+        self.callback.savingModelCache()
+        self.validateJson(step_name="Saving system model cache", step=4)
+
+        self.callback.preparingChangeSet()
+        self.validateJson(step_name="Preparing changeset request")
+
+        self.callback.resolvingDependencies()
+        self.validateJson(step_name="Resolving dependencies", step=3)
+
+        self.callback.creatingRollback()
+        self.validateJson(step_name="Creating rollback")
+
+        self.callback.preparingUpdate(1, 2)
+        self.validateJson(step_name="Preparing update", done=1, total=2,
+                          percent=50)
+
+        self.callback.restoreFiles(1024, 0)
+        self.validateJson()
+
+        self.callback.restoreFiles(1024, 10240)
+        self.validateJson(step_name="Restoring Files", done=1, total=10,
+                          percent=10)
+
+        self.callback.removeFiles(1, 0)
+        self.validateJson()
+
+        self.callback.removeFiles(1, 1)
+        self.validateJson(step_name="Removing Files", done=1, total=1,
+                          percent=100)
+
+        self.callback.creatingDatabaseTransaction(1, 1)
+        self.validateJson(step_name="Creating database transaction", done=1,
+                          total=1, percent=100)
+
+        self.callback.updatingDatabase('latest', 1, 2)
+        self.validateJson(step_name="Updating list of latest versions", done=1,
+                          total=2, percent=50)
+
+        self.callback.updatingDatabase('other', 1, 2)
+        self.validateJson(step_name="Updating database", done=1,
+                          total=2, percent=50)
+
+        self.callback.runningPreTagHandlers()
+        self.validateJson(step_name="Running tag prescripts")
+
+        self.callback.runningPostTagHandlers()
+        self.validateJson(step_name="Running tag post-scripts")
+
+        self.callback.committingTransaction()
+        self.validateJson(step_name="Committing database transaction")
+
+        mock.mock(self.callback, 'formatter')
+        self.callback.formatter.formatJobTups._mock.setReturn((
+                'install foo',
+                'update bar',
+                ), ['foo', 'bar'])
+        self.callback.setUpdateJob(['foo', 'bar'])
+        self.validateJson(step_name='Applying update job', jobs=[
+                dict(action='install', trove='foo'),
+                dict(action='update', trove='bar'),
+                ])
+
+        self.callback.capsuleSyncScan('rpm')
+        self.validateJson(step_name="Scanning for rpm capsule changes", step=1)
+
+        self.callback.capsuleSyncCreate('rpm', 'foo', 1, 2)
+        self.validateJson(step_name="Collecting modifications to rpm database",
+                          step=2, done=1, total=2, percent=50)
+
+        self.callback.rate = 100
+        self.callback.downloadingFileContents(1024, 2048)
+        self.validateJson(step_name="Downloading files for changeset",
+                          done=1024, total=2048, rate=100, percent=50)
+
+        self.callback.downloadingChangeSet(1024, 2048)
+        self.validateJson(setp_name="Downloading", done=1024, total=2048,
+                          rate=100, percent=50)
+
+        self.callback.csHunk = (0, 0)
+        self.callback.requestingFileContents()
+        self.validateJson(step_name="Requesting file contents for changeset",
+                          done=1, total=1, percent=100)
+
+        self.callback.csHunk = (1, 2)
+        self.callback.requestingFileContents()
+        self.validateJson(step_name="Requesting file contents for changeset",
+                          done=1, total=2, percent=50)
+
+        self.callback.csHunk = (0, 0)
+        self.callback.requestingChangeSet()
+        self.validateJson(step_name="Requesting changeset",
+                          done=1, total=1, percent=100)
+
+        self.callback.csHunk = (1, 2)
+        self.callback.requestingChangeSet()
+        self.validateJson(step_name="Requesting changeset",
+                          done=1, total=2, percent=50)
+
+        self.callback.troveScriptOutput('post', 'foo')
+        self.validateJson(step_name="[post] foo")
+
+        self.callback.troveScriptFailure('post', 'foo')
+        self.validateJson(step_name="[post] foo")
+
+        self.callback.capsuleSyncApply(1, 2)
+        self.validateJson(
+            step_name='Synchronizing database with capsule changes', step=3)

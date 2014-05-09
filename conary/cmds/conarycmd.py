@@ -63,6 +63,22 @@ _commands = []
 def _register(cmd):
     _commands.append(cmd)
 
+
+class _CallbackCommand(object):
+    docs = {'json': (VERBOSE_HELP, 'Format output into json')}
+
+    def addParameters(self, argDef):
+        argDef[self.defaultGroup]['json'] = NO_PARAM
+
+    def getCallback(self, cfg, argSet, *args, **kwargs):
+        if cfg.quiet or 'quiet' in argSet:
+            return callbacks.UpdateCallback()
+        elif 'json' in argSet:
+            return updatecmd.JsonUpdateCallback(cfg, *args, **kwargs)
+        else:
+            return updatecmd.UpdateCallback(cfg, *args, **kwargs)
+
+
 class ConaryCommand(command.ConaryCommand):
     paramHelp = ''
     defaultGroup = 'Common Options'
@@ -76,7 +92,7 @@ class ConaryCommand(command.ConaryCommand):
         cfgMap['trust-threshold'] = 'trustThreshold', ONE_PARAM
         command.ConaryCommand.addConfigOptions(self, cfgMap, argDef)
 
-class ChangeSetCommand(ConaryCommand):
+class ChangeSetCommand(ConaryCommand, _CallbackCommand):
     commands = ['changeset', 'cs' ]
     help = 'Request a changeset from one or more Conary repositories'
     paramHelp = "<pkg>[=[<oldver>--]<newver>]+ <outfile>"
@@ -89,17 +105,17 @@ Creates a changeset with the specified troves and stores it in <outfile>"""
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        _CallbackCommand.addParameters(self, argDef)
         argDef['no-recurse'] = NO_PARAM
 
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = {}
 
-        callback = updatecmd.UpdateCallback(cfg)
-        if cfg.quiet:
-            callback = callbacks.UpdateCallback()
+        callback = self.getCallback(cfg, argSet)
         if argSet.has_key('quiet'):
-            callback = callbacks.UpdateCallback()
             del argSet['quiet']
+        if argSet.has_key('json'):
+            del argSet['json']
         kwargs['callback'] = callback
 
         kwargs['recurse'] = not(argSet.has_key('no-recurse'))
@@ -246,7 +262,7 @@ class LocalCommitCommand(ConaryCommand):
 _register(LocalCommitCommand)
 
 
-class PinUnpinCommand(ConaryCommand):
+class PinUnpinCommand(ConaryCommand, _CallbackCommand):
     commands = ['pin', 'unpin']
     paramHelp = "<pkgname>[=<version>][[flavor]]+"
     hidden = True
@@ -259,6 +275,7 @@ class PinUnpinCommand(ConaryCommand):
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        _CallbackCommand.addParameters(self, argDef)
         d = {}
         d["ignore-model"] = NO_PARAM
         argDef['Update Options'] = d
@@ -279,10 +296,7 @@ class PinUnpinCommand(ConaryCommand):
             systemModel = cml.CML(cfg)
             modelFile = systemmodel.SystemModelFile(systemModel)
 
-            if cfg.quiet:
-                callback = callbacks.UpdateCallback()
-            else:
-                callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
+            callback = self.getCallback(cfg, argSet, modelFile=modelFile)
             kwargs['callback'] = callback
             if modelFile.exists():
                 kwargs['systemModel'] = systemModel
@@ -442,7 +456,7 @@ class ListRollbackCommand(ConaryCommand):
         rollbacks.listRollbacks(db, cfg)
 _register(ListRollbackCommand)
 
-class RollbackCommand(ConaryCommand):
+class RollbackCommand(ConaryCommand, _CallbackCommand):
     commands = ['rollback', 'rb']
     help = "Roll back operations stored in the rollback stack"
     paramHelp = "[<num changes>|r.<rollback point>]"
@@ -481,6 +495,7 @@ rollback operation #151 and all later operations)."""
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        _CallbackCommand.addParameters(self, argDef)
         argDef["from-file"] = MULT_PARAM
         argDef["just-db"] = NO_PARAM
         argDef["replace-files"] = NO_PARAM
@@ -509,7 +524,10 @@ rollback operation #151 and all later operations)."""
         kwargs['abortOnError'] = argSet.pop('abort-on-error', False)
         kwargs['capsuleChangesets'] = argSet.pop('from-file', [])
 
-        kwargs['callback'] = updatecmd.UpdateCallback(cfg)
+        kwargs['callback'] = self.getCallback(cfg, argSet)
+        if argSet.has_key('json'):
+            del argSet['json']
+
         if argSet or len(otherArgs) != 3: return self.usage()
         db = openDatabase(cfg.root, cfg.dbPath)
         client = conaryclient.ConaryClient(cfg)
@@ -931,7 +949,7 @@ class ShowChangesetCommand(_AbstractQueryCommand):
 _register(ShowChangesetCommand)
 
 
-class _UpdateCommand(ConaryCommand):
+class _UpdateCommand(ConaryCommand, _CallbackCommand):
     paramHelp = "[+][-]<pkgname>[=<version>][[flavor]]* <changeset>*"
     commandGroup = 'System Modification'
 
@@ -994,6 +1012,7 @@ class _UpdateCommand(ConaryCommand):
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        _CallbackCommand.addParameters(self, argDef)
         d = {}
         d["apply-critical"] = NO_PARAM
         d["disconnected"] = NO_PARAM
@@ -1035,12 +1054,11 @@ class _UpdateCommand(ConaryCommand):
         model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
 
-        callback = updatecmd.UpdateCallback(cfg, modelFile=modelFile)
-        if cfg.quiet:
-            callback = callbacks.UpdateCallback()
+        callback = self.getCallback(cfg, argSet, modelFile=modelFile)
         if argSet.has_key('quiet'):
-            callback = callbacks.UpdateCallback()
             del argSet['quiet']
+        if argSet.has_key('json'):
+            del argSet['json']
         kwargs['callback'] = callback
 
         if argSet.has_key('resolve'):
@@ -1189,7 +1207,7 @@ class EraseCommand(_UpdateCommand):
 _register(EraseCommand)
 
 
-class SyncCommand(_UpdateCommand):
+class SyncCommand(_UpdateCommand, _CallbackCommand):
     commands = ["syncchildren", "sync"]
     paramHelp = "<pkgname>[=<version>][[flavor]]* <changeset>*"
     help = 'Synchronize software on the system'
@@ -1200,6 +1218,7 @@ class SyncCommand(_UpdateCommand):
            }
     def addParameters(self, argDef):
         _UpdateCommand.addParameters(self, argDef)
+        _CallbackCommand.addParameters(self, argDef)
         sync = argDef.pop('Update Options')
         sync["full"] = NO_PARAM
         sync["current"] = NO_PARAM
@@ -1225,7 +1244,7 @@ class MigrateCommand(_UpdateCommand):
 _register(MigrateCommand)
 
 
-class UpdateAllCommand(_UpdateCommand):
+class UpdateAllCommand(_UpdateCommand, _CallbackCommand):
 
     commands = ['updateall']
     paramHelp = ''
@@ -1235,6 +1254,7 @@ class UpdateAllCommand(_UpdateCommand):
 
     def addParameters(self, argDef):
         ConaryCommand.addParameters(self, argDef)
+        _CallbackCommand.addParameters(self, argDef)
         argDef["items"] = NO_PARAM
         argDef["info"] = '-i', NO_PARAM
         argDef["just-db"] = NO_PARAM
@@ -1261,6 +1281,9 @@ class UpdateAllCommand(_UpdateCommand):
     def runCommand(self, cfg, argSet, otherArgs):
         kwargs = { 'systemModel': False }
         kwargs['restartInfo'] = argSet.pop('restart-info', None)
+        kwargs['callback'] = self.getCallback(cfg, argSet)
+        if argSet.has_key('json'):
+            del argSet['json']
 
         model = cml.CML(cfg)
         modelFile = systemmodel.SystemModelFile(model)
