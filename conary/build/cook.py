@@ -1522,7 +1522,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         if byDefault:
             grp.setSize(grp.getSize() + p.getSize())
 
-    if not targetVersion.isOnLocalHost():
+    if cfg.commitRelativeChangeset and not targetVersion.isOnLocalHost():
         # this keeps cook and emerge branchs from showing up
         previousVersions = repos.getTroveLeavesByBranch(
                 dict(
@@ -1542,10 +1542,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
         relativePackageList = []
         needTroves = {}
         for empty, p, fileMap in packageList:
-            if cfg.commitRelativeChangeset:
-                oldTrove = previousTroveDict.get(p.getName(), None)
-            else:
-                oldTrove = None
+            oldTrove = previousTroveDict.get(p.getName(), None)
             relativePackageList.append((oldTrove, p, fileMap))
 
         packageList = relativePackageList
