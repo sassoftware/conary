@@ -334,29 +334,27 @@ flavor use:ssl,krb,readline,\
         fobj.flush()
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
 
-        msg = "Timeout reading configuration file %s; retrying...\n" % configUrl
-
+        def _getOpener():
+            opener = type(cfg)._getOpener(cfg)
+            opener.connectAttempts = 1
+            return opener
+        cfg._getOpener = _getOpener
+        def connectSocket(self):
+            raise socket.timeout('timed out')
+        oldfn = connection.Connection.connectSocket
         oldStderr = sys.stderr
-        oldTimeout = connection.Connection.connectTimeout
-        connection.Connection.connectTimeout = 1
+        connection.Connection.connectSocket = connectSocket
         try:
-            fd, tempf = tempfile.mkstemp()
-            os.unlink(tempf)
-            stderr = sys.stderr = os.fdopen(fd, "w+")
+            sys.stderr = StringIO()
             try:
                 cfg.read(fobj.name)
             except conarycfg.ParseError, e:
-                if 'Network is unreachable' in str(e):
-                    raise testhelp.SkipTestException('requires default route')
-                elif 'No route to host' in str(e):
-                    raise testhelp.SkipTestException('requires default route')
+                assert 'timed out' in str(e) or 'timeout' in str(e)
             else:
                 self.fail('expected ParseError')
-            stderr.seek(0)
         finally:
+            connection.Connection.connectSocket = oldfn
             sys.stderr = oldStderr
-            connection.Connection.connectTimeout = oldTimeout
-            stderr.close()
         # Make sure we cleaned up the timeout
         self.assertEqual(socket.getdefaulttimeout(), None)
 
@@ -494,11 +492,17 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         out = StringIO()
         cfg.setDisplayOptions(hidePasswords=True)
         cfg.displayKey('user', out)
-        assert(out.getvalue() == 'user                      name* user <password>\nuser                      foobar a\n')
+        assert(out.getvalue() == """\
+user                      foobar a
+user                      name* user <password>
+""")
         out = StringIO()
         cfg.setDisplayOptions(hidePasswords=False)
         cfg.displayKey('user', out)
-        assert(out.getvalue() == 'user                      name* user passwd\nuser                      foobar a\n')
+        assert(out.getvalue() == """\
+user                      foobar a
+user                      name* user passwd
+""")
 
 
         assert(cfg.user.find('nameone') == ('user', 'passwd'))
@@ -513,9 +517,11 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
 
         # test iterator
         l = [ x for x in cfg.user ]
-        self.assertEqual(l, [('nameone', 'user1', 'passwd1'),
-                                 ('name*', 'user', 'passwd'),
-                                 ('foobar', 'a', None)])
+        self.assertEqual(l, [
+            ('foobar', 'a', None),
+            ('nameone', 'user1', 'passwd1'),
+            ('name*', 'user', 'passwd'),
+            ])
 
     def testProxy(self):
         def _test(*args):
@@ -711,8 +717,7 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
             l.append(("server-%05d" % i, ('name-%05d' % i, 'pass')))
         cfg.user.addServerGlobs(l)
 
-        del cfg.user[:]
-
+        cfg.user.clear()
         l = [
             ('*-commits', ('c', 'pass')),
             ('c*', ('c', 'pass')),
@@ -723,22 +728,22 @@ class ConaryTypesTest(rephelp.RepositoryHelper):
         ]
         cfg.user.addServerGlobs(l)
         target = [
-                ('conary-commits', ('conary-commits', 'pass')),
-                ('conary-*', ('conary-', 'pass')),
-                ('c*', ('c', 'pass')),
-                ('*-commits', ('c', 'pass')),
+                ('conary-commits', 'conary-commits', 'pass'),
+                ('conary-*', 'conary-', 'pass'),
+                ('c*', 'c', 'pass'),
+                ('*-commits', 'c', 'pass'),
             ]
 
-        self.assertEqual(cfg.user, target)
+        self.assertEqual(list(cfg.user), target)
 
         # Now verify that addServerGlob does the same thing
-        del cfg.user[:]
+        cfg.user.clear()
 
         # extend reverses the list, so to achieve the same effect we have to
         # process l in reverse order too
         for item in reversed(l):
             cfg.user.addServerGlob(*item)
-        self.assertEqual(cfg.user, target)
+        self.assertEqual(list(cfg.user), target)
 
 
 class EntitlementTest(testhelp.TestCase):
@@ -884,7 +889,7 @@ os.kill(os.getpid(), 9)
 
         cfg.configLine("entitlement some.host.com ANOTHER")
         assert(cfg.entitlement.find('some.host.com') ==
-                    [ (None, 'ANOTHER'), (None, 'MAGIC'), (None, 'MAGIC2') ] )
+                    [ (None, 'MAGIC'), (None, 'ANOTHER'), (None, 'MAGIC2') ] )
 
     def testTimeoutParsing(self):
         xml = conarycfg.emitEntitlement('server', key = 'ABCD01234',

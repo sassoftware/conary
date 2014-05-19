@@ -41,15 +41,23 @@ from conary.repository import transport
 
 # ----------- conary specific types
 
-class ServerGlobList(list):
+class ServerGlobList(object):
 
     multipleMatches = False
 
+    def __init__(self, items=()):
+        self._exact = {}
+        self._globs = []
+        self.extend(items)
+
     def find(self, server):
-        l = []
-        for (serverGlob, item) in ServerGlobList.__iter__(self):
-            # this is case insensitve, which is perfect for hostnames
-            if fnmatch.fnmatch(server, serverGlob):
+        server = server.lower()
+        l = list(self._exact.get(server, ()))
+        if l and not self.multipleMatches:
+            assert len(l) == 1
+            return l[0]
+        for (serverGlob, item) in self._globs:
+            if fnmatch.fnmatchcase(server, serverGlob):
                 if not self.multipleMatches:
                     return item
                 l.append(item)
@@ -59,53 +67,51 @@ class ServerGlobList(list):
 
         return l
 
-    def _fncmp(self, a, b):
-        # Comparison function
-        # Equal elements
-        if a[0] == b[0]:
-            return 0
-        if fnmatch.fnmatch(a[0], b[0]):
-            return -1
-        return 1
+    def append(self, newItem):
+        newGlob, newInfo = newItem
+        newGlob = newGlob.lower()
+        if not any(x in newGlob for x in '*?['):
+            # Exact matches go in a hash for quick add and lookup
+            if self.multipleMatches and newGlob in self._exact:
+                self._exact[newGlob].append(newInfo)
+            else:
+                self._exact[newGlob] = [newInfo]
+        else:
+            # Globs are put in a list that is scanned after exact matches
+            location = None
+            removeOld = False
+            for i, (serverGlob, info) in enumerate(self._globs):
+                if fnmatch.fnmatch(newItem[0], serverGlob):
+                    if not self.multipleMatches and serverGlob == newItem[0]:
+                        removeOld = True
+                    location = i
+                    break
+
+            if location is None:
+                self._globs.append(newItem)
+            elif removeOld:
+                self._globs[location] = newItem
+            else:
+                self._globs.insert(location, newItem)
 
     def extend(self, itemList):
         # Look for the first item which globs to this, and insert the new
         # item before it. That makes sure find always matches on the
         # most-specific instance
-        for newItem in reversed(itemList):
+        for newItem in reversed(list(itemList)):
             self.append(newItem)
 
-    def extendSort(self, itemList):
-        """Extend the current list with the new items, categorizing them and
-        eliminating duplicates"""
-        nlist = sorted(self + [ x for x in reversed(itemList)], self._fncmp)
-        # Walk the list, remove duplicates
-        del self[:]
+    def clear(self):
+        self._exact.clear()
+        del self._globs[:]
 
-        lasti = None
-        for ent in nlist:
-            if lasti is not None and lasti[0] == ent[0]:
-                self[-1] = ent
-            else:
-                list.append(self, ent)
-            lasti = ent
+    def __iter__(self):
+        for serverGlob, infoList in sorted(self._exact.iteritems()):
+            for info in infoList:
+                yield serverGlob, info
+        for serverGlob, info in self._globs:
+            yield serverGlob, info
 
-    def append(self, newItem):
-        location = None
-        removeOld = False
-        for i, (serverGlob, info) in enumerate(ServerGlobList.__iter__(self)):
-            if fnmatch.fnmatch(newItem[0], serverGlob):
-                if not self.multipleMatches and serverGlob == newItem[0]:
-                    removeOld = True
-                location = i
-                break
-
-        if location is None:
-            list.append(self, newItem)
-        elif removeOld:
-            self[location] = newItem
-        else:
-            self.insert(location, newItem)
 
 class UserInformation(ServerGlobList):
 
@@ -119,8 +125,9 @@ class UserInformation(ServerGlobList):
             args = args[0], (args[1], args[2])
         ServerGlobList.append(self, args)
 
-    def addServerGlobs(self, globList):
-        ServerGlobList.extendSort(self, globList)
+    def addServerGlobs(self, items):
+        for item in reversed(list(items)):
+            self.addServerGlob(*item)
 
     def extend(self, other):
         for item in other:
@@ -128,22 +135,6 @@ class UserInformation(ServerGlobList):
 
     def append(self, item):
         self.addServerGlob(*item)
-
-    def remove(self, item):
-        if len(item) == 3:
-            item = (item[0], (item[1], item[2]))
-        ServerGlobList.remove(self, item)
-
-    def insert(self, pos, item):
-        if len(item) == 3:
-            item = (item[0], (item[1], item[2]))
-        ServerGlobList.insert(self, pos, item)
-
-    def __reduce__(self):
-        # This is needed to make cPickle work because __iter__ returns 3-tuples
-        # which cPickle appends directly to the list using internal list code
-        # instead of our append().
-        return (type(self), (list(self),))
 
     def __init__(self, initVal = None):
         ServerGlobList.__init__(self)
@@ -289,9 +280,6 @@ class RepoMap(ServerGlobList):
 
     def __contains__(self, key):
         return key in self
-
-    def clear(self):
-        del self[:]
 
     def update(self, other):
         for key, val in other.iteritems():
