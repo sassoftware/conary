@@ -864,15 +864,14 @@ class SigTest(rephelp.RepositoryHelper):
         repos = self.openRepository()
         self.addUserAndRole(repos, rootLabel, 'foo', 'bar')
         repos.addAcl(rootLabel, 'foo', '.*', None)
-        oldUser = self.cfg.user[:]
+        oldUser = self.cfg.user
         try:
             self.cfg.user = conarycfg.UserInformation()
             self.cfg.user.addServerGlob('localhost', 'foo', 'bar')
             self.assertRaises(errors.InsufficientPermission,
                     cvccmd.sourceCommand, self.cfg, ["sign", "test:doc"], {})
         finally:
-            self.cfg.user = conarycfg.UserInformation()
-            self.cfg.user.extend(oldUser)
+            self.cfg.user = oldUser
 
     def testSubkeys(self):
         noSubKey = \

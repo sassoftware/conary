@@ -1025,14 +1025,15 @@ class TestRecipe(PackageRecipe):
 
         self.addfile('testcase.recipe')
 
-        oldUser = self.cfg.user.pop()
+        oldUser = self.cfg.user
+        self.cfg.resetToDefault('user')
         self.cfg.user.addServerGlob("*", "test", "bad pw")
 
         try:
             self.assertRaises(repoerrors.InsufficientPermission, self.commit)
         finally:
             os.chdir(origDir)
-            self.cfg.user.append(oldUser)
+            self.cfg.user = oldUser
 
     def testDuplicatePathIds(self):
         self.addComponent('foo:runtime=0.1-1-1',

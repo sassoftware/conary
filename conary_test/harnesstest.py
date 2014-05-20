@@ -52,4 +52,4 @@ class HarnessTest(rephelp.RepositoryHelper):
         self.stopRepository(1)
         self.stopRepository()
         repos = self.getRepositoryClient()
-        self.assertEqual(repos.getUserMap(), [])
+        self.assertEqual(list(repos.getUserMap()), [])

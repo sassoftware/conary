@@ -261,15 +261,9 @@ class RepoMap(ServerGlobList):
     # ease the transition.
 
     def __setitem__(self, key, val):
-        if type(key) is int:
-            return ServerGlobList.__setitem__(self, key, val)
-
         self.append((key, val))
 
     def __getitem__(self, key):
-        if type(key) is int:
-            return ServerGlobList.__getitem__(self, key)
-
         return self.find(key)
 
     def has_key(self, key):
@@ -277,9 +271,6 @@ class RepoMap(ServerGlobList):
         if r is None:
             return False
         return True
-
-    def __contains__(self, key):
-        return key in self
 
     def update(self, other):
         for key, val in other.iteritems():

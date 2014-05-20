@@ -17,7 +17,6 @@
 
 from conary_test import rephelp
 
-import copy
 import gzip
 import os
 
@@ -46,10 +45,11 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
         if log:
             os.environ['CONARY_CLIENT_LOG'] = log
 
-        rm = copy.copy(self.cfg.repositoryMap)
         # remove localhost from the map; we don't need it since this is a shim
-        del rm[[ x[0] for x in enumerate(rm) if x[1][0] == 'localhost'][0]]
-
+        rm = conarycfg.RepoMap()
+        for host, url in self.cfg.repositoryMap:
+            if host != 'localhost':
+                rm.append((host, url))
         shim = shimclient.ShimNetClient(server, 'http', 80,
              authToken, rm, self.cfg.user)
 
