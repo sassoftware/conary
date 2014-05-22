@@ -133,6 +133,10 @@ class tar_xz(bzip, tar):
         bzip.__init__(self, path, basedir = basedir, buffer = bzipBuffer)
         tar.__init__(self, path, basedir = basedir, buffer = tarBuffer)
 
+class lzo(Magic):
+    def __init__(self, path, basedir='', lzobuffer=''):
+        Magic.__init__(self, path, basedir=basedir)
+
 class changeset(Magic):
     def __init__(self, path, basedir='', buffer=''):
         Magic.__init__(self, path, basedir)
@@ -375,6 +379,8 @@ def magic(path, basedir=''):
     elif len(b) > 6 and b[0:6] == "\xFD\x37\x7A\x58\x5A\x00":
         # http://tukaani.org/xz/xz-file-format.txt
         return xz(path, basedir, b)
+    elif len(b) > 9 and b[0:9] == "\x89\x4c\x5a\x4f\x00\x0d\x0a\x1a\x0a":
+        return lzo(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
         return changeset(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "PK\x03\x04":

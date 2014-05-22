@@ -127,6 +127,7 @@ class ConaryTest(CPackageRecipe):
             'glibc-static:rpm',
             'gnupg2:rpm',
             'libxml2:rpm',
+            'lzop:rpm',
             'memcached:rpm',
             'mercurial:rpm',
             'net-tools:rpm',

@@ -260,3 +260,7 @@ class MagicTest(rephelp.RepositoryHelper):
     def testXzFile(self):
         m = magic.magic(os.path.join(resources.get_archive(), 'foo.tar.xz'))
         self.assertEquals(m.name, 'xz')
+
+    def testLzoFile(self):
+        m = magic.magic(resources.get_archive('foo.tar.lzo'))
+        self.assertEquals(m.name, 'lzo')

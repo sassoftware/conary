@@ -802,10 +802,15 @@ class addArchive(_Source):
                    or f.endswith(".Z"):
                 _uncompress = "gzip -d -c"
                 actionPathBuildRequires.append('gzip')
+            elif isinstance(m, magic.lzo) or f.endswith(".lzo"):
+                _uncompress = "lzop -d -c"
+                actionPathBuildRequires.append('lzop')
 
             # There are things we know we know...
             _tarSuffix  = ['tar', 'tgz', 'tbz2', 'txz', 'taZ',
-                           'tar.gz', 'tar.bz2', '.tar.xz', 'tar.Z']
+                           'tar.gz', 'tar.bz2', '.tar.xz', 'tar.Z',
+                           'tar.lzo',
+                           ]
             _cpioSuffix = ["cpio", "cpio.gz", "cpio.bz2"]
 
             if True in [f.endswith(x) for x in _tarSuffix]:

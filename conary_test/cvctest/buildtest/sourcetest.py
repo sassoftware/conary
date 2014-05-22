@@ -1222,6 +1222,20 @@ class TestTar(PackageRecipe):
         else:
             assert(0)
 
+    @decorators.requireBinary("lzop")
+    def testSourceLzop(self):
+        recipestr = """
+class TestSource(PackageRecipe):
+    name = 'foo'
+    version = '1.0'
+    clearBuildReqs()
+
+    def setup(r):
+        r.addArchive('foo.tar.lzo', dir='/')
+"""
+        built = self.buildRecipe(recipestr, 'TestSource')[0]
+        assert built
+
 class TestBadaddSource(rephelp.RepositoryHelper):
     def testBadaddSource(self):
         recipestr="""
