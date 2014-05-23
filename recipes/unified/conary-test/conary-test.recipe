@@ -109,6 +109,7 @@ class ConaryTest(CPackageRecipe):
             'info-bin:user',
             'info-daemon:user',
             'info-rmake-chroot:user',
+            'lzop:runtime',
             'testutils:python',
             'testutils:runtime',
 
@@ -127,7 +128,6 @@ class ConaryTest(CPackageRecipe):
             'glibc-static:rpm',
             'gnupg2:rpm',
             'libxml2:rpm',
-            'lzop:rpm',
             'memcached:rpm',
             'mercurial:rpm',
             'net-tools:rpm',
