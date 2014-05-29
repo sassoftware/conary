@@ -116,6 +116,9 @@ class ServerGlobList(object):
         for serverGlob, info in self._globs:
             yield self._caseMap[serverGlob], info
 
+    def __nonzero__(self):
+        return bool(self._exact) or bool(self._globs)
+
 
 class UserInformation(ServerGlobList):
 
