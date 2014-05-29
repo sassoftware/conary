@@ -48,6 +48,7 @@ class ServerGlobList(object):
     def __init__(self, items=()):
         self._exact = {}
         self._globs = []
+        self._caseMap = {}
         self.extend(items)
 
     def find(self, server):
@@ -69,7 +70,9 @@ class ServerGlobList(object):
 
     def append(self, newItem):
         newGlob, newInfo = newItem
-        newGlob = newGlob.lower()
+        newGlobLower = newGlob.lower()
+        self._caseMap[newGlobLower] = newGlob
+        newGlob = newGlobLower
         if not any(x in newGlob for x in '*?['):
             # Exact matches go in a hash for quick add and lookup
             if self.multipleMatches and newGlob in self._exact:
@@ -103,14 +106,15 @@ class ServerGlobList(object):
 
     def clear(self):
         self._exact.clear()
+        self._caseMap.clear()
         del self._globs[:]
 
     def __iter__(self):
         for serverGlob, infoList in sorted(self._exact.iteritems()):
             for info in infoList:
-                yield serverGlob, info
+                yield self._caseMap[serverGlob], info
         for serverGlob, info in self._globs:
-            yield serverGlob, info
+            yield self._caseMap[serverGlob], info
 
 
 class UserInformation(ServerGlobList):
