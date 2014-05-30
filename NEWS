@@ -1,3 +1,33 @@
+Changes in 2.5.3:
+  o New Features:
+    * Key/Value metadata is no longer copied forward during the build
+      process. To re-enable this behavior remove 'keyValue' from
+      r.metadataSkipSet. (CNY-3854)
+    * Add a new JsonUpdateCallback class that produces json-formatted
+      output. Conary commands that use an UpdateCallback now take a
+      --json flag to turn on json output (CNY-3855)
+    * Disabled commitRelativeChangeset by default. This may improve the
+      reliability of very large cooks. (CNY-3856)
+    * Added support for LZO compression in sources.
+
+  o Bug Fixes:
+    * Fixed system-model updates doing pairs of erase/install operations
+      instead of updates for all troves pulled in as dependencies
+      (CNY-3841)
+    * Some truncated gzip files no longer abort builds due to uncaught
+      struct.error exception (CNY-3852)
+    * 'conary rq' now emits a helpful error message instead of crashing
+      when installLabelPath is not defined. (CNY-3853)
+    * conarycfg: fixed parsing of repositoryMap scaling exponentially
+      with the number of entries (CNY-3857)
+    * Fixed 'buildlabel' macro not being set during initial checkin of a
+      recipe
+
+  o Internal Changes:
+    * The includeConfigFile directive now normalizes relative paths and
+      URLs. This improves compatibility with various types of web
+      services.
+
 Changes in 2.5.2:
   o New Features:
     * Added an updated version of the Conary introductory technical

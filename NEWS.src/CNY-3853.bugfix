@@ -1,1 +1,0 @@
-'conary rq' now emits a helpful error message instead of crashing when installLabelPath is not defined.

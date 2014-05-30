@@ -1,2 +1,0 @@
-Fixed system-model updates doing pairs of erase/install operations instead of
-updates for all troves pulled in as dependencies

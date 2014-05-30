@@ -1,2 +1,0 @@
-The includeConfigFile directive now normalizes relative paths and URLs. This
-improves compatibility with various types of web services.

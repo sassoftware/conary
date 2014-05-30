@@ -1,1 +1,0 @@
-conarycfg: fixed parsing of repositoryMap scaling exponentially with the number of entries
