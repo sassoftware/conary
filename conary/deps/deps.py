@@ -81,7 +81,10 @@ for key, val in senseMap.iteritems():
 
 class DependencyClassRegistry(dict):
     def __getitem__(self, key):
-        return self.get(key, UnknownDependencyFactory(key))
+        cls = self.get(key)
+        if cls is None:
+            cls = self[key] = UnknownDependencyFactory(key)
+        return cls
 
 dependencyClasses = DependencyClassRegistry()
 dependencyClassesByName = {}
