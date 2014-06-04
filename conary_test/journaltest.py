@@ -86,19 +86,18 @@ class JournalTest(rephelp.RepositoryHelper):
             return realLink(oldPath, newPath)
 
     @staticmethod
-    def sha1UncompressStub(info, path, name, target, failPaths = [],
-                           counter = None):
-        base = os.path.basename(target)
-        if base in failPaths:
+    def sha1UncompressStub(inFd, inAt, inSize, path, name, failPaths=[],
+            counter = None):
+        if name in failPaths:
             if counter:
                 if not counter():
-                    return realSha1Uncompress(info, path, name, target)
+                    return realSha1Uncompress(inFd, inAt, inSize, path, name)
                                               
                 counter.adjust(-1)
 
             raise OSError(errno.EACCES, 'Permission denied', path)
         else:
-            return realSha1Uncompress(info, path, name, target)
+            return realSha1Uncompress(inFd, inAt, inSize, path, name)
 
     @staticmethod
     def renameStub(oldPath, newPath, failNewPaths, counter = None,

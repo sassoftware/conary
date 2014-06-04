@@ -76,10 +76,8 @@ class MiscTest(rephelp.RepositoryHelper):
             # also decompress to a target file, while performing a sha1sum
             # of the uncompressed contents
             target = path + '-uncompressed'
-            sha2 = digest_uncompress.sha1Uncompress((infd, offset, len(s)),
-                                       os.path.dirname(target),
-                                       os.path.basename(target),
-                                       target)
+            sha2, tmpname = digest_uncompress.sha1Uncompress(infd, offset,
+                    len(s), os.path.dirname(target), os.path.basename(target))
             # make sure the sha matches what we expect
             expected = sha1helper.sha1String(teststr)
             self.assertEqual(sha, expected)
@@ -89,7 +87,7 @@ class MiscTest(rephelp.RepositoryHelper):
             f = open(path + '-copy')
             self.assertEqual(f.read(), s)
             # and that it also is correctly uncompressed
-            f = open(path + '-uncompressed')
+            f = open(tmpname)
             self.assertEqual(f.read(), teststr)
         finally:
             if infd > 0:

@@ -1614,7 +1614,8 @@ implements files remove
             ret = origRestore(slf, fileContents, root, target, *args, **kwargs)
             if self._count == 1:
                 # Mess up the file on disk
-                file(target, "w").write("Other content")
+                with util.AtomicFile(target) as f:
+                    f.write("Other content")
             return ret
         self.mock(update.files.RegularFile, 'restore', mockedRestore)
         self.updatePkg('foo:runtime')
