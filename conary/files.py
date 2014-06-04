@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-
+import errno
 import grp
 import gzip
 import os
@@ -592,50 +592,31 @@ class RegularFile(File):
                 nameLookup=True, **kwargs):
 
         keepTempfile = kwargs.get('keepTempfile', False)
+        destTarget = target
 
-        if fileContents != None:
+        if fileContents is not None:
             # this is first to let us copy the contents of a file
             # onto itself; the unlink helps that to work
             src = fileContents.get()
             inFd = None
 
-            if fileContents.isCompressed():
-                if hasattr(src, '_fdInfo'):
-                    # inFd is None if we can't figure this information out
-                    # (for _LazyFile for instance)
-                    (inFd, inStart, inSize) = src._fdInfo()
-                else:
-                    src = gzip.GzipFile(mode = "r", fileobj = src)
+            if fileContents.isCompressed() and hasattr(src, '_fdInfo'):
+                # inFd is None if we can't figure this information out
+                # (for _LazyFile for instance)
+                (inFd, inStart, inSize) = src._fdInfo()
 
-            name = os.path.basename(target)
-            path = os.path.dirname(target)
+            path, name = os.path.split(target)
             if not os.path.isdir(path):
                 util.mkdirChain(path)
 
-            if inFd is not None:
-                if keepTempfile:
-                    tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
-                    os.close(tmpfd)
-                    destName = os.path.basename(destTarget)
-                else:
-                    destName, destTarget = name, target
-                actualSha1 = util.sha1Uncompress((inFd, inStart, inSize),
-                                                 path, destName, destTarget)
-                if keepTempfile:
-                    # Set up the second temp file here. This makes
-                    # sure we get through the next if branch.
-                    inFd = None
-                    src = file(destTarget)
-            elif keepTempfile:
-                tmpfd, destTarget = tempfile.mkstemp(name, '.ct', path)
-                f = os.fdopen(tmpfd, 'w')
-                util.copyfileobj(src, f)
-                f.close()
-                src = file(destTarget)
+            # Uncompress to a temporary file, using the accelerated
+            # implementation if possible.
+            if inFd is not None and util.sha1Uncompress is not None:
+                actualSha1, tmpname = util.sha1Uncompress(
+                        inFd, inStart, inSize, path, name)
             else:
-                destTarget = target
-
-            if inFd is None:
+                if fileContents.isCompressed():
+                    src = gzip.GzipFile(mode='r', fileobj=src)
                 tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
                 try:
                     d = digestlib.sha1()
@@ -643,30 +624,26 @@ class RegularFile(File):
                     util.copyfileobj(src, f, digest = d)
                     f.close()
                     actualSha1 = d.digest()
-
-                    # would be nice if util could do this w/ a single
-                    # system call, but exists is better than an exception
-                    # when the file doesn't already exist
-                    if (os.path.exists(target) and
-                            stat.S_ISDIR(os.lstat(target).st_mode)):
-                        os.rmdir(target)
-                    os.rename(tmpname, target)
                 except:
-                    # we've not renamed tmpname to target yet, we should
-                    # clean up instead of leaving temp files around
                     os.unlink(tmpname)
-                    if keepTempfile:
-                        os.unlink(destTarget)
                     raise
+
+            if keepTempfile:
+                # Make a hardlink "copy" for the caller to use
+                destTarget = tmpname + '.ptr'
+                os.link(tmpname, destTarget)
+            try:
+                os.rename(tmpname, target)
+            except OSError, err:
+                if err.args[0] != errno.EISDIR:
+                    raise
+                os.rmdir(target)
+                os.rename(tmpname, target)
 
             if (sha1 is not None and sha1 != actualSha1):
                 raise Sha1Exception(target)
 
-            File.restore(self, root, target, journal=journal,
-                nameLookup=nameLookup, **kwargs)
-        else:
-            destTarget = target
-            File.restore(self, root, target, journal=journal,
+        File.restore(self, root, target, journal=journal,
                 nameLookup=nameLookup, **kwargs)
         return destTarget
 
