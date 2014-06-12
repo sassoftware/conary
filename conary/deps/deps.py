@@ -889,7 +889,9 @@ class DependencySet(object):
                 yield (classId, name, flags)
         else:
             for depClass, oneDep in self.iterDeps():
-                yield (depClass.tag, oneDep.getName()[0], oneDep.getFlags()[0])
+                flags = [senseMap[sense] + name
+                        for (name, sense) in oneDep.getFlags()[0]]
+                yield (depClass.tag, oneDep.getName()[0], flags)
 
     def hasDepClass(self, depClass):
         return depClass.tag in self.members

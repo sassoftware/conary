@@ -921,3 +921,14 @@ class DepsTest(unittest.TestCase):
         for text in ('', '4#blam|4#foo'):
             dep = ThawDependencySet(text)
             self.assertEquals(dep, pickle.loads(pickle.dumps(dep)))
+
+    def testIterRawDeps(self):
+        dep = ThawDependencySet('4#blam|4#foo:!bar')
+        expected = [(4, 'blam', []), (4, 'foo', ['!bar'])]
+        self.assertEqual(list(dep.iterRawDeps()), expected)
+        # Ensure it did not force a lazy parse
+        assert isinstance(dep._members, str)
+        # Now try again after parsing
+        str(dep)
+        assert isinstance(dep._members, dict)
+        self.assertEqual(sorted(dep.iterRawDeps()), expected)
