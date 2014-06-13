@@ -1810,6 +1810,77 @@ def getShortFlavorDescriptors(flavors):
     raise NotImplementedError
 
 
+class DependencyMatcher(object):
+
+    def __init__(self, ignoreDepClasses=()):
+        self.ignoreDepClasses = set()
+        for depClass in ignoreDepClasses:
+            if not isinstance(depClass, (int, long)):
+                depClass = depClass.tag
+            self.ignoreDepClasses.add(depClass)
+        self.depMap = {}
+
+    def add(self, depSet, data=None):
+        for depClassId, depName, depFlags in depSet.iterRawDeps():
+            if depClassId in self.ignoreDepClasses:
+                continue
+            depValue = (depClassId, depFlags, data)
+            values = self.depMap.get(depName)
+            if values is not None:
+                values.append(depValue)
+            else:
+                self.depMap[depName] = [depValue]
+
+    def find(self, depSet):
+        setMatches = []
+        for depClassId, depName, depFlags in depSet.iterRawDeps():
+            depMatches = []
+            for provClassId, provFlags, provData in self.depMap.get(depName, ()):
+                if provClassId != depClassId:
+                    continue
+                if provFlags == depFlags:
+                    depMatches.append(provData)
+                    continue
+                for depFlag in depFlags:
+                    assert depFlag[0] not in '~!'
+                    if depFlag not in provFlags:
+                        break
+                else:
+                    depMatches.append(provData)
+            setMatches.append(depMatches)
+        return setMatches
+
+    def check(self, depSet):
+        unsatisfied = None
+        for depClassId, depName, depFlags in depSet.iterRawDeps():
+            if depClassId in self.ignoreDepClasses:
+                continue
+            found = False
+            for provClassId, provFlags, provData in self.depMap.get(depName, ()):
+                if provClassId != depClassId:
+                    continue
+                if provFlags == depFlags:
+                    found = True
+                    break
+                for depFlag in depFlags:
+                    assert depFlag[0] not in '~!'
+                    if depFlag not in provFlags:
+                        break
+                else:
+                    found = True
+                    break
+            if not found:
+                if unsatisfied is None:
+                    unsatisfied = DependencySet()
+                depClass = dependencyClasses[depClassId]
+                dep = DependencyClass.thawRawDep(depName, depFlags)
+                unsatisfied.addDep(depClass, dep)
+        return unsatisfied
+
+    def clear(self):
+        self.depMap.clear()
+
+
 dependencyCache = weakref.WeakValueDictionary()
 
 ident = '(?:[0-9A-Za-z_-]+)'
