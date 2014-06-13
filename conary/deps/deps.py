@@ -550,6 +550,7 @@ class DependencyClass(object):
         for name, dep in sorted(self.members.iteritems()):
             yield dep
 
+    @staticmethod
     def thawDependency(frozen):
         cached = dependencyCache.get(frozen, None)
         if cached:
@@ -573,7 +574,21 @@ class DependencyClass(object):
         dependencyCache[frozen] = d
 
         return d
-    thawDependency = staticmethod(thawDependency)
+
+    @staticmethod
+    def thawRawDep(name, flags):
+        parsed = []
+        for flag in flags:
+            kind = flag[0:2]
+            if kind == '~!':
+                parsed.append((flag[2:], FLAG_SENSE_PREFERNOT))
+            elif kind[0] == '!':
+                parsed.append((flag[1:], FLAG_SENSE_DISALLOWED))
+            elif kind[0] == '~':
+                parsed.append((flag[1:], FLAG_SENSE_PREFERRED))
+            else:
+                parsed.append((flag, FLAG_SENSE_REQUIRED))
+        return Dependency(name, parsed)
 
     def __hash__(self):
         val = self.tag

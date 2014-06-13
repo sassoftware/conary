@@ -932,3 +932,13 @@ class DepsTest(unittest.TestCase):
         str(dep)
         assert isinstance(dep._members, dict)
         self.assertEqual(sorted(dep.iterRawDeps()), expected)
+
+    def testThawRawDeps(self):
+        for raw, expect in [
+                ( ('foo', []), 'java: foo'),
+                ( ('ELF64/foo.so', ['SysV']), 'soname: ELF64/foo.so(SysV)'),
+                ( ('ELF64/foo.so', ['SysV', 'GLIBC_42']), 'soname: ELF64/foo.so(SysV GLIBC_42)'),
+                ]:
+            actual = DependencyClass.thawRawDep(*raw)
+            expected = parseDep(expect).iterDeps().next()[1]
+            self.assertEqual(actual, expected)
