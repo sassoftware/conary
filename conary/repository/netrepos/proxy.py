@@ -739,6 +739,12 @@ class ChangesetFilter(BaseProxy):
                             caller, chgSetList, recurse, withFiles,
                             withFileContents, excludeAutoSource, mirrorMode)
 
+    def getChangeSetFingerprints(self, caller, authToken, clientVersion,
+            chgSetList, recurse, withFiles, withFileContents,
+            excludeAutoSource, mirrorMode=False):
+        return self.lookupFingerprints(caller, authToken, chgSetList, recurse,
+                withFiles, withFileContents, excludeAutoSource, mirrorMode)
+
     def _callGetChangeSet(self, caller, changeSetList, getCsVersion,
                 wireCsVersion, neededCsVersion, neededFiles, recurse,
                 withFiles, withFileContents, excludeAutoSource, mirrorMode,
