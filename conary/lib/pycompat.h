@@ -133,6 +133,11 @@ typedef struct PyModuleDef {
 } PyModuleDef;
 #endif
 
+/* Solaris is missing a MIN implementation */
+#ifndef MIN
+#define MIN(x,y) ((x)<(y)?(x):(y))
+#endif
+
 
 #endif
 /* vim: set sts=4 sw=4 expandtab : */
