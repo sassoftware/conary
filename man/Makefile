@@ -29,8 +29,8 @@ install-mkdirs:
 	mkdir -p $(DESTDIR)$(mandir)/man1
 
 install: install-mkdirs
-	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
-	install -m 644 cvc.1 $(DESTDIR)$(mandir)/man1
+	$(INSTALL) -m 644 conary.1 $(DESTDIR)$(mandir)/man1
+	$(INSTALL) -m 644 cvc.1 $(DESTDIR)$(mandir)/man1
 
 dist: default-dist
 

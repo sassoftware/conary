@@ -38,7 +38,7 @@ install-mkdirs:
 
 install: install-mkdirs
 	for f in $(bin_files); do \
-		install -m755 $$f $(DESTDIR)$(bindir)/$$f; \
+		$(INSTALL) -m755 $$f $(DESTDIR)$(bindir)/$$f; \
 	done
 
 dist: default-dist

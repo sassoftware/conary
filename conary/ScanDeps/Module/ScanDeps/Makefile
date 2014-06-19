@@ -23,7 +23,7 @@ all: default-all
 
 install:
 	mkdir -p $(DESTDIR)$(libdir)/conary/ScanDeps/Module/ScanDeps/
-	install -m 644 DataFeed.pm $(DESTDIR)$(libdir)/conary/ScanDeps/Module/ScanDeps
+	$(INSTALL) -m 644 DataFeed.pm $(DESTDIR)$(libdir)/conary/ScanDeps/Module/ScanDeps
 
 dist: default-dist
 

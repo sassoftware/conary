@@ -20,6 +20,7 @@ PYTHON = /usr/bin/python${PYVER}
 PYINCLUDE = /usr/include/python${PYVER}
 CYTHON = $(PYTHON) /usr/bin/cython
 SED = sed
+INSTALL = install
 
 PYFLAKES = /usr/bin/pyflakes
 

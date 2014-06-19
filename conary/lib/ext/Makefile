@@ -39,7 +39,7 @@ all: default-subdirs $(all_modules)
 
 install: all install-subdirs pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
-	install -m 755 $(install_modules) $(DESTDIR)$(sitedir)/$(DIR)
+	$(INSTALL) -m 755 $(install_modules) $(DESTDIR)$(sitedir)/$(DIR)
 
 clean: clean-subdirs default-clean
 

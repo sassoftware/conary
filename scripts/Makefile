@@ -42,11 +42,11 @@ all: default-subdirs default-all
 install: install-subdirs
 	# see conary-wrapper symlink in ../Makefile to make scripts
 	# available in $(bindir)
-	install -m 755 $(bin_scripts) $(DESTDIR)$(bindir)
+	$(INSTALL) -m 755 $(bin_scripts) $(DESTDIR)$(bindir)
 	mkdir -p $(DESTDIR)$(datadir)/conary
-	install -m 755 $(util_scripts) $(DESTDIR)$(datadir)/conary
+	$(INSTALL) -m 755 $(util_scripts) $(DESTDIR)$(datadir)/conary
 	mkdir -p $(DESTDIR)$(conarylibexecdir)
-	install -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
+	$(INSTALL) -m 755 perlreqs.pl $(DESTDIR)$(conarylibexecdir)
 
 dist: default-dist
 

@@ -64,9 +64,9 @@ filename_wrapper.so: filename_wrapper.c
 
 install: all install-subdirs pyfiles-install
 	mkdir -p $(DESTDIR)$(sitedir)/$(DIR)
-	install -m 755 $(python_modules) $(DESTDIR)$(sitedir)/$(DIR)
+	$(INSTALL) -m 755 $(python_modules) $(DESTDIR)$(sitedir)/$(DIR)
 	mkdir -p $(DESTDIR)$(conarylibdir)
-	install -m 755 $(wrapper_libs) $(DESTDIR)$(conarylibdir)/
+	$(INSTALL) -m 755 $(wrapper_libs) $(DESTDIR)$(conarylibdir)/
 
 clean: clean-subdirs default-clean
 

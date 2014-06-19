@@ -25,7 +25,7 @@ all: default-all
 
 install: install-subdirs
 	mkdir -p $(DESTDIR)$(libdir)/conary/ScanDeps/Module/
-	install -m 644 ScanDeps.pm $(DESTDIR)$(libdir)/conary/ScanDeps/Module
+	$(INSTALL) -m 644 ScanDeps.pm $(DESTDIR)$(libdir)/conary/ScanDeps/Module
 
 dist: default-dist
 
