@@ -3523,9 +3523,10 @@ class Requires(_addInfo, _dependency):
         # anything that any buildreqs have caused to go into ld.so.conf
         # or ld.so.conf.d/*.conf is a system library by definition,
         # but only look at paths, not (for example) "include" lines
-        self.systemLibPaths |= set(os.path.normpath(x.strip())
-            for x in file('/etc/ld.so.conf').readlines()
-            if x.startswith('/'))
+        if os.path.exists('/etc/ld.so.conf'):
+            self.systemLibPaths |= set(os.path.normpath(x.strip())
+                for x in file('/etc/ld.so.conf').readlines()
+                if x.startswith('/'))
         for fileName in fixedglob.glob('/etc/ld.so.conf.d/*.conf'):
             self.systemLibPaths |= set(os.path.normpath(x.strip())
                 for x in file(fileName).readlines()
