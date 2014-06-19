@@ -2245,7 +2245,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 prof = cProfile.Profile()
                 prof.enable()
             # child, set ourself to be the foreground process
-            os.setpgrp()
+            os.setpgid(0, 0)
 
             if cookGid:
                 os.setgid(cookGid)
