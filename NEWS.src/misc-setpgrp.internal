@@ -1,0 +1,1 @@
+Switch to using os.setpgid when configuring the build process instead of os.setpgrp because setpgrp creates a new session on Solaris.

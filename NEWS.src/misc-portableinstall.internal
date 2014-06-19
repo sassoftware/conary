@@ -1,0 +1,1 @@
+Switch install, sed, cp, and make calls to use Makefile macros for portabilty to platforms that rename the GNU versions of those utilities.
