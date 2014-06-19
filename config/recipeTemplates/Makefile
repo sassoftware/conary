@@ -26,7 +26,7 @@ all: default-all
 install:
 	mkdir -p $(DESTDIR)/etc/conary/recipeTemplates/; \
 	for f in $(template_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/recipeTemplates/$$f; \
+		$(CP) -a $$f $(DESTDIR)/etc/conary/recipeTemplates/$$f; \
 	done
 
 dist: default-dist

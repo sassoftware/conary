@@ -29,7 +29,7 @@ all:
 install: pyfiles-install kidfiles-install
 
 kidfiles-install:
-	cp -a $(kid_files) $(DESTDIR)/$(sitedir)/$(DIR)/; \
+	$(CP) -a $(kid_files) $(DESTDIR)/$(sitedir)/$(DIR)/; \
 	kidc --force --source $(DESTDIR)$(sitedir)/$(DIR) ||:
 	rm -f $(DESTDIR)$(sitedir)/$(DIR)/*.pyc
 	if [ -n "$(DESTDIR)" ]; then sed -i -e 's#$(DESTDIR)##g' $(DESTDIR)$(sitedir)/$(DIR)/*.py; fi

@@ -58,7 +58,7 @@ all: default-all
 install:
 	mkdir -p $(DESTDIR)/etc/conary/use/; \
 	for f in $(use_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/use/$$f; \
+		$(CP) -a $$f $(DESTDIR)/etc/conary/use/$$f; \
 	done
 
 dist: default-dist

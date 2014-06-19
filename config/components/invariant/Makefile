@@ -29,7 +29,7 @@ all: default-all
 install:
 	mkdir -p $(DESTDIR)/etc/conary/components/invariant/; \
 	for f in $(filter_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/components/invariant/$$f; \
+		$(CP) -a $$f $(DESTDIR)/etc/conary/components/invariant/$$f; \
 	done
 
 dist: default-dist

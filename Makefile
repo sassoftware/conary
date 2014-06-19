@@ -121,7 +121,7 @@ ccs: dist
 	# recipe: filter out non-sqlite patches (the sqlite patch spans across
 	# two lines)
 	$(SED) -i 's,r.addPatch(.*),,' conary-$(VERSION)/conary.recipe;
-	cp conary-$(VERSION).tar.bz2 conary-$(VERSION)
+	$(CP) conary-$(VERSION).tar.bz2 conary-$(VERSION)
 	# This is just to prime the cache for the cook from a recipe
 	bin/cvc cook --build-label conary.rpath.com@rpl:devel --prep conary=conary.rpath.com@rpl:devel
 	bin/cvc cook --build-label conary.rpath.com@rpl:devel conary-$(VERSION)/conary.recipe

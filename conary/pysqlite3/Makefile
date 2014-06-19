@@ -25,7 +25,7 @@ all:
 	if [ -f $(sqlite_lib) ]; then \
 		rm -rf embed; \
 		mkdir embed; \
-		cp $(sqlite_lib) $(sqlite_inc) embed/; \
+		$(CP) $(sqlite_lib) $(sqlite_inc) embed/; \
 	fi
 	$(PYTHON) setup.py build
 	$(PYTHON) setup.py install --install-lib=..

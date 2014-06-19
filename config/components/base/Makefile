@@ -24,7 +24,7 @@ all: default-all
 install:
 	mkdir -p $(DESTDIR)/etc/conary/components/base/; \
 	for f in $(filter_files); do \
-		cp -a $$f $(DESTDIR)/etc/conary/components/base/$$f; \
+		$(CP) -a $$f $(DESTDIR)/etc/conary/components/base/$$f; \
 	done
 
 dist: default-dist

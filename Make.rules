@@ -21,13 +21,14 @@ PYINCLUDE = /usr/include/python${PYVER}
 CYTHON = $(PYTHON) /usr/bin/cython
 SED = sed
 INSTALL = install
+CP = cp
 
 PYFLAKES = /usr/bin/pyflakes
 
 pyfiles-install:
 ifdef python_files
 	mkdir -p $(DESTDIR)/$(sitedir)/$(DIR)
-	cp -a $(python_files) $(DESTDIR)/$(sitedir)/$(DIR)/
+	$(CP) -a $(python_files) $(DESTDIR)/$(sitedir)/$(DIR)/
 endif
 
 check:
@@ -36,7 +37,7 @@ check:
 default-dist: dist-subdirs
 	for f in $(dist_files); do \
 		mkdir -p $(DISTDIR)/$(DIR)/`dirname $$f`; \
-		cp -a $$f $(DISTDIR)/$(DIR)/$$f; \
+		$(CP) -a $$f $(DISTDIR)/$(DIR)/$$f; \
 	done
 
 default-install:
