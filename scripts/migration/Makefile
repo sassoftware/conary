@@ -27,7 +27,7 @@ all: default-subdirs default-all
 
 install:
 	mkdir -p $(DESTDIR)$(datadir)/conary/migration
-	install -m 755 $(python_files) $(DESTDIR)$(datadir)/conary/migration
+	$(INSTALL) -m 755 $(python_files) $(DESTDIR)$(datadir)/conary/migration
 
 dist: default-dist
 

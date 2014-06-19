@@ -79,9 +79,9 @@ smoketest: archive
 	@echo "=== sanity building/testing conary ==="; \
 	tar jxf $(DISTDIR).tar.bz2 ; \
 	cd $(DISTDIR); \
-	make > /dev/null; \
+	$(MAKE) > /dev/null; \
 	tmpdir=$$(mktemp -d); \
-	make install DESTDIR=$$tmpdir > /dev/null; \
+	$(MAKE) install DESTDIR=$$tmpdir > /dev/null; \
 	PYTHONPATH=$$tmpdir/usr/lib/python$(PYVER)/site-packages $$tmpdir/usr/bin/conary --version > /dev/null || echo "CONARY DOES NOT WORK"; \
 	PYTHONPATH=$$tmpdir/usr/lib/python$(PYVER)/site-packages $$tmpdir/usr/bin/cvc --version > /dev/null || echo "CVC DOES NOT WORK"; \
 	cd -; \

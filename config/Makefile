@@ -22,7 +22,7 @@ dist_files = Makefile pubring.gpg trustdb.gpg macros
 all: default-subdirs
 
 install: install-subdirs
-	install --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
+	$(INSTALL) --mode=644 pubring.gpg trustdb.gpg macros $(DESTDIR)/etc/conary
 
 dist: default-dist
 
