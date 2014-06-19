@@ -837,6 +837,8 @@ class Make(BuildCommand):
             If True, skip the action if dir does not exist.
         @keyword dir: The directory to enter before running C{make}
         """
+        if not 'makeName' in keywords and 'makeName' in recipe.macros:
+            keywords['makeName'] = recipe.macros.makeName
         BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
             for i in (';', '&&', '||'):
@@ -964,7 +966,7 @@ class MakeInstall(Make):
                 'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
                 ' CPPFLAGS="%%(cppflags)s" CLASSPATH="%%(classpath)s" '
                 ' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
-                ' %(preMake)s make %%(overrides)s'
+                ' %(preMake)s %(makeName)s %%(overrides)s'
                 ' %%(mflags)s %%(rootVarArgs)s'
                 ' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
