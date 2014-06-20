@@ -17,6 +17,7 @@
 
 #include <Python.h>
 
+#include <alloca.h>
 #include <errno.h>
 #include <malloc.h>
 #include <openssl/sha.h>

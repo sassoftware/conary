@@ -21,6 +21,7 @@
 #include "pycompat.h"
 #include "streams.h"
 
+#include <alloca.h>
 #include <stdio.h>
 
 /* debugging aid */
