@@ -2018,7 +2018,7 @@ class Trove(streams.StreamSet):
             troveGroup = self.weakTroves
         else:
             troveGroup = self.strongTroves
-        key = (name, version, flavor)
+        key = trovetup.TroveTuple(name, version, flavor)
         if not presentOkay and key in troveGroup:
             raise TroveError, "duplicate trove included in %s" % self.name()
 
@@ -2268,7 +2268,8 @@ class Trove(streams.StreamSet):
                                                missingOkay = redundantOkay,
                                                weakRef = weakRef)
                     elif oper == "~":
-                        troveDict[(name, version, flavor)] = byDefault
+                        key = trovetup.TroveTuple(name, version, flavor)
+                        troveDict[key] = byDefault
                     else:
                         assert(0)
 
@@ -2465,7 +2466,6 @@ class Trove(streams.StreamSet):
 
         added = {}
         removed = {}
-        oldTroves = []
 
         for name, chgList in \
                 chgSet.iterChangedTroves(strongRefs = True):
@@ -2474,7 +2474,6 @@ class Trove(streams.StreamSet):
                     whichD = added
                 elif how == '-':
                     whichD = removed
-                    oldTroves.append((name, version, flavor))
                 else:
                     continue
 

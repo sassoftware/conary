@@ -111,3 +111,59 @@ class TroveTupleTest(testhelp.TestCase):
         tt = trovetup.TroveTuple(self.sample)
         self.assertEquals(str(tt), 'tmpwatch=/conary.rpath.com@rpl:devel//2/'
                 '2.9.10-2-0.1[is: x86_64]')
+
+
+class JobTupleTest(testhelp.TestCase):
+
+    old = (versions.ThawVersion('/conary.rpath.com@rpl:devel//2/1000000000.000:2.9.10-2-0.1'),
+            deps.parseFlavor('is: x86_64'))
+    new = (versions.ThawVersion('/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1'),
+            deps.parseFlavor('is: x86_64'))
+
+    def testNewTuple(self):
+        n = 'tmpwatch'
+        a = self.old
+        b = self.new
+        atup = (n, a[0], a[1])
+        btup = trovetup.TroveTuple(n, b[0], b[1])
+        self.assertEqual((n, a, b, False), trovetup.JobTuple((n, a, b, False)))
+        self.assertEqual((n, a, b, False), trovetup.JobTuple(n, a, b, False))
+        self.assertEqual((n, a, b, False), trovetup.JobTuple(n, a, b))
+        self.assertEqual((n, a, b, False), trovetup.JobTuple(n, atup, btup))
+        self.assertEqual((n, (None, None), b, True), trovetup.JobTuple(n, new=b))
+        self.assertEqual((n, (None, None), b, True), trovetup.JobTuple(n, new=btup))
+        self.assertEqual((n, a, (None, None), False), trovetup.JobTuple(n, old=a))
+        self.assertEqual((n, a, (None, None), False), trovetup.JobTuple(n, old=atup))
+        self.assertEqual((n, (None, None), b, True), btup.asJob())
+
+    def testStringify(self):
+        x = trovetup.JobTuple('tmpwatch', new=self.new)
+        self.assertEqual(str(x), "tmpwatch=/conary.rpath.com@rpl:devel//2/3.0.00-1-0.1[is: x86_64]")
+        self.assertEqual(repr(x), "JobTuple('tmpwatch=/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1[is: x86_64]')")
+        x = x._replace(absolute=False)
+        self.assertEqual(str(x), "tmpwatch=/conary.rpath.com@rpl:devel//2/3.0.00-1-0.1[is: x86_64]")
+        self.assertEqual(repr(x), "JobTuple('tmpwatch=/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1[is: x86_64]', absolute=False)")
+        x = trovetup.JobTuple('tmpwatch', self.old, self.new)
+        self.assertEqual(str(x), "tmpwatch=/conary.rpath.com@rpl:devel//2/2.9.10-2-0.1[is: x86_64]"
+                "--/conary.rpath.com@rpl:devel//2/3.0.00-1-0.1[is: x86_64]")
+        self.assertEqual(repr(x), "JobTuple('tmpwatch=/conary.rpath.com@rpl:devel//2/1000000000.000:2.9.10-2-0.1[is: x86_64]"
+                "--/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1[is: x86_64]')")
+        x = x._replace(absolute=True)
+        self.assertEqual(str(x), "tmpwatch=/conary.rpath.com@rpl:devel//2/2.9.10-2-0.1[is: x86_64]"
+                "--/conary.rpath.com@rpl:devel//2/3.0.00-1-0.1[is: x86_64]")
+        self.assertEqual(repr(x), "JobTuple('tmpwatch=/conary.rpath.com@rpl:devel//2/1000000000.000:2.9.10-2-0.1[is: x86_64]"
+                "--/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1[is: x86_64]', absolute=True)")
+        x = trovetup.JobTuple('tmpwatch', self.old)
+        self.assertEqual(str(x), "tmpwatch=/conary.rpath.com@rpl:devel//2/2.9.10-2-0.1[is: x86_64]--")
+        self.assertEqual(repr(x), "JobTuple('tmpwatch=/conary.rpath.com@rpl:devel//2/1000000000.000:2.9.10-2-0.1[is: x86_64]--')")
+
+    def testParser(self):
+        p = trovetup.JobTuple
+        self.assertRaises(ParseError, p, u'spam\xFF=foo[bar]')
+        self.assertEqual(p('tmpwatch=/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1[is: x86_64]'),
+                ('tmpwatch', (None, None), self.new, True))
+        self.assertEqual(p('tmpwatch=/conary.rpath.com@rpl:devel//2/1000000000.000:2.9.10-2-0.1[is: x86_64]'
+                '--/conary.rpath.com@rpl:devel//2/1200000000.000:3.0.00-1-0.1[is: x86_64]'),
+                ('tmpwatch', self.old, self.new, False))
+        self.assertEqual(p('tmpwatch=/conary.rpath.com@rpl:devel//2/1000000000.000:2.9.10-2-0.1[is: x86_64]--'),
+                ('tmpwatch', self.old, (None, None), False))

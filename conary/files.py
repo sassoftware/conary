@@ -85,6 +85,8 @@ DYNAMIC = streams.DYNAMIC
 FILE_TYPE_DIFF = '\x01'
 
 PRELINK_CMD = ("/usr/sbin/prelink",)
+_havePrelink = None
+
 
 def fileStreamIsDiff(fileStream):
     return fileStream[0] == FILE_TYPE_DIFF
@@ -657,7 +659,7 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
     else:
         s = os.lstat(path)
 
-    global userCache, groupCache
+    global userCache, groupCache, _havePrelink
 
     if assumeRoot:
         owner = 'root'
@@ -737,14 +739,16 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
         f.contents = RegularFileStream()
 
         undoPrelink = False
-        try:
-            from conary.lib import elf
-            if (os.access(PRELINK_CMD[0], os.X_OK) and
-                f.inode.isExecutable() and elf.prelinked(path)):
-                undoPrelink = True
-        except:
-            pass
-        if undoPrelink:
+        if _havePrelink != False and f.inode.isExecutable():
+            try:
+                from conary.lib import elf
+                if elf.prelinked(path):
+                    undoPrelink = True
+            except:
+                pass
+        if undoPrelink and _havePrelink is None:
+            _havePrelink = bool(os.access(PRELINK_CMD[0], os.X_OK))
+        if undoPrelink and _havePrelink:
             prelink = subprocess.Popen(
                     PRELINK_CMD + ("-y", path),
                     stdout = subprocess.PIPE,

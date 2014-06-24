@@ -53,6 +53,7 @@ from conary.deps.deps import (
         TroveDependencies,
         InstructionSetDependency,
         flavorDifferences,
+        DependencyMatcher,
         )
 
 class DepsTest(unittest.TestCase):
@@ -921,3 +922,49 @@ class DepsTest(unittest.TestCase):
         for text in ('', '4#blam|4#foo'):
             dep = ThawDependencySet(text)
             self.assertEquals(dep, pickle.loads(pickle.dumps(dep)))
+
+    def testIterRawDeps(self):
+        dep = ThawDependencySet('4#blam|4#foo:!bar')
+        expected = [(4, 'blam', []), (4, 'foo', ['!bar'])]
+        self.assertEqual(list(dep.iterRawDeps()), expected)
+        # Ensure it did not force a lazy parse
+        assert isinstance(dep._members, str)
+        # Now try again after parsing
+        str(dep)
+        assert isinstance(dep._members, dict)
+        self.assertEqual(sorted(dep.iterRawDeps()), expected)
+
+    def testThawRawDeps(self):
+        for raw, expect in [
+                ( ('foo', []), parseDep('java: foo')),
+                ( ('ELF64/foo.so', ['SysV']), parseDep('soname: ELF64/foo.so(SysV)')),
+                ( ('ELF64/foo.so', ['SysV', 'GLIBC_42']), parseDep('soname: ELF64/foo.so(SysV GLIBC_42)')),
+                ( ('use', ['~maybe', 'yes', '~!maybenot', '!no']), parseFlavor('yes,!no,~maybe,~!maybenot')),
+                ]:
+            actual = DependencyClass.thawRawDep(*raw)
+            expected = expect.iterDeps().next()[1]
+            self.assertEqual(actual, expected)
+
+    def testDependencyMatcher(self):
+        m = DependencyMatcher(ignoreDepClasses=[AbiDependency])
+        m.add(ThawDependencySet('0#ignored|4#foobar::java|10#ham|10#spam'), 'foobar')
+        m.add(ThawDependencySet('0#ignored|11#ham:2.6:lib|11#spam:2.6:lib'), 'hamspam32')
+        m.add(ThawDependencySet('0#ignored|11#ham:2.6:lib64|11#spam:2.6:lib64'), 'hamspam64')
+
+        self.assertEqual(m.find(parseDep('java: ham')), [['foobar']])
+        self.assertEqual(m.find(parseDep('python: ham')), [['hamspam32', 'hamspam64']])
+        s = parseDep('python: ham(lib)')
+        s.union(parseDep('python: spam(lib)'))
+        self.assertEqual(m.find(s), [ ['hamspam32'], ['hamspam32'] ])
+
+        s = parseDep('python: ham(lib)')
+        s.union(parseDep('python: spam'))
+        s.union(parseDep('trove: foobar:java'))
+        s.union(parseDep('abi: missing(SysV)'))
+        self.assertEqual(m.check(s), None)
+        s.union(parseDep('python: pork'))
+        e = parseDep('python: pork')
+        self.assertEqual(m.check(s), e)
+        s.union(parseDep('python: spam(nope)'))
+        e.union(parseDep('python: spam(nope)'))
+        self.assertEqual(m.check(s), e)

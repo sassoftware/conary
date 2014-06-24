@@ -192,6 +192,10 @@ class TroveTuple(_namedtuple('TroveTuple', 'name version flavor')):
             raise errors.ParseError("Not a valid trove tuple")
         return cls(name, version, flavor)
 
+    def asJob(self):
+        return JobTuple(self.name, (None, None), (self.version, self.flavor),
+                True)
+
 
 class JobSpec(_namedtuple('JobSpec', 'name old new')):
     """
@@ -209,7 +213,70 @@ class JobTuple(_namedtuple('JobTuple', 'name old new absolute')):
     the job is absolute.
     """
     __slots__ = ()
-    # TODO: Parsers, stringifiers, etc.
+
+    def __new__(cls, name, old=None, new=None, absolute=None):
+        if isinstance(name, (tuple, list)):
+            name, old, new, absolute = name
+        elif old is None and new is None:
+            return cls.fromString(name, absolute)
+        if old is None:
+            old = (None, None)
+        elif len(old) == 3:
+            # Permit passing in a TroveTuple
+            old = old[1:3]
+        if new is None:
+            new = (None, None)
+        elif len(new) == 3:
+            new = new[1:3]
+        if absolute is None:
+            absolute = (old[0] is None)
+        return tuple.__new__(cls, (name, old, new, absolute))
+
+    def __repr__(self):
+        ret = 'JobTuple(%r' % (self.asString(True),)
+        defaultAbsolute = (self.old[0] is None)
+        if self.absolute != defaultAbsolute:
+            ret += ', absolute=%r' % (self.absolute,)
+        return ret + ')'
+
+    def asString(self, withTimestamp=False):
+        if self.old[0]:
+            if withTimestamp:
+                oldpart = '%s[%s]--' % (self.old[0].freeze(), self.old[1])
+            else:
+                oldpart = '%s[%s]--' % self.old
+        else:
+            oldpart = ''
+        if self.new[0]:
+            if withTimestamp:
+                newpart = '%s[%s]' % (self.new[0].freeze(), self.new[1])
+            else:
+                newpart = '%s[%s]' % self.new
+        else:
+            newpart = ''
+        return '%s=%s%s' % (self.name, oldpart, newpart)
+    __str__ = asString
+
+    @classmethod
+    def fromString(cls, val, absolute=None):
+        try:
+            val = _cast(val)
+        except UnicodeEncodeError:
+            raise errors.ParseError("Job tuple must be ASCII safe")
+        name, val = val.split('=')
+        if '--' in val:
+            old, new = val.split('--')
+        else:
+            old, new = '', val
+        if old:
+            old = TroveTuple.fromString('%s=%s' % (name, old))[1:3]
+        else:
+            old = (None, None)
+        if new:
+            new = TroveTuple.fromString('%s=%s' % (name, new))[1:3]
+        else:
+            new = (None, None)
+        return cls(name, old, new, absolute)
 
 
 def _cast(val):

@@ -30,6 +30,7 @@ from conary import conarycfg
 from conary import files
 from conary.cmds import metadata
 from conary import trove
+from conary import trovetup
 from conary import versions
 from conary.lib import util, api
 from conary.lib import httputils
@@ -1119,7 +1120,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 for version, flavorList in results.iteritems():
                     for flavor in flavorList:
                         for name in versionFlavorDict[version][flavor]:
-                            finalResults[idx].append((name, version, flavor))
+                            finalResults[idx].append(trovetup.TroveTuple(name,
+                                version, flavor))
         for idx, results in enumerate(finalResults):
             if results:
                 finalAltFlavors[idx] = [] # any results means no alternates

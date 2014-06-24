@@ -34,6 +34,10 @@ class EmptyCache(dict):
     def set_multi(self, items, time = 0, key_prefix = None):
         return
 
+    def incr(self, key, delta=1):
+        return None
+
+
 class DumbCache(dict):
 
     def __init__(self, limit = 2000):
@@ -88,6 +92,19 @@ class DumbCache(dict):
 
         for x in toRemove:
             del self[x[0]]
+
+    def incr(self, key, delta=1):
+        val = self.get(key)
+        if val is None:
+            return None
+        try:
+            val = long(val)
+        except ValueError:
+            return None
+        val = str(val + delta)
+        self.set(key, val)
+        return val
+
 
 def getCache(url):
     if url is None:

@@ -36,6 +36,7 @@ class DepResolutionMethod(object):
             flavor = [flavor]
         self.flavor = flavor
         self.flavorPreferences = []
+        self.troveSource = None
 
     def setFlavorPreferences(self, flavorPreferences):
         self.flavorPreferences = flavorPreferences
@@ -373,6 +374,10 @@ class DepResolutionByLabelPath(DepResolutionMethod):
             return results
 
 class DepResolutionByTroveList(DepResolutionMethod):
+    """
+    Resolve dependencies against a list of troves by making calls to a
+    repository (or other trovesource).
+    """
     def __init__(self, cfg, db, troveList, flavor=None):
         DepResolutionMethod.__init__(self, cfg, db, flavor)
         assert(troveList)
@@ -392,6 +397,47 @@ class DepResolutionByTroveList(DepResolutionMethod):
     def resolveDependencies(self):
         return self.troveSource.resolveDependenciesByGroups(self.troveList,
                                                             self.depList)
+
+
+class DepResolutionByTroveListFast(DepResolutionMethod):
+    """
+    Resolve dependencies against a list of troves after pre-caching all their
+    provides in memory.
+    """
+
+    def __init__(self, cfg, db, troveList, flavor=None):
+        DepResolutionMethod.__init__(self, cfg, db, flavor)
+        assert troveList
+        self.troveList = troveList
+        self.depList = None
+        self.matcher = None
+
+    def prepareForResolution(self, depList):
+        newDepList = [x[1] for x in depList]
+        if not newDepList or newDepList == self.depList:
+            return False
+        self.depList = newDepList
+        return True
+
+    def _cacheDeps(self):
+        """Fetch provides for all troves in this troveList"""
+        allTups = set(x.getNameVersionFlavor() for x in self.troveList)
+        for trv in self.troveList:
+            allTups.update(trv.iterTroveList(strongRefs=True, weakRefs=True))
+        allTups = sorted(allTups)
+        allProvides = self.troveSource.getDepsForTroveList(allTups,
+                provides=True, requires=False)
+        self.matcher = deps.DependencyMatcher()
+        for tup, (provSet, _) in zip(allTups, allProvides):
+            self.matcher.add(provSet, tup)
+
+    def resolveDependencies(self):
+        if self.matcher is None:
+            self._cacheDeps()
+        sugg = {}
+        for depSet in self.depList:
+            sugg[depSet] = self.matcher.find(depSet)
+        return sugg
 
 
 class ResolutionStack(DepResolutionMethod):

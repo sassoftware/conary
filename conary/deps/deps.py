@@ -550,6 +550,7 @@ class DependencyClass(object):
         for name, dep in sorted(self.members.iteritems()):
             yield dep
 
+    @staticmethod
     def thawDependency(frozen):
         cached = dependencyCache.get(frozen, None)
         if cached:
@@ -573,7 +574,21 @@ class DependencyClass(object):
         dependencyCache[frozen] = d
 
         return d
-    thawDependency = staticmethod(thawDependency)
+
+    @staticmethod
+    def thawRawDep(name, flags):
+        parsed = []
+        for flag in flags:
+            kind = flag[0:2]
+            if kind == '~!':
+                parsed.append((flag[2:], FLAG_SENSE_PREFERNOT))
+            elif kind[0] == '!':
+                parsed.append((flag[1:], FLAG_SENSE_DISALLOWED))
+            elif kind[0] == '~':
+                parsed.append((flag[1:], FLAG_SENSE_PREFERRED))
+            else:
+                parsed.append((flag, FLAG_SENSE_REQUIRED))
+        return Dependency(name, parsed)
 
     def __hash__(self):
         val = self.tag
@@ -889,7 +904,9 @@ class DependencySet(object):
                 yield (classId, name, flags)
         else:
             for depClass, oneDep in self.iterDeps():
-                yield (depClass.tag, oneDep.getName()[0], oneDep.getFlags()[0])
+                flags = [senseMap[sense] + name
+                        for (name, sense) in oneDep.getFlags()[0]]
+                yield (depClass.tag, oneDep.getName()[0], flags)
 
     def hasDepClass(self, depClass):
         return depClass.tag in self.members
@@ -1791,6 +1808,77 @@ def getShortFlavorDescriptors(flavors):
         return dict((x[0], '-'.join(x[1])) for x in descriptors.iteritems())
 
     raise NotImplementedError
+
+
+class DependencyMatcher(object):
+
+    def __init__(self, ignoreDepClasses=()):
+        self.ignoreDepClasses = set()
+        for depClass in ignoreDepClasses:
+            if not isinstance(depClass, (int, long)):
+                depClass = depClass.tag
+            self.ignoreDepClasses.add(depClass)
+        self.depMap = {}
+
+    def add(self, depSet, data=None):
+        for depClassId, depName, depFlags in depSet.iterRawDeps():
+            if depClassId in self.ignoreDepClasses:
+                continue
+            depValue = (depClassId, depFlags, data)
+            values = self.depMap.get(depName)
+            if values is not None:
+                values.append(depValue)
+            else:
+                self.depMap[depName] = [depValue]
+
+    def find(self, depSet):
+        setMatches = []
+        for depClassId, depName, depFlags in depSet.iterRawDeps():
+            depMatches = []
+            for provClassId, provFlags, provData in self.depMap.get(depName, ()):
+                if provClassId != depClassId:
+                    continue
+                if provFlags == depFlags:
+                    depMatches.append(provData)
+                    continue
+                for depFlag in depFlags:
+                    assert depFlag[0] not in '~!'
+                    if depFlag not in provFlags:
+                        break
+                else:
+                    depMatches.append(provData)
+            setMatches.append(depMatches)
+        return setMatches
+
+    def check(self, depSet):
+        unsatisfied = None
+        for depClassId, depName, depFlags in depSet.iterRawDeps():
+            if depClassId in self.ignoreDepClasses:
+                continue
+            found = False
+            for provClassId, provFlags, provData in self.depMap.get(depName, ()):
+                if provClassId != depClassId:
+                    continue
+                if provFlags == depFlags:
+                    found = True
+                    break
+                for depFlag in depFlags:
+                    assert depFlag[0] not in '~!'
+                    if depFlag not in provFlags:
+                        break
+                else:
+                    found = True
+                    break
+            if not found:
+                if unsatisfied is None:
+                    unsatisfied = DependencySet()
+                depClass = dependencyClasses[depClassId]
+                dep = DependencyClass.thawRawDep(depName, depFlags)
+                unsatisfied.addDep(depClass, dep)
+        return unsatisfied
+
+    def clear(self):
+        self.depMap.clear()
 
 
 dependencyCache = weakref.WeakValueDictionary()
