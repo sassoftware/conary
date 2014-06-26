@@ -867,6 +867,32 @@ more content''')
         assert(f.read() == '\xc2\xab\n')
         f.close()
 
+    def testNormalizeManPagesTest2(self):
+        """
+        Ensure man pages with symlinks outside of manpath works.
+        """
+        recipestr = r"""
+class TestNormalizeManPages(PackageRecipe):
+    name = 'test'
+    version = '0'
+    clearBuildReqs()
+
+    def setup(r):
+        r.macros.thisdatadir = '%(datadir)s/%(name)s'
+        r.Create('%(thisdatadir)s/man/man8/test.8', contents='123')
+        r.Symlink('%(thisdatadir)s/man/man8/test.8', '%(mandir)s/man8/')
+"""
+        self.reset()
+        (built, d) = self.buildRecipe(recipestr, "TestNormalizeManPages")
+        for p in built:
+            self.updatePkg(self.workDir, p[0], p[1], depCheck=False)
+        self.failUnless(os.path.exists(os.path.join(self.workDir, 'usr/share/'
+            'test/man/man8/test.8.gz')))
+        self.failUnlessEqual(os.readlink(self.workDir + '/usr/share/man/man8/'
+            'test.8.gz'), '../../test/man/man8/test.8.gz')
+        a = magic.magic("/usr/share/test/man/man8/test.8.gz", self.workDir)
+        assert(a.contents['compression'] == '9')
+
     def getmode(self, filename):
         return os.stat(self.workDir+filename)[stat.ST_MODE]
 
@@ -895,6 +921,35 @@ class TestStuff(PackageRecipe):
         assert(os.path.exists(self.workDir + '/usr/share/man/man1/foo.1.gz'))
 
 
+class TestFixObsoletePaths(rephelp.RepositoryHelper):
+    def testFixObsoletePathsSymlinks(self):
+        """
+        Verify that a symlink from a obsolete path to the new path is valid.
+        """
+        recipestr = """
+class Test(PackageRecipe):
+    name = 'test'
+    version = '0'
+    clearBuildReqs()
+
+    def setup(r):
+        paths = [
+            ('/usr/man', '/usr/share/man'),
+            ('/usr/info', '/usr/share/info'),
+            ('/usr/doc', '/usr/share/doc'),
+        ]
+
+        for src, dest in paths:
+            r.Symlink(dest, src)
+            r.MakeDirs(dest)
+            r.ExcludeDirectories(exceptions=dest)
+"""
+        (built, d) = self.buildRecipe(recipestr, 'Test')
+        for p in built:
+            self.updatePkg(self.workDir, p[0], p[1], depCheck=False)
+        self.failUnless(os.path.exists(self.workDir + '/usr/man'))
+        self.failUnless(os.path.islink(self.workDir + '/usr/man'))
+        self.failUnlessEqual(os.readlink(self.workDir + '/usr/man'), 'share/man')
 
 class NormalizeAppDefaultsTest(rephelp.RepositoryHelper):
     def testNormalizeAppDefaultsTest1(self):

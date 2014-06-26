@@ -1358,6 +1358,8 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
                       datastore.DataStoreRepository,
                       repository.AbstractRepository):
 
+    MEMORY = ':memory:'
+
     def iterAllTroveNames(self):
         return self.db.iterAllTroveNames()
 
@@ -1613,7 +1615,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
             self._db = None
 
         # No locks associated with an in-memory database
-        if self.dbpath == ':memory:':
+        if self.dbpath == self.MEMORY:
             return
         self.commitLock(False)
 
@@ -1631,7 +1633,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     def writeAccess(self):
         assert(self.db) # when checking for write access, make sure the
                         # db has been initialized
-        return os.access(self.dbpath, os.W_OK)
+        return self.dbpath == self.MEMORY or os.access(self.dbpath, os.W_OK)
 
     def _initDb(self):
         self._db = sqldb.Database(self.dbpath, timeout = self._lockTimeout)
@@ -1650,7 +1652,7 @@ class SqlDbRepository(trovesource.SearchableTroveSource,
     db = property(_getDb)
 
     def __init__(self, path, timeout=None):
-        if path == ":memory:":
+        if path == self.MEMORY:
             self.dbpath = path
         else:
             self.dbpath = path + "/conarydb"
@@ -2203,6 +2205,7 @@ class Database(SqlDbRepository):
             opJournal = NoopJobJournal()
 
         # Gross, but we need to protect against signals for this call.
+        storeRollback = self.rollbackStack and not repair
         @sigprotect.sigprotect()
         def signalProtectedCommit():
             try:
@@ -2210,7 +2213,7 @@ class Database(SqlDbRepository):
                             opJournal, tagSet, reposRollback, localRollback,
                             rollbackPhase, fsJob, updateDatabase, callback,
                             tagScript, dbCache, autoPinList, flags, journal,
-                            directoryCandidates, storeRollback = not repair,
+                            directoryCandidates, storeRollback=storeRollback,
                             capsuleChangeSet = capsuleChangeSet)
             except Exception, e:
                 if not issubclass(e.__class__, ConaryError):
@@ -2447,7 +2450,7 @@ class Database(SqlDbRepository):
                 self.lockFileObj.close()
                 self.lockFileObj = None
         else:
-            if self.lockFile == ":memory:":
+            if self.lockFile == self.MEMORY:
                 # not sure how we can lock a :memory: database without
                 # knowing we can drop a lock file (any|some)where
                 return
@@ -2971,13 +2974,15 @@ class Database(SqlDbRepository):
 
         self.root = root
         self.modelPath = modelPath
+        self.lockFileObj = None
 
-        if path == ":memory:": # memory-only db
-            SqlDbRepository.__init__(self, ':memory:', timeout = timeout)
+        if path == self.MEMORY: # memory-only db
+            SqlDbRepository.__init__(self, path, timeout = timeout)
             # use :memory: as a marker not to bother with locking
             self.lockFile = path
             self.opJournalPath = None
             self.modelFile = None
+            self.rollbackStack = None
         else:
             conarydbPath = util.joinPaths(root, path)
             SqlDbRepository.__init__(self, conarydbPath, timeout = timeout)
@@ -2986,7 +2991,6 @@ class Database(SqlDbRepository):
             self.modelFile = modelFile
 
             self.lockFile = top + "/syslock"
-            self.lockFileObj = None
             self.rollbackCache = top + "/rollbacks"
             self.rollbackStatus = self.rollbackCache + "/status"
             try:

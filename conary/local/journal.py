@@ -140,8 +140,7 @@ class JobJournal(NoopJobJournal):
         s.old.set(origName[self.rootLen:])
         s.new.set(newName[self.rootLen:])
         frz = s.freeze()
-        os.write(self.fd, frz)
-        os.write(self.fd, struct.pack("!BH", kind, len(frz)))
+        os.write(self.fd, frz + struct.pack("!BH", kind, len(frz)))
 
     def _backup(self, origName, newName, statBuf, kind = JOURNAL_ENTRY_BACKUP):
         assert(not self.immutable)
@@ -155,8 +154,7 @@ class JobJournal(NoopJobJournal):
         s.inode.perms.set(statBuf.st_mode & 07777)
 
         frz = s.freeze()
-        os.write(self.fd, frz)
-        os.write(self.fd, struct.pack("!BH", kind, len(frz)))
+        os.write(self.fd, frz + struct.pack("!BH", kind, len(frz)))
 
     def _backdir(self, name, statBuf):
         self._backup("", name, statBuf, kind = JOURNAL_ENTRY_BACKDIR)

@@ -474,6 +474,9 @@ class BaseProxy(xmlshims.NetworkConvertors):
         newParts[3:] = oldParts[3:]
         return urlparse.urlunparse(newParts)
 
+    def pokeCounter(self, name, delta):
+        pass
+
 
 class ChangeSetInfo(object):
 
@@ -739,6 +742,12 @@ class ChangesetFilter(BaseProxy):
                             caller, chgSetList, recurse, withFiles,
                             withFileContents, excludeAutoSource, mirrorMode)
 
+    def getChangeSetFingerprints(self, caller, authToken, clientVersion,
+            chgSetList, recurse, withFiles, withFileContents,
+            excludeAutoSource, mirrorMode=False):
+        return self.lookupFingerprints(caller, authToken, chgSetList, recurse,
+                withFiles, withFileContents, excludeAutoSource, mirrorMode)
+
     def _callGetChangeSet(self, caller, changeSetList, getCsVersion,
                 wireCsVersion, neededCsVersion, neededFiles, recurse,
                 withFiles, withFileContents, excludeAutoSource, mirrorMode,
@@ -867,6 +876,8 @@ class ChangesetFilter(BaseProxy):
             [ x for x in
                     enumerate(itertools.izip(chgSetList, fingerprints))
                     if changeSetList[x[0]] is None ]
+        self.pokeCounter('cscache_misses', len(changeSetsNeeded))
+        self.pokeCounter('cscache_hits', len(chgSetList) - len(changeSetsNeeded))
 
         # If proxying for a repository, self.csCache is None, so
         # changeSetsNeeded is equivalent to chgSetList
@@ -1561,6 +1572,13 @@ class Memcache(object):
                                             nTroveList),
                 troveList, infoType,
                 key_prefix = "TROVEINFO")
+
+    def pokeCounter(self, name, delta):
+        if self.memCachePrefix:
+            name = self.memCachePrefix + ':' + name
+        if not self.memCache.incr(name, delta):
+            self.memCache.set(name, str(delta))
+
 
 class SimpleRepositoryFilter(Memcache, BaseCachingChangesetFilter, RepositoryFilterMixin):
     withCapsuleInjection = False

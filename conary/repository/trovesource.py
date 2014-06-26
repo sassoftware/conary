@@ -1530,25 +1530,28 @@ class SourceStack(object):
 
     def hasTroves(self, troveList):
         results = [False] * len(troveList)
-
         troveList = list(enumerate(troveList))
-
         for source in self.sources:
-            newTroveList = []
             try:
-                hasTroves = source.hasTroves(
-                    [ info for (i, info) in troveList if not(results[i]) ] )
+                hasTroves = source.hasTroves([x[1] for x in troveList])
             except errors.OpenError:
-                hasTroves = [ False] * len(troveList)
+                continue
+            newTroveList = []
             if isinstance(hasTroves, list):
-                hasTroves = dict(itertools.izip([x[1] for x in troveList],
-                                                hasTroves))
-
-            for (index, troveTup) in troveList:
-                if not hasTroves.get(troveTup, False):
-                    newTroveList.append((index, troveTup))
-                else:
-                    results[index] = True
+                for (index, troveTup), hasTrove in zip(troveList, hasTroves):
+                    if hasTrove:
+                        results[index] = True
+                    else:
+                        newTroveList.append((index, troveTup))
+            else:
+                for (index, troveTup) in troveList:
+                    if hasTroves.get(troveTup):
+                        results[index] = True
+                    else:
+                        newTroveList.append((index, troveTup))
+            troveList = newTroveList
+            if not troveList:
+                break
         return results
 
     def iterSources(self):

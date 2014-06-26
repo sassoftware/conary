@@ -145,13 +145,25 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
 }
 
 
-/* sha1Uncompress - Decompress a stream from a file descriptor to a new file
- * and simultaneously compute a SHA-1 digest of the decompressed contents.
+/* sha1Uncompress - Decompress a stream from a file descriptor to a new
+ * temporary file and simultaneously compute a SHA-1 digest of the decompressed
+ * contents.
+ *
+ * @param inFd: Numeric file descriptor to read from
+ * @param inAt: Starting byte offset within input file
+ * @param inSize: Number of bytes from input file to read
+ * @param path: Destination directory to write to
+ * @param baseName: Basename of destination file, used to generate a temporary
+ *                  filename
+ * @return: Tuple (sha1, tmpname) where sha1 is a raw SHA-1 digest of the
+ *  uncompressed contents and tmpname is the full path to the temporary file
+ *  to which it was written.
  */
-static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
+static PyObject *
+sha1Uncompress(PyObject *module, PyObject *args) {
     int inFd, outFd = -1, rc, inflate_rc;
     off_t inStop, inAt, inSize, inStart, to_read, to_write;
-    PyObject *pyInStart, *pyInSize;
+    PyObject *pyInStart, *pyInSize, *retSha = NULL, *retPath = NULL;
     z_stream zs;
     uint8_t inBuf[1024 * 256];
     uint8_t outBuf[1024 * 256];
@@ -159,12 +171,12 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
     SHA_CTX sha1state;
     uint8_t sha1[20];
     char * path, * baseName;
-    struct stat sb;
-    char * tmpPath = NULL, * targetPath;
+    char * tmpPath = NULL;
 
-    if (!PyArg_ParseTuple(args, "(iOO)sss", &inFd, &pyInStart, &pyInSize,
-			  &path, &baseName, &targetPath))
+    if (!PyArg_ParseTuple(args, "iOOss",
+                &inFd, &pyInStart, &pyInSize, &path, &baseName)) {
         goto onerror;
+    }
 
     if (!PYINT_CHECK_EITHER(pyInStart)) {
         PyErr_SetString(PyExc_TypeError, "second item in first argument must be an int or long");
@@ -251,37 +263,30 @@ static PyObject * sha1Uncompress(PyObject *module, PyObject *args) {
         goto onerror;
     }
 
-    SHA1_Final(sha1, &sha1state);
-
     if (close(outFd)) {
         PyErr_SetFromErrno(PyExc_OSError);
         goto onerror;
     }
     outFd = -1;
 
-    rc = lstat(targetPath, &sb);
-    if (rc && (errno != ENOENT && errno != ELOOP)) {
-        PyErr_SetFromErrno(PyExc_OSError);
-        goto onerror;
-    } else if (!rc && S_ISDIR(sb.st_mode)) {
-        if (rmdir(targetPath)) {
-            PyErr_SetFromErrno(PyExc_OSError);
-            goto onerror;
-        }
-    }
-
-    if (rename(tmpPath, targetPath)) {
-        PyErr_SetFromErrno(PyExc_OSError);
+    SHA1_Final(sha1, &sha1state);
+    retSha = PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
+    if (retSha == NULL) {
         goto onerror;
     }
-
-    return PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
+    retPath = PYBYTES_FromString(tmpPath);
+    if (retPath == NULL) {
+        goto onerror;
+    }
+    return PyTuple_Pack(2, retSha, retPath);
 
 onerror:
     if (outFd != -1)
         close(outFd);
     if (tmpPath != NULL)
         unlink(tmpPath);
+    Py_XDECREF(retSha);
+    Py_XDECREF(retPath);
     return NULL;
 }
 
