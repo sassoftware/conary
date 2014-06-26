@@ -1,0 +1,5 @@
+make = 'gmake'
+strip = 'gstrip'
+strip_archive = 'gstrip -g'
+cflags = cflags + ' -fPIC'
+tar = 'gtar'
