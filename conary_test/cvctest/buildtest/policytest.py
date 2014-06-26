@@ -29,6 +29,7 @@ class DummyRecipe(recipe.Recipe):
     def __init__(self, cfg):
         recipe.Recipe.__init__(self, cfg)
         self.macros = macros.Macros()
+        self.macros.update(recipe.loadMacros(cfg.defaultMacros))
         self.theMainDir = 'dummy-1.0'
         self.macros.builddir = tempfile.mkdtemp()
         self.macros.destdir = tempfile.mkdtemp()

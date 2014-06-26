@@ -817,9 +817,10 @@ class addArchive(_Source):
                 preserve = ''
                 if self.dir.startswith('/'):
                     preserve = 'p'
-                _unpack = "tar -C '%s' -xvvS%sf -" % (destDir, preserve)
+                _unpack = ("%(tar)s -C '%%s' -xvvS%%sf -"
+                        % self.recipe.macros % (destDir, preserve))
                 ownerParser = self._tarOwners
-                actionPathBuildRequires.append('tar')
+                actionPathBuildRequires.append(self.recipe.macros.tar)
             elif True in [f.endswith(x) for x in _cpioSuffix]:
                 _unpack = "( cd '%s' && cpio -iumd --quiet )" % (destDir,)
                 ownerListCmd = "cpio -tv --quiet"
@@ -831,7 +832,8 @@ class addArchive(_Source):
                 # TODO: do something smarter about the contents of the
                 # archive
                 # Note: .deb handling currently depends on this default
-                _unpack = "tar -C '%s' -xvvSpf -" % (destDir,)
+                _unpack = (("%(tar)s -C '%%s' -xvvSpf -" % self.recipe.macros)
+                        % (destDir,))
                 ownerParser = self._tarOwners
                 actionPathBuildRequires.append('tar')
             else:
@@ -2283,8 +2285,8 @@ class addCvsSnapshot(_RevisionControl):
         stagePath = tmpPath + os.path.sep + dirName
         # don't use cvs export -d <dir> as it is fragile
         util.mkdirChain(stagePath)
-        util.execute("cd %s && cvs -Q -d '%s' export -r '%s' '%s' && cd '%s/%s' && "
-                  "tar cjf '%s' '%s'" %
+        util.execute(("cd %%s && cvs -Q -d '%%s' export -r '%%s' '%%s' && cd '%%s/%%s' && "
+                  "%(tar)s cjf '%%s' '%%s'" % self.recipe.macros) % 
                         (stagePath, self.root, self.tag, self.project,
                          tmpPath, dirName, target, self.project))
         shutil.rmtree(tmpPath)
@@ -2378,8 +2380,8 @@ class addSvnSnapshot(_RevisionControl):
         tmpPath = tempfile.mkdtemp()
         stagePath = tmpPath + '/' + self.project + '--' + \
                             self.url.split('/')[-1]
-        util.execute("svn --quiet export --revision '%s' '%s' '%s' && cd '%s' && "
-                  "tar cjf '%s' '%s'" %
+        util.execute(("svn --quiet export --revision '%%s' '%%s' '%%s' && cd "
+                  "'%%s' && %(tar)s cjf '%%s' '%%s'" % self.recipe.macros) %
                         (self.revision, lookasideDir, stagePath,
                          tmpPath, target, os.path.basename(stagePath)))
         shutil.rmtree(tmpPath)

@@ -118,3 +118,6 @@ buildcxx            = '%(cxx)s'
 
 # the following dummy value is for testing macro overrides
 dummyMacro      = 'wrong'
+
+make                = 'make'
+tar                 = 'tar'
