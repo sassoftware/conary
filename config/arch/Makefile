@@ -24,7 +24,8 @@ arch_files =	alpha	\
 		sparc	\
 		sparc64	\
 		x86	\
-		x86_64
+		x86_64 \
+		i86pc
 
 dist_files = Makefile $(arch_files)
 
