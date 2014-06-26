@@ -837,8 +837,8 @@ class Make(BuildCommand):
             If True, skip the action if dir does not exist.
         @keyword dir: The directory to enter before running C{make}
         """
-        if not 'makeName' in keywords and 'makeName' in recipe.macros:
-            keywords['makeName'] = recipe.macros.makeName
+        if not 'makeName' in keywords and 'make' in recipe.macros:
+            keywords['makeName'] = recipe.macros.make
         BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
             for i in (';', '&&', '||'):

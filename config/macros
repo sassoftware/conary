@@ -69,6 +69,7 @@ strip               = 'eu-strip' # eu-strip for debuginfo, "strip -g" else
 strip_archive       = 'strip -g' # eu-strip segfaults on ar
 monodis             = '%(bindir)s/monodis' # tool to determine mono dependencies
 ruby                = '%(bindir)s/ruby'
+make                = 'make'
 
 # reference macros filled in from the recipe
 archive_name       = '%(name)s'
