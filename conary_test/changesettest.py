@@ -19,6 +19,7 @@ import os
 import tempfile
 
 from conary_test import rephelp
+import conary_test
 import StringIO
 
 from conary import errors
@@ -31,7 +32,7 @@ class ChangeSetTest(rephelp.RepositoryHelper):
     def testCreateChangeSet(self):
         self.addQuickTestComponent('test:runtime', '1.0-1-1')
         self.addQuickTestCollection('test', '1.0-1-1', ['test:runtime'])
-        self.addQuickTestCollection('group-test', '1.0-1-1', 
+        self.addQuickTestCollection('group-test', '1.0-1-1',
                                     # byDefault = False
                                     [('test', None, None, False)])
         repos = self.openRepository()
@@ -196,7 +197,7 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         # pathid and fileid. One is a diff and the other is not.  This should
         # be ok the diff will be used.
         cs1 = changeset.ChangeSet()
-        cs1.addFileContents('0' * 16, '0' * 20, 
+        cs1.addFileContents('0' * 16, '0' * 20,
                             changeset.ChangedFileTypes.diff,
                             filecontents.FromString('some diff'),
                             cfgFile = True)
@@ -209,7 +210,7 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         # pathid and fileid. Both are identical diffs.  This should
         # be ok the diff will be used.
         cs1 = changeset.ChangeSet()
-        cs1.addFileContents('0' * 16, '0' * 20, 
+        cs1.addFileContents('0' * 16, '0' * 20,
                             changeset.ChangedFileTypes.diff,
                             filecontents.FromString('the diff'),
                             cfgFile = True)
@@ -224,7 +225,7 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         try:
             changeset.ChangeSetFromFile(csPath)
         except errors.ConaryError, e:
-            assert(str(e) == 'File %s is not a valid conary changeset.' % 
+            assert(str(e) == 'File %s is not a valid conary changeset.' %
                         csPath)
 
     def testCreateChangeSetInvalidFile(self):
@@ -236,7 +237,7 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         o  = self.addComponent('other:runtime', '1.0-1-1',
                                fileContents = [ ("/etc/one", "something") ] )
 
-        jobList = [ 
+        jobList = [
             (o.getName(), (None, None), (o.getVersion(), o.getFlavor()),
                           False),
             (t1.getName(), (None, None), (t1.getVersion(), t1.getFlavor()),
@@ -250,7 +251,7 @@ class ChangeSetTest(rephelp.RepositoryHelper):
         bad_paths = [rofile, '/tmp']
 
         repos = self.openRepository()
-        
+
         for path in bad_paths:
             self.assertRaises(errors.FilesystemError,
                 repos.createChangeSetFile, jobList, path)
@@ -465,3 +466,273 @@ class ChangeSetTest(rephelp.RepositoryHelper):
             "literal 1\n"
             "Ic${kh004mifdBvi\n"
             "\n")
+
+        cs = repos.createChangeSet([ ('foo:run',  t5.getNameVersionFlavor()[1:],
+                                      (None, None), False) ])
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/etc/config b/etc/config\n"
+            "deleted file mode 100644\n"
+            "Binary files /etc/config and /dev/null differ\n"
+            "diff --git a/pipe b/pipe\n"
+            "deleted file mode 10755\n"
+            "Binary files /pipe and /dev/null differ\n")
+
+    def testGitDiffCollectionRegularFile(self):
+        self.addComponent('foo:run=1', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/etc/config', 'config contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:run=2', fileContents=[
+            ('/etc/config', 'config contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:walk=2', fileContents=[
+            ('/text', 'new contents\n'),
+            ])
+
+        self.addComponent('foo:run=3', fileContents=[
+            ('/etc/config', 'config contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:walk=3', fileContents=[
+            ('/text', 'different contents\n'),
+            ])
+
+        foo1 = self.addCollection('foo', '1', [':run=1'])
+        foo2 = self.addCollection('foo', '2', [':run=2', ':walk=2'])
+        foo3 = self.addCollection('foo', '3', [':run=3', ':walk=3'])
+
+        repos = self.openRepository()
+        cs = repos.createChangeSet([('foo', foo1.getNameVersionFlavor()[1:],
+            foo2.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/text b/text\n"
+            "deleted file mode 100644\n"
+            "Binary files /text and /dev/null differ\n"
+            "diff --git a/text b/text\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "--- a/dev/null\n"
+            "+++ b/text\n"
+            "@@ -1,0 +1,1 @@\n"
+            "+new contents\n")
+
+        cs = repos.createChangeSet([('foo', foo2.getNameVersionFlavor()[1:],
+            foo1.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/text b/text\n"
+            "deleted file mode 100644\n"
+            "Binary files /text and /dev/null differ\n"
+            "diff --git a/text b/text\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "--- a/dev/null\n"
+            "+++ b/text\n"
+            "@@ -1,0 +1,1 @@\n"
+            "+new contents\n")
+
+        cs = repos.createChangeSet([('foo', foo1.getNameVersionFlavor()[1:],
+            foo3.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/text b/text\n"
+            "deleted file mode 100644\n"
+            "Binary files /text and /dev/null differ\n"
+            "diff --git a/text b/text\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "--- a/dev/null\n"
+            "+++ b/text\n"
+            "@@ -1,0 +1,1 @@\n"
+            "+different contents\n")
+
+    def testGitDiffCollectionConfigFile(self):
+        self.addComponent('foo:run=1', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/etc/config', 'config contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:run=2', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:walk=2', fileContents=[
+            ('/etc/config', 'config contents\n'),
+            ])
+
+        self.addComponent('foo:run=3', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:walk=3', fileContents=[
+            ('/etc/config', 'different config contents\n'),
+            ])
+
+        foo1 = self.addCollection('foo', '1', [':run=1'])
+        foo2 = self.addCollection('foo', '2', [':run=2', ':walk=2'])
+        foo3 = self.addCollection('foo', '3', [':run=3', ':walk=3'])
+
+        repos = self.openRepository()
+        cs = repos.createChangeSet([('foo', foo1.getNameVersionFlavor()[1:],
+            foo2.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/etc/config b/etc/config\n"
+            "deleted file mode 100644\n"
+            "Binary files /etc/config and /dev/null differ\n"
+            "diff --git a/etc/config b/etc/config\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "--- a/dev/null\n"
+            "+++ b/etc/config\n"
+            "@@ -1,0 +1,1 @@\n"
+            "+config contents\n")
+
+        cs = repos.createChangeSet([('foo', foo2.getNameVersionFlavor()[1:],
+            foo1.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/etc/config b/etc/config\n"
+            "deleted file mode 100644\n"
+            "Binary files /etc/config and /dev/null differ\n"
+            "diff --git a/etc/config b/etc/config\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "--- a/dev/null\n"
+            "+++ b/etc/config\n"
+            "@@ -1,0 +1,1 @@\n"
+            "+config contents\n")
+
+        cs = repos.createChangeSet([('foo', foo1.getNameVersionFlavor()[1:],
+            foo3.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/etc/config b/etc/config\n"
+            "deleted file mode 100644\n"
+            "Binary files /etc/config and /dev/null differ\n"
+            "diff --git a/etc/config b/etc/config\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "--- a/dev/null\n"
+            "+++ b/etc/config\n"
+            "@@ -1,0 +1,1 @@\n"
+            "+different config contents\n")
+
+    def testGitDiffCollectionBinaryFile(self):
+        self.addComponent('foo:run=1', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/etc/config', 'config contents\n'),
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:run=2', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/etc/config', 'config contents\n'),
+            ])
+
+        self.addComponent('foo:walk=2', fileContents=[
+            ('/binary', '\x80'),
+            ])
+
+        self.addComponent('foo:run=3', fileContents=[
+            ('/text', 'new contents\n'),
+            ('/etc/config', 'config contents\n'),
+            ])
+
+        self.addComponent('foo:walk=3', fileContents=[
+            ('/binary', '\x81'),
+            ])
+
+        foo1 = self.addCollection('foo', '1', [':run=1'])
+        foo2 = self.addCollection('foo', '2', [':run=2', ':walk=2'])
+        foo3 = self.addCollection('foo', '3', [':run=3', ':walk=3'])
+
+        repos = self.openRepository()
+        cs = repos.createChangeSet([('foo', foo1.getNameVersionFlavor()[1:],
+            foo2.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/binary b/binary\n"
+            "deleted file mode 100644\n"
+            "Binary files /binary and /dev/null differ\n"
+            "diff --git a/binary b/binary\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "GIT binary patch\n"
+            "literal 1\n"
+            "Ic${kh004mifdBvi\n"
+            "\n")
+
+        cs = repos.createChangeSet([('foo', foo2.getNameVersionFlavor()[1:],
+            foo1.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/binary b/binary\n"
+            "deleted file mode 100644\n"
+            "Binary files /binary and /dev/null differ\n"
+            "diff --git a/binary b/binary\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "GIT binary patch\n"
+            "literal 1\n"
+            "Ic${kh004mifdBvi\n"
+            "\n")
+
+        cs = repos.createChangeSet([('foo', foo1.getNameVersionFlavor()[1:],
+            foo3.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/binary b/binary\n"
+            "deleted file mode 100644\n"
+            "Binary files /binary and /dev/null differ\n"
+            "diff --git a/binary b/binary\n"
+            "new user root\n"
+            "new group root\n"
+            "new mode 100644\n"
+            "GIT binary patch\n"
+            "literal 1\n"
+            "Ic${kl004pjf&c&j\n"
+            "\n")
+
+    @conary_test.rpm
+    def testGitDiffEnacapsulated(self):
+        rpm1 = self.addRPMComponent("simple:rpm=1.0", 'simple-1.0-1.i386.rpm')
+        rpm2 = self.addRPMComponent("simple:rpm=1.1", 'simple-1.1-1.i386.rpm')
+
+        repos = self.openRepository()
+        cs = repos.createChangeSet([('simple:rpm',
+                rpm1.getNameVersionFlavor()[1:],
+                rpm2.getNameVersionFlavor()[1:], False)])
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/normal b/normal\n"
+            "Encapsulated files differ\n"
+            "diff --git a/config b/config\n"
+            "Encapsulated files differ\n")

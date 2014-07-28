@@ -974,6 +974,43 @@ class ChangeSet(streams.StreamSet):
 
         return False
 
+    def _makeFileGitDiffCapsule(self, troveSource, pathId,
+                         (oldPath, oldFileId, oldFileVersion, oldFileObj),
+                         (newPath, newFileId, newFileObj), diffBinaries):
+        if pathId == trove.CAPSULE_PATHID:
+            return
+
+        if oldFileId == newFileId:
+            return
+
+        if not oldFileObj:
+            yield "diff --git a%s b%s\n" % (newPath, newPath)
+            yield "new user %s\n" % newFileObj.inode.owner()
+            yield "new group %s\n" % newFileObj.inode.group()
+            yield "new mode %o\n" % (newFileObj.statType |
+                                     newFileObj.inode.perms())
+        else:
+            yield "diff --git a%s b%s\n" % (oldPath, newPath)
+            if oldFileObj.inode.perms() != newFileObj.inode.perms():
+                yield "old mode %o\n" % (oldFileObj.statType |
+                                         oldFileObj.inode.perms())
+                yield "new mode %o\n" % (newFileObj.statType |
+                                         newFileObj.inode.perms())
+            if oldFileObj.inode.owner() != newFileObj.inode.owner():
+                yield "old user %s\n" % oldFileObj.inode.owner()
+                yield "new user %s\n" % newFileObj.inode.owner()
+
+            if oldFileObj.inode.group() != newFileObj.inode.group():
+                yield "old group %s\n" % oldFileObj.inode.group()
+                yield "new group %s\n" % newFileObj.inode.group()
+
+        if not newFileObj.hasContents:
+            return
+        elif (oldFileObj and oldFileObj.hasContents and
+              oldFileObj.contents.sha1() == newFileObj.contents.sha1()):
+            return
+        yield "Encapsulated files differ\n"
+
     def _makeFileGitDiff(self, troveSource, pathId,
                          (oldPath, oldFileId, oldFileVersion, oldFileObj),
                          (newPath, newFileId, newFileObj),
@@ -1090,27 +1127,32 @@ class ChangeSet(streams.StreamSet):
         # get the old file objects we need
         filesNeeded = []
         for job in jobs:
-            trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
             if job[1][0] is not None:
                 oldTrv = oldTroves.pop(0)
             else:
                 trv = None
 
-            # look at the changed files and get a list of file objects
-            # we need to have available
-            for (pathId, path, fileId, fileVersion) in \
-                                        trvCs.getChangedFileList():
-                oldPath = oldTrv.getFile(pathId)[0]
-                if fileVersion:
-                   filesNeeded.append((pathId, ) +
-                                       oldTrv.getFile(pathId)[1:3] +
-                                       (oldPath, ))
+            if self.hasNewTrove(job[0], job[2][0], job[2][1]):
+                trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
 
-            for pathId in trvCs.getOldFileList():
-                oldPath = oldTrv.getFile(pathId)[0]
-                filesNeeded.append((pathId, ) +
-                                   oldTrv.getFile(pathId)[1:3] +
-                                   (oldPath, ))
+                # look at the changed files and get a list of file objects
+                # we need to have available
+                for (pathId, path, fileId, fileVersion) in \
+                                            trvCs.getChangedFileList():
+                    oldPath = oldTrv.getFile(pathId)[0]
+                    if fileVersion:
+                        filesNeeded.append((pathId, ) +
+                                        oldTrv.getFile(pathId)[1:3] +
+                                        (oldPath, ))
+
+                for pathId in trvCs.getOldFileList():
+                    oldPath = oldTrv.getFile(pathId)[0]
+                    filesNeeded.append((pathId, ) +
+                                    oldTrv.getFile(pathId)[1:3] +
+                                    (oldPath, ))
+            else:
+                filesNeeded.extend((pathId, fileId, version, path)
+                    for pathId, path, fileId, version in oldTrv.iterFileList())
 
         fileObjects = troveSource.getFileVersions(
                             [ x[0:3] for x in filesNeeded ])
@@ -1120,57 +1162,83 @@ class ChangeSet(streams.StreamSet):
         configList = []
         normalList = []
         removeList = []
+        encapsulatedList = []
         for job in jobs:
-            trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
-            for (pathId, path, fileId, fileVersion) in \
-                                        trvCs.getNewFileList():
-                fileStream = self.getFileChange(None, fileId)
-                if files.frozenFileFlags(fileStream).isConfig():
-                    configList.append((pathId, fileId,
-                                      (None, None, None, None),
-                                      (path, fileId, fileStream)))
-                else:
-                    normalList.append((pathId, fileId,
-                                      (None, None, None, None),
-                                      (path, fileId, fileStream)))
+            if self.hasNewTrove(job[0], job[2][0], job[2][1]):
+                trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
+                for (pathId, path, fileId, fileVersion) in \
+                                            trvCs.getNewFileList():
+                    fileStream = self.getFileChange(None, fileId)
+                    if trvCs.hasCapsule():
+                        encapsulatedList.append((pathId, fileId,
+                            (None, None, None, None),
+                            (path, fileId, fileStream)))
+                    elif files.frozenFileFlags(fileStream).isConfig():
+                        configList.append((pathId, fileId,
+                                        (None, None, None, None),
+                                        (path, fileId, fileStream)))
+                    else:
+                        normalList.append((pathId, fileId,
+                                        (None, None, None, None),
+                                        (path, fileId, fileStream)))
 
-            for (pathId, path, fileId, fileVersion) in \
-                                        trvCs.getChangedFileList():
-                oldFileObj = fileObjects.pop(0)
-                fileObj = oldFileObj.copy()
-                oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
-                fileObj.twm(self.getFileChange(oldFileId, fileId), fileObj)
+                for (pathId, path, fileId, fileVersion) in \
+                                            trvCs.getChangedFileList():
+                    oldFileObj = fileObjects.pop(0)
+                    fileObj = oldFileObj.copy()
+                    oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
+                    fileObj.twm(self.getFileChange(oldFileId, fileId), fileObj)
 
-                if path is None:
-                    path = oldPath
+                    if path is None:
+                        path = oldPath
 
-                if fileObj.flags.isConfig():
-                    configList.append((pathId, fileId,
-                                      (oldPath, oldFileId, oldFileVersion,
-                                       oldFileObj),
-                                      (path, fileId, fileObj.freeze())))
-                else:
-                    normalList.append((pathId, fileId,
-                                      (oldPath, oldFileId, oldFileVersion,
-                                       oldFileObj),
-                                      (path, fileId, fileObj.freeze())))
+                    if trvCs.hasCapsule():
+                        encapsulatedList.append((pathId, fileId,
+                            (oldPath, oldFileId, oldFileVersion, oldFileObj),
+                            (path, fileId, fileObj.freeze())))
+                    elif fileObj.flags.isConfig():
+                        configList.append((pathId, fileId,
+                                        (oldPath, oldFileId, oldFileVersion,
+                                        oldFileObj),
+                                        (path, fileId, fileObj.freeze())))
+                    else:
+                        normalList.append((pathId, fileId,
+                                        (oldPath, oldFileId, oldFileVersion,
+                                        oldFileObj),
+                                        (path, fileId, fileObj.freeze())))
 
-            for pathId in trvCs.getOldFileList():
-                oldFileObj = fileObjects.pop(0)
-                oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
-                yield "diff --git a%s b%s\n" % (oldPath, oldPath)
-                yield "deleted file mode %o\n" % (oldFileObj.statType |
-                                                  oldFileObj.inode.perms())
-                yield "Binary files %s and /dev/null differ\n" % oldPath
+                for pathId in trvCs.getOldFileList():
+                    oldFileObj = fileObjects.pop(0)
+                    oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
+                    removeList.append((oldPath, oldFileObj))
+            else:
+                for (pathId, fileId, version, path), fileObj in \
+                        itertools.izip(filesNeeded, fileObjects):
+                    removeList.append((path, fileObj))
+
+        for path, fileObj in removeList:
+            yield "diff --git a%s b%s\n" % (path, path)
+            yield "deleted file mode %o\n" % (fileObj.statType |
+                                              fileObj.inode.perms())
+            yield "Binary files %s and /dev/null differ\n" % path
 
         configList.sort()
         normalList.sort()
+        encapsulatedList.sort()
 
         for (pathId, fileId, oldInfo, newInfo) in \
-                        itertools.chain(configList, normalList):
+                itertools.chain(configList, normalList):
+            if pathId == trove.CAPSULE_PATHID:
+                import epdb; epdb.st()
             newInfo = newInfo[0:2] + (files.ThawFile(newInfo[2], pathId),)
             for x in self._makeFileGitDiff(troveSource, pathId,
                         oldInfo, newInfo, diffBinaries):
+                yield x
+
+        for (pathId, fileId, oldInfo, newInfo) in encapsulatedList:
+            newInfo = newInfo[0:2] + (files.ThawFile(newInfo[2], pathId),)
+            for x in self._makeFileGitDiffCapsule(troveSource, pathId,
+                    oldInfo, newInfo, diffBinaries):
                 yield x
 
 
