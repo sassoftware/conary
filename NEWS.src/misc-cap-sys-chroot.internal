@@ -1,0 +1,4 @@
+When running the test suite, if the python executable being used
+does not have cap_sys_chroot, skip the capsule tests that require
+cap_sys_chroot and print a message documenting how to enable
+those tests.

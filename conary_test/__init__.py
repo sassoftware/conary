@@ -14,8 +14,29 @@
 # limitations under the License.
 #
 
+import ctypes
+import os
 
 from testrunner import testhelp
+
+class ChrootError(Exception):
+    pass
+
+# singleton
+chrootCapability = None
+def requireChroot():
+    global chrootCapability
+    if chrootCapability is None:
+        libcap = ctypes.cdll.LoadLibrary('libcap.so.2')
+        libcap.cap_to_text.restype = ctypes.c_char_p
+        cap = libcap.cap_to_text(libcap.cap_get_pid(os.getpid()), None)
+        chrootCapability = 'cap_sys_chroot' in cap
+        libcap.cap_free(cap)
+
+    if chrootCapability is False:
+        raise ChrootError
+
+    return
 
 
 def rpm(func):
@@ -25,8 +46,11 @@ def rpm(func):
     def run(*args, **kwargs):
         try:
             __import__('rpm')
+            requireChroot()
         except ImportError:
             raise testhelp.SkipTestException('RPM module not present')
+        except ChrootError:
+            raise testhelp.SkipTestException('"sudo setcap cap_sys_chroot=ep /usr/bin/python" to run RPM module tests')
         else:
             return func(*args, **kwargs)
 
