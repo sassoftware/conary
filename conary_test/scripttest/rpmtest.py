@@ -19,6 +19,7 @@ from testrunner import testhelp
 from testrunner.decorators import requireBinary
 from testutils import mock
 
+import conary_test
 import gzip
 import os
 import tempfile
@@ -167,11 +168,8 @@ class RpmTest(unittest.TestCase):
                       'PartialHardlinkSets', 'VersionedDependencies' ]:
             assert(('rpmlib: %s\n' % flag) in dsStr)
 
+    @conary_test.rpm
     def testTestSuiteRpmLockOverride(self):
-        try:
-            import rpm
-        except ImportError:
-            raise testhelp.SkipTestException('rpm python module not installed')
 
         class simpleCallback:
             def __init__(self):
