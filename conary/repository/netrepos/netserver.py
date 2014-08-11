@@ -1904,6 +1904,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 break
             else: # all went well
                 util.removeIfExists(path)
+                util.removeIfExists(statusPath)
                 return ret
         # we only reach here if we could not handle the exception above
         util.removeIfExists(path)
