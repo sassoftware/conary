@@ -1004,16 +1004,16 @@ class UserGroupIdCache:
         self.idCache[theId] = name
         return name
 
-    def __init__(self, name, nameLookupFn, idLookupFn):
+    def __init__(self, name, nameLookupFn, idLookupFn, seed='root'):
         self.nameLookupFn = nameLookupFn
         self.idLookupFn = idLookupFn
         self.name = name
-        self.nameCache = { 'root' : 0 }
-        self.idCache = { 0 : 'root' }
+        self.nameCache = { seed : 0 }
+        self.idCache = { 0 : seed }
         # Make sure that the resolver is initialized outside the chroot
         # (if any) so that the correct configuration and libraries are
         # loaded. (CNY-1515)
-        nameLookupFn('root')
+        nameLookupFn(seed)
 
 class Sha1Exception(Exception):
 
@@ -1023,5 +1023,7 @@ class Sha1Exception(Exception):
     def __init__(self, path):
         self.path = path
 
-userCache = UserGroupIdCache('user', pwd.getpwnam, pwd.getpwuid)
-groupCache = UserGroupIdCache('group', grp.getgrnam, grp.getgrgid)
+userCache = UserGroupIdCache('user', pwd.getpwnam, pwd.getpwuid,
+        seed=pwd.getpwuid(0).pw_name)
+groupCache = UserGroupIdCache('group', grp.getgrnam, grp.getgrgid,
+        seed=grp.getgrgid(0).gr_name)
