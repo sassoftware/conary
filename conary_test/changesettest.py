@@ -736,3 +736,22 @@ class ChangeSetTest(rephelp.RepositoryHelper):
             "Encapsulated files differ\n"
             "diff --git a/config b/config\n"
             "Encapsulated files differ\n")
+
+    def testGitDiffFileToDirectory(self):
+        foo1 = self.addComponent('foo:run=1', fileContents=[
+            ("/path.d", "contents\n"),
+            ])
+
+        foo2 = self.addComponent('foo:run=2', fileContents=[
+            ("/path.d", rephelp.Directory()),
+            ])
+
+        repos = self.openRepository()
+        cs = repos.createChangeSet([('foo:run', foo1.getNameVersionFlavor()[1:],
+            foo2.getNameVersionFlavor()[1:], False)])
+
+        diff = "".join(x for x in cs.gitDiff(repos))
+        self.assertEqual(diff,
+            "diff --git a/path.d b/path.d\n"
+            "old mode 100644\n"
+            "new mode 40755\n")

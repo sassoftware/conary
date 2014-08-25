@@ -1082,11 +1082,13 @@ class ChangeSet(streams.StreamSet):
                         contents.decode('utf-8')
                     except:
                         isConfig = False
+            elif isConfig:
+                oldContents = None
 
             if isConfig:
                 yield "--- a%s\n" % oldPath
                 yield "+++ b%s\n" % newPath
-                if oldFileId:
+                if oldFileId and oldContents:
                     unified = fixeddifflib.unified_diff(
                                  oldContents.get().readlines(),
                                  newContents.get().readlines())
@@ -1130,7 +1132,7 @@ class ChangeSet(streams.StreamSet):
             if job[1][0] is not None:
                 oldTrv = oldTroves.pop(0)
             else:
-                trv = None
+                oldTrv = None
 
             if self.hasNewTrove(job[0], job[2][0], job[2][1]):
                 trvCs = self.getNewTroveVersion(job[0], job[2][0], job[2][1])
@@ -1141,9 +1143,8 @@ class ChangeSet(streams.StreamSet):
                                             trvCs.getChangedFileList():
                     oldPath = oldTrv.getFile(pathId)[0]
                     if fileVersion:
-                        filesNeeded.append((pathId, ) +
-                                        oldTrv.getFile(pathId)[1:3] +
-                                        (oldPath, ))
+                        filesNeeded.append(
+                            (pathId, ) + oldTrv.getFile(pathId)[1:3] + (oldPath, ))
 
                 for pathId in trvCs.getOldFileList():
                     oldPath = oldTrv.getFile(pathId)[0]
@@ -1187,7 +1188,13 @@ class ChangeSet(streams.StreamSet):
                     oldFileObj = fileObjects.pop(0)
                     fileObj = oldFileObj.copy()
                     oldFileId, oldFileVersion, oldPath = filesNeeded.pop(0)[1:4]
-                    fileObj.twm(self.getFileChange(oldFileId, fileId), fileObj)
+                    diff = self.getFileChange(oldFileId, fileId)
+                    # check if new and old files are of the same type
+                    if fileObj.lsTag == diff[1]:
+                        fileObj.twm(diff, fileObj)
+                    else:
+                        fileObj = troveSource.getFileVersion(
+                            pathId, fileId, fileVersion)
 
                     if path is None:
                         path = oldPath
@@ -1228,8 +1235,6 @@ class ChangeSet(streams.StreamSet):
 
         for (pathId, fileId, oldInfo, newInfo) in \
                 itertools.chain(configList, normalList):
-            if pathId == trove.CAPSULE_PATHID:
-                import epdb; epdb.st()
             newInfo = newInfo[0:2] + (files.ThawFile(newInfo[2], pathId),)
             for x in self._makeFileGitDiff(troveSource, pathId,
                         oldInfo, newInfo, diffBinaries):
