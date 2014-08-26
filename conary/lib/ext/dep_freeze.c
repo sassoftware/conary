@@ -125,7 +125,7 @@ static PyObject * depSplit(PyObject *self, PyObject *args) {
     /* Copy the original string over, replace single : with a '\0' and
        double :: with a single :, and \X with X (where X is anything,
        including backslash)  */
-    endPtr = data = malloc(strlen(origData) + 1);
+    endPtr = data = PyMem_Malloc(strlen(origData) + 1);
     if (data == NULL) {
         PyErr_NoMemory();
         goto cleanup;
@@ -182,7 +182,7 @@ cleanup:
     Py_XDECREF(flags);
     Py_XDECREF(flag);
     if (data != NULL) {
-        free(data);
+        PyMem_Free(data);
     }
     return ret;
 }
@@ -263,7 +263,7 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
         return -1;
     }
     itemCount = PyList_GET_SIZE(itemList);
-    flags = malloc(itemCount * sizeof(*flags));
+    flags = PyMem_Malloc(itemCount * sizeof(*flags));
     if (flags == NULL) {
         PyErr_NoMemory();
         goto cleanup;
@@ -295,7 +295,7 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
 
     /* Frozen form is name:SENSEflag:SENSEflag. Worst case size for name/flag
        is * 2 due to : expansion */
-    result = malloc((PYBYTES_GET_SIZE(nameObj) * 2) + 1 +
+    result = PyMem_Malloc((PYBYTES_GET_SIZE(nameObj) * 2) + 1 +
                     (itemSize * 2) + itemCount * 3);
     if (result == NULL) {
         PyErr_NoMemory();
@@ -335,10 +335,10 @@ static int depFreezeRaw(PyObject * nameObj, PyObject * dict,
 cleanup:
     Py_XDECREF(itemList);
     if (result != NULL) {
-        free(result);
+        PyMem_Free(result);
     }
     if (flags != NULL) {
-        free(flags);
+        PyMem_Free(flags);
     }
     return rc;
 }
@@ -393,7 +393,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
         goto cleanup;
     }
 
-    depList = malloc(depCount * sizeof(*depList));
+    depList = PyMem_Malloc(depCount * sizeof(*depList));
     if (!depList) {
         PyErr_NoMemory();
         goto cleanup;
@@ -434,7 +434,7 @@ static int depClassFreezeRaw(PyObject * tagObj, PyObject * dict,
         totalSize += tagLen + depList[i].frzSize + 1;
     }
 
-    result = malloc(totalSize);
+    result = PyMem_Malloc(totalSize);
     if (result == NULL) {
         PyErr_NoMemory();
         rc = -1;
@@ -463,14 +463,14 @@ cleanup:
     Py_XDECREF(depObjList);
     for (i = 0; i < depCount; i++) {
         if (depList[i].frz != NULL) {
-            free(depList[i].frz);
+            PyMem_Free(depList[i].frz);
         }
     }
     if (depList != NULL) {
-        free(depList);
+        PyMem_Free(depList);
     }
     if (result != NULL) {
-        free(result);
+        PyMem_Free(result);
     }
     return rc;
 }
@@ -525,7 +525,7 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
         return PYBYTES_FromString("");
     }
 
-    members = malloc(sizeof(*members) * memberCount);
+    members = PyMem_Malloc(sizeof(*members) * memberCount);
     if (members == NULL) {
         PyErr_NoMemory();
         goto cleanup;
@@ -565,7 +565,7 @@ static PyObject * depSetFreeze(PyObject * self, PyObject * args) {
 
     Py_CLEAR(memberList);
 
-    next = result = malloc(totalSize);
+    next = result = PyMem_Malloc(totalSize);
     if (result == NULL) {
         PyErr_NoMemory();
         goto cleanup;
@@ -588,15 +588,15 @@ cleanup:
     Py_XDECREF(tagObj);
     Py_XDECREF(memberList);
     if (result != NULL) {
-        free(result);
+        PyMem_Free(result);
     }
     if (members != NULL) {
         for (i = 0; i < memberCount; i++) {
             if (members[i].frz != NULL) {
-                free(members[i].frz);
+                PyMem_Free(members[i].frz);
             }
         }
-        free(members);
+        PyMem_Free(members);
     }
     return rc;
 }

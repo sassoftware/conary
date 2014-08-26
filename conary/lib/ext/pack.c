@@ -140,7 +140,7 @@ static PyObject * pack(PyObject * self, PyObject * args) {
         }
     }
 
-    result = malloc(strLen);
+    result = PyMem_Malloc(strLen);
     if (result == NULL) {
         PyErr_NoMemory();
         return NULL;
@@ -197,7 +197,7 @@ static PyObject * pack(PyObject * self, PyObject * args) {
 
 cleanup:
     if (result != NULL) {
-        free(result);
+        PyMem_Free(result);
     }
     return ret;
 }

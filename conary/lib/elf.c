@@ -572,12 +572,12 @@ static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
 	char *err;
 	int len;
 	read(p[0], (void *) &len, sizeof(len));
-	err = malloc(len);
+	err = PyMem_Malloc(len);
 	if (NULL == err)
 	    return PyErr_NoMemory();
 	read(p[0], err, len);
         rc = PYBYTES_FromStringAndSize(err, len);
-	free(err);
+	PyMem_Free(err);
     } else {
 	/* child exited with a 0 return code, no unresolved symbols */
 	Py_INCREF(Py_False);

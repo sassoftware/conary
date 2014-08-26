@@ -72,7 +72,7 @@ static void StreamSetDef_Dealloc(PyObject * self) {
         Py_CLEAR(ssd->tags[i].name);
         Py_CLEAR(ssd->tags[i].type);
     }
-    free(ssd->tags);
+    PyMem_Free(ssd->tags);
     Py_TYPE(self)->tp_free(self);
 }
 
@@ -97,7 +97,7 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
     }
 
     ssd->tagCount = Py_SIZE(items);
-    ssd->tags = malloc(ssd->tagCount * sizeof(*ssd->tags));
+    ssd->tags = PyMem_Malloc(ssd->tagCount * sizeof(*ssd->tags));
     if (ssd->tags == NULL) {
         PyErr_NoMemory();
         goto onerror;
@@ -143,7 +143,7 @@ onerror:
         Py_CLEAR(ssd->tags[i].name);
         Py_CLEAR(ssd->tags[i].type);
     }
-    free(ssd->tags);
+    PyMem_Free(ssd->tags);
     ssd->tags = NULL;
     return -1;
 }
@@ -177,7 +177,7 @@ static StreamSetDefObject * StreamSet_GetSSD(PyTypeObject *o) {
     if (!sd) {
 	char *buf;
 	int len = 50 + strlen(o->tp_name);
-	buf = malloc(len);
+	buf = PyMem_Malloc(len);
 	if (buf == NULL) {
 	    PyErr_NoMemory();
 	    return NULL;
@@ -186,7 +186,7 @@ static StreamSetDefObject * StreamSet_GetSSD(PyTypeObject *o) {
 		       "%s class is missing the streamDict class variable",
 		       o->tp_name);
 	PyErr_SetString(PyExc_ValueError, buf);
-	free(buf);
+	PyMem_Free(buf);
 	return NULL;
     }
 
@@ -393,7 +393,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 	useAlloca = 1;
 	final = alloca(len);
     } else
-	final = malloc(len);
+	final = PyMem_Malloc(len);
 
     if (final == NULL)
 	/* FIXME: memory leak.  DECREF vals here */
@@ -460,7 +460,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     result = PYBYTES_FromStringAndSize(final, len);
 
     if (!useAlloca)
-	free(final);
+	PyMem_Free(final);
 
     if (isEmpty && includeEmpty == INCLUDE_EMPTY) {
         Py_DECREF(result);
@@ -478,7 +478,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 	}
 
 	if (!useAlloca)
-	    free(final);
+	    PyMem_Free(final);
 	return NULL;
     }
 }
@@ -534,7 +534,7 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args,
 	useAlloca = 1;
 	vals = alloca(len);
     } else
-	vals = malloc(len);
+	vals = PyMem_Malloc(len);
 
     for (i = 0; i < ssd->tagCount; i++) {
 	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
@@ -557,7 +557,7 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args,
 		Py_DECREF(vals[j]);
 
 	    if (!useAlloca)
-		free(vals);
+		PyMem_Free(vals);
 	    return NULL;
 	}
     }
@@ -568,7 +568,7 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args,
     rc = concatStrings(ssd, vals, 0, NULL, NULL, INCLUDE_EMPTY);
 
     if (!useAlloca)
-	free(vals);
+	PyMem_Free(vals);
     return rc;
 }
 
@@ -704,7 +704,7 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	useAlloca = 1;
 	vals = alloca(len);
     } else
-	vals = malloc(len);
+	vals = PyMem_Malloc(len);
 
     for (i = 0; i < ssd->tagCount; i++) {
         if (freezeKnown == Py_False ||
@@ -733,7 +733,7 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	    for (j = 0; j < i; j++)
 		Py_DECREF(vals[j]);
 	    if (!useAlloca)
-		free(vals);
+		PyMem_Free(vals);
 	    return NULL;
 	}
     }
@@ -747,7 +747,7 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
     rc = concatStrings(ssd, vals, unknownCount, sset->unknownTags, skipSet,
                        EXCLUDE_EMPTY);
     if (!useAlloca)
-	free(vals);
+	PyMem_Free(vals);
     return rc;
 }
 
@@ -804,7 +804,7 @@ static void StreamSet_Dealloc(PyObject * self) {
     }
 
     if (sset->unknownCount)
-        free(sset->unknownTags);
+        PyMem_Free(sset->unknownTags);
     Py_TYPE(self)->tp_free(self);
 }
 
@@ -865,7 +865,7 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
                 return -1;
             }
 
-            sset->unknownTags = realloc(sset->unknownTags,
+            sset->unknownTags = PyMem_Realloc(sset->unknownTags,
                                         sizeof(*sset->unknownTags) *
                                             (sset->unknownCount + 1));
             sset->unknownTags[sset->unknownCount].tag = streamId;
@@ -952,7 +952,7 @@ PyObject *StreamSet_remove(PyObject *self, PyObject *args) {
     skipId = PyLong_AsLong(pyskipid);
     data = PYBYTES_AsString(pydata);
     dataLen = PYBYTES_Size(pydata);
-    newdata = malloc(dataLen);
+    newdata = PyMem_Malloc(dataLen);
     if (NULL == newdata) {
 	PyErr_NoMemory();
 	return NULL;
@@ -977,10 +977,10 @@ PyObject *StreamSet_remove(PyObject *self, PyObject *args) {
 	len += size;
     }
     s = PYBYTES_FromStringAndSize(newdata, len);
-    free(newdata);
+    PyMem_Free(newdata);
     return s;
  error:
-    free(newdata);
+    PyMem_Free(newdata);
     return NULL;
 }
 
@@ -1063,7 +1063,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
                 /* We don't have an entry for this tag at all. Make a new
                    one in the proper sorted order */
                 /* append this new item to the end of the unknown tags. */
-                self->unknownTags = realloc(self->unknownTags,
+                self->unknownTags = PyMem_Realloc(self->unknownTags,
                                             sizeof(*self->unknownTags) *
                                                 (self->unknownCount + 1));
                 if (unknownIdx < self->unknownCount)

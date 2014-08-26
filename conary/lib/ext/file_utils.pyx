@@ -38,6 +38,10 @@ cdef extern from "poll.h" nogil:
     int poll(pollfd *fds, int nfds, int timeout)
     int POLLIN, POLLPRI, POLLOUT, POLLNVAL
 
+cdef extern from "Python.h":
+    void *PyMem_Malloc(size_t)
+    void PyMem_Free(void *)
+
 
 def countOpenFileDescriptors():
     """Return a count of the number of open file descriptors."""
@@ -45,7 +49,7 @@ def countOpenFileDescriptors():
     cdef pollfd *ufds
 
     maxfd = getdtablesize()
-    ufds = <pollfd*>malloc(maxfd * sizeof(pollfd))
+    ufds = <pollfd*>PyMem_Malloc(maxfd * sizeof(pollfd))
     if ufds == NULL:
         raise MemoryError
 
@@ -61,7 +65,7 @@ def countOpenFileDescriptors():
                 break
 
     if rc < 0:
-        free(ufds)
+        PyMem_Free(ufds)
         PyErr_SetFromErrno(OSError)
 
     count = 0
@@ -69,7 +73,7 @@ def countOpenFileDescriptors():
         if ufds[i].revents != POLLNVAL:
             count += 1
 
-    free(ufds)
+    PyMem_Free(ufds)
     return count
 
 
@@ -161,7 +165,7 @@ def pread(fobj, size_t count, off_t offset):
 
     fd = PyObject_AsFileDescriptor(fobj)
 
-    data = <char*>malloc(count)
+    data = <char*>PyMem_Malloc(count)
     if data == NULL:
         raise MemoryError
 
@@ -169,11 +173,11 @@ def pread(fobj, size_t count, off_t offset):
         rc = c_pread(fd, data, count, offset)
 
     if rc == -1:
-        free(data)
+        PyMem_Free(data)
         PyErr_SetFromErrno(OSError)
 
     ret = PyString_FromStringAndSize(data, rc)
-    free(data)
+    PyMem_Free(data)
     return ret
 
 
