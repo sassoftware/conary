@@ -195,7 +195,7 @@ class StreamSet(_BaseStream):
         return True
 
     def __ne__(self, other, skipSet=None):
-        return self.__eq__(other, skipSet=skipSet)
+        return not self.__eq__(other, skipSet=skipSet)
 
     def __hash__(self):
         return hash(self.freeze())
@@ -233,6 +233,8 @@ class StreamSet(_BaseStream):
                 raise TypeError("Invalid tag size")
             words.append(struct.pack(fmt, tag.tag, size))
             words.append(substream)
+        if includeEmpty and not words:
+            return None
         return ''.join(words)
 
     def freeze(self, skipSet=None, freezeKnown=True, freezeUnknown=True):
