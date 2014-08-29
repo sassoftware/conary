@@ -1196,6 +1196,8 @@ def _cookPackageObject(repos, cfg, loader, sourceVersion, prep=True,
         logBuild = False
 
     if logBuild:
+        # Suppress progress information when downloading ephemeral sources
+        lcache.setQuiet(True)
         # turn on logging of this trove.  Logs are packaged as part
         # of :debuginfo component
         logPath = destdir + recipeObj.macros.buildlogpath

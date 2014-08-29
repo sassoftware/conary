@@ -455,6 +455,9 @@ class RepositoryCache(object):
         self._basePath = self.downloadRatedLimit = None
         self.setConfig(cfg)
 
+    def setQuiet(self, quiet):
+        self.quiet = quiet
+
     def setConfig(self, cfg):
         if cfg:
             self.quiet = cfg.quiet
