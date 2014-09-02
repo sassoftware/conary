@@ -1,1 +1,0 @@
-Fixed applying updates with a configuration of 'dbPath :memory:' always failing with a permission error.

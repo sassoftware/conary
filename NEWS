@@ -1,3 +1,39 @@
+Changes in 2.5.4:
+  o New Features:
+    * Progress information is no longer emitted when downloading
+      ephemeral sources during a cook. This keeps logs from being
+      bloated when using very large sources. (CNY-3865)
+    * Add createAppOnlyArchive script for creating archives that could
+      be used in an App Only deployment.
+    * r.MakeInstall now takes a makeName argument for overriding the
+      name of the make binary. Additionally, a makeName macro may be
+      specified to override the default make binary used for both r.Make
+      and r.MakeInstall.
+    * Added cscache hit/miss counters to the proxy.
+    * Minor performance improvements for updates.
+    * Add an architecture configuration for i86pc (Solaris x86)
+    * Allow tar binary name to be overriden by the tar macro.
+
+  o Bug Fixes:
+    * Conary no longer fails to load user/group information on platforms
+      where uid 0 or gid 0 are not root. (CNY-3867)
+    * Fixed applying updates with a configuration of 'dbPath :memory:'
+      always failing with a permission error.
+    * Policy no longer fails a build if /etc/ld.so.conf doesn't exist.
+
+  o Internal Changes:
+    * When running the test suite, if the python executable being used
+      does not have cap_sys_chroot, skip the capsule tests that require
+      cap_sys_chroot and print a message documenting how to enable those
+      tests.
+    * Define a MIN C macro for portabilty to Solaris.
+    * Switch install, sed, cp, and make calls to use Makefile macros for
+      portabilty to platforms that rename the GNU versions of those
+      utilities.
+    * Switch to using os.setpgid when configuring the build process
+      instead of os.setpgrp because setpgrp creates a new session on
+      Solaris.
+
 Changes in 2.5.3:
   o New Features:
     * Key/Value metadata is no longer copied forward during the build

@@ -1,1 +1,0 @@
-r.MakeInstall now takes a makeName argument for overriding the name of the make binary. Additionally, a makeName macro may be specified to override the default make binary used for both r.Make and r.MakeInstall.

@@ -1,1 +1,0 @@
-Policy no longer fails a build if /etc/ld.so.conf doesn't exist.
