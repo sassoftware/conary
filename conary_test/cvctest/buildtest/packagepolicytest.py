@@ -2947,12 +2947,14 @@ class TestRequires(PackageRecipe):
             '',
             "require 'foo/bar'",
             "require 'spam'",
+            "require 'eggs'",
             '',
         )), mode=0755)
         r.Create('/usr/lib64/ruby/site_ruby/1.8/foo/bar.rb',
                  contents="require 'blah/baz'")
         r.Create('/usr/lib/ruby/site_ruby/blah/baz.rb')
         r.Create('/usr/lib64/ruby/gems/1.8/gems/spam-1.0.0/lib/spam.rb')
+        r.Create('/usr/lib/ruby/gems/1.8/gems/eggs-1.0.0/lib/eggs.rb')
 
         #FLAGS
         r.Create('/usr/bin/ruby', contents='\n'.join((
@@ -2970,7 +2972,7 @@ class TestRequires(PackageRecipe):
             '  exit 0',
             '  ;;',
             '*puts*)',
-            r'  echo "/usr/lib/ruby/site_ruby/1.8 /usr/lib/ruby/site_ruby /usr/lib64/ruby/site_ruby/1.8 /usr/lib64/ruby/site_ruby/1.8/x86_64-linux /usr/lib64/ruby/site_ruby /usr/lib64/ruby/1.8 /usr/lib64/ruby/1.8/x86_64-linux /usr/lib64/ruby/gems/1.8/gems ." | tr " " "\\n"',
+            r'  echo "/usr/lib/ruby/site_ruby/1.8 /usr/lib/ruby/site_ruby /usr/lib64/ruby/site_ruby/1.8 /usr/lib64/ruby/site_ruby/1.8/x86_64-linux /usr/lib64/ruby/site_ruby /usr/lib64/ruby/1.8 /usr/lib64/ruby/1.8/x86_64-linux /usr/lib64/ruby/gems/1.8/gems /usr/lib/ruby/gems/1.8/gems ." | tr " " "\\n"',
             '  exit 0',
             '  ;;',
             'esac',
@@ -2989,6 +2991,7 @@ class TestRequires(PackageRecipe):
                 assert('file: /usr/bin/ruby' in req)
                 assert('ruby: foo/bar(1.8 lib64)' in req)
                 assert('ruby: spam(1.8 lib64)' in req)
+                assert('ruby: eggs(1.8 lib)' in req)
         for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
             'foo:ruby', trv.getVersion(), trv.getFlavor(),
             withFiles=True):
@@ -3003,6 +3006,9 @@ class TestRequires(PackageRecipe):
             elif path == '/usr/lib64/ruby/gems/1.8/gems/spam-1.0.0/lib/spam.rb':
                 assert('ruby: spam(1.8 lib64)' in prov)
                 assert(not req)
+            elif path == '/usr/lib/ruby/gems/1.8/gems/eggs-1.0.0/lib/eggs.rb':
+                assert('ruby: eggs(1.8 lib)' in prov)
+                assert(not req)
         self.resetRepository()
 
         # All the #FLAGS modifications test CNY-3443
@@ -3016,6 +3022,7 @@ class TestRequires(PackageRecipe):
             if path == '/usr/bin/boot':
                 assert('ruby: foo/bar(1.8)' in req)
                 assert('ruby: spam(1.8)' in req)
+                assert('ruby: eggs(1.8)' in req)
         self.resetRepository()
         trv = self.build(recipestr.replace('#FLAGS',
             "r.Requires(removeFlagsByDependencyClass=('ruby', 'lib.*'))"),
@@ -3027,6 +3034,7 @@ class TestRequires(PackageRecipe):
             if path == '/usr/bin/boot':
                 assert('ruby: foo/bar(1.8)' in req)
                 assert('ruby: spam(1.8)' in req)
+                assert('ruby: eggs(1.8)' in req)
         self.resetRepository()
         trv = self.build(recipestr.replace('#FLAGS',
             "r.Requires(removeFlagsByDependencyClass=('ruby', ('lib', 'lib64')));r.Requires(removeFlagsByDependencyClass=('ruby', ('1.8', '1.9')))"),
@@ -3040,6 +3048,7 @@ class TestRequires(PackageRecipe):
                 assert('file: /usr/bin/ruby' in req)
                 assert('ruby: foo/bar' in req)
                 assert('ruby: spam' in req)
+                assert('ruby: eggs' in req)
 
     def testModuleFinderProxy(self):
         # CNY-2087
