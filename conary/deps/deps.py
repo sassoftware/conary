@@ -749,7 +749,6 @@ class RubyDependencies(DependencyClass):
     tagName = "ruby"
     justOne = False
     depClass = Dependency
-    depFormat = 'IDENT(?:/WORD)*'
     flags = DEP_CLASS_OPT_FLAGS
 _registerDepClass(RubyDependencies)
 

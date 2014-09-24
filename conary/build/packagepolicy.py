@@ -3062,7 +3062,6 @@ class Provides(_dependency):
                 if path.startswith(pathElement) \
                         and (path.endswith('.rb') or path.endswith('.so')):
                     if '/gems/' in path:
-                        path = path.partition("/gems/")[-1]
                         if '/lib/' in path:
                             return path.partition('/lib/')[-1].rsplit('.', 1)[0]
                     else:
