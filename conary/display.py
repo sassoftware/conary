@@ -698,6 +698,13 @@ class TroveFormatter(TroveTupFormatter):
             yield "Pinned    : %s" % troveSource.trovesArePinned(
                                                             [ (n, v, f) ])[0]
 
+        commitTime = v.trailingRevision().timeStamp
+        if commitTime:
+            commitTime = time.strftime("%c", time.localtime(commitTime))
+        else:
+            commitTime = '(unknown)'
+        if not trove.getBuildTime() or log.getVerbosity() <= log.DEBUG:
+            yield "Committed : " + commitTime
         yield "%-30s" % ("Flavor    : %s" % deps.formatFlavor(f))
         if trove.getInstallTime():
             yield 'Installed : %s' % (time.strftime("%c",
@@ -718,7 +725,6 @@ class TroveFormatter(TroveTupFormatter):
                 lines = cl.getMessage().split("\n")[:-1]
                 for l in lines:
                     yield "    " + l
-
         if log.getVerbosity() <= log.DEBUG:
             yield "%-30s %s" % (("Incomp.   : %s" %
                                  bool(trove.troveInfo.incomplete())),
