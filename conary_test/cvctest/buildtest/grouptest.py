@@ -776,6 +776,9 @@ class GroupTest(rephelp.RepositoryHelper):
         else:
             assert(0)
 
+        self.assertEqual(primary.troveInfo.subPackages(),
+                ['group-first', 'group-second', 'group-third'])
+
     def testUpdates(self):
         pkgVer1 = self.buildRecipe(packageRecipe, "testRecipe")[0][0][1]
         grpVer1 = self.buildRecipe(pkgGroup, "pkgGroup")[0][0][1]

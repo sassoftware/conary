@@ -824,8 +824,10 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
         buildReqs = recipeObj.getRecursiveBuildRequirements(db, cfg)
 
         troveList = []
+        groupNames = set()
         for group in recipeObj.iterGroupList():
             groupName = group.name
+            groupNames.add(groupName)
             grpTrv = trove.Trove(groupName, targetVersion, grpFlavor, None)
             grpTrv.setRequires(group.getRequires())
             grpTrv.setBuildRequirements(buildReqs)
@@ -902,6 +904,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
 
         _copyForwardTroveMetadata(repos, troveList, recipeObj)
         for grpTrv in troveList:
+            grpTrv.setSubPackages(groupNames)
             _setCookTroveMetadata(grpTrv,
                     recipeObj._metadataItemsMap.get(grpTrv.name(), {}))
 
@@ -1480,6 +1483,9 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
             _copyScripts(trv, recipeObj._scriptsMap)
             _setCookTroveMetadata(trv, recipeObj._metadataItemsMap.get(
                                                             trv.name(), {}))
+
+    for trv in grpMap.values():
+        trv.setSubPackages(grpMap.keys())
 
     # look up the pathids used by our immediate predecessor troves.
     log.info('looking up pathids from repository history')

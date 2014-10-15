@@ -1381,6 +1381,7 @@ class TestClass(CPackageRecipe):
 
     def setup(r):
         r.Create('/usr/share/installedfile')
+        r.Create('/subpkg/file', package='subpkg')
 """
 
         repos = self.openRepository()
@@ -1413,6 +1414,7 @@ class TestClass(CPackageRecipe):
         assert(dataComp.getBuildRequirements() == [])
         assert(dataComp.getLoadedTroves() == [])
         assert(not dataComp.isCollection())
+        self.assertEqual(trv.troveInfo.subPackages(), ['subpkg', 'test'])
 
     def testCookOntoTargetLabel(self):
         repos = self.openRepository()

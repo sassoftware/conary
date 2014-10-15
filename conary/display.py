@@ -731,6 +731,10 @@ class TroveFormatter(TroveTupFormatter):
                                 ("TroveVer  : %s" %
                                             trove.troveInfo.troveVersion()))
             yield "%-30s" % (("Clone of  : %s" % trove.troveInfo.clonedFrom()))
+            subPackages = set(trove.troveInfo.subPackages())
+            subPackages.discard(trove.getName())
+            if subPackages:
+                yield "%-30s" % (("Siblings  : %s" % (' '.join(sorted(subPackages)))))
             yield "%-30s" % (("Conary version : %s" % trove.troveInfo.conaryVersion()))
 
     def formatMetadata(self, trove):
