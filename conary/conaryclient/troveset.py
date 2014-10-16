@@ -717,24 +717,26 @@ class FindAction(ParallelAction):
     __call__ = findAction
 
     def __str__(self):
-        if isinstance(self.troveSpecs[0], str):
-            n1 = self.troveSpecs[0].split('=')[0]
+        if not self.troveSpecs:
+            s = '()'
         else:
-            n1 = self.troveSpecs[0][0]
+            if isinstance(self.troveSpecs[0], str):
+                n1 = self.troveSpecs[0].split('=')[0]
+            else:
+                n1 = self.troveSpecs[0][0]
 
-        if isinstance(self.troveSpecs[-1], str):
-            n2 = self.troveSpecs[-1].split('=')[0]
-        else:
-            n2 = self.troveSpecs[-1][0]
+            if isinstance(self.troveSpecs[-1], str):
+                n2 = self.troveSpecs[-1].split('=')[0]
+            else:
+                n2 = self.troveSpecs[-1][0]
 
-        if len(self.troveSpecs) == 1:
-            s =  n1
-        elif len(self.troveSpecs) == 2:
-            s =  n1 + r' ,\n' + n2
-        else:
-            s =  n1 + r' ...\n' + n2
-
-        return r'Find\n' + s
+            if len(self.troveSpecs) == 1:
+                s =  n1
+            elif len(self.troveSpecs) == 2:
+                s =  n1 + ' ,\n' + n2
+            else:
+                s =  n1 + ' ...\n' + n2
+        return 'Find ' + s
 
 class UnionAction(DelayedTupleSetAction):
 

@@ -1,0 +1,1 @@
+Fixed crash in GroupSetRecipe when using an empty find()
