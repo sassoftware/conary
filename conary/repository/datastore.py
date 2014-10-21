@@ -208,7 +208,10 @@ class DataStore(AbstractDataStore):
 class ShallowDataStore(DataStore):
 
     def hashToPath(self, hash):
-        hash = sha1helper.sha1ToString(hash)
+        # proxy code passes in hex digests with version suffixes, so just pass
+        # that through.
+        if len(hash) < 40:
+            hash = sha1helper.sha1ToString(hash)
         if (len(hash) < 5):
             raise KeyError, ("invalid hash %s" % hash)
 
