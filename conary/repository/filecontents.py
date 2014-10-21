@@ -22,7 +22,7 @@ except ImportError:
 
 import errno, os
 
-from conary.lib import sha1helper, util
+from conary.lib import util
 
 SEEK_SET=-1
 SEEK_CUR=1
@@ -54,10 +54,10 @@ class FromDataStore(FileContents):
         return self.__class__(self.store, self.sha1)
 
     def get(self):
-        return self.store.openFile(sha1helper.sha1ToString(self.sha1))
+        return self.store.openFile(self.sha1)
 
     def path(self):
-        return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
+        return self.store.hashToPath(self.sha1)
 
     def __init__(self, store, sha1):
         self.compressed = False
@@ -75,10 +75,10 @@ class CompressedFromDataStore(FileContents):
         return self.__class__(self.store, self.sha1)
 
     def get(self):
-        return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
+        return self.store.openRawFile(self.sha1)
 
     def path(self):
-        return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
+        return self.store.hashToPath(self.sha1)
 
     def __init__(self, store, sha1):
         self.store = store

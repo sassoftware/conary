@@ -27,14 +27,15 @@ import traceback
 
 from conary import files, trove, callbacks
 from conary.deps import deps
-from conary.lib import util, openpgpfile, sha1helper, openpgpkey
+from conary.lib import util, openpgpfile, openpgpkey
 from conary.repository import changeset, errors, filecontents
-from conary.repository.datastore import DataStoreRepository, DataStore
-from conary.repository.datastore import DataStoreSet
+from conary.repository.datastore import (DataStoreRepository, DataStore,
+        DataStoreSet, ShallowDataStore, FlatDataStore)
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
+from conary.repository.netrepos.repo_cfg import CfgContentStore
 from conary.repository import netclient
-from conary.server import schema
+
 
 class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, repos, cs, *args, **kw):
@@ -148,19 +149,26 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         self.reposSet = netclient.NetworkRepositoryClient(map,
                                     conarycfg.UserInformation())
         self.troveStore = troveStore
-
         self.requireSigs = requireSigs
-        for dir in contentsDir:
-            util.mkdirChain(dir)
 
-        if len(contentsDir) == 1:
-            store = DataStore(contentsDir[0])
+        storeType, paths = contentsDir
+        if storeType == CfgContentStore.LEGACY:
+            storeClass = DataStore
+        elif storeType == CfgContentStore.SHALLOW:
+            storeClass = ShallowDataStore
+        elif storeType == CfgContentStore.FLAT:
+            storeClass = FlatDataStore
         else:
-            storeList = []
-            for dir in contentsDir:
-                storeList.append(DataStore(dir))
+            raise ValueError("Invalid contentsDir type %r" % (storeType,))
 
-            store = DataStoreSet(*storeList)
+        stores = []
+        for path in paths:
+            util.mkdirChain(path)
+            stores.append(storeClass(path))
+        if len(stores) == 1:
+            store = stores[0]
+        else:
+            store = DataStoreSet(*stores)
 
         DataStoreRepository.__init__(self, dataStore = store)
         AbstractRepository.__init__(self)
@@ -331,7 +339,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         sha1s = self.troveStore.markTroveRemoved(name, version, flavor)
         for sha1 in sha1s:
             try:
-                self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+                self.contentsStore.removeFile(sha1)
             except OSError, e:
                 if e.errno != errno.ENOENT:
                     raise

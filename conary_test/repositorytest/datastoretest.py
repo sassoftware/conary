@@ -20,7 +20,8 @@ import shutil
 import tempfile
 import unittest
 
-from conary.repository.datastore import DataStore, DataStoreSet
+from conary.repository.datastore import (DataStore, DataStoreSet,
+        FlatDataStore, ShallowDataStore)
 from conary.local.localrep import SqlDataStore
 from conary.lib import util
 from conary import dbstore
@@ -28,6 +29,7 @@ from conary import dbstore
 class DataStoreTest(unittest.TestCase):
 
     def addFile(self, store, contents, hash, precompressed = False):
+        hash = hash.decode('hex')
         (fd, name) = tempfile.mkstemp()
         os.close(fd)
         f = open(name, "w+")
@@ -41,6 +43,7 @@ class DataStoreTest(unittest.TestCase):
         return name
 
     def checkFile(self, store, contents, hash):
+        hash = hash.decode('hex')
         f = store.openFile(hash)
         str = f.read()
         f.close()
@@ -57,6 +60,12 @@ class DataStoreTest(unittest.TestCase):
 
     def testDataStore(self):
         self._testDataStore(DataStore(self.top))
+
+    def testShallow(self):
+        self._testDataStore(ShallowDataStore(self.top))
+
+    def testFlat(self):
+        self._testDataStore(FlatDataStore(self.top))
 
     def testSqlDataStore(self):
         db = dbstore.connect(':memory:', driver='sqlite')
@@ -89,7 +98,7 @@ class DataStoreTest(unittest.TestCase):
         self.checkFile(d, "hello",
                        "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d")
 
-        if isinstance(d, DataStore):
+        if d.__class__ is DataStore:
             assert(os.path.exists(self.top + 
                      "/5e/2b/d4918bd3bf0a32be16ea85c74d52bfa27cc3"))
             assert(os.path.exists(self.top + 
@@ -98,12 +107,16 @@ class DataStoreTest(unittest.TestCase):
                      "/d9/4f/97fec5188ca5ca38981303aa6a364bdf3283"))
             assert(os.path.exists(self.top + 
                      "/aa/f4/c61ddcc5e8a2dabede0f3b482cd9aea9434d"))
+        elif d.__class__ is ShallowDataStore:
+            assert os.path.exists(self.top + "/5e/2bd4918bd3bf0a32be16ea85c74d52bfa27cc3")
+        elif d.__class__ is FlatDataStore:
+            assert os.path.exists(self.top + "/XivUkYvTvwoyvhbqhcdNUr-ifMM")
 
-        assert(d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3"))
-        assert(d.hasFile("48091aae70bd2bd56ffcd2e5ed4b1ded56511b69"))
-        assert(d.hasFile("d94f97fec5188ca5ca38981303aa6a364bdf3283"))
-        assert(d.hasFile("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"))
-        assert(not d.hasFile("d94f97fec5188ca5ca38981303aa6a364bdf3284"))
+        assert(d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex')))
+        assert(d.hasFile("48091aae70bd2bd56ffcd2e5ed4b1ded56511b69".decode('hex')))
+        assert(d.hasFile("d94f97fec5188ca5ca38981303aa6a364bdf3283".decode('hex')))
+        assert(d.hasFile("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d".decode('hex')))
+        assert(not d.hasFile("d94f97fec5188ca5ca38981303aa6a364bdf3284".decode('hex')))
 
         # duplicate file
         self.addFile(d, "test file 1\n", 
@@ -111,18 +124,18 @@ class DataStoreTest(unittest.TestCase):
 
         if isinstance(d, DataStore) or isinstance(d, DataStoreSet):
             # not reference counted
-            d.removeFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3")
-            if d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3"):
+            d.removeFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex'))
+            if d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex')):
                 raise AssertionError
             self.assertRaises(OSError, d.removeFile,
-                              "5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3")
+                    "5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex'))
         else:
             # reference counted
-            d.removeFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3")
-            if not d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3"):
+            d.removeFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex'))
+            if not d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex')):
                 raise AssertionError
-            d.removeFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3")
-            if d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3"):
+            d.removeFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex'))
+            if d.hasFile("5e2bd4918bd3bf0a32be16ea85c74d52bfa27cc3".decode('hex')):
                 raise AssertionError
 
     def tearDown(self):
