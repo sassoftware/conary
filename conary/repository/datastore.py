@@ -134,8 +134,9 @@ class DataStore(AbstractDataStore):
     def hashToPath(self, hash):
         # New consumers should pass a binary hash, but for backwards
         # compatibility (with rmake) continue to accept hashes that are already
-        # encoded.
-        if len(hash) != 40:
+        # encoded. Proxy code also passes in hashes with suffixes on them,
+        # which should probably be normalized further.
+        if len(hash) < 40:
             hash = sha1helper.sha1ToString(hash)
         if (len(hash) < 5):
             raise KeyError, ("invalid hash %s" % hash)
