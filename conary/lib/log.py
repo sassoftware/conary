@@ -252,7 +252,7 @@ if not globals().has_key('fmtLogger'):
 # Alternate logging setup
 def setupLogging(logPath=None, consoleLevel=logging.WARNING,
         consoleFormat='console', fileLevel=logging.INFO, fileFormat='file',
-        logger=''):
+        logger='', consoleStream=None):
 
     logger = logging.getLogger(logger)
     logger.handlers = []
@@ -262,7 +262,7 @@ def setupLogging(logPath=None, consoleLevel=logging.WARNING,
     # Console handler
     if consoleLevel is not None:
         consoleFormatter = _getFormatter(consoleFormat)
-        consoleHandler = logging.StreamHandler()
+        consoleHandler = logging.StreamHandler(consoleStream or sys.stderr)
         consoleHandler.setFormatter(consoleFormatter)
         consoleHandler.setLevel(consoleLevel)
         logger.addHandler(consoleHandler)
@@ -276,6 +276,9 @@ def setupLogging(logPath=None, consoleLevel=logging.WARNING,
         logfileHandler.setLevel(fileLevel)
         logger.addHandler(logfileHandler)
         level = min(level, fileLevel)
+
+    # Undo default conary logger
+    logging.getLogger(LOGGER_CONARY).handlers[:] = []
 
     logger.setLevel(level)
     return logger

@@ -49,7 +49,6 @@ log = logging.getLogger('wsgi_hooks')
 
 def makeApp(settings):
     """Paster entry point"""
-    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
     envOverrides = {}
     if 'conary_config' in settings:
         envOverrides['conary.netrepos.config_file'] = settings['conary_config']
@@ -82,6 +81,10 @@ class ConaryRouter(object):
         self.configCache = {}
 
     def __call__(self, environ, start_response):
+        if not logging.root.handlers:
+            cny_log.setupLogging(consoleLevel=logging.INFO,
+                    consoleFormat='apache',
+                    consoleStream=environ['wsgi.errors'])
         # gunicorn likes to umask(0) when daemonizing, so put back something
         # reasonable if that's the case.
         oldUmask = os.umask(022)
