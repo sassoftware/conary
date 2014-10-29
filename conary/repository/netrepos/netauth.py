@@ -615,7 +615,7 @@ class NetworkAuthorization:
         remove = int(bool(remove))
 
         if trovePattern:
-            itemId = self.items.addPattern(trovePattern)
+            itemId = self.items.getOrAddId(trovePattern)
         else:
             itemId = 0
         # XXX This functionality is available in the TroveStore class

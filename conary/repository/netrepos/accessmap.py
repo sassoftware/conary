@@ -18,6 +18,7 @@
 from conary.server import schema
 from conary.repository import errors
 from conary.repository.netrepos import instances, versionops
+from conary.repository.netrepos import items
 from conary.lib.tracelog import logMe
 
 # - Entries in the RoleTroves table are processed and flattened
@@ -34,17 +35,15 @@ class RoleTable:
 
     def getWhereArgs(self, cond = "where", **kw):
         where = []
-        args = []
         for key, val in kw.items():
             if val is None:
                 continue
-            where.append("%s = ?" % (key,))
-            args.append(val)
+            where.append("%s = %d" % (key, val))
         if len(where):
             where = cond + " " + " and ".join(where)
         else:
             where = ""
-        return (where, args)
+        return where
 
 
 # class and methods for handling RoleTroves operations
@@ -213,77 +212,97 @@ class RoleTroves(RoleTable):
 
 # class and methods for handling RoleAllPermissions operations
 class RolePermissions(RoleTable):
-    # adds into the RoleAllPermissions table new entries
-    # triggered by one or more recordIds
+
+    def _filterItems(self, cu, sql, permissionId=None):
+        """
+        Apply regexp permission checks, returning a SQL clause that filters a
+        join between instances and permissions.
+
+        The supplied query string should select relevant rows from the
+        instances table.
+        """
+        cu.execute("SELECT DISTINCT itemId, item FROM Items"
+                " JOIN Permissions USING ( itemId )"
+                + self.getWhereArgs("WHERE", permissionId=permissionId))
+        patterns = dict(cu)
+
+        # The supplied query yields items that need to be checked against
+        # patterns.
+        cu.execute(sql)
+        where = set()
+        for itemId, item in cu:
+            for patternId, pattern in patterns.iteritems():
+                if pattern == 'ALL':
+                    # This is by far the most common case, so instead of
+                    # enumerating every trove with its own filter, just select
+                    # on whether the ALL permission is applicable.
+                    where.add('p.itemId = %d' % patternId)
+                elif items.checkTrove(pattern, item):
+                    where.add("(p.itemId = %d AND i.itemId = %d)"
+                            % (patternId, itemId))
+        if where:
+            return "( %s )" % (" OR ".join(where))
+        else:
+            return None
+
     def addId(self, cu = None, permissionId = None, roleId = None, instanceId = None):
-        where = []
-        args = []
-        if permissionId is not None:
-            where.append("Permissions.permissionId = ?")
-            args.append(permissionId)
-        if instanceId is not None:
-            where.append("Instances.instanceId = ?")
-            args.append(instanceId)
-        if roleId is not None:
-            where.append("Permissions.userGroupId = ?")
-            args.append(roleId)
-        whereStr = ""
-        if len(where):
-            whereStr = "where %s" % (' and '.join(where),)
+        """
+        Adds into the RoleAllPermissions table new entries triggered by one or
+        more recordIds.
+        """
         if cu is None:
             cu = self.db.cursor()
-        cu.execute("""
-        insert into UserGroupAllPermissions
-            (permissionId, userGroupId, instanceId, canWrite)
-        select
-            Permissions.permissionId as permissionId,
-            Permissions.userGroupId as userGroupId,
-            Instances.instanceId as instanceId,
-            Permissions.canWrite as canWrite
-        from Instances
-        join Nodes using(itemId, versionId)
-        join LabelMap using(itemId, branchId)
-        join Permissions on
-            Permissions.labelId = 0 or
-            Permissions.labelId = LabelMap.labelId
-        join CheckTroveCache on
-            Permissions.itemId = CheckTroveCache.patternId and
-            Instances.itemId = CheckTroveCache.itemId
-        %s """ % (whereStr,), args)
-        return True
+        itemClause = self._filterItems(cu, "SELECT DISTINCT itemId, item "
+                "FROM Instances JOIN Items USING (itemId)"
+                + self.getWhereArgs("WHERE", instanceId=instanceId),
+                permissionId=permissionId)
+        if not itemClause:
+            # No items matched any permission
+            return
+        cu.execute(
+        """INSERT INTO UserGroupAllPermissions
+                (permissionId, userGroupId, instanceId, canWrite)
+            SELECT p.permissionId, p.userGroupId, i.instanceId, p.canWrite
+            FROM Instances i
+            JOIN Nodes USING (itemId, versionId)
+            JOIN LabelMap USING (itemId, branchId)
+            JOIN Permissions p ON p.labelId = 0 OR p.labelId = LabelMap.labelId
+            WHERE %s%s""" % (
+                itemClause,
+                self.getWhereArgs(" AND",
+                    permissionId=permissionId,
+                    roleId=roleId,
+                    instanceId=instanceId,
+                    )))
 
     def addInstanceSet(self, cu, table, column):
-        cu.execute("""
-        insert into UserGroupAllPermissions
-            (permissionId, userGroupId, instanceId, canWrite)
-        select
-            Permissions.permissionId as permissionId,
-            Permissions.userGroupId as userGroupId,
-            Instances.instanceId as instanceId,
-            Permissions.canWrite as canWrite
-        from %s
-        join Instances using(%s)
-        join Nodes on
-            Instances.itemId = Nodes.itemId and
-            Instances.versionId = Nodes.versionId
-        join LabelMap on
-            Nodes.itemId = LabelMap.itemId and
-            Nodes.branchId = LabelMap.branchId
-        join Permissions on
-            Permissions.labelId = 0 or
-            Permissions.labelId = LabelMap.labelId
-        join CheckTroveCache on
-            Permissions.itemId = CheckTroveCache.patternId and
-            Instances.itemId = CheckTroveCache.itemId
-        """ % (table, column))
+        itemClause = self._filterItems(cu,
+            """SELECT DISTINCT Items.itemId, Items.item FROM %s
+            JOIN Instances USING (%s)
+            JOIN Items ON Items.itemId = Instances.itemId
+            """ % (table, column))
+        if not itemClause:
+            # No items matched any permission
+            return
+        cu.execute(
+        """INSERT INTO UserGroupAllPermissions
+                (permissionId, userGroupId, instanceId, canWrite)
+            SELECT p.permissionId, p.userGroupId, i.instanceId, p.canWrite
+            FROM %s
+            JOIN Instances i USING (%s)
+            JOIN Nodes n ON i.itemId = n.itemId AND i.versionId = n.versionId
+            JOIN LabelMap m ON n.itemId = m.itemId AND n.branchId = m.branchId
+            JOIN Permissions p ON p.labelId = 0 OR p.labelId = m.labelId
+            WHERE %s
+            """ % (table, column, itemClause))
 
     def deleteId(self, cu = None, permissionId = None, roleId = None,
                  instanceId = None):
-        where, args = self.getWhereArgs("where", permissionId=permissionId,
+        where = self.getWhereArgs("where", permissionId=permissionId,
             userGroupId=roleId, instanceId=instanceId)
         if cu is None:
             cu = self.db.cursor()
-        cu.execute("delete from UserGroupAllPermissions %s" % (where,), args)
+        cu.execute("delete from UserGroupAllPermissions %s" % (where,))
         return True
 
     def rebuild(self, cu = None, permissionId = None, roleId = None,
@@ -296,6 +315,7 @@ class RolePermissions(RoleTable):
             # this was a full rebuild
             self.db.analyze("UserGroupAllPermissions")
         return True
+
 
 # this class takes care of the RoleInstancesCache table, which is
 # a summary of rows present in RoleAllTroves and RoleAllPermissions tables
@@ -569,8 +589,8 @@ class RoleInstances(RoleTable):
     def rebuild(self, roleId = None, cu = None):
         if cu is None:
             cu = self.db.cursor()
-        where, args = self.getWhereArgs("where", userGroupId = roleId)
-        cu.execute("delete from UserGroupInstancesCache %s" % (where,), args)
+        where = self.getWhereArgs("where", userGroupId = roleId)
+        cu.execute("delete from UserGroupInstancesCache %s" % (where,))
         # first, rebuild the flattened tables
         logMe(3, "rebuilding UserGroupAllTroves", "roleId=%s" % roleId)
         self.rt.rebuild(cu, roleId = roleId)
@@ -583,8 +603,8 @@ class RoleInstances(RoleTable):
         select userGroupId, instanceId, case when sum(canWrite) = 0 then 0 else 1 end
         from UserGroupAllPermissions %s
         group by userGroupId, instanceId
-        """ % (where,), args)
-        cond, args = self.getWhereArgs("and", userGroupId = roleId)
+        """ % (where,))
+        cond = self.getWhereArgs("and", userGroupId = roleId)
         logMe(3, "updating UserGroupInstancesCache from UserGroupAllTroves")
         cu.execute("""
         insert into UserGroupInstancesCache(userGroupId, instanceId, canWrite)
@@ -594,7 +614,7 @@ class RoleInstances(RoleTable):
             select 1 from UserGroupInstancesCache as ugi
             where ugat.instanceId = ugi.instanceId
               and ugat.userGroupId = ugi.userGroupId )
-        %s """ % (cond,), args)
+        %s """ % (cond,))
         self.db.analyze("UserGroupInstancesCache")
         # need to rebuild the latest as well
         logMe(3, "rebuilding the LatestCache rows", "roleId=%s"%roleId)

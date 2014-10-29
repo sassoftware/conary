@@ -172,7 +172,6 @@ class TroveStore:
         itemId = self.items.get(item, None)
         if itemId is None:
             itemId = self.items.addId(item)
-        self.items.updateCheckTrove(itemId, item)
         self.itemIdCache[item] = itemId
         return itemId
 
@@ -444,8 +443,6 @@ class TroveStore:
         """)
 
     def _mergeIncludedTroves(self, cu):
-        # need to use self.items.addId to keep the CheckTroveCache in
-        # sync for any new items we might add
         cu.execute("""
         INSERT INTO Items (item)
         SELECT DISTINCT tmpTroves.item FROM tmpTroves
@@ -689,16 +686,13 @@ class TroveStore:
                            start_transaction=False)
             self.db.analyze("tmpNewRedirects")
 
-            # again need to pay attention to CheckTrovesCache and use
-            # items.addId()
             cu.execute("""
+            INSERT INTO Items (item)
             SELECT tmpNewRedirects.item
             FROM tmpNewRedirects
             LEFT JOIN Items USING (item)
             WHERE Items.itemId is NULL
             """)
-            for (newItem,) in cu.fetchall():
-                self.items.addId(newItem)
 
             cu.execute("""
             INSERT INTO Branches (branch)
@@ -1527,18 +1521,6 @@ class TroveStore:
         # clean up Items
         cu.execute("""
         delete from Items
-        where itemId in (
-            select r.itemId
-            from tmpRemovals as r
-            where not exists (select itemId from Instances as i where i.itemId = r.itemId)
-            and not exists (select itemId from Nodes as n where n.itemId = r.itemId)
-            and not exists (select itemId from TroveRedirects as tr where tr.itemId = r.itemId)
-            and not exists (select itemId from Permissions as p where p.itemId = r.itemId)
-        )""")
-
-        # clean up CheckTroveCache
-        cu.execute("""
-        delete from CheckTroveCache
         where itemId in (
             select r.itemId
             from tmpRemovals as r

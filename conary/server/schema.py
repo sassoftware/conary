@@ -344,7 +344,6 @@ def createLatest(db, withIndexes = True):
         if createTrigger(db, "LatestCache"):
             commit = True
 
-    # a cache table for netauth.checktrove calls for use in SQL
     if commit:
         db.loadSchema()
 
@@ -976,25 +975,6 @@ def createAccessMaps(db):
     db.createIndex("UserGroupInstancesCache", "UGIC_userGroupIdIdx", "userGroupId,instanceId",
                    unique=True)
     db.createIndex("UserGroupInstancesCache", "UGIC_instanceId_fk", "instanceId")
-
-    # a cache table for netauth.checktrove calls for use in SQL
-    if 'CheckTroveCache' not in db.tables:
-        cu.execute("""
-        CREATE TABLE CheckTroveCache(
-            itemId      INTEGER NOT NULL,
-            patternId   INTEGER NOT NULL,
-            CONSTRAINT CheckTroveCache_itemId_fk
-                FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT CheckTroveCache_patternId_fk
-                FOREIGN KEY (itemId) REFERENCES Items(itemId)
-                ON DELETE CASCADE ON UPDATE CASCADE
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tables["CheckTroveCache"] = []
-        commit = True
-    db.createIndex("CheckTroveCache", "CheckTroveCache_itemId_fk",
-                   "itemId,patternId", unique = True)
-    db.createIndex("CheckTroveCache", "CheckTroveCache_patternId_fk", "patternId")
 
     if commit:
         db.loadSchema()

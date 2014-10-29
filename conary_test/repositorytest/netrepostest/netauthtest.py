@@ -529,6 +529,10 @@ class NetAuthTest2(rephelp.RepositoryHelper):
         na.addRoleMember(username, username)
 
     def testBatchCheck(self):
+        # If this test spontaneously fails, it might be due to a broken sqlite.
+        # Make sure you're using a modern embedded copy and not the one from
+        # the system on CentOS 6. Production builds of Conary always ship with
+        # an embedded sqlite.
         self.openRepository()
         db = self._setupDB()
         na = netauth.NetworkAuthorization(db, "localhost")

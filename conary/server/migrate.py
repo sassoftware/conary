@@ -477,30 +477,6 @@ class MigrateTo_15(SchemaMigration):
         # we make this a noop because the same will be done at schema 16.1
         return True
 
-# populate the CheckTroveCache table
-def createCheckTroveCache(db):
-    db.loadSchema()
-    assert("CheckTroveCache" in db.tables)
-    cu = db.cursor()
-    cu.execute("delete from CheckTroveCache")
-    # grab all possible patterns
-    cu.execute("select distinct i.itemId, i.item "
-               "from Permissions join Items as i using(itemId)")
-    patterns = set([(x[0],x[1]) for x in cu.fetchall()])
-    patterns.add((0, "ALL"))
-    # grab all items
-    cu.execute("select itemId, item from Items")
-    items = cu.fetchall()
-    from conary.repository.netrepos.items import checkTrove
-    for (patternId, pattern) in patterns:
-        for (itemId, troveName) in items:
-            if not checkTrove(pattern, troveName):
-                continue
-            cu.execute("insert into CheckTroveCache (patternId, itemId) values (?,?)",
-                    (patternId, itemId))
-    db.analyze("CheckTroveCache")
-    return True
-
 
 class MigrateTo_16(SchemaMigration):
     Version = (16,1)
@@ -626,9 +602,6 @@ class MigrateTo_16(SchemaMigration):
             cu.execute("drop table Caps")
         schema.createAccessMaps(self.db)
         schema.createLatest(self.db, withIndexes=False)
-        logMe(2, "creating the CheckTroveCache table...")
-        if not createCheckTroveCache(self.db):
-            return False
         logMe(2, "creating UserGroupInstancesCache table")
         ugi = accessmap.RoleInstances(self.db)
         ugi.rebuild()
@@ -830,6 +803,8 @@ class MigrateTo_18(SchemaMigration):
         cu = self.db.cursor()
         if 'Prefixes' in self.db.tables:
             cu.execute("DROP TABLE Prefixes")
+        if 'CheckTroveCache' in self.db.tables:
+            cu.execute("DROP TABLE CheckTroveCache")
         return True
 
 def _getMigration(major):
