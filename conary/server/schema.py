@@ -589,23 +589,6 @@ def createTroves(db, createIndex = True):
 
     if idtable.createIdTable(db, "Dirnames", "dirnameId", "dirname", colType = 'PATHTYPE'):
         commit = True
-    if 'Prefixes' not in db.tables:
-        cu.execute("""
-        CREATE TABLE Prefixes(
-            dirnameId   INTEGER NOT NULL,
-            prefixId    INTEGER NOT NULL,
-            CONSTRAINT  Prefixes_dirnameId_fk
-                FOREIGN KEY (dirnameId) REFERENCES Dirnames(dirnameId)
-                ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT Prefixes_prefixId_fk
-                FOREIGN KEY (prefixId) REFERENCES Dirnames(dirnameId)
-                ON DELETE RESTRICT ON UPDATE CASCADE
-        ) %(TABLEOPTS)s""" % db.keywords)
-        db.tables["Prefixes"] = []
-        commit = True
-    if createIndex:
-        db.createIndex("Prefixes", "PrefixesDirnameIdPrefixId_uq", "dirnameId, prefixId", unique = True)
-        db.createIndex("Prefixes", "PrefixesPrefixId_fk", "prefixId")
     if idtable.createIdTable(db, "Basenames", "basenameId", "basename", colType = 'PATHTYPE'):
         commit = True
 

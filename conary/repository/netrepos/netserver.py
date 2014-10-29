@@ -2273,19 +2273,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return """join tmpId on fp.dirnameId = tmpId.id """
 
         prefixQuery = ""
-        if dirnames:
-            if clientVersion < 62: # dirnames are in fact filePrefixes
-                # if we're asked for all files with a '/' prefix, don't bother
-                # "optimizing" since no records will be filtered out
-                if not ('/' in dirnames):
-                    prefixQuery = _lookupIds(cu, dirnames, [
-                        """ select p.dirnameId from tmpPaths
-                            join Dirnames as d on tmpPaths.path = d.dirname
-                            join Prefixes as p on d.dirnameId = p.prefixId """,
-                        """ select d.dirnameId from tmpPaths
-                            join Dirnames as d on tmpPaths.path = d.dirname """ ])
-            else: # dirnames are just dirnames
-                prefixQuery = _lookupIds(cu, dirnames, [
+        # Before version 62, dirnames were sent as prefixes. That table has
+        # been dropped though, so just return unfiltered results.
+        if dirnames and clientVersion >= 62:
+            prefixQuery = _lookupIds(cu, dirnames, [
                     """ select d.dirnameId from tmpPaths
                         join Dirnames as d on tmpPaths.path = d.dirname """ ])
 

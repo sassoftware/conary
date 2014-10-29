@@ -131,44 +131,6 @@ class TroveAdder:
         self.dirMap = dirMap
         self.baseMap = baseMap
 
-# we need to call this from the schema migration as well, which is why
-# we extracted it from the TroveStore class
-def addPrefixesFromList(db, dirnameList):
-    prefixList = []
-    # all the new dirnames need to be processed for Prefixes links
-    def _getPrefixes(dirname):
-        # note: we deliberately do not insert '/' as a prefix for
-        # all directories, since not walking through the Prefixes
-        # is faster than looping through the entire Dirnames set
-        d, b = os.path.split(dirname)
-        if d == '/':
-            return [dirname]
-        if d == '':
-            return []
-        ret = _getPrefixes(d)
-        ret.append(dirname)
-        return ret
-    def _iterPrefixes(cu, dl):
-        for dirnameId, dirname in dl:
-            for x in _getPrefixes(dirname):
-                yield (dirnameId, cu.binary(x))
-        raise StopIteration
-    if not dirnameList:
-        return 0
-    cu = db.cursor()
-    schema.resetTable(cu, "tmpPaths")
-    db.bulkload("tmpPaths", _iterPrefixes(cu, dirnameList), ["id", "path"])
-    db.analyze("tmpPaths")
-    # insert any new prefix strings into Dirnames
-    cu.execute("""insert into Dirnames(dirname)
-    select distinct t.path from tmpPaths as t
-    left join Dirnames as d on t.path = d.dirname
-    where d.dirnameId is null """)
-    # now populate Prefixes
-    cu.execute(""" insert into Prefixes (dirnameId, prefixId)
-    select tmpPaths.id, d.dirnameId from tmpPaths
-    join Dirnames as d on tmpPaths.path = d.dirname """)
-    return len(dirnameList)
 
 class TroveStore:
     def __init__(self, db, log = None):
@@ -778,8 +740,6 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewPaths')
         l = [(cu.binary(x),) for x in dirNames]
         self.db.bulkload("tmpNewPaths", l, [ "path" ])
-        cu.execute("SELECT MAX (dirNameId) FROM Dirnames")
-        max = cu.next()[0]
         cu.execute("""
             INSERT INTO Dirnames (dirName)
                 SELECT path FROM tmpNewPaths
@@ -787,10 +747,6 @@ class TroveStore:
                         Dirnames.dirName = tmpNewPaths.path
                     WHERE Dirnames.dirNameId IS NULL
         """)
-        cu.execute("SELECT dirNameId, dirName FROM Dirnames "
-                   "WHERE dirNameId > ?", max)
-        addPrefixesFromList(self.db, [ (x[0], cu.frombinary(x[1])) for x in cu ])
-
         cu.execute("""
                 SELECT Dirnames.dirName, Dirnames.dirNameId FROM
                     tmpNewPaths JOIN Dirnames ON
@@ -1413,12 +1369,9 @@ class TroveStore:
             cu.execute("DELETE FROM FilePaths WHERE filePathId IN (%s)"
                        % ",".join("%d"%x for x in filePathIdsToRemove))
             # XXX: these cleanups are more expensive than they're worth, probably
-            cu.execute(""" delete from Prefixes where not exists (
-                select 1 from FilePaths as fp where fp.dirnameId = Prefixes.dirnameId ) """)
             cu.execute(""" delete from Dirnames where not exists (
                 select 1 from FilePaths as fp where fp.dirnameId = Dirnames.dirnameId )
-            and not exists (
-                select 1 from Prefixes as p where p.prefixId = Dirnames.dirnameId ) """)
+                """)
             cu.execute(""" delete from Basenames where not exists (
                 select 1 from FilePaths as fp where fp.basenameId = Basenames.basenameId ) """)
 
