@@ -278,7 +278,10 @@ def setupLogging(logPath=None, consoleLevel=logging.WARNING,
         level = min(level, fileLevel)
 
     # Undo default conary logger
-    logging.getLogger(LOGGER_CONARY).handlers[:] = []
+    cnylog = logging.getLogger(LOGGER_CONARY)
+    cnylog.handlers[:] = []
+    cnylog.setLevel(logging.NOTSET)
+    cnylog._loaded = True
 
     logger.setLevel(level)
     return logger

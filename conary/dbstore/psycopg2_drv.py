@@ -119,6 +119,8 @@ class Cursor(BaseCursor):
         # object instead of accumulating all rows into one big buffer, but it
         # does not seem to have any noticeable performance impact on commit
         # times and this way is more robust.
+        if not rows:
+            return
         sio = StringIO()
         for row in rows:
             sio.write(_formatBulk(row))
@@ -321,6 +323,12 @@ class Database(BaseDatabase):
     def truncate(self, *tables):
         cu = self.cursor()
         cu.execute("TRUNCATE TABLE " + ", ".join(tables))
+
+    def lockTable(self, tableName):
+        cu = self.cursor()
+        # "This mode protects a table against concurrent data changes, and is
+        # self-exclusive so that only one session can hold it at a time."
+        cu.execute("LOCK TABLE %s IN SHARE ROW EXCLUSIVE MODE" % (tableName,))
 
     def runAutoCommit(self, func, *args, **kwargs):
         """Call the given function in auto-commit mode. Needed to execute

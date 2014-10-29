@@ -388,6 +388,12 @@ class Database(BaseDatabase):
         cu = self.cursor()
         cu.execute("TRUNCATE TABLE " + ", ".join(tables))
 
+    def lockTable(self, tableName):
+        cu = self.cursor()
+        # "This mode protects a table against concurrent data changes, and is
+        # self-exclusive so that only one session can hold it at a time."
+        cu.execute("LOCK TABLE %s IN SHARE ROW EXCLUSIVE MODE" % (tableName,))
+
     # resetting the auto increment values of primary keys
     def setAutoIncrement(self, table, column, value = None):
         cu = self.cursor()
