@@ -15,9 +15,10 @@
 # limitations under the License.
 #
 
-
+import warnings
 import sys
 from testrunner import suite
+from conary import sqlite3
 
 from conary_test import resources
 
@@ -37,6 +38,10 @@ class Suite(suite.TestSuite):
         assert 'rpm._rpm' not in sys.modules
         from conary_test import norpmlock
         norpmlock.open(resources.get_path('conary_test', '_norpmlock.so'))
+        if sqlite3.sqlite_version_info() < (3,7,0):
+            warnings.warn("conary.sqlite3 is linked against a too-old system "
+                    "sqlite that is known to have bugs affecting the "
+                    "repository.")
 
     def getCoverageExclusions(self, handler, environ):
         return ['scripts/.*', 'epdb.py', 'stackutil.py']

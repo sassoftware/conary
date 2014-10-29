@@ -25,6 +25,7 @@ from conary.repository.netrepos import netauth
 from conary.repository.netrepos.auth_tokens import AuthToken
 from conary.repository.netrepos.trovestore import TroveStore
 from conary.server import schema
+from conary import sqlite3
 from conary import versions
 from conary.deps import deps
 
@@ -529,10 +530,8 @@ class NetAuthTest2(rephelp.RepositoryHelper):
         na.addRoleMember(username, username)
 
     def testBatchCheck(self):
-        # If this test spontaneously fails, it might be due to a broken sqlite.
-        # Make sure you're using a modern embedded copy and not the one from
-        # the system on CentOS 6. Production builds of Conary always ship with
-        # an embedded sqlite.
+        if sqlite3.sqlite_version_info() < (3,7,0):
+            raise testhelp.SkipTestException("buggy sqlite; use embedded sqlite")
         self.openRepository()
         db = self._setupDB()
         na = netauth.NetworkAuthorization(db, "localhost")
