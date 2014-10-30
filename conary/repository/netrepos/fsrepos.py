@@ -111,6 +111,21 @@ class FilesystemChangeSetJob(ChangeSetJob):
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
 
+    def _filterRestoreList(self, configRestoreList, normalRestoreList):
+        # The base class version of this method will re-store contents already
+        # in the repository for refcounting purposes, but repository datastores
+        # do not refcount. This one just checks if contents exist.
+        def filterOne(restoreList):
+            inReposList = self._containsFileContents(tup[2]
+                    for tup in restoreList)
+            return [x for (x, inRepos) in zip(restoreList, inReposList)
+                    if not inRepos]
+
+        configRestoreList = filterOne(configRestoreList)
+        normalRestoreList = filterOne(normalRestoreList)
+        return configRestoreList, normalRestoreList
+
+
 class UpdateCallback(callbacks.UpdateCallback):
     def __init__(self, statusPath, trustThreshold, keyCache):
         self.path = statusPath
