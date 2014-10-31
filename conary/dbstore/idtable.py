@@ -59,7 +59,7 @@ def createIdPairTable(db, tableName, tup1, tup2, item):
         commit = True
     return commit
 
-class IdTable:
+class IdTable(object):
     """
     Generic table for assigning id's to simple items.
     """
@@ -162,6 +162,7 @@ class IdTable:
 
     def items(self):
         return [ x for x in self.iteritems() ]
+
 
 class CachedIdTable(IdTable):
     """

@@ -20,6 +20,7 @@ import itertools
 
 from conary import files, trove, versions, changelog, callbacks
 from conary.cmds import metadata
+from conary.dbstore import idtable
 from conary.deps import deps
 from conary.lib import util, tracelog
 from conary.local import deptable
@@ -30,36 +31,6 @@ from conary.repository.netrepos import instances, items, keytable, flavors,\
      troveinfo, versionops, cltable, accessmap
 from conary.server import schema
 
-
-class LocalRepVersionTable(versiontable.VersionTable):
-
-    def getId(self, theId, itemId):
-        cu = self.db.cursor()
-        cu.execute("""
-        SELECT Versions.version, Nodes.timeStamps
-        FROM Nodes
-        JOIN Versions USING (versionId)
-        WHERE Nodes.versionId=? AND Nodes.itemId=?
-        """, theId, itemId)
-        try:
-            (s, t) = cu.next()
-            v = self._makeVersion(s, t)
-            return v
-        except StopIteration:
-            raise KeyError, theId
-
-    def getTimeStamps(self, version, itemId):
-        cu = self.db.cursor()
-        cu.execute("""
-        SELECT timeStamps
-        FROM Nodes
-        WHERE versionId = (SELECT versionId from Versions WHERE version=?)
-          AND itemId=?""", version.asString(), itemId)
-        try:
-            (t,) = cu.next()
-            return [ float(x) for x in t.split(":") ]
-        except StopIteration:
-            raise KeyError, itemId
 
 class TroveAdder:
 
@@ -141,7 +112,7 @@ class TroveStore:
         self.branchTable = versionops.BranchTable(self.db)
         self.changeLogs = cltable.ChangeLogTable(self.db)
 
-        self.versionTable = LocalRepVersionTable(self.db)
+        self.versionTable = versiontable.VersionTable(self.db)
         self.versionOps = versionops.SqlVersioning(
             self.db, self.versionTable, self.branchTable)
         self.instances = instances.InstanceTable(self.db)

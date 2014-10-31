@@ -14,75 +14,40 @@
 # limitations under the License.
 #
 
-
 from conary import versions
+from conary.dbstore import idtable
 
-# XXX: this looks awfully similar to an idtable...
-class VersionTable:
+class VersionTable(idtable.IdTable):
     """
     Maps a version to an id and timestamp pair.
     """
-    noVersion = 0
 
     def __init__(self, db):
-        self.db = db
+        idtable.IdTable.__init__(self, db, 'Versions', 'versionId', 'version')
 
     def addId(self, version):
-        cu = self.db.cursor()
-        cu.execute("INSERT INTO Versions (version) VALUES (?)",
-                   version.asString())
-        return cu.lastrowid
-
-    def delId(self, theId):
-        assert(type(theId) is int)
-        cu = self.db.cursor()
-        cu.execute("DELETE FROM Versions WHERE versionId=?", theId)
-
-    def _makeVersion(self, str, timeStamps):
-        ts = [ float(x) for x in timeStamps.split(":") ]
-        v = versions.VersionFromString(str, timeStamps=ts)
-        return v
+        return idtable.IdTable.addId(self, version.asString())
 
     def getBareId(self, theId):
         """
         Gets a version object w/o setting any timestamps.
         """
-        cu = self.db.cursor()
-        cu.execute("""SELECT version FROM Versions
-                      WHERE Versions.versionId=?""", theId)
-        try:
-            (s, ) = cu.next()
-            return versions.VersionFromString(s)
-        except StopIteration:
-            raise KeyError, theId
+        return versions.VersionFromString(self.getId(theId))
 
     def has_key(self, version):
-        cu = self.db.cursor()
-        cu.execute("SELECT versionId FROM Versions WHERE version=?",
-                   version.asString())
-        return not(cu.fetchone() == None)
+        return idtable.IdTable.has_key(self, version.asString())
 
     def __delitem__(self, version):
-        cu = self.db.cursor()
-        cu.execute("DELETE FROM Versions WHERE version=?", version.asString())
+        idtable.IdTable.__delitem__(self, version.asString())
 
     def __getitem__(self, version):
         v = self.get(version, None)
-        if v == None:
-            raise KeyError, version
-
+        if v is None:
+            raise KeyError(version)
         return v
 
     def get(self, version, defValue):
-        cu = self.db.cursor()
-        cu.execute("SELECT versionId FROM Versions WHERE version=?",
-                   version.asString())
-
-        item = cu.fetchone()
-        if item:
-            return item[0]
-        else:
-            return defValue
+        return idtable.IdTable.get(self, version.asString(), defValue)
 
     def removeUnused(self):
         # removes versions which don't have parents and aren't used
