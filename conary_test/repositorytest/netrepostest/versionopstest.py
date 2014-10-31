@@ -17,6 +17,7 @@
 
 from conary_test import dbstoretest
 
+from conary.local import versiontable
 from conary.versions import VersionFromString
 from conary.versions import ThawVersion
 from conary.versions import Label
@@ -30,7 +31,7 @@ class VersionsSqlTest(dbstoretest.DBStoreTestBase):
     def testVersionTable(self):
         db = self.getDB()
         schema.createIdTables(db)
-        tbl = trovestore.LocalRepVersionTable(db)
+        tbl = versiontable.VersionTable(db)
 
         v1 = VersionFromString("/conary.rpath.com@test:trunk/1.2-3")
         v2 = VersionFromString("/conary.rpath.com@test:trunk/1.4-5")
@@ -76,7 +77,7 @@ class VersionsSqlTest(dbstoretest.DBStoreTestBase):
         db = self.getDB()
         schema.createSchema(db)
 
-        vTbl = trovestore.LocalRepVersionTable(db)
+        vTbl = versiontable.VersionTable(db)
         bTbl = versionops.BranchTable(db)
         sv = versionops.SqlVersioning(db, vTbl, bTbl)
         i = items.Items(db)
@@ -107,21 +108,21 @@ class VersionsSqlTest(dbstoretest.DBStoreTestBase):
         self.assertRaises(versionops.DuplicateVersionError,
                           sv.createVersion, itemId2, v10, 0, None)
 
-        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)]
-                    == [ v10 ])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)]
+                    == [ str(v10) ])
 
         sv.createVersion(1, v20, 0, None)
-        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)]
-                    == [ v20, v10 ])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)]
+                    == [ str(v20), str(v10) ])
 
         sv.createVersion(1, v15, 0, None)
         db.commit()
-        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)] ==
-               [ v20, v15, v10 ])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
+               [ str(v20), str(v15), str(v10) ])
 
         sv.createVersion(1, v5, 0, None)
-        assert([vTbl.getId(x, 1) for x in sv.versionsOnBranch(1, branchId)] ==
-               [ v20, v15, v10, v5 ])
+        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
+               [ str(v20), str(v15), str(v10), str(v5) ])
 
         label = Label("conary.rpath.com@test:trunk")
         assert [bTbl.getId(x) for x in sv.branchesOfLabel(1, label) ]\
@@ -141,51 +142,11 @@ class VersionsSqlTest(dbstoretest.DBStoreTestBase):
         assert([bTbl.getId(x) for x in sv.branchesOfItem(1)] ==
                     [ branch, branch1, branch2 ])
 
-        return
-
-        # erasing doesn't work
-
-        sv.eraseVersion(1, vTbl[v20])
-        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
-               [ v15, v10, v5 ])
-        vTbl.removeUnused()
-        assert(not vTbl.has_key(v20))
-
-        sv.eraseVersion(1, vTbl[v10])
-        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
-                [ v15, v5 ])
-        # we created this for node 2 as well
-        vTbl.removeUnused()
-        assert(vTbl.has_key(v10))
-
-        sv.eraseVersion(1, vTbl[v5])
-        assert([vTbl.getId(x) for x in sv.versionsOnBranch(1, branchId)] ==
-                [ v15 ])
-        vTbl.removeUnused()
-        assert(not vTbl.has_key(v5))
-
-        sv.eraseVersion(1, vTbl[v15])
-        assert([x for x in sv.versionsOnBranch(1, branchId)] == [ ])
-        vTbl.removeUnused()
-        assert(not vTbl.has_key(v15))
-
-        sv.eraseVersion(2, vTbl[v10])
-        vTbl.removeUnused()
-        assert(not vTbl.has_key(v10))
-
-        assert(bTbl.has_key(branch))
-        assert(bTbl.has_key(branch1))
-        assert(bTbl.has_key(branch2))
-        bTbl.removeUnused()
-        assert(not bTbl.has_key(branch))
-        assert(not bTbl.has_key(branch1))
-        assert(not bTbl.has_key(branch2))
-
     def testNodesTable(self):
         db = self.getDB()
         schema.createSchema(db)
         b = versionops.BranchTable(db)
-        v = trovestore.LocalRepVersionTable(db)
+        v = versiontable.VersionTable(db)
         i = items.Items(db)
         sv = versionops.SqlVersioning(db, v, b)
         ver = ThawVersion("/a.b.c@d:e/1:1-1-1")

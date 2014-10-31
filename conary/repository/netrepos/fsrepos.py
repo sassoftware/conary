@@ -291,8 +291,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 label = v.branch().label()
                 raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
-        self.troveStore.begin(serialize)
-
         if self.requireSigs:
             threshold = openpgpfile.TRUST_FULL
         else:
@@ -303,6 +301,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             callback = UpdateCallback(statusPath=statusPath,
                     trustThreshold=threshold,
                     keyCache=self.troveStore.keyTable.keyCache)
+        # Restore contents first, before any shared database resources get
+        # locked.
+        preRestored = set()
+        for sha1, fobj in cs.iterRegularFileContents():
+            cont = filecontents.FromFile(fobj, compressed=True)
+            self._storeFileFromContents(cont, sha1, restoreContents=True,
+                    precompressed=True)
+            preRestored.add(sha1)
+        cs.reset()
+        self.troveStore.begin(serialize)
         try:
             # reset time stamps only if we're not mirroring.
             FilesystemChangeSetJob(self, cs, self.serverNameList,
@@ -312,7 +320,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                    hidden = hidden,
                                    excludeCapsuleContents =
                                         excludeCapsuleContents,
-                                   requireSigs = self.requireSigs)
+                                   requireSigs = self.requireSigs,
+                                   preRestored=preRestored,
+                                   )
         except (openpgpfile.KeyNotFound, errors.DigitalSignatureVerificationError):
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()

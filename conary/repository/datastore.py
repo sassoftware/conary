@@ -56,7 +56,6 @@ class AbstractDataStore:
     def _writeFile(cls, fileObj, outFds, precompressed, computeSha1):
         if precompressed and hasattr(fileObj, '_fdInfo'):
             (fd, start, size) = fileObj._fdInfo()
-            pid = os.getpid()
             realHash = digest_uncompress.sha1Copy((fd, start, size), outFds)
             for x in outFds:
                 cls._fchmod(x)

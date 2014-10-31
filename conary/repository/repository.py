@@ -699,7 +699,9 @@ class ChangeSetJob:
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False, allowIncomplete = False,
                  hidden = False, mirror = False,
-                 excludeCapsuleContents = False):
+                 excludeCapsuleContents = False,
+                 preRestored=None,
+                 ):
 
         self.repos = repos
         self.cs = cs
@@ -753,6 +755,29 @@ class ChangeSetJob:
         configRestoreList.sort(key=lambda x: x[0:5])
         normalRestoreList.sort(key=lambda x: x[0:3])
 
+        self._restoreConfig(cs, configRestoreList)
+        self._restoreNormal(cs, normalRestoreList, preRestored)
+
+        #del configRestoreList
+        #del normalRestoreList
+
+        for csTrove in newList:
+            if csTrove.troveType() != trove.TROVE_TYPE_REMOVED:
+                continue
+
+            troveNo += 1
+
+            if callback:
+                callback.creatingDatabaseTransaction(troveNo, len(newList))
+
+            self.markTroveRemoved(csTrove.getName(), csTrove.getNewVersion(),
+                                  csTrove.getNewFlavor())
+
+        for (troveName, version, flavor) in cs.getOldTroveList():
+            trv = self.repos.getTrove(troveName, version, flavor)
+            self.oldTrove(trv, None, troveName, version, flavor)
+
+    def _restoreConfig(self, cs, configRestoreList):
         # config files are cached, so we don't have to worry about not
         # restoring the same fileId/pathId twice
         for (pathId, newFileId, sha1, oldfile, newFileId,
@@ -791,11 +816,14 @@ class ChangeSetJob:
 
             self.addFileContents(sha1, fileContents, restoreContents, 1)
 
+    def _restoreNormal(self, cs, normalRestoreList, preRestored):
         ptrRestores = []
         ptrRefsAdded = {}
         lastRestore = None         # restore each pathId,fileId combo once
         while normalRestoreList:
             (pathId, fileId, sha1, restoreContents) = normalRestoreList.pop(0)
+            if preRestored is not None and sha1 in preRestored:
+                continue
             if (pathId, fileId) == lastRestore:
                 continue
 
@@ -834,22 +862,3 @@ class ChangeSetJob:
                 del ptrRefsAdded[sha1]
             else:
                 self.addFileContents(sha1, None, False, 0)
-
-        #del configRestoreList
-        #del normalRestoreList
-
-        for csTrove in newList:
-            if csTrove.troveType() != trove.TROVE_TYPE_REMOVED:
-                continue
-
-            troveNo += 1
-
-            if callback:
-                callback.creatingDatabaseTransaction(troveNo, len(newList))
-
-            self.markTroveRemoved(csTrove.getName(), csTrove.getNewVersion(),
-                                  csTrove.getNewFlavor())
-
-        for (troveName, version, flavor) in cs.getOldTroveList():
-            trv = self.repos.getTrove(troveName, version, flavor)
-            self.oldTrove(trv, None, troveName, version, flavor)
