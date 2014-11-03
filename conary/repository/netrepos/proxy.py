@@ -1574,6 +1574,8 @@ class Memcache(object):
                 key_prefix = "TROVEINFO")
 
     def pokeCounter(self, name, delta):
+        if not delta:
+            return
         if self.memCachePrefix:
             name = self.memCachePrefix + ':' + name
         if not self.memCache.incr(name, delta):
