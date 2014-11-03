@@ -56,23 +56,22 @@ class IntegrityTest(rephelp.RepositoryHelper):
         os.close(fd)
         outfc = filecontainer.FileContainer(open(path, "w"))
 
-        # first is the trove delta
-        (name, tag, f) = infc.getNextFile()
-        outfc.addFile(name, filecontents.FromFile(f), tag,
-                      precompressed = True)
-
-        # next let's modify the file a bit
-        (name, tag, f) = infc.getNextFile()
-        contents = gzip.GzipFile(None, "r", fileobj = f).read()
-        contents = chr(ord(contents[0]) ^ 0xff) + contents[1:]
-        outfc.addFile(name, filecontents.FromString(contents), tag)
-
-        next = infc.getNextFile()
-        while next is not None:
-            (name, tag, f) = next
-            outfc.addFile(name, filecontents.FromFile(f), tag,
-                          precompressed = True)
+        n = 0
+        while True:
             next = infc.getNextFile()
+            if not next:
+                break
+            (name, tag, f) = next
+            n += 1
+            if n == 2 or n == 5:
+                # modify the file a bit
+                contents = gzip.GzipFile(None, "r", fileobj = f).read()
+                contents = chr(ord(contents[0]) ^ 0xff) + contents[1:]
+                outfc.addFile(name, filecontents.FromString(contents), tag)
+            else:
+                contents = filecontents.FromFile(f)
+                outfc.addFile(name, filecontents.FromFile(f), tag,
+                        precompressed=True)
 
         infc.close()
         outfc.close()
