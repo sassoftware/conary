@@ -1,3 +1,0 @@
-When committing changesets to a repository, regular contents are written before
-the database operations begin. This avoids holding the commit lock any longer
-than necessary.
