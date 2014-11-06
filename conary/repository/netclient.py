@@ -1326,7 +1326,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not self.c.singleServer(*verSet):
             raise errors.CannotCalculateDownloadSize('job on multiple servers')
 
-        server = self.c[jobList[0][2][0]]
+        if jobList[0][2][0] is None:
+            # this trove is being removed, so use old version
+            server = self.c[jobList[0][1][0]]
+        else:
+            server = self.c[jobList[0][2][0]]
 
         if server.getProtocolVersion() >= 51:
             infoList = server.getChangeSet(wireJobs, False, True, True,

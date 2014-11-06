@@ -1,0 +1,1 @@
+Fix attempting to open repo None when calculating changeset size
