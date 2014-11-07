@@ -654,16 +654,11 @@ class ChangesetFilter(BaseProxy):
                 "Unable to produce changeset version %s "
                 "with upstream server %s" % (neededCsVersion, wireCsVersion))
 
-        try:
-            changeSetList = self._getNeededChangeSets(caller,
+        changeSetList = self._getNeededChangeSets(caller,
                 authToken, verPath, chgSetList, serverVersion,
                 getCsVersion, wireCsVersion, neededCsVersion,
                 recurse, withFiles, withFileContents, excludeAutoSource,
                 mirrorMode, infoOnly)
-        finally:
-            if self.csCache:
-                # In case we missed releasing some of the locks
-                self.csCache.resetLocks()
 
         if not infoOnly:
             (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir,
@@ -831,14 +826,8 @@ class ChangesetFilter(BaseProxy):
             # We have no cache, so don't even bother
             return changeSetList
 
-        # We need to order by fingerprint first
-        # This prevents deadlocks from occurring - as long as different
-        # processes acquire locks in the same order, we should be fine
-        orderedData = sorted(
-            enumerate(itertools.izip(chgSetList, fingerprints)),
-            key = lambda x: x[1][1])
-
-        for jobIdx, (rawJob, fingerprint) in orderedData:
+        for jobIdx, (rawJob, fingerprint) in enumerate(itertools.izip(
+                chgSetList, fingerprints)):
             # if we have both a cs fingerprint and a cache, then we will
             # cache the cs for this job
             cachable = bool(fingerprint)
@@ -847,11 +836,7 @@ class ChangesetFilter(BaseProxy):
 
             # look up the changeset in the cache, oldest to newest
             for iterV in verPath:
-                # We will only lock the last version (wireCsVersion)
-                # Everything else gets derived from it, and is fast to convert
-                shouldLock = (iterV == verPath[-1])
-                csInfo = self.csCache.get((fingerprint, iterV),
-                    shouldLock = shouldLock)
+                csInfo = self.csCache.get((fingerprint, iterV))
                 if csInfo:
                     # Found in the cache (possibly with an older version)
                     csInfo.fingerprint = fingerprint
@@ -1967,10 +1952,6 @@ class ChangesetCache(object):
     def __init__(self, dataStore, logPath=None):
         self.dataStore = dataStore
         self.logPath = logPath
-        self.locksMap = {}
-        # Use only 1/4 our file descriptor limit for locks
-        limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
-        self.maxLocks = limit / 4
 
     def hashKey(self, key):
         (fingerPrint, csVersion) = key
@@ -1984,11 +1965,7 @@ class ChangesetCache(object):
         csDir = os.path.dirname(csPath)
         util.mkdirChain(csDir)
 
-        csObj = self.locksMap.get(csPath)
-        if csObj is None:
-            # We did not get a lock for it
-            csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
-
+        csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
         try:
             written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
         except transport.MultipartDecodeError:
@@ -2004,60 +1981,26 @@ class ChangesetCache(object):
 
         csInfoObj.commit()
         csObj.commit()
-        # If we locked the cache file, we need to no longer track it
-        self.locksMap.pop(csPath, None)
-
         self._log('WRITE', key, size=sizeLimit)
 
         return csPath
 
-    def get(self, key, shouldLock = True):
+    def get(self, key):
         csPath = self.hashKey(key)
         csVersion = key[1]
         dataPath = csPath + '.data'
-        if len(self.locksMap) >= self.maxLocks:
-            shouldLock = False
 
-        lockfile = util.LockedFile(csPath)
-        util.mkdirChain(os.path.dirname(csPath))
-        fileObj = lockfile.open(shouldLock=shouldLock)
-
+        fileObj = util.fopenIfExists(csPath, 'r')
         dataFile = util.fopenIfExists(dataPath, "r")
-
-        # Use XOR - if one is None and one is not, we need to regenerate
-        if (fileObj is not None) ^ (dataFile is not None):
-            # We have csPath but not dataPath, or the other way around
-            if not shouldLock:
-                return None
-            # Get rid of csPath - no other process can produce it because
-            # we're holding the lock
-            util.removeIfExists(csPath)
-            util.removeIfExists(dataPath)
-            # Unlock
-            lockfile.close()
-            # Try again
-            fileObj = lockfile.open()
-
-        if fileObj is None:
-            if shouldLock:
-                # We got the lock on csPath
-                self.locksMap[csPath] = lockfile
+        if not fileObj or not dataFile:
             self._log('MISS', key)
             return None
-
-        # touch to refresh atime
-        # This makes sure tmpwatch will not remove this file while we are
-        # reading it (which would not hurt this process, but would invalidate
-        # a perfectly good cache entry)
-        for fobj in [ fileObj, dataFile ]:
-            fobj.read(1)
-            fobj.seek(0)
 
         try:
             csInfo = ChangeSetInfo(pickled = dataFile.read())
             dataFile.close()
         except IOError, err:
-            self._log('MISS', key, errno=err.errno)
+            self._log('MISS', key, errno=err.args[0])
             return None
 
         csInfo.path = csPath
@@ -2067,9 +2010,6 @@ class ChangesetCache(object):
         self._log('HIT', key)
 
         return csInfo
-
-    def resetLocks(self):
-        self.locksMap.clear()
 
     def _log(self, status, key, **kwargs):
         """Log a HIT/MISS/WRITE to file."""
