@@ -142,8 +142,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.readOnlyRepository = cfg.readOnlyRepository
         self.serializeCommits = cfg.serializeCommits
         self.paranoidCommits = cfg.paranoidCommits
-        self.excludeCapsuleContents = cfg.excludeCapsuleContents
         self.geoIpFiles = cfg.geoIpFiles
+        for key in ['capsuleServerUrl', 'excludeCapsuleContents',
+                'injectCapsuleContentServers']:
+            if cfg[key]:
+                raise RuntimeError("Capsule injection is no longer "
+                        "implemented (%s)" % (key,))
 
         self.__delDB = False
         self.log = tracelog.getLog(None)
@@ -1439,11 +1443,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     exception = errors.FileStreamNotFound
                 elif not files.frozenFileHasContents(stream):
                     exception = errors.FileHasNoContents
-                elif (self.excludeCapsuleContents and
-                        files.frozenFileFlags(stream).isEncapsulatedContent()):
-                    # Not permitted to serve this file (which may not exist on
-                    # disk anyway)
-                    exception = errors.FileStreamNotFound
                 else:
                     contents = files.frozenFileContentInfo(stream)
                     filePath = self.repos.contentsStore.hashToPath(
@@ -1540,8 +1539,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                          recurse = recurse,
                                          withFiles = withFiles,
                                          withFileContents = withFileContents,
-                                         excludeCapsuleContents =
-                                                self.excludeCapsuleContents,
                                          excludeAutoSource = excludeAutoSource,
                                          roleIds = roleIds):
             (newCs, trovesNeeded, filesNeeded, removedTroves) = ret
@@ -1609,9 +1606,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # iterator.
             jobDict = dict.fromkeys(jobs)
             jobOrder = jobDict.keys()
-            for result in self.repos.createChangeSet(jobOrder,
-                         excludeCapsuleContents = self.excludeCapsuleContents,
-                         **kwargs):
+            for result in self.repos.createChangeSet(jobOrder, **kwargs):
                 job = jobOrder.pop(0)
                 jobDict[job] = result
 
@@ -1947,8 +1942,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.repos.commitChangeSet(cs, mirror = mirror,
                                    hidden = hidden,
                                    serialize = self.serializeCommits,
-                                   excludeCapsuleContents =
-                                       self.excludeCapsuleContents,
                                    statusPath=statusPath)
 
         if not self.commitAction:
@@ -2008,117 +2001,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     @accessReadOnly
     def getFileContentsCapsuleInfo(self, authToken, clientVersion, fileList):
-        self.log(2, "fileList", fileList)
-
-        # We use _getFileStreams here for the permission checks.
-        fileIdGen = (self.toFileId(x[0]) for x in fileList)
-        fileIdMap =  self._getFileContentsCapsuleInfo(authToken, fileIdGen)
-        result = [ ]
-        for ent in fileList:
-            fileId = ent[0]
-            result.append(fileIdMap.get(fileId, ''))
-        return result
-
-    def _getFileContentsCapsuleInfo(self, authToken, fileIdGen):
-        self.log(3)
-        cu = self.db.cursor()
-
-        roleIds = self.auth.getAuthRoles(cu, authToken)
-        if not roleIds:
-            return {}
-        schema.resetTable(cu, 'tmpFileId')
-
-        # we need to make sure we don't look up the same fileId multiple
-        # times to avoid asking the sql server to do busy work
-        fileIdMap = {}
-        i = 0               # protect against empty fileIdGen
-        for i, fileId in enumerate(fileIdGen):
-            fileIdMap.setdefault(fileId, []).append(i)
-        uniqIdList = fileIdMap.keys()
-
-        # use the list of uniqified fileIds to look up streams in the repo
-        def _iterIdList(uniqIdList):
-            for i, fileId in enumerate(uniqIdList):
-                yield ((i, cu.binary(fileId)))
-        self.db.bulkload("tmpFileId",
-            ((i, cu.binary(fileId)) for (i, fileId) in enumerate(uniqIdList)),
-            ["itemId", "fileId"], start_transaction=False)
-        self.db.analyze("tmpFileId")
-        q = """
-        SELECT DISTINCT tmpFileId.itemId, TroveFiles.instanceId,
-            TroveInfo.changed,
-            TroveInfo.data,
-            Dirnames.dirname,
-            Basenames.basename,
-            FileStreams.sha1
-        FROM tmpFileId
-        JOIN FileStreams ON (tmpFileId.fileId = FileStreams.fileId)
-        JOIN TroveFiles ON (FileStreams.streamId = TroveFiles.streamId)
-        JOIN Instances ON (TroveFiles.instanceId = Instances.instanceId)
-        JOIN UserGroupInstancesCache ON
-            (Instances.instanceId = UserGroupInstancesCache.instanceId)
-        JOIN TroveInfo ON (Instances.instanceId = TroveInfo.instanceId)
-        JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
-        JOIN Dirnames ON (FilePaths.dirnameId = Dirnames.dirnameId)
-        JOIN Basenames ON (FilePaths.basenameId = Basenames.basenameId)
-        WHERE FileStreams.stream IS NOT NULL
-          AND UserGroupInstancesCache.userGroupId IN (%(roleids)s)
-        AND TroveInfo.infoType = ?
-        ORDER BY TroveInfo.changed
-        """ % { 'roleids' : ", ".join("%d" % x for x in roleIds) }
-        cu.execute(q, trove._TROVEINFO_TAG_CAPSULE)
-        fileIdCapsuleList = []
-        instanceIds = set()
-        for (i, instanceId, _, data, dirname, basename, fileSha1) in cu:
-            fileId = uniqIdList[i]
-            trvCapsule = trove.TroveCapsule()
-            trvCapsule.thaw(cu.frombinary(data))
-            instanceIds.add(instanceId)
-            dirname = cu.frombinary(dirname)
-            basename = cu.frombinary(basename)
-            fileSha1 = cu.frombinary(fileSha1)
-            if dirname:
-                filePath = util.joinPaths(dirname, basename)
-            else:
-                filePath= basename
-            fileIdCapsuleList.append((fileId, trvCapsule,
-                filePath, fileSha1, instanceId))
-        instanceIds = sorted(instanceIds)
-
-        # We now have to look up the capsule that is part of this instance,
-        # since we need its sha1
-        schema.resetTable(cu, 'tmpInstanceId')
-        self.db.bulkload("tmpInstanceId", enumerate(instanceIds),
-                         ["idx", "instanceId"], start_transaction=False)
-        self.db.analyze("tmpInstanceId")
-        q = """
-        SELECT DISTINCT tmpInstanceId.idx, FileStreams.sha1, FileStreams.fileId
-        FROM tmpInstanceId
-        JOIN TroveFiles ON (tmpInstanceId.instanceId = TroveFiles.instanceId)
-        JOIN FilePaths ON (TroveFiles.filePathId = FilePaths.filePathId)
-        JOIN FileStreams ON (TroveFiles.streamId = FileStreams.streamId)
-        WHERE FilePaths.pathId = ?
-        """
-        cu.execute(q, cu.binary(trove.CAPSULE_PATHID))
-        instanceIds = dict((instanceIds[i], (cu.frombinary(sha1),
-            cu.frombinary(fileId))) for (i, sha1, fileId) in cu)
-        fileIdMapWithResults = {}
-        for fileId, trvCapsule, filePath, fileSha1, instanceId in fileIdCapsuleList:
-            capsuleSha1, capsuleFileId = instanceIds.get(instanceId)
-            # Send back empty string for filePath if the file is actually the
-            # capsule itself.
-            if capsuleFileId == fileId:
-                filePath = ''
-            epoch = trvCapsule.rpm.epoch()
-            if epoch is None:
-                epoch = ''
-            capsuleKey = (trvCapsule.rpm.name(), epoch,
-                trvCapsule.rpm.version(), trvCapsule.rpm.release(),
-                trvCapsule.rpm.arch())
-            fileInfo =  (trvCapsule.type(), capsuleKey,
-                capsuleSha1, filePath, fileSha1 or '')
-            fileIdMapWithResults[self.fromFileId(fileId)] = fileInfo
-        return fileIdMapWithResults
+        # OBSOLETE
+        return [''] * len(fileList)
 
     # retrieve the raw streams for a fileId list passed in as a generator
     def _getFileStreams(self, authToken, fileIdGen):
@@ -3607,15 +3491,12 @@ class ServerConfig(ConfigFile):
     changesetCacheLogFile   = CfgPath
     commitAction            = CfgString
     contentsDir             = CfgContentStore
-    capsuleServerUrl        = (CfgString, None)
     deadlockRetry           = (CfgInt, 5)
     entitlement             = CfgEntitlement
     entitlementCheckURL     = CfgString
-    excludeCapsuleContents  = (CfgBool, False)
     externalPasswordURL     = CfgString
     forceSSL                = CfgBool
     geoIpFiles              = CfgList(CfgPath)
-    injectCapsuleContentServers = CfgList(CfgString)
     logFile                 = CfgPath
     proxy                   = (CfgProxy, None)
     conaryProxy             = (CfgProxy, None)
@@ -3633,6 +3514,11 @@ class ServerConfig(ConfigFile):
     traceLog                = tracelog.CfgTraceLog
     user                    = CfgUserInfo
     webEnabled              = (CfgBool, True)
+
+    # DEPRECATED
+    capsuleServerUrl        = (CfgString, None)
+    excludeCapsuleContents  = (CfgBool, False)
+    injectCapsuleContentServers = CfgList(CfgString)
 
     def getProxyMap(self):
         return getProxyMap(self)

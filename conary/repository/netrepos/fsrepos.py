@@ -282,7 +282,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     ###
 
     def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False,
-                        excludeCapsuleContents = False, callback = None,
+                        callback=None,
                         statusPath = None):
         # let's make sure commiting this change set is a sane thing to attempt
         for trvCs in cs.iterNewTroveList():
@@ -318,8 +318,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                    callback=callback,
                                    mirror = mirror,
                                    hidden = hidden,
-                                   excludeCapsuleContents =
-                                        excludeCapsuleContents,
                                    requireSigs = self.requireSigs,
                                    preRestored=preRestored,
                                    )
@@ -384,7 +382,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def createChangeSet(self, origTroveList, recurse = True,
                         withFiles = True, withFileContents = True,
-                        excludeCapsuleContents = False,
                         excludeAutoSource = False,
                         mirrorMode = False, roleIds = None):
         """
@@ -399,10 +396,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         If recurse is set, this yields one result for the entire troveList.
 
         If recurse is not set, it yields one result per troveList entry.
-
-        @param excludeCapsuleContents: If True, troves which include capsules
-        have all of their content excluded from the changeset no matter how
-        withFileContents is set.
         """
         cs = changeset.ChangeSet()
         externalTroveList = []
@@ -563,9 +556,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                 cs.addFile(oldFileId, newFileId, filecs)
 
-                if (excludeCapsuleContents and new.troveInfo.capsule.type and
-                               new.troveInfo.capsule.type()):
-                    continue
                 if (not withFileContents
                     or (excludeAutoSource and newFile.flags.isAutoSource())
                     or (newFile.flags.isEncapsulatedContent()
