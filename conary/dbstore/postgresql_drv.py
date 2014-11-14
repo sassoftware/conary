@@ -200,6 +200,7 @@ class Database(BaseDatabase):
     iterCursorClass = IterCursor
     keywords = KeywordDict()
     basic_transaction = "START TRANSACTION"
+    savepoints = True
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -360,17 +361,6 @@ class Database(BaseDatabase):
         cu.execute("DROP FUNCTION %s()" % funcName)
         del self.triggers[triggerName]
         return True
-
-    # avoid leaving around invalid transations when schema is not initialized
-    def getVersion(self):
-        try:
-            return BaseDatabase.getVersion(self, raiseOnError=True)
-        except sqlerrors.InvalidTable:
-            # Postgres is so nice that it ruined the current
-            # transaction because of the missing table, so roll back.
-            self.dbh.rollback()
-            self.version = sqllib.DBversion(0, 0)
-            return self.version
 
     def analyze(self, table=""):
         cu = self.cursor()
