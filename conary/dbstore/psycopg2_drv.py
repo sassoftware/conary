@@ -263,6 +263,27 @@ class Database(BaseDatabase):
         """
         return self.dbh.status == psy_ext.STATUS_IN_TRANSACTION
 
+    def transaction(self, name = None):
+        "start transaction [ named point ]"
+        assert(self.dbh)
+        c = self.cursor()
+        if name:
+            if not self.inTransaction():
+                c.execute(self.basic_transaction)
+            c.execute("SAVEPOINT " + name)
+        else:
+            c.execute(self.basic_transaction)
+        return c
+
+    def rollback(self, name=None):
+        "rollback [ to transaction point ]"
+        assert(self.dbh)
+        if name:
+            c = self.cursor()
+            c.execute("ROLLBACK TO SAVEPOINT " + name)
+        else:
+            return self.dbh.rollback()
+
     def createTrigger(self, table, column, onAction):
         onAction = onAction.lower()
         assert onAction in ('insert', 'update')

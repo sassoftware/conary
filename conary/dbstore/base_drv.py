@@ -530,15 +530,17 @@ class BaseDatabase:
         # or it could be a new style version that has (version, minor) columns
         # or it can be a mint table that has (version, timestamps) columns
         c = self.cursor()
-        if self.savepoints:
-            c.execute("SAVEPOINT getversion_save")
+        used_savepoint = None
+        if self.savepoints and self.inTransaction():
+            used_savepoint = 'getversion_save'
+            self.transaction(used_savepoint)
         try:
             c.execute("select * from DatabaseVersion limit 1")
         except sqlerrors.InvalidTable:
             if raiseOnError:
                 raise
             if self.savepoints:
-                c.execute("ROLLBACK TO SAVEPOINT getversion_save")
+                self.rollback(used_savepoint)
             self.version = sqllib.DBversion(0,0)
             return self.version
         # keep compatibility with old style table versioning
