@@ -65,7 +65,9 @@ system.so: LIBS = -lresolv
 
 %.c: %.pyx common.pxi
 ifdef DO_CYTHON
-	$(CYTHON) -f $< -o $@
+	$(CYTHON) -f $< -o $@.tmp
+	$(SED) -e '1s# on .* \*/# */#' $@.tmp > $@
+	rm -f $@.tmp
 endif
 
 
