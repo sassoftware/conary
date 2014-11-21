@@ -908,6 +908,9 @@ class ExtendedFdopen(object):
             raise ValueError("Invalid byte count %s" % bytes)
         return file_utils.pread(self.fd, bytes, offset)
 
+    def pwrite(self, data, offset):
+        return file_utils.pwrite(self.fd, data, offset)
+
     def seek(self, offset, whence = 0):
         return os.lseek(self.fd, offset, whence)
 
@@ -950,6 +953,13 @@ class ExtendedStringIO(StringIO.StringIO):
         data = self.read(bytes)
         self.seek(pos, 0)
         return data
+
+    def pwrite(self, data, offset):
+        pos = self.tell()
+        self.seek(offset, 0)
+        rc = self.write(data)
+        self.seek(pos, 0)
+        return rc
 
 
 class SeekableNestedFile:

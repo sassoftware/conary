@@ -525,6 +525,9 @@ static CYTHON_INLINE void __Pyx_ErrFetch(PyObject **type, PyObject **value, PyOb
 
 static void __Pyx_Raise(PyObject *type, PyObject *value, PyObject *tb, PyObject *cause);
 
+static CYTHON_INLINE int __Pyx_ArgTypeTest(PyObject *obj, PyTypeObject *type, int none_allowed,
+    const char *name, int exact);
+
 typedef struct {
     int code_line;
     PyCodeObject* code_object;
@@ -579,7 +582,8 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
 static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescriptors(CYTHON_UNUSED PyObject *__pyx_self, int __pyx_v_start, int __pyx_v_count, int __pyx_v_end); /* proto */
 static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON_UNUSED PyObject *__pyx_self, char *__pyx_v_path); /* proto */
 static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_fobj, size_t __pyx_v_count, off_t __pyx_v_offset); /* proto */
-static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON_UNUSED PyObject *__pyx_self, char *__pyx_v_path); /* proto */
+static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14pwrite(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_fobj, PyObject *__pyx_v_data_p, off_t __pyx_v_offset); /* proto */
+static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_16removeIfExists(CYTHON_UNUSED PyObject *__pyx_self, char *__pyx_v_path); /* proto */
 static char __pyx_k_i[] = "i";
 static char __pyx_k_j[] = "j";
 static char __pyx_k_fd[] = "fd";
@@ -600,8 +604,11 @@ static char __pyx_k_maxfd[] = "maxfd";
 static char __pyx_k_pread[] = "pread";
 static char __pyx_k_range[] = "range";
 static char __pyx_k_start[] = "start";
+static char __pyx_k_data_b[] = "data_b";
+static char __pyx_k_data_p[] = "data_p";
 static char __pyx_k_fchmod[] = "fchmod";
 static char __pyx_k_offset[] = "offset";
+static char __pyx_k_pwrite[] = "pwrite";
 static char __pyx_k_OSError[] = "OSError";
 static char __pyx_k_lexists[] = "lexists";
 static char __pyx_k_ValueError[] = "ValueError";
@@ -623,6 +630,8 @@ static PyObject *__pyx_n_s_conary_lib_ext_file_utils;
 static PyObject *__pyx_n_s_count;
 static PyObject *__pyx_n_s_countOpenFileDescriptors;
 static PyObject *__pyx_n_s_data;
+static PyObject *__pyx_n_s_data_b;
+static PyObject *__pyx_n_s_data_p;
 static PyObject *__pyx_n_s_end;
 static PyObject *__pyx_n_s_fchmod;
 static PyObject *__pyx_n_s_fd;
@@ -641,6 +650,7 @@ static PyObject *__pyx_n_s_mode;
 static PyObject *__pyx_n_s_offset;
 static PyObject *__pyx_n_s_path;
 static PyObject *__pyx_n_s_pread;
+static PyObject *__pyx_n_s_pwrite;
 static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_rc;
 static PyObject *__pyx_n_s_removeIfExists;
@@ -658,6 +668,7 @@ static PyObject *__pyx_tuple__10;
 static PyObject *__pyx_tuple__12;
 static PyObject *__pyx_tuple__14;
 static PyObject *__pyx_tuple__16;
+static PyObject *__pyx_tuple__18;
 static PyObject *__pyx_codeobj__3;
 static PyObject *__pyx_codeobj__5;
 static PyObject *__pyx_codeobj__7;
@@ -666,8 +677,9 @@ static PyObject *__pyx_codeobj__11;
 static PyObject *__pyx_codeobj__13;
 static PyObject *__pyx_codeobj__15;
 static PyObject *__pyx_codeobj__17;
+static PyObject *__pyx_codeobj__19;
 
-/* "conary/lib/ext/file_utils.pyx":46
+/* "conary/lib/ext/file_utils.pyx":47
  * 
  * 
  * def countOpenFileDescriptors():             # <<<<<<<<<<<<<<
@@ -708,7 +720,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("countOpenFileDescriptors", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":51
+  /* "conary/lib/ext/file_utils.pyx":52
  *     cdef pollfd *ufds
  * 
  *     maxfd = getdtablesize()             # <<<<<<<<<<<<<<
@@ -717,7 +729,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
   __pyx_v_maxfd = getdtablesize();
 
-  /* "conary/lib/ext/file_utils.pyx":52
+  /* "conary/lib/ext/file_utils.pyx":53
  * 
  *     maxfd = getdtablesize()
  *     ufds = <pollfd*>PyMem_Malloc(maxfd * sizeof(pollfd))             # <<<<<<<<<<<<<<
@@ -726,7 +738,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
   __pyx_v_ufds = ((struct pollfd *)PyMem_Malloc((__pyx_v_maxfd * (sizeof(struct pollfd)))));
 
-  /* "conary/lib/ext/file_utils.pyx":53
+  /* "conary/lib/ext/file_utils.pyx":54
  *     maxfd = getdtablesize()
  *     ufds = <pollfd*>PyMem_Malloc(maxfd * sizeof(pollfd))
  *     if ufds == NULL:             # <<<<<<<<<<<<<<
@@ -736,17 +748,17 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
   __pyx_t_1 = ((__pyx_v_ufds == NULL) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":54
+    /* "conary/lib/ext/file_utils.pyx":55
  *     ufds = <pollfd*>PyMem_Malloc(maxfd * sizeof(pollfd))
  *     if ufds == NULL:
  *         raise MemoryError             # <<<<<<<<<<<<<<
  * 
  *     with nogil:
  */
-    PyErr_NoMemory(); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 54; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    PyErr_NoMemory(); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 55; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
 
-  /* "conary/lib/ext/file_utils.pyx":56
+  /* "conary/lib/ext/file_utils.pyx":57
  *         raise MemoryError
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -760,7 +772,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
       #endif
       /*try:*/ {
 
-        /* "conary/lib/ext/file_utils.pyx":57
+        /* "conary/lib/ext/file_utils.pyx":58
  * 
  *     with nogil:
  *         for i in range(maxfd):             # <<<<<<<<<<<<<<
@@ -771,7 +783,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
         for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
           __pyx_v_i = __pyx_t_3;
 
-          /* "conary/lib/ext/file_utils.pyx":58
+          /* "conary/lib/ext/file_utils.pyx":59
  *     with nogil:
  *         for i in range(maxfd):
  *             ufds[i].fd = i             # <<<<<<<<<<<<<<
@@ -780,7 +792,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
           (__pyx_v_ufds[__pyx_v_i]).fd = __pyx_v_i;
 
-          /* "conary/lib/ext/file_utils.pyx":59
+          /* "conary/lib/ext/file_utils.pyx":60
  *         for i in range(maxfd):
  *             ufds[i].fd = i
  *             ufds[i].events = POLLIN | POLLPRI | POLLOUT             # <<<<<<<<<<<<<<
@@ -790,7 +802,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
           (__pyx_v_ufds[__pyx_v_i]).events = ((POLLIN | POLLPRI) | POLLOUT);
         }
 
-        /* "conary/lib/ext/file_utils.pyx":62
+        /* "conary/lib/ext/file_utils.pyx":63
  * 
  *         # Loop until poll() succeeds without being interrupted by a signal
  *         while True:             # <<<<<<<<<<<<<<
@@ -799,7 +811,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
         while (1) {
 
-          /* "conary/lib/ext/file_utils.pyx":63
+          /* "conary/lib/ext/file_utils.pyx":64
  *         # Loop until poll() succeeds without being interrupted by a signal
  *         while True:
  *             rc = poll(ufds, maxfd, 0)             # <<<<<<<<<<<<<<
@@ -808,7 +820,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
           __pyx_v_rc = poll(__pyx_v_ufds, __pyx_v_maxfd, 0);
 
-          /* "conary/lib/ext/file_utils.pyx":64
+          /* "conary/lib/ext/file_utils.pyx":65
  *         while True:
  *             rc = poll(ufds, maxfd, 0)
  *             if rc >= 0 or errno != EINTR:             # <<<<<<<<<<<<<<
@@ -826,7 +838,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
           __pyx_L12_bool_binop_done:;
           if (__pyx_t_1) {
 
-            /* "conary/lib/ext/file_utils.pyx":65
+            /* "conary/lib/ext/file_utils.pyx":66
  *             rc = poll(ufds, maxfd, 0)
  *             if rc >= 0 or errno != EINTR:
  *                 break             # <<<<<<<<<<<<<<
@@ -839,7 +851,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
         __pyx_L10_break:;
       }
 
-      /* "conary/lib/ext/file_utils.pyx":56
+      /* "conary/lib/ext/file_utils.pyx":57
  *         raise MemoryError
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -857,7 +869,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
       }
   }
 
-  /* "conary/lib/ext/file_utils.pyx":67
+  /* "conary/lib/ext/file_utils.pyx":68
  *                 break
  * 
  *     if rc < 0:             # <<<<<<<<<<<<<<
@@ -867,7 +879,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
   __pyx_t_1 = ((__pyx_v_rc < 0) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":68
+    /* "conary/lib/ext/file_utils.pyx":69
  * 
  *     if rc < 0:
  *         PyMem_Free(ufds)             # <<<<<<<<<<<<<<
@@ -876,21 +888,21 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
     PyMem_Free(__pyx_v_ufds);
 
-    /* "conary/lib/ext/file_utils.pyx":69
+    /* "conary/lib/ext/file_utils.pyx":70
  *     if rc < 0:
  *         PyMem_Free(ufds)
  *         PyErr_SetFromErrno(OSError)             # <<<<<<<<<<<<<<
  * 
  *     count = 0
  */
-    __pyx_t_5 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 69; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_5 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 70; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_5);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     goto __pyx_L14;
   }
   __pyx_L14:;
 
-  /* "conary/lib/ext/file_utils.pyx":71
+  /* "conary/lib/ext/file_utils.pyx":72
  *         PyErr_SetFromErrno(OSError)
  * 
  *     count = 0             # <<<<<<<<<<<<<<
@@ -899,7 +911,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
   __pyx_v_count = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":72
+  /* "conary/lib/ext/file_utils.pyx":73
  * 
  *     count = 0
  *     for i in range(maxfd):             # <<<<<<<<<<<<<<
@@ -910,7 +922,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_i = __pyx_t_3;
 
-    /* "conary/lib/ext/file_utils.pyx":73
+    /* "conary/lib/ext/file_utils.pyx":74
  *     count = 0
  *     for i in range(maxfd):
  *         if ufds[i].revents != POLLNVAL:             # <<<<<<<<<<<<<<
@@ -920,7 +932,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
     __pyx_t_1 = (((__pyx_v_ufds[__pyx_v_i]).revents != POLLNVAL) != 0);
     if (__pyx_t_1) {
 
-      /* "conary/lib/ext/file_utils.pyx":74
+      /* "conary/lib/ext/file_utils.pyx":75
  *     for i in range(maxfd):
  *         if ufds[i].revents != POLLNVAL:
  *             count += 1             # <<<<<<<<<<<<<<
@@ -933,7 +945,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
     __pyx_L17:;
   }
 
-  /* "conary/lib/ext/file_utils.pyx":76
+  /* "conary/lib/ext/file_utils.pyx":77
  *             count += 1
  * 
  *     PyMem_Free(ufds)             # <<<<<<<<<<<<<<
@@ -942,7 +954,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  */
   PyMem_Free(__pyx_v_ufds);
 
-  /* "conary/lib/ext/file_utils.pyx":77
+  /* "conary/lib/ext/file_utils.pyx":78
  * 
  *     PyMem_Free(ufds)
  *     return count             # <<<<<<<<<<<<<<
@@ -950,13 +962,13 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_count); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 77; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_count); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 78; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_5);
   __pyx_r = __pyx_t_5;
   __pyx_t_5 = 0;
   goto __pyx_L0;
 
-  /* "conary/lib/ext/file_utils.pyx":46
+  /* "conary/lib/ext/file_utils.pyx":47
  * 
  * 
  * def countOpenFileDescriptors():             # <<<<<<<<<<<<<<
@@ -975,7 +987,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_countOpenFileDescriptor
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":80
+/* "conary/lib/ext/file_utils.pyx":81
  * 
  * 
  * def fchmod(fobj, int mode):             # <<<<<<<<<<<<<<
@@ -1016,11 +1028,11 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_3fchmod(PyObject *__pyx
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_mode)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("fchmod", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("fchmod", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fchmod") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fchmod") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -1029,11 +1041,11 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_3fchmod(PyObject *__pyx
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
     __pyx_v_fobj = values[0];
-    __pyx_v_mode = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_mode == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_mode = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_mode == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("fchmod", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("fchmod", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("conary.lib.ext.file_utils.fchmod", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -1059,17 +1071,17 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_2fchmod(CYTHON_UNUSED P
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("fchmod", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":83
+  /* "conary/lib/ext/file_utils.pyx":84
  *     """Change the permissions of an open file."""
  *     cdef int fd, rc
  *     fd = PyObject_AsFileDescriptor(fobj)             # <<<<<<<<<<<<<<
  *     with nogil:
  *         rc = c_fchmod(fd, mode)
  */
-  __pyx_t_1 = PyObject_AsFileDescriptor(__pyx_v_fobj); if (unlikely(__pyx_t_1 == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 83; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyObject_AsFileDescriptor(__pyx_v_fobj); if (unlikely(__pyx_t_1 == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 84; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_fd = __pyx_t_1;
 
-  /* "conary/lib/ext/file_utils.pyx":84
+  /* "conary/lib/ext/file_utils.pyx":85
  *     cdef int fd, rc
  *     fd = PyObject_AsFileDescriptor(fobj)
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -1083,7 +1095,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_2fchmod(CYTHON_UNUSED P
       #endif
       /*try:*/ {
 
-        /* "conary/lib/ext/file_utils.pyx":85
+        /* "conary/lib/ext/file_utils.pyx":86
  *     fd = PyObject_AsFileDescriptor(fobj)
  *     with nogil:
  *         rc = c_fchmod(fd, mode)             # <<<<<<<<<<<<<<
@@ -1093,7 +1105,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_2fchmod(CYTHON_UNUSED P
         __pyx_v_rc = fchmod(__pyx_v_fd, __pyx_v_mode);
       }
 
-      /* "conary/lib/ext/file_utils.pyx":84
+      /* "conary/lib/ext/file_utils.pyx":85
  *     cdef int fd, rc
  *     fd = PyObject_AsFileDescriptor(fobj)
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -1111,7 +1123,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_2fchmod(CYTHON_UNUSED P
       }
   }
 
-  /* "conary/lib/ext/file_utils.pyx":86
+  /* "conary/lib/ext/file_utils.pyx":87
  *     with nogil:
  *         rc = c_fchmod(fd, mode)
  *     if rc == -1:             # <<<<<<<<<<<<<<
@@ -1121,21 +1133,21 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_2fchmod(CYTHON_UNUSED P
   __pyx_t_2 = ((__pyx_v_rc == -1) != 0);
   if (__pyx_t_2) {
 
-    /* "conary/lib/ext/file_utils.pyx":87
+    /* "conary/lib/ext/file_utils.pyx":88
  *         rc = c_fchmod(fd, mode)
  *     if rc == -1:
  *         PyErr_SetFromErrno(OSError)             # <<<<<<<<<<<<<<
  * 
  * 
  */
-    __pyx_t_3 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 87; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 88; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     goto __pyx_L6;
   }
   __pyx_L6:;
 
-  /* "conary/lib/ext/file_utils.pyx":80
+  /* "conary/lib/ext/file_utils.pyx":81
  * 
  * 
  * def fchmod(fobj, int mode):             # <<<<<<<<<<<<<<
@@ -1156,7 +1168,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_2fchmod(CYTHON_UNUSED P
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":90
+/* "conary/lib/ext/file_utils.pyx":91
  * 
  * 
  * def fopenIfExists(char *path, char *mode):             # <<<<<<<<<<<<<<
@@ -1197,11 +1209,11 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_5fopenIfExists(PyObject
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_mode)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("fopenIfExists", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("fopenIfExists", 1, 2, 2, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fopenIfExists") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "fopenIfExists") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -1209,12 +1221,12 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_5fopenIfExists(PyObject
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
     }
-    __pyx_v_path = __Pyx_PyObject_AsString(values[0]); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_mode = __Pyx_PyObject_AsString(values[1]); if (unlikely((!__pyx_v_mode) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_path = __Pyx_PyObject_AsString(values[0]); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_mode = __Pyx_PyObject_AsString(values[1]); if (unlikely((!__pyx_v_mode) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("fopenIfExists", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("fopenIfExists", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("conary.lib.ext.file_utils.fopenIfExists", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -1238,7 +1250,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("fopenIfExists", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":94
+  /* "conary/lib/ext/file_utils.pyx":95
  *     cdef FILE *fp
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -1252,7 +1264,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
       #endif
       /*try:*/ {
 
-        /* "conary/lib/ext/file_utils.pyx":95
+        /* "conary/lib/ext/file_utils.pyx":96
  * 
  *     with nogil:
  *         fp = fopen(path, mode)             # <<<<<<<<<<<<<<
@@ -1262,7 +1274,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
         __pyx_v_fp = fopen(__pyx_v_path, __pyx_v_mode);
       }
 
-      /* "conary/lib/ext/file_utils.pyx":94
+      /* "conary/lib/ext/file_utils.pyx":95
  *     cdef FILE *fp
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -1280,7 +1292,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
       }
   }
 
-  /* "conary/lib/ext/file_utils.pyx":97
+  /* "conary/lib/ext/file_utils.pyx":98
  *         fp = fopen(path, mode)
  * 
  *     if fp == NULL:             # <<<<<<<<<<<<<<
@@ -1290,7 +1302,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
   __pyx_t_1 = ((__pyx_v_fp == NULL) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":98
+    /* "conary/lib/ext/file_utils.pyx":99
  * 
  *     if fp == NULL:
  *         return None             # <<<<<<<<<<<<<<
@@ -1304,7 +1316,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
   }
   /*else*/ {
 
-    /* "conary/lib/ext/file_utils.pyx":100
+    /* "conary/lib/ext/file_utils.pyx":101
  *         return None
  *     else:
  *         return PyFile_FromFile(fp, path, mode, fclose)             # <<<<<<<<<<<<<<
@@ -1312,14 +1324,14 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
  * 
  */
     __Pyx_XDECREF(__pyx_r);
-    __pyx_t_2 = PyFile_FromFile(__pyx_v_fp, __pyx_v_path, __pyx_v_mode, fclose); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 100; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_2 = PyFile_FromFile(__pyx_v_fp, __pyx_v_path, __pyx_v_mode, fclose); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 101; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_2);
     __pyx_r = __pyx_t_2;
     __pyx_t_2 = 0;
     goto __pyx_L0;
   }
 
-  /* "conary/lib/ext/file_utils.pyx":90
+  /* "conary/lib/ext/file_utils.pyx":91
  * 
  * 
  * def fopenIfExists(char *path, char *mode):             # <<<<<<<<<<<<<<
@@ -1338,7 +1350,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_4fopenIfExists(CYTHON_U
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":103
+/* "conary/lib/ext/file_utils.pyx":104
  * 
  * 
  * def lexists(char *path):             # <<<<<<<<<<<<<<
@@ -1359,7 +1371,7 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_7lexists(PyObject *__py
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("lexists (wrapper)", 0);
   assert(__pyx_arg_path); {
-    __pyx_v_path = __Pyx_PyObject_AsString(__pyx_arg_path); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 103; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_path = __Pyx_PyObject_AsString(__pyx_arg_path); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 104; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -1387,7 +1399,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("lexists", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":106
+  /* "conary/lib/ext/file_utils.pyx":107
  *     """Return C{True} if C{path} exists."""
  *     cdef stat sb
  *     if lstat(path, &sb) == -1:             # <<<<<<<<<<<<<<
@@ -1397,7 +1409,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
   __pyx_t_1 = ((lstat(__pyx_v_path, (&__pyx_v_sb)) == -1) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":107
+    /* "conary/lib/ext/file_utils.pyx":108
  *     cdef stat sb
  *     if lstat(path, &sb) == -1:
  *         if errno in (ENOENT, ENOTDIR, ENAMETOOLONG, EACCES):             # <<<<<<<<<<<<<<
@@ -1429,7 +1441,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
     __pyx_t_3 = (__pyx_t_1 != 0);
     if (__pyx_t_3) {
 
-      /* "conary/lib/ext/file_utils.pyx":108
+      /* "conary/lib/ext/file_utils.pyx":109
  *     if lstat(path, &sb) == -1:
  *         if errno in (ENOENT, ENOTDIR, ENAMETOOLONG, EACCES):
  *             return False             # <<<<<<<<<<<<<<
@@ -1442,21 +1454,21 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
       goto __pyx_L0;
     }
 
-    /* "conary/lib/ext/file_utils.pyx":109
+    /* "conary/lib/ext/file_utils.pyx":110
  *         if errno in (ENOENT, ENOTDIR, ENAMETOOLONG, EACCES):
  *             return False
  *         PyErr_SetFromErrnoWithFilename(OSError, path)             # <<<<<<<<<<<<<<
  *     return True
  * 
  */
-    __pyx_t_4 = PyErr_SetFromErrnoWithFilename(__pyx_builtin_OSError, __pyx_v_path); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 109; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_4 = PyErr_SetFromErrnoWithFilename(__pyx_builtin_OSError, __pyx_v_path); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 110; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     goto __pyx_L3;
   }
   __pyx_L3:;
 
-  /* "conary/lib/ext/file_utils.pyx":110
+  /* "conary/lib/ext/file_utils.pyx":111
  *             return False
  *         PyErr_SetFromErrnoWithFilename(OSError, path)
  *     return True             # <<<<<<<<<<<<<<
@@ -1468,7 +1480,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
   __pyx_r = Py_True;
   goto __pyx_L0;
 
-  /* "conary/lib/ext/file_utils.pyx":103
+  /* "conary/lib/ext/file_utils.pyx":104
  * 
  * 
  * def lexists(char *path):             # <<<<<<<<<<<<<<
@@ -1487,7 +1499,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_6lexists(CYTHON_UNUSED 
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":113
+/* "conary/lib/ext/file_utils.pyx":114
  * 
  * 
  * def massCloseFileDescriptors(int start, int count, int end):             # <<<<<<<<<<<<<<
@@ -1530,16 +1542,16 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_9massCloseFileDescripto
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_count)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("massCloseFileDescriptors", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("massCloseFileDescriptors", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_end)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("massCloseFileDescriptors", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("massCloseFileDescriptors", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "massCloseFileDescriptors") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "massCloseFileDescriptors") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -1548,13 +1560,13 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_9massCloseFileDescripto
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
-    __pyx_v_start = __Pyx_PyInt_As_int(values[0]); if (unlikely((__pyx_v_start == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_count = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_count == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_end = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_end == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_start = __Pyx_PyInt_As_int(values[0]); if (unlikely((__pyx_v_start == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_count = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_count == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_end = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_end == (int)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("massCloseFileDescriptors", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("massCloseFileDescriptors", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("conary.lib.ext.file_utils.massCloseFileDescriptors", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -1581,7 +1593,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("massCloseFileDescriptors", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":118
+  /* "conary/lib/ext/file_utils.pyx":119
  *     cdef int i, j, rc
  * 
  *     if count and end:             # <<<<<<<<<<<<<<
@@ -1599,21 +1611,21 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":119
+    /* "conary/lib/ext/file_utils.pyx":120
  * 
  *     if count and end:
  *         raise ValueError("Exactly one of count and end must be zero.")             # <<<<<<<<<<<<<<
  * 
  *     rc = 0
  */
-    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 119; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 120; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_Raise(__pyx_t_3, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 119; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 120; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
 
-  /* "conary/lib/ext/file_utils.pyx":121
+  /* "conary/lib/ext/file_utils.pyx":122
  *         raise ValueError("Exactly one of count and end must be zero.")
  * 
  *     rc = 0             # <<<<<<<<<<<<<<
@@ -1622,7 +1634,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
  */
   __pyx_v_rc = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":122
+  /* "conary/lib/ext/file_utils.pyx":123
  * 
  *     rc = 0
  *     i = start             # <<<<<<<<<<<<<<
@@ -1631,7 +1643,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
  */
   __pyx_v_i = __pyx_v_start;
 
-  /* "conary/lib/ext/file_utils.pyx":123
+  /* "conary/lib/ext/file_utils.pyx":124
  *     rc = 0
  *     i = start
  *     j = count             # <<<<<<<<<<<<<<
@@ -1640,7 +1652,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
  */
   __pyx_v_j = __pyx_v_count;
 
-  /* "conary/lib/ext/file_utils.pyx":124
+  /* "conary/lib/ext/file_utils.pyx":125
  *     i = start
  *     j = count
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -1654,7 +1666,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
       #endif
       /*try:*/ {
 
-        /* "conary/lib/ext/file_utils.pyx":125
+        /* "conary/lib/ext/file_utils.pyx":126
  *     j = count
  *     with nogil:
  *         while True:             # <<<<<<<<<<<<<<
@@ -1663,7 +1675,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
  */
         while (1) {
 
-          /* "conary/lib/ext/file_utils.pyx":126
+          /* "conary/lib/ext/file_utils.pyx":127
  *     with nogil:
  *         while True:
  *             if count:             # <<<<<<<<<<<<<<
@@ -1673,7 +1685,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           __pyx_t_1 = (__pyx_v_count != 0);
           if (__pyx_t_1) {
 
-            /* "conary/lib/ext/file_utils.pyx":128
+            /* "conary/lib/ext/file_utils.pyx":129
  *             if count:
  *                 # Stopping after a contiguous number of fds
  *                 if j == 0:             # <<<<<<<<<<<<<<
@@ -1683,7 +1695,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
             __pyx_t_1 = ((__pyx_v_j == 0) != 0);
             if (__pyx_t_1) {
 
-              /* "conary/lib/ext/file_utils.pyx":129
+              /* "conary/lib/ext/file_utils.pyx":130
  *                 # Stopping after a contiguous number of fds
  *                 if j == 0:
  *                     break             # <<<<<<<<<<<<<<
@@ -1695,7 +1707,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
             goto __pyx_L11;
           }
 
-          /* "conary/lib/ext/file_utils.pyx":130
+          /* "conary/lib/ext/file_utils.pyx":131
  *                 if j == 0:
  *                     break
  *             elif i == end:             # <<<<<<<<<<<<<<
@@ -1705,7 +1717,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           __pyx_t_1 = ((__pyx_v_i == __pyx_v_end) != 0);
           if (__pyx_t_1) {
 
-            /* "conary/lib/ext/file_utils.pyx":132
+            /* "conary/lib/ext/file_utils.pyx":133
  *             elif i == end:
  *                 # Stopping at specific value
  *                 break             # <<<<<<<<<<<<<<
@@ -1716,7 +1728,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           }
           __pyx_L11:;
 
-          /* "conary/lib/ext/file_utils.pyx":134
+          /* "conary/lib/ext/file_utils.pyx":135
  *                 break
  * 
  *             rc = close(i)             # <<<<<<<<<<<<<<
@@ -1725,7 +1737,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
  */
           __pyx_v_rc = close(__pyx_v_i);
 
-          /* "conary/lib/ext/file_utils.pyx":135
+          /* "conary/lib/ext/file_utils.pyx":136
  * 
  *             rc = close(i)
  *             if rc == 0:             # <<<<<<<<<<<<<<
@@ -1735,7 +1747,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           __pyx_t_1 = ((__pyx_v_rc == 0) != 0);
           if (__pyx_t_1) {
 
-            /* "conary/lib/ext/file_utils.pyx":137
+            /* "conary/lib/ext/file_utils.pyx":138
  *             if rc == 0:
  *                 # Successful close -- reset contiguous counter
  *                 j = count             # <<<<<<<<<<<<<<
@@ -1746,7 +1758,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
             goto __pyx_L13;
           }
 
-          /* "conary/lib/ext/file_utils.pyx":138
+          /* "conary/lib/ext/file_utils.pyx":139
  *                 # Successful close -- reset contiguous counter
  *                 j = count
  *             elif errno == EBADF:             # <<<<<<<<<<<<<<
@@ -1756,7 +1768,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           __pyx_t_1 = ((errno == EBADF) != 0);
           if (__pyx_t_1) {
 
-            /* "conary/lib/ext/file_utils.pyx":140
+            /* "conary/lib/ext/file_utils.pyx":141
  *             elif errno == EBADF:
  *                 # FD was not in use
  *                 j -= 1             # <<<<<<<<<<<<<<
@@ -1768,7 +1780,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           }
           /*else*/ {
 
-            /* "conary/lib/ext/file_utils.pyx":143
+            /* "conary/lib/ext/file_utils.pyx":144
  *             else:
  *                 # Some other error
  *                 break             # <<<<<<<<<<<<<<
@@ -1779,7 +1791,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
           }
           __pyx_L13:;
 
-          /* "conary/lib/ext/file_utils.pyx":144
+          /* "conary/lib/ext/file_utils.pyx":145
  *                 # Some other error
  *                 break
  *             rc = 0             # <<<<<<<<<<<<<<
@@ -1788,7 +1800,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
  */
           __pyx_v_rc = 0;
 
-          /* "conary/lib/ext/file_utils.pyx":145
+          /* "conary/lib/ext/file_utils.pyx":146
  *                 break
  *             rc = 0
  *             i += 1             # <<<<<<<<<<<<<<
@@ -1800,7 +1812,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
         __pyx_L10_break:;
       }
 
-      /* "conary/lib/ext/file_utils.pyx":124
+      /* "conary/lib/ext/file_utils.pyx":125
  *     i = start
  *     j = count
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -1818,7 +1830,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
       }
   }
 
-  /* "conary/lib/ext/file_utils.pyx":147
+  /* "conary/lib/ext/file_utils.pyx":148
  *             i += 1
  * 
  *     if rc != 0:             # <<<<<<<<<<<<<<
@@ -1828,21 +1840,21 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
   __pyx_t_1 = ((__pyx_v_rc != 0) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":148
+    /* "conary/lib/ext/file_utils.pyx":149
  * 
  *     if rc != 0:
  *         PyErr_SetFromErrno(OSError)             # <<<<<<<<<<<<<<
  * 
  * 
  */
-    __pyx_t_3 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 148; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 149; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     goto __pyx_L14;
   }
   __pyx_L14:;
 
-  /* "conary/lib/ext/file_utils.pyx":113
+  /* "conary/lib/ext/file_utils.pyx":114
  * 
  * 
  * def massCloseFileDescriptors(int start, int count, int end):             # <<<<<<<<<<<<<<
@@ -1863,7 +1875,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_8massCloseFileDescripto
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":151
+/* "conary/lib/ext/file_utils.pyx":152
  * 
  * 
  * def mkdirIfMissing(char *path):             # <<<<<<<<<<<<<<
@@ -1884,7 +1896,7 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_11mkdirIfMissing(PyObje
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("mkdirIfMissing (wrapper)", 0);
   assert(__pyx_arg_path); {
-    __pyx_v_path = __Pyx_PyObject_AsString(__pyx_arg_path); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 151; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_path = __Pyx_PyObject_AsString(__pyx_arg_path); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 152; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -1909,7 +1921,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("mkdirIfMissing", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":153
+  /* "conary/lib/ext/file_utils.pyx":154
  * def mkdirIfMissing(char *path):
  *     """Make a directory at C{path} if it does not exist."""
  *     if mkdir(path, 0777) == -1:             # <<<<<<<<<<<<<<
@@ -1919,7 +1931,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON
   __pyx_t_1 = ((mkdir(__pyx_v_path, 0777) == -1) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":154
+    /* "conary/lib/ext/file_utils.pyx":155
  *     """Make a directory at C{path} if it does not exist."""
  *     if mkdir(path, 0777) == -1:
  *         if errno == EEXIST:             # <<<<<<<<<<<<<<
@@ -1929,7 +1941,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON
     __pyx_t_1 = ((errno == EEXIST) != 0);
     if (__pyx_t_1) {
 
-      /* "conary/lib/ext/file_utils.pyx":155
+      /* "conary/lib/ext/file_utils.pyx":156
  *     if mkdir(path, 0777) == -1:
  *         if errno == EEXIST:
  *             return False             # <<<<<<<<<<<<<<
@@ -1942,21 +1954,21 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON
       goto __pyx_L0;
     }
 
-    /* "conary/lib/ext/file_utils.pyx":156
+    /* "conary/lib/ext/file_utils.pyx":157
  *         if errno == EEXIST:
  *             return False
  *         PyErr_SetFromErrnoWithFilename(OSError, path)             # <<<<<<<<<<<<<<
  *     return True
  * 
  */
-    __pyx_t_2 = PyErr_SetFromErrnoWithFilename(__pyx_builtin_OSError, __pyx_v_path); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 156; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_2 = PyErr_SetFromErrnoWithFilename(__pyx_builtin_OSError, __pyx_v_path); if (unlikely(!__pyx_t_2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 157; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     goto __pyx_L3;
   }
   __pyx_L3:;
 
-  /* "conary/lib/ext/file_utils.pyx":157
+  /* "conary/lib/ext/file_utils.pyx":158
  *             return False
  *         PyErr_SetFromErrnoWithFilename(OSError, path)
  *     return True             # <<<<<<<<<<<<<<
@@ -1968,7 +1980,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON
   __pyx_r = Py_True;
   goto __pyx_L0;
 
-  /* "conary/lib/ext/file_utils.pyx":151
+  /* "conary/lib/ext/file_utils.pyx":152
  * 
  * 
  * def mkdirIfMissing(char *path):             # <<<<<<<<<<<<<<
@@ -1987,7 +1999,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_10mkdirIfMissing(CYTHON
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":160
+/* "conary/lib/ext/file_utils.pyx":161
  * 
  * 
  * def pread(fobj, size_t count, off_t offset):             # <<<<<<<<<<<<<<
@@ -2030,16 +2042,16 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_13pread(PyObject *__pyx
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_count)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("pread", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("pread", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_offset)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("pread", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+          __Pyx_RaiseArgtupleInvalid("pread", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "pread") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "pread") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -2049,12 +2061,12 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_13pread(PyObject *__pyx
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
     __pyx_v_fobj = values[0];
-    __pyx_v_count = __Pyx_PyInt_As_size_t(values[1]); if (unlikely((__pyx_v_count == (size_t)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
-    __pyx_v_offset = __Pyx_PyInt_As_off_t(values[2]); if (unlikely((__pyx_v_offset == (off_t)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_count = __Pyx_PyInt_As_size_t(values[1]); if (unlikely((__pyx_v_count == (size_t)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_offset = __Pyx_PyInt_As_off_t(values[2]); if (unlikely((__pyx_v_offset == (off_t)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("pread", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __Pyx_RaiseArgtupleInvalid("pread", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   __pyx_L3_error:;
   __Pyx_AddTraceback("conary.lib.ext.file_utils.pread", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -2082,17 +2094,17 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("pread", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":166
+  /* "conary/lib/ext/file_utils.pyx":167
  *     cdef int fd
  * 
  *     fd = PyObject_AsFileDescriptor(fobj)             # <<<<<<<<<<<<<<
  * 
  *     data = <char*>PyMem_Malloc(count)
  */
-  __pyx_t_1 = PyObject_AsFileDescriptor(__pyx_v_fobj); if (unlikely(__pyx_t_1 == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 166; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyObject_AsFileDescriptor(__pyx_v_fobj); if (unlikely(__pyx_t_1 == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 167; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __pyx_v_fd = __pyx_t_1;
 
-  /* "conary/lib/ext/file_utils.pyx":168
+  /* "conary/lib/ext/file_utils.pyx":169
  *     fd = PyObject_AsFileDescriptor(fobj)
  * 
  *     data = <char*>PyMem_Malloc(count)             # <<<<<<<<<<<<<<
@@ -2101,7 +2113,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
  */
   __pyx_v_data = ((char *)PyMem_Malloc(__pyx_v_count));
 
-  /* "conary/lib/ext/file_utils.pyx":169
+  /* "conary/lib/ext/file_utils.pyx":170
  * 
  *     data = <char*>PyMem_Malloc(count)
  *     if data == NULL:             # <<<<<<<<<<<<<<
@@ -2111,17 +2123,17 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
   __pyx_t_2 = ((__pyx_v_data == NULL) != 0);
   if (__pyx_t_2) {
 
-    /* "conary/lib/ext/file_utils.pyx":170
+    /* "conary/lib/ext/file_utils.pyx":171
  *     data = <char*>PyMem_Malloc(count)
  *     if data == NULL:
  *         raise MemoryError             # <<<<<<<<<<<<<<
  * 
  *     with nogil:
  */
-    PyErr_NoMemory(); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 170; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    PyErr_NoMemory(); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 171; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   }
 
-  /* "conary/lib/ext/file_utils.pyx":172
+  /* "conary/lib/ext/file_utils.pyx":173
  *         raise MemoryError
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -2135,7 +2147,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
       #endif
       /*try:*/ {
 
-        /* "conary/lib/ext/file_utils.pyx":173
+        /* "conary/lib/ext/file_utils.pyx":174
  * 
  *     with nogil:
  *         rc = c_pread(fd, data, count, offset)             # <<<<<<<<<<<<<<
@@ -2145,7 +2157,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
         __pyx_v_rc = pread(__pyx_v_fd, __pyx_v_data, __pyx_v_count, __pyx_v_offset);
       }
 
-      /* "conary/lib/ext/file_utils.pyx":172
+      /* "conary/lib/ext/file_utils.pyx":173
  *         raise MemoryError
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
@@ -2163,7 +2175,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
       }
   }
 
-  /* "conary/lib/ext/file_utils.pyx":175
+  /* "conary/lib/ext/file_utils.pyx":176
  *         rc = c_pread(fd, data, count, offset)
  * 
  *     if rc == -1:             # <<<<<<<<<<<<<<
@@ -2173,7 +2185,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
   __pyx_t_2 = ((__pyx_v_rc == -1) != 0);
   if (__pyx_t_2) {
 
-    /* "conary/lib/ext/file_utils.pyx":176
+    /* "conary/lib/ext/file_utils.pyx":177
  * 
  *     if rc == -1:
  *         PyMem_Free(data)             # <<<<<<<<<<<<<<
@@ -2182,33 +2194,33 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
  */
     PyMem_Free(__pyx_v_data);
 
-    /* "conary/lib/ext/file_utils.pyx":177
+    /* "conary/lib/ext/file_utils.pyx":178
  *     if rc == -1:
  *         PyMem_Free(data)
  *         PyErr_SetFromErrno(OSError)             # <<<<<<<<<<<<<<
  * 
  *     ret = PyString_FromStringAndSize(data, rc)
  */
-    __pyx_t_3 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 177; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_3 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 178; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     goto __pyx_L7;
   }
   __pyx_L7:;
 
-  /* "conary/lib/ext/file_utils.pyx":179
+  /* "conary/lib/ext/file_utils.pyx":180
  *         PyErr_SetFromErrno(OSError)
  * 
  *     ret = PyString_FromStringAndSize(data, rc)             # <<<<<<<<<<<<<<
  *     PyMem_Free(data)
  *     return ret
  */
-  __pyx_t_3 = PyString_FromStringAndSize(__pyx_v_data, __pyx_v_rc); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 179; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_3 = PyString_FromStringAndSize(__pyx_v_data, __pyx_v_rc); if (unlikely(!__pyx_t_3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 180; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_v_ret = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":180
+  /* "conary/lib/ext/file_utils.pyx":181
  * 
  *     ret = PyString_FromStringAndSize(data, rc)
  *     PyMem_Free(data)             # <<<<<<<<<<<<<<
@@ -2217,7 +2229,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
  */
   PyMem_Free(__pyx_v_data);
 
-  /* "conary/lib/ext/file_utils.pyx":181
+  /* "conary/lib/ext/file_utils.pyx":182
  *     ret = PyString_FromStringAndSize(data, rc)
  *     PyMem_Free(data)
  *     return ret             # <<<<<<<<<<<<<<
@@ -2229,7 +2241,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
   __pyx_r = __pyx_v_ret;
   goto __pyx_L0;
 
-  /* "conary/lib/ext/file_utils.pyx":160
+  /* "conary/lib/ext/file_utils.pyx":161
  * 
  * 
  * def pread(fobj, size_t count, off_t offset):             # <<<<<<<<<<<<<<
@@ -2249,7 +2261,242 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
   return __pyx_r;
 }
 
-/* "conary/lib/ext/file_utils.pyx":184
+/* "conary/lib/ext/file_utils.pyx":185
+ * 
+ * 
+ * def pwrite(fobj, bytes data_p, off_t offset):             # <<<<<<<<<<<<<<
+ *     """Write C{data} at C{offset} in file C{fobj}."""
+ *     cdef Py_ssize_t rc
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_15pwrite(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_6conary_3lib_3ext_10file_utils_14pwrite[] = "Write C{data} at C{offset} in file C{fobj}.";
+static PyMethodDef __pyx_mdef_6conary_3lib_3ext_10file_utils_15pwrite = {"pwrite", (PyCFunction)__pyx_pw_6conary_3lib_3ext_10file_utils_15pwrite, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6conary_3lib_3ext_10file_utils_14pwrite};
+static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_15pwrite(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyObject *__pyx_v_fobj = 0;
+  PyObject *__pyx_v_data_p = 0;
+  off_t __pyx_v_offset;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("pwrite (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_fobj,&__pyx_n_s_data_p,&__pyx_n_s_offset,0};
+    PyObject* values[3] = {0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fobj)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        case  1:
+        if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_data_p)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("pwrite", 1, 3, 3, 1); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        }
+        case  2:
+        if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_offset)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("pwrite", 1, 3, 3, 2); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "pwrite") < 0)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+    }
+    __pyx_v_fobj = values[0];
+    __pyx_v_data_p = ((PyObject*)values[1]);
+    __pyx_v_offset = __Pyx_PyInt_As_off_t(values[2]); if (unlikely((__pyx_v_offset == (off_t)-1) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("pwrite", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("conary.lib.ext.file_utils.pwrite", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_data_p), (&PyBytes_Type), 1, "data_p", 1))) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_r = __pyx_pf_6conary_3lib_3ext_10file_utils_14pwrite(__pyx_self, __pyx_v_fobj, __pyx_v_data_p, __pyx_v_offset);
+
+  /* function exit code */
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14pwrite(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_fobj, PyObject *__pyx_v_data_p, off_t __pyx_v_offset) {
+  Py_ssize_t __pyx_v_rc;
+  int __pyx_v_fd;
+  size_t __pyx_v_count;
+  char *__pyx_v_data_b;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  int __pyx_t_1;
+  char *__pyx_t_2;
+  Py_ssize_t __pyx_t_3;
+  int __pyx_t_4;
+  PyObject *__pyx_t_5 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("pwrite", 0);
+
+  /* "conary/lib/ext/file_utils.pyx":192
+ *     cdef char *data_b
+ * 
+ *     fd = PyObject_AsFileDescriptor(fobj)             # <<<<<<<<<<<<<<
+ *     data_b = data_p
+ *     count = len(data_p)
+ */
+  __pyx_t_1 = PyObject_AsFileDescriptor(__pyx_v_fobj); if (unlikely(__pyx_t_1 == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 192; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_v_fd = __pyx_t_1;
+
+  /* "conary/lib/ext/file_utils.pyx":193
+ * 
+ *     fd = PyObject_AsFileDescriptor(fobj)
+ *     data_b = data_p             # <<<<<<<<<<<<<<
+ *     count = len(data_p)
+ * 
+ */
+  __pyx_t_2 = __Pyx_PyObject_AsString(__pyx_v_data_p); if (unlikely((!__pyx_t_2) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 193; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_v_data_b = __pyx_t_2;
+
+  /* "conary/lib/ext/file_utils.pyx":194
+ *     fd = PyObject_AsFileDescriptor(fobj)
+ *     data_b = data_p
+ *     count = len(data_p)             # <<<<<<<<<<<<<<
+ * 
+ *     with nogil:
+ */
+  if (unlikely(__pyx_v_data_p == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
+    {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  }
+  __pyx_t_3 = PyBytes_GET_SIZE(__pyx_v_data_p); if (unlikely(__pyx_t_3 == -1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 194; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_v_count = __pyx_t_3;
+
+  /* "conary/lib/ext/file_utils.pyx":196
+ *     count = len(data_p)
+ * 
+ *     with nogil:             # <<<<<<<<<<<<<<
+ *         rc = c_pwrite(fd, data_b, count, offset)
+ * 
+ */
+  {
+      #ifdef WITH_THREAD
+      PyThreadState *_save;
+      Py_UNBLOCK_THREADS
+      #endif
+      /*try:*/ {
+
+        /* "conary/lib/ext/file_utils.pyx":197
+ * 
+ *     with nogil:
+ *         rc = c_pwrite(fd, data_b, count, offset)             # <<<<<<<<<<<<<<
+ * 
+ *     if rc == -1:
+ */
+        __pyx_v_rc = pwrite(__pyx_v_fd, __pyx_v_data_b, __pyx_v_count, __pyx_v_offset);
+      }
+
+      /* "conary/lib/ext/file_utils.pyx":196
+ *     count = len(data_p)
+ * 
+ *     with nogil:             # <<<<<<<<<<<<<<
+ *         rc = c_pwrite(fd, data_b, count, offset)
+ * 
+ */
+      /*finally:*/ {
+        /*normal exit:*/{
+          #ifdef WITH_THREAD
+          Py_BLOCK_THREADS
+          #endif
+          goto __pyx_L5;
+        }
+        __pyx_L5:;
+      }
+  }
+
+  /* "conary/lib/ext/file_utils.pyx":199
+ *         rc = c_pwrite(fd, data_b, count, offset)
+ * 
+ *     if rc == -1:             # <<<<<<<<<<<<<<
+ *         PyErr_SetFromErrno(OSError)
+ *     return rc
+ */
+  __pyx_t_4 = ((__pyx_v_rc == -1) != 0);
+  if (__pyx_t_4) {
+
+    /* "conary/lib/ext/file_utils.pyx":200
+ * 
+ *     if rc == -1:
+ *         PyErr_SetFromErrno(OSError)             # <<<<<<<<<<<<<<
+ *     return rc
+ * 
+ */
+    __pyx_t_5 = PyErr_SetFromErrno(__pyx_builtin_OSError); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 200; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    goto __pyx_L6;
+  }
+  __pyx_L6:;
+
+  /* "conary/lib/ext/file_utils.pyx":201
+ *     if rc == -1:
+ *         PyErr_SetFromErrno(OSError)
+ *     return rc             # <<<<<<<<<<<<<<
+ * 
+ * 
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_5 = PyInt_FromSsize_t(__pyx_v_rc); if (unlikely(!__pyx_t_5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 201; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_r = __pyx_t_5;
+  __pyx_t_5 = 0;
+  goto __pyx_L0;
+
+  /* "conary/lib/ext/file_utils.pyx":185
+ * 
+ * 
+ * def pwrite(fobj, bytes data_p, off_t offset):             # <<<<<<<<<<<<<<
+ *     """Write C{data} at C{offset} in file C{fobj}."""
+ *     cdef Py_ssize_t rc
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_AddTraceback("conary.lib.ext.file_utils.pwrite", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "conary/lib/ext/file_utils.pyx":204
  * 
  * 
  * def removeIfExists(char *path):             # <<<<<<<<<<<<<<
@@ -2258,10 +2505,10 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_12pread(CYTHON_UNUSED P
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_15removeIfExists(PyObject *__pyx_self, PyObject *__pyx_arg_path); /*proto*/
-static char __pyx_doc_6conary_3lib_3ext_10file_utils_14removeIfExists[] = "Try to unlink C{path}, but don't fail if it doesn't exist.";
-static PyMethodDef __pyx_mdef_6conary_3lib_3ext_10file_utils_15removeIfExists = {"removeIfExists", (PyCFunction)__pyx_pw_6conary_3lib_3ext_10file_utils_15removeIfExists, METH_O, __pyx_doc_6conary_3lib_3ext_10file_utils_14removeIfExists};
-static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_15removeIfExists(PyObject *__pyx_self, PyObject *__pyx_arg_path) {
+static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_17removeIfExists(PyObject *__pyx_self, PyObject *__pyx_arg_path); /*proto*/
+static char __pyx_doc_6conary_3lib_3ext_10file_utils_16removeIfExists[] = "Try to unlink C{path}, but don't fail if it doesn't exist.";
+static PyMethodDef __pyx_mdef_6conary_3lib_3ext_10file_utils_17removeIfExists = {"removeIfExists", (PyCFunction)__pyx_pw_6conary_3lib_3ext_10file_utils_17removeIfExists, METH_O, __pyx_doc_6conary_3lib_3ext_10file_utils_16removeIfExists};
+static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_17removeIfExists(PyObject *__pyx_self, PyObject *__pyx_arg_path) {
   char *__pyx_v_path;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
@@ -2270,7 +2517,7 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_15removeIfExists(PyObje
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("removeIfExists (wrapper)", 0);
   assert(__pyx_arg_path); {
-    __pyx_v_path = __Pyx_PyObject_AsString(__pyx_arg_path); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 184; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
+    __pyx_v_path = __Pyx_PyObject_AsString(__pyx_arg_path); if (unlikely((!__pyx_v_path) && PyErr_Occurred())) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L3_error;}
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -2278,14 +2525,14 @@ static PyObject *__pyx_pw_6conary_3lib_3ext_10file_utils_15removeIfExists(PyObje
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(__pyx_self, ((char *)__pyx_v_path));
+  __pyx_r = __pyx_pf_6conary_3lib_3ext_10file_utils_16removeIfExists(__pyx_self, ((char *)__pyx_v_path));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON_UNUSED PyObject *__pyx_self, char *__pyx_v_path) {
+static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_16removeIfExists(CYTHON_UNUSED PyObject *__pyx_self, char *__pyx_v_path) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -2297,7 +2544,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("removeIfExists", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":186
+  /* "conary/lib/ext/file_utils.pyx":206
  * def removeIfExists(char *path):
  *     """Try to unlink C{path}, but don't fail if it doesn't exist."""
  *     if unlink(path):             # <<<<<<<<<<<<<<
@@ -2307,7 +2554,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON
   __pyx_t_1 = (unlink(__pyx_v_path) != 0);
   if (__pyx_t_1) {
 
-    /* "conary/lib/ext/file_utils.pyx":187
+    /* "conary/lib/ext/file_utils.pyx":207
  *     """Try to unlink C{path}, but don't fail if it doesn't exist."""
  *     if unlink(path):
  *         if errno in (ENOENT, ENAMETOOLONG):             # <<<<<<<<<<<<<<
@@ -2327,7 +2574,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON
     __pyx_t_3 = (__pyx_t_1 != 0);
     if (__pyx_t_3) {
 
-      /* "conary/lib/ext/file_utils.pyx":188
+      /* "conary/lib/ext/file_utils.pyx":208
  *     if unlink(path):
  *         if errno in (ENOENT, ENAMETOOLONG):
  *             return False             # <<<<<<<<<<<<<<
@@ -2340,20 +2587,20 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON
       goto __pyx_L0;
     }
 
-    /* "conary/lib/ext/file_utils.pyx":189
+    /* "conary/lib/ext/file_utils.pyx":209
  *         if errno in (ENOENT, ENAMETOOLONG):
  *             return False
  *         PyErr_SetFromErrnoWithFilename(OSError, path)             # <<<<<<<<<<<<<<
  *     return True
  */
-    __pyx_t_4 = PyErr_SetFromErrnoWithFilename(__pyx_builtin_OSError, __pyx_v_path); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 189; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+    __pyx_t_4 = PyErr_SetFromErrnoWithFilename(__pyx_builtin_OSError, __pyx_v_path); if (unlikely(!__pyx_t_4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 209; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     goto __pyx_L3;
   }
   __pyx_L3:;
 
-  /* "conary/lib/ext/file_utils.pyx":190
+  /* "conary/lib/ext/file_utils.pyx":210
  *             return False
  *         PyErr_SetFromErrnoWithFilename(OSError, path)
  *     return True             # <<<<<<<<<<<<<<
@@ -2363,7 +2610,7 @@ static PyObject *__pyx_pf_6conary_3lib_3ext_10file_utils_14removeIfExists(CYTHON
   __pyx_r = Py_True;
   goto __pyx_L0;
 
-  /* "conary/lib/ext/file_utils.pyx":184
+  /* "conary/lib/ext/file_utils.pyx":204
  * 
  * 
  * def removeIfExists(char *path):             # <<<<<<<<<<<<<<
@@ -2413,6 +2660,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_count, __pyx_k_count, sizeof(__pyx_k_count), 0, 0, 1, 1},
   {&__pyx_n_s_countOpenFileDescriptors, __pyx_k_countOpenFileDescriptors, sizeof(__pyx_k_countOpenFileDescriptors), 0, 0, 1, 1},
   {&__pyx_n_s_data, __pyx_k_data, sizeof(__pyx_k_data), 0, 0, 1, 1},
+  {&__pyx_n_s_data_b, __pyx_k_data_b, sizeof(__pyx_k_data_b), 0, 0, 1, 1},
+  {&__pyx_n_s_data_p, __pyx_k_data_p, sizeof(__pyx_k_data_p), 0, 0, 1, 1},
   {&__pyx_n_s_end, __pyx_k_end, sizeof(__pyx_k_end), 0, 0, 1, 1},
   {&__pyx_n_s_fchmod, __pyx_k_fchmod, sizeof(__pyx_k_fchmod), 0, 0, 1, 1},
   {&__pyx_n_s_fd, __pyx_k_fd, sizeof(__pyx_k_fd), 0, 0, 1, 1},
@@ -2431,6 +2680,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_offset, __pyx_k_offset, sizeof(__pyx_k_offset), 0, 0, 1, 1},
   {&__pyx_n_s_path, __pyx_k_path, sizeof(__pyx_k_path), 0, 0, 1, 1},
   {&__pyx_n_s_pread, __pyx_k_pread, sizeof(__pyx_k_pread), 0, 0, 1, 1},
+  {&__pyx_n_s_pwrite, __pyx_k_pwrite, sizeof(__pyx_k_pwrite), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
   {&__pyx_n_s_rc, __pyx_k_rc, sizeof(__pyx_k_rc), 0, 0, 1, 1},
   {&__pyx_n_s_removeIfExists, __pyx_k_removeIfExists, sizeof(__pyx_k_removeIfExists), 0, 0, 1, 1},
@@ -2442,10 +2692,10 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 54; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 57; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __pyx_builtin_OSError = __Pyx_GetBuiltinName(__pyx_n_s_OSError); if (!__pyx_builtin_OSError) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 69; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 119; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 55; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 58; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_OSError = __Pyx_GetBuiltinName(__pyx_n_s_OSError); if (!__pyx_builtin_OSError) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 70; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 120; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   return 0;
   __pyx_L1_error:;
   return -1;
@@ -2455,112 +2705,124 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "conary/lib/ext/file_utils.pyx":119
+  /* "conary/lib/ext/file_utils.pyx":120
  * 
  *     if count and end:
  *         raise ValueError("Exactly one of count and end must be zero.")             # <<<<<<<<<<<<<<
  * 
  *     rc = 0
  */
-  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_s_Exactly_one_of_count_and_end_mus); if (unlikely(!__pyx_tuple_)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 119; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_s_Exactly_one_of_count_and_end_mus); if (unlikely(!__pyx_tuple_)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 120; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
 
-  /* "conary/lib/ext/file_utils.pyx":46
+  /* "conary/lib/ext/file_utils.pyx":47
  * 
  * 
  * def countOpenFileDescriptors():             # <<<<<<<<<<<<<<
  *     """Return a count of the number of open file descriptors."""
  *     cdef int maxfd, count, i, rc
  */
-  __pyx_tuple__2 = PyTuple_Pack(5, __pyx_n_s_maxfd, __pyx_n_s_count, __pyx_n_s_i, __pyx_n_s_rc, __pyx_n_s_ufds); if (unlikely(!__pyx_tuple__2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 46; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__2 = PyTuple_Pack(5, __pyx_n_s_maxfd, __pyx_n_s_count, __pyx_n_s_i, __pyx_n_s_rc, __pyx_n_s_ufds); if (unlikely(!__pyx_tuple__2)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 47; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
-  __pyx_codeobj__3 = (PyObject*)__Pyx_PyCode_New(0, 0, 5, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__2, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_countOpenFileDescriptors, 46, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 46; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__3 = (PyObject*)__Pyx_PyCode_New(0, 0, 5, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__2, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_countOpenFileDescriptors, 47, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__3)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 47; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":80
+  /* "conary/lib/ext/file_utils.pyx":81
  * 
  * 
  * def fchmod(fobj, int mode):             # <<<<<<<<<<<<<<
  *     """Change the permissions of an open file."""
  *     cdef int fd, rc
  */
-  __pyx_tuple__4 = PyTuple_Pack(4, __pyx_n_s_fobj, __pyx_n_s_mode, __pyx_n_s_fd, __pyx_n_s_rc); if (unlikely(!__pyx_tuple__4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__4 = PyTuple_Pack(4, __pyx_n_s_fobj, __pyx_n_s_mode, __pyx_n_s_fd, __pyx_n_s_rc); if (unlikely(!__pyx_tuple__4)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__4);
   __Pyx_GIVEREF(__pyx_tuple__4);
-  __pyx_codeobj__5 = (PyObject*)__Pyx_PyCode_New(2, 0, 4, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_fchmod, 80, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__5 = (PyObject*)__Pyx_PyCode_New(2, 0, 4, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__4, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_fchmod, 81, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__5)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":90
+  /* "conary/lib/ext/file_utils.pyx":91
  * 
  * 
  * def fopenIfExists(char *path, char *mode):             # <<<<<<<<<<<<<<
  *     """Open a file, or return C{None} if opening failed."""
  *     cdef FILE *fp
  */
-  __pyx_tuple__6 = PyTuple_Pack(3, __pyx_n_s_path, __pyx_n_s_mode, __pyx_n_s_fp); if (unlikely(!__pyx_tuple__6)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__6 = PyTuple_Pack(3, __pyx_n_s_path, __pyx_n_s_mode, __pyx_n_s_fp); if (unlikely(!__pyx_tuple__6)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__6);
   __Pyx_GIVEREF(__pyx_tuple__6);
-  __pyx_codeobj__7 = (PyObject*)__Pyx_PyCode_New(2, 0, 3, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__6, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_fopenIfExists, 90, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__7)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__7 = (PyObject*)__Pyx_PyCode_New(2, 0, 3, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__6, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_fopenIfExists, 91, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__7)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":103
+  /* "conary/lib/ext/file_utils.pyx":104
  * 
  * 
  * def lexists(char *path):             # <<<<<<<<<<<<<<
  *     """Return C{True} if C{path} exists."""
  *     cdef stat sb
  */
-  __pyx_tuple__8 = PyTuple_Pack(3, __pyx_n_s_path, __pyx_n_s_path, __pyx_n_s_sb); if (unlikely(!__pyx_tuple__8)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 103; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__8 = PyTuple_Pack(3, __pyx_n_s_path, __pyx_n_s_path, __pyx_n_s_sb); if (unlikely(!__pyx_tuple__8)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 104; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__8);
   __Pyx_GIVEREF(__pyx_tuple__8);
-  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(1, 0, 3, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_lexists, 103, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 103; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(1, 0, 3, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__8, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_lexists, 104, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 104; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":113
+  /* "conary/lib/ext/file_utils.pyx":114
  * 
  * 
  * def massCloseFileDescriptors(int start, int count, int end):             # <<<<<<<<<<<<<<
  *     """Close file descriptors from C{start} to either C{end} or after C{count}
  *     unused descriptors have been encountered."""
  */
-  __pyx_tuple__10 = PyTuple_Pack(6, __pyx_n_s_start, __pyx_n_s_count, __pyx_n_s_end, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_rc); if (unlikely(!__pyx_tuple__10)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__10 = PyTuple_Pack(6, __pyx_n_s_start, __pyx_n_s_count, __pyx_n_s_end, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_rc); if (unlikely(!__pyx_tuple__10)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__10);
   __Pyx_GIVEREF(__pyx_tuple__10);
-  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(3, 0, 6, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_massCloseFileDescriptors, 113, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(3, 0, 6, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_massCloseFileDescriptors, 114, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":151
+  /* "conary/lib/ext/file_utils.pyx":152
  * 
  * 
  * def mkdirIfMissing(char *path):             # <<<<<<<<<<<<<<
  *     """Make a directory at C{path} if it does not exist."""
  *     if mkdir(path, 0777) == -1:
  */
-  __pyx_tuple__12 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__12)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 151; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__12 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__12)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 152; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__12);
   __Pyx_GIVEREF(__pyx_tuple__12);
-  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__12, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_mkdirIfMissing, 151, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 151; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__12, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_mkdirIfMissing, 152, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 152; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":160
+  /* "conary/lib/ext/file_utils.pyx":161
  * 
  * 
  * def pread(fobj, size_t count, off_t offset):             # <<<<<<<<<<<<<<
  *     """Read C{count} bytes at C{offset} in file C{fobj}."""
  *     cdef Py_ssize_t rc
  */
-  __pyx_tuple__14 = PyTuple_Pack(7, __pyx_n_s_fobj, __pyx_n_s_count, __pyx_n_s_offset, __pyx_n_s_rc, __pyx_n_s_data, __pyx_n_s_fd, __pyx_n_s_ret); if (unlikely(!__pyx_tuple__14)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__14 = PyTuple_Pack(7, __pyx_n_s_fobj, __pyx_n_s_count, __pyx_n_s_offset, __pyx_n_s_rc, __pyx_n_s_data, __pyx_n_s_fd, __pyx_n_s_ret); if (unlikely(!__pyx_tuple__14)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_tuple__14);
   __Pyx_GIVEREF(__pyx_tuple__14);
-  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(3, 0, 7, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__14, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_pread, 160, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(3, 0, 7, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__14, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_pread, 161, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
 
-  /* "conary/lib/ext/file_utils.pyx":184
+  /* "conary/lib/ext/file_utils.pyx":185
+ * 
+ * 
+ * def pwrite(fobj, bytes data_p, off_t offset):             # <<<<<<<<<<<<<<
+ *     """Write C{data} at C{offset} in file C{fobj}."""
+ *     cdef Py_ssize_t rc
+ */
+  __pyx_tuple__16 = PyTuple_Pack(7, __pyx_n_s_fobj, __pyx_n_s_data_p, __pyx_n_s_offset, __pyx_n_s_rc, __pyx_n_s_fd, __pyx_n_s_count, __pyx_n_s_data_b); if (unlikely(!__pyx_tuple__16)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__16);
+  __Pyx_GIVEREF(__pyx_tuple__16);
+  __pyx_codeobj__17 = (PyObject*)__Pyx_PyCode_New(3, 0, 7, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__16, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_pwrite, 185, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__17)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+
+  /* "conary/lib/ext/file_utils.pyx":204
  * 
  * 
  * def removeIfExists(char *path):             # <<<<<<<<<<<<<<
  *     """Try to unlink C{path}, but don't fail if it doesn't exist."""
  *     if unlink(path):
  */
-  __pyx_tuple__16 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__16)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 184; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
-  __Pyx_GOTREF(__pyx_tuple__16);
-  __Pyx_GIVEREF(__pyx_tuple__16);
-  __pyx_codeobj__17 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__16, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_removeIfExists, 184, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__17)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 184; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_tuple__18 = PyTuple_Pack(2, __pyx_n_s_path, __pyx_n_s_path); if (unlikely(!__pyx_tuple__18)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_tuple__18);
+  __Pyx_GIVEREF(__pyx_tuple__18);
+  __pyx_codeobj__19 = (PyObject*)__Pyx_PyCode_New(1, 0, 2, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__18, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_home_mithar_appengine_conary_co, __pyx_n_s_removeIfExists, 204, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__19)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -2660,100 +2922,112 @@ PyMODINIT_FUNC PyInit_file_utils(void)
   /*--- Function import code ---*/
   /*--- Execution code ---*/
 
-  /* "conary/lib/ext/file_utils.pyx":46
+  /* "conary/lib/ext/file_utils.pyx":47
  * 
  * 
  * def countOpenFileDescriptors():             # <<<<<<<<<<<<<<
  *     """Return a count of the number of open file descriptors."""
  *     cdef int maxfd, count, i, rc
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_1countOpenFileDescriptors, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 46; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_1countOpenFileDescriptors, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 47; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_countOpenFileDescriptors, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 46; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_countOpenFileDescriptors, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 47; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":80
+  /* "conary/lib/ext/file_utils.pyx":81
  * 
  * 
  * def fchmod(fobj, int mode):             # <<<<<<<<<<<<<<
  *     """Change the permissions of an open file."""
  *     cdef int fd, rc
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_3fchmod, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_3fchmod, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_fchmod, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 80; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_fchmod, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 81; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":90
+  /* "conary/lib/ext/file_utils.pyx":91
  * 
  * 
  * def fopenIfExists(char *path, char *mode):             # <<<<<<<<<<<<<<
  *     """Open a file, or return C{None} if opening failed."""
  *     cdef FILE *fp
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_5fopenIfExists, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_5fopenIfExists, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_fopenIfExists, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 90; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_fopenIfExists, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 91; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":103
+  /* "conary/lib/ext/file_utils.pyx":104
  * 
  * 
  * def lexists(char *path):             # <<<<<<<<<<<<<<
  *     """Return C{True} if C{path} exists."""
  *     cdef stat sb
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_7lexists, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 103; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_7lexists, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 104; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_lexists, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 103; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_lexists, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 104; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":113
+  /* "conary/lib/ext/file_utils.pyx":114
  * 
  * 
  * def massCloseFileDescriptors(int start, int count, int end):             # <<<<<<<<<<<<<<
  *     """Close file descriptors from C{start} to either C{end} or after C{count}
  *     unused descriptors have been encountered."""
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_9massCloseFileDescriptors, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_9massCloseFileDescriptors, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_massCloseFileDescriptors, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 113; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_massCloseFileDescriptors, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 114; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":151
+  /* "conary/lib/ext/file_utils.pyx":152
  * 
  * 
  * def mkdirIfMissing(char *path):             # <<<<<<<<<<<<<<
  *     """Make a directory at C{path} if it does not exist."""
  *     if mkdir(path, 0777) == -1:
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_11mkdirIfMissing, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 151; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_11mkdirIfMissing, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 152; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_mkdirIfMissing, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 151; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_mkdirIfMissing, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 152; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":160
+  /* "conary/lib/ext/file_utils.pyx":161
  * 
  * 
  * def pread(fobj, size_t count, off_t offset):             # <<<<<<<<<<<<<<
  *     """Read C{count} bytes at C{offset} in file C{fobj}."""
  *     cdef Py_ssize_t rc
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_13pread, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_13pread, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_pread, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 160; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_pread, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 161; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "conary/lib/ext/file_utils.pyx":184
+  /* "conary/lib/ext/file_utils.pyx":185
+ * 
+ * 
+ * def pwrite(fobj, bytes data_p, off_t offset):             # <<<<<<<<<<<<<<
+ *     """Write C{data} at C{offset} in file C{fobj}."""
+ *     cdef Py_ssize_t rc
+ */
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_15pwrite, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_pwrite, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 185; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+
+  /* "conary/lib/ext/file_utils.pyx":204
  * 
  * 
  * def removeIfExists(char *path):             # <<<<<<<<<<<<<<
  *     """Try to unlink C{path}, but don't fail if it doesn't exist."""
  *     if unlink(path):
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_15removeIfExists, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 184; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6conary_3lib_3ext_10file_utils_17removeIfExists, NULL, __pyx_n_s_conary_lib_ext_file_utils); if (unlikely(!__pyx_t_1)) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_removeIfExists, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 184; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_removeIfExists, __pyx_t_1) < 0) {__pyx_filename = __pyx_f[0]; __pyx_lineno = 204; __pyx_clineno = __LINE__; goto __pyx_L1_error;}
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "conary/lib/ext/file_utils.pyx":1
@@ -3163,6 +3437,32 @@ bad:
     return;
 }
 #endif
+
+static void __Pyx_RaiseArgumentTypeInvalid(const char* name, PyObject *obj, PyTypeObject *type) {
+    PyErr_Format(PyExc_TypeError,
+        "Argument '%.200s' has incorrect type (expected %.200s, got %.200s)",
+        name, type->tp_name, Py_TYPE(obj)->tp_name);
+}
+static CYTHON_INLINE int __Pyx_ArgTypeTest(PyObject *obj, PyTypeObject *type, int none_allowed,
+    const char *name, int exact)
+{
+    if (unlikely(!type)) {
+        PyErr_SetString(PyExc_SystemError, "Missing type object");
+        return 0;
+    }
+    if (none_allowed && obj == Py_None) return 1;
+    else if (exact) {
+        if (likely(Py_TYPE(obj) == type)) return 1;
+        #if PY_MAJOR_VERSION == 2
+        else if ((type == &PyBaseString_Type) && likely(__Pyx_PyBaseString_CheckExact(obj))) return 1;
+        #endif
+    }
+    else {
+        if (likely(PyObject_TypeCheck(obj, type))) return 1;
+    }
+    __Pyx_RaiseArgumentTypeInvalid(name, obj, type);
+    return 0;
+}
 
 static int __pyx_bisect_code_objects(__Pyx_CodeObjectCacheEntry* entries, int count, int code_line) {
     int start = 0, mid = 0, end = count - 1;
