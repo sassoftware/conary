@@ -602,7 +602,7 @@ class UpdateJob:
 
     def _saveFrozenRepr(self, jobfile, drep):
         f = open(jobfile, "w+")
-        util.xmlrpcDump((drep, ), stream=f)
+        util.xmlrpcDump((drep, ), stream=f, allow_none=True)
         return drep
 
     def _loadFrozenRepr(self, jobfile):
