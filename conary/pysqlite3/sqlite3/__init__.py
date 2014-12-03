@@ -51,7 +51,7 @@ UNICODESTRING = DBAPITypeObject(_sqlite.UNICODESTRING)
 
 from conary._sqlite3 import Warning, Error, InterfaceError, \
     DatabaseError, DataError, OperationalError, IntegrityError, InternalError, \
-    ProgrammingError, NotSupportedError
+    ProgrammingError, NotSupportedError, sqlite_version, sqlite_version_info
 
 #------------------------------------------------------------------------------
 # Global Functions

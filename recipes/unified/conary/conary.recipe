@@ -103,7 +103,7 @@ class Conary(CPackageRecipe):
         raise RuntimeError("Wrong value for 'plat' class variable")
 
     def setup(r):
-        r.macros.sqlitever = '3071201'
+        r.macros.sqlitever = '3080701'
         r.macros.sqlite = 'sqlite-autoconf-%(sqlitever)s'
 
         if r.embedded:
@@ -127,7 +127,7 @@ class Conary(CPackageRecipe):
             r.addPatch(patchName, use=(patchName == r.patchName))
 
         ### Build internal sqlite library for Conary to use
-        r.addArchive('http://sqlite.org/%(sqlite)s.tar.gz',
+        r.addArchive('http://sqlite.org/2014/%(sqlite)s.tar.gz',
             dir='%(maindir)s/conary/pysqlite3/')
         r.Configure('--disable-shared --enable-threadsafe',
                     dir='conary/pysqlite3/%(sqlite)s')

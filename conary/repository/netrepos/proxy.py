@@ -1574,6 +1574,8 @@ class Memcache(object):
                 key_prefix = "TROVEINFO")
 
     def pokeCounter(self, name, delta):
+        if not delta:
+            return
         if self.memCachePrefix:
             name = self.memCachePrefix + ':' + name
         if not self.memCache.incr(name, delta):
@@ -2133,7 +2135,7 @@ class ChangesetFileReader(object):
             sha1, expandedSize = entry.split(' ')
             expandedSize = int(expandedSize)
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-            path = contentsStore.hashToPath(sha1)
+            path = contentsStore.hashToPath(sha1helper.sha1FromString(sha1))
             fobj = open(path, 'rb')
             return tag, expandedSize, util.iterFileChunks(fobj)
         else:

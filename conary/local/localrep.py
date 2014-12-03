@@ -24,6 +24,7 @@ except ImportError:
 
 from conary.repository import errors, repository, datastore
 from conary.lib import digestlib
+from conary.lib import sha1helper
 from conary.local import schema
 from conary import files
 
@@ -160,6 +161,8 @@ class SqlDataStore(datastore.AbstractDataStore):
     """
 
     def hasFile(self, hash):
+        if len(hash) != 40:
+            hash = sha1helper.sha1ToString(hash)
         cu = self.db.cursor()
         cu.execute("SELECT COUNT(*) FROM DataStore WHERE hash=?", hash)
         return (cu.next()[0] != 0)
@@ -169,6 +172,8 @@ class SqlDataStore(datastore.AbstractDataStore):
         Decrements the count by one; it it becomes 1, the count file
         is removed. If it becomes zero, the contents are removed.
         """
+        if len(hash) != 40:
+            hash = sha1helper.sha1ToString(hash)
         cu = self.db.cursor()
         cu.execute("SELECT count FROM DataStore WHERE hash=?", hash)
         count = cu.next()[0]
@@ -184,6 +189,8 @@ class SqlDataStore(datastore.AbstractDataStore):
         Increments the count by one.  If it becomes one (the file is
         new), the contents of fileObj are stored into that path.
         """
+        if len(hash) != 40:
+            hash = sha1helper.sha1ToString(hash)
         cu = self.db.cursor()
         cu.execute("SELECT COUNT(*) FROM DataStore WHERE hash=?", hash)
         exists = cu.next()[0]
@@ -222,6 +229,8 @@ class SqlDataStore(datastore.AbstractDataStore):
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
+        if len(hash) != 40:
+            hash = sha1helper.sha1ToString(hash)
         cu = self.db.cursor()
         cu.execute("SELECT data FROM DataStore WHERE hash=?", hash)
         data = cu.next()[0]

@@ -23,7 +23,7 @@ from conary.dbstore import migration, sqlerrors, sqllib, idtable
 from conary.lib.tracelog import logMe
 from conary.deps import deps
 from conary.repository.netrepos import versionops, trovestore, \
-     netauth, flavors, accessmap
+     flavors, accessmap
 from conary.server import schema
 
 # SCHEMA Migration
@@ -477,43 +477,6 @@ class MigrateTo_15(SchemaMigration):
         # we make this a noop because the same will be done at schema 16.1
         return True
 
-# populate the CheckTroveCache table
-def createCheckTroveCache(db):
-    db.loadSchema()
-    assert("CheckTroveCache" in db.tables)
-    cu = db.cursor()
-    cu.execute("delete from CheckTroveCache")
-    # grab all possible patterns
-    cu.execute("select distinct i.itemId, i.item "
-               "from Permissions join Items as i using(itemId)")
-    patterns = set([(x[0],x[1]) for x in cu.fetchall()])
-    patterns.add((0, "ALL"))
-    # grab all items
-    cu.execute("select itemId, item from Items")
-    items = cu.fetchall()
-    from conary.repository.netrepos.items import checkTrove
-    for (patternId, pattern) in patterns:
-        for (itemId, troveName) in items:
-            if not checkTrove(pattern, troveName):
-                continue
-            cu.execute("insert into CheckTroveCache (patternId, itemId) values (?,?)",
-                    (patternId, itemId))
-    db.analyze("CheckTroveCache")
-    return True
-
-# return a list of all prefixes for a given dirname, including self
-# note: we deliberately do not insert '/' as a prefix for all directories, since
-#       not walking through the Prefixes is faster than looping through the entire
-#       Dirnames set (gafton)
-def _prefix(dirname):
-    d, b = os.path.split(dirname)
-    if d == '/':
-        return [dirname]
-    if d == '':
-        return []
-    ret = _prefix(d)
-    ret.append(dirname)
-    return ret
 
 class MigrateTo_16(SchemaMigration):
     Version = (16,1)
@@ -639,9 +602,6 @@ class MigrateTo_16(SchemaMigration):
             cu.execute("drop table Caps")
         schema.createAccessMaps(self.db)
         schema.createLatest(self.db, withIndexes=False)
-        logMe(2, "creating the CheckTroveCache table...")
-        if not createCheckTroveCache(self.db):
-            return False
         logMe(2, "creating UserGroupInstancesCache table")
         ugi = accessmap.RoleInstances(self.db)
         ugi.rebuild()
@@ -749,8 +709,6 @@ class MigrateTo_17(SchemaMigration):
         schema.setupTempTables(self.db)
         # migrate FilesPath to a dirnames-based setup
         self._createFilePaths()
-        # prefixes will be created by the migration to schema version 17.1
-        self.db.analyze("Prefixes")
         return True
 
     # migrate to 17.1
@@ -765,10 +723,8 @@ class MigrateTo_17(SchemaMigration):
             logMe(2, "fixing column types for pathfields")
             cu.execute("create table saveDirnames as select dirnameId, dirname from Dirnames")
             cu.execute("create table saveBasenames as select basenameId, basename from Basenames")
-            cu.execute("create table savePrefixes as select dirnameId, prefixId from Prefixes")
             self.db.dropForeignKey("FilePaths", "dirnameId")
             self.db.dropForeignKey("FilePaths", "basenameId")
-            cu.execute("drop table Prefixes")
             cu.execute("drop table Dirnames")
             cu.execute("drop table Basenames")
             self.db.loadSchema()
@@ -779,33 +735,15 @@ class MigrateTo_17(SchemaMigration):
             cu.execute("select basenameId, basename from saveBasenames")
             self.db.bulkload("Basenames", ( (x[0], cu.binary(x[1])) for x in cu.fetchall() ),
                              ["basenameId", "basename"])
-            cu.execute("insert into Prefixes(dirnameId, prefixId) "
-                       "select dirnameId, prefixId from savePrefixes")
             schema.createTroves(self.db, createIndex = True)
             self.db.addForeignKey("FilePaths", "dirnameId", "Dirnames", "dirnameId")
             self.db.addForeignKey("FilePaths", "basenameId", "Basenames", "basenameId")
             cu.execute("drop table saveDirnames")
             cu.execute("drop table saveBasenames")
-            cu.execute("drop table savePrefixes")
             self.db.analyze("Dirnames")
             self.db.analyze("Basenames")
             self.db.setAutoIncrement("Dirnames", "dirnameId")
             self.db.setAutoIncrement("Basenames", "basenameId")
-        # fix the missing dirnames/prefixes links
-        schema.setupTempTables(self.db)
-        logMe(2, "looking for missing dirnames/prefixes links")
-        cu = self.db.cursor()
-        cu.execute("""select distinct d.dirnameId, d.dirname
-        from Dirnames as d
-        join ( select fp.dirnameId as dirnameId
-               from FilePaths as fp
-               left join Prefixes as p using(dirnameId)
-               where p.dirnameId is null ) as dq using(dirnameId) """)
-        ret = cu.fetchall()
-        if ret:
-            logMe(2, "fixing missing dirnames/prefixes links in %d dirnames" % (len(ret),))
-            trovestore.addPrefixesFromList(self.db, ret)
-        self.db.analyze("Prefixes")
         return True
 
     # migrate to 17.3
@@ -859,6 +797,14 @@ class MigrateTo_18(SchemaMigration):
                 % self.db.keywords)
         cu.execute("ALTER TABLE UserGroups ADD filter_flags %(STRING)s"
                 % self.db.keywords)
+        return True
+
+    def migrate1(self):
+        cu = self.db.cursor()
+        if 'Prefixes' in self.db.tables:
+            cu.execute("DROP TABLE Prefixes")
+        if 'CheckTroveCache' in self.db.tables:
+            cu.execute("DROP TABLE CheckTroveCache")
         return True
 
 def _getMigration(major):

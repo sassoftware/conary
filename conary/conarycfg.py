@@ -119,6 +119,12 @@ class ServerGlobList(object):
     def __nonzero__(self):
         return bool(self._exact) or bool(self._globs)
 
+    def __eq__(self, other):
+        return list(self) == list(other)
+
+    def __ne__(self, other):
+        return list(self) != list(other)
+
 
 class UserInformation(ServerGlobList):
 

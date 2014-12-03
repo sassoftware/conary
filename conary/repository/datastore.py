@@ -23,6 +23,7 @@ The hash can be any arbitrary string of at least 5 bytes in length;
 keys are assumed to be unique.
 """
 
+import base64
 import errno
 import gzip
 import itertools
@@ -55,7 +56,6 @@ class AbstractDataStore:
     def _writeFile(cls, fileObj, outFds, precompressed, computeSha1):
         if precompressed and hasattr(fileObj, '_fdInfo'):
             (fd, start, size) = fileObj._fdInfo()
-            pid = os.getpid()
             realHash = digest_uncompress.sha1Copy((fd, start, size), outFds)
             for x in outFds:
                 cls._fchmod(x)
@@ -131,6 +131,12 @@ class Tee:
 class DataStore(AbstractDataStore):
 
     def hashToPath(self, hash):
+        # New consumers should pass a binary hash, but for backwards
+        # compatibility (with rmake) continue to accept hashes that are already
+        # encoded. Proxy code also passes in hashes with suffixes on them,
+        # which should probably be normalized further.
+        if len(hash) < 40:
+            hash = sha1helper.sha1ToString(hash)
         if (len(hash) < 5):
             raise KeyError, ("invalid hash %s" % hash)
 
@@ -169,7 +175,7 @@ class DataStore(AbstractDataStore):
         realHash = self._writeFile(fileObj, [ tmpFd ], precompressed,
                                    computeSha1 = integrityCheck)
 
-        if integrityCheck and realHash != sha1helper.sha1FromString(hash):
+        if integrityCheck and realHash != hash:
             os.unlink(tmpName)
             raise errors.IntegrityError
 
@@ -202,10 +208,35 @@ class DataStore(AbstractDataStore):
 class ShallowDataStore(DataStore):
 
     def hashToPath(self, hash):
+        # proxy code passes in hex digests with version suffixes, so just pass
+        # that through.
+        if len(hash) < 40:
+            hash = sha1helper.sha1ToString(hash)
         if (len(hash) < 5):
             raise KeyError, ("invalid hash %s" % hash)
 
         return os.sep.join((self.top, hash[0:2], hash[2:]))
+
+    def makeDir(self, path):
+        d = os.path.dirname(path)
+        try:
+            os.mkdir(d)
+        except OSError, e:
+            if e.args[0] != errno.EEXIST:
+                raise
+
+
+class FlatDataStore(DataStore):
+
+    def hashToPath(self, hash):
+        assert len(hash) == 20
+        hash = base64.urlsafe_b64encode(hash)
+        # Omit trailing padding
+        return os.sep.join((self.top, hash[:27]))
+
+    def makeDir(self, path):
+        pass
+
 
 class OverlayDataStoreSet:
 
@@ -284,7 +315,7 @@ class DataStoreSet(AbstractDataStore):
         realHash = self._writeFile(f, [ x[0] for x in tmpFileList ],
                                    precompressed, computeSha1 = True)
 
-        if realHash != sha1helper.sha1FromString(hash):
+        if realHash != hash:
             for fd, tmpPath, path in tmpFileList:
                 os.unlink(tmpPath)
 
@@ -324,25 +355,24 @@ class DataStoreRepository:
     def _storeFileFromContents(self, contents, sha1, restoreContents,
                                precompressed = False):
         if restoreContents:
-            self.contentsStore.addFile(contents.get(),
-                                       sha1helper.sha1ToString(sha1),
+            self.contentsStore.addFile(contents.get(), sha1,
                                        precompressed = precompressed)
         else:
             # the file doesn't have any contents, so it must exist
             # in the data store already; we still need to increment
             # the reference count for it
-            self.contentsStore.addFileReference(sha1helper.sha1ToString(sha1))
+            self.contentsStore.addFileReference(sha1)
 
         return 1
 
     def _removeFileContents(self, sha1):
-        self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+        self.contentsStore.removeFile(sha1)
 
     def _getFileObject(self, sha1):
-        return self.contentsStore.openFile(sha1helper.sha1ToString(sha1))
+        return self.contentsStore.openFile(sha1)
 
     def _hasFileContents(self, sha1):
-        return self.contentsStore.hasFile(sha1helper.sha1ToString(sha1))
+        return self.contentsStore.hasFile(sha1)
 
     def getFileContents(self, fileList):
         contentList = []

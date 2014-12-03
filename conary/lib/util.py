@@ -166,15 +166,15 @@ errorMessage = '''
 ERROR: An unexpected condition has occurred in Conary.  This is
 most likely due to insufficient handling of erroneous input, but
 may be some other bug.  In either case, please report the error at
-http://issues.rpath.com/ and attach to the issue the file
+http://opensource.sas.com/its/ and attach to the issue the file
 %(stackfile)s
 
 Then, for more complete information, please run the following script:
 conary-debug "%(command)s"
 You can attach the resulting archive to your issue report at
-http://issues.rpath.com/  For more information, or if you have
+http://opensource.sas.com/its/  For more information, or if you have
 trouble with the conary-debug command, go to:
-http://wiki.rpath.com/wiki/Conary:How_To_File_An_Effective_Bug_Report
+https://opensource.sas.com/conarywiki/index.php/Conary:How_To_File_An_Effective_Bug_Report
 
 To get a debug prompt, rerun the command with --debug-all
 

@@ -28,6 +28,7 @@ from conary.cmds import query
 from conary.cmds import queryrep
 from conary.deps import deps
 from conary.deps.deps import parseFlavor as Flavor
+from conary.lib import log
 from conary.versions import VersionFromString as VFS
 
 
@@ -131,6 +132,41 @@ Source    : test1:source
 Change log:  ()
 '''
         assert(s == info)
+
+        # --debug mode
+        debugInfo = '''\
+Name      : test1:run          Build time: <TIME>
+Version   : 1.0-1-1            Label     : localhost@rpl:linux
+Size      : 14                
+Committed : <TIME>
+Flavor    :                   
+License   : GPL
+License   : GPLv3
+Crypto    : foo
+Crypto    : foo2
+Category  : cat1
+Category  : cat2
+Summary   : short
+Url       : url1
+Description: 
+    long
+Source    : test1:source
+Change log:  ()
+Incomp.   : False              TroveVer  : 10
+Clone of  : None              
+Conary version :              
+'''
+
+        verbosity = log.getVerbosity()
+        log.setVerbosity(log.DEBUG)
+        try:
+            rs, s = self.captureOutput(queryrep.displayTroves, self.cfg,
+                    ['test1:run'], info=True)
+        finally:
+            log.setVerbosity(verbosity)
+
+        s = re.sub('(Build time|Committed ): .*', r'\1: <TIME>', s)
+        self.assertEqual(s, debugInfo)
 
         # test to make sure that we can display some info if :source
         # is not available to us

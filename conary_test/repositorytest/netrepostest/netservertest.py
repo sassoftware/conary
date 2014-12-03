@@ -154,7 +154,7 @@ class NetServerTest(rephelp.RepositoryHelper):
 
         # Set defaults
         cfg.repositoryDB = ('sqlite', os.path.join(self.workDir, 'schema.sqlite'))
-        cfg.contentsDir = os.path.join(self.workDir, 'contentsDir')
+        cfg.contentsDir = ('legacy', [os.path.join(self.workDir, 'contentsDir')])
         cfg.readOnlyRepository = False
 
         # And override the defaults with any values supplied as arguments

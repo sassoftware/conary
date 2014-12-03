@@ -18,7 +18,6 @@
 import base64
 import cPickle
 import errno
-import fnmatch
 import itertools
 import os
 import re
@@ -42,6 +41,7 @@ from conary.repository.netrepos.netauth import NetworkAuthorization
 from conary.repository.netclient import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, \
                                         TROVE_QUERY_NORMAL
 from conary.repository.netrepos import reposlog
+from conary.repository.netrepos.repo_cfg import GlobListType, CfgContentStore
 from conary import dbstore
 from conary.dbstore import idtable, sqlerrors
 from conary.server import schema
@@ -135,7 +135,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.requireSigs = cfg.requireSigs
         self.deadlockRetry = cfg.deadlockRetry
         self.repDB = cfg.repositoryDB
-        self.contentsDir = cfg.contentsDir.split(" ")
+        self.contentsDir = cfg.contentsDir
         self.authCacheTimeout = cfg.authCacheTimeout
         self.externalPasswordURL = cfg.externalPasswordURL
         self.entitlementCheckURL = cfg.entitlementCheckURL
@@ -162,7 +162,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.open(connect = False)
 
         self.log(1, "url=%s" % basicUrl, "name=%s" % self.serverNameList,
-              self.repDB, self.contentsDir)
+              self.repDB, self.contentsDir[1])
 
     def __del__(self):
         # this is ugly, but for now it is the only way to break the
@@ -1447,7 +1447,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 else:
                     contents = files.frozenFileContentInfo(stream)
                     filePath = self.repos.contentsStore.hashToPath(
-                        sha1helper.sha1ToString(contents.sha1()))
+                            contents.sha1())
                     try:
                         size = os.stat(filePath).st_size
                         sizeList.append(size)
@@ -2273,19 +2273,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return """join tmpId on fp.dirnameId = tmpId.id """
 
         prefixQuery = ""
-        if dirnames:
-            if clientVersion < 62: # dirnames are in fact filePrefixes
-                # if we're asked for all files with a '/' prefix, don't bother
-                # "optimizing" since no records will be filtered out
-                if not ('/' in dirnames):
-                    prefixQuery = _lookupIds(cu, dirnames, [
-                        """ select p.dirnameId from tmpPaths
-                            join Dirnames as d on tmpPaths.path = d.dirname
-                            join Prefixes as p on d.dirnameId = p.prefixId """,
-                        """ select d.dirnameId from tmpPaths
-                            join Dirnames as d on tmpPaths.path = d.dirname """ ])
-            else: # dirnames are just dirnames
-                prefixQuery = _lookupIds(cu, dirnames, [
+        # Before version 62, dirnames were sent as prefixes. That table has
+        # been dropped though, so just return unfiltered results.
+        if dirnames and clientVersion >= 62:
+            prefixQuery = _lookupIds(cu, dirnames, [
                     """ select d.dirnameId from tmpPaths
                         join Dirnames as d on tmpPaths.path = d.dirname """ ])
 
@@ -3600,32 +3591,6 @@ class HiddenException(Exception):
         self.forLog = forLog
         self.forReturn = forReturn
 
-class GlobListType(list):
-
-    def __delitem__(self, key):
-        raise NotImplementedError
-
-    def __init__(self, *args):
-        list.__init__(self, *args)
-        self.matchCache = set()
-
-    def __getstate__(self):
-        return list(self)
-
-    def __setstate__(self, state):
-        self += state
-
-    def __contains__(self, item):
-        if item in self.matchCache:
-            return True
-
-        for glob in self:
-            if fnmatch.fnmatch(item, glob):
-                self.matchCache.add(item)
-                return True
-
-        return False
-
 
 class ServerConfig(ConfigFile):
     authCacheTimeout        = CfgInt
@@ -3641,7 +3606,7 @@ class ServerConfig(ConfigFile):
     changesetCacheDir       = CfgPath
     changesetCacheLogFile   = CfgPath
     commitAction            = CfgString
-    contentsDir             = CfgPath
+    contentsDir             = CfgContentStore
     capsuleServerUrl        = (CfgString, None)
     deadlockRetry           = (CfgInt, 5)
     entitlement             = CfgEntitlement

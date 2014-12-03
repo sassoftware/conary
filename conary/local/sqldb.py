@@ -1394,6 +1394,7 @@ order by
                           JOIN DBTroveFiles USING(instanceId)
                           JOIN Versions ON
                               Versions.versionId = DBTroveFiles.versionId
+                          ORDER BY idx
                           """ % streamStr)
             curIdx = 0
             for (idx, pathId, path, version, fileId, isPresent, stream) in cu:

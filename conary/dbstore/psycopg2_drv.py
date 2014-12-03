@@ -14,11 +14,14 @@
 # limitations under the License.
 #
 
-
 import os
 import psycopg2
 import sys
 from psycopg2 import extensions as psy_ext
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from conary.dbstore.base_drv import BaseDatabase, BaseCursor, BaseKeywordDict
 from conary.dbstore import _mangle
@@ -110,6 +113,20 @@ class Cursor(BaseCursor):
             return int(row[0])
 
     lastrowid = property(lastid)
+
+    def _bulkload(self, tableName, rows, columnNames):
+        # This could yield successive lines/chunks of data from a file-like
+        # object instead of accumulating all rows into one big buffer, but it
+        # does not seem to have any noticeable performance impact on commit
+        # times and this way is more robust.
+        if not rows:
+            return
+        sio = StringIO()
+        for row in rows:
+            sio.write(_formatBulk(row))
+        sio.seek(0)
+        self._tryExecute(self._cursor.copy_from, sio, tableName,
+                columns=columnNames)
 
     def _row(self, data):
         "Convert a data tuple to a C{Row} object."
@@ -234,6 +251,9 @@ class Database(BaseDatabase):
         version = self.getVersion()
         return version
 
+    def _bulkload(self, tableName, rows, columnNames, start_transaction=True):
+        return self.cursor()._bulkload(tableName, rows, columnNames)
+
     # Transaction support
     def inTransaction(self, default=None):
         """
@@ -304,6 +324,12 @@ class Database(BaseDatabase):
         cu = self.cursor()
         cu.execute("TRUNCATE TABLE " + ", ".join(tables))
 
+    def lockTable(self, tableName):
+        cu = self.cursor()
+        # "This mode protects a table against concurrent data changes, and is
+        # self-exclusive so that only one session can hold it at a time."
+        cu.execute("LOCK TABLE %s IN SHARE ROW EXCLUSIVE MODE" % (tableName,))
+
     def runAutoCommit(self, func, *args, **kwargs):
         """Call the given function in auto-commit mode. Needed to execute
         statements that cannot be run in a transaction, like CREATE
@@ -342,3 +368,27 @@ class Database(BaseDatabase):
         self.close()
         self.database = "/".join([self.database.rsplit("/", 1)[0], dbName])
         return self.connect(**kwargs)
+
+
+def _formatBulk(row):
+    out = []
+    for col in row:
+        if col is None:
+            out.append(r'\N')
+        elif isinstance(col, buffer):
+            out.append(r'\\x' + str(col).encode('hex'))
+        elif isinstance(col, basestring):
+            if isinstance(col, unicode):
+                col = col.encode('utf8')
+            col = col.replace('\\', r'\\'
+                    ).replace('\r', r'\r'
+                    ).replace('\t', r'\t'
+                    ).replace('\n', r'\n'
+                    )
+            out.append(col)
+        elif isinstance(col, (int, long)):
+            out.append(str(col))
+        else:
+            raise TypeError("bulkload can't serialize value of type %r",
+                    type(col))
+    return '\t'.join(out) + '\n'

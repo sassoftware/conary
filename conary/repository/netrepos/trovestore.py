@@ -20,6 +20,7 @@ import itertools
 
 from conary import files, trove, versions, changelog, callbacks
 from conary.cmds import metadata
+from conary.dbstore import idtable
 from conary.deps import deps
 from conary.lib import util, tracelog
 from conary.local import deptable
@@ -30,36 +31,6 @@ from conary.repository.netrepos import instances, items, keytable, flavors,\
      troveinfo, versionops, cltable, accessmap
 from conary.server import schema
 
-
-class LocalRepVersionTable(versiontable.VersionTable):
-
-    def getId(self, theId, itemId):
-        cu = self.db.cursor()
-        cu.execute("""
-        SELECT Versions.version, Nodes.timeStamps
-        FROM Nodes
-        JOIN Versions USING (versionId)
-        WHERE Nodes.versionId=? AND Nodes.itemId=?
-        """, theId, itemId)
-        try:
-            (s, t) = cu.next()
-            v = self._makeVersion(s, t)
-            return v
-        except StopIteration:
-            raise KeyError, theId
-
-    def getTimeStamps(self, version, itemId):
-        cu = self.db.cursor()
-        cu.execute("""
-        SELECT timeStamps
-        FROM Nodes
-        WHERE versionId = (SELECT versionId from Versions WHERE version=?)
-          AND itemId=?""", version.asString(), itemId)
-        try:
-            (t,) = cu.next()
-            return [ float(x) for x in t.split(":") ]
-        except StopIteration:
-            raise KeyError, itemId
 
 class TroveAdder:
 
@@ -131,44 +102,6 @@ class TroveAdder:
         self.dirMap = dirMap
         self.baseMap = baseMap
 
-# we need to call this from the schema migration as well, which is why
-# we extracted it from the TroveStore class
-def addPrefixesFromList(db, dirnameList):
-    prefixList = []
-    # all the new dirnames need to be processed for Prefixes links
-    def _getPrefixes(dirname):
-        # note: we deliberately do not insert '/' as a prefix for
-        # all directories, since not walking through the Prefixes
-        # is faster than looping through the entire Dirnames set
-        d, b = os.path.split(dirname)
-        if d == '/':
-            return [dirname]
-        if d == '':
-            return []
-        ret = _getPrefixes(d)
-        ret.append(dirname)
-        return ret
-    def _iterPrefixes(cu, dl):
-        for dirnameId, dirname in dl:
-            for x in _getPrefixes(dirname):
-                yield (dirnameId, cu.binary(x))
-        raise StopIteration
-    if not dirnameList:
-        return 0
-    cu = db.cursor()
-    schema.resetTable(cu, "tmpPaths")
-    db.bulkload("tmpPaths", _iterPrefixes(cu, dirnameList), ["id", "path"])
-    db.analyze("tmpPaths")
-    # insert any new prefix strings into Dirnames
-    cu.execute("""insert into Dirnames(dirname)
-    select distinct t.path from tmpPaths as t
-    left join Dirnames as d on t.path = d.dirname
-    where d.dirnameId is null """)
-    # now populate Prefixes
-    cu.execute(""" insert into Prefixes (dirnameId, prefixId)
-    select tmpPaths.id, d.dirnameId from tmpPaths
-    join Dirnames as d on tmpPaths.path = d.dirname """)
-    return len(dirnameList)
 
 class TroveStore:
     def __init__(self, db, log = None):
@@ -179,7 +112,7 @@ class TroveStore:
         self.branchTable = versionops.BranchTable(self.db)
         self.changeLogs = cltable.ChangeLogTable(self.db)
 
-        self.versionTable = LocalRepVersionTable(self.db)
+        self.versionTable = versiontable.VersionTable(self.db)
         self.versionOps = versionops.SqlVersioning(
             self.db, self.versionTable, self.branchTable)
         self.instances = instances.InstanceTable(self.db)
@@ -210,7 +143,6 @@ class TroveStore:
         itemId = self.items.get(item, None)
         if itemId is None:
             itemId = self.items.addId(item)
-        self.items.updateCheckTrove(itemId, item)
         self.itemIdCache[item] = itemId
         return itemId
 
@@ -482,8 +414,6 @@ class TroveStore:
         """)
 
     def _mergeIncludedTroves(self, cu):
-        # need to use self.items.addId to keep the CheckTroveCache in
-        # sync for any new items we might add
         cu.execute("""
         INSERT INTO Items (item)
         SELECT DISTINCT tmpTroves.item FROM tmpTroves
@@ -727,16 +657,13 @@ class TroveStore:
                            start_transaction=False)
             self.db.analyze("tmpNewRedirects")
 
-            # again need to pay attention to CheckTrovesCache and use
-            # items.addId()
             cu.execute("""
+            INSERT INTO Items (item)
             SELECT tmpNewRedirects.item
             FROM tmpNewRedirects
             LEFT JOIN Items USING (item)
             WHERE Items.itemId is NULL
             """)
-            for (newItem,) in cu.fetchall():
-                self.items.addId(newItem)
 
             cu.execute("""
             INSERT INTO Branches (branch)
@@ -778,8 +705,6 @@ class TroveStore:
         schema.resetTable(cu, 'tmpNewPaths')
         l = [(cu.binary(x),) for x in dirNames]
         self.db.bulkload("tmpNewPaths", l, [ "path" ])
-        cu.execute("SELECT MAX (dirNameId) FROM Dirnames")
-        max = cu.next()[0]
         cu.execute("""
             INSERT INTO Dirnames (dirName)
                 SELECT path FROM tmpNewPaths
@@ -787,10 +712,6 @@ class TroveStore:
                         Dirnames.dirName = tmpNewPaths.path
                     WHERE Dirnames.dirNameId IS NULL
         """)
-        cu.execute("SELECT dirNameId, dirName FROM Dirnames "
-                   "WHERE dirNameId > ?", max)
-        addPrefixesFromList(self.db, [ (x[0], cu.frombinary(x[1])) for x in cu ])
-
         cu.execute("""
                 SELECT Dirnames.dirName, Dirnames.dirNameId FROM
                     tmpNewPaths JOIN Dirnames ON
@@ -1413,12 +1334,9 @@ class TroveStore:
             cu.execute("DELETE FROM FilePaths WHERE filePathId IN (%s)"
                        % ",".join("%d"%x for x in filePathIdsToRemove))
             # XXX: these cleanups are more expensive than they're worth, probably
-            cu.execute(""" delete from Prefixes where not exists (
-                select 1 from FilePaths as fp where fp.dirnameId = Prefixes.dirnameId ) """)
             cu.execute(""" delete from Dirnames where not exists (
                 select 1 from FilePaths as fp where fp.dirnameId = Dirnames.dirnameId )
-            and not exists (
-                select 1 from Prefixes as p where p.prefixId = Dirnames.dirnameId ) """)
+                """)
             cu.execute(""" delete from Basenames where not exists (
                 select 1 from FilePaths as fp where fp.basenameId = Basenames.basenameId ) """)
 
@@ -1574,18 +1492,6 @@ class TroveStore:
         # clean up Items
         cu.execute("""
         delete from Items
-        where itemId in (
-            select r.itemId
-            from tmpRemovals as r
-            where not exists (select itemId from Instances as i where i.itemId = r.itemId)
-            and not exists (select itemId from Nodes as n where n.itemId = r.itemId)
-            and not exists (select itemId from TroveRedirects as tr where tr.itemId = r.itemId)
-            and not exists (select itemId from Permissions as p where p.itemId = r.itemId)
-        )""")
-
-        # clean up CheckTroveCache
-        cu.execute("""
-        delete from CheckTroveCache
         where itemId in (
             select r.itemId
             from tmpRemovals as r

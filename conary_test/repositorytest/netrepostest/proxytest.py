@@ -203,7 +203,8 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
         caller.checkVersion._mock.setDefaultReturn([51, 52, 53])
         # Make sure we present the fingerprints in non-sorted order, we need
         # to verify we sort them
-        fingerprints = ['aac3aac3', 'aaa1aaa1', 'aab2aab2']
+        suf = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        fingerprints = ['aac3aac3' + suf, 'aaa1aaa1' + suf, 'aab2aab2' + suf]
         caller.getChangeSetFingerprints._mock.setDefaultReturn(fingerprints)
         csSizes = [ 12, 13, 14 ]
         allInfo = [

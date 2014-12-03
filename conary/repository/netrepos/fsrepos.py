@@ -27,14 +27,15 @@ import traceback
 
 from conary import files, trove, callbacks
 from conary.deps import deps
-from conary.lib import util, openpgpfile, sha1helper, openpgpkey
+from conary.lib import util, openpgpfile, openpgpkey
 from conary.repository import changeset, errors, filecontents
-from conary.repository.datastore import DataStoreRepository, DataStore
-from conary.repository.datastore import DataStoreSet
+from conary.repository.datastore import (DataStoreRepository, DataStore,
+        DataStoreSet, ShallowDataStore, FlatDataStore)
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
+from conary.repository.netrepos.repo_cfg import CfgContentStore
 from conary.repository import netclient
-from conary.server import schema
+
 
 class FilesystemChangeSetJob(ChangeSetJob):
     def __init__(self, repos, cs, *args, **kw):
@@ -110,6 +111,21 @@ class FilesystemChangeSetJob(ChangeSetJob):
             raise openpgpfile.KeyNotFound('Repository does not recognize '
                                           'key: %s'% res[1][0])
 
+    def _filterRestoreList(self, configRestoreList, normalRestoreList):
+        # The base class version of this method will re-store contents already
+        # in the repository for refcounting purposes, but repository datastores
+        # do not refcount. This one just checks if contents exist.
+        def filterOne(restoreList):
+            inReposList = self._containsFileContents(tup[2]
+                    for tup in restoreList)
+            return [x for (x, inRepos) in zip(restoreList, inReposList)
+                    if not inRepos]
+
+        configRestoreList = filterOne(configRestoreList)
+        normalRestoreList = filterOne(normalRestoreList)
+        return configRestoreList, normalRestoreList
+
+
 class UpdateCallback(callbacks.UpdateCallback):
     def __init__(self, statusPath, trustThreshold, keyCache):
         self.path = statusPath
@@ -148,19 +164,26 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         self.reposSet = netclient.NetworkRepositoryClient(map,
                                     conarycfg.UserInformation())
         self.troveStore = troveStore
-
         self.requireSigs = requireSigs
-        for dir in contentsDir:
-            util.mkdirChain(dir)
 
-        if len(contentsDir) == 1:
-            store = DataStore(contentsDir[0])
+        storeType, paths = contentsDir
+        if storeType == CfgContentStore.LEGACY:
+            storeClass = DataStore
+        elif storeType == CfgContentStore.SHALLOW:
+            storeClass = ShallowDataStore
+        elif storeType == CfgContentStore.FLAT:
+            storeClass = FlatDataStore
         else:
-            storeList = []
-            for dir in contentsDir:
-                storeList.append(DataStore(dir))
+            raise ValueError("Invalid contentsDir type %r" % (storeType,))
 
-            store = DataStoreSet(*storeList)
+        stores = []
+        for path in paths:
+            util.mkdirChain(path)
+            stores.append(storeClass(path))
+        if len(stores) == 1:
+            store = stores[0]
+        else:
+            store = DataStoreSet(*stores)
 
         DataStoreRepository.__init__(self, dataStore = store)
         AbstractRepository.__init__(self)
@@ -261,27 +284,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def commitChangeSet(self, cs, mirror=False, hidden=False, serialize=False,
                         excludeCapsuleContents = False, callback = None,
                         statusPath = None):
-        # when we add troves (no removals) we disable constraints on
-        # the TroveFiles table; it speeds up large commits massively on
-        # postgres
-        enableConstraints = True
-
         # let's make sure commiting this change set is a sane thing to attempt
         for trvCs in cs.iterNewTroveList():
-            if trvCs.troveType() == trove.TROVE_TYPE_REMOVED:
-                enableConstraints = False
-
             v = trvCs.getNewVersion()
             if v.isOnLocalHost():
                 label = v.branch().label()
                 raise errors.CommitError('can not commit items on '
                                          '%s label' %(label.asString()))
-        self.troveStore.begin(serialize)
-
-        if enableConstraints:
-            enableConstraints = self.troveStore.db.disableTableConstraints(
-                                            'TroveFiles')
-
         if self.requireSigs:
             threshold = openpgpfile.TRUST_FULL
         else:
@@ -292,6 +301,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             callback = UpdateCallback(statusPath=statusPath,
                     trustThreshold=threshold,
                     keyCache=self.troveStore.keyTable.keyCache)
+        # Restore contents first, before any shared database resources get
+        # locked.
+        preRestored = set()
+        for sha1, fobj in cs.iterRegularFileContents():
+            cont = filecontents.FromFile(fobj, compressed=True)
+            self._storeFileFromContents(cont, sha1, restoreContents=True,
+                    precompressed=True)
+            preRestored.add(sha1)
+        cs.reset()
+        self.troveStore.begin(serialize)
         try:
             # reset time stamps only if we're not mirroring.
             FilesystemChangeSetJob(self, cs, self.serverNameList,
@@ -301,7 +320,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                    hidden = hidden,
                                    excludeCapsuleContents =
                                         excludeCapsuleContents,
-                                   requireSigs = self.requireSigs)
+                                   requireSigs = self.requireSigs,
+                                   preRestored=preRestored,
+                                   )
         except (openpgpfile.KeyNotFound, errors.DigitalSignatureVerificationError):
             # don't be quite so noisy, this is a common error
             self.troveStore.rollback()
@@ -321,17 +342,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
                     trv = self.getTrove(withFiles = True, *newTuple)
                     assert(trv.verifyDigests())
-
-            if enableConstraints:
-                enableConstraints.enable()
-
             self.troveStore.commit()
 
     def markTroveRemoved(self, name, version, flavor):
         sha1s = self.troveStore.markTroveRemoved(name, version, flavor)
         for sha1 in sha1s:
             try:
-                self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
+                self.contentsStore.removeFile(sha1)
             except OSError, e:
                 if e.errno != errno.ENOENT:
                     raise

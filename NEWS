@@ -1,3 +1,32 @@
+Changes in 2.5.5:
+  o New Features:
+    * Added a new repository content store type 'flat'. In this
+      configuration contents are stored without any intermediate
+      directories, which may improve access times and will improve
+      sequential access by e.g. backups. To use it, use the syntax
+      "contentsDir flat /path/to/store". (CNY-2406)
+    * The time at which a trove was committed is now shown in "conary rq
+      --debug --info". It is also shown without --debug for source
+      troves. (CNY-3487)
+    * Added a new 'subPackages' troveinfo that enumerates the names of
+      packages created via PackageSpec and groups created via
+      createGroup from the same source. Query, repquery, and
+      showchangeset commands with the --info and --debug flag set will
+      display the list of subpackages.
+
+  o Bug Fixes:
+    * The online help for GroupSetRecipe has been fixed to refer to the
+      CML method that exists, rather than the SystemModel method that
+      does not. (CNY-3868)
+    * Fixed crash in GroupSetRecipe when using an empty find()
+      (CNY-3872)
+
+  o Internal Changes:
+    * When committing changesets to a repository, regular contents are
+      written before the database operations begin. This avoids holding
+      the commit lock any longer than necessary.
+    * Upgraded the embedded SQLite version to 3.8.7.1
+
 Changes in 2.5.4:
   o New Features:
     * Progress information is no longer emitted when downloading

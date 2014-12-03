@@ -333,6 +333,28 @@ class UpdateJobFreezeThawTests(testhelp.TestCase):
         self.assertEqual(uJob._jobPreScriptsAlreadyRun,
             set(runScripts))
 
+    def testFreezeThawCompatClassNoneScripts(self):
+        db = database.Database(':memory:', ':memory:')
+        uJob = database.UpdateJob(db)
+        uJob.setTransactionCounter(100)
+
+        now = 1234567890.0
+        v1 = VersionFromString('/a@b:c/1.0-1', timeStamps = [ now ])
+        flv1 = parseFlavor("")
+        js1 = ("trove1", (None, None), (v1, flv1), True)
+
+        scripts = [
+            (js1, '', None, None, 'preupdate'),
+        ]
+
+        uJob._jobPreScripts = scripts
+        uJob.freeze(self.workDir)
+
+        uJob = database.UpdateJob(db)
+        uJob.thaw(self.workDir)
+        self.assertEqual(uJob.getTransactionCounter(), 100)
+        self.assertEqual(uJob._jobPreScripts, scripts)
+
     def testFreezeThawTroveMap(self):
         db = database.Database(':memory:', ':memory:')
         uJob = database.UpdateJob(db)

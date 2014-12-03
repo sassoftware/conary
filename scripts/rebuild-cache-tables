@@ -24,7 +24,6 @@ import optparse
 from conary import dbstore
 from conary.lib import tracelog
 from conary.repository.netrepos import accessmap
-from conary.server import migrate
 
 
 def main():
@@ -41,9 +40,6 @@ def main():
 
     db = dbstore.connect(options.database, 'postgresql')
     db.transaction()
-
-    print 'Rebuilding CheckTroveCache'
-    migrate.createCheckTroveCache(db)
 
     print 'Rebuilding UGI and friends'
     accessmap.RoleInstances(db).rebuild()

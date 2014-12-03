@@ -54,7 +54,8 @@ class Cursor(BaseCursor):
         try:
             ret = func(*params, **kw)
         except sqlite3.ProgrammingError, e:
-            if e.args[0].startswith("column") and e.args[0].endswith("not unique"):
+            if ((e.args[0].startswith("column") and e.args[0].endswith("not unique"))
+                    or e.args[0].startswith("UNIQUE constraint failed")):
                 raise sqlerrors.ColumnNotUnique(e)
             elif e.args[0] == 'attempt to write a readonly database':
                 raise sqlerrors.ReadOnlyDatabase(str(e))

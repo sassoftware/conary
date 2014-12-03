@@ -1811,6 +1811,34 @@ Cannot apply a relative changeset to an incomplete trove.  Please upgrade conary
 
         self.filesRead = False
 
+    def iterRegularFileContents(self):
+        """
+        Yields (sha1, fobj) tuples for each non-config, non-diff, non-pointer
+        file content item in the changeset.
+        """
+        unpack = {}
+        for (oldFileId, newFileId), stream in self.files.iteritems():
+            if not files.frozenFileHasContents(stream):
+                continue
+            if files.frozenFileFlags(stream).isEncapsulatedContent():
+                continue
+            cont = files.frozenFileContentInfo(stream)
+            unpack[newFileId] = cont.sha1()
+
+        want_tag = '0 ' + ChangedFileTypes.file[4:]
+        while True:
+            f = self._nextFile()
+            if not f:
+                break
+            name, tag, fobj, csf = f
+            if len(name) != 36 or tag != want_tag:
+                continue
+            fileId = name[16:]
+            sha1 = unpack.get(fileId)
+            if not sha1:
+                continue
+            yield sha1, fobj
+
     def __init__(self, data = None):
         ChangeSet.__init__(self, data = data)
         self.filesRead = False

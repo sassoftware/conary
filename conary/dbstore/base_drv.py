@@ -491,14 +491,6 @@ class BaseDatabase:
         cu.execute(sql)
         return True
 
-    def disableTableConstraints(self, tableName):
-        class ConstraintEnableClass:
-
-            def enable(self):
-                pass
-
-        return ConstraintEnableClass()
-
     # easy access to the schema state
     def loadSchema(self):
         assert(self.dbh)
@@ -618,6 +610,9 @@ class BaseDatabase:
         cu = self.cursor()
         for table in tables:
             cu.execute("DELETE FROM " + table)
+
+    def lockTable(self, tableName):
+        pass
 
     # foreign key constraint management
     def addForeignKey(self, table, column, refTable, refColumn,

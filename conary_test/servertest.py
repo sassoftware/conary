@@ -62,13 +62,13 @@ class ServerTest(rephelp.RepositoryHelper):
         # proxy keepalive code added (CNY-1341)
         cfg = server.ServerConfig()
         cfg.port = testhelp.findPorts(1)[0]
-        cfg.contentsDir = self.workDir + '/contents'
+        cfg.contentsDir = ('legacy', [self.workDir + '/contents'])
         cfg.repositoryDB = ('sqlite', self.workDir + '/serverdb')
         cfg.logFile = self.workDir + '/serverlog'
         cfg.tmpDir = self.workDir + '/tmp'
         cfg.serverName = 'localhost'
         util.mkdirChain(cfg.tmpDir)
-        util.mkdirChain(cfg.contentsDir)
+        util.mkdirChain(cfg.contentsDir[1][0])
         if useSSL:
             cfg.useSSL = True
             cfg.sslCert = os.path.join(resources.get_archive(), 'ssl-cert.crt')

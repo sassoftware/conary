@@ -28,14 +28,17 @@ def _getVhostDir(environ):
         vhostDir = os.environ['CONARY_VHOST_DIR']
     elif 'CONARY_VHOST_DIR' in environ:
         vhostDir = environ['CONARY_VHOST_DIR']
-    if vhostDir and os.path.isdir(vhostDir):
-        return vhostDir
     else:
         return None
+    if not os.path.isdir(vhostDir):
+        return None
+    return vhostDir
 
 
 def application(environ, start_response):
-    cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache')
+    if not logging.root.handlers:
+        cny_log.setupLogging(consoleLevel=logging.INFO, consoleFormat='apache',
+                consoleStream=environ['wsgi.errors'])
 
     vhostDir = _getVhostDir(environ)
     if not vhostDir:
