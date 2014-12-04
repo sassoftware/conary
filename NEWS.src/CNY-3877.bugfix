@@ -1,0 +1,1 @@
+Fixed a "pathId not in changeset" crash when updating a trove across labels after local filesystem file types were changed.
