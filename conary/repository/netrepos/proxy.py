@@ -14,10 +14,12 @@
 # limitations under the License.
 #
 
-
 import cPickle
+import errno
 import itertools
 import os
+import resource
+import struct
 import tempfile
 import time
 
@@ -477,15 +479,44 @@ class BaseProxy(xmlshims.NetworkConvertors):
 
 class ChangeSetInfo(object):
 
-    __slots__ = [ 'size', 'trovesNeeded', 'removedTroves', 'filesNeeded',
-                  'path', 'cached', 'version', 'fingerprint',
-                  'rawSize' ]
+    __slots__ = (
+        # Fields that get pickled into the cached changeset
+        'filesNeeded',
+        'removedTroves',
+        'size',
+        'trovesNeeded',
+        # Transient fields that are filled out by the caching layer
+        'cached',
+        'fingerprint',
+        'offset',
+        'path',
+        'rawSize',
+        'version',
+        )
 
     def pickle(self):
         return cPickle.dumps(((self.trovesNeeded, self.filesNeeded,
                                self.removedTroves), self.size))
 
-    def __init__(self, pickled = None):
+    def open(self):
+        """Return file-like object of the changeset pointed to by this info"""
+        container = util.ExtendedFile(self.path, 'rb', buffering=False)
+        rawSize = os.fstat(container.fileno()).st_size - self.offset
+        fobj = util.SeekableNestedFile(container, rawSize, self.offset)
+        return fobj
+
+    def write(self, cacheObj):
+        """Write csinfo header into a changeset cache file object"""
+        pickled = self.pickle()
+        cacheObj.write(struct.pack('>I', len(pickled)) + pickled)
+        self.offset = 4 + len(pickled)
+
+    def __init__(self, pickled=None, cacheObj=None):
+        if cacheObj is not None:
+            # Cached changeset file with pickled csInfo header
+            infoSize = struct.unpack('>I', cacheObj.read(4))[0]
+            pickled = cacheObj.read(infoSize)
+            self.offset = 4 + infoSize
         if pickled is not None:
             ((self.trovesNeeded, self.filesNeeded, self.removedTroves),
                     self.size) = cPickle.loads(pickled)
@@ -509,34 +540,26 @@ class ChangesetFilter(BaseProxy):
         # Determine the changeset version based on the client version
         return changeset.getNativeChangesetVersion(clientVersion)
 
-    def _convertChangeSet(self, csPath, size, destCsVersion, csVersion):
-        # Changeset is in the file csPath
-        # Changeset was fetched from the cache using key
-        # Convert it to destCsVersion
-        if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
-            return self._convertChangeSetV1V0(csPath, size, destCsVersion)
-        elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
-            return self._convertChangeSetV2V1(csPath, size, destCsVersion)
-        assert False, "Unknown versions"
-
-    def _convertChangeSetV3V2(self, cspath, size, destCsVersion):
-        (fd, newCsPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                           suffix = '.tmp')
+    def _convertChangeSet(self, csInfo, destCsVersion, csVersion):
+        inFobj = csInfo.open()
+        (fd, newCsPath) = tempfile.mkstemp(dir=self.cfg.tmpDir, suffix='.tmp')
         os.close(fd)
-        size = changeset._convertChangeSetV3V2(cspath, newCsPath)
-
+        try:
+            if (csVersion, destCsVersion) == (_CSVER1, _CSVER0):
+                size = self._convertChangeSetV1V0(inFobj, newCsPath)
+            elif (csVersion, destCsVersion) == (_CSVER2, _CSVER1):
+                inFc = filecontainer.FileContainer(inFobj)
+                delta = changeset._convertChangeSetV2V1(inFc, newCsPath)
+                size = csInfo.size + delta
+            else:
+                assert False, "Unknown versions"
+        except:
+            util.removeIfExists(newCsPath)
+            raise
         return newCsPath, size
 
-    def _convertChangeSetV2V1(self, cspath, size, destCsVersion):
-        (fd, newCsPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                        suffix = '.tmp')
-        os.close(fd)
-        delta = changeset._convertChangeSetV2V1(cspath, newCsPath)
-
-        return newCsPath, size + delta
-
-    def _convertChangeSetV1V0(self, cspath, size, destCsVersion):
-        cs = changeset.ChangeSetFromFile(cspath)
+    def _convertChangeSetV1V0(self, inFobj, newCsPath):
+        cs = changeset.ChangeSetFromFile(inFobj)
         newCs = changeset.ChangeSet()
 
         for tcs in cs.iterNewTroveList():
@@ -582,14 +605,9 @@ class ChangesetFilter(BaseProxy):
         # we need to re-write the munged changeset for an
         # old client
         cs.merge(newCs)
-        # create a new temporary file for the munged changeset
-        (fd, cspath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                        suffix = '.tmp')
-        os.close(fd)
-        # now write out the munged changeset
-        size = cs.writeToFile(cspath,
+        size = cs.writeToFile(newCsPath,
             versionOverride = filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES)
-        return cspath, size
+        return size
 
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource,
@@ -662,19 +680,16 @@ class ChangesetFilter(BaseProxy):
                 self.csCache.resetLocks()
 
         if not infoOnly:
-            (fd, path) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                          suffix = '.cf-out')
-            url = os.path.join(self.urlBase(),
-                               "changeset?%s" % os.path.basename(path[:-4]))
-            f = os.fdopen(fd, 'w')
-
+            manifest = netserver.ManifestWriter(self.cfg.tmpDir)
             for csInfo in changeSetList:
-                # the hard-coded 1 means it's a changeset and needs to be walked
-                # looking for files to include by reference
-                f.write("%s %d 1 %d\n" % (csInfo.path, csInfo.size,
-                csInfo.cached))
-
-            f.close()
+                manifest.append(csInfo.path,
+                        expandedSize=csInfo.size,
+                        isChangeset=True,
+                        preserveFile=csInfo.cached,
+                        offset=csInfo.offset,
+                        )
+            name = manifest.close()
+            url = os.path.join(self.urlBase(), "changeset?%s" % name)
         else:
             url = ''
 
@@ -921,43 +936,28 @@ class ChangesetFilter(BaseProxy):
                 assert(neededCsVersion == wireCsVersion)
                 # the changeset isn't present
                 continue
-
-            fc = filecontainer.FileContainer(
-                util.ExtendedFile(csInfo.path, 'r', buffering = False))
-            csVersion = fc.version
-            fc.close()
             if csInfo.version == neededCsVersion:
                 # We already have the right version
                 continue
 
             # Now walk the precedence list backwards for conversion
-            oldV = csInfo.version
-            csPath = csInfo.path
-
-            # Find the position of this version into the precedence list
-            idx = verHash[oldV]
-
+            idx = verHash[csInfo.version]
             for iterV in reversed(verPath[:idx]):
                 # Convert the changeset
-                path, newSize = self._convertChangeSet(csPath, csInfo.size,
-                                                       iterV, oldV)
+                path, newSize = self._convertChangeSet(csInfo, iterV,
+                        csInfo.version)
                 csInfo.size = newSize
                 csInfo.version = iterV
-
                 cachable = (csInfo.fingerprint and self.csCache)
-
                 if not cachable:
                     # we're not caching; erase the old version
-                    os.unlink(csPath)
-                    csPath = path
+                    os.unlink(csInfo.path)
+                    csInfo.path = path
+                    csInfo.offset = 0
                 else:
-                    csPath = self.csCache.set((csInfo.fingerprint, iterV),
+                    self.csCache.set((csInfo.fingerprint, iterV),
                         (csInfo, open(path), None))
-
-                oldV = iterV
-
-            csInfo.version = neededCsVersion
-            csInfo.path = csPath
+            assert csInfo.version == neededCsVersion
 
         return changeSetList
 
@@ -984,8 +984,9 @@ class ChangesetFilter(BaseProxy):
 
             if cachable:
                 # Add it to the cache
-                path = self.csCache.set((fingerprint, csInfo.version),
+                self.csCache.set((fingerprint, csInfo.version),
                     (csInfo, inF, csInfo.rawSize))
+                csInfo.cached = True
             else:
                 # If only one file was requested, and it's already
                 # a file://, this is unnecessary :-(
@@ -994,14 +995,10 @@ class ChangesetFilter(BaseProxy):
                 outF = os.fdopen(fd, "w")
                 util.copyfileobj(inF, outF, sizeLimit = csInfo.rawSize)
                 outF.close()
-                path = tmpPath
-
+                csInfo.path = tmpPath
+                csInfo.offset = 0
+                csInfo.cached = False
             csInfo.fingerprint = fingerprint
-            # path points to a wire version of the changeset (possibly
-            # in the cache)
-            csInfo.path = path
-            # make a note if this path has been stored in the cache or not
-            csInfo.cached = cachable
             changeSetList[jobIdx] = csInfo
 
         if inPath:
@@ -1012,18 +1009,20 @@ class ChangesetFilter(BaseProxy):
         # If the changeset can be downloaded locally, return it
         parts = util.urlSplit(url)
         fname = parts[6]
-        csfr = ChangesetFileReader(self.cfg.tmpDir)
-        items = csfr.getItems(fname)
-        if items is None:
-            return url
-        (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
-                                         suffix = '.tmp')
-        dest = util.ExtendedFile(tmpPath, "w+", buffering = False)
-        os.close(fd)
-        os.unlink(tmpPath)
-        csfr.writeItems(items, dest)
-        dest.seek(0)
-        return dest
+        try:
+            producer = ChangesetProducer(
+                    os.path.join(self.cfg.tmpDir, fname + '.cf-out'),
+                    self.getContentsStore())
+        except IOError as err:
+            if err.args[0] == errno.ENOENT:
+                return url
+            raise
+        tmpFile = tempfile.TemporaryFile(dir=self.cfg.tmpDir, suffix='.tmp')
+        for data in producer:
+            tmpFile.write(data)
+        tmpFile.seek(0)
+        return tmpFile
+
 
 class BaseCachingChangesetFilter(ChangesetFilter):
     # Changeset filter which uses a directory to create a ChangesetCache
@@ -1271,38 +1270,34 @@ class FileCachingChangesetFilter(BaseCachingChangesetFilter):
         dest.close()
 
     def _saveFileContentsChangeset(self, clientVersion, fileList):
-        (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
-                                      suffix = '.cf-out')
+        manifest = netserver.ManifestWriter(self.tmpPath)
         sizeList = []
+        for encFileId, encVersion in fileList:
+            fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
+            filePath = self.contents.hashToPath(fileId + '-c')
+            size = os.stat(filePath).st_size
+            sizeList.append(size)
+            manifest.append(filePath,
+                    expandedSize=size,
+                    isChangeset=False,
+                    preserveFile=True,
+                    offset=0,
+                    )
+        name = manifest.close()
+        url = os.path.join(self.urlBase(), "changeset?%s" % name)
 
-        try:
-            for encFileId, encVersion in fileList:
-                fileId = sha1helper.sha1ToString(self.toFileId(encFileId))
-                filePath = self.contents.hashToPath(fileId + '-c')
-                size = os.stat(filePath).st_size
-                sizeList.append(size)
-
-                # 0 means it's not a changeset
-                # 1 means it is cached (don't erase it after sending)
-                os.write(fd, "%s %d 0 1\n" % (filePath, size))
-
-            url = os.path.join(self.urlBase(),
-                               "changeset?%s" % os.path.basename(path)[:-4])
-
-            # client versions >= 44 use strings instead of ints for size
-            # because xmlrpclib can't marshal ints > 2GiB
-            if clientVersion >= 44:
-                sizeList = [ str(x) for x in sizeList ]
-            else:
-                for size in sizeList:
-                    if size >= 0x80000000:
-                        raise errors.InvalidClientVersion(
-                             'This version of Conary does not support '
-                             'downloading file contents larger than 2 '
-                             'GiB.  Please install a new Conary client.')
-            return (url, sizeList)
-        finally:
-            os.close(fd)
+        # client versions >= 44 use strings instead of ints for size
+        # because xmlrpclib can't marshal ints > 2GiB
+        if clientVersion >= 44:
+            sizeList = [ str(x) for x in sizeList ]
+        else:
+            for size in sizeList:
+                if size >= 0x80000000:
+                    raise errors.InvalidClientVersion(
+                         'This version of Conary does not support '
+                         'downloading file contents larger than 2 '
+                         'GiB.  Please install a new Conary client.')
+        return (url, sizeList)
 
     def _cacheFileContents(self, encFileId, fileObj):
         # We skip the integrity check here because (1) the hash we're using
@@ -1383,7 +1378,8 @@ class ProxyRepositoryServer(Memcache, FileCachingChangesetFilter):
             nestedF = util.SeekableNestedFile(dest, size, start)
             (fd, tmpPath) = tempfile.mkstemp(dir = self.cfg.tmpDir,
                                              suffix = '.tmp')
-            size = util.copyfileobj(nestedF, os.fdopen(fd, 'w'))
+            with os.fdopen(fd, 'w') as f_out:
+                size = util.copyfileobj(nestedF, f_out)
             totalSize -= size
             start += size
             fileList.append(tmpPath)
@@ -1392,39 +1388,37 @@ class ProxyRepositoryServer(Memcache, FileCachingChangesetFilter):
         # this closes the underlying fd opened by mkstemp for us
         dest.close()
 
-        (fd, path) = tempfile.mkstemp(dir = self.tmpPath,
-                                      suffix = '.cf-out')
+        manifest = netserver.ManifestWriter(self.tmpPath)
         sizeList = []
+        for filePath in fileList:
+            size = os.stat(filePath).st_size
+            sizeList.append(size)
+            manifest.append(filePath,
+                    expandedSize=size,
+                    isChangeset=False,
+                    preserveFile=False,
+                    offset=0,
+                    )
+        name = manifest.close()
+        url = os.path.join(self.urlBase(), "changeset?%s" % name)
 
-        try:
-            for filePath in fileList:
-                size = os.stat(filePath).st_size
-                sizeList.append(size)
-
-                # 0 means it's not a changeset
-                # 0 means it is not cached (erase it after sending)
-                os.write(fd, "%s %d 0 0\n" % (filePath, size))
-
-            url = os.path.join(self.urlBase(),
-                               "changeset?%s" % os.path.basename(path)[:-4])
-
-            # client versions >= 44 use strings instead of ints for size
-            # because xmlrpclib can't marshal ints > 2GiB
-            if clientVersion >= 44:
-                sizeList = [ str(x) for x in sizeList ]
-            else:
-                for size in sizeList:
-                    if size >= 0x80000000:
-                        raise errors.InvalidClientVersion(
-                             'This version of Conary does not support '
-                             'downloading file contents larger than 2 '
-                             'GiB.  Please install a new Conary client.')
-            return (url, sizeList)
-        finally:
-            os.close(fd)
+        # client versions >= 44 use strings instead of ints for size
+        # because xmlrpclib can't marshal ints > 2GiB
+        if clientVersion >= 44:
+            sizeList = [ str(x) for x in sizeList ]
+        else:
+            for size in sizeList:
+                if size >= 0x80000000:
+                    raise errors.InvalidClientVersion(
+                         'This version of Conary does not support '
+                         'downloading file contents larger than 2 '
+                         'GiB.  Please install a new Conary client.')
+        return (url, sizeList)
 
 
 class ChangesetCache(object):
+
+    CACHE_VERSION = 1
 
     # Provides a place to cache changeset; uses a directory for them
     # all indexed by fingerprint
@@ -1439,21 +1433,22 @@ class ChangesetCache(object):
 
     def hashKey(self, key):
         (fingerPrint, csVersion) = key
-        return self.dataStore.hashToPath(fingerPrint + '-%d' % csVersion)
+        return self.dataStore.hashToPath(fingerPrint + '-%d.%d' % (
+            csVersion, self.CACHE_VERSION))
 
     def set(self, key, value):
         (csInfo, inF, sizeLimit) = value
 
         csPath = self.hashKey(key)
-        dataPath = csPath + '.data'
-        csDir = os.path.dirname(csPath)
-        util.mkdirChain(csDir)
+        util.mkdirChain(os.path.dirname(csPath))
 
         csObj = self.locksMap.get(csPath)
         if csObj is None:
             # We did not get a lock for it
             csObj = util.AtomicFile(csPath, tmpsuffix = '.ccs-new')
 
+        csInfo.path = csPath
+        csInfo.write(csObj)
         try:
             written = util.copyfileobj(inF, csObj, sizeLimit=sizeLimit)
         except transport.MultipartDecodeError:
@@ -1463,45 +1458,20 @@ class ChangesetCache(object):
             raise errors.RepositoryError("Changeset was truncated in transit "
                     "(expected %d bytes, got %d bytes for subchangeset)" %
                     (sizeLimit, written))
-
-        csInfoObj = util.AtomicFile(dataPath, tmpsuffix = '.data-new')
-        csInfoObj.write(csInfo.pickle())
-
-        csInfoObj.commit()
         csObj.commit()
         # If we locked the cache file, we need to no longer track it
         self.locksMap.pop(csPath, None)
 
         self._log('WRITE', key, size=sizeLimit)
 
-        return csPath
-
     def get(self, key, shouldLock = True):
         csPath = self.hashKey(key)
         csVersion = key[1]
-        dataPath = csPath + '.data'
         if len(self.locksMap) >= self.maxLocks:
             shouldLock = False
-
         lockfile = util.LockedFile(csPath)
         util.mkdirChain(os.path.dirname(csPath))
         fileObj = lockfile.open(shouldLock=shouldLock)
-
-        dataFile = util.fopenIfExists(dataPath, "r")
-
-        # Use XOR - if one is None and one is not, we need to regenerate
-        if (fileObj is not None) ^ (dataFile is not None):
-            # We have csPath but not dataPath, or the other way around
-            if not shouldLock:
-                return None
-            # Get rid of csPath - no other process can produce it because
-            # we're holding the lock
-            util.removeIfExists(csPath)
-            util.removeIfExists(dataPath)
-            # Unlock
-            lockfile.close()
-            # Try again
-            fileObj = lockfile.open()
 
         if fileObj is None:
             if shouldLock:
@@ -1510,21 +1480,7 @@ class ChangesetCache(object):
             self._log('MISS', key)
             return None
 
-        # touch to refresh atime
-        # This makes sure tmpwatch will not remove this file while we are
-        # reading it (which would not hurt this process, but would invalidate
-        # a perfectly good cache entry)
-        for fobj in [ fileObj, dataFile ]:
-            fobj.read(1)
-            fobj.seek(0)
-
-        try:
-            csInfo = ChangeSetInfo(pickled = dataFile.read())
-            dataFile.close()
-        except IOError, err:
-            self._log('MISS', key, errno=err.errno)
-            return None
-
+        csInfo = ChangeSetInfo(cacheObj=fileObj)
         csInfo.path = csPath
         csInfo.cached = True
         csInfo.version = csVersion
@@ -1587,12 +1543,53 @@ class ProxyRepositoryError(Exception):
         self.kwArgs = kwArgs
 
 
-class ChangesetFileReader(object):
-    def __init__(self, tmpDir):
-        self.tmpDir = tmpDir
+class ChangesetProducer(object):
+    """
+    Transform a changeset manifest (something.cf-out) into an iterable stream
+    of bytes.
+    """
 
-    @staticmethod
-    def readNestedFile(name, tag, rawSize, subfile, contentsStore):
+    def __init__(self, manifestPath, contentsStore):
+        self.contentsStore = contentsStore
+        self.items = []
+        self.totalSize = 0
+        assert manifestPath.endswith('-out')
+        if manifestPath.endswith('.cf-out'):
+            # Manifest of items to produce
+            for line in open(manifestPath):
+                (path, expandedSize, isChangeset, preserveFile, offset,
+                        ) = line.split()
+                expandedSize = long(expandedSize)
+                self.items.append((path, expandedSize, int(isChangeset),
+                    int(preserveFile), int(offset)))
+                self.totalSize += expandedSize
+            util.removeIfExists(manifestPath)
+        else:
+            # Single prepared temporary file (always deleted)
+            expandedSize = os.stat(path).st_size
+            self.items.append((path, expandedSize, 0, 0, 0))
+
+    def getSize(self):
+        return self.totalSize
+
+    def __iter__(self):
+        for (path, expandedSize, isChangeset, preserveFile, offset,
+                ) in self.items:
+            container = util.ExtendedFile(path, 'rb', buffering=False)
+            rawSize = os.fstat(container.fileno()).st_size - offset
+            fobj = util.SeekableNestedFile(container, rawSize, offset)
+            if isChangeset:
+                changeSet = filecontainer.FileContainer(fobj)
+                for data in changeSet.dumpIter(self._readNestedFile):
+                    yield data
+            else:
+                for data in util.iterFileChunks(fobj):
+                    yield data
+            container.close()
+            if not preserveFile:
+                os.unlink(path)
+
+    def _readNestedFile(self, name, tag, rawSize, subfile):
         """Use with ChangeSet.dumpIter to handle external file references."""
         if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
             # this is a reference to a compressed file in the contents store
@@ -1600,59 +1597,14 @@ class ChangesetFileReader(object):
             sha1, expandedSize = entry.split(' ')
             expandedSize = int(expandedSize)
             tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
-            path = contentsStore.hashToPath(sha1helper.sha1FromString(sha1))
+            path = self.contentsStore.hashToPath(
+                    sha1helper.sha1FromString(sha1))
             fobj = open(path, 'rb')
             return tag, expandedSize, util.iterFileChunks(fobj)
         else:
             # this is data from the changeset itself
             return tag, rawSize, util.iterFileChunks(subfile)
 
-    def getItems(self, fileName):
-        localName = self.tmpDir + "/" + fileName + "-out"
-        if os.path.realpath(localName) != localName:
-            return None
-
-        if localName.endswith(".cf-out"):
-            try:
-                f = open(localName, "r")
-            except IOError:
-                return None
-
-            os.unlink(localName)
-
-            items = []
-            for l in f.readlines():
-                (path, size, isChangeset, preserveFile) = l.split()
-                size = int(size)
-                isChangeset = int(isChangeset)
-                preserveFile = int(preserveFile)
-                items.append((path, size, isChangeset, preserveFile))
-            f.close()
-            del f
-        else:
-            try:
-                size = os.stat(localName).st_size;
-            except OSError:
-                return None
-            items = [ (localName, size, 0, 0) ]
-        return items
-
-    def writeItems(self, items, wfile, contentsStore=None):
-        for path, size, isChangeset, preserveFile in items:
-            if isChangeset:
-                cs = filecontainer.FileContainer(util.ExtendedFile(path,
-                                                     buffering = False))
-                for data in cs.dumpIter(self.readNestedFile,
-                        args=(contentsStore,)):
-                    wfile.write(data)
-
-                del cs
-            else:
-                f = open(path)
-                util.copyfileobj(f, wfile)
-
-            if not preserveFile:
-                os.unlink(path)
 
 # ewtroan: for the internal proxy, we support client version 38 but need to talk to a server which is at least version 41
 # ewtroan: for external proxy, we support client version 41 and need a server which is at least 41

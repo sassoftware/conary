@@ -936,7 +936,7 @@ class NetServerTest(rephelp.RepositoryHelper):
                 contents = datastore.ShallowDataStore(self.proxy.reposDir +
                         '/cscache')
                 for fp in fpList:
-                    path = fp + '-%s' % \
+                    path = fp + '-%s.1' % \
                             (filecontainer.FILE_CONTAINER_VERSION_LATEST)
                     if expectCachedAtProxy:
                         assert(contents.hasFile(path))
@@ -949,7 +949,7 @@ class NetServerTest(rephelp.RepositoryHelper):
                 # whether or not it's cached on the proxy
                 contents = datastore.ShallowDataStore(server.cache.getPath())
                 for fp in fpList:
-                    path = fp + '-%s' % \
+                    path = fp + '-%s.1' % \
                             (filecontainer.FILE_CONTAINER_VERSION_LATEST)
                     assert(contents.hasFile(path))
 

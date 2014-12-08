@@ -16,6 +16,7 @@
 
 
 from testrunner import testcase, testhelp
+from testutils import mock
 from testutils.servers import memcache_server
 import copy
 import os
@@ -27,6 +28,7 @@ from conary import trove
 from conary.files import ThawFile
 from conary.repository import errors
 from conary.repository.netrepos import proxy as netreposproxy
+from conary.repository.netrepos import netserver
 from conary.repository.netrepos.auth_tokens import AuthToken
 
 
@@ -168,12 +170,12 @@ class ProxyUnitTest(testcase.TestCaseWithWorkDir):
 
         logEntries1 = contents[:len(fingerprints)]
         self.assertEqual(logEntries1,
-            [ 'Lock acquired for %s/%s/%s-2007022001' %
+            [ 'Lock acquired for %s/%s/%s-2007022001.1' %
                 (cfg.changesetCacheDir, fp[:2], fp[2:])
               for fp in sortedFP ])
         logEntries2 = contents[len(fingerprints):2 * len(fingerprints)]
         self.assertEqual(logEntries2,
-            [ 'Releasing lock for %s/%s/%s-2007022001' %
+            [ 'Releasing lock for %s/%s/%s-2007022001.1' %
                 (cfg.changesetCacheDir, fp[:2], fp[2:])
               for fp in fingerprints ])
         # We're not releasing locks we didn't close

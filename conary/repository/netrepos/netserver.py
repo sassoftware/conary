@@ -1430,55 +1430,55 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getFileContents(clientVersion, fileList, rawStreams)
 
     def _getFileContents(self, clientVersion, fileList, rawStreams):
-        fd, path = tempfile.mkstemp(dir=self.tmpPath, suffix='.cf-out')
-        try:
-            sizeList = []
-            exception = None
+        manifest = ManifestWriter(self.tmpPath)
+        sizeList = []
+        exception = None
 
-            for stream, (encFileId, encVersion) in \
-                                itertools.izip(rawStreams, fileList):
-                if stream is None:
-                    # return an exception if we couldn't find one of
-                    # the streams
-                    exception = errors.FileStreamNotFound
-                elif not files.frozenFileHasContents(stream):
-                    exception = errors.FileHasNoContents
-                else:
-                    contents = files.frozenFileContentInfo(stream)
-                    filePath = self.repos.contentsStore.hashToPath(
-                            contents.sha1())
-                    try:
-                        size = os.stat(filePath).st_size
-                        sizeList.append(size)
-                        # 0 means it's not a changeset
-                        # 1 means it is cached (don't erase it after sending)
-                        os.write(fd, "%s %d 0 1\n" % (filePath, size))
-                    except OSError, e:
-                        if e.errno != errno.ENOENT:
-                            raise
-                        exception = errors.FileContentsNotFound
-
-                if exception:
-                    raise exception(self.toFileId(encFileId),
-                                    self.toVersion(encVersion))
-
-            url = os.path.join(self.urlBase(),
-                               "changeset?%s" % os.path.basename(path)[:-4])
-            # client versions >= 44 use strings instead of ints for size
-            # because xmlrpclib can't marshal ints > 2GiB
-            if clientVersion >= 44:
-                sizeList = [ str(x) for x in sizeList ]
+        for stream, (encFileId, encVersion) in \
+                            itertools.izip(rawStreams, fileList):
+            if stream is None:
+                # return an exception if we couldn't find one of
+                # the streams
+                exception = errors.FileStreamNotFound
+            elif not files.frozenFileHasContents(stream):
+                exception = errors.FileHasNoContents
             else:
-                for size in sizeList:
-                    if size >= 0x80000000:
-                        raise errors.InvalidClientVersion(
-                            'This version of Conary does not support '
-                            'downloading file contents larger than 2 '
-                            'GiB.  Please install a new Conary '
-                            'client.')
-            return url, sizeList
-        finally:
-            os.close(fd)
+                contents = files.frozenFileContentInfo(stream)
+                filePath = self.repos.contentsStore.hashToPath(
+                        contents.sha1())
+                try:
+                    size = os.stat(filePath).st_size
+                    sizeList.append(size)
+                    manifest.append(filePath,
+                            expandedSize=size,
+                            isChangeset=False,
+                            preserveFile=True,
+                            offset=0,
+                            )
+                except OSError, e:
+                    if e.errno != errno.ENOENT:
+                        raise
+                    exception = errors.FileContentsNotFound
+
+            if exception:
+                raise exception(self.toFileId(encFileId),
+                                self.toVersion(encVersion))
+
+        name = manifest.close()
+        url = os.path.join(self.urlBase(), "changeset?%s" % name)
+        # client versions >= 44 use strings instead of ints for size
+        # because xmlrpclib can't marshal ints > 2GiB
+        if clientVersion >= 44:
+            sizeList = [ str(x) for x in sizeList ]
+        else:
+            for size in sizeList:
+                if size >= 0x80000000:
+                    raise errors.InvalidClientVersion(
+                        'This version of Conary does not support '
+                        'downloading file contents larger than 2 '
+                        'GiB.  Please install a new Conary '
+                        'client.')
+        return url, sizeList
 
     @accessReadOnly
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName,
@@ -3467,6 +3467,22 @@ for attr, val in NetworkRepositoryServer.__dict__.iteritems():
     if type(val) == types.FunctionType:
         if hasattr(val, '_accessType'):
             NetworkRepositoryServer.publicCalls.add(attr)
+
+
+class ManifestWriter(object):
+
+    def __init__(self, tmpDir):
+        self.fobj = tempfile.NamedTemporaryFile(dir=tmpDir, suffix='.cf-out')
+
+    def append(self, path, expandedSize, isChangeset, preserveFile, offset):
+        print >> self.fobj, "%s %d %d %d %d" % (path, expandedSize,
+                isChangeset, preserveFile, offset)
+
+    def close(self):
+        name = os.path.basename(self.fobj.name)[:-4]
+        self.fobj.delete = False
+        self.fobj.close()
+        return name
 
 
 class HiddenException(Exception):

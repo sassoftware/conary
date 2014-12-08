@@ -569,48 +569,6 @@ class NetclientTest(rephelp.RepositoryHelper):
         self.assertRaises(errors.RepositoryError,
             client.applyUpdate, updJob)
 
-    def testCommitChangesetConversion(self):
-        class PutProxy:
-
-            def __init__(self, old, ver):
-                self.old = old
-                self.expect = ver
-
-            def __call__(self, url, inF, size, **kwargs):
-                f2 = util.ExtendedFdopen(os.dup(inF.fileno()))
-                fc = filecontainer.FileContainer(f2)
-                assert(fc.version == self.expect)
-                f2.close()
-                inF.seek(0)
-                return self.old(url, inF, size, **kwargs)
-
-        cs = changeset.ChangeSet()
-        trv = trove.Trove('test:runtime',
-                versions.ThawVersion('/localhost@foo:test/1.0:1.0-1-1'),
-                deps.parseFlavor(''), None)
-        trv.computeDigests()
-        trvCs = trv.diff(None, absolute = True)[0]
-        cs.newTrove(trvCs)
-
-        repos = self.openRepository()
-
-        old = netclient.httpPutFile
-        try:
-            repos = self.openRepository()
-            netclient.httpPutFile = PutProxy(old,
-                            filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
-            repos.commitChangeSet(cs)
-
-            self.resetRepository()
-            repos = self.openRepository()
-            repos.c['localhost'].setProtocolVersion(42)
-            netclient.httpPutFile = PutProxy(old,
-                            filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
-            repos.commitChangeSet(cs)
-        finally:
-            netclient.httpPutFile = old
-            self.stopRepository()
-
     def testChangeSetConversionError(self):
         # Test returning non-200 or 403 errors
         def errorHttpPutFile(*args, **kwargs):

@@ -16,6 +16,7 @@
 
 
 import errno
+import itertools
 import logging
 import os
 import smtplib
@@ -34,7 +35,6 @@ from conary.lib import util
 from conary.lib.formattrace import formatTrace
 from conary.lib.http.request import URL
 from conary.repository import errors
-from conary.repository import filecontainer
 from conary.repository import netclient
 from conary.repository import shimclient
 from conary.repository import xmlshims
@@ -506,84 +506,22 @@ class ConaryHandler(object):
 
     def getChangeset(self, filename=None):
         """GET a prepared changeset file."""
-        # IMPORTANT: As used here, "expandedSize" means the size of the
-        # changeset as it is sent over the wire. The size of the file we are
-        # reading from may be different if it includes references to other
-        # files in lieu of their actual contents.
         path = self._changesetPath('-out', filename)
         if not path:
             return self._makeError('403 Forbidden',
                     "Illegal changeset request")
-
-        items = []
-        totalSize = 0
-
-        # TODO: incorporate the improved logic here into
-        # proxy.ChangesetFileReader and consume it here.
-
-        if path.endswith('.cf-out'):
-            # Manifest of files to send sequentially (file contents or cached
-            # changesets). Some of these may live outside of the tmpDir and
-            # thus should not be unlinked afterwards.
-            try:
-                manifest = open(path, 'rt')
-            except IOError, err:
-                if err.errno == errno.ENOENT:
-                    return self._makeError('404 Not Found',
-                            "Changeset not found")
-                raise
-            os.unlink(path)
-
-            for line in manifest:
-                path, expandedSize, isChangeset, preserveFile = line.split()
-                expandedSize = int(expandedSize)
-                isChangeset = bool(int(isChangeset))
-                preserveFile = bool(int(preserveFile))
-
-                items.append((path, isChangeset, preserveFile))
-                totalSize += expandedSize
-
-            manifest.close()
-
-        else:
-            # Single prepared file. Always in tmpDir, so always unlink
-            # afterwards.
-            try:
-                fobj = open(path, 'rb')
-            except IOError, err:
-                if err.errno == errno.ENOENT:
-                    return self._makeError('404 Not Found',
-                            "Changeset not found")
-                raise
-            expandedSize = os.fstat(fobj.fileno()).st_size
-            items.append((path, False, False))
-            totalSize += expandedSize
-
+        try:
+            producer = proxy.ChangesetProducer(path, self.contentsStore)
+        except IOError as err:
+            if err.args[0] == errno.ENOENT:
+                return self._makeError('404 Not Found', "Changeset not found")
+            raise
         return self.responseFactory(
                 status='200 OK',
-                app_iter=self._produceChangeset(items),
+                app_iter=producer,
                 content_type='application/x-conary-change-set',
-                content_length=str(totalSize),
+                content_length=str(producer.getSize()),
                 )
-
-    def _produceChangeset(self, items):
-        readNestedFile = proxy.ChangesetFileReader.readNestedFile
-        for path, isChangeset, preserveFile in items:
-            if isChangeset:
-                csFile = util.ExtendedFile(path, 'rb', buffering=False)
-                changeSet = filecontainer.FileContainer(csFile)
-                for data in changeSet.dumpIter(readNestedFile,
-                        args=(self.contentsStore,)):
-                    yield data
-                del changeSet
-            else:
-                fobj = open(path, 'rb')
-                for data in util.iterFileChunks(fobj):
-                    yield data
-                fobj.close()
-
-            if not preserveFile:
-                os.unlink(path)
 
     def inlineChangeset(self, rpcResponse, responseArgs, headers):
         filename = responseArgs.result[0].split('?')[-1]
@@ -608,14 +546,10 @@ class ConaryHandler(object):
         totalSize += len(final)
         iterables.append([final])
 
-        def _produceInline():
-            for iterable in iterables:
-                for data in iterable:
-                    yield data
         response = self.responseFactory(
                 status='200 OK',
                 headerlist=headers.items(),
-                app_iter=_produceInline(),
+                app_iter=itertools.chain.from_iterable(iterables),
                 )
         response.content_type = 'multipart/mixed; boundary="%s"' % boundary
         response.content_length=str(totalSize)

@@ -17,6 +17,7 @@
 
 
 import base64
+import errno
 import os
 import posixpath
 import select
@@ -52,7 +53,7 @@ from conary.lib.tracelog import initLog, logMe
 from conary.repository import errors, netclient
 from conary.repository import xmlshims
 from conary.repository.netrepos import netserver, proxy
-from conary.repository.netrepos.proxy import ProxyRepositoryServer, ChangesetFileReader
+from conary.repository.netrepos.proxy import ProxyRepositoryServer, ChangesetProducer
 from conary.repository.netrepos.netserver import NetworkRepositoryServer
 from conary.server import schema
 from conary.web import webauth
@@ -105,27 +106,30 @@ class HttpRequests(SimpleHTTPRequestHandler):
             queryString = ""
 
         if base == 'changeset':
-            if not queryString:
+            if not queryString or '/' in queryString:
                 # handle CNY-1142
                 self.send_error(400)
                 return None
-            csfr = ChangesetFileReader(self.tmpDir)
-            items = csfr.getItems(queryString)
-            if items is None:
-                self.send_error(404)
-                return None
-            totalSize = sum(x[1] for x in items)
-
-            self.send_response(200)
-            self.send_header("Content-type", "application/octet-stream")
-            self.send_header("Content-Length", str(totalSize))
-            self.end_headers()
-
             if self.netProxy:
                 repos = self.netProxy
             else:
                 repos = self.netRepos
-            csfr.writeItems(items, self.wfile, repos.getContentsStore())
+            try:
+                producer = ChangesetProducer(
+                        os.path.join(self.tmpDir, queryString),
+                        repos.getContentsStore())
+            except IOError as err:
+                if err.args[0] == errno.ENOENT:
+                    self.send_error(404)
+                    return None
+                raise
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/octet-stream")
+            self.send_header("Content-Length", str(producer.getSize()))
+            self.end_headers()
+            for data in producer:
+                self.wfile.write(data)
         else:
             self.send_error(501)
 
