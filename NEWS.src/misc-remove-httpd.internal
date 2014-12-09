@@ -1,0 +1,1 @@
+Removed support for mod_python in the repository. Use a WSGI server such as gunicorn or uwsgi.
