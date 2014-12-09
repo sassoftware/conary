@@ -1,0 +1,1 @@
+Allow None types when serializing update jobs.
