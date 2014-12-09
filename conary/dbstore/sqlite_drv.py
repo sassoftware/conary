@@ -401,6 +401,25 @@ class Database(BaseDatabase):
             raise
         return cu
 
+    def rollback(self, name=None):
+        assert not name
+        # When using pysqlite3, which contains mixed python and C code, a
+        # signal arriving during a commit or rollback results in the sqlite
+        # library committing but the pysqlite3 transaction state not being
+        # updated. Try to fix this when the subsequent rollback happens.
+
+        # With the Python stdlib bindings everything is C, including the
+        # transaction flag, so this does not happen. The signal exception still
+        # gets raised after the db has already finished committing but the
+        # connection works normally afterwards.
+        try:
+            self.dbh.rollback()
+        except sqlite3.ProgrammingError, err:
+            if 'no transaction is active' in str(err):
+                self.dbh.inTransaction = 0
+            else:
+                raise
+
     # sqlite doesn't support SQL language to add a foreign key constraint
     def addForeignKey(self, *args, **kw):
         return True
