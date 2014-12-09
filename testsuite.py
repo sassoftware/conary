@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+import os
 import warnings
 import sys
 from testrunner import suite
@@ -42,6 +43,11 @@ class Suite(suite.TestSuite):
             warnings.warn("conary.sqlite3 is linked against a too-old system "
                     "sqlite that is known to have bugs affecting the "
                     "repository.")
+        # Some transport tests are affected by proxy environment settings
+        for transport in ('http', 'https', 'ftp', 'all', 'no'):
+            name = '%s_proxy' % transport
+            os.environ.pop(name, None)
+            os.environ.pop(name.upper(), None)
 
     def getCoverageExclusions(self, handler, environ):
         return ['scripts/.*', 'epdb.py', 'stackutil.py']
