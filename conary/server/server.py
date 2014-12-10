@@ -116,7 +116,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 repos = self.netRepos
             try:
                 producer = ChangesetProducer(
-                        os.path.join(self.tmpDir, queryString),
+                        os.path.join(self.tmpDir, queryString + '-out'),
                         repos.getContentsStore())
             except IOError as err:
                 if err.args[0] == errno.ENOENT:

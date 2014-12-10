@@ -1009,9 +1009,11 @@ class ChangesetFilter(BaseProxy):
         # If the changeset can be downloaded locally, return it
         parts = util.urlSplit(url)
         fname = parts[6]
+        if '/' in fname:
+            return url
         try:
             producer = ChangesetProducer(
-                    os.path.join(self.cfg.tmpDir, fname + '.cf-out'),
+                    os.path.join(self.cfg.tmpDir, fname + '-out'),
                     self.getContentsStore())
         except IOError as err:
             if err.args[0] == errno.ENOENT:
@@ -1566,8 +1568,11 @@ class ChangesetProducer(object):
             util.removeIfExists(manifestPath)
         else:
             # Single prepared temporary file (always deleted)
-            expandedSize = os.stat(path).st_size
-            self.items.append((path, expandedSize, 0, 0, 0))
+            try:
+                expandedSize = os.stat(manifestPath).st_size
+            except OSError as err:
+                raise IOError(*err.args)
+            self.items.append((manifestPath, expandedSize, 0, 0, 0))
 
     def getSize(self):
         return self.totalSize
