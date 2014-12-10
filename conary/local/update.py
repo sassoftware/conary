@@ -1411,7 +1411,21 @@ class FilesystemJob:
                 # the user changed the file type. we could try and
                 # merge things a bit more intelligently then we do
                 # here, but it probably isn't worth the effort
-                if replaceThisModifiedFile:
+                if headFile == baseFile:
+                    # Nothing changed in the repository aside from the file
+                    # version. Don't bother trying to fix the filesystem.
+                    fsTrove.addFile(pathId, finalPath, headFileVersion,
+                            headFileId)
+                    continue
+                elif replaceThisModifiedFile:
+                    if (baseFile.hasContents and headFile.hasContents
+                      and baseFile.contents.sha1() == headFile.contents.sha1()):
+                        # The contents didn't change in the repository and thus
+                        # aren't in the changeset; no way to fix this even if
+                        # we're replacing files. See CNY-3877
+                        fsTrove.addFile(pathId, finalPath, headFileVersion,
+                                headFileId)
+                        continue
                     attributesChanged = True
                     fsFile = headFile
                     forceUpdate = True

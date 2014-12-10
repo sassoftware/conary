@@ -602,7 +602,7 @@ class UpdateJob:
 
     def _saveFrozenRepr(self, jobfile, drep):
         f = open(jobfile, "w+")
-        util.xmlrpcDump((drep, ), stream=f)
+        util.xmlrpcDump((drep, ), stream=f, allow_none=True)
         return drep
 
     def _loadFrozenRepr(self, jobfile):
@@ -1947,7 +1947,29 @@ class Database(SqlDbRepository):
 
         callback.committingTransaction()
         self._updateTransactionCounter = True
-        self.commit()
+        origCounter = self.db.getTransactionCounter()
+        try:
+            self.commit()
+        except sigprotect.SignalException as commit_err:
+            # If a signal arrives while sqlite is committing internally then
+            # Python will shelve the signal until it returns to the Python
+            # interpreter. By that point the database has already been
+            # committed. If this happens, postpone dealing with the signal
+            # until after the filesystem journal has been committed.
+            try:
+                self.db.rollback()
+                if self.db.getTransactionCounter() == origCounter:
+                    # The rollback completed, reraise the exception and
+                    # continue unwinding
+                    raise commit_err
+                else:
+                    # The commit completed and we were unable to rollback. Eat
+                    # the signal.
+                    callback.error("Caught signal during transaction commit. "
+                            "Aborting after this job.")
+                    self._savedSignal = commit_err
+            except:
+                raise commit_err
 
         if csJob:
             return csJob.invalidateRollbacks()
@@ -2206,6 +2228,7 @@ class Database(SqlDbRepository):
 
         # Gross, but we need to protect against signals for this call.
         storeRollback = self.rollbackStack and not repair
+        self._savedSignal = None
         @sigprotect.sigprotect()
         def signalProtectedCommit():
             try:
@@ -2228,9 +2251,14 @@ class Database(SqlDbRepository):
                 raise
 
             log.debug("committing journal")
-            opJournal.commit()
-            if not commitFlags.keepJournal:
-                opJournal.removeJournal()
+            try:
+                opJournal.commit()
+            finally:
+                # At this point it is too late to rollback the filesystem
+                # journal, so make sure it gets deleted to keep future updates
+                # from undoing anything.
+                if not commitFlags.keepJournal:
+                    opJournal.removeJournal()
 
             return invalidateRollbacks
 
@@ -2250,6 +2278,11 @@ class Database(SqlDbRepository):
         if commitFlags.shouldRunScripts(tagScript):
             fsJob.orderPostScripts(uJob)
             fsJob.runPostScripts(tagScript)
+
+        if self._savedSignal:
+            saved = self._savedSignal
+            self._savedSignal = None
+            saved.reraise()
 
     def runPreScripts(self, uJob, callback, tagScript = None,
                       justDatabase = False, tmpDir = '/', jobIdx = None,

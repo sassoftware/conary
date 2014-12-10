@@ -4310,6 +4310,29 @@ foo:run
             self.rollback(1)
             self.verifyFile(self.rootDir + '/foo', 'foo')
 
+    def testReplacedBySymlink(self):
+        """
+        Same ids but on a different label, and was replaced by a symlink on-disk
+        @tests: CNY-3877
+        """
+        self.addComponent('foo:runtime=1', fileContents = [
+                ('/foo', rephelp.RegularFile(contents = 'foo')),
+                ('/bar', rephelp.RegularFile(contents = 'foo')),
+                ('/baz', rephelp.RegularFile(contents = 'foo')),
+                ('/beef', rephelp.Socket()),
+                ] )
+        self.addComponent('foo:runtime=:other-label/1', fileContents = [
+                ('/foo', rephelp.RegularFile(contents = 'foo')), # identical
+                ('/bar', rephelp.RegularFile(contents = 'foo', mode=0600)), # mode changes
+                ('/baz', rephelp.RegularFile(contents = 'baz')), # content changes
+                ('/beef', rephelp.Socket(mode=0600)), # not a regular file
+                ] )
+        self.updatePkg('foo:runtime=1')
+        for name in ['/foo', '/bar', '/baz', '/beef']:
+            os.unlink(self.rootDir + name)
+            os.symlink('foo', self.rootDir + name)
+        self.updatePkg('foo:runtime=:other-label/1', replaceModifiedFiles=True)
+
     def testDirectoryOrdering(self):
         self.addComponent('foo:runtime=1', fileContents =
                           [ ('/a', rephelp.RegularFile(contents = 'something',

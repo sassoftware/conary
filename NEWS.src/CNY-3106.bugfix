@@ -1,0 +1,3 @@
+Interrupting an update with Ctrl-C during "Committing database transaction" no
+longer results in the filesystem journal being rolled back after the database
+has already committed.
