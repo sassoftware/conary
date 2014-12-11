@@ -27,22 +27,34 @@ def passExceptions(f):
     f._passExceptions = True
     return f
 
-def exceptionProtection(method, exceptionCallback):
-    def wrapper(*args, **kwargs):
-        if hasattr(method, '_passExceptions') and method._passExceptions:
+def _exceptionProtection(method):
+    def wrapper(self, *args, **kwargs):
+        if getattr(method, '_passExceptions', False):
             return method(*args, **kwargs)
 
         try:
-            return method(*args, **kwargs)
+            return method(self, *args, **kwargs)
         except Exception, e:
             exc_info = sys.exc_info()
             if errors.exceptionIsUncatchable(e):
                 raise
-            exceptionCallback(exc_info)
+            self._exceptionOccured(exc_info)
 
     return wrapper
 
+
+class _CallbackMeta(type):
+    """Decorate all methods of Callback and its subclasses"""
+    def __new__(metacls, cls_name, cls_bases, cls_dict):
+        for key, value in cls_dict.items():
+            if isinstance(value, types.FunctionType) and not key.startswith('_'):
+                cls_dict[key] = _exceptionProtection(value)
+        return type.__new__(metacls, cls_name, cls_bases, cls_dict)
+
+
 class Callback(object):
+
+    __metaclass__ = _CallbackMeta
 
     def _exceptionOccured(self, exc_info):
         etype, e, tb = exc_info
@@ -65,15 +77,6 @@ class Callback(object):
         if not hasattr(self, 'exceptions'):
             self.exceptions = []
         self.exceptions.append(e)
-
-    def __getattribute__(self, name):
-        item = object.__getattribute__(self, name)
-        if name[0] == '_':
-            return item
-        elif not isinstance(item, types.MethodType):
-            return item
-
-        return exceptionProtection(item, self._exceptionOccured)
 
     def cancelOperation(self):
         """Return True if we should cancel the operation as soon as it is
