@@ -30,7 +30,7 @@ def passExceptions(f):
 def _exceptionProtection(method):
     def wrapper(self, *args, **kwargs):
         if getattr(method, '_passExceptions', False):
-            return method(*args, **kwargs)
+            return method(self, *args, **kwargs)
 
         try:
             return method(self, *args, **kwargs)
