@@ -803,7 +803,7 @@ class addArchive(_Source):
                 _uncompress = "gzip -d -c"
                 actionPathBuildRequires.append('gzip')
             elif isinstance(m, magic.lzo) or f.endswith(".lzo"):
-                _uncompress = "lzop -d -c"
+                _uncompress = "lzop -dcq"
                 actionPathBuildRequires.append('lzop')
 
             # There are things we know we know...
