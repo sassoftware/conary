@@ -1,3 +1,26 @@
+Changes in 2.5.6:
+  o Bug Fixes:
+    * Interrupting an update with Ctrl-C during "Committing database
+      transaction" no longer results in the filesystem journal being
+      rolled back after the database has already committed. (CNY-3106)
+    * Fixed getChangeSetSize failing when given a job containing
+      erasures. (CNY-3876)
+    * Fixed a "pathId not in changeset" crash when updating a trove
+      across labels after local filesystem file types were changed.
+      (CNY-3877)
+    * Allow None types when serializing update jobs. (CNY-3879)
+    * Fixed a race condition in standalone proxy caches that could cause
+      a crash when three or more clients requested the same changeset
+      simultaneously. (CNY-3880)
+    * Fixed "conary repair" crashing when a config file was replaced by
+      a symlink. (CNY-3881)
+
+  o Internal Changes:
+    * Committing to repositories running Conary older than 2.1.0 is no
+      longer supported.
+    * Removed support for mod_python in the repository. Use a WSGI
+      server such as gunicorn or uwsgi.
+
 Changes in 2.5.5:
   o New Features:
     * Added a new repository content store type 'flat'. In this

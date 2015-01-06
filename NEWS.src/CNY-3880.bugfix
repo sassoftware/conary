@@ -1,2 +1,0 @@
-Fixed a race condition in standalone proxy caches that could cause a crash when
-three or more clients requested the same changeset simultaneously.
