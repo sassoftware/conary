@@ -59,15 +59,19 @@ class RepairTest(rephelp.RepositoryHelper):
     @testhelp.context('repair')
     def testFileTypeChange(self):
         self.addComponent('foo:run=1', fileContents = [
+            ( '/c', rephelp.RegularFile(contents = 'orig\n', mode = 0600, config=True) ),
             ( '/f', rephelp.RegularFile(contents = 'orig\n', mode = 0600) ) ])
         self.addComponent('foo:run=2', fileContents = [
             ( '/f', rephelp.Symlink(target = '/targ') ) ])
 
         self.updatePkg('foo:run=1')
+        os.unlink(self.rootDir + '/c')
+        os.symlink('/', self.rootDir + '/c')
         os.unlink(self.rootDir + '/f')
         os.symlink('/', self.rootDir + '/f')
         rc, s = self.captureOutput(self.repairTroves, [ 'foo:run' ])
         self.assertEquals(s, '')
+        self.verifyFile(self.rootDir + '/c', 'orig\n')
         self.verifyFile(self.rootDir + '/f', 'orig\n')
 
         self.updatePkg('foo:run=2')

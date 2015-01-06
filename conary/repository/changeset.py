@@ -658,6 +658,7 @@ class ChangeSet(streams.StreamSet):
                                      ChangedFileTypes.hldr,
                                      filecontents.FromString(""), False);
                 elif (origFile.flags.isConfig() and newFile.flags.isConfig() and
+                        origFile.hasContents and newFile.hasContents and
                         (origFile.contents.sha1() != newFile.contents.sha1())):
                     if self.configFileIsDiff(newFile.pathId(), newFileId):
                         (contType, cont) = self.getFileContents(

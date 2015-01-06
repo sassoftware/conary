@@ -1,0 +1,1 @@
+Fixed "conary repair" crashing when a config file was replaced by a symlink.
