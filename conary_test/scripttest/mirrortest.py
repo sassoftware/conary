@@ -267,9 +267,6 @@ class MirrorTest(rephelp.RepositoryHelper):
         self.runMirror(mirrorFile)
         self.compareRepositories(sourceRepos, targetRepos)
 
-    testCompareReposV46 = mockversion(testCompareRepos, 'testCompareReposV46',
-                                      46)
-
     @skipproxy
     def testMirrrorInfoExcluded(self):
         sourceRepos, targetRepos = self.createRepositories()

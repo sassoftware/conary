@@ -658,6 +658,7 @@ class ChangeSet(streams.StreamSet):
                                      ChangedFileTypes.hldr,
                                      filecontents.FromString(""), False);
                 elif (origFile.flags.isConfig() and newFile.flags.isConfig() and
+                        origFile.hasContents and newFile.hasContents and
                         (origFile.contents.sha1() != newFile.contents.sha1())):
                     if self.configFileIsDiff(newFile.pathId(), newFileId):
                         (contType, cont) = self.getFileContents(
@@ -2049,9 +2050,7 @@ class DictAsCsf:
         self.items.sort()
         self.next = 0
 
-def _convertChangeSetV2V1(inPath, outPath):
-    inFc = filecontainer.FileContainer(
-                        util.ExtendedFile(inPath, "r", buffering = False))
+def _convertChangeSetV2V1(inFc, outPath):
     assert(inFc.version == filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
     outFcObj = util.ExtendedFile(outPath, "w+", buffering = False)
     outFc = filecontainer.FileContainer(outFcObj,
@@ -2067,7 +2066,7 @@ def _convertChangeSetV2V1(inPath, outPath):
             key = key[0:16]
 
             if key == lastPathId:
-                raise changeset.PathIdsConflictError(key)
+                raise PathIdsConflictError(key)
 
             size -= 20
 

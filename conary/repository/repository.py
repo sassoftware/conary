@@ -458,7 +458,7 @@ class ChangeSetJob:
     def _createInstallTroveObjects(self, fileHostFilter = [],
                                    callback = None, hidden = False,
                                    mirror = False, allowIncomplete = False,
-                                   excludeCapsuleContents = False):
+                                   ):
         # create the trove objects which need to be installed; the
         # file objects which map up with them are created later, but
         # we do need a map from pathId to the path and version of the
@@ -524,10 +524,6 @@ class ChangeSetJob:
             newFileMap = newTrove.applyChangeSet(csTrove,
                                      needNewFileMap=True,
                                      allowIncomplete=allowIncomplete)
-            skipContents = (excludeCapsuleContents and
-                              newTrove.troveInfo.capsule.type and
-                              newTrove.troveInfo.capsule.type())
-
             if newTrove.troveInfo.incomplete():
                 log.warning('trove %s has schema version %s, which contains'
                         ' information not handled by this client.  This'
@@ -550,7 +546,7 @@ class ChangeSetJob:
 
             checkFilesList += self._getCheckFilesList(csTrove, troveInfo,
                 fileHostFilter, configRestoreList, normalRestoreList,
-                restoreContents = not skipContents)
+                restoreContents=True)
 
             for (pathId, path, fileId, newVersion) in \
                             newTrove.iterFileList(members = True,
@@ -562,7 +558,7 @@ class ChangeSetJob:
                     continue
 
                 self.addFileVersion(troveInfo, pathId, path, fileId,
-                                    newVersion, withContents = not skipContents)
+                                    newVersion, withContents=True)
 
             filesNeeded = []
             for i, (pathId, path, fileId, newVersion) in enumerate(csTrove.getChangedFileList()):
@@ -599,7 +595,7 @@ class ChangeSetJob:
                 # None is the file object
                 self.addFileVersion(troveInfo, pathId, path, fileId,
                                     newVersion, fileStream = fileStream,
-                                    withContents = not skipContents)
+                                    withContents=True)
 
                 if fileStream is not None:
                     self._handleContents(pathId, fileId, fileStream,
@@ -607,7 +603,7 @@ class ChangeSetJob:
                                     oldFileId = oldFileId,
                                     oldVersion = oldVersion,
                                     oldfile = None,
-                                    restoreContents = not skipContents)
+                                    restoreContents=True)
 
             oldFileObjects = list(repos.getFileVersions(
                                         [ x[1] for x in filesNeeded ]))
@@ -626,7 +622,7 @@ class ChangeSetJob:
                 if newVersion is None:
                     newVersion = oldVersion
 
-                restoreContents = not skipContents
+                restoreContents = True
 
                 diff = cs.getFileChange(oldFileId, fileId)
 
@@ -699,7 +695,6 @@ class ChangeSetJob:
     def __init__(self, repos, cs, fileHostFilter = [], callback = None,
                  resetTimestamps = False, allowIncomplete = False,
                  hidden = False, mirror = False,
-                 excludeCapsuleContents = False,
                  preRestored=None,
                  ):
 
@@ -745,8 +740,7 @@ class ChangeSetJob:
                                             callback = callback,
                                             mirror = mirror, hidden = hidden,
                                             allowIncomplete = allowIncomplete,
-                                            excludeCapsuleContents =
-                                                excludeCapsuleContents)
+                                            )
         configRestoreList, normalRestoreList = \
             self._filterRestoreList(configRestoreList, normalRestoreList)
 

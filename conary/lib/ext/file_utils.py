@@ -115,13 +115,30 @@ def pread(fobj, count, offset):
         return os.read(fd, count)
     buf = ctypes.create_string_buffer(count)
     libc = ctypes_utils.get_libc()
-    libc.pread.argtypes = (c_int, c_void_p, c_size_t, c_long)
+    libc.pread.argtypes = (c_int, c_void_p, c_size_t, c_size_t)
     libc.pread.restype = c_int
     rc = libc.pread(fd, buf, count, offset)
     if rc < 0:
         ctypes_utils.throw_errno(libc)
     else:
         return buf[:rc]
+
+
+def pwrite(fobj, data, offset):
+    if offset >= 0x8000000000000000:
+        raise OverflowError
+    fd = _fileno(fobj)
+    if os.name != 'posix':
+        os.lseek(fd, offset, os.SEEK_SET)
+        return os.write(fd, data)
+    libc = ctypes_utils.get_libc()
+    libc.pread.argtypes = (c_int, c_void_p, c_size_t, c_size_t)
+    libc.pread.restype = c_int
+    rc = libc.pwrite(fd, data, len(data), offset)
+    if rc < 0:
+        ctypes_utils.throw_errno(libc)
+    else:
+        return rc
 
 
 def removeIfExists(path):

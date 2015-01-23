@@ -500,7 +500,6 @@ class RepositoryHelper(testhelp.TestCase):
             commitAction=commitAction,
             deadlockRetry=deadlockRetry,
             entitlementCheckURL=entCheck,
-            excludeCapsuleContents=excludeCapsuleContents,
             externalPasswordURL=authCheck,
             forceSSL=forceSSL,
             readOnlyRepository=readOnlyRepository,
@@ -2755,7 +2754,6 @@ class RepositoryHelper(testhelp.TestCase):
             useSSL=False,
             cacheTimeout=None,
             cacheLocation=None,
-            withCapsuleContentServer=None,
             ):
         cProxyDir = os.path.join(self.tmpDir, "conary-proxy")
         if idx:
@@ -2770,11 +2768,6 @@ class RepositoryHelper(testhelp.TestCase):
                 user=[' '.join(x) for x in users],
                 )
         configValues.update(self._reformatProxies(proxies))
-        if withCapsuleContentServer:
-            capsuleServerUrl = "http://localhost:%s/toplevel" % (
-                    self.capsuleContentServer.port,)
-            configValues['capsuleServerUrl'] = capsuleServerUrl
-            configValues['injectCapsuleContentServers'] = 'localhost1'
         return ProxyServer(cProxyDir,
                 withCache=True,
                 singleWorker=singleWorker,

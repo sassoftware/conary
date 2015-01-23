@@ -29,6 +29,7 @@ cdef extern from "unistd.h" nogil:
     int mkdir(char *pathname, int mode)
     int unlink(char *pathname)
     ssize_t c_pread "pread"(int fd, void *buf, size_t count, off_t offset)
+    ssize_t c_pwrite "pwrite"(int fd, void *buf, size_t count, off_t offset)
 
 cdef extern from "poll.h" nogil:
     cdef struct pollfd:
@@ -179,6 +180,25 @@ def pread(fobj, size_t count, off_t offset):
     ret = PyString_FromStringAndSize(data, rc)
     PyMem_Free(data)
     return ret
+
+
+def pwrite(fobj, bytes data_p, off_t offset):
+    """Write C{data} at C{offset} in file C{fobj}."""
+    cdef Py_ssize_t rc
+    cdef int fd
+    cdef size_t count
+    cdef char *data_b
+
+    fd = PyObject_AsFileDescriptor(fobj)
+    data_b = data_p
+    count = len(data_p)
+
+    with nogil:
+        rc = c_pwrite(fd, data_b, count, offset)
+
+    if rc == -1:
+        PyErr_SetFromErrno(OSError)
+    return rc
 
 
 def removeIfExists(char *path):

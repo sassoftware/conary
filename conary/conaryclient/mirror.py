@@ -76,23 +76,14 @@ def parseArgs(argv):
     return options
 
 
-class CapsuleMirrorCallbackMixin(object):
-    allowMissingFiles = False
-
-    def missingFiles(self, fileList):
-        return self.allowMissingFiles
-
-
-class VerboseChangesetCallback(CapsuleMirrorCallbackMixin,
-        clientCallbacks.ChangesetCallback):
+class VerboseChangesetCallback(clientCallbacks.ChangesetCallback):
 
     def done(self):
         self.clearPrefix()
         self._message('\r')
 
 
-class ChangesetCallback(CapsuleMirrorCallbackMixin,
-        callbacks.ChangesetCallback):
+class ChangesetCallback(callbacks.ChangesetCallback):
 
     def setPrefix(self, *args):
         pass
@@ -122,7 +113,6 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     useHiddenCommits = (cfg.CfgBool, True)
     absoluteChangesets = (cfg.CfgBool, False)
     includeSources = (cfg.CfgBool, False)
-    excludeCapsuleContents = (cfg.CfgBool, False)
     splitNodes = (cfg.CfgBool, True,
             "Split jobs that would commit two versions of a trove at once. "
             "Needed for compatibility with older repositories.")
@@ -235,7 +225,6 @@ def Main(argv=None):
         callback = VerboseChangesetCallback()
     if options.fastSync: # make --fast-sync imply --full-trove-sync
         options.sync = True
-    callback.allowMissingFiles = cfg.excludeCapsuleContents
     try:
         mainWorkflow(cfg, callback, options.test,
                  sync = options.sync, infoSync = options.infoSync,

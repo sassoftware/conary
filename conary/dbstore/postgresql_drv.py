@@ -200,6 +200,7 @@ class Database(BaseDatabase):
     iterCursorClass = IterCursor
     keywords = KeywordDict()
     basic_transaction = "START TRANSACTION"
+    savepoints = True
 
     def connect(self, **kwargs):
         assert(self.database)
@@ -313,6 +314,26 @@ class Database(BaseDatabase):
         return self.dbh.transaction in (pgsql.TRANS_INTRANS,
                 pgsql.TRANS_INERROR, pgsql.TRANS_ACTIVE)
 
+    def transaction(self, name = None):
+        "start transaction [ named point ]"
+        assert(self.dbh)
+        c = self.cursor()
+        if name:
+            if not self.inTransaction():
+                c.execute(self.basic_transaction)
+            c.execute("SAVEPOINT " + name)
+        else:
+            c.execute(self.basic_transaction)
+        return c
+
+    def rollback(self, name=None):
+        "rollback [ to transaction point ]"
+        assert(self.dbh)
+        if name:
+            self.dbh.execute("ROLLBACK TO SAVEPOINT " + name)
+        else:
+            return self.dbh.rollback()
+
     # Postgresql's trigegr syntax kind of sucks because we have to
     # create a function first and then call that function from the
     # trigger
@@ -360,17 +381,6 @@ class Database(BaseDatabase):
         cu.execute("DROP FUNCTION %s()" % funcName)
         del self.triggers[triggerName]
         return True
-
-    # avoid leaving around invalid transations when schema is not initialized
-    def getVersion(self):
-        try:
-            return BaseDatabase.getVersion(self, raiseOnError=True)
-        except sqlerrors.InvalidTable:
-            # Postgres is so nice that it ruined the current
-            # transaction because of the missing table, so roll back.
-            self.dbh.rollback()
-            self.version = sqllib.DBversion(0, 0)
-            return self.version
 
     def analyze(self, table=""):
         cu = self.cursor()

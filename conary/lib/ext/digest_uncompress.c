@@ -78,8 +78,11 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     for (i = 0; i < outFdCount; i++)
         outFds[i] = PYINT_AS_LONG(PyList_GET_ITEM(outFdList, i));
 
+    Py_BEGIN_ALLOW_THREADS
+
     memset(&zs, 0, sizeof(zs));
     if ((rc = inflateInit2(&zs, 31)) != Z_OK) {
+        Py_BLOCK_THREADS
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
         return NULL;
     }
@@ -95,6 +98,7 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
             to_read = MIN(sizeof(inBuf), inStop - inAt);
             rc = pread(inFd, inBuf, to_read, inAt);
             if (rc < 0) {
+                Py_BLOCK_THREADS
                 PyErr_SetFromErrno(PyExc_OSError);
                 return NULL;
             }
@@ -108,6 +112,7 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
                 while (to_write2 > 0) {
                     rc = write(outFds[i], inBuf, to_write2);
                     if (rc < 0) {
+                        Py_BLOCK_THREADS
                         PyErr_SetFromErrno(PyExc_OSError);
                         return NULL;
                     }
@@ -125,6 +130,7 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
         zs.avail_out = sizeof(outBuf);
         zs.next_out = outBuf;
         if ((inflate_rc = inflate(&zs, 0)) < 0) {
+            Py_BLOCK_THREADS
             PyErr_SetString(PyExc_RuntimeError, zError(inflate_rc));
             return NULL;
         }
@@ -135,12 +141,13 @@ static PyObject * sha1Copy(PyObject *module, PyObject *args) {
     }
 
     if ((rc = inflateEnd(&zs)) != Z_OK) {
+        Py_BLOCK_THREADS
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
         return NULL;
     }
 
     SHA1_Final(sha1, &sha1state);
-
+    Py_END_ALLOW_THREADS
     return PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
 }
 
@@ -195,16 +202,20 @@ sha1Uncompress(PyObject *module, PyObject *args) {
     if (PyErr_Occurred())
         goto onerror;
 
+    Py_BEGIN_ALLOW_THREADS
+
     tmpPath = alloca(strlen(path) + strlen(baseName) + 10);
     sprintf(tmpPath, "%s/.ct%sXXXXXX", path, baseName);
     outFd = mkstemp(tmpPath);
     if (outFd == -1) {
+        Py_BLOCK_THREADS
         PyErr_SetFromErrno(PyExc_OSError);
         goto onerror;
     }
 
     memset(&zs, 0, sizeof(zs));
     if ((rc = inflateInit2(&zs, 31)) != Z_OK) {
+        Py_BLOCK_THREADS
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
         goto onerror;
     }
@@ -221,9 +232,11 @@ sha1Uncompress(PyObject *module, PyObject *args) {
             to_read = MIN(sizeof(inBuf), inStop - inAt);
             rc = pread(inFd, inBuf, to_read, inAt);
             if (rc < 0) {
+                Py_BLOCK_THREADS
                 PyErr_SetFromErrno(PyExc_OSError);
                 goto onerror;
             } else if (rc == 0) {
+                Py_BLOCK_THREADS
                 PyErr_SetString(PyExc_RuntimeError, "short read");
                 goto onerror;
             }
@@ -237,6 +250,7 @@ sha1Uncompress(PyObject *module, PyObject *args) {
         zs.next_out = outBuf;
         inflate_rc = inflate(&zs, 0);
         if (inflate_rc < 0) {
+            Py_BLOCK_THREADS
             PyErr_SetString(PyExc_RuntimeError, zError(rc));
             goto onerror;
         }
@@ -250,6 +264,7 @@ sha1Uncompress(PyObject *module, PyObject *args) {
         while (to_write > 0) {
             rc = write(outFd, outBuf_p, to_write);
             if (rc < 0) {
+                Py_BLOCK_THREADS
                 PyErr_SetFromErrno(PyExc_OSError);
                 goto onerror;
             }
@@ -259,17 +274,21 @@ sha1Uncompress(PyObject *module, PyObject *args) {
     }
 
     if ((rc = inflateEnd(&zs)) != Z_OK) {
+        Py_BLOCK_THREADS
         PyErr_SetString(PyExc_RuntimeError, zError(rc));
         goto onerror;
     }
 
     if (close(outFd)) {
+        Py_BLOCK_THREADS
         PyErr_SetFromErrno(PyExc_OSError);
         goto onerror;
     }
     outFd = -1;
 
     SHA1_Final(sha1, &sha1state);
+    Py_END_ALLOW_THREADS
+
     retSha = PYBYTES_FromStringAndSize((char*)sha1, sizeof(sha1));
     if (retSha == NULL) {
         goto onerror;

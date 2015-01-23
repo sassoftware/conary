@@ -261,6 +261,7 @@ class BaseDatabase:
     kind = "base"
     keywords = BaseKeywordDict()
     poolmode = False    # indicates if connections are pooled and can be open/closed cheaply
+    savepoints = False
 
     # schema caching
     tables = None
@@ -514,7 +515,6 @@ class BaseDatabase:
         """
 
         assert(self.dbh)
-        c = self.cursor()
 
         # If self.tables is non-empty, loadSchema() has probably been
         # called, so we can do a fast (and non-intrusive) check for
@@ -529,11 +529,18 @@ class BaseDatabase:
         # DatabaseVersion canbe an old style table that has only a version column
         # or it could be a new style version that has (version, minor) columns
         # or it can be a mint table that has (version, timestamps) columns
+        c = self.cursor()
+        used_savepoint = None
+        if self.savepoints and self.inTransaction():
+            used_savepoint = 'getversion_save'
+            self.transaction(used_savepoint)
         try:
             c.execute("select * from DatabaseVersion limit 1")
         except sqlerrors.InvalidTable:
             if raiseOnError:
                 raise
+            if self.savepoints:
+                self.rollback(used_savepoint)
             self.version = sqllib.DBversion(0,0)
             return self.version
         # keep compatibility with old style table versioning

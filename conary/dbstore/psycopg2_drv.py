@@ -148,6 +148,7 @@ class Database(BaseDatabase):
     keywords = KeywordDict()
     basic_transaction = "START TRANSACTION"
     poolmode = True
+    savepoints = True
 
     def connect(self, **kwargs):
         assert self.database
@@ -262,6 +263,27 @@ class Database(BaseDatabase):
         """
         return self.dbh.status == psy_ext.STATUS_IN_TRANSACTION
 
+    def transaction(self, name = None):
+        "start transaction [ named point ]"
+        assert(self.dbh)
+        c = self.cursor()
+        if name:
+            if not self.inTransaction():
+                c.execute(self.basic_transaction)
+            c.execute("SAVEPOINT " + name)
+        else:
+            c.execute(self.basic_transaction)
+        return c
+
+    def rollback(self, name=None):
+        "rollback [ to transaction point ]"
+        assert(self.dbh)
+        if name:
+            c = self.cursor()
+            c.execute("ROLLBACK TO SAVEPOINT " + name)
+        else:
+            return self.dbh.rollback()
+
     def createTrigger(self, table, column, onAction):
         onAction = onAction.lower()
         assert onAction in ('insert', 'update')
@@ -302,18 +324,6 @@ class Database(BaseDatabase):
         cu.execute("DROP FUNCTION %s()" % funcName)
         del self.triggers[triggerName]
         return True
-
-    def getVersion(self):
-        cu = self.dbh.cursor()
-        cu.execute("SAVEPOINT getversion_save")
-        try:
-            try:
-                return BaseDatabase.getVersion(self, raiseOnError=True)
-            except sqlerrors.InvalidTable:
-                self.version = sqllib.DBversion(0, 0)
-                return self.version
-        finally:
-            cu.execute("ROLLBACK TO SAVEPOINT getversion_save")
 
     def analyze(self, table=""):
         cu = self.cursor()

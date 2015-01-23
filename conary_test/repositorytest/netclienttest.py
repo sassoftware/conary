@@ -68,7 +68,7 @@ class NetclientTest(rephelp.RepositoryHelper):
                   { 'testcase:source' : None })['testcase:source'].keys()[0]
         # find the version of the file
         barId = None
-        for f in repos.iterFilesInTrove('testcase:source', troveVer, 
+        for f in repos.iterFilesInTrove('testcase:source', troveVer,
                                         deps.Flavor(), withFiles=True):
             pathId, path, fileId, version, fileObj = f
             if path == 'bar':
@@ -134,7 +134,7 @@ class NetclientTest(rephelp.RepositoryHelper):
 
         # try getting the contents of a file which doesn't have contents
         t = self.addComponent('symtest:runtime', '1.0-1-1',
-                              fileContents = [ ('/symlink', 
+                              fileContents = [ ('/symlink',
                                                 rephelp.Symlink('something')) ])
         fileList = list(t.iterFileList())
         assert(len(fileList) == 1)
@@ -221,7 +221,7 @@ class NetclientTest(rephelp.RepositoryHelper):
 
         self.updateSourceTrove("PathIdTest", recipes.pathIdTest4,
                                "localhost@rpl:branch")
-        self.cookFromRepository("PathIdTest", 
+        self.cookFromRepository("PathIdTest",
                 buildLabel = versions.Label("localhost@rpl:branch"))[0][1]
         ids = repos.getPackageBranchPathIds("PathIdTest:source", trunk)
         assert(len(ids) == 5)
@@ -302,7 +302,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         flavor = deps.parseFlavor('')
         cs = changeset.ChangeSet()
         # add a pkg diff
-        v = versions.VersionFromString('/localhost@foo:bar/1.2-1-2', 
+        v = versions.VersionFromString('/localhost@foo:bar/1.2-1-2',
                                        timeStamps=[1.000])
         pkg = trove.Trove('test', v, flavor, None)
         pkg.troveInfo.sourceName.set('test:source')
@@ -569,48 +569,6 @@ class NetclientTest(rephelp.RepositoryHelper):
         self.assertRaises(errors.RepositoryError,
             client.applyUpdate, updJob)
 
-    def testCommitChangesetConversion(self):
-        class PutProxy:
-
-            def __init__(self, old, ver):
-                self.old = old
-                self.expect = ver
-
-            def __call__(self, url, inF, size, **kwargs):
-                f2 = util.ExtendedFdopen(os.dup(inF.fileno()))
-                fc = filecontainer.FileContainer(f2)
-                assert(fc.version == self.expect)
-                f2.close()
-                inF.seek(0)
-                return self.old(url, inF, size, **kwargs)
-
-        cs = changeset.ChangeSet()
-        trv = trove.Trove('test:runtime',
-                versions.ThawVersion('/localhost@foo:test/1.0:1.0-1-1'),
-                deps.parseFlavor(''), None)
-        trv.computeDigests()
-        trvCs = trv.diff(None, absolute = True)[0]
-        cs.newTrove(trvCs)
-
-        repos = self.openRepository()
-
-        old = netclient.httpPutFile
-        try:
-            repos = self.openRepository()
-            netclient.httpPutFile = PutProxy(old,
-                            filecontainer.FILE_CONTAINER_VERSION_FILEID_IDX)
-            repos.commitChangeSet(cs)
-
-            self.resetRepository()
-            repos = self.openRepository()
-            repos.c['localhost'].setProtocolVersion(42)
-            netclient.httpPutFile = PutProxy(old,
-                            filecontainer.FILE_CONTAINER_VERSION_WITH_REMOVES)
-            repos.commitChangeSet(cs)
-        finally:
-            netclient.httpPutFile = old
-            self.stopRepository()
-
     def testChangeSetConversionError(self):
         # Test returning non-200 or 403 errors
         def errorHttpPutFile(*args, **kwargs):
@@ -648,7 +606,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         self.addUserAndRole(repos, "localhost@rpl:qa", "qauser", "qapw")
         repos.addAcl("localhost@rpl:qa", "qauser", "beta.*", "localhost@rpl:qa")
         qarepo = self.getRepositoryClient(user="qauser", password="qapw")
-        
+
         # set up the test case
         verlist = [
             "/localhost@rpl:linux//devel/1.0-1-1",
@@ -677,7 +635,7 @@ class NetclientTest(rephelp.RepositoryHelper):
             ret = allrepo.getTroveReferences("localhost", [("alpha:data", v, noF)])
             self.assertEqual(set(ret[0]),
                                  set([("alpha",v,noF),("alpha%d"%i,v,noF),("beta%d"%i,v,noF)]) )
-           
+
             # test qauser
             ret = qarepo.getTroveReferences("localhost", [("beta:runtime",v,noF), ("beta:data",v,noF)])
             if v.branch().label().asString() == "localhost@rpl:qa":
@@ -716,7 +674,7 @@ class NetclientTest(rephelp.RepositoryHelper):
         ret = allrepo.getTroveDescendants("localhost", [
             ("gamma", versions.VersionFromString("/localhost@rpl:linux"), noF)])
         self.assertEqual(set(ret[0]), retset)
-        
+
     def testFlavoredReferences(self):
         repos = self.openRepository()
         # set up a trove flavored two different ways
@@ -725,16 +683,16 @@ class NetclientTest(rephelp.RepositoryHelper):
 
         f1 = deps.parseFlavor("use: foo")
         f2 = deps.parseFlavor("use: !foo, bar")
-        
+
         self.addComponent("trove:runtime", v1, f1)
         self.addComponent("trove:runtime", v1, f2)
-        
+
         self.addCollection("trove", v1, [":runtime"], defaultFlavor = f1)
         self.addCollection("trove", v1, [":runtime"], defaultFlavor = f2)
-        
+
         # set up a collection
         self.addCollection("group-dist", v2, [("trove", v1, f1)], defaultFlavor = f1)
-        
+
         # query for references to both flavors; expected result is only one match
         ret = repos.getTroveReferences("localhost", [
             ("trove", versions.VersionFromString(v1), f1),
@@ -932,6 +890,9 @@ class ServerProxyTest(rephelp.RepositoryHelper):
 
         repos = self.openRepository()
 
+        # CNY-3876: use old version to determine repo name
+        assert(repos.getChangeSetSize([ removeJob ])[0] == 0)
+
         sizes = repos.getChangeSetSize([ firstJob, removeJob, secondJob ])
         _check([ firstJob ], sizes[0])
         assert(sizes[1] == 0)
@@ -1091,7 +1052,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
             rv = oldCacheHostLookups(hosts)
             self.assertEqual(ipcache._cache._map.keys(), [] )
             return rv
-        self.mock(netclient.NetworkRepositoryClient, 
+        self.mock(netclient.NetworkRepositoryClient,
                   '_cacheHostLookups', checkCacheHostLookups)
 
     def testUpdateUsesCache2(self):
@@ -1116,7 +1077,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
                 rv = oldCacheHostLookups(hosts)
                 self.assertEqual(ipcache._cache._map.keys(), [ 'localhost' ] )
                 return rv
-            self.mock(netclient.NetworkRepositoryClient, 
+            self.mock(netclient.NetworkRepositoryClient,
                       '_cacheHostLookups', checkCacheHostLookups)
             self.updatePkg(['foo:run', 'bar:run=localhost1@rpl:1'])
         finally:
@@ -1218,7 +1179,7 @@ class ServerProxyTest(rephelp.RepositoryHelper):
                                                   ['/foo', '/bar'])
         assert(contents[0].get().read() == 'contents!')
         assert(contents[1].get().read() == 'other')
-        self.assertRaises(errors.PathsNotFound, 
+        self.assertRaises(errors.PathsNotFound,
                           repos.getFileContentsFromTrove,
                           n,v,f,
                           ['/foo2'])
@@ -1239,10 +1200,10 @@ class ServerProxyTest(rephelp.RepositoryHelper):
             self.addComponent(
                     'foo:run=/localhost@rpl:1//localhost1@rpl:branch/1-1-1')
             labels = self.openRepository().getLabelsForHost('localhost')
-            assert(sorted([str(x) for x in labels]) == 
+            assert(sorted([str(x) for x in labels]) ==
                    ['localhost@rpl:branch', 'localhost@rpl:linux'])
             labels = self.openRepository().getLabelsForHost('localhost1')
-            assert(sorted([str(x) for x in labels]) == 
+            assert(sorted([str(x) for x in labels]) ==
                    ['localhost1@rpl:2', 'localhost1@rpl:branch'])
         finally:
             self.resetRepository(0)

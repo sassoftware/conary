@@ -1326,7 +1326,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not self.c.singleServer(*verSet):
             raise errors.CannotCalculateDownloadSize('job on multiple servers')
 
-        server = self.c[jobList[0][2][0]]
+        if jobList[0][2][0] is None:
+            # this trove is being removed, so use old version
+            server = self.c[jobList[0][1][0]]
+        else:
+            server = self.c[jobList[0][2][0]]
 
         if server.getProtocolVersion() >= 51:
             infoList = server.getChangeSet(wireJobs, False, True, True,
@@ -2394,42 +2398,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return contents
 
-    def getFileContentsCapsuleInfo(self, fileList):
-        capsuleInfo = [ None ] * len(fileList)
-        byServer = {}
-
-        for i, item in enumerate(fileList):
-            # we try to get the file from the trove which originally contained
-            # it since we know that server has the contents; other servers may
-            # not
-            (fileId, fileVersion) = item[0:2]
-            server = fileVersion.getHost()
-            l = byServer.setdefault(server, [])
-            l.append((i, (fileId, fileVersion)))
-
-        for server, itemList in byServer.iteritems():
-            fileList = [ (self.fromFileId(x[1][0]),
-                          self.fromVersion(x[1][1])) for x in itemList ]
-
-            infoList = self.c[server].getFileContentsCapsuleInfo(fileList)
-
-            for (i, item), fObj in itertools.izip(itemList, infoList):
-                capsuleInfo[i] = self._capsuleInfoFromData(fObj)
-
-        return capsuleInfo
-
-    @classmethod
-    def _capsuleInfoFromData(cls, data):
-        # Convert '' back to None
-        if data == '':
-            return None
-        capsuleType, capsuleKey, capsuleSha1, fileName, fileSha1 = \
-            data[:5]
-        n, e, v, r, a = capsuleKey[:5]
-        if e == '':
-            e = None
-        return (capsuleType, (n, e, v, r, a), capsuleSha1, fileName, fileSha1)
-
     def getPackageBranchPathIds(self, sourceName, branch, dirnames = [], fileIds=None):
         """
         Searches all of the troves generated from sourceName on the
@@ -2868,33 +2836,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         serverName = None
         if chgSet.isEmpty():
             raise errors.CommitError('Attempted to commit an empty changeset')
+        minProtocolRequired = 69
 
-        # new-style TroveInfo means support for versioned signatures and
-        # storing unknown TroveInfo
-        minProtocolRequired = CLIENT_VERSIONS[0]
-        if hidden:
-            minProtocolRequired = 46
-
-        newOnlySkipSet = {}
-        for tagId in trove.TroveInfo.streamDict:
-            if tagId <= trove._TROVEINFO_TAG_DIR_HASHES:
-                newOnlySkipSet[trove.TroveInfo.streamDict[tagId][2]] = \
-                                                        True
         jobs = []
         for trvCs in chgSet.iterNewTroveList():
-            # See if there is anything which needs new trove info handling
-            # to commit
-            troveInfo = trvCs.getTroveInfo()
-            if troveInfo.freeze(skipSet = newOnlySkipSet):
-                minProtocolRequired = max(minProtocolRequired, 45)
-
-            # Removals of groups requires new servers. It's true of redirects
-            # too, but I can't tell if this is a redirect or not so the
-            # server failure will have to do :-(
-            if (trove.troveIsGroup(trvCs.getName()) and
-                        not trvCs.getNewVersion()):
-                minProtocolRequired = max(minProtocolRequired, 45)
-
             v = trvCs.getOldVersion()
             if v:
                 if serverName is None:
@@ -2916,69 +2861,37 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                           self.fromFlavor(trvCs.getNewFlavor())),
                          trvCs.isAbsolute()))
 
-        # XXX We don't check the version of the changeset we're committing,
-        # so we might do an unnecessary conversion. It won't hurt anything
-        # though.
         server = self.c[serverName]
-
         if server.getProtocolVersion() < minProtocolRequired:
             raise errors.CommitError('The changeset being committed needs '
                                      'a newer repository server.')
 
-        if server.getProtocolVersion() >= 38:
-            rc = server.prepareChangeSet(jobs, mirror)
-        else:
-            rc = server.prepareChangeSet()
-        if server.getProtocolVersion() >= 69:
-            url, hasStatus = rc
-        else:
-            url = rc
-            hasStatus = False
+        url, hasStatus = server.prepareChangeSet(jobs, mirror)
+        inFile = open(fName)
+        size = os.fstat(inFile.fileno()).st_size
 
-        if server.getProtocolVersion() <= 42:
-            (outFd, tmpName) = util.mkstemp()
-            os.close(outFd)
-            changeset._convertChangeSetV2V1(fName, tmpName)
-            autoUnlink = True
-            fName = tmpName
-        else:
-            autoUnlink = False
+        # use chunked transfer encoding to work around servers that do not
+        # handle Content-length of > 2 GiB
+        chunked = False
+        if size >= 0x80000000:
+            chunked = True
 
-        try:
-            inFile = open(fName)
-            size = os.fstat(inFile.fileno()).st_size
+        headers = [('X-Conary-Servername', serverName)]
+        status, reason = httpPutFile(url, inFile, size, callback = callback,
+                                     rateLimit = self.uploadRateLimit,
+                                     proxyMap = self.c.proxyMap,
+                                     chunked=chunked,
+                                     headers=headers,
+                                     )
 
-            # use chunked transfer encoding to work around servers that do not
-            # handle Content-length of > 2 GiB
-            chunked = False
-            if size >= 0x80000000:
-                # protocol version 44 introduces the ability to decode chunked
-                # PUTs
-                if server.getProtocolVersion() < 44:
-                    raise errors.CommitError('The changeset being uploaded is '
-                                             'too large for the server to '
-                                             'handle.')
-                chunked = True
-
-            headers = [('X-Conary-Servername', serverName)]
-            status, reason = httpPutFile(url, inFile, size, callback = callback,
-                                         rateLimit = self.uploadRateLimit,
-                                         proxyMap = self.c.proxyMap,
-                                         chunked=chunked,
-                                         headers=headers,
-                                         )
-
-            # give a slightly more helpful message for 403
-            if status == 403:
-                raise errors.CommitError('Permission denied. Check username, '
-                                         'password, and https settings.')
-            # and a generic message for a non-OK status
-            if status != 200:
-                raise errors.CommitError('Error uploading to repository: '
-                                         '%s (%s)' %(status, reason))
-        finally:
-            if autoUnlink:
-                os.unlink(fName)
+        # give a slightly more helpful message for 403
+        if status == 403:
+            raise errors.CommitError('Permission denied. Check username, '
+                                     'password, and https settings.')
+        # and a generic message for a non-OK status
+        if status != 200:
+            raise errors.CommitError('Error uploading to repository: '
+                                     '%s (%s)' %(status, reason))
 
         if hasStatus and callback:
             # build up a function with access to local server, url, and
@@ -3007,16 +2920,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 return False
             server.setAbortCheck(abortCheck)
 
-        # avoid sending the mirror and hidden argumentsunless we have to.
-        # this helps preserve backwards compatibility with old
-        # servers.
         try:
-            if hidden:
-                server.commitChangeSet(url, mirror, hidden)
-            elif mirror:
-                server.commitChangeSet(url, mirror)
-            else:
-                server.commitChangeSet(url)
+            server.commitChangeSet(url, mirror, hidden)
         finally:
             server.setAbortCheck(None)
 
