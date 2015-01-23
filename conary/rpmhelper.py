@@ -59,6 +59,7 @@ FILEGROUPNAME = 1040
 SOURCERPM = 1044
 FILEVERIFYFLAGS = 1045  # bitmask: RPMVERIFY_* are bitmasks to interpret
 PROVIDENAME = 1047
+REQUIREFLAGS = 1048
 REQUIRENAME = 1049
 REQUIREVERSION = 1050
 RPMVERSION = 1064
@@ -73,6 +74,7 @@ POSTINPROG = 1086
 PREUNPROG = 1087
 POSTUNPROG = 1088
 OBSOLETENAME = 1090
+PROVIDEFLAGS = 1112
 PROVIDEVERSION = 1113
 OBSOLETEFLAGS = 1114
 OBSOLETEVERSION = 1115
@@ -230,19 +232,24 @@ class _RpmHeader(object):
     localere = re.compile('locale\((.*)\)')
     kmodre = re.compile('(kernel|ksym)\((.*)\)')
 
-    def _getDepsetFromHeader(self, tags, mergeKmodSymbols=False):
+    def _getDepsetFromHeader(self, tags, mergeKmodSymbols=False,
+            enableRPMVersionDeps=True):
         if isinstance(tags, tuple):
-            assert len(tags) == 2
+            assert len(tags) == 3
             rpmdeps = self.get(tags[0], [])
-            rpmvers = self.get(tags[1], [])
+            rpmflags = self.get(tags[1], [])
+            rpmvers = self.get(tags[2], [])
             if len(rpmdeps) != len(rpmvers):
                 rpmvers = itertools.repeat(None, len(rpmdeps))
+            if not rpmflags or len(rpmdeps) != len(rpmflags):
+                rpmflags = itertools.repeat(None, len(rpmdeps))
         else:
             rpmdeps = self.get(tags, [])
+            rpmflags = itertools.repeat(None, len(rpmdeps))
             rpmvers = itertools.repeat(None, len(rpmdeps))
 
         depset = deps.DependencySet()
-        for dep, ver in itertools.izip(rpmdeps, rpmvers):
+        for dep, flags, ver in itertools.izip(rpmdeps, rpmflags, rpmvers):
             if dep.startswith('/'):
                 depset.addDep(deps.FileDependencies, deps.Dependency(dep))
             elif dep.startswith('rpmlib'):
@@ -316,32 +323,60 @@ class _RpmHeader(object):
                 else:
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
+                    if enableRPMVersionDeps:
+                        self._addVersionedDep(dep, flags, ver, depset)
                     depset.addDep(deps.RpmDependencies,
                                   deps.Dependency(dep, []))
             else:
+                if enableRPMVersionDeps:
+                    self._addVersionedDep(dep, flags, ver, depset)
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 
-    def getDeps(self, mergeKmodSymbols=False):
+    def _addVersionedDep(self, dep, flags, ver, depset):
+        # Ignore any dep without flags
+        if not flags:
+            return
+        # Make sure it is an equal version
+        if not flags & RPMSENSE_EQUAL:
+            return
+        # Make sure not >= or <=
+        if flags & RPMSENSE_LESS or flags & RPMSENSE_GREATER:
+            return
+        # Add version deps for anything that specifies an exact
+        # version in addition to the unversioned dep.
+        verdep = '%s-%s' % (dep, ver)
+        depset.addDep(deps.RpmDependencies,
+            deps.Dependency(verdep, []))
+
+    def getDeps(self, mergeKmodSymbols=False, enableRPMVersionDeps=True):
         """
         Create two dependency sets that represent the requires and
         provides described in this RPM header object.
 
         @param mergeKmodSymbols: merge kernel module symbols into a
         single dependency (False)
+        @param enableRPMVersionDeps: add rpm class dependencies that contain
+        versions for any exact version requirement (True)
         @return: (requires, provides)
         @rtype: two-tuple of deps.DependencySet instances
         """
-        return (self.getRequires(mergeKmodSymbols=mergeKmodSymbols),
-                self.getProvides(mergeKmodSymbols=mergeKmodSymbols))
+        return (self.getRequires(mergeKmodSymbols=mergeKmodSymbols,
+                    enableRPMVersionDeps=enableRPMVersionDeps),
+                self.getProvides(mergeKmodSymbols=mergeKmodSymbols,
+                    enableRPMVersionDeps=enableRPMVersionDeps))
 
-    def getProvides(self, mergeKmodSymbols=False):
-        return self._getDepsetFromHeader((PROVIDENAME, PROVIDEVERSION, ),
-                                         mergeKmodSymbols=mergeKmodSymbols)
+    def getProvides(self, mergeKmodSymbols=False, enableRPMVersionDeps=True):
+        return self._getDepsetFromHeader(
+                (PROVIDENAME, PROVIDEFLAGS, PROVIDEVERSION, ),
+                mergeKmodSymbols=mergeKmodSymbols,
+                enableRPMVersionDeps=enableRPMVersionDeps)
 
-    def getRequires(self, mergeKmodSymbols=False):
-        return self._getDepsetFromHeader((REQUIRENAME, REQUIREVERSION, ),
-                                         mergeKmodSymbols=mergeKmodSymbols)
+    def getRequires(self, mergeKmodSymbols=False, enableRPMVersionDeps=True):
+        return self._getDepsetFromHeader(
+                (REQUIRENAME, REQUIREFLAGS, REQUIREVERSION, ),
+                mergeKmodSymbols=mergeKmodSymbols,
+                enableRPMVersionDeps=enableRPMVersionDeps)
 
     def __getitem__(self, tag):
         if tag == OLDFILENAMES and tag not in self.entries:

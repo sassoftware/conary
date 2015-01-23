@@ -706,7 +706,7 @@ class RpmCapsulePlugin(BaseCapsulePlugin):
         provides = header.getProvides()
         provides.addDep(deps.TroveDependencies, deps.Dependency(name))
         trv.setProvides(provides)
-        trv.setRequires(header.getRequires())
+        trv.setRequires(header.getRequires(enableRPMVersionDeps=False))
         # Fake capsule file
         path = str(header.getNevra()) + '.rpm'
         fileHelper = filetypes.RegularFile(contents='')

@@ -324,7 +324,8 @@ class RPMProvides(policy.Policy):
             if capsule and capsule[0] == 'rpm':
                 path = capsule[1]
                 h = rpmhelper.readHeader(file(path))
-                prov = h.getProvides(mergeKmodSymbols=self.mergeKmodSymbols)
+                prov = h.getProvides(mergeKmodSymbols=self.mergeKmodSymbols,
+                    enableRPMVersionDeps=self.recipe.cfg.enableRPMVersionDeps)
 
                 fltrprov = self._filterProvides(comp[0], prov)
 
@@ -493,7 +494,8 @@ class RPMRequires(policy.Policy):
                     continue
 
                 h = rpmhelper.readHeader(file(path))
-                rReqs, rProv = h.getDeps(mergeKmodSymbols=self.mergeKmodSymbols)
+                rReqs, rProv = h.getDeps(mergeKmodSymbols=self.mergeKmodSymbols,
+                    enableRPMVersionDeps=self.recipe.cfg.enableRPMVersionDeps)
 
                 # integrate user specified requirements
                 if self.requirements:

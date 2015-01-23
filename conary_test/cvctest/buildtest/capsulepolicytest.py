@@ -83,6 +83,7 @@ class TestEpoch(CapsuleRecipe):
         r.RPMProvides('rpm: nonsenseProvision(FOO BAR)', 'epoch:rpm' )
         r.RPMRequires('rpm: nonsenseRequirement(BAZ QUX)', 'epoch' )
 """
+        self.cfg.enableRPMVersionDeps = False
         built, d = self.buildRecipe(recipestr1, "TestEpoch")
 
         nvf = built[0]
@@ -95,6 +96,28 @@ class TestEpoch(CapsuleRecipe):
             '\n'.join(('trove: epoch:rpm',
                        'rpm: epoch',
                        'rpm: epoch[x86-32]',
+                       'rpm: nonsenseProvision(BAR FOO)')))
+
+        self.assertEquals(str(trv.requires),
+            '\n'.join(('rpm: nonsenseRequirement(BAZ QUX)',
+                       'rpmlib: CompressedFileNames',
+                       'rpmlib: PayloadFilesHavePrefix')))
+
+        self.cfg.enableRPMVersionDeps = True
+        built, d = self.buildRecipe(recipestr1, "TestEpoch")
+
+        nvf = built[0]
+        nvf = nvf[0], versions.VersionFromString(nvf[1]), nvf[2]
+
+        repos = self.openRepository()
+        trv = repos.getTrove(*nvf)
+
+        self.assertEquals(str(trv.provides()),
+            '\n'.join(('trove: epoch:rpm',
+                       'rpm: epoch',
+                       'rpm: epoch-17:1.0-1',
+                       'rpm: epoch[x86-32]',
+                       'rpm: epoch[x86-32]-17:1.0-1',
                        'rpm: nonsenseProvision(BAR FOO)')))
 
         self.assertEquals(str(trv.requires),
@@ -178,6 +201,7 @@ class TestRecipe(CapsuleRecipe):
             return [ x for x in str(trv.provides()).split('\n')
                      if x.startswith('rpm: perl') ]
 
+        self.cfg.enableRPMVersionDeps = False
         r1trv = self.build(recipe1, 'TestRecipe')
         r1provides = getPerlProvides(r1trv)
         self.assertEqual(len(r1provides), 5)
@@ -188,6 +212,16 @@ class TestRecipe(CapsuleRecipe):
 
         self.assertTrue([ x for x in str(r2trv.provides()) ])
 
+        self.cfg.enableRPMVersionDeps = True
+        r1trv = self.build(recipe1, 'TestRecipe')
+        r1provides = getPerlProvides(r1trv)
+        self.assertEqual(len(r1provides), 10)
+
+        r2trv = self.build(recipe2, 'TestRecipe')
+        r2provides = getPerlProvides(r2trv)
+        self.assertEqual(len(r2provides), 0)
+
+        self.assertTrue([ x for x in str(r2trv.provides()) ])
 
     @conary_test.rpm
     def testRPMCapsuleKernelModMerging(self):
@@ -214,9 +248,16 @@ class TestKernel(CapsuleRecipe):
         r.addCapsule('kernelish-1.0-1.noarch.rpm')
         r.RPMRequires(mergeKmodSymbols=True)
 """
+        self.cfg.enableRPMVersionDeps = False
         built, d = self.buildRecipe(recipestr1, "TestKernel")
         req = "[Dependency('ksym', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1})]"
         prov = "[Dependency('kernel', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1}), Dependency('kernelish')]"
+        checkDeps(built[0], req, prov)
+
+        self.cfg.enableRPMVersionDeps = True
+        built, d = self.buildRecipe(recipestr1, "TestKernel")
+        req = "[Dependency('ksym', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1})]"
+        prov = "[Dependency('kernel', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1}), Dependency('kernelish-1.0-1'), Dependency('kernelish')]"
         checkDeps(built[0], req, prov)
 
         recipestr2 = r"""
@@ -229,9 +270,16 @@ class TestKernel(CapsuleRecipe):
         r.addCapsule('kernelish-1.0-1.noarch.rpm')
         r.RPMRequires(mergeKmodSymbols=False)
 """
+        self.cfg.enableRPMVersionDeps = False
         built, d = self.buildRecipe(recipestr2, "TestKernel")
         req = "[Dependency('ksym[bar:123456789abcdef]'), Dependency('ksym[foo:123456789abcdef]')]"
         prov = "[Dependency('kernel[foo:123456789abcdef]'), Dependency('kernelish'), Dependency('kernel[bar:123456789abcdef]')]"
+        checkDeps(built[0], req, prov)
+
+        self.cfg.enableRPMVersionDeps = True
+        built, d = self.buildRecipe(recipestr2, "TestKernel")
+        req = "[Dependency('ksym[bar:123456789abcdef]'), Dependency('ksym[foo:123456789abcdef]')]"
+        prov = "[Dependency('kernelish-1.0-1'), Dependency('kernel[foo:123456789abcdef]'), Dependency('kernelish'), Dependency('kernel[bar:123456789abcdef]')]"
         checkDeps(built[0], req, prov)
 
     @conary_test.rpm
@@ -246,6 +294,7 @@ class TestDepCulling(CapsuleRecipe):
     def setup(r):
         r.addCapsule('gnome-main-menu-0.9.10-26.x86_64.rpm')
 """
+        self.cfg.enableRPMVersionDeps = False
         self.overrideBuildFlavor('is: x86_64')
         built, d = self.buildRecipe(recipestr1, "TestDepCulling")
 
@@ -256,6 +305,18 @@ class TestDepCulling(CapsuleRecipe):
         trv = repos.getTrove(*nvf)
         reqGot = list(trv.requires().iterDepsByClass(deps.RpmDependencies))
         reqExpected = "[Dependency('hal'), Dependency('gnome-main-menu-lang'), Dependency('gnome-panel'), Dependency('tango-icon-theme'), Dependency('coreutils'), Dependency('dbus-1-glib'), Dependency('libssui'), Dependency('eel'), Dependency('wireless-tools')]"
+        self.assertEquals(str(reqGot), reqExpected)
+
+        self.cfg.enableRPMVersionDeps = True
+        built, d = self.buildRecipe(recipestr1, "TestDepCulling")
+
+        nvf = built[0]
+        nvf = nvf[0], versions.VersionFromString(nvf[1]), nvf[2]
+
+        repos = self.openRepository()
+        trv = repos.getTrove(*nvf)
+        reqGot = list(trv.requires().iterDepsByClass(deps.RpmDependencies))
+        reqExpected = "[Dependency('hal'), Dependency('gnome-main-menu-lang'), Dependency('gnome-main-menu-lang-0.9.10'), Dependency('gnome-panel'), Dependency('tango-icon-theme'), Dependency('coreutils'), Dependency('dbus-1-glib'), Dependency('libssui'), Dependency('eel'), Dependency('wireless-tools')]"
         self.assertEquals(str(reqGot), reqExpected)
 
     @conary_test.rpm
@@ -422,6 +483,7 @@ class TestProvides(CapsuleRecipe):
     def setup(r):
         r.addCapsule('depstest-0.1-1.x86_64.rpm')
 """
+        self.cfg.enableRPMVersionDeps = False
         built, d = self.buildRecipe(recipestr1, "TestProvides")
         client = self.getConaryClient()
         repos = client.getRepos()
@@ -446,6 +508,33 @@ class TestProvides(CapsuleRecipe):
         self.assertEqual(str(trv.provides()), provExpected)
         self.assertEqual(str(trv.requires()), reqExpected)
 
+        self.cfg.enableRPMVersionDeps = True
+        built, d = self.buildRecipe(recipestr1, "TestProvides")
+        client = self.getConaryClient()
+        repos = client.getRepos()
+        nvf = repos.findTrove(None, built[0])
+        trv = repos.getTrove(*nvf[0])
+
+        reqExpected = '\n'.join((
+            'abi: ELF32(SysV x86)',
+            'file: /bin/sh',
+            'soname: ELF32/ld-linux.so.2(GLIBC_PRIVATE SysV x86)',
+            'soname: ELF32/libc.so.6(GLIBC_2.0 GLIBC_2.1.3 SysV x86)',
+            'rpmlib: CompressedFileNames',
+            'rpmlib: PayloadFilesHavePrefix'))
+        provExpected = '\n'.join((
+            'file: /bin/fakebin',
+            'trove: depstest:rpm',
+            'soname: ELF32/libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 '
+            'GLIBC_2.4 SysV x86)',
+            'rpm: depstest',
+            'rpm: depstest-0.1-1',
+            'rpm: depstest[x86-64]',
+            'rpm: depstest[x86-64]-0.1-1',
+            'rpm: libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 GLIBC_2.4)'))
+        self.assertEqual(str(trv.provides()), provExpected)
+        self.assertEqual(str(trv.requires()), reqExpected)
+
     @conary_test.rpm
     def testRPMCapsuleSharedDeps(self):
         'make sure that rpm capsule deps on shared files are correct'
@@ -464,6 +553,7 @@ class TestSharedDep(CapsuleRecipe):
         # test dep requires
         r.Requires('foo:bar', '/usr/lib/libfoo.so.0.0')
 """
+        self.cfg.enableRPMVersionDeps = False
         built, d = self.buildRecipe(recipestr1, "TestSharedDep")
         client = self.getConaryClient()
         repos = client.getRepos()
@@ -484,6 +574,40 @@ class TestSharedDep(CapsuleRecipe):
                 'rpm: libfoo.so.0',
                 'rpm: TROVENAME',
                 'rpm: TROVENAME[x86-32]',
+        ))
+
+        for b in built:
+            nvf = repos.findTrove(None, b)
+            trv = repos.getTrove(*nvf[0])
+            provExpected = provExpectedTemplate.replace('TROVENAME',
+                                                        b[0].split(':')[0])
+
+            self.assertEqual(str(trv.provides()), provExpected)
+            self.assertEqual(str(trv.requires()), reqExpected)
+
+        self.cfg.enableRPMVersionDeps = True
+        built, d = self.buildRecipe(recipestr1, "TestSharedDep")
+        client = self.getConaryClient()
+        repos = client.getRepos()
+        reqExpected = '\n'.join((
+            'abi: ELF32(SysV x86)',
+            'file: /bin/sh',
+            'trove: foo:bar',
+            'soname: ELF32/libc.so.6(GLIBC_2.1.3 SysV x86)',
+            'rpm: rtld[GNU_HASH]',
+            'rpmlib: CompressedFileNames',
+            'rpmlib: PayloadFilesHavePrefix',
+        ))
+        provExpectedTemplate = '\n'.join((
+                'file: /usr/bin/script',
+                'trove: TROVENAME:rpm',
+                'soname: ELF32/libfoo.so.0(SysV x86)',
+                'soname: ELF32/libfoo.so.0.0(SysV x86)',
+                'rpm: libfoo.so.0',
+                'rpm: TROVENAME',
+                'rpm: TROVENAME-1.0-1',
+                'rpm: TROVENAME[x86-32]',
+                'rpm: TROVENAME[x86-32]-1.0-1',
         ))
 
         for b in built:

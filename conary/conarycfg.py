@@ -578,6 +578,7 @@ class ConaryContext(ConfigSection):
                                             '/etc/conary/macros.d/*',
                                             '~/.conary/macros'))
     emergeUser            =  (CfgString, 'emerge')
+    enableRPMVersionDeps  =  (CfgBool, True)
     enforceManagedPolicy  =  (CfgBool, True)
     entitlement           =  CfgEntitlement
     entitlementDirectory  =  (CfgPath, '/etc/conary/entitlements')

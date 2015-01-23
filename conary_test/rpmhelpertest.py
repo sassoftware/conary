@@ -116,7 +116,7 @@ class RPMHelperTest(testhelp.TestCase):
         rpmPath = os.path.join(self.archiveDir, rpmName)
         fileObj = file(rpmPath)
         header = rpmhelper.readHeader(fileObj)
-        reqset, provset = header.getDeps()
+        reqset, provset = header.getDeps(enableRPMVersionDeps=False)
         self.assertEquals(str(reqset), '\n'.join((
             'file: /bin/sh',
             'rpm: ld-linux.so.2(GLIBC_PRIVATE)',
@@ -128,12 +128,31 @@ class RPMHelperTest(testhelp.TestCase):
             'rpm: depstest[x86-64]',
             'rpm: libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 GLIBC_2.4)')))
 
+    def testRpmVersionDeps(self):
+        rpmName = 'depstest-0.1-1.x86_64.rpm'
+        rpmPath = os.path.join(self.archiveDir, rpmName)
+        fileObj = file(rpmPath)
+        header = rpmhelper.readHeader(fileObj)
+        reqset, provset = header.getDeps()
+        self.assertEquals(str(reqset), '\n'.join((
+            'file: /bin/sh',
+            'rpm: ld-linux.so.2(GLIBC_PRIVATE)',
+            'rpm: libc.so.6(GLIBC_2.0 GLIBC_2.1.3)',
+            'rpmlib: CompressedFileNames',
+            'rpmlib: PayloadFilesHavePrefix')))
+        self.assertEquals(str(provset), '\n'.join((
+            'rpm: depstest',
+            'rpm: depstest-0.1-1',
+            'rpm: depstest[x86-64]',
+            'rpm: depstest[x86-64]-0.1-1',
+            'rpm: libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 GLIBC_2.4)')))
+
     def testRpmDepsPerl(self):
         rpmName = 'perl-Archive-Tar-1.46-68.fc11.x86_64.rpm'
         rpmPath = os.path.join(self.archiveDir, rpmName)
         fileObj = file(rpmPath)
         header = rpmhelper.readHeader(fileObj)
-        reqset, provset = header.getDeps()
+        reqset, provset = header.getDeps(enableRPMVersionDeps=False)
         self.assertEquals(str(reqset), '\n'.join((
             'file: /usr/bin/perl',
             'rpm: perl',
@@ -170,6 +189,53 @@ class RPMHelperTest(testhelp.TestCase):
             'rpm: perl[Archive::Tar::File]',
             'rpm: perl[Archive::Tar]')))
 
+    def testRpmVersionDepsPerl(self):
+        rpmName = 'perl-Archive-Tar-1.46-68.fc11.x86_64.rpm'
+        rpmPath = os.path.join(self.archiveDir, rpmName)
+        fileObj = file(rpmPath)
+        header = rpmhelper.readHeader(fileObj)
+        reqset, provset = header.getDeps(enableRPMVersionDeps=True)
+        self.assertEquals(str(reqset), '\n'.join((
+            'file: /usr/bin/perl',
+            'rpm: perl',
+            'rpm: perl-4:5.10.0-68.fc11',
+            'rpm: perl[Archive::Tar::Constant]',
+            'rpm: perl[Archive::Tar::File]',
+            'rpm: perl[Archive::Tar]',
+            'rpm: perl[Carp]',
+            'rpm: perl[Compress::Zlib]',
+            'rpm: perl[Config]',
+            'rpm: perl[Cwd]',
+            'rpm: perl[Data::Dumper]',
+            'rpm: perl[Exporter]',
+            'rpm: perl[File::Basename]',
+            'rpm: perl[File::Find]',
+            'rpm: perl[File::Path]',
+            'rpm: perl[File::Spec::Unix]',
+            'rpm: perl[File::Spec]',
+            'rpm: perl[Getopt::Std]',
+            'rpm: perl[IO::File]',
+            'rpm: perl[IO::Handle]',
+            'rpm: perl[IO::Zlib]',
+            'rpm: perl[Package::Constants]',
+            'rpm: perl[constant]',
+            'rpm: perl[strict]',
+            'rpm: perl[vars]',
+            'rpmlib: CompressedFileNames',
+            'rpmlib: FileDigests',
+            'rpmlib: PayloadFilesHavePrefix',
+            'rpmlib: VersionedDependencies')))
+        self.assertEquals(str(provset), '\n'.join((
+            'rpm: perl-Archive-Tar',
+            'rpm: perl-Archive-Tar-0:1.46-68.fc11',
+            'rpm: perl-Archive-Tar[x86-64]',
+            'rpm: perl-Archive-Tar[x86-64]-0:1.46-68.fc11',
+            'rpm: perl[Archive::Tar::Constant]',
+            'rpm: perl[Archive::Tar::Constant]-0.02',
+            'rpm: perl[Archive::Tar::File]',
+            'rpm: perl[Archive::Tar::File]-0.02',
+            'rpm: perl[Archive::Tar]',
+            'rpm: perl[Archive::Tar]-1.46')))
 
     def testVerifySig(self):
         rpmName = 'tmpwatch-2.9.7-1.1.el5.2.x86_64.rpm'
