@@ -1,0 +1,3 @@
+Fixed capsule postinstall scripts failing if they referenced a shared file
+being preserved during the same job. For example, installing a library that
+calls ldconfig in the same job as installing glibc.i686 alongside glibc.x86_64.

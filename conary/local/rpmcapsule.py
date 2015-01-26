@@ -397,7 +397,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                   and fileObj.lsTag != 'd'):
                 # this content isn't part of the capsule; remember to put
                 # it back when RPM is done
-                self.preservePath(path)
+                self.preservePath(path, unlink=True)
                 continue
 
             s = util.lstat(absolutePath)
@@ -508,7 +508,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                                                   troveCs.getNewFlavor()))
             else:
                 assert(action == ACTION_SKIP)
-                self.preservePath(path)
+                self.preservePath(path, unlink=False)
                 self.fsJob.userRemoval(trv.getName(), trv.getVersion(),
                                        trv.getFlavor(), pathId)
 
@@ -558,7 +558,7 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                       trove.conaryContents(hasCapsule, pathId, fileObj)):
                     # this content isn't part of the capsule; remember to put
                     # it back when RPM is done
-                    self.preservePath(path)
+                    self.preservePath(path, unlink=True)
                     continue
 
                 fsFileObj = files.FileFromFilesystem(fullPath, pathId,

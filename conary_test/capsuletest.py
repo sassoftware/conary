@@ -488,6 +488,37 @@ class CapsuleTest(rephelp.RepositoryHelper):
         assert('conflicts' in str)
 
     @conary_test.rpm
+    def testFileColorUsedByScript(self):
+        """
+        Post script references a file that is being "shared" in the same job
+
+        @tests: CNY-3884
+        """
+        if os.uname()[4] != 'x86_64':
+            # this test only works on x86_64 platforms
+            return
+
+        i386md5 = '0fc54eafb8daf886ff7d43c4448acc71'
+        x64md5 = '4cb13908ca1d7989be493c581a6fa1d3'
+
+        i386trv = self.addRPMComponent("tmpwatch:rpm=1.0-1-1",
+                'tmpwatch-2.9.7-1.1.el5.2.i386.rpm')
+        x64trv = self.addRPMComponent("tmpwatch:rpm=2.0-1-1",
+                'tmpwatch-2.9.7-1.1.el5.2.x86_64.rpm')
+        consumer = self.addRPMComponent('usetmpwatch:rpm=1.0-1-1',
+                'usetmpwatch-1.0-1.x86_64.rpm')
+
+        self.updatePkg('tmpwatch:rpm=2.0-1-1')
+        self.checkMd5('/usr/sbin/tmpwatch', x64md5)
+        self.checkOwners('/usr/sbin/tmpwatch',  [ x64trv ])
+        rc, out = self.captureOutput(self.updatePkg,
+                ['tmpwatch:rpm=1.0-1-1', 'usetmpwatch:rpm'],
+                keepExisting=True)
+        self.checkMd5('/usr/sbin/tmpwatch', x64md5)
+        self.checkOwners('/usr/sbin/tmpwatch',  [ x64trv ])
+        self.assertEqual(out, 'PRESENT\n')
+
+    @conary_test.rpm
     @testhelp.context('rollback')
     def test14_testRpmSharedHardLinks(self):
         # we build fro msource here rather than use addRPMComponent to get
