@@ -37,12 +37,13 @@ class ParameterError(TransportError):
 
 class ResponseError(TransportError):
 
-    def __init__(self, url, proxy, errcode, reason):
+    def __init__(self, url, proxy, errcode, reason, headers=None):
         TransportError.__init__(self, url, proxy, errcode, reason)
         self.url = url
         self.proxy = proxy
         self.errcode = errcode
         self.reason = reason
+        self.headers = headers
 
     def __str__(self):
         if self.proxy:

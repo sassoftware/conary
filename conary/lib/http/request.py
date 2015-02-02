@@ -55,6 +55,43 @@ class URL(namedtuple('URL', 'scheme userpass hostport path')):
         return util.urlUnsplit((self.scheme, username, password, str(host),
             port, self.path, None, None))
 
+    def join(self, suffix):
+        """
+        Evaluate a possibly relative URL C{suffix} against the current URL and
+        return the new absolute URL.
+        """
+        if '://' in suffix:
+            # Fully qualified URL
+            return URL.parse(suffix)
+        elif suffix.startswith('//'):
+            # Relative to scheme
+            return URL.parse(self.scheme + ':' + suffix)
+        elif suffix.startswith('/'):
+            # Relative to host
+            return self._replace(path=suffix)
+        # Fully relative
+        path = self.path or ''
+        path = path.split('?')[0]
+        path = path.split('/')
+        # Strip leading slash(es)
+        if path and path[0] == '':
+            path.pop(0)
+        # Strip trailing basename
+        if path and path[-1]:
+            path.pop()
+        for elem in suffix.split('/'):
+            if elem == '..':
+                if path:
+                    path.pop()
+            elif elem == '.':
+                pass
+            else:
+                path.append(elem)
+        if not path or path[0] != '':
+            path.insert(0, '')
+        path = '/'.join(path)
+        return self._replace(path=path)
+
     def __str__(self):
         rv = self.unsplit()
         if hasattr(rv, '__safe_str__'):

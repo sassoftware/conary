@@ -15,6 +15,7 @@
 .coverage/
 .failed
 .times
+annotate/
 bin/
 html/
 tmp/

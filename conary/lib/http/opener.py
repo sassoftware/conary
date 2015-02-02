@@ -40,9 +40,10 @@ class URLOpener(object):
     # Only try proxies with these schemes.
     proxyFilter = ('http', 'https')
     connectAttempts = 3
+    redirectAttempts = 5
 
     def __init__(self, proxyMap=None, caCerts=None, persist=False,
-            connectAttempts=None):
+            connectAttempts=None, followRedirects=False):
         if proxyMap is None:
             proxyMap = proxy_map.ProxyMap()
         self.proxyMap = proxyMap
@@ -50,6 +51,7 @@ class URLOpener(object):
         self.persist = persist
         if connectAttempts:
             self.connectAttempts = connectAttempts
+        self.followRedirects = followRedirects
 
         self.connectionCache = {}
         self.lastProxy = None
@@ -99,18 +101,24 @@ class URLOpener(object):
             raise http_error.ParameterError(
                     "Unknown URL scheme %r" % (req.url.scheme,))
 
-        response = self._doRequest(req, forceProxy=forceProxy)
-        if response.status == 200:
-            return self._handleResponse(req, response)
-        else:
-            return self._handleError(req, response)
+        for x in range(self.redirectAttempts):
+            response = self._doRequest(req, forceProxy=forceProxy)
+            if response.status == 200:
+                return self._handleResponse(req, response)
+            elif self.followRedirects and response.status in (
+                    301, 302, 303, 307):
+                if x < self.redirectAttempts - 1:
+                    req = self._followRedirect(req, response)
+                    log.debug("Following redirect to %s", req.url)
+            else:
+                return self._handleError(req, response)
+        log.error("Too many redirects")
+        return self._handleError(req, response)
 
     def _handleResponse(self, req, response):
         fp = response
         encoding = response.getheader('content-encoding', None)
         if encoding == 'deflate':
-            # disable until performace is better
-            #fp = DecompressFileObj(fp)
             fp = util.decompressStream(fp)
             fp.seek(0)
         elif encoding == 'gzip':
@@ -119,12 +127,22 @@ class URLOpener(object):
         return ResponseWrapper(fp, response)
 
     def _handleError(self, req, response):
+        # Drain the response body because we don't use it, otherwise pipelining
+        # breaks
+        response.read()
         self._handleProxyErrors(response.status)
         raise http_error.ResponseError(req.url, self.lastProxy,
-                response.status, response.reason)
+                response.status, response.reason, response.msg)
 
     def _handleFileRequest(self, req):
         return open(req.url.path, 'rb')
+
+    def _followRedirect(self, req, response):
+        response.read()
+        base = req.url
+        dest = response.msg['Location']
+        req.url = base.join(dest)
+        return req
 
     def _doRequest(self, req, forceProxy):
         resetResolv = False
