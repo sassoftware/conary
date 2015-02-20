@@ -113,7 +113,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     useHiddenCommits = (cfg.CfgBool, True)
     absoluteChangesets = (cfg.CfgBool, False)
     includeSources = (cfg.CfgBool, False)
-    splitNodes = (cfg.CfgBool, True,
+    splitNodes = (cfg.CfgBool, False,
             "Split jobs that would commit two versions of a trove at once. "
             "Needed for compatibility with older repositories.")
 
