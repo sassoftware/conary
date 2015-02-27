@@ -1026,9 +1026,7 @@ class UpdateAction(AbstractModifyAction):
         newVersion = newTuple[1]
 
         if not oldVersion:
-            # something in the update doesn't map to something we
-            # had previously, include it if it is explicit in the
-            # new trove, and use the new trove's install/optional value
+            # Trove is in update set but not primary set. Use update set.
             isInInstallSet, isExplicit = afterInfo[newTuple]
             if isExplicit:
                 if isInInstallSet:
@@ -1036,8 +1034,7 @@ class UpdateAction(AbstractModifyAction):
                 else:
                     optionalSet.add(newTuple)
         elif not newVersion:
-            # something we used to have doesn't map to anything in
-            # the update, keep it if it was explicit
+            # Trove is in primary set but not update set. Use primary set.
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
             if wasExplicit:
                 if wasInInstallSet:
@@ -1045,17 +1042,26 @@ class UpdateAction(AbstractModifyAction):
                 else:
                     optionalSet.add(oldTuple)
         else:
-            # it existed before and after; keep the install setting
-            # we used before
+            # Trove is in both sets; take a closer look.
             wasInInstallSet, wasExplicit = beforeInfo[oldTuple]
             isInInstallSet, isExplicit = afterInfo[newTuple]
-            if wasInInstallSet or (isExplicit and isInInstallSet):
-                installSet.add(newTuple)
-            else:
-                optionalSet.add(newTuple)
-
-            if oldTuple != newTuple:
+            if isExplicit:
+                # If it is explicitly in the update set then it will also be
+                # explicitly in the output set.
+                if isInInstallSet:
+                    installSet.add(newTuple)
+                else:
+                    optionalSet.add(newTuple)
+            # If a trove changed explicitness it means we may need to mask off
+            # something that recursion would otherwise implicitly pull in. For
+            # example, if a trove used to be inherited via a group but this
+            # update replaces it with something else, then the old trove must
+            # be added to the optional set as not-by-default to mark that the
+            # inherited presentness is being overridden.
+            if wasExplicit != isExplicit and (
+                    oldTuple != newTuple or wasInInstallSet != isInInstallSet):
                 optionalSet.add(oldTuple)
+
 
 class IncludeException(ConaryError):
 
