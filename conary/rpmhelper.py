@@ -324,16 +324,16 @@ class _RpmHeader(object):
                     # replace any () with [] because () are special to Conary
                     dep = dep.replace('(', '[').replace(')', ']')
                     if enableRPMVersionDeps:
-                        self._addVersionedDep(dep, flags, ver, depset)
+                        self._addVersionedDep(tags, dep, flags, ver, depset)
                     depset.addDep(deps.RpmDependencies,
                                   deps.Dependency(dep, []))
             else:
                 if enableRPMVersionDeps:
-                    self._addVersionedDep(dep, flags, ver, depset)
+                    self._addVersionedDep(tags, dep, flags, ver, depset)
                 depset.addDep(deps.RpmDependencies, deps.Dependency(dep, []))
         return depset
 
-    def _addVersionedDep(self, dep, flags, ver, depset):
+    def _addVersionedDep(self, tags, dep, flags, ver, depset):
         # Ignore any dep without flags
         if not flags:
             return
@@ -343,11 +343,29 @@ class _RpmHeader(object):
         # Make sure not >= or <=
         if flags & RPMSENSE_LESS or flags & RPMSENSE_GREATER:
             return
+        # If the version contains an epoch, make sure there is only one colon.
+        if ':' in ver:
+            ver = ':'.join([ x for x in ver.split(':') if x ])
+        # Add provides for versions without the release string since some rpms
+        # just require the version without the release.
+        vers = [ ver, ]
+        if [ x for x in tags if x == PROVIDENAME ]:
+            vver = ver.split('-', 1)[0]
+            vers.append(vver)
+            # Add a provides without epoch for anything with an epoch of 0.
+            if ':' in ver and ver.split(':')[0] == '0':
+                vers.append(ver.split(':')[1])
+                vers.append(vver.split(':')[1])
+            # Add epoch provides for anything with an epoch of None.
+            elif ':' not in ver:
+                vers.append('0:%s' % ver)
+                vers.append('0:%s' % vver)
         # Add version deps for anything that specifies an exact
         # version in addition to the unversioned dep.
-        verdep = '%s-%s' % (dep, ver)
-        depset.addDep(deps.RpmDependencies,
-            deps.Dependency(verdep, []))
+        for v in vers:
+            verdep = '%s-%s' % (dep, v)
+            depset.addDep(deps.RpmDependencies,
+                deps.Dependency(verdep, []))
 
     def getDeps(self, mergeKmodSymbols=False, enableRPMVersionDeps=True):
         """

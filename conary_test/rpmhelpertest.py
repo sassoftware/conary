@@ -142,10 +142,39 @@ class RPMHelperTest(testhelp.TestCase):
             'rpmlib: PayloadFilesHavePrefix')))
         self.assertEquals(str(provset), '\n'.join((
             'rpm: depstest',
+            'rpm: depstest-0.1',
             'rpm: depstest-0.1-1',
+            'rpm: depstest-0:0.1',
+            'rpm: depstest-0:0.1-1',
             'rpm: depstest[x86-64]',
+            'rpm: depstest[x86-64]-0.1',
             'rpm: depstest[x86-64]-0.1-1',
+            'rpm: depstest[x86-64]-0:0.1',
+            'rpm: depstest[x86-64]-0:0.1-1',
             'rpm: libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 GLIBC_2.4)')))
+
+    def testRpmVersionDepsRelase(self):
+        rpmName = 'versiondeps-bar-1-2.x86_64.rpm'
+        rpmPath = os.path.join(self.archiveDir, rpmName)
+        fileObj = file(rpmPath)
+        header = rpmhelper.readHeader(fileObj)
+        reqset, provset = header.getDeps()
+        self.assertEquals(str(reqset), '\n'.join((
+            'rpm: baz',
+            'rpm: baz-2:1.0-el5',
+            'rpm: versiondeps',
+            'rpm: versiondeps-1',
+            'rpmlib: CompressedFileNames',
+            'rpmlib: PayloadFilesHavePrefix',
+        )))
+        self.assertEquals(str(provset), '\n'.join((
+            'rpm: versiondeps-bar',
+            'rpm: versiondeps-bar-2:1',
+            'rpm: versiondeps-bar-2:1-2',
+            'rpm: versiondeps-bar[x86-64]',
+            'rpm: versiondeps-bar[x86-64]-2:1',
+            'rpm: versiondeps-bar[x86-64]-2:1-2',
+        )))
 
     def testRpmDepsPerl(self):
         rpmName = 'perl-Archive-Tar-1.46-68.fc11.x86_64.rpm'
@@ -227,14 +256,23 @@ class RPMHelperTest(testhelp.TestCase):
             'rpmlib: VersionedDependencies')))
         self.assertEquals(str(provset), '\n'.join((
             'rpm: perl-Archive-Tar',
+            'rpm: perl-Archive-Tar-0:1.46',
             'rpm: perl-Archive-Tar-0:1.46-68.fc11',
+            'rpm: perl-Archive-Tar-1.46',
+            'rpm: perl-Archive-Tar-1.46-68.fc11',
             'rpm: perl-Archive-Tar[x86-64]',
+            'rpm: perl-Archive-Tar[x86-64]-0:1.46',
             'rpm: perl-Archive-Tar[x86-64]-0:1.46-68.fc11',
+            'rpm: perl-Archive-Tar[x86-64]-1.46',
+            'rpm: perl-Archive-Tar[x86-64]-1.46-68.fc11',
             'rpm: perl[Archive::Tar::Constant]',
             'rpm: perl[Archive::Tar::Constant]-0.02',
+            'rpm: perl[Archive::Tar::Constant]-0:0.02',
             'rpm: perl[Archive::Tar::File]',
             'rpm: perl[Archive::Tar::File]-0.02',
+            'rpm: perl[Archive::Tar::File]-0:0.02',
             'rpm: perl[Archive::Tar]',
+            'rpm: perl[Archive::Tar]-0:1.46',
             'rpm: perl[Archive::Tar]-1.46')))
 
     def testVerifySig(self):

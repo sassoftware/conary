@@ -115,8 +115,10 @@ class TestEpoch(CapsuleRecipe):
         self.assertEquals(str(trv.provides()),
             '\n'.join(('trove: epoch:rpm',
                        'rpm: epoch',
+                       'rpm: epoch-17:1.0',
                        'rpm: epoch-17:1.0-1',
                        'rpm: epoch[x86-32]',
+                       'rpm: epoch[x86-32]-17:1.0',
                        'rpm: epoch[x86-32]-17:1.0-1',
                        'rpm: nonsenseProvision(BAR FOO)')))
 
@@ -215,7 +217,7 @@ class TestRecipe(CapsuleRecipe):
         self.cfg.enableRPMVersionDeps = True
         r1trv = self.build(recipe1, 'TestRecipe')
         r1provides = getPerlProvides(r1trv)
-        self.assertEqual(len(r1provides), 10)
+        self.assertEqual(len(r1provides), 19)
 
         r2trv = self.build(recipe2, 'TestRecipe')
         r2provides = getPerlProvides(r2trv)
@@ -257,7 +259,7 @@ class TestKernel(CapsuleRecipe):
         self.cfg.enableRPMVersionDeps = True
         built, d = self.buildRecipe(recipestr1, "TestKernel")
         req = "[Dependency('ksym', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1})]"
-        prov = "[Dependency('kernel', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1}), Dependency('kernelish-1.0-1'), Dependency('kernelish')]"
+        prov = "[Dependency('kernel', flags={'bar:123456789abcdef': 1, 'foo:123456789abcdef': 1}), Dependency('kernelish-1.0'), Dependency('kernelish-0:1.0'), Dependency('kernelish-0:1.0-1'), Dependency('kernelish'), Dependency('kernelish-1.0-1')]"
         checkDeps(built[0], req, prov)
 
         recipestr2 = r"""
@@ -279,7 +281,15 @@ class TestKernel(CapsuleRecipe):
         self.cfg.enableRPMVersionDeps = True
         built, d = self.buildRecipe(recipestr2, "TestKernel")
         req = "[Dependency('ksym[bar:123456789abcdef]'), Dependency('ksym[foo:123456789abcdef]')]"
-        prov = "[Dependency('kernelish-1.0-1'), Dependency('kernel[foo:123456789abcdef]'), Dependency('kernelish'), Dependency('kernel[bar:123456789abcdef]')]"
+        prov = '[%s]' % ', '.join([
+            "Dependency('kernelish-1.0')",
+            "Dependency('kernel[bar:123456789abcdef]')",
+            "Dependency('kernelish-0:1.0')",
+            "Dependency('kernelish-0:1.0-1')",
+            "Dependency('kernel[foo:123456789abcdef]')",
+            "Dependency('kernelish')",
+            "Dependency('kernelish-1.0-1')",
+            ])
         checkDeps(built[0], req, prov)
 
     @conary_test.rpm
@@ -528,9 +538,15 @@ class TestProvides(CapsuleRecipe):
             'soname: ELF32/libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 '
             'GLIBC_2.4 SysV x86)',
             'rpm: depstest',
+            'rpm: depstest-0.1',
             'rpm: depstest-0.1-1',
+            'rpm: depstest-0:0.1',
+            'rpm: depstest-0:0.1-1',
             'rpm: depstest[x86-64]',
+            'rpm: depstest[x86-64]-0.1',
             'rpm: depstest[x86-64]-0.1-1',
+            'rpm: depstest[x86-64]-0:0.1',
+            'rpm: depstest[x86-64]-0:0.1-1',
             'rpm: libm.so.6(GLIBC_2.0 GLIBC_2.1 GLIBC_2.2 GLIBC_2.4)'))
         self.assertEqual(str(trv.provides()), provExpected)
         self.assertEqual(str(trv.requires()), reqExpected)
@@ -605,8 +621,14 @@ class TestSharedDep(CapsuleRecipe):
                 'soname: ELF32/libfoo.so.0.0(SysV x86)',
                 'rpm: libfoo.so.0',
                 'rpm: TROVENAME',
+                'rpm: TROVENAME-0:1.0',
+                'rpm: TROVENAME-0:1.0-1',
+                'rpm: TROVENAME-1.0',
                 'rpm: TROVENAME-1.0-1',
                 'rpm: TROVENAME[x86-32]',
+                'rpm: TROVENAME[x86-32]-0:1.0',
+                'rpm: TROVENAME[x86-32]-0:1.0-1',
+                'rpm: TROVENAME[x86-32]-1.0',
                 'rpm: TROVENAME[x86-32]-1.0-1',
         ))
 
