@@ -14,12 +14,15 @@
 # limitations under the License.
 #
 
-
+import copy
 import itertools
 import optparse
 import os
+import Queue
 import sys
+import threading
 import time
+import traceback
 
 from conary.conaryclient import callbacks as clientCallbacks
 from conary.conaryclient import cmdline
@@ -113,7 +116,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     useHiddenCommits = (cfg.CfgBool, True)
     absoluteChangesets = (cfg.CfgBool, False)
     includeSources = (cfg.CfgBool, False)
-    splitNodes = (cfg.CfgBool, True,
+    splitNodes = (cfg.CfgBool, False,
             "Split jobs that would commit two versions of a trove at once. "
             "Needed for compatibility with older repositories.")
 
@@ -512,8 +515,8 @@ def splitJobList(jobList, src, targetSet, hidden = False, callback = ChangesetCa
             i + 1, len(jobs), displayBundle([(0,x) for x in smallJobList])))
         src.createChangeSetFile(smallJobList, tmpName, recurse = False,
                                 callback = callback, mirrorMode = True)
-        for target in targetSet:
-            target.commitChangeSetFile(tmpName, hidden = hidden, callback = callback)
+        _parallel(targetSet, TargetRepository.commitChangeSetFile,
+                tmpName, hidden=hidden, callback=callback)
         os.unlink(tmpName)
         callback.done()
         i += 1
@@ -599,6 +602,47 @@ def _getNewInfo(src, cfg, mark):
         infoList = _getNewSigs(src, cfg, mark)
     return infoList
 
+
+def _parallel_run(index, results, targets, classMethod, args, kwargs):
+    try:
+        target = targets[index]
+        ret = (index, True, classMethod(target, *args, **kwargs))
+    except Exception as err:
+        ret = (index, False, (err, traceback.format_exc()))
+    results.put(ret)
+
+
+def _parallel(targets, classMethod, *args, **kwargs):
+    """
+    Map a method call across multiple targets concurrently
+    """
+    if len(targets) == 1:
+        return [classMethod(targets[0], *args, **kwargs)]
+    results = Queue.Queue()
+    threads = []
+    for index in range(len(targets)):
+        thread = threading.Thread(target=_parallel_run,
+                args=(index, results, targets, classMethod, args, kwargs,))
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
+    ret = [None] * len(targets)
+    last_error = None
+    for thread in threads:
+        index, ok, result = results.get()
+        if ok:
+            ret[index] = result
+        else:
+            last_error, trace = result
+            log.error("Error updating target %s:\n%s",
+                    targets[index].name, trace)
+    if last_error is not None:
+        raise last_error
+    return ret
+
+
 # mirror new trove info for troves we have already mirrored.
 def mirrorTroveInfo(src, targets, mark, cfg, resync=False):
     if resync:
@@ -614,9 +658,8 @@ def mirrorTroveInfo(src, targets, mark, cfg, resync=False):
         log.debug("no troveinfo records need to be mirrored")
         return 0
     log.debug("mirroring %d changed trove info records" % len(infoList))
-    updateCount = 0
-    for t in targets:
-        updateCount += t.setTroveInfo(infoList)
+    updateCount = sum(_parallel(targets,
+        TargetRepository.setTroveInfo, infoList))
     return updateCount
 
 # this mirrors all the troves marked as removed from the sourceRepos into the targetRepos
@@ -724,6 +767,7 @@ class TargetRepository:
     def commitChangeSetFile(self, filename, hidden, callback):
         if self.test:
             return 0
+        callback = copy.copy(callback)
         callback.setPrefix(self.name + ": ")
         t1 = time.time()
         ret = self.repo.commitChangeSetFile(filename, mirror=True, hidden=hidden,
@@ -734,9 +778,10 @@ class TargetRepository:
         if hidden: hstr = "hidden "
         log.debug("%s %scommit (%.2f sec)", self.name, hstr, t2-t1)
         return ret
-    def presentHiddenTroves(self):
+    def presentHiddenTroves(self, newMark):
         log.debug("%s unhiding comitted troves", self.name)
         self.repo.presentHiddenTroves(self.cfg.host)
+        self.setMirrorMark(newMark)
 
 # split a troveList in changeset jobs
 def buildBundles(sourceRepos, target, troveList, absolute=False,
@@ -840,21 +885,20 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     if hidden:
         log.debug("will use hidden commits to synchronize target mirrors")
 
+    marks = _parallel(targets, TargetRepository.getMirrorMark)
     if sync:
         currentMark = -1
     else:
-        marks = [ t.getMirrorMark() for t in targets ]
         # we use the oldest mark as a starting point (since we have to
         # get stuff from source for that oldest one anyway)
         currentMark = min(marks)
     log.debug("using common mirror mark %s", currentMark)
     # reset mirror mark to the lowest common denominator
-    for t in targets:
-        if t.getMirrorMark() != currentMark:
+    for t, mark in zip(targets, marks):
+        if mark != currentMark:
             t.setMirrorMark(currentMark)
     # mirror gpg signatures from the src into the targets
-    for t in targets:
-        t.mirrorGPG(referenceRepos, cfg.host)
+    _parallel(targets, TargetRepository.mirrorGPG, referenceRepos, cfg.host)
     # mirror changed trove information for troves already mirrored
     if fastSync:
         updateCount = 0
@@ -865,8 +909,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     newMark, troveList = getTroveList(referenceRepos, cfg, currentMark)
     if not troveList:
         if newMark > currentMark: # something was returned, but filtered out
-            for t in targets:
-                t.setMirrorMark(newMark)
+            _parallel(targets, TargetRepository.setMirrorMark, newMark)
             return -1 # call again
         return 0
     # prepare a new max mark to be used when we need to break out of a loop
@@ -909,8 +952,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
         # we need to make sure we mirror the GPG keys of any newly added troves
         newHosts = set([x[1].getHost() for x in troveSetList.union(removedSet)])
         for host in newHosts.difference(set([cfg.host])):
-            for t in targets:
-                t.mirrorGPG(referenceRepos, host)
+            _parallel(targets, TargetRepository.mirrorGPG,
+                    referenceRepos, host)
 
     # we check which troves from the troveList are needed on each
     # target and we split the troveList into separate lists depending
@@ -939,8 +982,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     if len(byTarget) == 0 and len(removedSet) == 0 and initTLlen:
         # we had troves and now we don't
         log.debug("no troves found for our label %s" % cfg.labels)
-        for t in targets:
-            t.setMirrorMark(crtMaxMark)
+        _parallel(targets, TargetRepository.setMirrorMark, crtMaxMark)
         # try again
         return -1
 
@@ -982,8 +1024,8 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
                 splitJobList(jobList, sourceRepos, targetSet, hidden=hidden,
                              callback=callback)
             else:
-                for target in targetSet:
-                    target.commitChangeSetFile(tmpName, hidden=hidden, callback=callback)
+                _parallel(targetSet, TargetRepository.commitChangeSetFile,
+                        tmpName, hidden=hidden, callback=callback)
             try:
                 os.unlink(tmpName)
             except OSError:
@@ -997,10 +1039,11 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     else: # only when we're all done looping advance mark to the new max
         if bundlesMark == 0 or bundlesMark <= currentMark:
             bundlesMark = crtMaxMark # avoid repeating the same query...
-        for target in targets:
-            if hidden: # if we've hidden the last commits, show them now
-                target.presentHiddenTroves()
-            target.setMirrorMark(bundlesMark)
+        if hidden: # if we've hidden the last commits, show them now
+            _parallel(targets, TargetRepository.presentHiddenTroves,
+                    bundlesMark)
+        else:
+            _parallel(targets, TargetRepository.setMirrorMark, bundlesMark)
     # mirroring removed troves requires one by one processing
     for target in targets:
         copySet = removedSet.copy()
@@ -1009,8 +1052,7 @@ def mirrorRepository(sourceRepos, targetRepos, cfg,
     # if this was a noop because the removed troves were already mirrored
     # we need to keep going
     if updateCount == 0 and len(removedSet):
-        for target in targets:
-            target.setMirrorMark(crtMaxMark)
+        _parallel(targets, TargetRepository.setMirrorMark, crtMaxMark)
         return -1
     return updateCount
 
