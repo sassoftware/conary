@@ -152,7 +152,6 @@ class ConaryTest(CPackageRecipe):
             'python-memcached:python',
             'python-webob:python',
             'python-webunit:python',
-            'rpm-rhel-6:runtime',
             ]
 
         if embedded:
@@ -166,6 +165,7 @@ class ConaryTest(CPackageRecipe):
                 'm2crypto:rpm',
                 'python-devel:rpm',
                 'python-setuptools:rpm',
+                'rpm-python:rpm',
                 ])
 
 
