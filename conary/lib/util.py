@@ -2457,7 +2457,7 @@ def statFile(pathOrFile, missingOk=False, inodeOnly=False):
     """
     try:
         if isinstance(pathOrFile, basestring):
-            st = os.stat(pathOrFile)
+            st = os.lstat(pathOrFile)
         else:
             if hasattr(pathOrFile, 'fileno'):
                 pathOrFile = pathOrFile.fileno()

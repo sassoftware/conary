@@ -433,6 +433,12 @@ class RpmCapsuleOperation(SingleCapsuleOperation):
                 # should remove them either way.
                 action = ACTION_RESTORE
 
+            if action == ACTION_CONFLICT and not existingOwners:
+                # Check for "conflicts" that might just be a view across a
+                # symlink.
+                if self.fsJob.findAliasedRemovals(absolutePath):
+                    action = ACTION_RESTORE
+
             if action == ACTION_CONFLICT and existingOwners:
                 if fileId in [ x[4] for x in existingOwners ]:
                     # The files share metadata same. Whatever it looks like on
