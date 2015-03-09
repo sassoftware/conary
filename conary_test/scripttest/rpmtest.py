@@ -14,8 +14,6 @@
 # limitations under the License.
 #
 
-
-from testrunner import testhelp
 from testrunner.decorators import requireBinary
 from testutils import mock
 
@@ -165,11 +163,9 @@ class RpmTest(unittest.TestCase):
         self.assertEqual(req.freeze(), '')
         self.assertEqual(prov.freeze(), '16#libpopt.so.0')
 
+    @conary_test.rpm
     def testRpmLibProvidesSet(self):
-        try:
-            import rpm
-        except ImportError:
-            raise testhelp.SkipTestException('rpm python module not installed')
+        import rpm
         ds = rpmhelper.getRpmLibProvidesSet(rpm)
         # Note: hopefully these won't change in rpm all that much...
         # if it does, we'll need to do something different.
@@ -182,7 +178,7 @@ class RpmTest(unittest.TestCase):
 
     @conary_test.rpm
     def testTestSuiteRpmLockOverride(self):
-
+        import rpm
         class simpleCallback:
             def __init__(self):
                 self.fdnos = {}
