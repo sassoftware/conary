@@ -137,6 +137,7 @@ class ConaryTest(CPackageRecipe):
             'popt-devel:rpm',
             'postgresql:rpm',
             'postgresql-server:rpm',
+            'prelink:rpm',
             'python-psycopg2:rpm',
             'sqlite-devel:rpm',
             'squid:rpm',
