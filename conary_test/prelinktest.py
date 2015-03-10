@@ -59,6 +59,7 @@ class PrelinkTest(rephelp.RepositoryHelper):
         oldCmd = files.PRELINK_CMD
         try:
             files.PRELINK_CMD = (archivePath + '/prelink', )
+            files._havePrelink = None
             rc, str = self.captureOutput(verify.verify, ['test:foo'], db,
                                          self.cfg, forceHashCheck = True)
             self.assertEquals(str, '')
@@ -72,3 +73,4 @@ class PrelinkTest(rephelp.RepositoryHelper):
                     '23ad3a2c940a30809b68a5b8a13392196004efab')
         finally:
             files.PRELINK_CMD = oldCmd
+            files._havePrelink = None
