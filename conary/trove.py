@@ -1338,7 +1338,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_INSTALLTIME   : (DYNAMIC, streams.LongLongStream, 'installTime'),
         _TROVEINFO_TAG_SUBPACKAGES   : (DYNAMIC, streams.StringsStream, "subPackages" ),
         _TROVEINFO_TAG_PRODUCT_DEFINITION_VERSION : (DYNAMIC,
-            FrozenVersionStream, 'productDefinitionVersion'),
+            StringVersionStream, 'productDefinitionVersion'),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -3264,11 +3264,9 @@ class Trove(streams.StreamSet):
             self.troveInfo.subPackages.set(name)
 
     def setProductDefinitionVersion(self, version):
-        if version is None:
-            return None
         if isinstance(version, basestring):
             version = str(version)
-        version = versions.ThawVersion(version)
+            version = versions.VersionFromString(version)
         self.troveInfo.productDefinitionVersion.set(version)
 
     def getProductDefinitionVersion(self):

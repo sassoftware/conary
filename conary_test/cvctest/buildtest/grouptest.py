@@ -4841,11 +4841,19 @@ class Group(GroupRecipe):
         r.add('foo')
 """
 
-        v = versions.ThawVersion("/cny.tv@ns:1/12345.67:1-1")
+        v = versions.VersionFromString("/cny.tv@ns:1/1-1")
         grp = self.build(groupRecipe, "Group",
-                macros=dict(productDefinitionVersion=v.freeze()))
-        self.assertEquals(grp.getProductDefinitionVersion().freeze(),
-                v.freeze())
+                macros=dict(productDefinitionVersion=v.asString()))
+        self.assertEquals(grp.getProductDefinitionVersion().asString(),
+                v.asString())
+        # I should be able to reset it too
+        grp.setProductDefinitionVersion(None)
+        self.assertEquals(grp.getProductDefinitionVersion(), None)
+        # Or set it as a version
+        grp.setProductDefinitionVersion(v)
+        self.assertEquals(grp.getProductDefinitionVersion().asString(),
+                v.asString())
+
         # If unset, we should get None back
         grp = self.build(groupRecipe, "Group")
         self.assertEquals(grp.getProductDefinitionVersion(), None)
