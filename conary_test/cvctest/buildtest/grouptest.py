@@ -689,10 +689,11 @@ class GroupTest(rephelp.RepositoryHelper):
 
     
     def build(self, str, name, dict = {}, serverIdx = 0, returnName = None,
-              groupOptions=None, logLevel=None):
+              groupOptions=None, logLevel=None, macros=None):
         (built, d) = self.buildRecipe(str, name, dict,
                                       groupOptions=groupOptions,
-                                      logLevel=logLevel)
+                                      logLevel=logLevel,
+                                      macros=macros)
         if returnName:
             name, verStr, flavor = [x for x in built if x[0] == returnName][0]
         else:
@@ -4822,3 +4823,29 @@ class ImageAutoResolveGroup(GroupRecipe):
         trvs = [ x[0] for x in grp.iterTroveList(strongRefs=True) ]
         self.assertEqual(len(trvs), 1)
         self.assertTrue('foo' in trvs)
+
+
+    def testProductDefinitionVersion(self):
+        self.addComponent('foo:runtime')
+        self.addCollection('foo', strongList = ['foo:runtime'])
+        groupRecipe = """
+class Group(GroupRecipe):
+    name = 'group-image'
+    version = '1.90'
+    clearBuildRequires()
+
+    imageGroup = False
+
+    def setup(r):
+        r.setSearchPath('localhost@rpl:linux', 'localhost@rpl:branch')
+        r.add('foo')
+"""
+
+        v = versions.ThawVersion("/cny.tv@ns:1/12345.67:1-1")
+        grp = self.build(groupRecipe, "Group",
+                macros=dict(productDefinitionVersion=v.freeze()))
+        self.assertEquals(grp.getProductDefinitionVersion().freeze(),
+                v.freeze())
+        # If unset, we should get None back
+        grp = self.build(groupRecipe, "Group")
+        self.assertEquals(grp.getProductDefinitionVersion(), None)
