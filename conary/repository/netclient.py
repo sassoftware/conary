@@ -1673,13 +1673,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
                 expectSize = long(inF.headers['content-length'])
                 if totalSize != expectSize:
-                    raise errors.RepositoryError("Changeset was truncated in "
-                            "transit (expected %d bytes, got %d bytes)" %
-                            (expectSize, totalSize))
+                    raise errors.TruncatedResponseError(expectSize, totalSize)
             elif totalSize != sum(sizes):
-                raise errors.RepositoryError("Changeset was truncated in "
-                        "transit (expected %d bytes, got %d bytes)" %
-                        (sum(sizes), totalSize))
+                raise errors.TruncatedResponseError(sum(sizes), totalSize)
             inF.close()
 
             for size in sizes:
@@ -2271,6 +2267,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         totalSize = util.copyfileobj(inF, outF,
                                      rateLimit = self.downloadRateLimit,
                                      callback = copyCallback)
+        if totalSize == None:
+            raise errors.RepositoryError("Unknown error downloading changeset")
+        elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
+            expectSize = long(inF.headers['content-length'])
+            if totalSize != expectSize:
+                raise errors.TruncatedResponseError(expectSize, totalSize)
+        elif totalSize != sum(sizes):
+            raise errors.TruncatedResponseError(sum(sizes), totalSize)
 
         fileObjList= []
         for size in sizes:

@@ -116,6 +116,21 @@ class OpenError(RepositoryError):
     other problems.
     """
 
+class TruncatedResponseError(OpenError):
+    _error = ("Error occurred downloading a changeset:\n"
+            "Changeset was truncated in transit")
+    _error_extra = " (expected %d bytes, got %d bytes)"
+
+    def __init__(self, expectedSize=None, actualSize=None):
+        OpenError.__init__(self, expectedSize, actualSize)
+
+    def __str__(self):
+        err = self._error
+        if self.args[0]:
+            err += self._error_extra % self.args
+        return err
+
+
 class RepositoryClosed(OpenError):
     """Repository is closed"""
 

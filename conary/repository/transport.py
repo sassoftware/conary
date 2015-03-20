@@ -270,11 +270,17 @@ class MultipartDecoder(object):
         self.boundary = boundary
 
     def _getHeader(self):
-        if self.fobj.readline() != "--%s\r\n" % (self.boundary,):
+        line = self.fobj.readline()
+        if '\n' not in line:
+            raise errors.TruncatedResponseError()
+        if line != "--%s\r\n" % (self.boundary,):
             raise MultipartDecodeError("Invalid multipart response")
         headers = {}
         while True:
-            line = self.fobj.readline().rstrip('\r\n')
+            line = self.fobj.readline()
+            if '\n' not in line:
+                raise errors.TruncatedResponseError()
+            line = line.rstrip('\r\n')
             if not line:
                 break
             key, value = line.split(': ')
@@ -300,10 +306,13 @@ class MultipartDecoder(object):
             raise MultipartDecodeError("Invalid multipart response")
         body = self.fobj.read(clen)
         if len(body) < clen:
-            raise MultipartDecodeError("Multipart response was truncated")
+            raise errors.TruncatedResponseError()
         body = self._decode(body, headers, 'content-transfer-encoding')
         body = self._decode(body, headers, 'content-encoding')
-        if self.fobj.readline() != '\r\n':
+        line = self.fobj.readline()
+        if '\n' not in line:
+            raise errors.TruncatedResponseError()
+        if line != '\r\n':
             raise MultipartDecodeError("Invalid multipart response")
         return headers, body
 
@@ -339,15 +348,21 @@ class MultipartResponseFile(object):
         self.remaining -= len(data)
         if self.remaining == 0:
             self.eof = True
-            if self.fobj.readline() != '\r\n':
+            line = self.fobj.readline()
+            if '\n' not in line:
+                raise errors.TruncatedResponseError()
+            if line != '\r\n':
                 raise MultipartDecodeError("Invalid multipart response")
         return data
 
     def close(self):
         if self.final:
-            if (self.eof and self.fobj.readline()
-                    != "--%s--\r\n" % self.boundary):
-                raise MultipartDecodeError("Invalid multipart response")
+            if self.eof:
+                line = self.fobj.readline()
+                if '\n' not in line:
+                    raise errors.TruncatedResponseError()
+                if line != "--%s--\r\n" % self.boundary:
+                    raise MultipartDecodeError("Invalid multipart response")
             self.fobj.close()
         self.fobj = None
 
