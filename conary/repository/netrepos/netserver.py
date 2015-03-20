@@ -171,7 +171,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def __del__(self):
         # this is ugly, but for now it is the only way to break the
         # circular dep created by self.repos back to us
-        self.repos.troveStore = self.repos.reposSet = None
+        self.repos.troveStore = None
         self.auth = self.ugo = None
         try:
             if self.__delDB: self.db.close()
@@ -208,7 +208,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(3)
         if self.db.reopen():
             # help the garbage collector with the magic from __del__
-            self.repos.troveStore = self.repos.reposSet = None
+            self.repos.troveStore = None
             self.troveStore = self.repos = self.auth = self.deptable = None
             self.open(connect=False)
 

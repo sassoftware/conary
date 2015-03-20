@@ -34,7 +34,6 @@ from conary.repository.datastore import (DataStoreRepository, DataStore,
 from conary.repository.repository import AbstractRepository
 from conary.repository.repository import ChangeSetJob
 from conary.repository.netrepos.repo_cfg import CfgContentStore
-from conary.repository import netclient
 
 
 class FilesystemChangeSetJob(ChangeSetJob):
@@ -159,10 +158,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         map = dict(repositoryMap)
         for serverName in serverNameList:
             map[serverName] = self
-        # XXX this client needs to die
-        from conary import conarycfg
-        self.reposSet = netclient.NetworkRepositoryClient(map,
-                                    conarycfg.UserInformation())
         self.troveStore = troveStore
         self.requireSigs = requireSigs
 
@@ -228,9 +223,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         # FilesystemRepository (it needs to create a change set which gets
         # passed)
         if fileVersion.getHost() not in self.serverNameList:
-            # XXX This code is not needed as of version 1.0.14 of the client.
-            assert(not withContents)
-            return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
+            raise errors.RepositoryMismatch(self.serverNameList,
+                    fileVersion.getHost())
 
         fileObj = self.troveStore.getFile(pathId, fileId)
         if withContents:
@@ -365,17 +359,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 cont = filecontents.FromDataStore(self.contentsStore,
                                                   fileObj.contents.sha1())
             else:
-                # XXX This code is not needed as of version 1.0.14 of the
-                # client.
-                #
-                # a bit of sleight of hand here... we look for this file in
-                # the trove it was first built in
-                #
-                # this could cause us to run out of file descriptors on large
-                # troves. it might be better to close the file and return
-                # a filecontents object?
-                cont = self.reposSet.getFileContents([ item ])[0]
-
+                raise errors.RepositoryMismatch(self.serverNameList,
+                        fileVersion.getHost())
             contents.append(cont)
 
         return contents
@@ -403,7 +388,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         removedTroveList = []
 
         dupFilter = set()
-        resultList = []
 
         # make a copy to remove things from
         troveList = origTroveList[:]
@@ -500,7 +484,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
             # sort the set of files we need into bins based on the server
             # name
-            serverIdx = {}
             getList = []
             localFilesNeeded = []
 
