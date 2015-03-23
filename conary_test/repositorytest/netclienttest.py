@@ -847,11 +847,6 @@ class ServerProxyTest(rephelp.RepositoryHelper):
         csVersion = changeset.getNativeChangesetVersion(42)
         self.assertEqual(fcont.version, csVersion)
 
-    def testEntitlementParameter(self):
-        nc = netclient.NetworkRepositoryClient({}, {},
-                    entitlements = { 'server' : ('class', 'key') } )
-        assert(list(nc.c.entitlements) == [ ('server', ('class' ,'key') ) ] )
-
     def testMultitenantServers(self):
         self.stopRepository(0)
         repos = self.openRepository(0, serverName = [ 'localhost', 'localhost1' ])
@@ -1011,7 +1006,8 @@ class ServerProxyTest(rephelp.RepositoryHelper):
                     return []
                 return f
 
-        repos = netclient.NetworkRepositoryClient({}, {})
+        empty = conarycfg.ConaryConfiguration(False)
+        repos = netclient.NetworkRepositoryClient(cfg=empty)
         server = MockServerProxy()
         repos.c = { 'localhost': server }
         for method, serverMethod in m:

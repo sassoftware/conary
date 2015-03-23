@@ -181,25 +181,22 @@ class ServerProxy(util.ServerProxy):
         self._entitlementDir = entitlementDir
         self._callLog = callLog
 
-class ServerCache:
+class ServerCache(object):
     TransportFactory = transport.Transport
-    def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
-            callback=None, proxies=None, proxyMap=None, entitlementDir=None,
-            caCerts=None, connectAttempts=None, systemId=None):
+
+    def __init__(self, cfg, pwPrompt=None):
         self.cache = {}
         self.shareCache = {}
-        self.map = repMap
-        self.userMap = userMap
+        self.map = cfg.repositoryMap
+        self.userMap = cfg.user
         self.pwPrompt = pwPrompt
-        self.entitlements = entitlements
-        if proxyMap is None:
-            proxyMap = proxy_map.ProxyMap.fromDict(proxies)
-        self.proxyMap = proxyMap
-        self.entitlementDir = entitlementDir
-        self.caCerts = caCerts
-        self.connectAttempts = connectAttempts
+        self.entitlements = cfg.entitlement
+        self.proxyMap = cfg.getProxyMap()
+        self.entitlementDir = cfg.entitlementDirectory
+        self.caCerts = cfg.trustedCerts
+        self.connectAttempts = cfg.connectAttempts
         self.callLog = None
-        self.systemId = systemId
+        self.systemId = util.SystemIdFactory(cfg.systemIdScript).getId()
 
         if 'CONARY_CLIENT_LOG' in os.environ:
             self.callLog = calllog.ClientCallLogger(
@@ -393,37 +390,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     FILE_CONTAINER_VERSION_NO_REMOVES = \
                             filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
 
-    # fixme: take a cfg object instead of all these parameters
-    def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
-            entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
-            entitlements=None, proxy=None, proxyMap=None, caCerts=None,
-            connectAttempts=None, systemId=None):
+    def __init__(self, cfg, localRepository=None, pwPrompt=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: (None, None)
 
-        self.downloadRateLimit = downloadRateLimit
-        self.uploadRateLimit = uploadRateLimit
-
-        if proxy:
-            proxies = proxy
-        else:
-            proxies = None
-
-        if entitlements is None:
-            entitlements = conarycfg.EntitlementList()
-        elif type(entitlements) == dict:
-            newEnts = conarycfg.EntitlementList()
-            for (server, (entClass, ent)) in entitlements.iteritems():
-                newEnts.addEntitlement(server, ent, entClass = entClass)
-            entitlements = newEnts
-
-        self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
-                proxies=proxies, entitlementDir=entitlementDir,
-                caCerts=caCerts, proxyMap=proxyMap,
-                connectAttempts=connectAttempts, systemId=systemId)
+        self.downloadRateLimit = cfg.downloadRateLimit
+        self.uploadRateLimit = cfg.uploadRateLimit
+        self.c = ServerCache(cfg, pwPrompt)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
@@ -432,9 +408,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
         self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
         self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
-
-    def __del__(self):
-        self.c = None
 
     def close(self, *args):
         pass
@@ -1721,7 +1694,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         assert(not [ x for x in chgSetList if (x[1][0] and x[-1]) ])
 
         cs = None
-        scheduledSet = {}
         internalCs = None
         filesNeeded = set()
         removedList = []

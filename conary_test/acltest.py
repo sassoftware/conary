@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-
+import copy
 import cgi
 import itertools
 import os
@@ -1078,17 +1078,13 @@ class AclTest(AuthHelper):
         runtime = self.addComponent('foo:runtime', '1')
         self.setupEntitlement(repos, "entGroup", "123456", self.cfg.buildLabel,
                               None, None, withClass = True)[0]
-
-        anonClient = netclient.NetworkRepositoryClient(
-                    self.servers.getMap(), conarycfg.UserInformation(),
-                    entitlementDir = self.workDir)
-        #assert(anonClient.hasTrove(*runtime.getNameVersionFlavor()))
         repos.deleteUserByName(self.cfg.buildLabel, 'anonymous')
-        #assert(not anonClient.hasTrove(*runtime.getNameVersionFlavor()))
 
-        anonClient = netclient.NetworkRepositoryClient(
-                    self.servers.getMap(), conarycfg.UserInformation(),
-                    entitlementDir = self.workDir)
+        cfg = copy.copy(self.cfg)
+        cfg.resetToDefault('user')
+        cfg.entitlementDirectory = self.workDir
+        anonClient = netclient.NetworkRepositoryClient(cfg)
+
         open(self.workDir + "/localhost", "w").write(
                 conarycfg.emitEntitlement('localhost', 'entGroup', '123456') )
         assert(anonClient.hasTrove(*runtime.getNameVersionFlavor()))

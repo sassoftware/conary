@@ -135,6 +135,17 @@ def checkConfig(cfg):
             log.error("ERROR: label %s is not on host %s", label, cfg.host)
             raise RuntimeError("label %s is not on host %s", label, cfg.host)
 
+
+def _getMirrorClient(mirrorCfg, section):
+    section = mirrorCfg.getSection(section)
+    cfg = conarycfg.ConaryConfiguration(False)
+    for name in ['repositoryMap', 'user', 'entitlement']:
+        cfg[name] = section[name]
+    for name in ['uploadRateLimit', 'downloadRateLimit', 'entitlementDirectory']:
+        cfg[name] = mirrorCfg[name]
+    return netclient.NetworkRepositoryClient(cfg=cfg)
+
+
 def mainWorkflow(cfg = None, callback=ChangesetCallback(),
                  test=False, sync=False, infoSync=False,
                  checkSync=False, fastSync=False):
@@ -152,23 +163,11 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
     if not cfg.hasSection('source'):
         log.debug("ERROR: mirror configuration file is missing a [source] section")
         raise RuntimeError("Mirror configuration file is missing a [source] section")
-    srcCfg = cfg.getSection('source')
-    sourceRepos = netclient.NetworkRepositoryClient(
-        srcCfg.repositoryMap, srcCfg.user,
-        uploadRateLimit = cfg.uploadRateLimit,
-        downloadRateLimit = cfg.downloadRateLimit,
-        entitlementDir = cfg.entitlementDirectory,
-        entitlements=srcCfg.entitlement)
+    sourceRepos = _getMirrorClient(cfg, 'source')
 
     # Optional reference repository
     if cfg.hasSection('reference'):
-        refCfg = cfg.getSection('reference')
-        refRepos = netclient.NetworkRepositoryClient(
-            refCfg.repositoryMap, refCfg.user,
-            uploadRateLimit = cfg.uploadRateLimit,
-            downloadRateLimit = cfg.downloadRateLimit,
-            entitlementDir = cfg.entitlementDirectory,
-            entitlements=refCfg.entitlement)
+        refRepos = _getMirrorClient(cfg, 'reference')
     else:
         refRepos = sourceRepos
 
@@ -178,13 +177,7 @@ def mainWorkflow(cfg = None, callback=ChangesetCallback(),
     for name in cfg.iterSectionNames():
         if not name.startswith("target"):
             continue
-        secCfg = cfg.getSection(name)
-        target = netclient.NetworkRepositoryClient(
-            secCfg.repositoryMap, secCfg.user,
-            uploadRateLimit = cfg.uploadRateLimit,
-            downloadRateLimit = cfg.downloadRateLimit,
-            entitlementDir = cfg.entitlementDirectory,
-            entitlements=secCfg.entitlement)
+        target = _getMirrorClient(cfg, name)
         target = TargetRepository(target, cfg, name, test=test)
         targets.append(target)
     # checkSync is a special operation...
