@@ -29,7 +29,7 @@ from conary import callbacks
 from conary import conarycfg
 from conary import files
 from conary.cmds import metadata
-from conary import trove
+from conary import trove as trv_mod
 from conary import trovetup
 from conary import versions
 from conary.lib import util, api
@@ -513,7 +513,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def addDigitalSignature(self, name, version, flavor, digsig):
         if self.c[version].getProtocolVersion() < 45:
-            raise InvalidServerVersion("Cannot sign troves on Conary "
+            raise errors.InvalidServerVersion("Cannot sign troves on Conary "
                                        "repositories older than 1.1.20")
 
         encSig = base64.b64encode(digsig.freeze())
@@ -573,8 +573,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for server in byServer.keys():
             s = self.c[version]
             if s.getProtocolVersion() < 47:
-                raise InvalidServerVersion, "Cannot add metadata to troves on " \
-                      "repositories older than 1.1.24"
+                raise errors.InvalidServerVersion("Cannot add metadata to "
+                        "troves on repositories older than 1.1.24")
         for server in byServer.keys():
             s = self.c[server]
             s.addMetadataItems(byServer[server])
@@ -864,7 +864,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         except KeyError:
             raise StopIteration
 
-        t = trove.Trove(trvCs, skipIntegrityChecks = not withFiles)
+        t = trv_mod.Trove(trvCs, skipIntegrityChecks = not withFiles)
         # if we're sorting, we'll need to pull out all the paths ahead
         # of time.  We'll use a generator that returns the items
         # in the same order as iterFileList() to reuse code.
@@ -1267,7 +1267,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             # trove integrity checks don't work when file information is
             # excluded
-            t = trove.Trove(troveCs, skipIntegrityChecks = not withFiles)
+            t = trv_mod.Trove(troveCs, skipIntegrityChecks = not withFiles)
             l.append(t)
 
         return l
@@ -2014,7 +2014,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         seen.append(info)
                     else:
                         notMatching.append(info)
-                        if trove.troveIsGroup(info[0]):
+                        if trv_mod.troveIsGroup(info[0]):
                             groupsToGet.append(info)
 
             if not groupsToGet:
@@ -2433,7 +2433,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for host, l in byServer.iteritems():
             server = self.c[host]
             if server.getProtocolVersion() < 62:
-                raise InvalidServerVersion("Server %s does not have support "
+                raise errors.InvalidServerVersion(
+                        "Server %s does not have support "
                                            "for a commitCheck() call" % (host,))
             ret = self.c[host].commitCheck([(n, self.fromVersion(v)) for n,v in l])
             for (n,v), r in itertools.izip(l, ret):
@@ -2496,7 +2497,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not thaw:
             return info
         # need to thaw the troveinfo as well
-        return [ (m,t,trove.TroveInfo(base64.b64decode(ti)))
+        return [ (m,t,trv_mod.TroveInfo(base64.b64decode(ti)))
                  for (m,t,ti) in info ]
 
     def setTroveInfo(self, info, freeze=True):
@@ -2518,15 +2519,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for host, infoList in byServer.iteritems():
             server = self.c[host]
             #(n,v,f) are always assumed to be instances
-            infoList = [ ((n,self.fromVersion(v),self.fromFlavor(f)), ti)
-                     for (n,v,f),ti in infoList ]
+            infoList = [(self.fromTroveTup(tup), ti_)
+                    for (tup, ti_) in infoList]
             if freeze: # need to freeze the troveinfo as well
                 if server.getProtocolVersion() < 65:
                     skipSet = ti._newMetadataItems
                 else:
                     skipSet = None
-                infoList = [ (t, base64.b64encode(ti.freeze(skipSet=skipSet)))
-                             for t, ti in infoList ]
+                infoList = [ (t, base64.b64encode(ti_.freeze(skipSet=skipSet)))
+                             for t, ti_ in infoList ]
             total += server.setTroveInfo(infoList)
         return total
 
@@ -2536,7 +2537,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if server.getProtocolVersion() < 40:
             return [ ( x[0],
                        (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
-                       trove.TROVE_TYPE_NORMAL
+                       trv_mod.TROVE_TYPE_NORMAL
                      ) for x in server.getNewTroveList(mark) ]
         return [ ( x[0],
                    (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
@@ -2624,7 +2625,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def getTroveInfo(self, infoType, troveList):
         # first, we need to know about this infoType
-        if infoType not in trove.TroveInfo.streamDict.keys():
+        if infoType not in trv_mod.TroveInfo.streamDict.keys():
             raise Exception("Invalid infoType requested")
 
         byServer = {}
@@ -2640,10 +2641,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 troveInfoList = self.getTroves(tl, withFiles = False)
                 for (i, tup), trv in itertools.izip(l, troveInfoList):
                     if trv is not None:
-                        attrname = trove.TroveInfo.streamDict[infoType][2]
+                        attrname = trv_mod.TroveInfo.streamDict[infoType][2]
                         results[i] = getattr(trv.troveInfo, attrname, None)
                 continue
-            elif (infoType >= trove._TROVEINFO_TAG_CLONEDFROMLIST and
+            elif (infoType >= trv_mod._TROVEINFO_TAG_CLONEDFROMLIST and
                   self.c[host].getProtocolVersion() < 64):
                 # server doesn't support this troveInfo type
                 continue
@@ -2657,7 +2658,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if present  == 0:
                     continue
                 data = base64.decodestring(dataStr)
-                results[i] = trove.TroveInfo.streamDict[infoType][1](data)
+                results[i] = trv_mod.TroveInfo.streamDict[infoType][1](data)
         return results
 
     @api.publicApi
