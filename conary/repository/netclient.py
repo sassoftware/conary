@@ -1497,55 +1497,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             return (serverJobs, ourJobList)
 
-        def _cvtTroveList(l):
-            new = []
-            for (name, (oldV, oldF), (newV, newF), absolute) in l:
-                if oldV == 0:
-                    oldV = None
-                    oldF = None
-                else:
-                    oldV = self.toVersion(oldV)
-                    oldF = self.toFlavor(oldF)
-
-                if newV == 0:
-                    newV = None
-                    newF = None
-                else:
-                    newV = self.toVersion(newV)
-                    newF = self.toFlavor(newF)
-
-                new.append((name, (oldV, oldF), (newV, newF), absolute))
-
-            return new
-
-        def _cvtFileList(l):
-            new = []
-            for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV),
-                                    (newTroveV, newTroveF, newFileId, newFileV)) in l:
-                if oldTroveV == 0:
-                    oldTroveV = None
-                    oldFileV = None
-                    oldFileId = None
-                    oldTroveF = None
-                else:
-                    oldTroveV = self.toVersion(oldTroveV)
-                    oldFileV = self.toVersion(oldFileV)
-                    oldFileId = self.toFileId(oldFileId)
-                    oldTroveF = self.toFlavor(oldTroveF)
-
-                newTroveV = self.toVersion(newTroveV)
-                newFileV = self.toVersion(newFileV)
-                newFileId = self.toFileId(newFileId)
-                newTroveF = self.toFlavor(newTroveF)
-
-                pathId = self.toPathId(pathId)
-
-                new.append((pathId, troveName,
-                               (oldTroveV, oldTroveF, oldFileId, oldFileV),
-                               (newTroveV, newTroveF, newFileId, newFileV)))
-
-            return new
-
         def _getLocalTroves(troveList):
             if not self.localRep or not troveList:
                 return [ None ] * len(troveList)
@@ -1596,9 +1547,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             sizes = [ int(x) for x in sizes ]
             server.setAbortCheck(None)
 
-            chgSetList += _cvtTroveList(extraTroveList)
-            filesNeeded.update(_cvtFileList(extraFileList))
-            removedList += _cvtTroveList(removedTroveList)
+            chgSetList += self.toJobList(extraTroveList)
+            filesNeeded.update(self.toFilesNeeded(extraFileList))
+            removedList += self.toJobList(removedTroveList)
 
             if hasattr(url, 'read'):
                 # Nested changeset file in a multi-part response
@@ -1669,8 +1620,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             assert totalSize == 0, '%d unexpected trailing bytes fetching args %r' %(totalSize, args)
 
-            return (cs, _cvtTroveList(extraTroveList),
-                    _cvtFileList(extraFileList))
+            return (cs, self.toJobList(extraTroveList),
+                    self.toFilesNeeded(extraFileList))
 
         def _getCsFromShim(target, cs, server, job, recurse, withFiles,
                            withFileContents, excludeAutoSource,

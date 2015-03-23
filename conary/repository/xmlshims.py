@@ -18,6 +18,7 @@
 import base64
 
 from conary import deps, files, versions
+from conary import trovetup
 from conary.lib import compat
 
 
@@ -129,12 +130,115 @@ class NetworkConvertors(object):
             return (tuple[0], self.fromVersion(tuple[1]),
                     self.fromFlavor(tuple[2]))
 
-    def toTroveTup(self, tuple, withTime=False):
+    def toTroveTup(self, tup, withTime=False):
+        name, version, flavor = tup[:3]
         if withTime:
-            return (tuple[0], self.thawVersion(tuple[1]),
-                    self.toFlavor(tuple[2]))
+            version = self.thawVersion(version)
         else:
-            return (tuple[0], self.toVersion(tuple[1]), self.toFlavor(tuple[2]))
+            version = self.toVersion(version)
+        flavor = self.toFlavor(flavor)
+        return trovetup.TroveTuple(name, version, flavor)
+
+    def fromJobList(self, jobs):
+        new = []
+        for (name, (oldV, oldF), (newV, newF), absolute) in jobs:
+            if oldV:
+                oldV = self.fromVersion(oldV)
+                oldF = self.fromFlavor(oldF)
+            else:
+                oldV = 0
+                oldF = 0
+
+            if newV:
+                newV = self.fromVersion(newV)
+                newF = self.fromFlavor(newF)
+            else:
+                # this happens when a distributed group has a trove
+                # on a remote repository disappear
+                newV = 0
+                newF = 0
+
+            new.append((name, (oldV, oldF), (newV, newF), absolute))
+        return new
+
+    def toJobList(self, jobs):
+        new = []
+        for (name, (oldV, oldF), (newV, newF), absolute) in jobs:
+            if oldV:
+                oldV = self.toVersion(oldV)
+                oldF = self.toFlavor(oldF)
+            else:
+                oldV = None
+                oldF = None
+
+            if newV:
+                newV = self.toVersion(newV)
+                newF = self.toFlavor(newF)
+            else:
+                newV = None
+                newF = None
+
+            new.append(trovetup.JobTuple(name,
+                (oldV, oldF), (newV, newF), absolute))
+        return new
+
+    def fromFilesNeeded(self, files):
+        new = []
+        for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV),
+                                (newTroveV, newTroveF, newFileId, newFileV)
+                                ) in files:
+            if oldFileV:
+                oldTroveV = self.fromVersion(oldTroveV)
+                oldFileV = self.fromVersion(oldFileV)
+                oldFileId = self.fromFileId(oldFileId)
+                oldTroveF = self.fromFlavor(oldTroveF)
+            else:
+                oldTroveV = 0
+                oldFileV = 0
+                oldFileId = 0
+                oldTroveF = 0
+
+            newTroveV = self.fromVersion(newTroveV)
+            newFileV = self.fromVersion(newFileV)
+            newFileId = self.fromFileId(newFileId)
+            newTroveF = self.fromFlavor(newTroveF)
+
+            pathId = self.fromPathId(pathId)
+
+            new.append((pathId, troveName,
+                           (oldTroveV, oldTroveF, oldFileId, oldFileV),
+                           (newTroveV, newTroveF, newFileId, newFileV)))
+
+        return new
+
+    def toFilesNeeded(self, files):
+        new = []
+        for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV),
+                                (newTroveV, newTroveF, newFileId, newFileV)
+                                ) in files:
+            if oldTroveV:
+                oldTroveV = self.toVersion(oldTroveV)
+                oldFileV = self.toVersion(oldFileV)
+                oldFileId = self.toFileId(oldFileId)
+                oldTroveF = self.toFlavor(oldTroveF)
+            else:
+                oldTroveV = None
+                oldFileV = None
+                oldFileId = None
+                oldTroveF = None
+
+            newTroveV = self.toVersion(newTroveV)
+            newFileV = self.toVersion(newFileV)
+            newFileId = self.toFileId(newFileId)
+            newTroveF = self.toFlavor(newTroveF)
+
+            pathId = self.toPathId(pathId)
+
+            new.append((pathId, troveName,
+                           (oldTroveV, oldTroveF, oldFileId, oldFileV),
+                           (newTroveV, newTroveF, newFileId, newFileV)))
+
+        return new
 
 
 class RequestArgs(compat.namedtuple('RequestArgs',
