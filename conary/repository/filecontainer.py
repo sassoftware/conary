@@ -71,7 +71,6 @@ This code is careful not to depend on the file pointer at all for reading
 """
 
 import errno
-import gzip
 import struct
 
 import conary.errors
@@ -136,7 +135,7 @@ class FileContainer:
             size = util.copyfileobj(fileObj, self.file)
         else:
             start = self.file.tell()
-            gzFile = gzip.GzipFile('', "wb", 6, self.file)
+            gzFile = util.DeterministicGzipFile('', "wb", 6, self.file)
             util.copyfileobj(fileObj, gzFile)
             gzFile.close()
             size = self.file.tell() - start

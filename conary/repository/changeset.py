@@ -333,7 +333,7 @@ class ChangeSet(streams.StreamSet):
             # we have uncompressed contents, but have been asked for compressed
             # contents
             f = util.BoundedStringIO()
-            compressor = gzip.GzipFile(None, "w", fileobj = f)
+            compressor = util.DeterministicGzipFile(None, "w", fileobj = f)
             util.copyfileobj(contentObj.get(), compressor)
             compressor.close()
             f.seek(0)
@@ -1413,7 +1413,7 @@ class ReadOnlyChangeSet(ChangeSet):
 
             if compressed:
                 f = util.BoundedStringIO()
-                compressor = gzip.GzipFile(None, "w", fileobj = f)
+                compressor = util.DeterministicGzipFile(None, "w", fileobj = f)
                 util.copyfileobj(cont.get(), compressor)
                 compressor.close()
                 f.seek(0)
@@ -2018,7 +2018,7 @@ class DictAsCsf:
                                                             self.maxMemSize)
             bufSize = 16384
 
-            gzf = gzip.GzipFile('', "wb", fileobj = compressedFile)
+            gzf = util.DeterministicGzipFile('', "wb", fileobj = compressedFile)
             while 1:
                 buf = f.read(bufSize)
                 if not buf:
@@ -2079,7 +2079,7 @@ def _convertChangeSetV2V1(inFc, outPath):
                                 fileobj = StringIO(oldCompressed)).read()
             new = old[0:16]
             newCompressedF = StringIO()
-            gzip.GzipFile(None, "w", fileobj = newCompressedF).write(new)
+            util.DeterministicGzipFile(None, "w", fileobj = newCompressedF).write(new)
             newCompressed = newCompressedF.getvalue()
             fc = filecontents.FromString(newCompressed, compressed = True)
             size -= len(oldCompressed) - len(newCompressed)
