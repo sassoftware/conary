@@ -35,6 +35,7 @@ from conary.lib import util, openpgpfile
 from conary.lib.http import request
 from conary.repository import changeset, errors, filecontainer, netclient, transport
 from conary.repository import datastore
+from conary.repository import xmlshims
 from conary.repository.netrepos import reposlog, netserver
 from conary.server import schema
 from conary.build import signtrove
@@ -1494,3 +1495,33 @@ foo:runtime
         assert ts[0] == ts[1]
         assert ts[0] < ts[2]
         assert ts[2] == ts[3]
+
+    def testResumeOffset(self):
+        repos = self.openRepository()
+        trv1 = self.addComponent('foo:runtime', '1.0')
+        trv2 = self.addComponent('foo:python', '1.0')
+        path1 = os.path.join(self.workDir, 'expected1.ccs')
+        path2 = os.path.join(self.workDir, 'expected2.ccs')
+        job = [trv1.getNameVersionFlavor().asJob(),
+                trv2.getNameVersionFlavor().asJob()]
+        repos.createChangeSetFile([job[0]], path1)
+        repos.createChangeSetFile([job[1]], path2)
+        expected1 = open(path1).read()
+        expected2 = open(path2).read()
+        expected = expected1 + expected2
+        size1 = len(expected1)
+        total = size1 + len(expected2)
+
+        sp = repos.c[trv1.getVersion().getHost()]
+        job = xmlshims.NetworkConvertors().fromJobList(job)
+        # This is too slow to run for every possible byte offset and
+        # ChangeSetTest.testChangeSetDumpOffset is already doing an exhaustive
+        # test, so just test the boundary conditions for the ChangesetProducer
+        # part.
+        offsets = [0, size1 - 1, size1, size1 + 1, total - 2, total - 1, total]
+        for offset in offsets:
+            rc = sp.getChangeSet(job, recurse=True, withFiles=True,
+                    withFileContents=True, excludeAutoSource=False,
+                    resumeOffset=offset)
+            actual = rc[0].read()
+            self.assertEqual(actual, expected[offset:])

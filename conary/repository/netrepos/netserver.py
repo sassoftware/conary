@@ -52,7 +52,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 72 + 1)
+SERVER_VERSIONS = range(36, 73 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -1578,9 +1578,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource,
                      changeSetVersion = None, mirrorMode = False,
-                     infoOnly = False):
-        # infoOnly is for compatibilit with the network call; it's ignored
-        # here (but implemented in the front-side proxy)
+                     infoOnly = False, resumeOffset=None):
+        # infoOnly and resumeOffset are for compatibility with the network
+        # call; it's ignored here (but implemented in the front-side proxy)
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -3398,8 +3398,10 @@ for attr, val in NetworkRepositoryServer.__dict__.iteritems():
 
 class ManifestWriter(object):
 
-    def __init__(self, tmpDir):
+    def __init__(self, tmpDir, resumeOffset=None):
         self.fobj = tempfile.NamedTemporaryFile(dir=tmpDir, suffix='.cf-out')
+        if resumeOffset:
+            self.fobj.write('resumeOffset=%d\n' % resumeOffset)
 
     def append(self, path, expandedSize, isChangeset, preserveFile, offset):
         print >> self.fobj, "%s %d %d %d %d" % (path, expandedSize,

@@ -1,4 +1,11 @@
 # this file documents the wire protocol changes for conary.
+Version 73:
+  - Added 'resumeOffset' arg to getChangeSet
+  - Added 'extra' dictionary to return value from getChangeset. extra may
+    contain a 'resumeOffset' key indicating how many bytes were skipped in the
+    response changeset. extra may contain a 'tag' key holding an opaque
+    checksum of the changeset.
+
 Version 72:
   - added getRoleFilters, setRoleFilters
 

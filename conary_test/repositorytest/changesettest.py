@@ -26,6 +26,7 @@ from conary import errors, files, trove, versions
 from conary.deps import deps
 from conary.lib import sha1helper, util
 from conary.repository import changeset, filecontainer, filecontents, netclient
+from conary.repository import datastore
 
 
 class ChangesetTest(rephelp.RepositoryHelper):
@@ -234,3 +235,59 @@ class ChangesetTest(rephelp.RepositoryHelper):
         repos.commitChangeSet(cs)
 
         cs = repos.createChangeSet([ job(first), job(second) ])
+
+    def testChangeSetDumpOffset(self):
+        """Stress test offset arg to dumpIter"""
+        # Make a changeset with one regular file
+        cs = changeset.ChangeSet()
+        pathId = '0' * 16
+        fileId = '0' * 20
+        contents = 'contents'
+        store = datastore.FlatDataStore(self.workDir)
+        sha1 = sha1helper.sha1String(contents)
+        store.addFile(StringIO(contents), sha1)
+        rawFile = store.openRawFile(sha1)
+        rawSize = os.fstat(rawFile.fileno()).st_size
+        contObj = filecontents.CompressedFromDataStore(store, sha1)
+        cs.addFileContents(pathId, fileId, changeset.ChangedFileTypes.file,
+                contObj, cfgFile=False, compressed=True)
+
+        # Test dumping a fully populated changeset with every possible resume
+        # point
+        path = os.path.join(self.workDir, 'full.ccs')
+        size = cs.writeToFile(path)
+        expected = open(path).read()
+        self.assertEqual(len(expected), size)
+        fc = filecontainer.FileContainer(util.ExtendedFile(path,
+            'r', buffering=False))
+        def noop(name, tag, size, subfile):
+            assert tag[2:] != changeset.ChangedFileTypes.refr[4:]
+            return tag, size, subfile
+        for offset in range(size + 1):
+            fc.reset()
+            actual = ''.join(fc.dumpIter(noop, (), offset))
+            self.assertEqual(actual, expected[offset:])
+
+        # Test dumping a changeset with contents stripped out
+        path = os.path.join(self.workDir, 'stubby.ccs')
+        size2 = cs.writeToFile(path, withReferences=True)
+        self.assertEqual(size2, size)
+        fc = filecontainer.FileContainer(util.ExtendedFile(path,
+            'r', buffering=False))
+        expect_reference = '%s %d' % (sha1.encode('hex'), rawSize)
+        def addfile(name, tag, size, subfile, dummy):
+            self.assertEqual(dummy, 'dummy')
+            if name == 'CONARYCHANGESET':
+                return tag, size, subfile
+            elif name == pathId + fileId:
+                self.assertEqual(tag[2:], changeset.ChangedFileTypes.refr[4:])
+                self.assertEqual(subfile.read(), expect_reference)
+                tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+                rawFile.seek(0)
+                return tag, rawSize, rawFile
+            else:
+                assert False
+        for offset in range(size + 1):
+            fc.reset()
+            actual = ''.join(fc.dumpIter(addfile, ('dummy',), offset))
+            self.assertEqual(actual, expected[offset:])

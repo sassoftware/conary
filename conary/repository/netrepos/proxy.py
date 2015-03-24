@@ -612,7 +612,7 @@ class ChangesetFilter(BaseProxy):
     def getChangeSet(self, caller, authToken, clientVersion, chgSetList,
                      recurse, withFiles, withFileContents, excludeAutoSource,
                      changesetVersion = None, mirrorMode = False,
-                     infoOnly = False):
+                     infoOnly = False, resumeOffset=None):
 
         # This is how the caching algorithm works:
         # - Produce verPath, a path in the digraph of possible version
@@ -680,7 +680,8 @@ class ChangesetFilter(BaseProxy):
                 self.csCache.resetLocks()
 
         if not infoOnly:
-            manifest = netserver.ManifestWriter(self.cfg.tmpDir)
+            manifest = netserver.ManifestWriter(self.cfg.tmpDir,
+                    resumeOffset=resumeOffset)
             for csInfo in changeSetList:
                 manifest.append(csInfo.path,
                         expandedSize=csInfo.size,
@@ -719,11 +720,16 @@ class ChangesetFilter(BaseProxy):
 
             return (url, allSizes, allTrovesNeeded, allFilesNeeded,
                     allTrovesRemoved)
-
-        # clientVersion >= 50
-        return (url, (
-                [ (str(x.size), x.trovesNeeded, x.filesNeeded, x.removedTroves)
-                    for x in changeSetList ] ) )
+        items = [ (str(x.size), x.trovesNeeded, x.filesNeeded, x.removedTroves)
+                for x in changeSetList ]
+        if clientVersion < 73:
+            return url, items
+        else:
+            extra = {}
+            if resumeOffset:
+                extra['resumeOffset'] = resumeOffset
+            # TODO: add checksum/tag/whatever here
+            return url, items, extra
 
     def _callGetChangeSetFingerprints(self, caller, chgSetList,
             recurse, withFiles, withFileContents, excludeAutoSource,
@@ -1555,12 +1561,21 @@ class ChangesetProducer(object):
         self.contentsStore = contentsStore
         self.items = []
         self.totalSize = 0
+        self.resumeOffset = None
         assert manifestPath.endswith('-out')
         if manifestPath.endswith('.cf-out'):
             # Manifest of items to produce
             for line in open(manifestPath):
+                line = line.split()
+                if len(line) == 1:
+                    key, value = line[0].split('=')
+                    if key == 'resumeOffset':
+                        self.resumeOffset = int(value)
+                    else:
+                        raise RuntimeError("invalid key in changeset manifest")
+                    continue
                 (path, expandedSize, isChangeset, preserveFile, offset,
-                        ) = line.split()
+                        ) = line
                 expandedSize = long(expandedSize)
                 self.items.append((path, expandedSize, int(isChangeset),
                     int(preserveFile), int(offset)))
@@ -1575,7 +1590,7 @@ class ChangesetProducer(object):
             self.items.append((manifestPath, expandedSize, 0, 0, 0))
 
     def getSize(self):
-        return self.totalSize
+        return self.totalSize - (self.resumeOffset or 0)
 
     def __iter__(self):
         for (path, expandedSize, isChangeset, preserveFile, offset,
@@ -1583,11 +1598,29 @@ class ChangesetProducer(object):
             container = util.ExtendedFile(path, 'rb', buffering=False)
             rawSize = os.fstat(container.fileno()).st_size - offset
             fobj = util.SeekableNestedFile(container, rawSize, offset)
-            if isChangeset:
+            if self.resumeOffset:
+                self.resumeOffset -= expandedSize
+                if self.resumeOffset >= 0:
+                    # This file has been skipped entirely
+                    additionalOffset = expandedSize
+                else:
+                    # Part of this file will be returned
+                    remaining = -self.resumeOffset
+                    additionalOffset = expandedSize - remaining
+                    self.resumeOffset = None
+            else:
+                additionalOffset = 0
+            assert 0 <= additionalOffset <= expandedSize
+            if additionalOffset == expandedSize:
+                # Skipped
+                pass
+            elif isChangeset:
                 changeSet = filecontainer.FileContainer(fobj)
-                for data in changeSet.dumpIter(self._readNestedFile):
+                for data in changeSet.dumpIter(self._readNestedFile,
+                        offset=additionalOffset):
                     yield data
             else:
+                fobj.seek(additionalOffset)
                 for data in util.iterFileChunks(fobj):
                     yield data
             container.close()
@@ -1605,10 +1638,10 @@ class ChangesetProducer(object):
             path = self.contentsStore.hashToPath(
                     sha1helper.sha1FromString(sha1))
             fobj = open(path, 'rb')
-            return tag, expandedSize, util.iterFileChunks(fobj)
+            return tag, expandedSize, fobj
         else:
             # this is data from the changeset itself
-            return tag, rawSize, util.iterFileChunks(subfile)
+            return tag, rawSize, subfile
 
 
 # ewtroan: for the internal proxy, we support client version 38 but need to talk to a server which is at least version 41
