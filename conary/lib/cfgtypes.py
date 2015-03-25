@@ -541,6 +541,57 @@ class CfgSignedRegExpList(CfgRegExpList):
 
 CfgPathList  = CfgLineList(CfgPath, ':')
 
+
+class CfgBytes(CfgType):
+    """
+    Scalar type that holds either a number of bytes or a rate in bytes per
+    second.
+    """
+    scales = [
+            ('G',   1000000000),
+            ('Gi',  1024*1024*1024),
+            ('M',   1000000),
+            ('Mi',  1024*1024),
+            ('k',   1000),
+            ('K',   1000),
+            ('ki',  1024),
+            ('Ki',  1024),
+            ('',    1),
+            ]
+    scales_d = dict(scales)
+    pattern = '^(\d+) *([kKMG]?i?)([bB]?)[/p]?s?$'
+
+    def __init__(self, defaultScale='', perSecond=False):
+        assert defaultScale in self.scales_d
+        self.perSecond = perSecond
+        self.defaultScale = defaultScale
+
+    def parseString(self, text):
+        m = re.search(self.pattern, text)
+        if not m:
+            if self.perSecond:
+                raise ParseError("invalid rate '%s'. Example: 123 kB/s" %
+                        (text,))
+            else:
+                raise ParseError("invalid byte value '%s'. Example: 123 MB" %
+                        (text,))
+        value, suffix, isBytes = m.groups()
+        if not suffix and not isBytes:
+            suffix = self.defaultScale
+        value = int(value) * self.scales_d[suffix]
+        return value
+
+    def format(self, val, displayOptions=None):
+        if not val:
+            suffix = self.defaultScale
+        else:
+            for suffix, scale in self.scales:
+                if val % scale == 0:
+                    val //= scale
+                    break
+        return '%d %sB%s' % (val, suffix, '/s' if self.perSecond else '')
+
+
 # --- errors
 
 class CfgError(Exception):

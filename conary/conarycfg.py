@@ -32,7 +32,8 @@ from conary.deps import deps, arch
 from conary.lib import util, api
 from conary.lib.cfg import ParseError, SectionedConfigFile, ConfigSection
 from conary.lib.cfgtypes import (CfgType, CfgString, CfgBool, CfgPath, CfgEnum,
-        CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt)
+        CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt,
+        CfgBytes)
 from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions
@@ -622,9 +623,9 @@ class ConaryContext(ConfigSection):
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
     pubRing               =  (CfgPathList, _getDefaultPublicKeyrings())
-    uploadRateLimit       =  (CfgInt, 0,
+    uploadRateLimit       =  (CfgBytes(perSecond=True), 0,
             "Upload rate limit, in bytes per second")
-    downloadRateLimit     =  (CfgInt, 0,
+    downloadRateLimit     =  (CfgBytes(perSecond=True), 0,
             "Download rate limit, in bytes per second")
 
     recipeTemplate        =  None
