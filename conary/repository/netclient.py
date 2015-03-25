@@ -34,6 +34,7 @@ from conary import trovetup
 from conary import versions
 from conary.lib import util, api
 from conary.lib import httputils
+from conary.lib import log
 from conary.lib.http import proxy_map, request as req_mod
 from conary.repository import calllog
 from conary.repository import changeset
@@ -56,7 +57,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 72 + 1)
+CLIENT_VERSIONS = range(36, 73 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -397,6 +398,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if pwPrompt is None:
             pwPrompt = lambda x, y: (None, None)
 
+        self.cfg = cfg
         self.downloadRateLimit = cfg.downloadRateLimit
         self.uploadRateLimit = cfg.uploadRateLimit
         self.c = ServerCache(cfg, pwPrompt)
@@ -1508,12 +1510,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             excludeAutoSource, filesNeeded,
                             chgSetList, removedList, changesetVersion,
                             mirrorMode):
-            abortCheck = None
             if callback:
                 callback.requestingChangeSet()
-            server.setAbortCheck(abortCheck)
+            server.setAbortCheck(None)
             args = (job, recurse, withFiles, withFileContents,
                     excludeAutoSource)
+            kwargs = {}
             serverVersion = server.getProtocolVersion()
 
             if mirrorMode and serverVersion >= 49:
@@ -1525,7 +1527,59 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             elif changesetVersion and serverVersion > 47:
                 args += (changesetVersion, )
 
-            l = server.getChangeSet(*args)
+            # seek to the end of the file
+            outFile.seek(0, 2)
+            start = resume = outFile.tell()
+            attempts = max(1, self.cfg.downloadAttempts)
+            while attempts > 0:
+                if resume - start:
+                    assert serverVersion >= 73
+                    outFile.seek(resume)
+                    kwargs['resumeOffset'] = resume - start
+                    if callback:
+                        callback.warning("Changeset download was interrupted. "
+                                "Attempting to resume where it left off.")
+                try:
+                    (sizes, extraTroveList, extraFileList, removedTroveList,
+                            extra,) = _getCsOnce(serverVersion, args, kwargs)
+                    break
+                except errors.TruncatedResponseError:
+                    attempts -= 1
+                    if not attempts or serverVersion < 73:
+                        raise
+                    # Figure out how many bytes were downloaded, then trim off
+                    # a bit to ensure any garbage (e.g. a proxy error page) is
+                    # discarded.
+                    keep = max(resume, outFile.tell() -
+                            self.cfg.downloadRetryTrim)
+                    if self.cfg.downloadRetryTrim and (
+                            keep - resume > self.cfg.downloadRetryThreshold):
+                        attempts = max(1, self.cfg.downloadAttempts)
+                    resume = keep
+
+            chgSetList += self.toJobList(extraTroveList)
+            filesNeeded.update(self.toFilesNeeded(extraFileList))
+            removedList += self.toJobList(removedTroveList)
+
+            for size in sizes:
+                f = util.SeekableNestedFile(outFile, size, start)
+                try:
+                    newCs = changeset.ChangeSetFromFile(f)
+                except IOError, err:
+                    assert False, 'IOError in changeset (%s); args = %r' % (
+                            str(err), args,)
+                if not cs:
+                    cs = newCs
+                else:
+                    cs.merge(newCs)
+                start += size
+
+            return (cs, self.toJobList(extraTroveList),
+                    self.toFilesNeeded(extraFileList))
+
+        def _getCsOnce(serverVersion, args, kwargs):
+            l = server.getChangeSet(*args, **kwargs)
+            extra = {}
             if serverVersion >= 50:
                 url = l[0]
                 sizes = [ x[0] for x in l[1] ]
@@ -1535,6 +1589,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                     *[ x[2] for x in l[1] ] ) ]
                 removedTroveList = [ x for x in itertools.chain(
                                     *[ x[3] for x in l[1] ] ) ]
+                if serverVersion >= 73:
+                    extra = l[2]
             elif serverVersion < 38:
                 (url, sizes, extraTroveList, extraFileList) = l
                 removedTroveList = []
@@ -1545,11 +1601,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # later sends them as strings instead of ints due to the 2
             # GiB limitation
             sizes = [ int(x) for x in sizes ]
-            server.setAbortCheck(None)
-
-            chgSetList += self.toJobList(extraTroveList)
-            filesNeeded.update(self.toFilesNeeded(extraFileList))
-            removedList += self.toJobList(removedTroveList)
 
             if hasattr(url, 'read'):
                 # Nested changeset file in a multi-part response
@@ -1584,44 +1635,26 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 copyCallback = None
                 abortCheck = None
 
-            # seek to the end of the file
-            outFile.seek(0, 2)
-            start = outFile.tell()
-            totalSize = util.copyfileobj(inF, outFile,
-                                         callback = copyCallback,
-                                         abortCheck = abortCheck,
-                                         rateLimit = self.downloadRateLimit)
-
-            if totalSize == None:
+            resumeOffset = kwargs.get('resumeOffset') or 0
+            # Start the total at resumeOffset so that progress callbacks
+            # continue where they left off.
+            copied = util.copyfileobj(inF, outFile, callback=copyCallback,
+                    abortCheck=abortCheck, rateLimit=self.downloadRateLimit,
+                    total=resumeOffset)
+            if copied is None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
-                expectSize = long(inF.headers['content-length'])
+            totalSize = copied + resumeOffset
+            if hasattr(inF, 'headers') and 'content-length' in inF.headers:
+                expectSize = resumeOffset + long(inF.headers['content-length'])
                 if totalSize != expectSize:
                     raise errors.TruncatedResponseError(expectSize, totalSize)
+                assert sum(sizes) == expectSize
             elif totalSize != sum(sizes):
                 raise errors.TruncatedResponseError(sum(sizes), totalSize)
             inF.close()
 
-            for size in sizes:
-                f = util.SeekableNestedFile(outFile, size, start)
-                try:
-                    newCs = changeset.ChangeSetFromFile(f)
-                except IOError, err:
-                    assert False, 'IOError in changeset (%s); args = %r' % (
-                            str(err), args,)
-
-                if not cs:
-                    cs = newCs
-                else:
-                    cs.merge(newCs)
-
-                totalSize -= size
-                start += size
-
-            assert totalSize == 0, '%d unexpected trailing bytes fetching args %r' %(totalSize, args)
-
-            return (cs, self.toJobList(extraTroveList),
-                    self.toFilesNeeded(extraFileList))
+            return (sizes, extraTroveList, extraFileList, removedTroveList,
+                    extra)
 
         def _getCsFromShim(target, cs, server, job, recurse, withFiles,
                            withFileContents, excludeAutoSource,

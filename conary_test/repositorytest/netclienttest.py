@@ -21,6 +21,7 @@ import copy
 import itertools
 import os
 import shutil
+import tempfile
 import time
 import SimpleHTTPServer
 
@@ -785,6 +786,46 @@ class NetclientTest(rephelp.RepositoryHelper):
         log = calllog.ClientCallLogger(p)
         methods = [ x.methodName for x in log ]
         self.assertEqual(methods, ['checkVersion', 'addNewAsciiPGPKey'])
+
+    def testRetryChangesetDownload(self):
+        self.cfg.downloadRetryTrim = 16
+        repos = self.openRepository()
+        trv = self.addComponent('foo:runtime', '1')
+        job = [trv.getNameVersionFlavor().asJob()]
+        host = trv.getVersion().getHost()
+
+        clean = os.path.join(self.workDir, 'clean.ccs')
+        repos.createChangeSetFile(job, clean)
+        sp = repos.c[host]
+        orig_cs = sp.getChangeSet
+        did_truncate = [False]
+        def getChangeSet(*args, **kwargs):
+            rc = orig_cs(*args, **kwargs)
+            fobj = rc[0]
+            spool = tempfile.TemporaryFile(dir=self.workDir)
+            size = util.copyfileobj(fobj, spool)
+            spool.seek(size // 2)
+            spool.write('garbage')
+            spool.truncate()
+            spool.seek(0)
+            # Patch this function back out so the second try works
+            sp.getChangeSet = orig_cs
+            did_truncate[0] = True
+            return [spool] + rc[1:]
+
+        sp.getChangeSet = getChangeSet
+        did_truncate = [False]
+        self.cfg.downloadAttempts = 1
+        self.assertRaises(errors.TruncatedResponseError,
+                repos.createChangeSet, job)
+
+        sp.getChangeSet = getChangeSet
+        did_truncate = [False]
+        self.cfg.downloadAttempts = 2
+        retry = os.path.join(self.workDir, 'retry.ccs')
+        repos.createChangeSetFile(job, retry)
+        assert did_truncate[0]
+        self.assertEqual(open(clean).read(), open(retry).read())
 
 
 class ServerProxyTest(rephelp.RepositoryHelper):

@@ -619,6 +619,14 @@ class ConaryContext(ConfigSection):
     proxyMap              =  CfgProxyMap
     connectAttempts       = (CfgInt, 3, "Number of connection attempts to make "
             "for outbound HTTP requests.")
+    downloadAttempts      = (CfgInt, 3, "Number of attempts to restart an "
+            "interrupted download")
+    downloadRetryThreshold = (CfgBytes('M'), 10000000,
+            "Reset the download attempt count if at least this many megabytes "
+            "have been transferred since the last failure")
+    downloadRetryTrim     =  (CfgBytes('k'), 1000000,
+            "If a download is reattempted, trim this many kilobytes off the "
+            "end of what was previously downloaded. 0 disables this feature.")
     # The first keyring in the list is writable, and is used for storing the
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
