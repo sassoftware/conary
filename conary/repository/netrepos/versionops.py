@@ -203,18 +203,19 @@ class LatestTable:
         # Investigate that.
         cu = self.db.cursor()
         cu.execute("SELECT itemId, branchId, flavorId FROM %s" % table)
-        query = ' OR '.join(
-                '(itemId = %d AND branchId = %d AND flavorId = %d)'
-                % tuple(x) for x in cu)
-        if not query:
-            return
-        cu.execute("DELETE FROM LatestCache WHERE " + query)
-        cu.execute("""
-            INSERT INTO LatestCache (latestType, userGroupId, itemId, branchId,
-                    flavorId, versionId)
-            SELECT DISTINCT v.latestType, v.userGroupId, v.itemId, v.branchId,
-                    v.flavorId, v.versionId
-            FROM LatestView v WHERE """ + query)
+        pieces = ['(itemId = %d AND branchId = %d AND flavorId = %d)'
+                % tuple(x) for x in cu]
+        count = 1000
+        while pieces:
+            query = ' OR '.join(pieces[-count:])
+            del pieces[-count:]
+            cu.execute("DELETE FROM LatestCache WHERE " + query)
+            cu.execute("""
+                INSERT INTO LatestCache (latestType, userGroupId, itemId, branchId,
+                        flavorId, versionId)
+                SELECT DISTINCT v.latestType, v.userGroupId, v.itemId, v.branchId,
+                        v.flavorId, v.versionId
+                FROM LatestView v WHERE """ + query)
 
 
 class LabelMap(idtable.IdPairSet):
