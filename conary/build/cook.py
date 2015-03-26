@@ -844,6 +844,7 @@ def cookGroupObjects(repos, db, cfg, recipeClasses, sourceVersion, macros={},
             grpTrv.setIsCollection(True)
             grpTrv.setLabelPath(recipeObj.getLabelPath())
             grpTrv.setSearchPath(recipeObj.getSearchPath())
+            grpTrv.setProductDefinitionVersion(recipeObj.getProductDefinitionVersion())
             grpTrv.setBuildRefs(group.getBuildRefs())
             grpTrv.troveInfo.imageGroup.set(group.imageGroup)
             compatClass = group.compatibilityClass
@@ -1480,6 +1481,7 @@ def _createPackageChangeSet(repos, db, cfg, bldList, loader, recipeObj,
             trv.setProvides(provides)
             trv.setIsCollection(True)
             trv.setIsDerived(recipeObj._isDerived)
+            trv.setProductDefinitionVersion(recipeObj.getProductDefinitionVersion())
             _copyScripts(trv, recipeObj._scriptsMap)
             _setCookTroveMetadata(trv, recipeObj._metadataItemsMap.get(
                                                             trv.name(), {}))
