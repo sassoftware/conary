@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+# The Java class file format is described in JSR-202: https://www.jcp.org/en/jsr/detail?id=202
 
 import struct
 from collections import namedtuple
