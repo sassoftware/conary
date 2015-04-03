@@ -29,8 +29,9 @@ all:
 install: pyfiles-install kidfiles-install
 
 kidfiles-install:
+	if [ -z "$(NO_KID)" ] ; then \
 	$(CP) -a $(kid_files) $(DESTDIR)/$(sitedir)/$(DIR)/; \
-	kidc --force --source $(DESTDIR)$(sitedir)/$(DIR) ||:
+	kidc --force --source $(DESTDIR)$(sitedir)/$(DIR) ||: ; fi
 	rm -f $(DESTDIR)$(sitedir)/$(DIR)/*.pyc
 	if [ -n "$(DESTDIR)" ]; then $(SED) -i -e 's#$(DESTDIR)##g' $(DESTDIR)$(sitedir)/$(DIR)/*.py; fi
 
