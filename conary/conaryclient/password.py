@@ -29,6 +29,6 @@ def getPassword(server, userName=None, useCached=True):
             return userName, passwd
     s = "Enter the password for %s on %s:" % (userName, server)
     passwd = getpass.getpass(s)
-    if passwd:
+    if passwd and useCached:
         keystore.setPassword(keyDesc, passwd)
     return userName, passwd

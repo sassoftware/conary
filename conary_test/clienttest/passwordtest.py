@@ -31,7 +31,7 @@ class PasswordTest(rephelp.RepositoryHelper):
     def testGetPassword(self):
         # CNY-2497
 
-        userName, ret = password.getPassword('foo')
+        userName, ret = password.getPassword('foo', useCached=False)
         self.assertEqual(userName, None)
         self.assertEqual(ret, None)
 
@@ -39,6 +39,6 @@ class PasswordTest(rephelp.RepositoryHelper):
             return prompt
 
         self.mock(getpass, 'getpass', mockedGetpass)
-        userName, ret = password.getPassword("server.com", userName="Johnny")
+        userName, ret = password.getPassword("server.com", userName="Johnny", useCached=False)
         self.assertEqual(userName, "Johnny")
         self.assertEqual(ret, "Enter the password for Johnny on server.com:")

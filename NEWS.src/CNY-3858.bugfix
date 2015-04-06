@@ -1,0 +1,4 @@
+Fixed crash when using saved passwords after the session keyring was revoked.
+
+Cached passwords are saved in the per-user keyring instead of the per-session
+keyring.
