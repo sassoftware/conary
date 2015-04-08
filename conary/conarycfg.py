@@ -637,6 +637,8 @@ class ConaryContext(ConfigSection):
             "Download rate limit, in bytes per second")
 
     recipeTemplate        =  None
+    groupTemplate         =  None
+    factoryTemplate       =  None
     repositoryMap         =  CfgRepoMap
     resolveLevel          =  (CfgInt, 2)
     root                  =  (CfgPath, '/')

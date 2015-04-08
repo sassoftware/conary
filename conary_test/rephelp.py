@@ -859,11 +859,13 @@ class RepositoryHelper(testhelp.TestCase):
             client.close()
         return ret
 
-    def newpkg(self, name, factory = None):
+    def newpkg(self, name, factory=None, template=None):
         self.openRepository()
         args = {}
         if factory:
             args['factory'] = factory
+        if template:
+            args['template'] = template
         cvccmd.sourceCommand(self.cfg, [ "newpkg", name], args)
 
     def makeSourceTrove(self, name, recipeFile, buildLabel=None,
@@ -1460,7 +1462,7 @@ class RepositoryHelper(testhelp.TestCase):
                     f.flags.isConfig(True)
                 index += 1
 
-                if capsule and not (f.flags.isConfig() or 
+                if capsule and not (f.flags.isConfig() or
                                 getattr(contents, 'isGhost', None)):
                     # RBL-5684: we force ghost files to not be marked as
                     # payload
@@ -1717,7 +1719,7 @@ class RepositoryHelper(testhelp.TestCase):
         null = os.open('/dev/null', os.O_WRONLY)
         os.dup2(null, sys.stdout.fileno())
         os.dup2(null, sys.stderr.fileno())
-        try: 
+        try:
             return cook.cookItem(self.repos, self.cfg, 'test%s' % num, macros=macros, prep=prep)
         finally:
             os.dup2(stdout, sys.stdout.fileno())
@@ -1746,7 +1748,7 @@ class RepositoryHelper(testhelp.TestCase):
         if not repos:
             repos = self.openRepository()
 
-        built = self.discardOutput( cook.cookItem, repos, self.cfg, troveName, 
+        built = self.discardOutput( cook.cookItem, repos, self.cfg, troveName,
                                     ignoreDeps = ignoreDeps, logBuild = logBuild,
                                     callback = callback )
         if buildLabel:
@@ -1838,8 +1840,8 @@ class RepositoryHelper(testhelp.TestCase):
     _printOnError = False
 
     def cookObject(self, loader, prep=False, macros={}, sourceVersion = None,
-                   serverIdx = 0, ignoreDeps = False, logBuild = False, 
-                   targetLabel = None, repos = None, 
+                   serverIdx = 0, ignoreDeps = False, logBuild = False,
+                   targetLabel = None, repos = None,
                    groupOptions = None, resume = None):
         theClass = loader.getRecipe()
         if repos is None:

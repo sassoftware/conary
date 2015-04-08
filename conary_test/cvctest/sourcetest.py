@@ -276,7 +276,7 @@ contents(size sha1)
         os.chdir(origDir)
 
     def testDiffByFiles(self):
-        
+
         mdiff2 = '''\
 (working version) (no log message)
 
@@ -333,7 +333,7 @@ contents(sha1)
         self.writeFile("test.source1", ''.join(lines))
         lines[2] = 'linenew\n'
         self.writeFile("test.source2", ''.join(lines))
-        
+
         rc = self.diff('test.source2')
         self.assertEquals(rc, mdiff2)
 
@@ -571,7 +571,7 @@ contents(sha1)
         # cmdline has more trailing whitespace
         self.assertEquals('\n'.join(logMessagesNewer).strip(),
                           cmdLineNewer.strip())
-        self.assertRaises(errors.CvcError, 
+        self.assertRaises(errors.CvcError,
             checkin.iterLog(repos, branch='foo', newer=True).next)
 
 
@@ -606,8 +606,8 @@ contents(sha1)
         # properly
         repos = self.openRepository()
         for (pathId, path, fileId, version, fObj) in repos.iterFilesInTrove(
-                    'testcase:source', 
-                    versions.VersionFromString('/localhost@rpl:linux/1.0-1'), 
+                    'testcase:source',
+                    versions.VersionFromString('/localhost@rpl:linux/1.0-1'),
                     deps.deps.Flavor(), withFiles = True):
             assert(fObj.flags.isSource())
             if path in ('test.source', 'testcase.recipe'):
@@ -618,7 +618,7 @@ contents(sha1)
 
         self.checkout("testcase", dir = "foo")
         os.chdir("foo")
-        self.verifySrcDirectory(["testcase.recipe", "test.source", 
+        self.verifySrcDirectory(["testcase.recipe", "test.source",
                                  "test.fifo" ])
         os.chdir("..")
 
@@ -638,7 +638,7 @@ contents(sha1)
         self.commit()
 
         s = self.showLog()
-        lines = [ x.strip() for x in s.split('\n') if x.strip() != '' ] 
+        lines = [ x.strip() for x in s.split('\n') if x.strip() != '' ]
         self.assertEquals(lines, ['Name  : testcase:source',
                          'Branch: /localhost@rpl:linux',
                          '1.0-2 Test', 'foo', '1.0-1 Test', 'foo' ] )
@@ -659,7 +659,7 @@ contents(sha1)
 
         self.checkout("testcase")
         os.chdir("testcase")
-        self.verifySrcDirectory(["testcase.recipe", "test.source", 
+        self.verifySrcDirectory(["testcase.recipe", "test.source",
                                  "test.newsource" ])
         self.verifyFile("test.newsource", newSourceContents)
         os.chdir("..")
@@ -668,10 +668,10 @@ contents(sha1)
         # 1.0-3
         self.checkout("testcase", "1.0-1")
         os.chdir("testcase")
-        self.verifySrcDirectory(["testcase.recipe", "test.source", 
+        self.verifySrcDirectory(["testcase.recipe", "test.source",
                                  "test.fifo" ])
         self.update()
-        self.verifySrcDirectory(["testcase.recipe", "test.source", 
+        self.verifySrcDirectory(["testcase.recipe", "test.source",
                                  "test.newsource" ])
         self.rename("test.source", "test.renamed")
         os.remove("test.newsource")
@@ -709,7 +709,7 @@ contents(sha1)
         self.verifySrcDirectory(["testcase.recipe", "test.renamed"])
         self.verifyFile("testcase.recipe", recipes.testRecipe1)
         self.verifyFile("test.renamed", sourceContents)
-        sourceContents2 = recipes.testRecipe1 + "# some comments\n" 
+        sourceContents2 = recipes.testRecipe1 + "# some comments\n"
         self.writeFile("testcase.recipe", sourceContents2)
         rc = self.diff()
         self.assertEquals(rc, diff1)
@@ -779,7 +779,7 @@ contents(sha1)
         err = "error: cannot find source trove: revision badVersion of testcase:source was not found on label(s) localhost@rpl:linux"
         self.logCheck(self.update, ("badVersion",), err)
         os.chdir(origDir)
-    
+
     def testSourceFlag(self):
         self.resetWork()
         origDir = os.getcwd()
@@ -807,8 +807,8 @@ contents(sha1)
 
         # it's a shame there isn't a better way to do this
         repos = self.openRepository()
-        trv = repos.getTrove("testcase:source", 
-             versions.VersionFromString("/localhost@rpl:linux/1.0-1"), 
+        trv = repos.getTrove("testcase:source",
+             versions.VersionFromString("/localhost@rpl:linux/1.0-1"),
              deps.deps.Flavor())
 
         for (pathId, path, fileId, version) in trv.iterFileList():
@@ -831,10 +831,10 @@ contents(sha1)
         util.rmtree('foo')
         self.checkout('foo:source', buildLabel)
         assert(os.path.exists('foo'))
-        self.assertRaises(errors.CvcError, 
+        self.assertRaises(errors.CvcError,
                           self.checkout, 'foo:source')
         # no build label set and we don't specify a label
-        self.assertRaises(errors.LabelPathNeeded, 
+        self.assertRaises(errors.LabelPathNeeded,
                           self.checkout, 'foo:source', '1.0')
 
     def testNewpkg(self):
@@ -856,7 +856,7 @@ contents(sha1)
         assert(os.path.exists(os.path.join('foo', 'foo.recipe')))
         util.rmtree('foo')
 
-        self.newpkg('foo=%s --template rpath' % buildLabel)
+        self.newpkg('foo=%s' % buildLabel, template="rpath")
         assert(os.path.exists(os.path.join('foo', 'foo.recipe')))
         util.rmtree('foo')
 
@@ -872,6 +872,49 @@ contents(sha1)
         self.assertEquals([ x[1] for x in sourceState.iterFileList() if x[1].endswith('.recipe') ], ['foo.recipe'])
 
         self.cfg.recipeTemplate = None
+
+    def testNewGroup(self):
+        os.chdir(self.workDir)
+        buildLabel = str(self.cfg.buildLabel)
+        self.cfg.buildLabel = None
+        templateDir = os.path.join(resources.get_archive(), 'recipeTemplates')
+        self.cfg.recipeTemplateDirs = [templateDir]
+
+        self.newpkg('group-foo=%s' % buildLabel)
+        assert(os.path.exists('group-foo'))
+        assert(os.path.exists(os.path.join('group-foo', 'CONARY')))
+        assert(not os.path.exists(os.path.join('group-foo', 'group-foo.recipe')))
+
+        self.newpkg('group-foo=%s' % buildLabel, template='test')
+        assert(os.path.exists(os.path.join('group-foo', 'group-foo.recipe')))
+        util.rmtree('group-foo')
+
+        self.cfg.groupTemplate = 'test'
+        self.newpkg('group-foo=%s' % buildLabel)
+        assert(os.path.exists(os.path.join('group-foo', 'group-foo.recipe')))
+        util.rmtree('group-foo')
+
+    def testNewFactory(self):
+        os.chdir(self.workDir)
+        buildLabel = str(self.cfg.buildLabel)
+        self.cfg.buildLabel = None
+        self.newpkg('factory-foo=%s' % buildLabel, factory="factory")
+        assert(os.path.exists('factory-foo'))
+        assert(os.path.exists(os.path.join('factory-foo', 'CONARY')))
+        assert(not os.path.exists(os.path.join('factory-foo', 'factory-foo.recipe')))
+
+        templateDir = os.path.join(resources.get_archive(), 'recipeTemplates')
+        self.cfg.recipeTemplateDirs = [templateDir]
+
+        self.newpkg('factory-foo=%s' % buildLabel,
+                    factory="factory", template="factory")
+        assert(os.path.exists(os.path.join('factory-foo', 'factory-foo.recipe')))
+        util.rmtree('factory-foo')
+
+        self.cfg.factoryTemplate = 'test'
+        self.newpkg('factory-foo=%s' % buildLabel, factory="factory")
+        assert(os.path.exists(os.path.join('factory-foo', 'factory-foo.recipe')))
+        util.rmtree('factory-foo')
 
     def testCommitErrors(self):
         # let's do evil things with commit
@@ -897,7 +940,7 @@ contents(sha1)
         os.chdir(self.workDir)
         self.newpkg('simple')
         os.chdir('simple')
-        self.logCheck(self.update, ['someversion'], 
+        self.logCheck(self.update, ['someversion'],
             "error: cannot update source directory for package 'simple:source' - it was created with newpkg and has never been checked in.")
 
     def testNewCommit(self):
@@ -991,7 +1034,7 @@ contents(sha1)
         self.assertIn("uucp     uucp", str)
 
         # make a change
-        sourceContents2 = recipes.testRecipe1 + "# some comments\n" 
+        sourceContents2 = recipes.testRecipe1 + "# some comments\n"
         self.writeFile("testcase.recipe", sourceContents2)
 
         # user the daemon user to commit this change (1.0-2)
@@ -1023,13 +1066,13 @@ contents(sha1)
 
     def testAutoSource(self):
         def _checkFile(repos, target, version):
-            trv = repos.getTrove("autosource:source", 
-                 versions.VersionFromString("/localhost@rpl:linux/%s" % 
-                                                    version), 
+            trv = repos.getTrove("autosource:source",
+                 versions.VersionFromString("/localhost@rpl:linux/%s" %
+                                                    version),
                  deps.deps.Flavor())
 
             for (pathId, path, fileId, version) in trv.iterFileList():
-                if path == target: 
+                if path == target:
                     return version.asString()
 
             return None
@@ -1060,7 +1103,7 @@ contents(sha1)
         # copy autosource files into new source search dir so we can
         # modify them safely
         for fileName in [ 'distcc-2.9.tar.bz2', 'multilib-sample.tar.bz2' ]:
-            shutil.copy2(os.path.join(resources.get_archive(), fileName), 
+            shutil.copy2(os.path.join(resources.get_archive(), fileName),
                          sourceDir)
 
         repos = self.openRepository()
@@ -1073,7 +1116,7 @@ contents(sha1)
         self.logCheck(self.commit, (),
                   'error: recipe not in CONARY state file, please run cvc add')
         self.addfile("autosource.recipe")
-        self.logCheck(self.commit, (), 
+        self.logCheck(self.commit, (),
                       'error: localfile (in current directory) must '
                       'be added with cvc add')
         self.addfile("localfile", binary = True)
@@ -1142,7 +1185,7 @@ contents(sha1)
         assert('M  multilib-sample.tar.bz2' in rc)
         self.logFilter.add()
         self.commit()
-        self.logFilter.compare(['+ found localfile in repository', 
+        self.logFilter.compare(['+ found localfile in repository',
                                 '+ localfile not yet cached, fetching...'])
         os.chdir("..")
         v = _checkFile(repos, 'multilib-sample.tar.bz2', '3.0-1').split('/')[-1]
@@ -1230,9 +1273,9 @@ contents(sha1)
         # ensure that createChangeSet excludeAutoSource is not downloading
         # auto source parts from other repositories.
         self.checkout("autosource", 'localhost1@rpl:branch')
-        trvTup = repos.findTrove(self.cfg.installLabelPath, 
-                                 ('autosource:source', 
-                                  'localhost1@rpl:branch', 
+        trvTup = repos.findTrove(self.cfg.installLabelPath,
+                                 ('autosource:source',
+                                  'localhost1@rpl:branch',
                                   deps.deps.Flavor()), None)[0]
         changeList = [(trvTup[0], (None, None), trvTup[1:], False)]
         cs = repos.createChangeSet(changeList, excludeAutoSource=True)
@@ -1289,15 +1332,15 @@ class foo(PackageRecipe):
     def testAddSourceInSubClass(self):
         # subclass is an exact duplicate of superclass -
         # it has no setup() method, and so just uses the superclass one.
-        # superclass gains a source file 'newsource' in its second 
+        # superclass gains a source file 'newsource' in its second
         # variation.  When then try cooking subclass and it fails
         # because newsource is not available.
 
         # NOTE: I'm turning this test off because being able to do this
         # is not part of the design of course sources atm.  I'm leaving
-        # the code here for historical record and to document this 
+        # the code here for historical record and to document this
         # behavior.
-        return 
+        return
         os.chdir(self.workDir)
         self.newpkg("superclass")
         os.chdir("superclass")
@@ -1346,9 +1389,9 @@ class foo(PackageRecipe):
 
         # copy file into autosource directory
         shutil.copyfile(os.path.join(resources.get_archive(),
-                        'distcc-2.9.tar.bz2'), 
+                        'distcc-2.9.tar.bz2'),
                          dir + '/foo')
-        simpleRecipe = (recipes.simpleRecipe 
+        simpleRecipe = (recipes.simpleRecipe
                      + '\tr.addSource("a/foo", dir="/foo1")\n'
                      + '\tr.addSource("b/foo", dir="/foo2")\n'
                      + '\tr.addSource("http://localhost/foo", dir="/foo3")\n'
@@ -1389,7 +1432,7 @@ class foo(PackageRecipe):
         shutil.copyfile(archivePath + '/' + rpm,
                         sourceDir + '/' + rpm)
 
-        simpleRecipe = ((recipes.simpleRecipe 
+        simpleRecipe = ((recipes.simpleRecipe
                      + '\tr.addSource("a/%(tarfile)s", dir="/foo1")\n'
                      + '\tr.addSource("b/%(tarfile)s", dir="/foo2")\n')
                       % dict(tarfile=tarfile, rpm=rpm))
@@ -1421,9 +1464,9 @@ class foo(PackageRecipe):
 
         # copy file into cache, for finding when using http
         shutil.copyfile(os.path.join(resources.get_archive(),
-                        'distcc-2.9.tar.bz2'), 
+                        'distcc-2.9.tar.bz2'),
                          dir + '/foo')
-        simpleRecipe = (recipes.simpleRecipe 
+        simpleRecipe = (recipes.simpleRecipe
                      + '\tr.addSource("foo", dir="/foo1")\n'
                      + '\tr.addSource("a/foo", dir="/foo2")\n'
                      + '\tr.addSource("http://localhost/foo", dir="/foo3")\n'
@@ -1572,7 +1615,7 @@ branch /conary.rpath.com@rpl:linux
 
         self.newpkg('simple')
         os.chdir('simple')
-        simpleRecipe = (recipes.simpleRecipe 
+        simpleRecipe = (recipes.simpleRecipe
                      + '\tr.addSource("foo.txt", dir="/foo1")\n'
                      )
         self.writeFile('simple.recipe', simpleRecipe)
@@ -2077,7 +2120,7 @@ class SimpleRecipe(PackageRecipe):
         self.assertEqual(oldState, newState)
 
     def testMarkRemovedSource(self):
-        self.addComponent('simple:source', '1', '', 
+        self.addComponent('simple:source', '1', '',
                          [('simple.recipe', recipes.simpleRecipe)])
         self.markRemoved('simple:source')
         os.chdir(self.workDir)
@@ -2148,7 +2191,7 @@ class SimpleRecipe(PackageRecipe):
 
     def testUsingBuildlabel(self):
         # buildlabel is not defined at checkin time.  But that
-        # should be ok because unknown macros are allowed at checkin 
+        # should be ok because unknown macros are allowed at checkin
         # time.
         os.chdir(self.workDir)
         self.newpkg('group-test')
@@ -2387,11 +2430,11 @@ class BarRecipe(PackageRecipe):
         self.assertEquals(str, '(none)\n')
 
     def testCvcUpdateToFactory(self):
-        self.addComponent('simple:source', 
+        self.addComponent('simple:source',
                           [('simple.recipe', recipes.simpleRecipe)])
         os.chdir(self.workDir)
         self.checkout('simple')
-        self.addComponent('simple:source=2', 
+        self.addComponent('simple:source=2',
                           [('simple.recipe', recipes.simpleRecipe)],
                           factory='foo')
         os.chdir('simple')
@@ -2401,7 +2444,7 @@ class BarRecipe(PackageRecipe):
 
     def testFilePermChangeCache(self):
         repos = self.openRepository()
-        self.addComponent('autosource:source', 
+        self.addComponent('autosource:source',
                           [('autosource.recipe', recipes.autoSource0 +
                           '\tr.Install("localfile", "/foo")\n\n'),
                            ('localfile', 'contents\n')])
@@ -2491,7 +2534,7 @@ class SbWrapper:
         if item == stat.ST_GID:
             return self.gid
         return self.sb.__getitem__(item)
-    
+
     def __init__(self, sb, uid, gid):
         self.sb = sb
         self.uid = uid
