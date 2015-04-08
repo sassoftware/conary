@@ -67,7 +67,9 @@ def getPassword(keyDesc):
     except _keyutils.Error as err:
         if err.args[0] != _keyutils.EKEYREVOKED:
             raise
-        # This should only happen if using old keyutils.
+        # This happens if using old keyutils if the session was revoked (which
+        # normally _setupSession would fix), or using new keyutils if the key
+        # itself was revoked.
         return None
     if keyId is not None:
         return _keyutils.read_key(keyId)
@@ -85,3 +87,18 @@ def setPassword(keyDesc, passwd):
             raise
         # This should only happen if using old keyutils.
     return passwd
+
+
+def invalidatePassword(keyDesc):
+    if not _keyutils:
+        return
+    try:
+        keyId = _keyutils.search(_keyring, keyDesc)
+        _keyutils.revoke(keyId)
+    except AttributeError:
+        # Old keyutils, oh well
+        return
+    except _keyutils.Error as err:
+        if err.args[0] != _keyutils.EKEYREVOKED:
+            raise
+        # Close enough
