@@ -64,6 +64,10 @@ def troveIsGroup(troveName):
     return troveIsCollection(troveName) and troveName.startswith('group-')
 
 @api.developerApi
+def troveIsFactory(troveName):
+    return troveName.startswith('factory-')
+
+@api.developerApi
 def troveIsComponent(troveName):
     return ":" in troveName
 

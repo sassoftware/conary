@@ -1,0 +1,12 @@
+#
+# Copyright (c) %(year)s %(contactName)s (%(contact)s)
+#
+
+class %(className)s(GroupSetRecipe):
+    name = '%(name)s'
+    version = ''
+
+    buildRequires = []
+
+    def setup(r):
+        pass
