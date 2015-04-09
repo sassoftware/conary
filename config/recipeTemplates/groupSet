@@ -6,7 +6,42 @@ class %(className)s(GroupSetRecipe):
     name = '%(name)s'
     version = ''
 
-    buildRequires = []
+    checkPathConflicts = True
+    depCheck = True
+    imageGroup = True
+
+    # packages to be added to group
+    packages = []
+
+    def makeSearchPath(r):
+        '''
+        Constructs a search path using the buildLabel and the product
+        definition, if available. If additional search paths are required,
+        add them to the sps list below
+        '''
+        # add additional search paths
+        sps = []
+
+        buildLabel = r.cfg.buildLabel
+        repo = r.Repository(buildLabel, r.flavor)
+        if 'productDefinitionSearchPath' in r.macros:
+            for specs in r.macros.productDefinitionSearchPath.split('\n'):
+                if isinstance(specs, basestring):
+                    specs = [specs]
+                sps.append(repo.find(*specs))
+        return r.SearchPath(repo, *sps)
 
     def setup(r):
-        pass
+        sp = r.makeSearchPath()
+ 
+        packages = sp.find(*r.packages)
+ 
+        if r.depCheck:
+            # Checks against upstream searchpaths
+            deps = packages.depsNeeded(sp)
+ 
+            if r.imageGroup:
+                # For a bootable image (hopefully)
+                packages += deps
+ 
+        r.Group(packages, checkPathConflicts=r.checkPathConflicts)
