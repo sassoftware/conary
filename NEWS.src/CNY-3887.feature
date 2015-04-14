@@ -1,2 +1,1 @@
-Add new templates for group and factory recipes, and allow selecting
-the default template via config options, groupTemplae and factoryTemplate
+Add config options for selecting default group and factory recipe templates
