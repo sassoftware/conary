@@ -33,6 +33,7 @@ class _javaSymbolTable:
         self.accessFlags = 0
         self.classNameIndex = None
         self.superClassNameIndex = None
+        self.floatList = {}
         self.stringList = {}
         self.classRef = {}
         self.typeRef = {}
