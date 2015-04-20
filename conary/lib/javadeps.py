@@ -262,10 +262,11 @@ def _parseRefs(refStr):
     return s
 
 def _isAnonymousInnerClass(className):
+    # This also catches $1MethodScopedInner
     parts = iter(className.split('$'))
     parts.next()
     for part in parts:
-        if part.isdigit():
+        if part[0].isdigit():
             return True
     return False
 
@@ -304,7 +305,8 @@ def getDeps(contents):
     innerClassesMap = dict(
             ((x.outerClassName.replace('/', '.'), x.innerName), x)
             for x in (symbolTable.innerClasses or [])
-            if x.innerName is not None)
+            if x.innerName is not None
+                and x.outerClassName is not None)
     privateInnerClasses = set()
     for (outerClassName, innerName), obj in sorted(innerClassesMap.items()):
         className = "%s$%s" % (outerClassName, innerName)
@@ -318,7 +320,7 @@ def getDeps(contents):
     partsIter = iter(parts)
     outerClassName = partsIter.next()
     for innerName in partsIter:
-        if innerName.isdigit():
+        if innerName[0].isdigit():
             # Anonymous inner class
             className = None
             break

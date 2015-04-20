@@ -240,6 +240,8 @@ class MagicTest(rephelp.RepositoryHelper):
                 None,
                 ['cny.tv.vincent.InnerClasses',
                     'cny.tv.vincent.InnerClasses$InnerClass']),
+            ('cny/tv/vincent/InnerClasses$1MethodScopedFinalInnerClass.class',
+                None, ['cny.tv.vincent.InnerClasses', 'java.lang.Object']),
             ('cny/tv/vincent/InnerClasses$2.class',
                 None,
                 ['cny.tv.vincent.InnerClasses',
