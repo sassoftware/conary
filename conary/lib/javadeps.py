@@ -266,7 +266,7 @@ def _isAnonymousInnerClass(className):
     parts = iter(className.split('$'))
     parts.next()
     for part in parts:
-        if part[0].isdigit():
+        if not part or part[0].isdigit():
             return True
     return False
 
@@ -320,7 +320,7 @@ def getDeps(contents):
     partsIter = iter(parts)
     outerClassName = partsIter.next()
     for innerName in partsIter:
-        if innerName[0].isdigit():
+        if not innerName or innerName[0].isdigit():
             # Anonymous inner class
             className = None
             break
