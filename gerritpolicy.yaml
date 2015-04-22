@@ -8,8 +8,8 @@ GLOBAL:
       Code-Review : on
       Verified : off
       Encoding: off
-      EOL : on
-      Issue-Tracking : on
+      EOL : off
+      Issue-Tracking : off
       Template-ERB-Review: off
    validator-opts:
       Encoding:
