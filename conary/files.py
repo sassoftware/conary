@@ -750,7 +750,7 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
             _havePrelink = bool(os.access(PRELINK_CMD[0], os.X_OK))
         if undoPrelink and _havePrelink:
             prelink = subprocess.Popen(
-                    PRELINK_CMD + ("-y", path),
+                    PRELINK_CMD + ('-uo', '-', path),
                     stdout = subprocess.PIPE,
                     close_fds = True,
                     shell = False)
