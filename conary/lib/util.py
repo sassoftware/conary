@@ -2145,7 +2145,10 @@ class GzipFile(gzip.GzipFile):
 
         if buf == "":
             uncompress = self.decompress.flush()
-            self._read_eof()
+            eof = self.decompress.unused_data
+            if len(eof) < 8:
+                raise IOError("gzip file is truncated or corrupt")
+            self._read_eof(eof)
             self._add_read_data( uncompress )
             raise EOFError, 'Reached EOF'
 
