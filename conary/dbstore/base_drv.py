@@ -426,7 +426,7 @@ class BaseDatabase:
         %s
         END
         """ % (name, when.upper(), onAction.upper(), table, sql)
-        cu = self.dbh.cursor()
+        cu = self.cursor()
         cu.execute(sql)
         self.triggers[name] = table
         return True
@@ -435,7 +435,7 @@ class BaseDatabase:
         name = "%s_%s" % (table, onAction)
         if name not in self.triggers:
             return False
-        cu = self.dbh.cursor()
+        cu = self.cursor()
         cu.execute("DROP TRIGGER %s" % name)
         del self.triggers[name]
         return True
@@ -453,14 +453,14 @@ class BaseDatabase:
                 return False
         sql = "CREATE %s INDEX %s on %s (%s)" % (
             unique, name, table, columns)
-        cu = self.dbh.cursor()
+        cu = self.cursor()
         cu.execute(sql)
         if check:
             self.tables[table].append(name)
         return True
     def _dropIndexSql(self, table, name):
         sql = "DROP INDEX %s" % (name,)
-        cu = self.dbh.cursor()
+        cu = self.cursor()
         cu.execute(sql)
     def dropIndex(self, table, name, check = True):
         if check:
@@ -479,7 +479,7 @@ class BaseDatabase:
     def dropColumn(self, table, name):
         assert(self.dbh)
         sql = "ALTER TABLE %s DROP COLUMN %s" % (table, name)
-        cu = self.dbh.cursor()
+        cu = self.cursor()
         cu.execute(sql)
         return True
     def renameColumn(self, table, oldName, newName):
@@ -488,7 +488,7 @@ class BaseDatabase:
             return True
         assert(self.dbh)
         sql = "ALTER TABLE %s RENAME COLUMN %s TO %s" % (table, oldName, newName)
-        cu = self.dbh.cursor()
+        cu = self.cursor()
         cu.execute(sql)
         return True
 
