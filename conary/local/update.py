@@ -179,6 +179,24 @@ class FilesystemJob:
     def iterUserRemovals(self):
         return self.userRemovals.iteritems()
 
+    def findAliasedRemovals(self, absolutePath):
+        """
+        Look for removed paths that might be the same file as one being
+        installed, aliased by way of a symlink.
+        """
+        newIno = util.statFile(absolutePath, inodeOnly=True)
+        for removedPath in self.removes:
+            removedIno = util.statFile(removedPath, missingOk=True,
+                    inodeOnly=True)
+            if removedIno == newIno and os.path.realpath(removedPath
+                    ) == os.path.realpath(absolutePath):
+                # Deleting this file would either do nothing (native case) or
+                # trash the file that just got restored (capsules); just forget
+                # about it.
+                del self.removes[removedPath]
+                return True
+        return False
+
     def _createFile(self, target, str, msg):
         self.newFiles.append((target, str, msg))
 
@@ -1154,6 +1172,9 @@ class FilesystemJob:
                     elif shareFile:
                         # we're sharing it, not replacing it, so there
                         # is no conflict
+                        fileConflict = False
+                    elif self.findAliasedRemovals(headRealPath):
+                        # "conflicts" with an aliased path by way of symlink
                         fileConflict = False
 
                     if shareFile:

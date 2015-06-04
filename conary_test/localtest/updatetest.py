@@ -1672,3 +1672,17 @@ root:x:0:0:root:/root:/bin/bash
 bin:x:1:1:bin:/bin:/sbin/nologin
 foo:*:1234:1234::/:/sbin/nologin
 """)
+
+    def testUsrmoveUpdate(self):
+        """
+        Update file from /sbin to /usr/sbin while /sbin is a symlink
+
+        @tests: CNY-3885
+        """
+        os.makedirs(os.path.join(self.rootDir, 'usr/sbin'))
+        os.symlink('usr/sbin', os.path.join(self.rootDir, 'sbin'))
+        self.addComponent('usrmove:runtime', '1.0', [('/sbin/usrmove', '1.0')])
+        self.addComponent('usrmove:runtime', '2.0', [('/usr/sbin/usrmove', '2.0')])
+        self.updatePkg('usrmove:runtime=1.0', raiseError=True)
+        self.updatePkg('usrmove:runtime=2.0', raiseError=True)
+        self.assertEqual(open(os.path.join(self.rootDir, 'usr/sbin/usrmove')).read(), '2.0')

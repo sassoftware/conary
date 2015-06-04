@@ -1859,8 +1859,13 @@ def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
     if dir is None:
         dir = name
 
-    if template:
-        cfg.recipeTemplate = template
+    if not template:
+        if trove.troveIsGroup(name):
+            template = cfg.groupTemplate
+        elif trove.troveIsFactory(name):
+            template = cfg.factoryTemplate
+        else:
+            template = cfg.recipeTemplate
 
     if not os.path.isdir(dir):
         try:
@@ -1871,11 +1876,11 @@ def newTrove(repos, cfg, name, dir = None, template = None, buildBranch=None,
 
     recipeFile = '%s.recipe' % name
     recipeFileDir = os.path.join(dir, recipeFile)
-    if not os.path.exists(recipeFileDir) and cfg.recipeTemplate:
+    if not os.path.exists(recipeFileDir) and template:
         try:
-            path = util.findFile(cfg.recipeTemplate, cfg.recipeTemplateDirs)
+            path = util.findFile(template, cfg.recipeTemplateDirs)
         except OSError:
-            log.error("recipe template '%s' not found" % cfg.recipeTemplate)
+            log.error("recipe template '%s' not found" % template)
             return
 
         macros = Macros()

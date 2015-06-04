@@ -16,13 +16,11 @@
 
 
 from urllib import unquote
-import errno
 import itertools
 import kid
 import os
 import string
 import textwrap
-import time
 import webob
 from webob import exc
 
@@ -89,8 +87,7 @@ class ReposWeb(object):
                 protocol=self.request.scheme,
                 port=self.request.server_port,
                 authToken=auth,
-                repMap=cfg.repositoryMap,
-                userMap=cfg.user,
+                cfg=cfg,
                 )
 
         # Check if the request is sane

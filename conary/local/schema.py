@@ -75,7 +75,7 @@ def createDBTroveFiles(db):
         stream              BLOB
     )""" % db.keywords)
     cu.execute("CREATE INDEX DBTroveFilesIdx ON DBTroveFiles(fileId)")
-    cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON DBTroveFiles(instanceId)")
+    cu.execute("CREATE INDEX DBTroveFilesInstanceIdx2 ON DBTroveFiles(instanceId, pathId)")
     cu.execute("CREATE INDEX DBTroveFilesPathIdx ON DBTroveFiles(path)")
 
     idtable.createIdTable(db, "Tags", "tagId", "tag")
@@ -872,6 +872,7 @@ class MigrateTo_20(SchemaMigration):
         self.db.loadSchema()
         return self.Version
 
+
 # silent update while we're at schema 20. We only need to create a
 # index, so there is no need to do a full blown migration and stop
 # conary from working until a schema migration is done
@@ -885,30 +886,17 @@ def optSchemaUpdate(db):
         cu.execute('select count(*) from sqlite_stat1')
         count = cu.fetchall()[0][0]
         if count != 0:
-            try:
-                # go - read-only
-                cu.execute('BEGIN IMMEDIATE')
-                cu.execute('delete from sqlite_stat1')
-            except sqlerrors.ReadOnlyDatabase:
-                # the database will go slowly, but it should work.
-                pass
+            cu.execute('delete from sqlite_stat1')
 
     # Create DatabaseAttributes (if it doesn't exist yet)
     createDatabaseAttributes(db)
+
     #do we have the index we need?
-    if "TroveInfoInstTypeIdx" in db.tables["TroveInfo"]:
-        return
-    # we need to have write access
-    try:
-        cu = db.cursor()
-        cu.execute("BEGIN IMMEDIATE")
-    except sqlerrors.ReadOnlyDatabase:
-        return
-    else:
-        db.rollback()
-    # we have write access and we need the index created
-    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx",
-                   "infoType,instanceId")
+    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx", "infoType,instanceId")
+    db.dropIndex('DBTroveFiles', 'DBTroveFilesInstanceIdx')
+    db.createIndex('DBTroveFiles', 'DBTroveFilesInstanceIdx2',
+            'instanceId, pathId')
+
 
 def checkVersion(db):
     global VERSION

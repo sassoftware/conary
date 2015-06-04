@@ -126,10 +126,19 @@ class URLOpener(object):
             fp.seek(0)
         return ResponseWrapper(fp, response)
 
+    @staticmethod
+    def _drain(response):
+        """
+        When processing an error, consume the response body to ensure it isn't
+        mixed up with the next request in case the connection is kept alive.
+        """
+        try:
+            response.read()
+        except socket.error:
+            pass
+
     def _handleError(self, req, response):
-        # Drain the response body because we don't use it, otherwise pipelining
-        # breaks
-        response.read()
+        self._drain(response)
         self._handleProxyErrors(response.status)
         raise http_error.ResponseError(req.url, self.lastProxy,
                 response.status, response.reason, response.msg)
@@ -138,7 +147,7 @@ class URLOpener(object):
         return open(req.url.path, 'rb')
 
     def _followRedirect(self, req, response):
-        response.read()
+        self._drain(response)
         base = req.url
         dest = response.msg['Location']
         req.url = base.join(dest)

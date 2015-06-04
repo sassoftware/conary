@@ -41,9 +41,11 @@ class JavaDepsTest(rephelp.RepositoryHelper):
                             }
 
                 x.classRef = dict(zip(range(1, 6), range(1, 6)))
-                x.typeRef = dict(zip(range(6, 10), range(6, 10)))
+                x.typeRef = dict((i, (i, i)) for i in range(6, 10))
+                x._attributes = {}
+                x.classNameIndex = 1
 
-        mockParse = lambda x: (FakeSymbolTable(), 'JavaClass', 0)
+        mockParse = lambda x: (FakeSymbolTable(), 0)
         self.mock(javadeps, '_parseSymbolTable', mockParse)
 
         deps = javadeps.getDeps('fakecontents')

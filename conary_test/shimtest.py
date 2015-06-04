@@ -17,6 +17,7 @@
 
 from conary_test import rephelp
 
+import copy
 import gzip
 import os
 
@@ -46,12 +47,13 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
             os.environ['CONARY_CLIENT_LOG'] = log
 
         # remove localhost from the map; we don't need it since this is a shim
+        cliCfg = copy.copy(self.cfg)
         rm = conarycfg.RepoMap()
         for host, url in self.cfg.repositoryMap:
             if host != 'localhost':
                 rm.append((host, url))
-        shim = shimclient.ShimNetClient(server, 'http', 80,
-             authToken, rm, self.cfg.user)
+        cliCfg.repositoryMap = rm
+        shim = shimclient.ShimNetClient(server, 'http', 80, authToken, cliCfg)
 
         if log:
             del os.environ['CONARY_CLIENT_LOG']
@@ -74,9 +76,9 @@ class ShimNetClientTest(rephelp.RepositoryHelper):
         # test 3-member auth token
         server = shimclient.NetworkRepositoryServer(cfg,
                 self.cfg.repositoryMap['localhost'])
+        empty = conarycfg.ConaryConfiguration(False)
         shim = shimclient.ShimNetClient(server, 'http', 80,
-            ('anonymous', 'anonymous', []), {},
-             conarycfg.UserInformation())
+            ('anonymous', 'anonymous', []), cfg=empty)
         trove = shim.getTroves([(n, v, f)])[0]
         self.assertEqual(trove.getName(), n)
 

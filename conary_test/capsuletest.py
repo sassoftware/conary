@@ -1023,3 +1023,18 @@ class TestPackage(CapsuleRecipe):
         self.assertEqual(oct(os.stat(path).st_mode), '0100600')
         path = os.path.join(self.rootDir, 'dir')
         self.assertEqual(oct(os.stat(path).st_mode), '040700')
+
+    @conary_test.rpm
+    def testUsrmoveUpdate(self):
+        """
+        Update file from /sbin to /usr/sbin while /sbin is a symlink
+
+        @tests: CNY-3885
+        """
+        os.makedirs(os.path.join(self.rootDir, 'usr/sbin'))
+        os.symlink('usr/sbin', os.path.join(self.rootDir, 'sbin'))
+        self.addRPMComponent('usrmove:rpm=1.0', 'usrmove-1.0-1.x86_64.rpm')
+        self.updatePkg('usrmove:rpm', raiseError=True)
+        self.addRPMComponent('usrmove:rpm=2.0', 'usrmove-2.0-1.x86_64.rpm')
+        self.updatePkg('usrmove:rpm', raiseError=True)
+        self.assertEqual(open(os.path.join(self.rootDir, 'usr/sbin/usrmove')).read(), '2.0\n')

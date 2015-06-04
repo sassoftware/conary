@@ -52,7 +52,7 @@ from conary.errors import InvalidRegex
 # one in the list is the lowest protocol version we support and th
 # last one is the current server protocol version. Remember that range stops
 # at MAX - 1
-SERVER_VERSIONS = range(36, 72 + 1)
+SERVER_VERSIONS = range(36, 73 + 1)
 
 # We need to provide transitions from VALUE to KEY, we cache them as we go
 
@@ -171,7 +171,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def __del__(self):
         # this is ugly, but for now it is the only way to break the
         # circular dep created by self.repos back to us
-        self.repos.troveStore = self.repos.reposSet = None
+        self.repos.troveStore = None
         self.auth = self.ugo = None
         try:
             if self.__delDB: self.db.close()
@@ -208,7 +208,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.log(3)
         if self.db.reopen():
             # help the garbage collector with the magic from __del__
-            self.repos.troveStore = self.repos.reposSet = None
+            self.repos.troveStore = None
             self.troveStore = self.repos = self.auth = self.deptable = None
             self.open(connect=False)
 
@@ -1503,19 +1503,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             if isPresent and not hasAccess:
                 raise errors.InsufficientPermission
 
-    def _cvtJobEntry(self, authToken, jobEntry):
-        (name, (old, oldFlavor), (new, newFlavor), absolute) = jobEntry
-
-        if old == 0:
-            l = (name, (None, None),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        else:
-            l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
-                       (self.toVersion(new), self.toFlavor(newFlavor)),
-                       absolute)
-        return l
-
     def _getChangeSetObj(self, authToken, chgSetList, recurse,
                          withFiles, withFileContents, excludeAutoSource):
         # return a changeset object that has all the changesets
@@ -1529,7 +1516,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise errors.InsufficientPermission
 
         cs = changeset.ReadOnlyChangeSet()
-        l = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
+        l = self.toJobList(chgSetList)
 
         allTrovesNeeded = []
         allFilesNeeded = []
@@ -1550,56 +1537,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return (cs, allTrovesNeeded, allFilesNeeded, allRemovedTroves)
 
     def _createChangeSet(self, destFile, jobList, recurse = False, **kwargs):
-        def _cvtTroveList(l):
-            new = []
-            for (name, (oldV, oldF), (newV, newF), absolute) in l:
-                if oldV:
-                    oldV = self.fromVersion(oldV)
-                    oldF = self.fromFlavor(oldF)
-                else:
-                    oldV = 0
-                    oldF = 0
-
-                if newV:
-                    newV = self.fromVersion(newV)
-                    newF = self.fromFlavor(newF)
-                else:
-                    # this happens when a distributed group has a trove
-                    # on a remote repository disappear
-                    newV = 0
-                    newF = 0
-
-                new.append((name, (oldV, oldF), (newV, newF), absolute))
-
-            return new
-
-        def _cvtFileList(l):
-            new = []
-            for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV),
-                                    (newTroveV, newTroveF, newFileId, newFileV)) in l:
-                if oldFileV:
-                    oldTroveV = self.fromVersion(oldTroveV)
-                    oldFileV = self.fromVersion(oldFileV)
-                    oldFileId = self.fromFileId(oldFileId)
-                    oldTroveF = self.fromFlavor(oldTroveF)
-                else:
-                    oldTroveV = 0
-                    oldFileV = 0
-                    oldFileId = 0
-                    oldTroveF = 0
-
-                newTroveV = self.fromVersion(newTroveV)
-                newFileV = self.fromVersion(newFileV)
-                newFileId = self.fromFileId(newFileId)
-                newTroveF = self.fromFlavor(newTroveF)
-
-                pathId = self.fromPathId(pathId)
-
-                new.append((pathId, troveName,
-                               (oldTroveV, oldTroveF, oldFileId, oldFileV),
-                               (newTroveV, newTroveF, newFileId, newFileV)))
-
-            return new
 
         def oneChangeSet(destFile, jobs, **kwargs):
             # dedup jobs here; duplicates confuse the createChangeSet
@@ -1616,9 +1553,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 start = destFile.tell()
                 size = cs.appendToFile(destFile, withReferences = True)
 
-                rc.append((str(size), _cvtTroveList(trovesNeeded),
-                                  _cvtFileList(filesNeeded),
-                                  _cvtTroveList(removedTroves),
+                rc.append((str(size), self.fromJobList(trovesNeeded),
+                                  self.fromFilesNeeded(filesNeeded),
+                                  self.fromJobList(removedTroves),
                                   str(destFile.tell() - start)))
 
 
@@ -1641,9 +1578,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource,
                      changeSetVersion = None, mirrorMode = False,
-                     infoOnly = False):
-        # infoOnly is for compatibilit with the network call; it's ignored
-        # here (but implemented in the front-side proxy)
+                     infoOnly = False, resumeOffset=None):
+        # infoOnly and resumeOffset are for compatibility with the network
+        # call; it's ignored here (but implemented in the front-side proxy)
 
         # try to log more information about these requests
         self.log(2, [x[0] for x in chgSetList],
@@ -1664,8 +1601,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         try:
             # Requesting hidden troves directly is OK, e.g. commit hooks
             self._checkPermissions(authToken, chgSetList, hidden=True)
-            chgSetList = [ self._cvtJobEntry(authToken, x) for x in chgSetList ]
-
+            chgSetList = self.toJobList(chgSetList)
             rc = self._createChangeSet(outFile, chgSetList,
                                     recurse = recurse,
                                     withFiles = withFiles,
@@ -1816,19 +1752,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     @accessReadOnly
     def prepareChangeSet(self, authToken, clientVersion, jobList=None,
                          mirror=False):
-        def _convertJobList(jobList):
-            for name, oldInfo, newInfo, absolute in jobList:
-                oldVer = oldInfo[0]
-                newVer = newInfo[0]
-                if oldVer:
-                    oldVer = self.toVersion(oldVer)
-                if newVer:
-                    newVer = self.toVersion(newVer)
-                yield name, oldVer, newVer
-
         if jobList:
-            self._checkCommitPermissions(authToken, _convertJobList(jobList),
-                                         mirror, False)
+            checkList = [(x.name, x.old[0], x.new[0])
+                    for x in self.toJobList(jobList)]
+            self._checkCommitPermissions(authToken, checkList, mirror, False)
 
         self.log(2, authToken[0])
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
@@ -3471,8 +3398,10 @@ for attr, val in NetworkRepositoryServer.__dict__.iteritems():
 
 class ManifestWriter(object):
 
-    def __init__(self, tmpDir):
+    def __init__(self, tmpDir, resumeOffset=None):
         self.fobj = tempfile.NamedTemporaryFile(dir=tmpDir, suffix='.cf-out')
+        if resumeOffset:
+            self.fobj.write('resumeOffset=%d\n' % resumeOffset)
 
     def append(self, path, expandedSize, isChangeset, preserveFile, offset):
         print >> self.fobj, "%s %d %d %d %d" % (path, expandedSize,

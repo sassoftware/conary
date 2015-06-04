@@ -1026,3 +1026,10 @@ class Recipe(object):
             for fileDatum in fileData:
                 fileInfo, package = fileDatum
                 yield fileName, package, fileInfo[0], fileInfo[1], fileInfo[2], fileInfo[4]
+
+    def getProductDefinitionVersion(self):
+        key = 'productDefinitionVersion'
+        if key in self.macros:
+            return self.macros[key]
+        return None
+

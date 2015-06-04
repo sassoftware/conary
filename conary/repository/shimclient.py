@@ -27,10 +27,9 @@ import time
 # this returns the same server for any server name or label
 # requested; because a shim can only refer to one server.
 class FakeServerCache(netclient.ServerCache):
-    def __init__(self, server, repMap, userMap, conaryProxies, systemId=None):
+    def __init__(self, server, cfg):
         self._server = server
-        netclient.ServerCache.__init__(self, repMap, userMap,
-                proxies=conaryProxies, systemId=systemId)
+        netclient.ServerCache.__init__(self, cfg=cfg)
 
     def __getitem__(self, item):
         serverName = self._getServerName(item)
@@ -63,7 +62,6 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse,
                      withFiles, withFileContents, excludeAutoSource):
-        paths = []
         csList = []
         def _cvtTroveList(l):
             new = []
@@ -89,7 +87,6 @@ class NetworkRepositoryServer(netserver.NetworkRepositoryServer):
             return new
 
         for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
-            newVer = self.toVersion(new)
             if old == 0:
                 l = (name, (None, None),
                            (self.toVersion(new), self.toFlavor(newFlavor)),
@@ -200,8 +197,7 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
         self.commitChangeSet(cs, callback = callback, mirror = mirror,
                              hidden = hidden)
 
-    def __init__(self, server, protocol, port, authToken, repMap, userMap,
-            conaryProxies=None, systemId=None):
+    def __init__(self, server, protocol, port, authToken, cfg):
         if type(authToken[2]) is not list:
             # old-style [single entitlement] authToken
             authToken = (authToken[0], authToken[1],
@@ -209,14 +205,14 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
         elif len(authToken) == 3:
             authToken = authToken + (None,)
 
-        netclient.NetworkRepositoryClient.__init__(self, repMap, userMap,
-                proxy=conaryProxies, systemId=systemId)
-        proxy = ShimServerProxy(server, protocol, port, authToken, systemId)
-        self.c = FakeServerCache(proxy, repMap, userMap, conaryProxies,
-                systemId=systemId)
+        netclient.NetworkRepositoryClient.__init__(self, cfg=cfg)
+        proxy = ShimServerProxy(server, protocol, port, authToken,
+                systemId=self.c.systemId)
+        self.c = FakeServerCache(proxy, cfg=cfg)
 
 
 class ShimServerProxy(netclient.ServerProxy):
+
     def __init__(self, server, protocol, port, authToken, systemId=None):
         self._authToken = authToken
         self._server = server

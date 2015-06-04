@@ -1,3 +1,8 @@
 #!/bin/bash
-
-[ "$1" == '-y' ] && cat ${2}-orig
+if [ "$1" == '-uo' ] && [ "$2" == '-' ]
+then
+    cat ${3}-orig
+else
+    echo fake-prelink: wrong arguments >&2
+    exit 1
+fi

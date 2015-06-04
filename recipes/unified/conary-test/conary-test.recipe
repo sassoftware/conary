@@ -165,6 +165,7 @@ class ConaryTest(CPackageRecipe):
                 'm2crypto:rpm',
                 'python-devel:rpm',
                 'python-setuptools:rpm',
+                'rpm-python:rpm',
                 ])
 
 

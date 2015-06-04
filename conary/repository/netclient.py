@@ -29,11 +29,12 @@ from conary import callbacks
 from conary import conarycfg
 from conary import files
 from conary.cmds import metadata
-from conary import trove
+from conary import trove as trv_mod
 from conary import trovetup
 from conary import versions
 from conary.lib import util, api
 from conary.lib import httputils
+from conary.lib import log
 from conary.lib.http import proxy_map, request as req_mod
 from conary.repository import calllog
 from conary.repository import changeset
@@ -56,7 +57,7 @@ PermissionAlreadyExists = errors.PermissionAlreadyExists
 shims = xmlshims.NetworkConvertors()
 
 # end of range or last protocol version + 1
-CLIENT_VERSIONS = range(36, 72 + 1)
+CLIENT_VERSIONS = range(36, 73 + 1)
 
 from conary.repository.trovesource import TROVE_QUERY_ALL, TROVE_QUERY_PRESENT, TROVE_QUERY_NORMAL
 
@@ -181,25 +182,22 @@ class ServerProxy(util.ServerProxy):
         self._entitlementDir = entitlementDir
         self._callLog = callLog
 
-class ServerCache:
+class ServerCache(object):
     TransportFactory = transport.Transport
-    def __init__(self, repMap, userMap, pwPrompt=None, entitlements = None,
-            callback=None, proxies=None, proxyMap=None, entitlementDir=None,
-            caCerts=None, connectAttempts=None, systemId=None):
+
+    def __init__(self, cfg, pwPrompt=None):
         self.cache = {}
         self.shareCache = {}
-        self.map = repMap
-        self.userMap = userMap
+        self.map = cfg.repositoryMap
+        self.userMap = cfg.user
         self.pwPrompt = pwPrompt
-        self.entitlements = entitlements
-        if proxyMap is None:
-            proxyMap = proxy_map.ProxyMap.fromDict(proxies)
-        self.proxyMap = proxyMap
-        self.entitlementDir = entitlementDir
-        self.caCerts = caCerts
-        self.connectAttempts = connectAttempts
+        self.entitlements = cfg.entitlement
+        self.proxyMap = cfg.getProxyMap()
+        self.entitlementDir = cfg.entitlementDirectory
+        self.caCerts = cfg.trustedCerts
+        self.connectAttempts = cfg.connectAttempts
         self.callLog = None
-        self.systemId = systemId
+        self.systemId = util.SystemIdFactory(cfg.systemIdScript).getId()
 
         if 'CONARY_CLIENT_LOG' in os.environ:
             self.callLog = calllog.ClientCallLogger(
@@ -393,37 +391,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     FILE_CONTAINER_VERSION_NO_REMOVES = \
                             filecontainer.FILE_CONTAINER_VERSION_NO_REMOVES
 
-    # fixme: take a cfg object instead of all these parameters
-    def __init__(self, repMap, userMap, localRepository=None, pwPrompt=None,
-            entitlementDir=None, downloadRateLimit=0, uploadRateLimit=0,
-            entitlements=None, proxy=None, proxyMap=None, caCerts=None,
-            connectAttempts=None, systemId=None):
+    def __init__(self, cfg, localRepository=None, pwPrompt=None):
         # the local repository is used as a quick place to check for
         # troves _getChangeSet needs when it's building changesets which
         # span repositories. it has no effect on any other operation.
         if pwPrompt is None:
             pwPrompt = lambda x, y: (None, None)
 
-        self.downloadRateLimit = downloadRateLimit
-        self.uploadRateLimit = uploadRateLimit
-
-        if proxy:
-            proxies = proxy
-        else:
-            proxies = None
-
-        if entitlements is None:
-            entitlements = conarycfg.EntitlementList()
-        elif type(entitlements) == dict:
-            newEnts = conarycfg.EntitlementList()
-            for (server, (entClass, ent)) in entitlements.iteritems():
-                newEnts.addEntitlement(server, ent, entClass = entClass)
-            entitlements = newEnts
-
-        self.c = ServerCache(repMap, userMap, pwPrompt, entitlements,
-                proxies=proxies, entitlementDir=entitlementDir,
-                caCerts=caCerts, proxyMap=proxyMap,
-                connectAttempts=connectAttempts, systemId=systemId)
+        self.cfg = cfg
+        self.downloadRateLimit = cfg.downloadRateLimit
+        self.uploadRateLimit = cfg.uploadRateLimit
+        self.c = ServerCache(cfg, pwPrompt)
         self.localRep = localRepository
 
         trovesource.SearchableTroveSource.__init__(self, searchableByType=True)
@@ -432,9 +410,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.TROVE_QUERY_ALL = TROVE_QUERY_ALL
         self.TROVE_QUERY_PRESENT = TROVE_QUERY_PRESENT
         self.TROVE_QUERY_NORMAL = TROVE_QUERY_NORMAL
-
-    def __del__(self):
-        self.c = None
 
     def close(self, *args):
         pass
@@ -540,7 +515,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def addDigitalSignature(self, name, version, flavor, digsig):
         if self.c[version].getProtocolVersion() < 45:
-            raise InvalidServerVersion("Cannot sign troves on Conary "
+            raise errors.InvalidServerVersion("Cannot sign troves on Conary "
                                        "repositories older than 1.1.20")
 
         encSig = base64.b64encode(digsig.freeze())
@@ -600,8 +575,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for server in byServer.keys():
             s = self.c[version]
             if s.getProtocolVersion() < 47:
-                raise InvalidServerVersion, "Cannot add metadata to troves on " \
-                      "repositories older than 1.1.24"
+                raise errors.InvalidServerVersion("Cannot add metadata to "
+                        "troves on repositories older than 1.1.24")
         for server in byServer.keys():
             s = self.c[server]
             s.addMetadataItems(byServer[server])
@@ -891,7 +866,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         except KeyError:
             raise StopIteration
 
-        t = trove.Trove(trvCs, skipIntegrityChecks = not withFiles)
+        t = trv_mod.Trove(trvCs, skipIntegrityChecks = not withFiles)
         # if we're sorting, we'll need to pull out all the paths ahead
         # of time.  We'll use a generator that returns the items
         # in the same order as iterFileList() to reuse code.
@@ -1294,7 +1269,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             # trove integrity checks don't work when file information is
             # excluded
-            t = trove.Trove(troveCs, skipIntegrityChecks = not withFiles)
+            t = trv_mod.Trove(troveCs, skipIntegrityChecks = not withFiles)
             l.append(t)
 
         return l
@@ -1524,55 +1499,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             return (serverJobs, ourJobList)
 
-        def _cvtTroveList(l):
-            new = []
-            for (name, (oldV, oldF), (newV, newF), absolute) in l:
-                if oldV == 0:
-                    oldV = None
-                    oldF = None
-                else:
-                    oldV = self.toVersion(oldV)
-                    oldF = self.toFlavor(oldF)
-
-                if newV == 0:
-                    newV = None
-                    newF = None
-                else:
-                    newV = self.toVersion(newV)
-                    newF = self.toFlavor(newF)
-
-                new.append((name, (oldV, oldF), (newV, newF), absolute))
-
-            return new
-
-        def _cvtFileList(l):
-            new = []
-            for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV),
-                                    (newTroveV, newTroveF, newFileId, newFileV)) in l:
-                if oldTroveV == 0:
-                    oldTroveV = None
-                    oldFileV = None
-                    oldFileId = None
-                    oldTroveF = None
-                else:
-                    oldTroveV = self.toVersion(oldTroveV)
-                    oldFileV = self.toVersion(oldFileV)
-                    oldFileId = self.toFileId(oldFileId)
-                    oldTroveF = self.toFlavor(oldTroveF)
-
-                newTroveV = self.toVersion(newTroveV)
-                newFileV = self.toVersion(newFileV)
-                newFileId = self.toFileId(newFileId)
-                newTroveF = self.toFlavor(newTroveF)
-
-                pathId = self.toPathId(pathId)
-
-                new.append((pathId, troveName,
-                               (oldTroveV, oldTroveF, oldFileId, oldFileV),
-                               (newTroveV, newTroveF, newFileId, newFileV)))
-
-            return new
-
         def _getLocalTroves(troveList):
             if not self.localRep or not troveList:
                 return [ None ] * len(troveList)
@@ -1584,12 +1510,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             excludeAutoSource, filesNeeded,
                             chgSetList, removedList, changesetVersion,
                             mirrorMode):
-            abortCheck = None
             if callback:
                 callback.requestingChangeSet()
-            server.setAbortCheck(abortCheck)
+            server.setAbortCheck(None)
             args = (job, recurse, withFiles, withFileContents,
                     excludeAutoSource)
+            kwargs = {}
             serverVersion = server.getProtocolVersion()
 
             if mirrorMode and serverVersion >= 49:
@@ -1601,7 +1527,59 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             elif changesetVersion and serverVersion > 47:
                 args += (changesetVersion, )
 
-            l = server.getChangeSet(*args)
+            # seek to the end of the file
+            outFile.seek(0, 2)
+            start = resume = outFile.tell()
+            attempts = max(1, self.cfg.downloadAttempts)
+            while attempts > 0:
+                if resume - start:
+                    assert serverVersion >= 73
+                    outFile.seek(resume)
+                    kwargs['resumeOffset'] = resume - start
+                    if callback:
+                        callback.warning("Changeset download was interrupted. "
+                                "Attempting to resume where it left off.")
+                try:
+                    (sizes, extraTroveList, extraFileList, removedTroveList,
+                            extra,) = _getCsOnce(serverVersion, args, kwargs)
+                    break
+                except errors.TruncatedResponseError:
+                    attempts -= 1
+                    if not attempts or serverVersion < 73:
+                        raise
+                    # Figure out how many bytes were downloaded, then trim off
+                    # a bit to ensure any garbage (e.g. a proxy error page) is
+                    # discarded.
+                    keep = max(resume, outFile.tell() -
+                            self.cfg.downloadRetryTrim)
+                    if self.cfg.downloadRetryTrim and (
+                            keep - resume > self.cfg.downloadRetryThreshold):
+                        attempts = max(1, self.cfg.downloadAttempts)
+                    resume = keep
+
+            chgSetList += self.toJobList(extraTroveList)
+            filesNeeded.update(self.toFilesNeeded(extraFileList))
+            removedList += self.toJobList(removedTroveList)
+
+            for size in sizes:
+                f = util.SeekableNestedFile(outFile, size, start)
+                try:
+                    newCs = changeset.ChangeSetFromFile(f)
+                except IOError, err:
+                    assert False, 'IOError in changeset (%s); args = %r' % (
+                            str(err), args,)
+                if not cs:
+                    cs = newCs
+                else:
+                    cs.merge(newCs)
+                start += size
+
+            return (cs, self.toJobList(extraTroveList),
+                    self.toFilesNeeded(extraFileList))
+
+        def _getCsOnce(serverVersion, args, kwargs):
+            l = server.getChangeSet(*args, **kwargs)
+            extra = {}
             if serverVersion >= 50:
                 url = l[0]
                 sizes = [ x[0] for x in l[1] ]
@@ -1611,6 +1589,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                     *[ x[2] for x in l[1] ] ) ]
                 removedTroveList = [ x for x in itertools.chain(
                                     *[ x[3] for x in l[1] ] ) ]
+                if serverVersion >= 73:
+                    extra = l[2]
             elif serverVersion < 38:
                 (url, sizes, extraTroveList, extraFileList) = l
                 removedTroveList = []
@@ -1621,11 +1601,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # later sends them as strings instead of ints due to the 2
             # GiB limitation
             sizes = [ int(x) for x in sizes ]
-            server.setAbortCheck(None)
-
-            chgSetList += _cvtTroveList(extraTroveList)
-            filesNeeded.update(_cvtFileList(extraFileList))
-            removedList += _cvtTroveList(removedTroveList)
 
             if hasattr(url, 'read'):
                 # Nested changeset file in a multi-part response
@@ -1660,48 +1635,26 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 copyCallback = None
                 abortCheck = None
 
-            # seek to the end of the file
-            outFile.seek(0, 2)
-            start = outFile.tell()
-            totalSize = util.copyfileobj(inF, outFile,
-                                         callback = copyCallback,
-                                         abortCheck = abortCheck,
-                                         rateLimit = self.downloadRateLimit)
-
-            if totalSize == None:
+            resumeOffset = kwargs.get('resumeOffset') or 0
+            # Start the total at resumeOffset so that progress callbacks
+            # continue where they left off.
+            copied = util.copyfileobj(inF, outFile, callback=copyCallback,
+                    abortCheck=abortCheck, rateLimit=self.downloadRateLimit,
+                    total=resumeOffset)
+            if copied is None:
                 raise errors.RepositoryError("Unknown error downloading changeset")
-            elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
-                expectSize = long(inF.headers['content-length'])
+            totalSize = copied + resumeOffset
+            if hasattr(inF, 'headers') and 'content-length' in inF.headers:
+                expectSize = resumeOffset + long(inF.headers['content-length'])
                 if totalSize != expectSize:
-                    raise errors.RepositoryError("Changeset was truncated in "
-                            "transit (expected %d bytes, got %d bytes)" %
-                            (expectSize, totalSize))
+                    raise errors.TruncatedResponseError(expectSize, totalSize)
+                assert sum(sizes) == expectSize
             elif totalSize != sum(sizes):
-                raise errors.RepositoryError("Changeset was truncated in "
-                        "transit (expected %d bytes, got %d bytes)" %
-                        (sum(sizes), totalSize))
+                raise errors.TruncatedResponseError(sum(sizes), totalSize)
             inF.close()
 
-            for size in sizes:
-                f = util.SeekableNestedFile(outFile, size, start)
-                try:
-                    newCs = changeset.ChangeSetFromFile(f)
-                except IOError, err:
-                    assert False, 'IOError in changeset (%s); args = %r' % (
-                            str(err), args,)
-
-                if not cs:
-                    cs = newCs
-                else:
-                    cs.merge(newCs)
-
-                totalSize -= size
-                start += size
-
-            assert totalSize == 0, '%d unexpected trailing bytes fetching args %r' %(totalSize, args)
-
-            return (cs, _cvtTroveList(extraTroveList),
-                    _cvtFileList(extraFileList))
+            return (sizes, extraTroveList, extraFileList, removedTroveList,
+                    extra)
 
         def _getCsFromShim(target, cs, server, job, recurse, withFiles,
                            withFileContents, excludeAutoSource,
@@ -1725,7 +1678,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         assert(not [ x for x in chgSetList if (x[1][0] and x[-1]) ])
 
         cs = None
-        scheduledSet = {}
         internalCs = None
         filesNeeded = set()
         removedList = []
@@ -2095,7 +2047,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         seen.append(info)
                     else:
                         notMatching.append(info)
-                        if trove.troveIsGroup(info[0]):
+                        if trv_mod.troveIsGroup(info[0]):
                             groupsToGet.append(info)
 
             if not groupsToGet:
@@ -2271,6 +2223,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         totalSize = util.copyfileobj(inF, outF,
                                      rateLimit = self.downloadRateLimit,
                                      callback = copyCallback)
+        if totalSize == None:
+            raise errors.RepositoryError("Unknown error downloading changeset")
+        elif hasattr(inF, 'headers') and 'content-length' in inF.headers:
+            expectSize = long(inF.headers['content-length'])
+            if totalSize != expectSize:
+                raise errors.TruncatedResponseError(expectSize, totalSize)
+        elif totalSize != sum(sizes):
+            raise errors.TruncatedResponseError(sum(sizes), totalSize)
 
         fileObjList= []
         for size in sizes:
@@ -2506,7 +2466,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for host, l in byServer.iteritems():
             server = self.c[host]
             if server.getProtocolVersion() < 62:
-                raise InvalidServerVersion("Server %s does not have support "
+                raise errors.InvalidServerVersion(
+                        "Server %s does not have support "
                                            "for a commitCheck() call" % (host,))
             ret = self.c[host].commitCheck([(n, self.fromVersion(v)) for n,v in l])
             for (n,v), r in itertools.izip(l, ret):
@@ -2569,7 +2530,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not thaw:
             return info
         # need to thaw the troveinfo as well
-        return [ (m,t,trove.TroveInfo(base64.b64decode(ti)))
+        return [ (m,t,trv_mod.TroveInfo(base64.b64decode(ti)))
                  for (m,t,ti) in info ]
 
     def setTroveInfo(self, info, freeze=True):
@@ -2591,15 +2552,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for host, infoList in byServer.iteritems():
             server = self.c[host]
             #(n,v,f) are always assumed to be instances
-            infoList = [ ((n,self.fromVersion(v),self.fromFlavor(f)), ti)
-                     for (n,v,f),ti in infoList ]
+            infoList = [(self.fromTroveTup(tup), ti_)
+                    for (tup, ti_) in infoList]
             if freeze: # need to freeze the troveinfo as well
                 if server.getProtocolVersion() < 65:
                     skipSet = ti._newMetadataItems
                 else:
                     skipSet = None
-                infoList = [ (t, base64.b64encode(ti.freeze(skipSet=skipSet)))
-                             for t, ti in infoList ]
+                infoList = [ (t, base64.b64encode(ti_.freeze(skipSet=skipSet)))
+                             for t, ti_ in infoList ]
             total += server.setTroveInfo(infoList)
         return total
 
@@ -2609,7 +2570,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if server.getProtocolVersion() < 40:
             return [ ( x[0],
                        (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
-                       trove.TROVE_TYPE_NORMAL
+                       trv_mod.TROVE_TYPE_NORMAL
                      ) for x in server.getNewTroveList(mark) ]
         return [ ( x[0],
                    (x[1][0], self.thawVersion(x[1][1]), self.toFlavor(x[1][2])),
@@ -2697,7 +2658,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def getTroveInfo(self, infoType, troveList):
         # first, we need to know about this infoType
-        if infoType not in trove.TroveInfo.streamDict.keys():
+        if infoType not in trv_mod.TroveInfo.streamDict.keys():
             raise Exception("Invalid infoType requested")
 
         byServer = {}
@@ -2713,10 +2674,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 troveInfoList = self.getTroves(tl, withFiles = False)
                 for (i, tup), trv in itertools.izip(l, troveInfoList):
                     if trv is not None:
-                        attrname = trove.TroveInfo.streamDict[infoType][2]
+                        attrname = trv_mod.TroveInfo.streamDict[infoType][2]
                         results[i] = getattr(trv.troveInfo, attrname, None)
                 continue
-            elif (infoType >= trove._TROVEINFO_TAG_CLONEDFROMLIST and
+            elif (infoType >= trv_mod._TROVEINFO_TAG_CLONEDFROMLIST and
                   self.c[host].getProtocolVersion() < 64):
                 # server doesn't support this troveInfo type
                 continue
@@ -2730,7 +2691,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if present  == 0:
                     continue
                 data = base64.decodestring(dataStr)
-                results[i] = trove.TroveInfo.streamDict[infoType][1](data)
+                results[i] = trv_mod.TroveInfo.streamDict[infoType][1](data)
         return results
 
     @api.publicApi

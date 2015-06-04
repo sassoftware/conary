@@ -32,7 +32,8 @@ from conary.deps import deps, arch
 from conary.lib import util, api
 from conary.lib.cfg import ParseError, SectionedConfigFile, ConfigSection
 from conary.lib.cfgtypes import (CfgType, CfgString, CfgBool, CfgPath, CfgEnum,
-        CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt)
+        CfgList, CfgDict, CfgLineList, CfgPathList, CfgRegExpList, CfgInt,
+        CfgBytes)
 from conary.lib.http import proxy_map
 from conary import errors
 from conary import versions
@@ -618,16 +619,26 @@ class ConaryContext(ConfigSection):
     proxyMap              =  CfgProxyMap
     connectAttempts       = (CfgInt, 3, "Number of connection attempts to make "
             "for outbound HTTP requests.")
+    downloadAttempts      = (CfgInt, 3, "Number of attempts to restart an "
+            "interrupted download")
+    downloadRetryThreshold = (CfgBytes('M'), 10000000,
+            "Reset the download attempt count if at least this many megabytes "
+            "have been transferred since the last failure")
+    downloadRetryTrim     =  (CfgBytes('k'), 1000000,
+            "If a download is reattempted, trim this many kilobytes off the "
+            "end of what was previously downloaded. 0 disables this feature.")
     # The first keyring in the list is writable, and is used for storing the
     # keys that are not present on the system-wide keyring. Always expect
     # Conary to write to the first keyring.
     pubRing               =  (CfgPathList, _getDefaultPublicKeyrings())
-    uploadRateLimit       =  (CfgInt, 0,
+    uploadRateLimit       =  (CfgBytes(perSecond=True), 0,
             "Upload rate limit, in bytes per second")
-    downloadRateLimit     =  (CfgInt, 0,
+    downloadRateLimit     =  (CfgBytes(perSecond=True), 0,
             "Download rate limit, in bytes per second")
 
     recipeTemplate        =  None
+    groupTemplate         =  None
+    factoryTemplate       =  None
     repositoryMap         =  CfgRepoMap
     resolveLevel          =  (CfgInt, 2)
     root                  =  (CfgPath, '/')

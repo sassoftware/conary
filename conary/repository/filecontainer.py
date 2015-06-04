@@ -71,7 +71,7 @@ This code is careful not to depend on the file pointer at all for reading
 """
 
 import errno
-import gzip
+import os
 import struct
 
 import conary.errors
@@ -136,7 +136,7 @@ class FileContainer:
             size = util.copyfileobj(fileObj, self.file)
         else:
             start = self.file.tell()
-            gzFile = gzip.GzipFile('', "wb", 6, self.file)
+            gzFile = util.DeterministicGzipFile('', "wb", 6, self.file)
             util.copyfileobj(fileObj, gzFile)
             gzFile.close()
             size = self.file.tell() - start
@@ -219,42 +219,56 @@ class FileContainer:
             footer = struct.pack('!HH', len(name), len(tag))
         return ''.join((header, name, tag)), footer
 
-    def dumpIter(self, readFileFunc, args=()):
+    def dumpIter(self, readFileFunc, args=(), offset=0):
         """Dump the changeset as a byte stream, yielding chunks of bytes.
 
         C{readFileFunc} allows the caller to replace placeholders with actual
         file contents. It should take as arguments C{name, tag, rawSize,
         subfile}, C{subfile} being a file-like object of size C{rawSize}, and
-        return a tuple C{(tag, expandedSize, dataIter)}. C{tag} replaces the
-        old tag. C{dataIter} is an iterable that yields bytestrings totalling
-        C{expandedSize} bytes.
+        return a tuple C{(tag, expandedSize, subfile)}, which takes the place
+        of C{(tag, rawSize, subfile)} respectively.
 
         @param readFileFunc: File reading callback
         @type  readFileFunc: callable
         @param args: Extra arguments to pass to C{readFileFunc}
         @type  args: C{tuple}
+        @param offset: Skip this many bytes in the output stream
+        @type  offset: C{int}
         """
         assert not self.mutable
 
         fileHeader = self.file.pread(8, 0)
-        yield fileHeader
+        if offset < 8:
+            yield fileHeader[offset:]
+        if offset:
+            offset = max(0, offset - 8)
 
         next = self.getNextFile()
         while next is not None:
             name, tag, subfile = next
             rawSize = subfile.size
-            tag, expandedSize, dataIter = readFileFunc(name, tag, rawSize,
+            tag, expandedSize, subfile = readFileFunc(name, tag, rawSize,
                     subfile, *args)
             header, footer = self._packFileHeader(name, tag, expandedSize)
 
-            yield header
-            for chunk in dataIter:
-                yield chunk
+            if offset < len(header):
+                yield header[offset:]
+            if offset:
+                offset = max(0, offset - len(header))
+            if offset < expandedSize:
+                if offset:
+                    subfile.seek(offset, os.SEEK_CUR)
+                for chunk in util.iterFileChunks(subfile):
+                    yield chunk
+            if offset:
+                offset = max(0, offset - expandedSize)
 
             # > 4 GiB files have length of file name and tag after contents
             # (see format at the top of this file)
-            yield footer
-
+            if footer and offset < len(footer):
+                yield footer[offset:]
+            if offset:
+                offset = max(0, offset - len(footer))
             next = self.getNextFile()
 
     def reset(self):

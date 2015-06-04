@@ -64,6 +64,10 @@ def troveIsGroup(troveName):
     return troveIsCollection(troveName) and troveName.startswith('group-')
 
 @api.developerApi
+def troveIsFactory(troveName):
+    return troveName.startswith('factory-')
+
+@api.developerApi
 def troveIsComponent(troveName):
     return ":" in troveName
 
@@ -1012,7 +1016,8 @@ _TROVEINFO_TAG_BUILD_REFS     = 31  # group set recipes track troves which
 _TROVEINFO_TAG_PATHCONFLICTS  = 32
 _TROVEINFO_TAG_INSTALLTIME    = 33  # client only: when trove was installed
 _TROVEINFO_TAG_SUBPACKAGES    = 34  # PackageSpecs used
-_TROVEINFO_TAG_LAST           = 34
+_TROVEINFO_TAG_PRODUCT_DEFINITION_VERSION = 35
+_TROVEINFO_TAG_LAST           = 35
 
 _TROVECAPSULE_TYPE            = 0
 _TROVECAPSULE_RPM             = 1
@@ -1336,6 +1341,8 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_PATHCONFLICTS : (DYNAMIC, StringOrderedStreamCollection, "pathConflicts" ),
         _TROVEINFO_TAG_INSTALLTIME   : (DYNAMIC, streams.LongLongStream, 'installTime'),
         _TROVEINFO_TAG_SUBPACKAGES   : (DYNAMIC, streams.StringsStream, "subPackages" ),
+        _TROVEINFO_TAG_PRODUCT_DEFINITION_VERSION : (DYNAMIC,
+            StringVersionStream, 'productDefinitionVersion'),
     }
 
     v0SignatureExclusions = _getTroveInfoSigExclusions(streamDict)
@@ -3259,6 +3266,15 @@ class Trove(streams.StreamSet):
         self.troveInfo.subPackages.thaw('')
         for name in sorted(names):
             self.troveInfo.subPackages.set(name)
+
+    def setProductDefinitionVersion(self, version):
+        if isinstance(version, basestring):
+            version = str(version)
+            version = versions.VersionFromString(version)
+        self.troveInfo.productDefinitionVersion.set(version)
+
+    def getProductDefinitionVersion(self):
+        return self.troveInfo.productDefinitionVersion()
 
     def __init__(self, name, version = None, flavor = None, changeLog = None,
                  type = TROVE_TYPE_NORMAL, skipIntegrityChecks = False,

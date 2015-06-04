@@ -2145,7 +2145,10 @@ class GzipFile(gzip.GzipFile):
 
         if buf == "":
             uncompress = self.decompress.flush()
-            self._read_eof()
+            eof = self.decompress.unused_data
+            if len(eof) < 8:
+                raise IOError("gzip file is truncated or corrupt")
+            self._read_eof(eof)
             self._add_read_data( uncompress )
             raise EOFError, 'Reached EOF'
 
@@ -2176,6 +2179,30 @@ class GzipFile(gzip.GzipFile):
                                                          hex(actualCrc)))
         elif isize != (self.size & 0xffffffffL):
             raise IOError, "Incorrect length of data produced"
+
+
+class DeterministicGzipFile(gzip.GzipFile):
+    """
+    Patch GzipFile to not write mtimes into output.
+
+    Python 2.7 and later take a mtime argument.
+    """
+
+    class _fake_time(object):
+        @staticmethod
+        def time():
+            return 0
+
+    def _write_gzip_header(self):
+        # Patch the gzip module, not time.time directly, so other threads
+        # calling time.time() by other means are not affected.
+        orig_time = gzip.time
+        try:
+            gzip.time = self._fake_time
+            gzip.GzipFile._write_gzip_header(self)
+        finally:
+            gzip.time = orig_time
+
 
 # yields sorted paths and their stat bufs
 def walkiter(dirNameList, skipPathSet = set(), root = '/'):
@@ -2457,7 +2484,7 @@ def statFile(pathOrFile, missingOk=False, inodeOnly=False):
     """
     try:
         if isinstance(pathOrFile, basestring):
-            st = os.stat(pathOrFile)
+            st = os.lstat(pathOrFile)
         else:
             if hasattr(pathOrFile, 'fileno'):
                 pathOrFile = pathOrFile.fileno()
