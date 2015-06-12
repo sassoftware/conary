@@ -1,3 +1,38 @@
+Changes in 2.5.7:
+  o New Features:
+    * Attempt to restart an interrupted download instead of raising a
+      'changeset was truncated in transit' error. The newly added
+      downloadAttempts, downloadRetryThreshold, and downloadRetryTrim
+      configuration options govern this behavior. (CNY-3886)
+    * Add config options for selecting default group and factory recipe
+      templates (CNY-3887)
+    * Improve update speed for troves with a large quantity of unchanged
+      files.
+    * Mirroring to multiple targets now operates concurrently across all
+      targets rather than sequentially.
+
+  o Bug Fixes:
+    * Fixed crash when using saved passwords after the session keyring
+      was revoked. (CNY-3858)
+    * Cached passwords are saved in the per-user keyring instead of the
+      per-session keyring. (CNY-3858)
+    * Introduce versioned RPM dependencies for any require or provide
+      that has an exact version. This behavior can be disabled by
+      setting the 'enableRPMVerisonDeps' config option to False.
+      (CNY-3882)
+    * Fixed capsule postinstall scripts failing if they referenced a
+      shared file being preserved during the same job. For example,
+      installing a library that calls ldconfig in the same job as
+      installing glibc.i686 alongside glibc.x86_64. (CNY-3884)
+    * Fixed updating encapsulated and native packages which move a file
+      across a symlinked directory, especially in the case of UsrMove.
+      (CNY-3885)
+    * Fixed error when updating binaries with out-of-date prelinks.
+
+  o Internal Changes:
+    * The makefile has been updated to avoid running kidc when running
+      'make install' with 'NO_KID=1'. (CNY-3887)
+
 Changes in 2.5.6:
   o Bug Fixes:
     * Interrupting an update with Ctrl-C during "Committing database

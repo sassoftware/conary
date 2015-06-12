@@ -1,1 +1,0 @@
-Fixed updating encapsulated and native packages which move a file across a symlinked directory, especially in the case of UsrMove.

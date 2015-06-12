@@ -1,1 +1,0 @@
-Introduce versioned RPM dependencies for any require or provide that has an exact version. This behavior can be disabled by setting the 'enableRPMVerisonDeps' config option to False.

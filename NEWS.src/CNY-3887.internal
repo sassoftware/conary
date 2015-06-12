@@ -1,1 +1,0 @@
-The makefile has been updated to avoid running kidc when running 'make install' with 'NO_KID=1'.
