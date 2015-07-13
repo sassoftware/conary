@@ -20,6 +20,7 @@ bin/
 html/
 tmp/
 venv/
+_build
 
 NEWS.html
 conary/constants.py

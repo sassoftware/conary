@@ -1,4 +1,13 @@
-# this file documents the wire protocol changes for conary.
+Protocol Revisions
+==================
+
+Conary's internal XMLRPC API uses numbered revisions to negotiate which
+protocol will be used for client-server communications.
+
+Both clients and servers are expected to maintain system update functionality
+with reasonable forward- and backwards-compatibility indefinitely, so that
+clients can always update to the latest version.
+
 Version 73:
   - Added 'resumeOffset' arg to getChangeSet
   - Added 'extra' dictionary to return value from getChangeset. extra may
