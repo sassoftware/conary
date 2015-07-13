@@ -1,0 +1,363 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Protocol Revisions &mdash; Conary 2 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="Conary 2 documentation" href="index.html"/>
+        <link rel="prev" title="Conary Documentation Index" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-nav-search">
+        
+
+        
+          <a href="index.html" class="icon icon-home"> Conary
+        
+
+        
+        </a>
+
+        
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+        
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+        
+          
+          
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">Protocol Revisions</a></li>
+</ul>
+
+          
+        
+      </div>
+      &nbsp;
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Conary</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Protocol Revisions</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/protocol_versions.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document">
+            
+  <div class="section" id="protocol-revisions">
+<h1>Protocol Revisions<a class="headerlink" href="#protocol-revisions" title="Permalink to this headline">¶</a></h1>
+<p>Conary&#8217;s internal XMLRPC API uses numbered revisions to negotiate which
+protocol will be used for client-server communications.</p>
+<p>Both clients and servers are expected to maintain system update functionality
+with reasonable forward- and backwards-compatibility indefinitely, so that
+clients can always update to the latest version.</p>
+<dl class="docutils">
+<dt>Version 73:</dt>
+<dd><ul class="first last simple">
+<li>Added &#8216;resumeOffset&#8217; arg to getChangeSet</li>
+<li>Added &#8216;extra&#8217; dictionary to return value from getChangeset. extra may
+contain a &#8216;resumeOffset&#8217; key indicating how many bytes were skipped in the
+response changeset. extra may contain a &#8216;tag&#8217; key holding an opaque
+checksum of the changeset.</li>
+</ul>
+</dd>
+<dt>Version 72:</dt>
+<dd><ul class="first last simple">
+<li>added getRoleFilters, setRoleFilters</li>
+</ul>
+</dd>
+<dt>Version 71:</dt>
+<dd><ul class="first last simple">
+<li>corrected accidental use of X-Conary-UsedAnonymous as an error flag</li>
+</ul>
+</dd>
+<dt>Version 70:</dt>
+<dd><ul class="first last simple">
+<li>added getDepsForTroveList, getTimestamps</li>
+</ul>
+</dd>
+<dt>Version 69:</dt>
+<dd><ul class="first last simple">
+<li>added getCommitProgress</li>
+<li>prepareChangeset() returns a tuple of url,
+supportsGetCommitProgress (because the call is not supported on
+standalone repositories)</li>
+</ul>
+</dd>
+<dt>Version 68:</dt>
+<dd><ul class="first last simple">
+<li>added getFileContentsCapsuleInfo</li>
+</ul>
+</dd>
+<dt>Version 67:</dt>
+<dd><ul class="first last simple">
+<li>added getFileContentsFromTrove</li>
+</ul>
+</dd>
+<dt>Version 66:</dt>
+<dd><ul class="first last simple">
+<li>added getLabelsForHost</li>
+</ul>
+</dd>
+<dt>Version 65:</dt>
+<dd><ul class="first last simple">
+<li>getTroveInfo and getNewTroveInfo calls filter extended metadata from
+results for older clients</li>
+</ul>
+</dd>
+<dt>Version 64:</dt>
+<dd><ul class="first last simple">
+<li>getTroveInfo call understands CLONEDFROMLIST troveInfo</li>
+</ul>
+</dd>
+<dt>Version 63:</dt>
+<dd><ul class="first last simple">
+<li>added calls addRoleMember and getRoleMembers</li>
+</ul>
+</dd>
+<dt>Version 62:</dt>
+<dd><ul class="first last simple">
+<li>added xmlrpc api call commitCheck()</li>
+<li>getPackageBranchPathIds now passes on a list of dirnames instead of filePrefixes</li>
+</ul>
+</dd>
+<dt>Version 61:</dt>
+<dd><ul class="first last simple">
+<li>The following methods have been renamed for consistency:
+addAccessGroup -&gt; addRole
+addEntitlementGroup -&gt; addEntitlementClass
+addEntitlementOwnerAcl -&gt; addEntitlementClassOwner
+addEntitlements -&gt; addEntitlementKeys
+deleteAccessGroup -&gt; deleteRole
+deleteEntitlementGroup -&gt; deleteEntitlementClass
+deleteEntitlementOwnerAcl -&gt; deleteEntitlementClassOwner
+deleteEntitlements -&gt; deleteEntitlementKeys
+getEntitlementClassAccessGroup -&gt; getEntitlementClassesRoles
+getUserGroups -&gt; getRoles
+listAccessGroups -&gt; listRoles
+listEntitlementGroups -&gt; listEntitlementClasses
+listEntitlements -&gt; listEntitlementKeys
+setEntitlementClassAccessGroup -&gt; setEntitlementClassesRoles
+setUserGroupCanMirror -&gt; setRoleCanMirror
+setUserGroupIsAdmin -&gt; setRoleIsAdmin
+updateAccessGroupMembers -&gt; updateRoleMembers</li>
+</ul>
+</dd>
+<dt>Version 60:</dt>
+<dd><ul class="first last simple">
+<li>server side support for setUserGroupIsAdmin</li>
+<li>addAcl and editAcl cannot be used for setting the admin flag anymore</li>
+<li>fixed keyword arguments to work through proxy</li>
+<li>don&#8217;t include useAnonymous in return values</li>
+<li>return exception details as (exceptName, args, kwwargs) insteace of
+(exceptName,) + args</li>
+</ul>
+</dd>
+<dt>Version 51:</dt>
+<dd><ul class="first last simple">
+<li>getChangeSet supports infoOnly parameter</li>
+<li>parameters are passed as (args, kwArgs) instead of individually</li>
+</ul>
+</dd>
+<dt>Version 50:</dt>
+<dd><ul class="first last simple">
+<li>getChangeSet keeps (troveNeeded, filesNeeded, troveRemoved) information
+separate for each element of the job list</li>
+</ul>
+</dd>
+<dt>Version 49:</dt>
+<dd><ul class="first last simple">
+<li>added mirrorMode to getChangeSet and getFingerprints which forces files
+to be included in changesets whenever the changeset is across hosts</li>
+</ul>
+</dd>
+<dt>Version 48: Conary 1.1.25</dt>
+<dd><ul class="first last simple">
+<li>Added extra argument to getChangeSet to force the creation of a specific
+changeset version.</li>
+</ul>
+</dd>
+<dt>Version 47:</dt>
+<dd><ul class="first last simple">
+<li>Added getNewTroveInfo and setTroveInfo</li>
+<li>added addMetadataItems call</li>
+</ul>
+</dd>
+<dt>Version 46:</dt>
+<dd><ul class="first last simple">
+<li>Added hidden flag to commitChangeSet and hasTroves call (only allowed for
+users with mirror or write permissions, respectively) and the
+presentHiddenTroves() call which requires write permissions</li>
+</ul>
+</dd>
+<dt>Version 45:</dt>
+<dd><ul class="first last simple">
+<li>addDigitalSignature takes a VersionedSignatureSet object. This call
+is incompatible between versions 43 and 44 of the protocol (though this
+could be addressed, to a limited extent).</li>
+<li>indicates that the repository can store V1 signatures and unknown troveinfo</li>
+</ul>
+</dd>
+<dt>Version 44:</dt>
+<dd><ul class="first last simple">
+<li>added support for decoding &#8220;chunked&#8221; Transfer-encoding requests
+from clients</li>
+<li>added support for obtaining sizes of changesets &gt; 2 GiB via the
+getChangeSet() and getFileContents() calls. The sizes are now
+returned as strings instead of ints.</li>
+</ul>
+</dd>
+<dt>Version 43:</dt>
+<dd><ul class="first last simple">
+<li>added getTroveReferences call.</li>
+<li>added getTroveDescendants call</li>
+<li>switched to fileId,pathId indexed changesets (changeset 2007022001)</li>
+<li>added getChangesetFingerprints call (not exposed in netclient)</li>
+<li>getTroveInfo now advertises troves as missing instead of raising
+PermissionDenied</li>
+</ul>
+</dd>
+<dt>Version 42: Conary 1.1.17</dt>
+<dd><ul class="first last simple">
+<li>Client uses negotiated protocol version</li>
+<li>getFileContents has authOnly parameter</li>
+</ul>
+</dd>
+<dt>Version 41: Conary 1.1.16</dt>
+<dd><ul class="first last simple">
+<li>Added getTroveInfo call [proxy requires at least this version]</li>
+</ul>
+</dd>
+</dl>
+</div>
+
+
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="Conary Documentation Index" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, SAS Institute Inc..
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
