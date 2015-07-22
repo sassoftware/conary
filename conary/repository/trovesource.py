@@ -20,6 +20,7 @@ import itertools
 from conary import errors as conaryerrors
 from conary import files
 from conary import trove
+from conary import trovetup
 from conary.deps import arch, deps
 from conary.local import deptable
 from conary.repository import changeset, errors, findtrove
@@ -560,7 +561,7 @@ class SearchableTroveSource(AbstractTroveSource):
         for version, flavorList in results.iteritems():
             for flavor in flavorList:
                 for name in versionFlavorDict[version][flavor]:
-                    resultsList.append((name, version, flavor))
+                    resultsList.append(trovetup.TroveTuple(name, version, flavor))
         return resultsList, altFlavors
 
     def _filterResultsByFlavor(self, versionFlavorDict,

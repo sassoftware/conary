@@ -24,6 +24,7 @@ from conary_test import rephelp
 #conary
 from conary.conaryclient import cmdline
 from conary import conarycfg
+from conary import trovetup
 from conary import versions
 from conary.cmds import updatecmd
 from conary.deps import deps
@@ -101,6 +102,7 @@ class FindTroveTest(rephelp.RepositoryHelper):
             for foundTrove in result[trove]:
                 assert(foundTrove in req[trove])
                 req[trove].remove(foundTrove)
+                self.assertTrue(isinstance(foundTrove, trovetup.TroveTuple))
             assert(not req[trove])
 
         # now search with a bogus primary flavor on the flavorPath
