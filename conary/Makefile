@@ -23,7 +23,7 @@ SUBDIRS=build local repository server lib pysqlite3 deps web \
 # These are stubs that must be maintained for as long as there is
 # active code that uses any of these modules that needs to work
 # against conary 2.1 or earlier.  If in doubt, leave these here.
-compat_modules=commit.py cscmd.py fmtroves.py metadata.py \
+compat_modules=commit.py cscmd.py metadata.py \
 	query.py queryrep.py rollbacks.py showchangeset.py \
 	updatecmd.py verify.py branch.py clone.py cvc.py
 

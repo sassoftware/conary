@@ -152,17 +152,6 @@ class MetadataTest(rephelp.RepositoryHelper):
         assert(metadata.getLicenses() == ["GPL"])
         assert(metadata.getCategories() == ["Test Category", "Test Category 2"])
 
-    def testFetchFreshmeat(self):
-        """Tests metadata.fetchFreshmeat"""
-        filename = os.path.join(resources.get_archive(), 'tora.xml')
-        f = open(filename)
-
-        try:
-            m = metadata_mod.fetchFreshmeat('tora', xmlDocStream=f)
-        except socket.gaierror:
-            raise testhelp.SkipTestException('requires network access')
-        self.assertEqual(m.getShortDesc(), "A tool for administrating or developing for Oracle databases.")
-
     def setUp(self):
         rephelp.RepositoryHelper.setUp(self)
         self.resetRepository()

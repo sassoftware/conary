@@ -14,17 +14,10 @@
 # limitations under the License.
 #
 
-
-from httplib import HTTPConnection
-from urllib2 import urlopen
 import textwrap
 import time
-import xml.dom.minidom
-import xml.parsers.expat
-
-from conary.cmds.fmtroves import TroveCategories, LicenseCategories
-from conary.lib import urlparse
 from conary.local import schema
+
 
 class MDClass:
     (SHORT_DESC, LONG_DESC,
@@ -151,18 +144,6 @@ class MetadataTable:
         else:
             return None
 
-def resolveUrl(url):
-    """Follows a redirect one level and returns the location of the HTTP 302 redirect"""
-    url = urlparse.urlparse(url)
-    connection = HTTPConnection(url[1])
-    connection.request("GET", url[2])
-    request = connection.getresponse()
-    if request.status == 302: # header "Found:", might need more here
-        realUrl = request.getheader("Location")
-    else:
-        realUrl = urlparse.urlunparse(url)
-    return realUrl
-
 class Metadata:
     shortDesc = ""
     longDesc = ""
@@ -221,55 +202,6 @@ class Metadata:
     def getLanguage(self):
         return self.language
 
-class NoFreshmeatRecord(xml.parsers.expat.ExpatError):
-    pass
-
-def fetchFreshmeat(troveName, xmlDocStream=None):
-    if xmlDocStream:
-        # Most likely part of a test suite, although one may want a different
-        # plugin for xml metadata - a stream will work just fine
-        source = xmlDocStream
-    else:
-        source = urlopen('http://freshmeat.net/projects-xml/%s/%s.xml' % (troveName, troveName))
-
-    try:
-        doc = xml.dom.minidom.parse(source)
-        metadata = {}
-
-        shortDesc = doc.getElementsByTagName("desc_short")[0]
-        if shortDesc.childNodes:
-            metadata["shortDesc"] = shortDesc.childNodes[0].data
-
-        longDesc = doc.getElementsByTagName("desc_full")[0]
-        if longDesc.childNodes:
-            metadata["longDesc"] = longDesc.childNodes[0].data
-
-        metadata["url"] = []
-        urlHomepage = doc.getElementsByTagName("url_homepage")[0]
-        if urlHomepage.childNodes:
-            metadata["url"].append(resolveUrl(urlHomepage.childNodes[0].data))
-        metadata["url"].append("http://freshmeat.net/projects/%s/" % troveName)
-
-        metadata["license"] = []
-        metadata["category"] = []
-
-        for node in doc.getElementsByTagName("trove_id"):
-            id = node.childNodes[0].data
-            if id in LicenseCategories:
-                name = LicenseCategories[id]
-                metadata["license"].append(name)
-            else:
-                name = TroveCategories[id]
-                if name.startswith('Topic ::'):
-                    metadata["category"].append(name)
-
-        metadata["source"] = "freshmeat"
-        metadata["language"] = "C"
-        # Free the DOM - CNY-2674
-        doc.unlink()
-        return Metadata(metadata)
-    except xml.parsers.expat.ExpatError:
-        raise NoFreshmeatRecord
 
 def formatDetails(repos, cfg, troveName, branch, sourceTrove):
     md = repos.getMetadata([troveName, branch], branch.label())
