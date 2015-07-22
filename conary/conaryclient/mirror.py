@@ -119,6 +119,7 @@ class MirrorFileConfiguration(cfg.SectionedConfigFile):
     splitNodes = (cfg.CfgBool, False,
             "Split jobs that would commit two versions of a trove at once. "
             "Needed for compatibility with older repositories.")
+    noPGP = (cfg.CfgBool, False)
 
     _allowNewSections = True
     _defaultSectionType = MirrorConfigurationSection
@@ -711,6 +712,8 @@ class TargetRepository:
             return
         self.repo.setMirrorMark(self.cfg.host, self.mark)
     def mirrorGPG(self, src, host):
+        if self.cfg.noPGP:
+            return
         if self.__gpg.has_key(host):
             return
         keyList = src.getNewPGPKeys(host, -1)
@@ -1096,3 +1099,6 @@ def checkSyncRepos(config, sourceRepos, targetRepos):
         hasDiff += _compare( ("source", sourceSet), (target.name, targetSet) )
     log.debug("Done")
     return hasDiff
+
+if __name__ == '__main__':
+    sys.exit(Main())
