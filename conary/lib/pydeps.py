@@ -200,7 +200,20 @@ def getData(inFile):
     if len(data) != size:
         raise ModuleFinderProtocolError(
             'Insufficient data: got %s expected %s', len(data), size)
-    return pickle.loads(data)
+    return _deunicode(pickle.loads(data))
+
+def _deunicode(obj):
+    if sys.version.startswith('3'):
+        return obj
+    if isinstance(obj, unicode):
+        return obj.encode('ascii')
+    if isinstance(obj, dict):
+        return dict((_deunicode(x), _deunicode(y))
+                    for x, y in obj.iteritems())
+    for typ in (list, set, tuple):
+        if isinstance(obj, typ):
+            return typ(_deunicode(x) for x in obj)
+    return obj
 
 
 def putData(outFile, data):
