@@ -137,7 +137,7 @@ class Conary(CPackageRecipe):
         # %(x11prefix)s deprecated in rPL2 (CNY-1205)
         r.Replace('^x11prefix.*$', 'x11prefix = \'%(exec_prefix)s\'',
                 'config/macros')
-        if r.plat == 'centos':
+        if r.plat == 'centos' and r.platver == '6':
             # Stay backward-compatible with kernels we've already built in
             # in this platform (CNY-3518)
             r.Replace('^        self.mergeKmodSymbols = False', 
@@ -171,7 +171,9 @@ class Conary(CPackageRecipe):
             versionMap=(('/usr/bin/python', '%(python)s'),
                         ('/usr/bin/python2.4', '%(python)s'),
                         ('/usr/bin/python2.5', '%(python)s'),
-                        ('/usr/bin/python2.6', '%(python)s')))
+                        ('/usr/bin/python2.6', '%(python)s'),
+                        ('/usr/bin/python2.7', '%(python)s'),
+                        ))
 
         ### Standard configuration
         r.Create('%(sysconfdir)s/conaryrc',
@@ -274,16 +276,16 @@ class Conary(CPackageRecipe):
         r.Requires(exceptions=r'%(sysconfdir)s/conary/components/')
         # We can't go back and change deps on rpm:python, so white it out
         r.Requires(exceptDeps=r'python\:\ rpm')
-        if r.encapsulated:
+        if r.embedded:
             r.Requires('rpm:python', '%(sitepkgs)s/conary/local/rpmcapsule.py')
+        elif r.encapsulated:
+            r.Requires('rpm-python:rpm', '%(sitepkgs)s/conary/local/rpmcapsule.py')
         if r.plat == 'rpath':
             # Ensure that we get the right version of python when migrating
             # from rPL1-based to rPL2-based systems; this is critical when
             # any part of the update uses SSL. (RPL-3043)
             r.Requires('python:lib(%(targetarch)s)', '%(bindir)s/conary')
         r.ComponentRequires({'python': set(('runtime',))})
-
-        r.AutoDoc('EULA_Conary_Dual_License.txt')
 
         if r.encapsulated:
             r.Remove('%(bindir)s/rpm2cpio') # conflict with the platform
