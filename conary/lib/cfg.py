@@ -661,8 +661,8 @@ class ConfigFile(_Config):
                     return
         elif exception:
             raise CfgEnvironmentError(
-                          "No such file or directory: '%s'" % path,
-                          path)
+                          path,
+                          "No such file or directory")
 
     @api.publicApi
     def read(self, path, exception=True):

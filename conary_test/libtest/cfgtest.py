@@ -49,6 +49,7 @@ from conary.lib.cfgtypes import (
         CfgQuotedLineList,
         CfgRegExpList,
         CfgString,
+        CfgEnvironmentError
         )
 from conary import versions
 
@@ -495,6 +496,15 @@ class ConfigTest(testhelp.TestCase):
 
         cfg.foo = 'bar'
         assert not cfg.isDefault('foo')
+
+    def testReadFileDoesntExist(self):
+        class TestCfgFile(ConfigFile):
+            foo = (CfgString, 'foo')
+        cfg = TestCfgFile()
+        ex = self.assertRaises(CfgEnvironmentError, cfg.read,
+                '/tmp/doesntexist/foo', exception=True)
+        assert(str(ex) == "Error reading config file /tmp/doesntexist/foo: No "
+            "such file or directory")
 
     def testPickle(self):
         cfg = PickleTestConfig()
