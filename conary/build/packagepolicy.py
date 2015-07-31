@@ -1950,6 +1950,8 @@ class _dependency(policy.Policy):
     def preProcess(self):
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
+        self.pythonInterpSoRE = re.compile(r'\.[a-z]+-\d\dm')
+
         # interpolate macros, using canonical path form with no trailing /
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
                                   for x in self.sonameSubtrees)
@@ -2532,7 +2534,7 @@ class _dependency(policy.Policy):
         else:
             pythonVersion = self._getPythonVersionFromPath(path, None)
             # After PATH, fall back to %(bindir)s.  If %(bindir)s should be
-            # preferred, it needs to be earlier in the PATH.  Include 
+            # preferred, it needs to be earlier in the PATH.  Include
             # unversioned python as a last resort for confusing cases.
             shellPath = os.environ.get('PATH', '').split(':') + [ '%(bindir)s' ]
             pythonPath = []
@@ -2966,6 +2968,10 @@ class Provides(_dependency):
             return
         if depPath.endswith('/__init__'):
             depPath = depPath.replace('/__init__', '')
+
+        # PEP 3147 adds the interperter and version to the pyc file
+        depPath = self.pythonInterpSoRE.sub('', depPath)
+
         depPath = depPath.replace('/', '.')
 
         depPaths = [ depPath ]
@@ -3365,10 +3371,10 @@ class Requires(_addInfo, _dependency):
     Demonstrates using C{r.Requires} to specify that files in the
     subdirectory C{/usr/share/vim/.*/doc} are excepted from being marked as
     requirements.
-    
+
     C{r.Requires(exceptDeps='trove:$trovename')}
-    
-    Uses C{r.Requires} to specify that the trove C{trovename} is excluded 
+
+    Uses C{r.Requires} to specify that the trove C{trovename} is excluded
     from the dependencies for the package.
     """
 
@@ -3968,6 +3974,7 @@ class Requires(_addInfo, _dependency):
         depName = depName.rsplit('.', 1)[0]
         depName = depName.replace('/', '.')
         depName = depName.replace('.__init__', '')
+        depName = self.pythonInterpSoRE.sub('', depName)
         return depName
 
     def _addRubyRequirements(self, path, fullpath, pkgFiles, script=False):

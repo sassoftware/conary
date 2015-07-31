@@ -3468,6 +3468,8 @@ class TestRequires(PackageRecipe):
         libPath = os.path.dirname(elf.__file__)
         util.copyfile(util.joinPaths(libPath, 'elf.so'),
                       util.joinPaths(sourceDir, 'elf.so'))
+        util.copyfile(resources.get_archive('syslog.cpython-34m.so'),
+                      util.joinPaths(sourceDir, 'syslog.cpython-34m.so'))
         util.copyfile(util.joinPaths(libPath, 'ext/streams.so'),
                       util.joinPaths(sourceDir, 'streams.so'))
         file(util.joinPaths(sourceDir, "foo.py"), "w+").write("""\
@@ -3475,6 +3477,7 @@ class TestRequires(PackageRecipe):
 
 import sys
 from blah import elf
+from blah import syslog
 import itertools
 """)
 
@@ -3486,6 +3489,7 @@ class Blah(PackageRecipe):
     def setup(r):
         r.Create('%(libdir)s/python%(pyver)s/site-packages/blah/__init__.py')
         r.addSource('elf.so', dest='%(libdir)s/python%(pyver)s/site-packages/blah/')
+        r.addSource('syslog.cpython-34m.so', dest='%(libdir)s/python%(pyver)s/site-packages/blah/')
         r.addSource('streams.so', dest='%(libdir)s/python%(pyver)s/site-packages/')
         r.addSource('foo.py', dest='%(libdir)s/python%(pyver)s/site-packages/blah/')
 """
@@ -3513,6 +3517,9 @@ class Blah(PackageRecipe):
         self.assertTrue(dep in provides, "%s not in %s" %
                 (dep, provides))
         dep = "python: streams(%s %s)" % (pythonVer, lib)
+        self.assertTrue(dep in provides, "%s not in %s" %
+                (dep, provides))
+        dep = "python: blah.syslog(%s %s)" % (pythonVer, lib)
         self.assertTrue(dep in provides, "%s not in %s" %
                 (dep, provides))
 
@@ -3550,6 +3557,25 @@ class Bloop(PackageRecipe):
         self.mock(packagepolicy.Requires, '_getPythonSysPath',
                    mockedGetPythonSysPath)
 
+        # Mock the finder so that we can force a soname that we would not
+        # otherwise find
+        oldGetPythonRequiresSysPath = packagepolicy.Requires._getPythonRequiresSysPath
+        def mockedGetPythonRequiresSysPath(slf, path):
+            sysPath, finder, version = oldGetPythonRequiresSysPath(slf, path)
+            oldGetDepsForPath = finder.getDepsForPath
+            def mockedGetDepsForPath(fullpath):
+                ret = oldGetDepsForPath(fullpath)
+                if fullpath.endswith("bar.py"):
+                    ret["missing"] = set()
+                    ret["paths"].add(util.joinPaths(rootDir, 'usr', lib,
+                        'python%s/site-packages' % pythonVer, 'blah',
+                        'syslog.cpython-34m.so'))
+                return ret
+            self.mock(finder, 'getDepsForPath', mockedGetDepsForPath)
+            return sysPath, finder, version
+        self.mock(packagepolicy.Requires, '_getPythonRequiresSysPath',
+                  mockedGetPythonRequiresSysPath)
+
         built, ret = self.buildRecipe(recipestr, "Bloop",
             macros = dict(pyver = pythonVer))
         built = [ (b[0], versions.VersionFromString(b[1]), b[2])
@@ -3560,6 +3586,9 @@ class Bloop(PackageRecipe):
         # Make sure we got the shorter requirement
         requires = str(trv2.getRequires())
         dep = "python: blah.elf\n"
+        self.assertTrue(dep in requires, "%s not in %s" %
+                (dep, requires))
+        dep = "python: blah.syslog\n"
         self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
@@ -4787,6 +4816,8 @@ class TestProvides(PackageRecipe):
         r.Create('%(libdir)s/python%(pyver)s/site-packages/badpython.py',
                  contents='#!/blah/bin/python',
                  mode=0755)
+        # Test PEP 3149 interpreter so files
+        r.Create('%(libdir)s/python%(pyver)s/site-packages/foo/ext.cpython-34m.so')
         r.ComponentSpec('runtime', '.*')
 """
         trv = self.build(recipestr1, "TestProvides",
@@ -4801,6 +4832,7 @@ class TestProvides(PackageRecipe):
         both = " ".join(sorted([ pythonVer, "2.5" ]))
         assert prov.find('python: foo.both(%s %s)' % (both, libsdir)) != -1, prov
         assert prov.find('python: foo.five(2.5 %s)' % libsdir) != -1, prov
+        assert prov.find('python: foo.ext(%s %s)' % (pythonVer, libsdir)) != -1, prov
 
     def testPythonBootCrossProvides(self):
         """
