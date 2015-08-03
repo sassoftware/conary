@@ -1950,7 +1950,7 @@ class _dependency(policy.Policy):
     def preProcess(self):
         self.CILPolicyRE = re.compile(r'.*mono/.*/policy.*/policy.*\.config$')
         self.legalCharsRE = re.compile('[.0-9A-Za-z_+-/]')
-        self.pythonInterpSoRE = re.compile(r'\.[a-z]+-\d\dm')
+        self.pythonInterpRE = re.compile(r'\.[a-z]+-\d\dm?')
 
         # interpolate macros, using canonical path form with no trailing /
         self.sonameSubtrees = set(os.path.normpath(x % self.macros)
@@ -2966,11 +2966,16 @@ class Provides(_dependency):
 
         if depPath == '__future__':
             return
-        if depPath.endswith('/__init__'):
-            depPath = depPath.replace('/__init__', '')
+
+        # remove python3 __pycache__ directory from dep
+        if '__pycache__/' in depPath:
+            depPath = depPath.replace('__pycache__/', '')
 
         # PEP 3147 adds the interperter and version to the pyc file
-        depPath = self.pythonInterpSoRE.sub('', depPath)
+        depPath = self.pythonInterpRE.sub('', depPath)
+
+        if depPath.endswith('/__init__'):
+            depPath = depPath.replace('/__init__', '')
 
         depPath = depPath.replace('/', '.')
 
@@ -3974,7 +3979,7 @@ class Requires(_addInfo, _dependency):
         depName = depName.rsplit('.', 1)[0]
         depName = depName.replace('/', '.')
         depName = depName.replace('.__init__', '')
-        depName = self.pythonInterpSoRE.sub('', depName)
+        depName = self.pythonInterpRE.sub('', depName)
         return depName
 
     def _addRubyRequirements(self, path, fullpath, pkgFiles, script=False):

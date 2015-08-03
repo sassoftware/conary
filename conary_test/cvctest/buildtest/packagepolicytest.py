@@ -4818,6 +4818,8 @@ class TestProvides(PackageRecipe):
                  mode=0755)
         # Test PEP 3149 interpreter so files
         r.Create('%(libdir)s/python%(pyver)s/site-packages/foo/ext.cpython-34m.so')
+        # Test PEP 3147 interpreter pyc files
+        r.Create('%(libdir)s/python%(pyver)s/site-packages/foo/__pycache__/bar.cpython-34m.pyc')
         r.ComponentSpec('runtime', '.*')
 """
         trv = self.build(recipestr1, "TestProvides",
@@ -4833,6 +4835,7 @@ class TestProvides(PackageRecipe):
         assert prov.find('python: foo.both(%s %s)' % (both, libsdir)) != -1, prov
         assert prov.find('python: foo.five(2.5 %s)' % libsdir) != -1, prov
         assert prov.find('python: foo.ext(%s %s)' % (pythonVer, libsdir)) != -1, prov
+        assert prov.find('python: foo.bar(%s %s)' % (pythonVer, libsdir)) != -1, prov
 
     def testPythonBootCrossProvides(self):
         """
