@@ -761,7 +761,7 @@ class testRedirect(RedirectRecipe):
                                                     # target of redirect
 
         # source of redirect
-        redirectBranch = '/localhost@rpl:branch' % self.cfg.buildLabel
+        redirectBranch = '/localhost@rpl:branch'
         self.addComponent('redirect:runtime', '%s/1.0' % redirectBranch)
         self.addCollection('redirect', '%s/1.0' % redirectBranch, [':runtime']) 
 
