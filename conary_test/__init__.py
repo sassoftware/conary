@@ -58,3 +58,18 @@ def rpm(func):
     run._contexts = func._contexts
 
     return run
+
+def installed_conarydb(func):
+    # mark the context as installed_conarydb
+    testhelp.context('installed_conarydb')(func)
+
+    def run(*args, **kwargs):
+        if os.path.exists('/var/lib/conarydb/conarydb'):
+            return func(*args, **kwargs)
+        else:
+            raise testhelp.SkipTestException('Test requires system conary database')
+
+    run.func_name = func.func_name
+    run._contexts = func._contexts
+
+    return run

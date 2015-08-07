@@ -33,6 +33,8 @@ try:
 except ImportError:
     from elementtree import ElementTree as etree  # pyflakes=ignore
 
+import conary_test
+
 from conary.lib import digestlib, log, util
 from conary_test import rephelp
 from conary_test import resources
@@ -3109,6 +3111,7 @@ from bogus import missing
         finally:
             finderModule.close()
 
+    @conary_test.installed_conarydb
     def testRequiresPython(self):
         """
         Test Python requirements
@@ -3398,6 +3401,7 @@ class TestRequires(PackageRecipe):
             depMap['boot'][1])
 
 
+    @conary_test.installed_conarydb
     def testRequiresPythonWithPth(self):
         """
         Test Python requirements when they are provided using a new .pth
@@ -3450,6 +3454,7 @@ class TestRequires(PackageRecipe):
         prov = str(trv.getProvides())
         assert('python: blah' in prov)
 
+    @conary_test.installed_conarydb
     def testPythonSOdeps(self):
         # CNY-1077
         # Load elf and copy it in the local directory
@@ -3655,6 +3660,7 @@ class Bloop(PackageRecipe):
         self.assertTrue(dep in requires, "%s not in %s" %
                 (dep, requires))
 
+    @conary_test.installed_conarydb
     def testPythonNoarchDeps(self):
         # CNY-2110
 
@@ -4779,6 +4785,7 @@ class TestProvides(PackageRecipe):
         self.resetRepository()
 
 
+    @conary_test.installed_conarydb
     def testPythonProvides(self):
         """
         Test python: provides only, no requirements

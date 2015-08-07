@@ -22,6 +22,8 @@ import signal
 import sys
 import urllib2
 
+import conary_test
+
 from conary_test import rephelp
 from conary_test import resources
 
@@ -57,6 +59,7 @@ class ServerTest(rephelp.RepositoryHelper):
             raise testhelp.SkipTestException("m2crypto not installed")
         return self._testSlowActionWithStandalone(useSSL = True)
 
+    @conary_test.installed_conarydb
     def _testSlowActionWithStandalone(self, useSSL = False):
         # Test to make sure that slow commits still work even with the
         # proxy keepalive code added (CNY-1341)

@@ -39,6 +39,8 @@ from conary.build import policy, packagepolicy
 from conary.build import recipe
 from conary import versions
 
+import conary_test
+
 class FixDirModesTest(rephelp.RepositoryHelper):
     def testFixDirModesTest1(self):
         """
@@ -1204,6 +1206,7 @@ class TestNormalizePkgConfig(PackageRecipe):
 
 class NormalizePythonInterpreterVersionTest(rephelp.RepositoryHelper):
 
+    @conary_test.installed_conarydb
     def testNormalizePythonInterpreterVersionTest1(self):
         """
         Test to make sure that #!/usr/bin/python[\d.]+ get fixed

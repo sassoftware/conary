@@ -30,6 +30,7 @@ import pwd
 
 
 #testsuite
+import conary_test
 from conary_test import rephelp
 
 #conary
@@ -908,6 +909,7 @@ os.kill(os.getpid(), 9)
 
 class ContextTest(testhelp.TestCase):
 
+    @conary_test.installed_conarydb
     def testNonExistantContext(self):
         cfg = conarycfg.ConaryConfiguration(readConfigFiles=False)
         client = conaryclient.ConaryClient(cfg)

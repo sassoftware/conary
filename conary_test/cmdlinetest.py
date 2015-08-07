@@ -25,6 +25,7 @@ import tempfile
 
 from testutils import mock
 
+import conary_test
 from conary_test import rephelp
 from conary_test import resources
 
@@ -1436,6 +1437,7 @@ class CmdLineTest(rephelp.RepositoryHelper):
                                    ['conary', 'help', 'erase'])
         self.assertTrue('Erase Options' in s)
 
+    @conary_test.installed_conarydb
     def testInstallLabel(self):
         class Foo:
             pass
