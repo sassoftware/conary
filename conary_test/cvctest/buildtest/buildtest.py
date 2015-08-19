@@ -1836,9 +1836,10 @@ class TestReportMissingBuildReqs(rephelp.RepositoryHelper):
         self.addComponent("fakemake:runtime", "1", fileContents = [
             ("/usr/bin/make", "somecontent")])
         self.updatePkg(self.rootDir, ["fakemake:runtime"])
-        # test for Run
+        # test for Run; work whether usrmove applied or not
         self.addComponent("true:runtime", "2", fileContents = [
-            ("/bin/true", "#!/bin/sh\nexit 0")])
+            ("/bin/true", "#!/bin/sh\nexit 0"),
+            ("/usr/bin/true", "#!/bin/sh\nexit 0") ])
         self.updatePkg(self.rootDir, ["true:runtime"])
         recipestr = """
 class ActionSuggests(PackageRecipe):

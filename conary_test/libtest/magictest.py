@@ -67,7 +67,7 @@ class MagicTest(rephelp.RepositoryHelper):
     def testCarArchive(self):
         # for now, just make sure we don't treat them as zip
         m = magic.magic(os.path.join(resources.get_archive(), 'Transmitter.car'))
-        if sys.version_info[:2] == (2, 6):
+        if sys.version_info[:2] in ((2, 6), (2, 7)):
             self.assertFalse(m is None)
         else:
             self.assertEqual(m, None)
@@ -442,7 +442,7 @@ class MagicTest(rephelp.RepositoryHelper):
         # tarfile in python 2.4 creates tar archives without the complete GNU magic
         # POSIX = "ustar\0"
         # GNU   = "ustar  \0"
-        isGnu = (sys.version_info[:2] == (2, 6))
+        isGnu = (sys.version_info[:2] in ((2, 6), (2, 7)))
         self.assertEquals(m.contents['GNU'], isGnu)
 
     def testGzipCompressedTarArchives3(self):

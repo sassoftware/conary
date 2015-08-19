@@ -104,7 +104,7 @@ class DebianPackageHeader(object):
         try:
             gf = gzip.GzipFile(fileobj=arFile.data)
             tf = tarfile.TarFile(fileobj=gf)
-        except IOError, e:
+        except (IOError, tarfile.ReadError), e:
             raise Error("control.tar.gz is not readable: %s" %str(e))
         # Look for a 'control' file
         arr = [ x for x in tf if os.path.basename(x.name) == 'control' ]

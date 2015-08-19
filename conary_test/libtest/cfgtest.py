@@ -437,10 +437,13 @@ class ConfigTest(testhelp.TestCase):
             except Exception, e:
                 if 'failure in name resolution' in str(e):
                     raise testhelp.SkipTestException('requires default route')
-                self.assertEqual(str(e), "%s/foo:1: when processing "
-                        "inCLUDEconFIGFile: Error reading config file "
-                        "http://nonesuchrediculoushostexists//bar: "
-                        "Name or service not known" % dir)
+                desc, sep, err = str(e).partition('bar: ')
+                self.assertEqual(desc, "%s/foo:1: when processing "
+                    "inCLUDEconFIGFile: Error reading config file "
+                    "http://nonesuchrediculoushostexists//" %dir)
+                self.assertIn(err, [
+                    "Name or service not known",
+                    "No address associated with hostname"])
 
             cfg = TestCfgFile()
             cfg.ignoreUrlIncludes()

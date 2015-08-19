@@ -99,7 +99,7 @@ class DepTest(rephelp.RepositoryHelper):
         (rc, str) = self.captureOutput(self.updatePkg, self.rootDir,
                                        "libhello", version,
                                        tagScript = '/dev/null')
-        assert(not str)
+        self.assertEquals(str, '')
 
         self.resetRoot()
         (rc, str) = self.captureOutput(self.updatePkg, self.rootDir,
@@ -144,7 +144,7 @@ class DepTest(rephelp.RepositoryHelper):
         (rc, str) = self.captureOutput(self.erasePkg, 
                                        self.rootDir,
                                        "libhello:user")
-        assert(str == """\
+        self.assertEquals(str, """\
 The following dependencies would not be met after this update:
 
   libhello:script=0-1-1 (Already installed) requires:
@@ -346,7 +346,7 @@ The following dependencies would not be met after this update:
   which is provided by:
     bash:runtime=0-1-1 (Would be updated to 1-1-1)
 """
-        assert(s == expectedStr)
+        self.assertEquals(s, expectedStr)
 
         # since /bin/bash is still installed, this should work fine
         self.updatePkg(self.rootDir, 'bashuser', version = bashVersion)

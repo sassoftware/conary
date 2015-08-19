@@ -27,6 +27,7 @@ from StringIO import StringIO
 import tempfile
 import threading
 import pwd
+import warnings
 
 
 #testsuite
@@ -811,9 +812,10 @@ class EntitlementTest(testhelp.TestCase):
         assert(conarycfg.loadEntitlementFromString(withoutClass)
                 == ('localhost', None, 'ABCD01234'))
 
-        rc, s = self.captureOutput(conarycfg.loadEntitlementFromString,
-                                   withoutClass, 'localhost', '<foo>')
-        self.assertTrue('The serverName argument to loadEntitlementFromString has been deprecated' in s)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            conarycfg.loadEntitlementFromString(withoutClass, 'localhost', '<foo>')
+            self.assertIn('The serverName argument to loadEntitlementFromString has been deprecated', w[-1].message)
 
     @testhelp.context('entitlements')
     def testFailedEntitlements(self):

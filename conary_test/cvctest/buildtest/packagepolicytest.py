@@ -2352,27 +2352,29 @@ class TestRequires(PackageRecipe):
             trv.getName(), trv.getVersion(), trv.getFlavor(),
             withFiles=True):
             foundPaths.append(path)
-            req = str(fileObj.requires())
+            req = str(fileObj.requires()).split('\n')
             if path == '/bin/foo':
-                assert(req.find('file: /bin/bash') != -1)
+                self.assertIn([x for x in req if x.startswith('file: ')][0],
+                              ['file: /bin/bash', 'file: /usr/bin/bash'])
                 found += 1
             if path == '/bin/blah':
-                assert(req.find('trove: asdf:runtime(ASDF FDSA)') != -1)
-                assert(req.find('file: /a/path') != -1)
-                assert(req.find('file: /b/path') != -1)
-                assert(req.find('trove: file:runtime') != -1)
-                found += 1
-            if path == '/bin/foo' or path == '/bin/blah':
-                assert(req.find('trove: foo:bar') != -1)
+                self.assertIn('trove: asdf:runtime(ASDF FDSA)', req)
+                self.assertIn('file: /a/path', req)
+                self.assertIn('file: /b/path', req)
+                self.assertIn('trove: file:runtime', req)
                 found += 1
             elif path == '/blah/bar':
-                assert(req.find('file: /bin/bash') == -1)
+                # not executable, no #! dep
+                self.assertEqual(req, [''])
+                found += 1
+            if path in ('/bin/foo', '/bin/blah'):
+                self.assertIn('trove: foo:bar', req)
                 found += 1
             elif path == '/bin/ignoreme':
-                assert(req.find('file: /usr/bin/ignored') == -1)
+                self.assertNotIn('file: /usr/bin/ignored', req)
                 found += 1
             elif path == '/bin/relativedep':
-                assert(req.find('file: no') == -1)
+                self.assertNotIn('file: no', req)
                 found += 1
         assert(found == 7)
         self.resetRepository()
@@ -3756,16 +3758,16 @@ class TestRequires(PackageRecipe):
     def setup(r):
         # all perl modules must be provided by package or present on system
         # (CNY-2180)
-        r.Create('VENDOR_PERL/CGI/Apache.pl', contents='\n'.join((
+        r.Create('VENDOR_PERL/CGI/Util.pl', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
-            'package CGI::Apache;',
+            'package CGI::Util;',
             '',
         )), mode=0755)
         r.Create('%(bindir)s/foo', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
-            'use CGI::Apache;',
+            'use CGI::Util;',
             '',
         )), mode=0755)
 """.replace('VENDOR_PERL', _findVendorPerl())
@@ -3780,7 +3782,7 @@ class TestRequires(PackageRecipe):
             trv.getName(), trv.getVersion(), trv.getFlavor(),
             withFiles=True):
             req = str(fileObj.requires())
-            assert('perl: CGI::Apache' in req)
+            assert('perl: CGI::Util' in req)
         self.resetRepository()
 
     def testRequiresPerlWithoutPerl(self):
@@ -3793,10 +3795,10 @@ class TestRequires(PackageRecipe):
     version = '1'
     clearBuildReqs()
     def setup(r):
-        r.Create('VENDOR_PERL/CGI/Apache.pl', contents='\n'.join((
+        r.Create('VENDOR_PERL/CGI/Util.pl', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
-            'package CGI::Apache;',
+            'package CGI::Util;',
             '',
         )), mode=0755)
 """.replace('VENDOR_PERL', _findVendorPerl())
@@ -3817,29 +3819,33 @@ class TestRequires(PackageRecipe):
     def setup(r):
         # all perl modules must be provided by package or present on system
         # (CNY-2180)
-        r.Create('VENDOR_PERL/CGI/Apache.pl', contents='\n'.join((
+        r.Create('VENDOR_PERL/CGI/Util.pl', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
-            'package CGI::Apache;',
+            'package CGI::Util;',
             '',
         )), mode=0755)
 
         r.Create('%(bindir)s/foo', contents='\n'.join((
             '#!/usr/bin/perl',
             '',
-            'use CGI::Apache;',
+            'use CGI::Util;',
             'use DFSJFSD::FDSJFK;',
             '',
         )), mode=0755)
 """.replace('VENDOR_PERL', _findVendorPerl())
         repos = self.openRepository()
         trv = self.build(recipestr, "TestRequires")
-        for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
+        data = [(path, str(fileObj.requires()), str(fileObj.provides()))
+                for pathId, path, fileId, version, fileObj in repos.iterFilesInTrove(
             trv.getName(), trv.getVersion(), trv.getFlavor(),
-            withFiles=True):
-            req = str(fileObj.requires())
-            self.assertFalse('perl: CGI::Apache' not in req)
-            self.assertFalse('perl: DFSJFSD::FDSJFK' in req)
+            withFiles=True)]
+        self.assertEquals(len(data), 1)
+        data = data[0]
+        self.assertEquals(data[0], '/usr/bin/foo')
+        self.assertIn('perl: CGI::Util', data[1])
+        self.assertNotIn('perl: DFSJFSD::FDSJFK', data[1])
+        self.assertEquals(data[2], '')
 
     def testRequiresPerlWithPerl(self):
         """
@@ -3856,8 +3862,8 @@ class TestRequires(PackageRecipe):
             '',
             'case $1 in',
             '  *INC*) ;;',
-            '   *) echo "module///usr/lib/perl5/5.8.7/CGI/Apache.pm//CGI/Apache.pm\nmodule////deptest.pm\nmodule////foo/deptest.pm\n/perlbase" ;;',
-            #'   *) echo "module///usr/lib/perl5/5.8.7/CGI/Apache.pm//CGI/Apache.pm" ;;',
+            '   *) echo "module///usr/lib/perl5/5.8.7/CGI/Util.pm//CGI/Util.pm\nmodule////deptest.pm\nmodule////foo/deptest.pm\n/perlbase" ;;',
+            #'   *) echo "module///usr/lib/perl5/5.8.7/CGI/Util.pm//CGI/Util.pm" ;;',
             'esac',
             '',
             'exit 0',
@@ -3865,14 +3871,14 @@ class TestRequires(PackageRecipe):
         )), mode=0755)
         r.Create('%(bindir)s/foo.pl', contents='\n'.join((
             '',
-            'use CGI::Apache;',
+            'use CGI::Util;',
             '',
         )), mode=0755)
 """
         db = self.openDatabase()
         self.addDbComponent(db, name = 'cgi-apache',
                 version = 'test.rpath.loacl@rpl:test',
-                provides = deps.parseDep('perl: CGI::Apache'))
+                provides = deps.parseDep('perl: CGI::Util'))
         self.resetRepository()
         trv = self.build(recipestr, "TestRequires")
         repos = self.openRepository()
@@ -3881,7 +3887,7 @@ class TestRequires(PackageRecipe):
             withFiles=True):
             if 'foo.pl' in path:
                 req = str(fileObj.requires())
-                assert('perl: CGI::Apache' in req)
+                assert('perl: CGI::Util' in req)
         self.resetRepository()
 
     def testProvidesPerlWithIncompatibleCrossPerl(self):
@@ -3997,7 +4003,7 @@ class TestRequires(PackageRecipe):
             '',
             'case $1 in',
             '  *INC*) ;;',
-            '   *) echo "module///usr/lib/perl5/5.8.7/CGI/Apache.pm//CGI/Apache.pm\nmodule////deptest.pm\nmodule////foo/deptest.pm\n/perlbase" ;;',
+            '   *) echo "module///usr/lib/perl5/5.8.7/CGI/Util.pm//CGI/Util.pm\nmodule////deptest.pm\nmodule////foo/deptest.pm\n/perlbase" ;;',
             'esac',
             '',
             'exit 0',
@@ -4007,7 +4013,7 @@ class TestRequires(PackageRecipe):
             '',
             "require 'deptest.pm'",
             "require foo::deptest",
-            'use CGI::Apache;',
+            'use CGI::Util;',
             '',
         )), mode=0755)
         r.Create('/perlbase/foo/deptest.pm', contents = "#!/usr/bin/perl\n\npackage foo::deptest;", mode = 0755)
@@ -4023,8 +4029,8 @@ class TestRequires(PackageRecipe):
                 req = str(fileObj.requires())
                 assert('perl: foo::deptest' in req)
                 self.assertFalse('perl: deptest' in req)
-                # CGI::Apache was dropped because it wasn't in the conary db
-                self.assertFalse('perl: CGI::Apache' in req)
+                # CGI::Util was dropped because it wasn't in the conary db
+                self.assertFalse('perl: CGI::Util' in req)
         self.resetRepository()
 
     def testInternalRpathWithMultipleFlags(self):

@@ -1016,17 +1016,14 @@ class TestNormalizeInterpreterPaths(PackageRecipe):
         self._checkOneFileNoEnv('/bin/foo')
         self._checkOneFileNoEnv('/bin/foo2')
         self._checkOneFileNoEnv('/bin/bar')
-        self._checkOneFileLine('/bin/blah', '#!/bin/bash\n')
+        self._checkOneFileLine('/bin/blah', ('#!/bin/bash\n',
+                                             '#!/usr/bin/bash\n'))
         self._checkOneFileLine('/bin/asdf', '#!/bin/blah\n')
         self._checkOneFileLine('/bin/asdf1', '#!/bin/blah\n')
         self._checkOneFileLine('/foo/bla', '#!/usr/bin/perl -w\n')
         self._checkOneFileLine('/foo/bla1', '#!/bin/foo\n')
-        if os.path.exists("/usr/bin/sh"):
-            # SLES-11
-            shPath = "/usr/bin/sh"
-        else:
-            shPath = "/bin/sh"
-        self._checkOneFileLine('/foo/bla2', '#!%s\n' % shPath)
+        self._checkOneFileLine('/foo/bla2', ('#!/usr/bin/sh\n',
+                                             '#!/bin/sh\n'))
         self._checkOneFileLine('/foo/blah', '#!/bin/env perl\n')
         self._checkOneFileLine('/foo/bar', '#!./bin/env perl\n')
         self._checkOneFileLine('/usr/share/doc/test++-0/asdf', '#!/bin/env /nonesuch\n')
@@ -1041,7 +1038,7 @@ class TestNormalizeInterpreterPaths(PackageRecipe):
         os.chmod(workpath, mode)
         assert(line.find('env') == -1)
 
-    def _checkOneFileLine(self, path, line):
+    def _checkOneFileLine(self, path, lines):
         workpath = self.workDir + path
         mode = os.lstat(workpath)[stat.ST_MODE]
         os.chmod(workpath, mode | 0400)
@@ -1049,7 +1046,10 @@ class TestNormalizeInterpreterPaths(PackageRecipe):
         thisline = f.readline()
         f.close()
         os.chmod(workpath, mode)
-        self.assertEqual(thisline, line)
+        if isinstance(lines, str):
+            self.assertEqual(thisline, lines)
+        else:
+            self.assertIn(thisline, lines)
 
     def testNormalizeInterpreterPathsTest2(self):
         """

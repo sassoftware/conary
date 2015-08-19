@@ -169,6 +169,10 @@ class Libhello(PackageRecipe):
     clearBuildReqs()
     
     def setup(self):
+        # NormalizeInterpreterPaths not the purpose of these tests,
+        # and dealing with it running would make tests needlessly
+        # and uselessly more verbose.
+        del self.NormalizeInterpreterPaths
         self.Create('libhello.c', contents='''
 /* libhello.c - Simple example of a shared library */
 
@@ -254,6 +258,7 @@ class Bash(PackageRecipe):
     version = '0'
     clearBuildReqs()
     def setup(r):
+        del r.NormalizeInterpreterPaths
         r.Create('%(essentialbindir)s/bash', mode=0755)
         r.Create('%(essentialbindir)s/conflict', mode=0755)
         r.Provides('file', '%(essentialbindir)s/(ba)?sh')
@@ -269,6 +274,7 @@ class Bash(PackageRecipe):
     version = '1'
     clearBuildReqs()
     def setup(r):
+        del r.NormalizeInterpreterPaths
         r.Create('%(essentialbindir)s/conflict', mode=0755)
         if Use.ssl:
             # turn on this use flag; we use this in the tests for flavor
@@ -282,6 +288,7 @@ class BashUser(PackageRecipe):
     version = '0'
     clearBuildReqs()
     def setup(r):
+        del r.NormalizeInterpreterPaths
         r.Create('%(essentialbindir)s/script', mode=0755,
                  contents = '#!/bin/bash')
 """
@@ -292,6 +299,7 @@ class BashTroveUser(PackageRecipe):
     version = '0'
     clearBuildReqs()
     def setup(r):
+        del r.NormalizeInterpreterPaths
         r.Create('%(essentiallibdir)s/empty', mode=0644)
         r.Requires('bash:runtime', '%(essentiallibdir)s/empty')
 
@@ -846,6 +854,7 @@ class TestRecipe%(num)d(PackageRecipe):
 echo "This is test%(num)s"
 %(fileContents)s
 ''', mode=0755)
+        del r.NormalizeInterpreterPaths
 
         if %(binary)s:
             r.Run('''

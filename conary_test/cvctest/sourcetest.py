@@ -1010,46 +1010,55 @@ contents(sha1)
         # other than the current user
         origstat = os.stat
         origlstat = os.lstat
-        uucpuser = StatWrapper(origstat, origlstat, 10, 14)
-        daemonuser = StatWrapper(origstat, origlstat, 2, 2)
+        try:
+            uucpuser = StatWrapper(origstat, origlstat, 10, 14)
+            daemonuser = StatWrapper(origstat, origlstat, 2, 2)
+            # to make sure that referenced ids "exist"
+            files.userCache.idCache[2] = 'daemon'
+            files.userCache.idCache[10] = 'uucp'
+            files.groupCache.idCache[14] = 'uucp'
 
-        os.chdir(self.workDir)
-        # create version 1.0-1 of the source component
-        self.newpkg("testcase")
-        os.chdir("testcase")
-        self.writeFile("testcase.recipe", recipes.testRecipe1)
-        self.addfile("testcase.recipe")
+            os.chdir(self.workDir)
+            # create version 1.0-1 of the source component
+            self.newpkg("testcase")
+            os.chdir("testcase")
+            self.writeFile("testcase.recipe", recipes.testRecipe1)
+            self.addfile("testcase.recipe")
 
-        # use the uucpuser for the first commit
-        os.stat = uucpuser.stat
-        os.lstat = uucpuser.lstat
-        self.commit()
+            # use the uucpuser for the first commit
+            os.stat = uucpuser.stat
+            os.lstat = uucpuser.lstat
+            self.commit()
 
-        repos = self.openRepository()
+            repos = self.openRepository()
 
-        # verify that the source component has the correct (fake) ownerships
-        (rc, str) = self.captureOutput(queryrep.displayTroves, self.cfg,
-                                       [ "testcase:source=1.0-1" ],
-                                       lsl = True)
-        self.assertIn("uucp     uucp", str)
+            # verify that the source component has the correct (fake) ownerships
+            queryrep.displayTroves(self.cfg,
+                                           [ "testcase:source=1.0-1" ],
+                                           lsl = True)
+            (rc, str) = self.captureOutput(queryrep.displayTroves, self.cfg,
+                                           [ "testcase:source=1.0-1" ],
+                                           lsl = True)
+            self.assertIn("uucp     uucp", str)
 
-        # make a change
-        sourceContents2 = recipes.testRecipe1 + "# some comments\n"
-        self.writeFile("testcase.recipe", sourceContents2)
+            # make a change
+            sourceContents2 = recipes.testRecipe1 + "# some comments\n"
+            self.writeFile("testcase.recipe", sourceContents2)
 
-        # user the daemon user to commit this change (1.0-2)
-        os.stat = daemonuser.stat
-        os.lstat = daemonuser.lstat
-        self.commit()
+            # user the daemon user to commit this change (1.0-2)
+            os.stat = daemonuser.stat
+            os.lstat = daemonuser.lstat
+            self.commit()
 
-        # verify that the source component once more
-        (rc, str) = self.captureOutput(queryrep.displayTroves, self.cfg,
-                                       [ "testcase:source=1.0-2" ], lsl = True)
-        assert("daemon   daemon" in str)
+            # verify that the source component once more
+            (rc, str) = self.captureOutput(queryrep.displayTroves, self.cfg,
+                                           [ "testcase:source=1.0-2" ], lsl = True)
+            assert("daemon   daemon" in str)
 
-        # restore the system stat
-        os.stat = origstat
-        os.lstat = origlstat
+        finally:
+            # restore the system stat
+            os.stat = origstat
+            os.lstat = origlstat
 
         # check out version 1.0-1 of the source component (this will be
         # owned by the current user)

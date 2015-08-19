@@ -1640,6 +1640,10 @@ class CmdLineTest(rephelp.RepositoryHelper):
         # verify failure for network operations
         rc, txt = self.captureOutput(self.assertRaises,
                                      AssertionError, self.testRepQuery)
-        self.assertEqual(txt, "error: conaryrc:2: when processing "
+        desc, sep, err = txt.partition('/: ')
+        self.assertEqual(desc, "error: conaryrc:2: when processing "
                 "includeConfigFile: Error reading config file "
-                "http://does-not-exist/: Name or service not known\n")
+                "http://does-not-exist")
+        self.assertIn(err, [
+            "Name or service not known\n",
+            "No address associated with hostname\n"])
