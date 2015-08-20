@@ -113,11 +113,12 @@ class Connection(object):
     def openConnection(self):
         sock = self.connectSocket()
         sock = self.startTunnel(sock)
-        sock = self.startSSL(sock)
+        wrapped = self.startSSL(sock)
+        sock.settimeout(socket.getdefaulttimeout())
 
         host, port = self.endpoint.hostport
         conn = httplib.HTTPConnection(host, port, strict=True)
-        conn.sock = sock
+        conn.sock = wrapped
         conn.auto_open = False
         return conn
 
@@ -127,10 +128,8 @@ class Connection(object):
         if hasattr(host, 'resolve'):
             host = host.resolve()[0]
         sock = socket.socket(host.family, socket.SOCK_STREAM)
-        oldTimeout = sock.gettimeout()
         sock.settimeout(self.connectTimeout)
         sock.connect((str(host), port))
-        sock.settimeout(oldTimeout)
         return sock
 
     def startTunnel(self, sock):
