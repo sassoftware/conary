@@ -108,7 +108,7 @@ L<Module::ScanDeps>
 =head1 AUTHORS
 
 Edward S. Peschko E<lt>esp5@pge.comE<gt>,
-Autrijus Tang E<lt>autrijus@autrijus.orgE<gt>
+Audrey Tang E<lt>autrijus@autrijus.orgE<gt>
 
 L<http://par.perl.org/> is the official website for this module.  You
 can write to the mailing list at E<lt>par@perl.orgE<gt>, or send an empty
@@ -119,7 +119,7 @@ Please submit bug reports to E<lt>bug-Module-ScanDeps@rt.cpan.orgE<gt>.
 =head1 COPYRIGHT
 
 Copyright 2004, 2005 by Edward S. Peschko E<lt>esp5@pge.comE<gt>,
-Autrijus Tang E<lt>autrijus@autrijus.orgE<gt>
+Audrey Tang E<lt>autrijus@autrijus.orgE<gt>
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

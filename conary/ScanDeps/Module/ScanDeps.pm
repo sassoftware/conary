@@ -1,11 +1,12 @@
 package Module::ScanDeps;
+
+use 5.004;
+use strict;
 use vars qw( $VERSION @EXPORT @EXPORT_OK $CurrentPackage );
 
-$VERSION   = '0.51';
+$VERSION   = '0.54';
 @EXPORT    = qw( scan_deps scan_deps_runtime );
 @EXPORT_OK = qw( scan_line scan_chunk add_deps scan_deps_runtime );
-
-use strict;
 
 use Config;
 use Exporter;
@@ -30,8 +31,8 @@ Module::ScanDeps - Recursively scan Perl code for dependencies
 
 =head1 VERSION
 
-This document describes version 0.51 of Module::ScanDeps, released
-January 8, 2005.
+This document describes version 0.54 of Module::ScanDeps, released
+January 11, 2005.
 
 =head1 SYNOPSIS
 
@@ -295,6 +296,9 @@ my %Preload = (
     'Tk/Balloon.pm'     => [qw( Tk/balArrow.xbm )],
     'Tk/BrowseEntry.pm' => [qw( Tk/cbxarrow.xbm Tk/arrowdownwin.xbm )],
     'Tk/ColorEditor.pm' => [qw( Tk/ColorEdit.xpm )],
+    'Tk/DragDrop/Common.pm' => sub {
+        _glob_in_inc('Tk/DragDrop', 1),
+    },
     'Tk/FBox.pm'        => [qw( Tk/folder.xpm Tk/file.xpm )],
     'Tk/Toplevel.pm'    => [qw( Tk/Wm.pm )],
     'URI.pm'            => sub {
@@ -516,6 +520,11 @@ sub scan_line {
             return;
         }
         return if /^\s*(use|require)\s+[\d\._]+/;
+        if ( /^\s*use\s+autouse\s+[\"\']([^"\']+).*/ )
+        {
+            s/^\s*use\s+autouse\s+[\"\']([^"\']+).*/$1/;
+            return "$_.pm";
+        }
 
         if (my ($libs) = /\b(?:use\s+lib\s+|(?:unshift|push)\W+\@INC\W+)(.+)/)
         {
@@ -826,9 +835,8 @@ sub get_files {
 sub _compile {
     my ($perl, $file, $inchash, $dl_shared_objects, $incarray) = @_;
 
-    my $fname = File::Temp::mktemp("$file.XXXXXX");
+    my ($fhout, $fname) = File::Temp::tempfile("XXXXXX");
     my $fhin  = FileHandle->new($file) or die "Couldn't open $file\n";
-    my $fhout = FileHandle->new("> $fname") or die "Couldn't open $fname\n";
 
     my $line = do { local $/; <$fhin> };
     $line =~ s/use Module::ScanDeps::DataFeed.*?\n//sg;
@@ -853,10 +861,9 @@ sub _execute {
     my ($perl, $file, $inchash, $dl_shared_objects, $incarray, $firstflag) = @_;
 
     $DB::single = $DB::single = 1;
-
-    my $fname = _abs_path(File::Temp::mktemp("$file.XXXXXX"));
+    my ($fhout, $fname) = File::Temp::tempfile("XXXXXX");
+    $fname = _abs_path($fname);
     my $fhin  = FileHandle->new($file) or die "Couldn't open $file";
-    my $fhout = FileHandle->new("> $fname") or die "Couldn't open $fname";
 
     my $line = do { local $/; <$fhin> };
     $line =~ s/use Module::ScanDeps::DataFeed.*?\n//sg;
@@ -1005,7 +1012,7 @@ documentations on CPAN for further information.
 
 =head1 AUTHORS
 
-Autrijus Tang E<lt>autrijus@autrijus.orgE<gt>
+Audrey Tang E<lt>autrijus@autrijus.orgE<gt>
 
 Parts of heuristics were deduced from:
 
@@ -1031,7 +1038,8 @@ Please submit bug reports to E<lt>bug-Module-ScanDeps@rt.cpan.orgE<gt>.
 
 =head1 COPYRIGHT
 
-Copyright 2002, 2003, 2004, 2005 by Autrijus Tang E<lt>autrijus@autrijus.orgE<gt>.
+Copyright 2002, 2003, 2004, 2005, 2006 by
+Audrey Tang E<lt>autrijus@autrijus.orgE<gt>.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
