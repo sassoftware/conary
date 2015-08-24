@@ -1231,7 +1231,8 @@ class UrlTests(testhelp.TestCase):
         for tup, url in self.Tests:
             nurl = util.urlUnsplit(tup)
             self.assertEqual(nurl, url)
-            self.assertEqual(util.urlSplit(url), tup)
+            ntup = util.urlSplit(url)
+            self.assertEqual(ntup, tup)
 
         # One-way tests
         tests = [

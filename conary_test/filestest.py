@@ -128,6 +128,9 @@ class FilesTest(testhelp.TestCase):
         s.inode.mtime.set(0100)
         s.inode.owner.set('daemon')
         s.inode.group.set('uucp')
+        # to make sure that referenced names "exist"
+        files.userCache.nameCache['daemon'] = 2
+        files.groupCache.nameCache['uucp'] = 14
         s.flags.set(0)
         s.target.set("/some/target")
         assert(s.sizeString() == "      12")
@@ -215,6 +218,10 @@ class FilesTest(testhelp.TestCase):
         f.inode.mtime.set(0100)
         f.inode.owner.set("daemon")
         f.inode.group.set("uucp")
+        # to make sure that referenced names "exist"
+        files.userCache.nameCache['daemon'] = 2
+        files.userCache.nameCache['uucp'] = 10
+        files.groupCache.nameCache['uucp'] = 14
 
         s = "hello world"
         contents = filecontents.FromString(s)
@@ -316,6 +323,9 @@ class FilesTest(testhelp.TestCase):
         d.inode.mtime.set(0100)
         d.inode.owner.set("daemon")
         d.inode.group.set("uucp")
+        # to make sure that referenced names "exist"
+        files.userCache.nameCache['daemon'] = 2
+        files.groupCache.nameCache['uucp'] = 14
         d.flags.set(0)
         d.devt.major.set(1)
         d.devt.minor.set(2)
@@ -467,6 +477,9 @@ class FilesTest(testhelp.TestCase):
                 d.inode.mtime.set(0100)
                 d.inode.owner.set("daemon")
                 d.inode.group.set("uucp")
+                # to make sure that referenced names "exist"
+                files.userCache.nameCache['daemon'] = 2
+                files.groupCache.nameCache['uucp'] = 14
                 d.flags.set(0)
                 d.devt.major.set(3)
                 d.devt.minor.set(1)
@@ -498,6 +511,9 @@ class FilesTest(testhelp.TestCase):
         f.inode.mtime.set(0100)
         f.inode.owner.set("daemon")
         f.inode.group.set("uucp")
+        # to make sure that referenced names "exist"
+        files.userCache.nameCache['daemon'] = 2
+        files.groupCache.nameCache['uucp'] = 14
         s = "hello world"
         contents = filecontents.FromString(s)
         f.contents = files.RegularFileStream()
@@ -540,6 +556,9 @@ class FilesTest(testhelp.TestCase):
         s.inode.mtime.set(0100)
         s.inode.owner.set('daemon')
         s.inode.group.set('uucp')
+        # to make sure that referenced names "exist"
+        files.userCache.nameCache['daemon'] = 2
+        files.groupCache.nameCache['uucp'] = 14
         s.flags.set(0)
         s.target.set("/some/target")
 
@@ -575,6 +594,9 @@ class FilesTest(testhelp.TestCase):
         s.inode.mtime.set(0100)
         s.inode.owner.set('daemon')
         s.inode.group.set('uucp')
+        # to make sure that referenced names "exist"
+        files.userCache.nameCache['daemon'] = 2
+        files.groupCache.nameCache['uucp'] = 14
         s.flags.set(0)
         s.target.set("/some/target")
 

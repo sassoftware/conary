@@ -326,8 +326,9 @@ class ClientResolveTest(rephelp.RepositoryHelper):
                        ' for dependency resolution: Error occurred'
                        ' opening repository'
                        ' https://test:<PASSWD>@doesnotexist/conary/:'
-                       ' Name or service not known')
-            self.logFilter.compare(msg)
+                       ' (Name or service not known'
+                         '|No address associated with hostname)')
+            self.logFilter.regexpCompare(msg)
         finally:
             self.cfg.installLabelPath = oldILP
 

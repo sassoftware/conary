@@ -201,7 +201,7 @@ test1=1.0-1-1
         rc, res = self.captureOutput(displayChangeSet, None, cs, 
                                     None, self.cfg, lsl=True, showChanges=True)
         lines = res.split('\n')
-        assert(lines[3].split()[1] == '52')
+        self.assertEquals(lines[3].split()[1], '52')
         rc, res = self.captureOutput(displayChangeSet, None, cs, 
                                     None, self.cfg, lsl=True, showChanges=True,
                                     tags=True)

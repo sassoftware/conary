@@ -756,7 +756,9 @@ class PGP_Message(object):
         if hasattr(message, 'fileno') and not hasattr(message, "pread"):
             # Try to reopen as an ExtendedFile. We have to dup the file
             # descriptor, otherwise it gets closed unexpectedly when the
-            # original message object gets out of scope
+            # original message object gets out of scope.  Need to make
+            # sure the file buffer is flushed before dup'ing the fd.
+            message.flush()
             f = util.ExtendedFdopen(os.dup(message.fileno()))
             f.seek(message.tell())
             return f

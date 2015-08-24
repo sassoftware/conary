@@ -1576,6 +1576,14 @@ def urlSplit(url, defaultPort = None):
 
     if userpass:
         user, passwd = urllib.splitpasswd(userpass)
+        if sys.version_info[:2] == (2, 7):
+            # splituser is considered internal and changed
+            # behavior in 2.7.  New behavior is right because
+            # it allows : in password, but we must deal with
+            # the old 2.6 behavior and not double-unquote
+            user = urllib.unquote(user)
+            if passwd:
+                passwd = urllib.unquote(passwd)
         if passwd:
             passwd = ProtectedString(passwd)
     else:
