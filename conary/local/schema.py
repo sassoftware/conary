@@ -873,6 +873,16 @@ class MigrateTo_20(SchemaMigration):
         return self.Version
 
 
+def _lockedSql(db, func, *args):
+    """
+    Ensure write lock on database, otherwise concurrent access can result in
+    "schema has changed" errors.
+    """
+    if not db.inTransaction():
+        db.cursor().execute('BEGIN IMMEDIATE')
+    return func(*args)
+
+
 # silent update while we're at schema 20. We only need to create a
 # index, so there is no need to do a full blown migration and stop
 # conary from working until a schema migration is done
@@ -886,16 +896,20 @@ def optSchemaUpdate(db):
         cu.execute('select count(*) from sqlite_stat1')
         count = cu.fetchall()[0][0]
         if count != 0:
-            cu.execute('delete from sqlite_stat1')
+            _lockedSql(db, cu.execute, "DELETE FROM sqlite_stat1")
 
     # Create DatabaseAttributes (if it doesn't exist yet)
-    createDatabaseAttributes(db)
+    if 'DatabaseAttributes' not in db.tables:
+        _lockedSql(db, createDatabaseAttributes, db)
 
     #do we have the index we need?
-    db.createIndex("TroveInfo", "TroveInfoInstTypeIdx", "infoType,instanceId")
-    db.dropIndex('DBTroveFiles', 'DBTroveFilesInstanceIdx')
-    db.createIndex('DBTroveFiles', 'DBTroveFilesInstanceIdx2',
-            'instanceId, pathId')
+    if "TroveInfoInstTypeIdx" not in db.tables["TroveInfo"]:
+        _lockedSql(db, db.createIndex, "TroveInfo", "TroveInfoInstTypeIdx", "infoType,instanceId")
+    if 'DBTroveFilesInstanceIdx' in db.tables['DBTroveFiles']:
+        _lockedSql(db, db.dropIndex, 'DBTroveFiles', 'DBTroveFilesInstanceIdx')
+    if 'DBTroveFilesInstanceIdx2' not in db.tables['DBTroveFiles']:
+        _lockedSql(db, db.createIndex, 'DBTroveFiles',
+                'DBTroveFilesInstanceIdx2', 'instanceId, pathId')
 
 
 def checkVersion(db):
