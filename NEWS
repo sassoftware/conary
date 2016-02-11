@@ -1,3 +1,15 @@
+Changes in 2.5.8:
+  o Bug Fixes:
+    * Fixed issues with unicode when scanning Python 3 files (#4)
+    * Strip interpreter and version from python dep info when scanning
+      compiled Python 3 files (#5)
+    * Fixed "schema has changed" error while updating from versions
+      prior to 2.5.7 (#7)
+    * When querying for a trove via a label, findTroves would return a
+      TroveTuple object. However, when querying using a full version
+      string, a plain tuple would be returned. This inconsistency has
+      been fixed by always returning a TroveTuple object. (CNY-3889)
+
 Changes in 2.5.7:
   o New Features:
     * Attempt to restart an interrupted download instead of raising a

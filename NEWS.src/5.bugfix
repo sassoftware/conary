@@ -1,1 +1,0 @@
-Strip interpreter and version from python dep info when scanning compiled Python 3 files

@@ -1,1 +1,0 @@
-When querying for a trove via a label, findTroves would return a TroveTuple object. However, when querying using a full version string, a plain tuple would be returned. This inconsistency has been fixed by always returning a TroveTuple object.
