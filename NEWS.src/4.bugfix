@@ -1,0 +1,1 @@
+Fixed issues with unicode when scanning Python 3 files

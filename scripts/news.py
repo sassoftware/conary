@@ -140,6 +140,9 @@ def preview(modifiedOK=True):
             if RE_ISSUE.match(issue):
                 entry += ' (%s)' % issue
                 htmlEntry += ' (<a href="https://opensource.sas.com/its/browse/%s">%s</a>)' % (issue,issue)
+            elif issue.isdigit():
+                entry += ' (#%s)' % issue
+                htmlEntry += ' (<a href="https://github.com/sassoftware/conary/issues/%s">#%s</a>)' % (issue,issue)
             lines = textwrap.wrap(entry, 66)
             out.append('    * %s' % (lines.pop(0),))
             for line in lines:
