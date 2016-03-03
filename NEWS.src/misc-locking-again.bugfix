@@ -1,0 +1,1 @@
+More robust fix for the "schema has changed" error that could occur when concurrent queries happen during an update.

@@ -927,9 +927,14 @@ def _shareLock(db):
         lockFile = open(lockPath, 'r+')
         fcntl.lockf(lockFile.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
     except IOError as err:
-        if err.args[0] not in (errno.EAGAIN, errno.EACCES, errno.ENOENT):
-            raise
-        return None, False
+        if err.args[0] in (errno.EAGAIN, errno.EACCES):
+            # Busy or no write access; skip optional migrations
+            return None, False
+        elif err.args[0] == errno.ENOENT:
+            # Database has never been locked. Probably running in a testsuite,
+            # so proceed anyway.
+            return None, True
+        raise
     return lockFile, True
 
 
