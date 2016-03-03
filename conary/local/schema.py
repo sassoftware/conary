@@ -927,7 +927,7 @@ def _shareLock(db):
         lockFile = open(lockPath, 'r+')
         fcntl.lockf(lockFile.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
     except IOError as err:
-        if err.args[0] not in (errno.EAGAIN, errno.EACCES):
+        if err.args[0] not in (errno.EAGAIN, errno.EACCES, errno.ENOENT):
             raise
         return None, False
     return lockFile, True
