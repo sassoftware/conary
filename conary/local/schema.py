@@ -14,7 +14,9 @@
 # limitations under the License.
 #
 
-
+import errno
+import fcntl
+import os
 import sys
 import itertools
 from conary import trove, deps, errors, files, streams
@@ -912,6 +914,25 @@ def optSchemaUpdate(db):
                 'DBTroveFilesInstanceIdx2', 'instanceId, pathId')
 
 
+def _shareLock(db):
+    """
+    Take a share lock on the database syslock when an optional migration might
+    run. If it conflicts due to an ongoing update then bail out.
+    """
+    if db.database == ':memory:':
+        # Nothing to lock
+        return None, True
+    lockPath = os.path.join(os.path.dirname(db.database), 'syslock')
+    try:
+        lockFile = open(lockPath, 'r+')
+        fcntl.lockf(lockFile.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except IOError as err:
+        if err.args[0] not in (errno.EAGAIN, errno.EACCES):
+            raise
+        return None, False
+    return lockFile, True
+
+
 def checkVersion(db):
     global VERSION
     version = db.getVersion()
@@ -920,10 +941,17 @@ def checkVersion(db):
         # in the next schema update, when we have a reason to block
         # conary functionality...  These schema changes *MUST* not be
         # required for Read Only functionality
+        lockFile = None
         try:
-            optSchemaUpdate(db)
-        except sqlerrors.ReadOnlyDatabase:
-            pass
+            try:
+                lockFile, locked = _shareLock(db)
+                if locked:
+                    optSchemaUpdate(db)
+            except (sqlerrors.ReadOnlyDatabase, sqlerrors.DatabaseLocked):
+                pass
+        finally:
+            if lockFile:
+                lockFile.close()
         return version
     if version > VERSION:
         raise NewDatabaseSchema
